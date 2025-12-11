@@ -1,0 +1,58 @@
+services:
+
+  laviciacion-front:
+    build:
+      context: ./front
+      dockerfile: Dockerfile
+    image: laviciacion-front
+    container_name: laviciacion-front
+    restart: unless-stopped
+    env_file: ./front/.env
+    networks:
+      - la-viciacion
+    ports:
+      - 3000:3000
+
+  laviciacion-bot:
+    build:
+      context: ./bot
+      dockerfile: Dockerfile
+    container_name: laviciacion-bot
+    image: laviciacion-bot
+    env_file: ./bot/.env
+    restart: unless-stopped
+    volumes:
+     - ./bot:/app
+    networks:
+      - la-viciacion
+
+  laviciacion-api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: laviciacion-api
+    image: laviciacion-api
+    env_file: ./api/.env
+    ports:
+      - 5000:5000
+    volumes:
+      - ./api:/app
+    restart: unless-stopped
+    networks:
+      - la-viciacion
+
+  laviciacion-db:
+    image: mariadb
+    container_name: laviciacion-db
+    volumes:
+      - ./db/data:/var/lib/mysql
+    env_file: .env
+    restart: unless-stopped
+    networks:
+      - la-viciacion
+    # Uncomment ports config to expose DB outside docker network
+    # ports:
+    #   - 3307:3306
+
+networks:
+  la-viciacion:
