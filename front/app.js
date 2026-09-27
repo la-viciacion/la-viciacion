@@ -1,0 +1,362 @@
+// ============================================================
+//  La Viciación — PWA App
+//  API: FastAPI + JWT (OAuth2PasswordRequestForm)
+//  Routes used:
+//    POST /api/v1/token          → login
+//    GET  /api/v1/auth/active_user → get user info
+//    GET  /api/v1/users/{username}/games → user games
+//    GET  /api/v1/users/{username}/avatar → avatar image
+// ============================================================
+
+const API_BASE = '/api/v1';
+
+// ── Storage helpers ──────────────────────────────────────────
+const storage = {
+  getToken: () => localStorage.getItem('lv_token'),
+  setToken: (t) => localStorage.setItem('lv_token', t),
+  clearToken: () => localStorage.removeItem('lv_token'),
+};
+
+// ── API client ───────────────────────────────────────────────
+async function apiFetch(path, options = {}) {
+  const token = storage.getToken();
+  const headers = { ...options.headers };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+
+  if (res.status === 401) {
+    storage.clearToken();
+    renderLogin();
+    return null;
+  }
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Error desconocido' }));
+    throw new Error(err.detail || `HTTP ${res.status}`);
+  }
+
+  const ct = res.headers.get('content-type') || '';
+  if (ct.includes('application/json')) return res.json();
+  if (ct.includes('image/')) return res.blob();
+  return res.text();
+}
+
+// ── Router ───────────────────────────────────────────────────
+const app = document.getElementById('app');
+
+function renderPage(html) {
+  app.innerHTML = html;
+}
+
+// ── Login page ───────────────────────────────────────────────
+function renderLogin() {
+  renderPage(`
+    <div class="login-page">
+      <div class="login-card">
+        <div class="login-brand">
+          <img src="icon.svg" alt="La Viciación logo" class="login-logo" />
+          <h1>La Viciación</h1>
+          <p>Accede a tu cuenta de gamer</p>
+        </div>
+
+        <form id="loginForm" novalidate>
+          <div class="form-group">
+            <label for="username">Usuario</label>
+            <div class="input-wrap">
+              ${iconUser()}
+              <input
+                type="text"
+                id="username"
+                name="username"
+                placeholder="tu_usuario"
+                autocomplete="username"
+                required
+              />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="password">Contraseña</label>
+            <div class="input-wrap">
+              ${iconLock()}
+              <input
+                type="password"
+                id="password"
+                name="password"
+                placeholder="••••••••••••"
+                autocomplete="current-password"
+                required
+              />
+              <button type="button" class="password-toggle" id="pwToggle" aria-label="Mostrar/ocultar contraseña">
+                ${iconEye()}
+              </button>
+            </div>
+          </div>
+
+          <div class="login-error" id="loginError" role="alert"></div>
+
+          <button type="submit" class="btn-primary" id="loginBtn">
+            <span class="btn-text">Entrar</span>
+            <div class="btn-spinner"></div>
+          </button>
+        </form>
+      </div>
+    </div>
+  `);
+
+  // Password toggle
+  const pwToggle = document.getElementById('pwToggle');
+  const pwInput = document.getElementById('password');
+  let visible = false;
+  pwToggle.addEventListener('click', () => {
+    visible = !visible;
+    pwInput.type = visible ? 'text' : 'password';
+    pwToggle.innerHTML = visible ? iconEyeOff() : iconEye();
+  });
+
+  // Form submit
+  document.getElementById('loginForm').addEventListener('submit', handleLogin);
+}
+
+async function handleLogin(e) {
+  e.preventDefault();
+  const btn = document.getElementById('loginBtn');
+  const errorEl = document.getElementById('loginError');
+
+  const username = document.getElementById('username').value.trim();
+  const password = document.getElementById('password').value;
+
+  errorEl.textContent = '';
+  errorEl.classList.remove('visible');
+
+  if (!username || !password) {
+    showLoginError('Rellena todos los campos');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.classList.add('loading');
+
+  try {
+    // OAuth2PasswordRequestForm requires application/x-www-form-urlencoded
+    const body = new URLSearchParams({ username, password });
+    const res = await fetch(`${API_BASE}/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body,
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Usuario o contraseña incorrectos');
+    }
+
+    const data = await res.json();
+    storage.setToken(data.access_token);
+    await renderHome();
+  } catch (err) {
+    showLoginError(err.message);
+    btn.disabled = false;
+    btn.classList.remove('loading');
+  }
+}
+
+function showLoginError(msg) {
+  const el = document.getElementById('loginError');
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.add('visible');
+}
+
+// ── Home page ────────────────────────────────────────────────
+async function renderHome() {
+  // Skeleton placeholder while loading
+  renderPage(`
+    <div id="loading-overlay">
+      <div class="spinner"></div>
+    </div>
+  `);
+
+  try {
+    const user = await apiFetch('/auth/active_user');
+    if (!user) return;
+
+    // Fetch games (non-blocking)
+    const [games, avatarBlob] = await Promise.allSettled([
+      apiFetch(`/users/${user.username}/games`),
+      apiFetch(`/users/${user.username}/avatar`),
+    ]);
+
+    const avatarUrl = avatarBlob.status === 'fulfilled' && avatarBlob.value instanceof Blob
+      ? URL.createObjectURL(avatarBlob.value)
+      : null;
+
+    const gamesData = games.status === 'fulfilled' ? (games.value || []) : [];
+    const completedCount = gamesData.filter(g => g.completed).length;
+
+    renderPage(`
+      <div class="home-page">
+        ${renderNavbar(user)}
+
+        <main class="home-main">
+          <!-- Profile Hero -->
+          <section class="profile-hero" aria-label="Perfil del usuario">
+            <div class="profile-avatar-wrap">
+              ${avatarUrl
+                ? `<img src="${avatarUrl}" alt="Avatar de ${user.username}" class="profile-avatar" />`
+                : `<div class="profile-avatar-placeholder" aria-hidden="true">${user.name?.[0]?.toUpperCase() || '?'}</div>`
+              }
+              ${user.is_active ? '<div class="online-dot" title="Activo"></div>' : ''}
+            </div>
+
+            <div class="profile-info">
+              <h1 class="profile-name">${escapeHtml(user.name || user.username)}</h1>
+              <div class="profile-username">@${escapeHtml(user.username)}</div>
+              <div class="profile-badges">
+                ${user.is_admin ? '<span class="badge badge-admin">⚡ Admin</span>' : ''}
+                <span class="badge ${user.is_active ? 'badge-active' : 'badge-inactive'}">
+                  ${user.is_active ? '✓ Activo' : '✗ Inactivo'}
+                </span>
+              </div>
+            </div>
+
+            <div class="profile-stats">
+              <div class="stat-value">${gamesData.length}</div>
+              <div class="stat-label">Juegos</div>
+              <div class="stat-value" style="margin-top:12px">${completedCount}</div>
+              <div class="stat-label">Completados</div>
+            </div>
+          </section>
+
+          <!-- Info Cards -->
+          <div class="section-header">
+            <h2 class="section-title">Información</h2>
+            <div class="section-line"></div>
+          </div>
+          <div class="info-grid" style="margin-bottom:40px">
+            ${infoCard('📧', 'teal', 'Correo electrónico', escapeHtml(user.email || '—'), false)}
+            ${user.telegram_id ? infoCard('✈️', 'gold', 'Telegram ID', escapeHtml(String(user.telegram_id)), true) : ''}
+            ${user.clockify_id ? infoCard('⏱️', 'purple', 'Clockify ID', escapeHtml(user.clockify_id), true) : ''}
+            ${infoCard('🆔', 'pink', 'ID de usuario', String(user.id), true)}
+          </div>
+
+          <!-- Games -->
+          <div class="section-header">
+            <h2 class="section-title">Mis juegos</h2>
+            <div class="section-line"></div>
+          </div>
+          <div class="games-grid" id="gamesGrid">
+            ${renderGames(gamesData)}
+          </div>
+        </main>
+      </div>
+    `);
+
+    // Bind logout
+    document.getElementById('logoutBtn').addEventListener('click', handleLogout);
+
+  } catch (err) {
+    console.error(err);
+    storage.clearToken();
+    renderLogin();
+  }
+}
+
+function renderNavbar(user) {
+  return `
+    <nav class="navbar" role="navigation" aria-label="Navegación principal">
+      <a href="#" class="navbar-brand" aria-label="La Viciación inicio">
+        <img src="icon.svg" alt="" class="navbar-logo" aria-hidden="true" />
+        La Viciación
+      </a>
+      <div class="navbar-actions">
+        <button class="btn-logout" id="logoutBtn" aria-label="Cerrar sesión">
+          ${iconLogout()} Salir
+        </button>
+      </div>
+    </nav>
+  `;
+}
+
+function renderGames(games) {
+  if (!games.length) {
+    return `
+      <div class="empty-state">
+        <span>🎮</span>
+        No tienes juegos registrados todavía.
+      </div>
+    `;
+  }
+
+  return games.map((g, i) => `
+    <article class="game-card" style="animation-delay: ${i * 0.05}s">
+      <div class="game-cover-placeholder" aria-hidden="true">🎮</div>
+      <div class="game-info">
+        <div class="game-title" title="${escapeHtml(g.game?.name || g.game_id)}">${escapeHtml(g.game?.name || g.game_id)}</div>
+        <div class="game-meta">
+          <span class="game-tag ${g.completed ? 'completed' : 'playing'}">
+            ${g.completed ? '✓ Completado' : '▶ Jugando'}
+          </span>
+        </div>
+        ${g.score != null ? `<div class="game-score">⭐ ${g.score.toFixed(1)}</div>` : ''}
+      </div>
+    </article>
+  `).join('');
+}
+
+function infoCard(icon, colorClass, label, value, mono = false) {
+  return `
+    <div class="info-card">
+      <div class="info-card-icon ${colorClass}">${icon}</div>
+      <div class="info-card-label">${label}</div>
+      <div class="info-card-value ${mono ? 'mono' : ''}">${value}</div>
+    </div>
+  `;
+}
+
+// ── Logout ───────────────────────────────────────────────────
+function handleLogout() {
+  storage.clearToken();
+  renderLogin();
+}
+
+// ── Icons (inline SVG) ───────────────────────────────────────
+function iconUser() {
+  return `<svg class="input-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
+}
+function iconLock() {
+  return `<svg class="input-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`;
+}
+function iconEye() {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
+}
+function iconEyeOff() {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`;
+}
+function iconLogout() {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>`;
+}
+
+// ── Utils ────────────────────────────────────────────────────
+function escapeHtml(str) {
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+// ── Service Worker ───────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(console.warn);
+  });
+}
+
+// ── Boot ─────────────────────────────────────────────────────
+(async () => {
+  if (storage.getToken()) {
+    await renderHome();
+  } else {
+    renderLogin();
+  }
+})();

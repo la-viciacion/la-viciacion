@@ -11,6 +11,7 @@ bcrypt==4.2.0
 mysql-connector-python==9.1.0
 pymysql==1.1.1
 sqlalchemy==1.4.51
+alembic==1.13.1
 requests==2.32.3
 howlongtobeatpy==1.0.16
 rawg==1.2.0

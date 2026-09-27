@@ -1,0 +1,13 @@
+{
+  "name": "la-viciacion-front",
+  "version": "1.0.0",
+  "description": "La Viciación PWA front-end",
+  "private": true,
+  "scripts": {
+    "dev": "npx serve . -p 3000 -s",
+    "preview": "npx serve . -p 3000 -s"
+  },
+  "devDependencies": {
+    "serve": "^14.2.4"
+  }
+}

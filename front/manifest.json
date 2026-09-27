@@ -1,0 +1,19 @@
+{
+  "name": "La Viciación",
+  "short_name": "LaVic",
+  "description": "Tu plataforma de gaming — La Viciación",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a14",
+  "theme_color": "#0f0f1e",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["games", "entertainment"]
+}
