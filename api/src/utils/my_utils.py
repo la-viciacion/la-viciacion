@@ -159,7 +159,7 @@ def day_of_the_year(date):
 def date_from_day_of_the_year(day):
     current_date = datetime.datetime.now()
     start_date_base = datetime.datetime.strptime(
-        str(current_date.year) + "-01-01", "YYYY-MM-DD"
+        str(current_date.year) + "-01-01", "%Y-%m-%d"
     )
     start_date = datetime.datetime(
         start_date_base.year, start_date_base.month, start_date_base.day

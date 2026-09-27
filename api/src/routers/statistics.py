@@ -1,6 +1,6 @@
 from enum import Enum
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi_versioning import version
 from sqlalchemy.orm import Session
 
@@ -132,15 +132,17 @@ def get_user_statistics(
         rankings_list = ranking.split(",")
     else:
         rankings_list = [elem.value for elem in UserStatisticsTypes]
+
+    user = users.get_user_by_username(db, username)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
     response = []
     for ranking_type in rankings_list:
         content = {}
         if ranking_type == UserStatisticsTypes.played_games:
-            user = users.get_user_by_username(db, username)
             data = users.get_games(db, user.id)
-            # data = users.played_games(db=db, username=username)
         elif ranking_type == UserStatisticsTypes.completed_games:
-            user = users.get_user_by_username(db, username)
             data = users.get_games(db=db, user_id=user.id, completed=True)
         elif ranking_type == UserStatisticsTypes.top_games:
             data = users.top_games(db, username)

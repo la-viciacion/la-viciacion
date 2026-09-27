@@ -272,11 +272,7 @@ def user_last_played_games(
         if is_active is not None:
             stmt = stmt.where(models.User.is_active == is_active)
 
-        stmt = (
-            stmt.filter(models.User.username == 1)
-            .order_by(func.count(models.UserGame.game_id).desc())
-            .limit(limit)
-        )
+        stmt = stmt.order_by(desc(models.TimeEntry.start)).limit(limit)
 
         return db.execute(stmt).fetchall()
     except Exception as e:

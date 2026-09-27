@@ -26,7 +26,6 @@ from ..utils.logger import LogManager
 
 log_manager = LogManager()
 logger = log_manager.get_logger()
-current_season = datetime.datetime.now().year
 
 models.Base.metadata.create_all(bind=engine)
 clockify_api = ClockifyApi()
@@ -148,6 +147,7 @@ async def add_game_to_user(
     """
     Add new game to user list
     """
+    current_season = datetime.datetime.now().year
     user = users.get_user_by_username(db, username)
     if user is None:
         raise HTTPException(status_code=404, detail=msg.USER_NOT_EXISTS)
@@ -196,6 +196,7 @@ async def complete_game(username: str, game_id: str, db: Session = Depends(get_d
     if user is None:
         logger.info("IS NONE")
         raise HTTPException(status_code=404, detail=msg.USER_NOT_EXISTS)
+    current_season = datetime.datetime.now().year
     user_game = users.get_game_by_id(db, user.id, game_id, current_season)
     if user_game is None:
         raise HTTPException(status_code=404, detail=msg.USER_NOT_PLAYING)
@@ -219,6 +220,9 @@ async def rate_game(
     Rate game
     """
     user = users.get_user_by_username(db, username)
+    if user is None:
+        raise HTTPException(status_code=404, detail=msg.USER_NOT_EXISTS)
+    current_season = datetime.datetime.now().year
     user_game = users.get_game_by_id(db, user.id, game_id, current_season)
     if user_game is None:
         raise HTTPException(status_code=404, detail=msg.USER_NOT_PLAYING)

@@ -213,9 +213,9 @@ def activate_account(
         _type_: _description_
     """
     if users.activate_account(db, username):
-        return msg.ACCOUNT_ALREADY_ACTIVATED
-    else:
         raise HTTPException(status_code=409, detail=msg.ACCOUNT_ALREADY_ACTIVATED)
+    else:
+        return {"message": "Account activated successfully"}
 
 
 @router.post("/send_email")
