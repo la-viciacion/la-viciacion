@@ -91,6 +91,7 @@ class Game(Base):
     genres = Column(String(255))
     avg_time = Column(Integer)
     slug = Column(String(255))
+    rawg_id = Column(Integer, nullable=True, index=True)
 
     __table_args__ = (UniqueConstraint("name"),)
 

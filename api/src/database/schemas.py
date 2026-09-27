@@ -90,6 +90,7 @@ class Game(BaseModel):
     genres: str | None = None
     avg_time: int | None = 0
     slug: str | None = None
+    rawg_id: int | None = None
 
     class Config:
         from_attributes = True
@@ -115,6 +116,7 @@ class NewGame(BaseModel):
     genres: Optional[str | None] = None
     avg_time: Optional[int | None] = None
     slug: Optional[str | None] = None
+    rawg_id: Optional[int | None] = None
 
 
 class UpdateGame(BaseModel):
@@ -125,6 +127,22 @@ class UpdateGame(BaseModel):
     image_url: Optional[str | None] = None
     genres: Optional[str | None] = None
     avg_time: Optional[int | None] = None
+    slug: Optional[str | None] = None
+    rawg_id: Optional[int | None] = None
+
+
+class RawgGameCandidate(BaseModel):
+    rawg_id: int
+    name: str
+    slug: str
+    released: Optional[str | None] = None
+    image_url: Optional[str | None] = None
+    genres: list[str] = []
+    platforms: list[str] = []
+    rating: Optional[float | None] = None
+    metacritic: Optional[int | None] = None
+    exists_in_db: bool = False
+    db_game_id: Optional[str | None] = None
 
 
 class NewGameUser(BaseModel):

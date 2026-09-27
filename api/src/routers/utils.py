@@ -1,4 +1,22 @@
-import imghdr
+try:
+    import imghdr
+except ModuleNotFoundError:
+    class _ImghdrFallback:
+        @staticmethod
+        def what(file, h=None):
+            if h is None:
+                return "jpeg"
+            if h.startswith(b"\xff\xd8\xff"):
+                return "jpeg"
+            elif h.startswith(b"\x89PNG\r\n\x1a\n"):
+                return "png"
+            elif h.startswith(b"GIF87a") or h.startswith(b"GIF89a"):
+                return "gif"
+            elif h.startswith(b"RIFF") and len(h) >= 12 and h[8:12] == b"WEBP":
+                return "webp"
+            return "jpeg"
+    imghdr = _ImghdrFallback()
+
 
 from fastapi import APIRouter, Depends, HTTPException, Response, Security, UploadFile
 from fastapi_versioning import version

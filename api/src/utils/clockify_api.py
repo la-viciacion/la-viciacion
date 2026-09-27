@@ -42,8 +42,8 @@ class ClockifyApi:
                 else:
                     request = requests.request(method, url, headers=headers)
             except Exception as e:
-                logger.error("Error on send request on clockify")
-                exit(e)
+                logger.error(f"Error on send request to Clockify: {e}")
+                raise e
 
             if not request.ok:
                 logger.error(
@@ -59,6 +59,58 @@ class ClockifyApi:
             method, endpoint, data, config.CLOCKIFY_ADMIN_API_KEY
         )
         return response.json()
+
+    def get_or_create_project(self, project_name: str) -> dict:
+        """Finds an existing project in Clockify by name (case-insensitive), or creates a new one."""
+        try:
+            existing = self.get_project_by_name(project_name, strict=True)
+            if isinstance(existing, list) and len(existing) > 0 and "id" in existing[0]:
+                logger.info(
+                    f"Project '{project_name}' already exists in Clockify (id: {existing[0]['id']})"
+                )
+                return existing[0]
+        except Exception as e:
+            logger.warning(f"Error checking project in Clockify by strict name: {e}")
+
+        try:
+            search = self.get_project_by_name(project_name, strict=False)
+            if isinstance(search, list) and len(search) > 0:
+                for p in search:
+                    if (
+                        p.get("name", "").strip().lower()
+                        == project_name.strip().lower()
+                        and "id" in p
+                    ):
+                        logger.info(
+                            f"Project '{project_name}' found in Clockify by loose match (id: {p['id']})"
+                        )
+                        return p
+        except Exception as e:
+            logger.warning(f"Error checking project in Clockify by loose name: {e}")
+
+        res = self.add_project(project_name)
+        if isinstance(res, dict) and "id" in res:
+            return res
+
+        logger.warning(
+            f"Project creation returned {res}, checking Clockify once more..."
+        )
+        try:
+            search = self.get_project_by_name(project_name, strict=False)
+            if isinstance(search, list) and len(search) > 0:
+                for p in search:
+                    if (
+                        p.get("name", "").strip().lower()
+                        == project_name.strip().lower()
+                        and "id" in p
+                    ):
+                        return p
+                if "id" in search[0]:
+                    return search[0]
+        except Exception:
+            pass
+
+        return res
 
     def get_project_by_id(self, project_id) -> json:
         method = self.GET
@@ -175,7 +227,8 @@ class ClockifyApi:
             # Filter entries by season. Only get the current season
             if start_date is None:
                 filtered_entries = [
-                    entry for entry in ordered_entries 
+                    entry
+                    for entry in ordered_entries
                     if get_date(entry).year == current_season
                 ]
 

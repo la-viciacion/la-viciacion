@@ -70,52 +70,73 @@ def recommended_games(
 
 
 async def new_game(db: Session, game: schemas.NewGame) -> models.Game:
-    logger.info("Adding new game to DB: " + game.name)
-    if game.clockify_id is None or not utils.check_hex(game.clockify_id):
-        logger.info("No clockify ID. Adding to clockify...")
-        clockify_id = clockify_api.add_project(game.name)["id"]
-        new_game = {"name": game.name, "id": clockify_id}
-        game_info = await utils.get_new_game_info(new_game)
-        game_to_add = models.Game(
-            id=clockify_id,
-            name=game_info.name,
-            dev=game_info.dev,
-            steam_id=game_info.steam_id,
-            image_url=game_info.image_url,
-            release_date=game_info.release_date,
-            genres=game_info.genres,
-            avg_time=game_info.avg_time,
-            slug=game_info.slug,
-        )
+    logger.info(f"Adding new game to DB: {game.name} (rawg_id: {game.rawg_id})")
+
+    # 1. Resolve official game data from RAWG first
+    game_info = await utils.get_new_game_info(game)
+    official_name = game_info.name if game_info.name else game.name
+
+    # 2. Check if the game already exists in DB by rawg_id or official name
+    existing_game = None
+    if game_info.rawg_id:
+        existing_game = db.query(models.Game).filter(models.Game.rawg_id == game_info.rawg_id).first()
+    if not existing_game and official_name:
+        existing_game = db.query(models.Game).filter(models.Game.name == official_name).first()
+    if existing_game:
+        logger.info(f"Game '{official_name}' already exists in DB (id: {existing_game.id})")
+        return existing_game
+
+    # 3. Resolve Clockify project
+    clockify_id = game.clockify_id
+    if clockify_id is None or not utils.check_hex(clockify_id):
+        logger.info(f"Resolving Clockify project for '{official_name}'...")
+        project = clockify_api.get_or_create_project(official_name)
+        if isinstance(project, dict) and "id" in project:
+            clockify_id = project["id"]
+        else:
+            raise ValueError(f"Failed to obtain Clockify project for '{official_name}': {project}")
     else:
-        game_to_add = models.Game(
-            id=game.clockify_id,
-            name=game.name,
-            dev=game.dev,
-            steam_id=game.steam_id,
-            image_url=game.image_url,
-            release_date=game.release_date,
-            genres=game.genres,
-            avg_time=game.avg_time,
-            slug=game.slug,
-        )
+        # If project was already created in Clockify, sync its name to official name if different
+        try:
+            clockify_project = clockify_api.get_project_by_id(clockify_id)
+            if isinstance(clockify_project, dict) and clockify_project.get("name") != official_name:
+                clockify_api.update_project_name(clockify_id, official_name)
+        except Exception as e:
+            logger.warning(f"Could not update project name in Clockify: {e}")
+
+    # Double check if clockify_id already exists in DB
+    existing_by_id = db.query(models.Game).filter(models.Game.id == clockify_id).first()
+    if existing_by_id:
+        logger.info(f"Game with Clockify ID '{clockify_id}' already exists in DB")
+        return existing_by_id
+
+    # 4. Create and persist Game
+    game_to_add = models.Game(
+        id=clockify_id,
+        name=official_name,
+        dev=game_info.dev,
+        steam_id=game_info.steam_id,
+        image_url=game_info.image_url,
+        release_date=game_info.release_date,
+        genres=game_info.genres,
+        avg_time=game_info.avg_time,
+        slug=game_info.slug,
+        rawg_id=game_info.rawg_id,
+    )
     try:
         db.add(game_to_add)
         db.commit()
         db.refresh(game_to_add)
         game_added = game_to_add
+
+        # 5. Initialize statistics
         try:
-            game_statistics = models.GameStatistics(
-                game_id=game_added.id, current_ranking=100000000
-            )
-            db.add(game_statistics)
-            db.commit()
+            create_game_statistics(db, game_added.id)
+            create_game_statistics_historical(db, game_added.id)
         except Exception as e:
-            db.rollback()
-            if "Duplicate" not in str(e):
-                logger.error("Error adding new game statistics: " + str(e))
-                raise e
-        logger.info("Game added to DB")
+            logger.warning(f"Error initializing statistics for {official_name}: {e}")
+
+        logger.info(f"Game '{official_name}' successfully added to DB with id {game_added.id}")
         return game_added
     except Exception as e:
         logger.error("Error adding new game: " + str(e))
@@ -123,6 +144,11 @@ async def new_game(db: Session, game: schemas.NewGame) -> models.Game:
         if "Duplicate" not in str(e):
             logger.warning("Error adding new game: " + str(e))
             raise e
+        # If it was duplicate, return the existing game
+        existing = db.query(models.Game).filter(models.Game.name == official_name).first()
+        if existing:
+            return existing
+        raise e
 
 
 def create_game_statistics(db: Session, game_id: int):

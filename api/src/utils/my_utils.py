@@ -10,7 +10,7 @@ import telegram
 from dateutil.parser import isoparse
 from howlongtobeatpy import HowLongToBeat
 from PIL import Image
-from sqlalchemy import asc, create_engine, desc, func, select, text, update
+from sqlalchemy import asc, create_engine, desc, func, or_, select, text, update
 from sqlalchemy.orm import Session
 
 from ..config import Config
@@ -172,81 +172,233 @@ def date_from_datetime(datetime: str):
     return datetime.split(" ")[0]
 
 
+async def search_rawg_games(query: str, db: Session = None) -> list[schemas.RawgGameCandidate]:
+    """Search games in RAWG.io and return candidates, checking if they exist in the DB."""
+    api_key = config.RAWG_API_KEY
+    if not api_key:
+        logger.warning("No RAWG API key configured")
+        return []
+
+    url = "https://api.rawg.io/api/games"
+    params = {"key": api_key, "search": query, "page": 1, "page_size": 10}
+    try:
+        resp = requests.get(url, params=params, timeout=10)
+        if not resp.ok:
+            logger.error(f"RAWG search error {resp.status_code}: {resp.content}")
+            return []
+        data = resp.json()
+        results = data.get("results", [])
+    except Exception as e:
+        logger.error(f"Error searching RAWG for '{query}': {e}")
+        return []
+
+    candidates = []
+    for item in results:
+        rawg_id = item.get("id")
+        name = item.get("name", "")
+        slug = item.get("slug", "")
+        released = item.get("released")
+        image_url = item.get("background_image")
+        genres = [g["name"] for g in item.get("genres", []) if "name" in g]
+        platforms = [
+            p.get("platform", {}).get("name")
+            for p in item.get("platforms", [])
+            if p.get("platform", {}).get("name")
+        ]
+        rating = item.get("rating")
+        metacritic = item.get("metacritic")
+
+        exists_in_db = False
+        db_game_id = None
+        if db is not None and (rawg_id or slug or name):
+            filters = []
+            if rawg_id:
+                filters.append(models.Game.rawg_id == rawg_id)
+            if slug:
+                filters.append(models.Game.slug == slug)
+            if name:
+                filters.append(models.Game.name == name)
+            existing = db.query(models.Game).filter(or_(*filters)).first()
+            if existing:
+                exists_in_db = True
+                db_game_id = existing.id
+
+        candidates.append(
+            schemas.RawgGameCandidate(
+                rawg_id=rawg_id,
+                name=name,
+                slug=slug,
+                released=released,
+                image_url=image_url,
+                genres=genres,
+                platforms=platforms,
+                rating=rating,
+                metacritic=metacritic,
+                exists_in_db=exists_in_db,
+                db_game_id=db_game_id,
+            )
+        )
+    return candidates
+
+
+async def get_game_details_by_rawg_id(rawg_id: int) -> dict | None:
+    """Fetch complete game details from RAWG.io by rawg_id, including developers and Steam ID."""
+    api_key = config.RAWG_API_KEY
+    if not api_key:
+        return None
+
+    url = f"https://api.rawg.io/api/games/{rawg_id}"
+    params = {"key": api_key}
+    try:
+        resp = requests.get(url, params=params, timeout=10)
+        if not resp.ok:
+            logger.error(f"RAWG details error {resp.status_code}: {resp.content}")
+            return None
+        data = resp.json()
+    except Exception as e:
+        logger.error(f"Error fetching RAWG details for id {rawg_id}: {e}")
+        return None
+
+    name = data.get("name", "")
+    slug = data.get("slug", "")
+    released = data.get("released")
+    image_url = data.get("background_image")
+    genres = ",".join([g["name"] for g in data.get("genres", []) if "name" in g])
+
+    # Developers and publishers from RAWG
+    dev_list = [d["name"] for d in data.get("developers", []) if "name" in d]
+    if not dev_list:
+        dev_list = [p["name"] for p in data.get("publishers", []) if "name" in p]
+    dev = ", ".join(dev_list) if dev_list else "-"
+
+    # Steam ID from stores endpoint
+    steam_id = ""
+    try:
+        stores_resp = requests.get(
+            f"https://api.rawg.io/api/games/{rawg_id}/stores", params=params, timeout=6
+        )
+        if stores_resp.ok:
+            stores_data = stores_resp.json().get("results", [])
+            for s in stores_data:
+                u = s.get("url", "")
+                if "steampowered.com/app/" in u:
+                    match = re.search(r"app/(\d+)", u)
+                    if match:
+                        steam_id = match.group(1)
+                        break
+    except Exception as e:
+        logger.warning(f"Error fetching stores for RAWG game {rawg_id}: {e}")
+
+    # HLTB for estimated playtime (and fallback for dev/steam_id)
+    avg_time = 0
+    clean_name = re.sub(r"[:/]", "", name)
+    try:
+        hltb_results = await HowLongToBeat().async_search(clean_name)
+        if hltb_results and len(hltb_results) > 0:
+            best_hltb = max(hltb_results, key=lambda x: x.similarity)
+            avg_time = getattr(best_hltb, "gameplay_main", 0) or 0
+            if dev == "-" and hasattr(best_hltb, "profile_dev") and best_hltb.profile_dev:
+                dev = best_hltb.profile_dev
+            if not steam_id and hasattr(best_hltb, "profile_steam") and best_hltb.profile_steam:
+                steam_id = str(best_hltb.profile_steam)
+    except Exception as e:
+        logger.warning(f"HLTB search failed for '{clean_name}': {e}")
+
+    release_date = None
+    if released:
+        try:
+            release_date = datetime.datetime.strptime(released, "%Y-%m-%d").date()
+        except Exception:
+            release_date = None
+
+    return {
+        "rawg_id": rawg_id,
+        "name": name,
+        "slug": slug,
+        "dev": dev,
+        "release_date": release_date,
+        "steam_id": str(steam_id) if steam_id else "",
+        "image_url": image_url,
+        "genres": genres,
+        "avg_time": int(avg_time) if avg_time else 0,
+    }
+
+
 async def get_game_info(game: str):
-    # Rawg
-    game_request = requests.get(config.RAWG_URL + game)
-    # logger.debug("RAWG:")
-    # logger.debug(json.loads(game_request.content)["results"][0])
-    try:
-        rawg_content = json.loads(game_request.content)["results"][0]
-    except Exception:
-        rawg_content = None
+    """Retrieve rawg and hltb info for backward compatibility."""
+    api_key = config.RAWG_API_KEY
+    rawg_content = None
+    if api_key:
+        try:
+            url = "https://api.rawg.io/api/games"
+            params = {"key": api_key, "search": game, "page": 1, "page_size": 1}
+            game_request = requests.get(url, params=params, timeout=10)
+            if game_request.ok:
+                results = game_request.json().get("results", [])
+                if results:
+                    rawg_content = results[0]
+        except Exception as e:
+            logger.warning(f"Error fetching RAWG for {game}: {e}")
+
     # HLTB
-    game = game.replace(":", "")
-    game = game.replace("/", "")
+    clean_game = re.sub(r"[:/]", "", game)
+    hltb_content = None
     try:
-        results_list = await HowLongToBeat().async_search(game)
-        if results_list is not None and len(results_list) > 0:
+        results_list = await HowLongToBeat().async_search(clean_game)
+        if results_list and len(results_list) > 0:
             best_element = max(results_list, key=lambda element: element.similarity)
             hltb_content = best_element.json_content
-        else:
-            hltb_content = None
     except Exception:
         hltb_content = None
+
     return {"rawg": rawg_content, "hltb": hltb_content}
 
 
 async def get_new_game_info(game) -> schemas.NewGame:
-    # logger.debug("Get new game info from rawg and hltb...")
-    game_name = game["name"]
-    project_id = game["id"]
-    released = ""
-    genres = ""
-    steam_id = ""
-    dev = ""
-    avg_time = 0
-    game_info = await get_game_info(game_name)
-    # logger.debug("Game info: " + str(game_info))
-    rawg_info = game_info["rawg"]
-    hltb_info = game_info["hltb"]
-    game_name = rawg_info["name"]
-    released = rawg_info["released"]
-    try:
-        if hltb_info is None:
-            steam_id = 0
-            dev = "-"
-            avg_time = 0
-        else:
-            steam_id = hltb_info["profile_steam"]
-            dev = hltb_info["profile_dev"]
-            avg_time = hltb_info["comp_main"]
-    except Exception:
-        steam_id = 0
-        dev = "-"
-        avg_time = 0
-    if steam_id == 0:
-        steam_id = ""
-    if released is not None:
-        release_date = datetime.datetime.strptime(released, "%Y-%m-%d")
-    else:
-        release_date = None
-    genres = ""
-    for genre in rawg_info["genres"]:
-        genres += genre["name"] + ","
-    genres = genres[:-1]
-    image_url = rawg_info["background_image"]
-    new_game = schemas.NewGame(
-        name=game_name,
-        dev=dev,
-        release_date=release_date,
-        steam_id=str(steam_id),
-        image_url=image_url,
-        genres=genres,
-        avg_time=avg_time,
+    """Resolve and build schemas.NewGame using rawg_id if provided, or by searching RAWG."""
+    game_data = game if isinstance(game, dict) else (game.dict() if hasattr(game, "dict") else vars(game))
+    game_name = game_data.get("name", "")
+    project_id = game_data.get("id") or game_data.get("clockify_id")
+    rawg_id = game_data.get("rawg_id")
+
+    details = None
+    if rawg_id:
+        details = await get_game_details_by_rawg_id(rawg_id)
+
+    if not details and game_name:
+        candidates = await search_rawg_games(game_name)
+        if candidates:
+            top_candidate = candidates[0]
+            details = await get_game_details_by_rawg_id(top_candidate.rawg_id)
+
+    if details:
+        return schemas.NewGame(
+            clockify_id=project_id,
+            name=details["name"],
+            dev=details["dev"],
+            release_date=details["release_date"],
+            steam_id=details["steam_id"],
+            image_url=details["image_url"],
+            genres=details["genres"],
+            avg_time=details["avg_time"],
+            slug=details["slug"],
+            rawg_id=details["rawg_id"],
+        )
+
+    # Safe fallback if RAWG finds nothing
+    logger.warning(f"No RAWG details found for game: {game_name}. Using fallback.")
+    return schemas.NewGame(
         clockify_id=project_id,
-        slug=rawg_info["slug"],
+        name=game_name,
+        dev="-",
+        release_date=None,
+        steam_id="",
+        image_url="",
+        genres="",
+        avg_time=0,
+        slug="",
+        rawg_id=None,
     )
-    return new_game
 
 
 async def sync_clockify_entries(

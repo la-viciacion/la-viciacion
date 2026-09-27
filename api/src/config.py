@@ -79,3 +79,19 @@ class Config:
         Gets an environment variable and parses it as JSON.
         """
         return json.loads(self._get_env(key))
+
+    @property
+    def RAWG_API_KEY(self) -> str:
+        try:
+            direct_key = os.getenv("RAWG_API_KEY") or self._dotenv_config.get("RAWG_API_KEY")
+            if direct_key:
+                return direct_key
+        except Exception:
+            pass
+        if self.RAWG_URL and "key=" in self.RAWG_URL:
+            import urllib.parse
+            parsed = urllib.parse.urlparse(self.RAWG_URL)
+            qs = urllib.parse.parse_qs(parsed.query)
+            if "key" in qs and qs["key"]:
+                return qs["key"][0]
+        return ""

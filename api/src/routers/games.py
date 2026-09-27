@@ -53,6 +53,17 @@ def get_games(name: str = None, limit: int = None, db: Session = Depends(get_db)
     return games_db
 
 
+@router.get("/search-rawg", response_model=list[schemas.RawgGameCandidate])
+@version(1)
+async def search_rawg(query: str, db: Session = Depends(get_db)):
+    """Search games on RAWG.io and return candidates with DB existence status."""
+    if not query or len(query.strip()) < 2:
+        raise HTTPException(
+            status_code=400, detail="Query must be at least 2 characters long"
+        )
+    return await utils.search_rawg_games(query.strip(), db=db)
+
+
 @router.get("/{game_id}", response_model=schemas.Game)
 @version(1)
 async def get_game_by_id(game_id: str, db: Session = Depends(get_db)):
@@ -106,21 +117,19 @@ async def get_game_rawg_by_name(name: str, db: Session = Depends(get_db)):
 @router.post("/", response_model=schemas.Game, status_code=201)
 @version(1)
 async def create_game(game: schemas.NewGame, db: Session = Depends(get_db)):
-    """_summary_
+    """Add a new game to DB and Clockify, resolving details via RAWG."""
+    if game.rawg_id:
+        existing = (
+            db.query(models.Game)
+            .filter(models.Game.rawg_id == game.rawg_id)
+            .first()
+        )
+        if existing:
+            raise HTTPException(status_code=400, detail="Game already in DB")
 
-    Args:
-        game (schemas.NewGame): _description_
-        db (Session, optional): _description_. Defaults to Depends(get_db).
-
-    Raises:
-        HTTPException: _description_
-
-    Returns:
-        _type_: _description_
-    """
     games_db = games.get_game_by_name(db, game.name)
     for game_db in games_db:
-        if game_db.name == game.name:
+        if game_db.name.strip().lower() == game.name.strip().lower():
             raise HTTPException(status_code=400, detail="Game already in DB")
     return await games.new_game(db=db, game=game)
 
