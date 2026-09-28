@@ -23,7 +23,6 @@ from sqlalchemy.orm import Session
 from ..config import Config
 from ..database import models, schemas
 from ..utils import my_utils as utils
-from ..utils.clockify_api import ClockifyApi
 from . import games
 from ..utils import ai_prompts as prompts
 from ..utils.logger import LogManager
@@ -31,7 +30,6 @@ from ..utils.logger import LogManager
 log_manager = LogManager()
 logger = log_manager.get_logger()
 
-clockify_api = ClockifyApi()
 config = Config()
 current_season = datetime.datetime.now().year
 
@@ -122,14 +120,6 @@ def get_user_by_username(db: Session, username: str) -> models.User:
 def get_user_by_id(db: Session, id: int) -> models.User:
     try:
         return db.query(models.User).filter(models.User.id == id).first()
-    except SQLAlchemyError as e:
-        logger.error("Error getting user by id: " + str(e))
-        raise
-
-
-def get_user_by_clockify_id(db: Session, id: int) -> models.User:
-    try:
-        return db.query(models.User).filter(models.User.clockify_id == id).first()
     except SQLAlchemyError as e:
         logger.error("Error getting user by id: " + str(e))
         raise
@@ -325,28 +315,6 @@ def update_user_telegram_id(db: Session, user: schemas.TelegramUser):
         db.rollback()
         logger.error("Error updating TelegramID user: " + str(e))
         raise
-
-
-def update_clockify_id(db: Session, username: str, user_clockify):
-    if user_clockify is not None:
-        try:
-            clockify_id = user_clockify["id"]
-            stmt = (
-                update(models.User)
-                .where(models.User.username == username)
-                .values(
-                    clockify_id=clockify_id,
-                )
-            )
-            db.execute(stmt)
-            db.commit()
-        except SQLAlchemyError as e:
-            db.rollback()
-            logger.error("Error updating user clockify_id: " + str(e))
-            raise
-
-    else:
-        logger.info("User nor found in Clockify")
 
 
 def upload_avatar(db: Session, username: str, avatar: bytes):

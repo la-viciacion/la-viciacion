@@ -2,12 +2,9 @@ import datetime
 import json
 import re
 from io import BytesIO
-from zoneinfo import ZoneInfo
-import time
 
 import requests
 import telegram
-from dateutil.parser import isoparse
 from howlongtobeatpy import HowLongToBeat
 from PIL import Image
 from sqlalchemy import asc, create_engine, desc, func, or_, select, text, update
@@ -17,7 +14,6 @@ from ..config import Config
 from ..crud import games, time_entries, users
 from ..database import models, schemas
 from .achievements import AchievementsElems
-from .clockify_api import ClockifyApi
 from ..clients.open_ai import OpenAIClient
 from ..utils import ai_prompts as prompts
 from ..utils.logger import LogManager
@@ -26,16 +22,7 @@ log_manager = LogManager()
 logger = log_manager.get_logger()
 
 oai_client = OpenAIClient()
-clockify_api = ClockifyApi()
 config = Config()
-
-
-def check_hex(s):
-    try:
-        int(s, 16)
-        return True
-    except ValueError:
-        return False
 
 
 def validate_password_requirements(password):
@@ -92,30 +79,6 @@ def convert_date_from_text(date: str):
     if ":" not in date:
         return datetime.datetime.strptime(date, "%Y-%m-%d")
     return datetime.datetime.strptime(date, "%Y-%m-%d %H:%M:%S")
-
-
-def change_timezone_clockify(time) -> str:
-    date_time = isoparse(time)
-    spain_timezone = ZoneInfo("Europe/Madrid")  # pytz.timezone("Europe/Madrid")
-    return str(date_time.astimezone(spain_timezone).strftime("%Y-%m-%d %H:%M:%S"))
-
-
-def convert_clockify_duration(duration):
-    match = re.match(r"PT(\d+H)?(\d+M)?(\d+S)?", duration)
-    if match:
-        hours_str = match.group(1)
-        mins_str = match.group(2)
-        secs_str = match.group(3)
-
-        hours = int(hours_str[:-1]) if hours_str else 0
-        mins = int(mins_str[:-1]) if mins_str else 0
-        secs = int(secs_str[:-1]) if secs_str else 0
-
-        total_secs = hours * 3600 + mins * 60 + secs
-
-        return total_secs
-    else:
-        return 0
 
 
 def get_week_range_dates(weeks_diff: int = 0):
@@ -396,32 +359,6 @@ async def get_new_game_info(game) -> schemas.NewGame:
         slug="",
         rawg_id=None,
     )
-
-
-async def sync_clockify_entries(
-    db: Session,
-    user: models.User,
-    date: str = None,
-    only_time_entries: bool = False,
-    silent: bool = False,
-):
-    try:
-        start_time = time.time()
-        total_entries = 0
-        entries = clockify_api.get_time_entries(user.clockify_id, date)
-        total_entries = len(entries)
-        logger.info("Sync " + str(total_entries) + " entries for " + str(user.name))
-        if total_entries == 0:
-            return 0
-        await time_entries.sync_clockify_entries_db(
-            db, user, entries, only_time_entries, silent
-        )
-        end_time = time.time()
-        elapsed_time = end_time - start_time
-        logger.debug("Elapsed time for sync time entries: " + str(elapsed_time))
-        return total_entries
-    except Exception as e:
-        logger.error("Error syncing clockify entries: " + str(e))
 
 
 def convert_blob_to_image(

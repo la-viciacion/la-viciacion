@@ -28,12 +28,6 @@ class Config:
         self.DB_USER = self._get_env("MARIADB_USER")
         self.DB_PASS = self._get_env("MARIADB_PASSWORD")
         
-        # Clockify
-        self.CLOCKIFY_BASEURL = self._get_env("CLOCKIFY_BASEURL")
-        self.CLOCKIFY_WORKSPACE = self._get_env("CLOCKIFY_WORKSPACE")
-        self.CLOCKIFY_ADMIN_API_KEY = self._get_env("CLOCKIFY_ADMIN_API_KEY")
-        self.CLOCKIFY_SIGNATURES = self._get_env_json("CLOCKIFY_SIGNATURES")
-        
         # External APIs
         self.RAWG_URL = self._get_env("RAWG_URL")
         self.OPENAI_API_KEY = self._get_env("OPENAI_API_KEY")
@@ -60,8 +54,6 @@ class Config:
         self.ENVIRONMENT = self._get_env("ENVIRONMENT")
         
         # App Config
-        self.INITIAL_DATE = self._get_env("INITIAL_DATE")
-        self.SYNC_DAYS = int(self._get_env("SYNC_DAYS"))
         self.CURRENT_SEASON = datetime.datetime.now().year
     
     def _get_env(self, key: str) -> str:

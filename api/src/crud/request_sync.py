@@ -7,14 +7,12 @@ from ..crud import users
 from ..database import models
 from ..utils import actions as actions
 from ..utils import my_utils as utils
-from ..utils.clockify_api import ClockifyApi
 from ..utils.logger import LogManager
 from sqlalchemy.exc import SQLAlchemyError
 
 log_manager = LogManager()
 logger = log_manager.get_logger()
 
-clockify = ClockifyApi()
 config = Config()
 
 

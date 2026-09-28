@@ -33,37 +33,18 @@ def get_db():
 async def webhook_sync(
     request: Request, db: Session = Depends(get_db), include_in_schema=False
 ):
-    """Sync using webhook"""
+    """Recompute stats/rankings/achievements (cron entrypoint)"""
     with process_lock:
-        headers = request.headers
-        try:
-            api_key = headers.get("x-api-key")
-            if api_key != config.API_KEY:
-                raise HTTPException(status_code=401, detail="Unauthorized")
-            user_id = None
-            event = None
-            logger.info("Sync from cron")
-        except:
-            try:
-                event = headers.get("clockify-webhook-event-type")
-                signature = headers.get("clockify-signature")
-                if signature in config.CLOCKIFY_SIGNATURES:
-                    data = await request.json()
-                    user_id = data["user"]["id"]
-                    logger.info(f"Evet: {event}")
-                    logger.info("Sync from Clockify TimeEntry")
-                else:
-                    raise HTTPException(status_code=401, detail="Unauthorized")
-            except:
-                raise HTTPException(status_code=400, detail="Bad Request")
+        api_key = request.headers.get("x-api-key")
+        if api_key != config.API_KEY:
+            raise HTTPException(status_code=401, detail="Unauthorized")
+        logger.info("Sync from cron")
 
-        sync_result = await actions.sync_data(
-            user_clfy_id=user_id,
-            sync_season=False,
+        await actions.recompute_all_users_and_rankings(
+            db,
             silent=False,
+            sync_season=False,
             sync_all=False,
-            only_acive_users=True,
-            only_time_entries=False,
-            db=db,
+            only_active_users=True,
         )
-        return sync_result
+        return {"message": "Sync completed!"}

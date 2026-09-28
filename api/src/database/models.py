@@ -31,6 +31,7 @@ class User(Base):
     username = Column(String(255))
     password = Column(String(255))
     telegram_id = Column(BigInteger)
+    # Legacy from the Clockify era; no longer written to, kept for history.
     clockify_id = Column(String(255))
     clockify_key = Column(String(255))
     email = Column(String(255))

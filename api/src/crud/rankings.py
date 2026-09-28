@@ -8,14 +8,12 @@ from ..crud import time_entries, users
 from ..database import models, schemas
 from ..utils import actions as actions
 from ..utils import my_utils as utils
-from ..utils.clockify_api import ClockifyApi
 from ..utils.logger import LogManager
 from ..config import Config
 
 log_manager = LogManager()
 logger = log_manager.get_logger()
 config = Config()
-clockify = ClockifyApi()
 current_season = datetime.datetime.now().year
 
 ####################

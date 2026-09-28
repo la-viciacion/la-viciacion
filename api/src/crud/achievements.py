@@ -12,13 +12,11 @@ from ..database import models, schemas
 from ..utils import actions as actions
 from ..utils import my_utils as utils
 from ..utils.achievements import AchievementsElems
-from ..utils.clockify_api import ClockifyApi
 from ..utils.logger import LogManager
 
 log_manager = LogManager()
 logger = log_manager.get_logger()
 
-clockify = ClockifyApi()
 config = Config()
 
 ######################
@@ -791,11 +789,10 @@ class Achievements:
         user_list = users.get_users(db)
         playing: List[models.User] = []
         for user in user_list:
-            has_active_time_entry = time_entries.get_active_time_entry_by_user(db, user)
             has_active_game_timer = time_entries.get_active_game_timer_by_user(
                 db, user.id
             )
-            if has_active_time_entry is not None or has_active_game_timer is not None:
+            if has_active_game_timer is not None:
                 playing.append(user)
         # logger.debug(
         #    "Playing users: " + str(len(playing)) + "/" + str(user_list.count())

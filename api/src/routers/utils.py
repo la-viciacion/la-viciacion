@@ -101,17 +101,8 @@ def get_playing_users(
     playing = []
     for user in users_db:
         info = {}
-        active_timer = time_entries.get_active_time_entry_by_user(db, user)
         active_game_timer = time_entries.get_active_game_timer_by_user(db, user.id)
-        if active_timer is not None:
-            logger.info(active_timer)
-            info["user"] = user.name
-            info["game"] = games.get_game_by_id(
-                db, active_timer.project_clockify_id
-            ).name
-            info["time"] = active_timer.start
-            playing.append(info)
-        elif active_game_timer is not None:
+        if active_game_timer is not None:
             logger.info(active_game_timer)
             info["user"] = user.name
             info["game"] = games.get_game_by_id(db, active_game_timer.game_id).name

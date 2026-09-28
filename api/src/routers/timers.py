@@ -16,10 +16,6 @@ from ..database.schemas import (
     TimerStats,
 )
 from ..utils import actions
-from ..utils.logger import LogManager
-
-log_manager = LogManager()
-logger = log_manager.get_logger()
 
 
 def get_db():
@@ -101,23 +97,6 @@ def stop_timer(db: Session, timer_id: int, user_id: int) -> GameTimer:
     db.commit()
     db.refresh(timer)
     return timer
-
-
-async def recompute_after_timer_stop():
-    """Recompute stats/rankings/achievements after a native timer session closes.
-
-    Runs as a background task with its own DB session (the request-scoped
-    session is already closed by the time this executes). While the Clockify
-    sync still runs in parallel, this reuses actions.sync_data as-is; once the
-    Clockify cutover happens this will point at its Clockify-free replacement.
-    """
-    db = SessionLocal()
-    try:
-        await actions.sync_data(db, silent=True)
-    except Exception as e:
-        logger.error("Error recomputing stats after timer stop: " + str(e))
-    finally:
-        db.close()
 
 
 def get_timer_history(db: Session, user_id: int, game_id: Optional[str] = None, limit: int = 100) -> List[GameTimer]:
@@ -204,7 +183,7 @@ def stop_timer_endpoint(
 ):
     """Stop an active timer"""
     timer = stop_timer(db, timer_id, user_id)
-    background_tasks.add_task(recompute_after_timer_stop)
+    background_tasks.add_task(actions.recompute_after_timer_stop)
     return timer
 
 

@@ -21,14 +21,12 @@ from ..database.database import SessionLocal, engine
 from ..utils import actions as actions
 from ..utils import messages as msg
 from ..utils import my_utils as utils
-from ..utils.clockify_api import ClockifyApi
 from ..utils.logger import LogManager
 
 log_manager = LogManager()
 logger = log_manager.get_logger()
 
 models.Base.metadata.create_all(bind=engine)
-clockify_api = ClockifyApi()
 
 router = APIRouter(
     prefix="/users",

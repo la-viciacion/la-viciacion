@@ -98,15 +98,10 @@ def init(
 @version(1)
 async def sync_data(
     api_key: None = Security(auth.get_api_key),
-    user_clfy_id: str = Query(
-        default=None,
-        title="User Clockify ID",
-        description="Sync data for the user with this Clockify ID",
-    ),
     sync_season: bool = Query(
         default=False,
-        title="Sync all season data",
-        description="Sync all time entries for the current year",
+        title="Reset season data",
+        description="Reset and recompute all current-season statistics",
     ),
     silent: bool = Query(
         default=False,
@@ -115,46 +110,24 @@ async def sync_data(
     ),
     sync_all: bool = Query(
         default=False,
-        title="Sync all data",
-        description="Sync all time entries for the whole time",
+        title="Reset all data",
+        description="Reset and recompute all statistics from scratch",
     ),
     only_acive_users: bool = Query(
         default=True,
         title="Sync only active users",
-        description="Sync only entries for active users",
-    ),
-    only_time_entries: bool = Query(
-        default=False,
-        title="Sync only time entries",
-        description="Sync all time entries for the whole time, but not calculate anything",
+        description="Recompute only active users",
     ),
     db: Session = Depends(get_db),
 ):
-    """Sync data from Clockify
-
-    Args:
-        api_key (None, optional): API Key. Defaults to Security(auth.get_api_key).
-        sync_season (bool, optional): Select if sync entire current season. Defaults to Query( default=None, title="Sync all season data", description="Sync all time entries for the current year", ).
-        silent (bool, optional): Sync data without send Telegram notifications. Defaults to Query( default=None, title="Run in silent mode", description="Disable Telegram notifications", ).
-        sync_all (bool, optional): Sync entire data (from the very beginning). Defaults to Query( default=None, title="Sync all data", description="Sync all time entries for the whole time", ).
-
-    Raises:
-        HTTPException: _description_
-
-    Returns:
-        _type_: _description_
-    """
+    """Recompute stats/rankings/achievements from current session data."""
     try:
-        # for admin in config.ADMIN_USERS:
-        #     users.create_admin_user(db, admin)
-        await actions.sync_data(
+        await actions.recompute_all_users_and_rankings(
             db,
-            user_clfy_id=user_clfy_id,
-            sync_season=sync_season,
             silent=silent,
+            sync_season=sync_season,
             sync_all=sync_all,
-            only_acive_users=only_acive_users,
-            only_time_entries=only_time_entries,
+            only_active_users=only_acive_users,
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

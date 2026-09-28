@@ -20,14 +20,12 @@ from ..database import models, schemas
 from ..utils import actions
 from ..utils import actions as actions
 from ..utils import my_utils as utils
-from ..utils.clockify_api import ClockifyApi
-from . import clockify, games, users
+from . import games, users
 from ..utils.logger import LogManager
 
 log_manager = LogManager()
 logger = log_manager.get_logger()
 
-clockify_api = ClockifyApi()
 config = Config()
 current_season = datetime.datetime.now().year
 
@@ -249,202 +247,6 @@ def get_played_days(
     return played_days, real_played_days
 
 
-async def sync_clockify_entries_db(
-    db: Session, user: models.User, entries, only_time_entries: bool, silent: bool
-):
-    # current_season = datetime.datetime.now().year
-    for entry in entries:
-        if entry["projectId"] is None:
-            logger.warning("Time entry without project: " + str(entry["id"]))
-            # msg = (
-            #     "Hola, "
-            #     + user.name
-            #     + ". Tienes un timer activo sin juego. Acuérdate de añadirlo antes de pararlo."
-            # )
-            # await utils.send_message_to_user(user.telegram_id, msg)
-            continue
-        try:
-            # Extract data from time entry
-            start = entry["timeInterval"]["start"]
-            end = entry["timeInterval"]["end"]
-            duration = entry["timeInterval"]["duration"]
-            platform = None
-            completed = None
-            if entry["tagIds"] is not None and len(entry["tagIds"]) > 0:
-                for tag in entry["tagIds"]:
-                    platform_check = clockify.get_platform_by_tag_id(db, tag)
-                    completed_check = clockify.check_completed_tag_by_id(db, tag)
-                    if completed is None and completed_check is not None:
-                        completed = 1
-                    if platform is None and platform_check is not None:
-                        platform = tag
-
-            start = utils.change_timezone_clockify(start)
-            if end is not None and end != "":
-                end = utils.change_timezone_clockify(end)
-            else:
-                end = None
-
-            # Check if time entry already exists (to update it if needed)
-            stmt = select(models.TimeEntry).where(models.TimeEntry.id == entry["id"])
-            exists = db.execute(stmt).first()
-            # Create new time entry
-            if not exists:
-                try:
-                    if end is not None:
-                        new_entry = models.TimeEntry(
-                            id=entry["id"],
-                            user_id=user.id,
-                            user_clockify_id=user.clockify_id,
-                            project_clockify_id=entry["projectId"],
-                            start=start,
-                            end=end,
-                            duration=utils.convert_clockify_duration(duration),
-                        )
-                    else:
-                        new_entry = models.TimeEntry(
-                            id=entry["id"],
-                            user_id=user.id,
-                            user_clockify_id=user.clockify_id,
-                            project_clockify_id=entry["projectId"],
-                            start=start,
-                        )
-                    db.add(new_entry)
-                    db.commit()
-                except Exception as e:
-                    db.rollback()
-                    logger.error(
-                        "Error creating time entry " + str(entry) + ": " + str(e)
-                    )
-            # Update existing time entry
-            else:
-                try:
-                    if end is not None:
-                        stmt = (
-                            update(models.TimeEntry)
-                            .where(models.TimeEntry.id == entry["id"])
-                            .values(
-                                project_clockify_id=entry["projectId"],
-                                start=start,
-                                end=end,
-                                duration=utils.convert_clockify_duration(duration),
-                            )
-                        )
-                    else:
-                        stmt = (
-                            update(models.TimeEntry)
-                            .where(models.TimeEntry.id == entry["id"])
-                            .values(
-                                project_clockify_id=entry["projectId"],
-                                start=start,
-                            )
-                        )
-                    db.execute(stmt)
-                    db.commit()
-                except Exception as e:
-                    db.rollback()
-                    logger.error(
-                        "Error updating time entry " + str(entry) + ": " + str(e)
-                    )
-
-            if only_time_entries:
-                continue
-            # Check if game on clockify already exists on local DB
-            game = games.get_game_by_id(db, entry["projectId"])
-            if game is not None:
-                game_name = game.name
-                game_id = game.id
-            else:
-                logger.info("Project " + entry["projectId"] + " not in DB")
-                project = clockify_api.get_project_by_id(entry["projectId"])
-                # logger.debug("Clockify project:")
-                # logger.debug(project)
-                game_name = project["name"]
-                new_game_info = await utils.get_new_game_info(project)
-                # logger.debug("New game info:")
-                # logger.debug(new_game_info.__dict__)
-                new_game = await games.new_game(db, new_game_info)
-                game_id = new_game.id
-
-            # Add game to GameStatistics (if needed)
-            try:
-                games.create_game_statistics(db, game_id)
-                games.create_game_statistics_historical(db, game_id)
-            except Exception as e:
-                logger.error(
-                    "Error creating game statistics for " + game_name + ": " + str(e)
-                )
-
-            # Check if player already plays the game this season
-            # if time_entry_year == config.CURRENT_SEASON:
-            already_playing = users.get_game_by_id(db, user.id, game_id, current_season)
-            if not already_playing:
-                try:
-                    logger.info("User not playing " + game_name)
-                    new_user_game = schemas.NewGameUser(
-                        game_id=game_id, platform=platform
-                    )
-                    await users.add_new_game(
-                        db,
-                        game=new_user_game,
-                        user=user,
-                        start_date=start,
-                        silent=silent,
-                    )
-                    already_playing = users.get_game_by_id(
-                        db, user.id, game_id, current_season
-                    )
-                except Exception as e:
-                    logger.error("Error adding game " + game_name + ": " + str(e))
-            try:
-                if platform is not None and already_playing.platform != platform:
-                    try:
-                        stmt = (
-                            update(models.UserGame)
-                            .where(models.UserGame.id == already_playing.id)
-                            .values(
-                                platform=platform,
-                            )
-                        )
-                        db.execute(stmt)
-                        db.commit()
-                    except Exception as e:
-                        db.rollback()
-                        logger.error(
-                            "Error updating platform for " + game_name + ": " + str(e)
-                        )
-            except Exception as e:
-                logger.error("Error updating platform for " + game_name + ": " + str(e))
-            if completed is not None and already_playing.completed != 1:
-                try:
-                    logger.info("Completing game " + str(game.id) + "...")
-                    played_time = get_user_games_played_time(db, user.id, game.id)
-                    # The follow list only will have 1 item
-                    for played_game in played_time:
-                        users.update_played_time_game(
-                            db, user.id, played_game[0], played_game[1]
-                        )
-                    await users.complete_game(
-                        db,
-                        user.id,
-                        game.id,
-                        completed_date=start,
-                        silent=silent,
-                    )
-                except Exception as e:
-                    logger.error("Error completing game " + game_name + ": " + str(e))
-            try:
-                update_game = models.UserGame(platform=platform)
-                users.update_game(db, update_game, already_playing.id)
-            except Exception as e:
-                logger.error("Error updating game" + game_name + " for user: " + str(e))
-
-            db.commit()
-        except Exception as e:
-            db.rollback()
-            logger.error("Error adding time entry " + str(entry) + ": " + str(e))
-
-
 def get_time_entry_by_time(
     db: Session,
     user_id: int,
@@ -523,16 +325,6 @@ def get_time_entry_between_hours(
     return entries
 
 
-def get_active_time_entry_by_user(db: Session, user: models.User) -> models.TimeEntry:
-    active_time_entry = (
-        db.query(models.TimeEntry)
-        .filter(models.TimeEntry.end == None)
-        .filter(models.TimeEntry.user_clockify_id == user.clockify_id)
-        .first()
-    )
-    return active_time_entry
-
-
 def get_active_game_timer_by_user(db: Session, user_id: int) -> models.GameTimer:
     return (
         db.query(models.GameTimer)
@@ -544,59 +336,17 @@ def get_active_game_timer_by_user(db: Session, user_id: int) -> models.GameTimer
     )
 
 
-def get_forgotten_timer_by_user(db: Session, user: models.User):
-    current_time = datetime.datetime.now()
-    time_threshold = current_time - datetime.timedelta(hours=4)
-    active_time_entry = (
-        db.query(models.TimeEntry)
-        .filter(models.TimeEntry.user_clockify_id == user.clockify_id)
-        .filter(models.TimeEntry.duration.is_(None))
-        .filter(models.TimeEntry.start < time_threshold)
-        .first()
+def get_forgotten_game_timers(
+    db: Session, user_id: int = None, hours: int = 4
+) -> list[models.GameTimer]:
+    time_threshold = datetime.datetime.now() - datetime.timedelta(hours=hours)
+    query = db.query(models.GameTimer).filter(
+        models.GameTimer.is_active == True,
+        models.GameTimer.start_time < time_threshold,
     )
-    return active_time_entry
-
-
-def get_older_active_timers(
-    db: Session, user: models.User = None
-) -> list[models.TimeEntry]:
-    current_time = datetime.datetime.now()
-    time_threshold = current_time - datetime.timedelta(minutes=5)
-    if user is None:
-        active_time_entries = (
-            db.query(models.TimeEntry)
-            .filter(models.TimeEntry.duration.is_(None))
-            .filter(models.TimeEntry.start < time_threshold)
-            .all()
-        )
-    else:
-        active_time_entries = (
-            db.query(models.TimeEntry)
-            .filter(models.TimeEntry.user_clockify_id == user.clockify_id)
-            .filter(models.TimeEntry.duration.is_(None))
-            .filter(models.TimeEntry.start < time_threshold)
-            .all()
-        )
-    return active_time_entries
-
-
-def get_older_timers(db: Session, user: models.User = None) -> list[models.TimeEntry]:
-    current_time = datetime.datetime.now()
-    time_threshold = current_time - datetime.timedelta(minutes=5)
-    if user is None:
-        active_time_entries = (
-            db.query(models.TimeEntry)
-            .filter(models.TimeEntry.start < time_threshold)
-            .all()
-        )
-    else:
-        active_time_entries = (
-            db.query(models.TimeEntry)
-            .filter(models.TimeEntry.user_clockify_id == user.clockify_id)
-            .filter(models.TimeEntry.start < time_threshold)
-            .all()
-        )
-    return active_time_entries
+    if user_id is not None:
+        query = query.filter(models.GameTimer.user_id == user_id)
+    return query.all()
 
 
 def get_weekly_resume(

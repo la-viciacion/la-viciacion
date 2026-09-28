@@ -117,7 +117,7 @@ async def get_game_rawg_by_name(name: str, db: Session = Depends(get_db)):
 @router.post("/", response_model=schemas.Game, status_code=201)
 @version(1)
 async def create_game(game: schemas.NewGame, db: Session = Depends(get_db)):
-    """Add a new game to DB and Clockify, resolving details via RAWG."""
+    """Add a new game to DB, resolving details via RAWG."""
     if game.rawg_id:
         existing = (
             db.query(models.Game)
