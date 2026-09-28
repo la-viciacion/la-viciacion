@@ -360,7 +360,6 @@ logs.log
 # .gitlab-ci.yml
 db/data/
 docker-compose.yml
-Dockerfile
 assets/*
 .vscode
 webhooks.py
