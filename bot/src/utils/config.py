@@ -14,9 +14,6 @@ class Config:
             self.TELEGRAM_TOKEN = config["TELEGRAM_TOKEN"]
             self.TELEGRAM_GROUP_ID = config["TELEGRAM_GROUP_ID"]
             self.TELEGRAM_ADMIN_CHAT_ID = config["TELEGRAM_ADMIN_CHAT_ID"]
-            self.CLOCKIFY_BASEURL = config["CLOCKIFY_BASEURL"]
-            self.CLOCKIFY_WORKSPACE = config["CLOCKIFY_WORKSPACE"]
-            self.CLOCKIFY_ADMIN_API_KEY = config["CLOCKIFY_ADMIN_API_KEY"]
             self.API_URL = config["API_URL"] + "/bot"
             self.API_KEY = config["API_KEY"]
             self.SECRET_KEY = config["SECRET_KEY"]
@@ -30,9 +27,6 @@ class Config:
             self.ADMIN_USERS = json.loads(os.environ["ADMIN_USERS"])
             self.TELEGRAM_TOKEN = os.environ["TELEGRAM_TOKEN"]
             self.TELEGRAM_ADMIN_CHAT_ID = os.environ["TELEGRAM_ADMIN_CHAT_ID"]
-            self.CLOCKIFY_BASEURL = os.environ["CLOCKIFY_BASEURL"]
-            self.CLOCKIFY_WORKSPACE = os.environ["CLOCKIFY_WORKSPACE"]
-            self.CLOCKIFY_ADMIN_API_KEY = os.environ["CLOCKIFY_ADMIN_API_KEY"]
             self.API_URL = os.environ["API_URL"] + "/bot"
             self.API_KEY = os.environ["API_KEY"]
             self.SECRET_KEY = os.environ["SECRET_KEY"]

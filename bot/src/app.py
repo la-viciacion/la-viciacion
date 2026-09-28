@@ -187,9 +187,6 @@ def main() -> None:
             ],
             utils.EXCEL_STUFF: [
                 MessageHandler(
-                    filters.Regex("^(🆕 Empezar juego)$"), data_routes.add_game
-                ),
-                MessageHandler(
                     filters.Regex("^(✅ Completar juego)$"), data_routes.complete_game
                 ),
                 MessageHandler(
@@ -208,21 +205,6 @@ def main() -> None:
                 ),
                 MessageHandler(
                     filters.Regex(FILTER_NO), data_routes.complete_game_confirmation
-                ),
-                MessageHandler(None, data_routes.cancel_data),
-            ],
-            utils.EXCEL_ADD_GAME: [
-                MessageHandler(None, data_routes.add_game_get_name),
-            ],
-            utils.EXCEL_ADD_GAME_PLATFORM: [
-                MessageHandler(None, data_routes.add_game_validation),
-            ],
-            utils.EXCEL_ADD_GAME_CONFIRMATION: [
-                MessageHandler(
-                    filters.Regex(FILTER_YES), data_routes.add_game_confirmation
-                ),
-                MessageHandler(
-                    filters.Regex(FILTER_NO), data_routes.add_game_confirmation
                 ),
                 MessageHandler(None, data_routes.cancel_data),
             ],

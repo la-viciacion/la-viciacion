@@ -11,7 +11,6 @@ import telegram
 import utils.messages as msgs
 from telegram import Bot, Update
 from telegram.ext import ContextTypes, ConversationHandler
-from utils.clockify_api import ClockifyApi
 from utils.config import Config
 from typing import Tuple, Dict, Any
 from utils.logger import LogManager
@@ -20,7 +19,6 @@ log_manager = LogManager()
 logger = log_manager.get_logger()
 
 config = Config()
-clockify = ClockifyApi()
 
 
 class MyUtils:
@@ -43,24 +41,16 @@ class MyUtils:
             self.EXCEL_CONFIRM_TIME,
             self.EXCEL_COMPLETE_GAME,
             self.EXCEL_CONFIRM_COMPLETED,
-            self.EXCEL_ADD_GAME,
-            self.EXCEL_ADD_GAME_PLATFORM,
-            self.EXCEL_ADD_GAME_CONFIRMATION,
             self.EXCEL_RATE_GAME,
             self.EXCEL_RATE_GAME_RATING,
             self.EXCEL_CONFIRM_RATE,
             self.EXCEL_START_TIMER,
             self.EXCEL_START_TIMER_COMPLETED,
             self.EXCEL_STOP_TIMER,
-        ) = range(21)
+        ) = range(18)
 
     def make_request(self, method, url, json=None):
         headers = {"x-api-key": config.API_KEY}
-        response = requests.request(method, url=url, headers=headers, json=json)
-        return response
-
-    def make_clockify_request(self, method, url, json=None):
-        headers = {"X-API-KEY": config.CLOCKIFY_ADMIN_API_KEY}
         response = requests.request(method, url=url, headers=headers, json=json)
         return response
 

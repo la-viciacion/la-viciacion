@@ -93,7 +93,7 @@ RANKING_MENU = [
 YES_NO = [["✅ Sí", "❌ No"]]
 
 DATA_ACTIONS = [
-    ["🆕 Empezar juego", "✅ Completar juego"],
+    ["✅ Completar juego"],
     ["📝 Puntuar juego"],
     [EXIT],
 ]
