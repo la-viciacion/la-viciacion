@@ -25,6 +25,9 @@ services:
      - ./bot:/app
     networks:
       - la-viciacion
+    depends_on:
+      laviciacion-api:
+        condition: service_started
 
   laviciacion-api:
     build:
@@ -40,16 +43,29 @@ services:
     restart: unless-stopped
     networks:
       - la-viciacion
+    depends_on:
+      laviciacion-db:
+        condition: service_healthy
 
   laviciacion-db:
     image: mariadb
     container_name: laviciacion-db
     volumes:
       - ./db/data:/var/lib/mysql
+      # Any .sql/.sql.gz/.sh dropped here is imported automatically by
+      # MariaDB, but ONLY the first time it starts up (empty ./db/data).
+      # Use it to seed a fresh environment from a pre-migration backup.
+      - ./db/init:/docker-entrypoint-initdb.d:ro
     env_file: .env
     restart: unless-stopped
     networks:
       - la-viciacion
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
     # Uncomment ports config to expose DB outside docker network
     # ports:
     #   - 3307:3306
