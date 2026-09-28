@@ -214,10 +214,9 @@ def update_game(db: Session, game_id: int, game: schemas.UpdateGame):
 
 def update_total_played_time(db: Session, game_id, total_played):
     try:
-        game = get_game_by_id(db, game_id)
         stmt = (
             update(models.GameStatistics)
-            .where(models.GameStatistics.game_id == game.id)
+            .where(models.GameStatistics.game_id == game_id)
             .values(played_time=total_played)
         )
         db.execute(stmt)

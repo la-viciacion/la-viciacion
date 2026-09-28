@@ -812,49 +812,6 @@ body {
   font-weight: 600;
 }
 
-.game-selector {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 20px;
-}
-
-.game-select {
-  flex: 1;
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: 14px 16px;
-  color: var(--text-primary);
-  font-size: 0.95rem;
-  font-family: var(--font);
-  cursor: pointer;
-  transition: border-color 0.2s ease;
-}
-
-.game-select:focus {
-  outline: none;
-  border-color: var(--accent-teal);
-}
-
-.btn-add-game {
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: 14px;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.btn-add-game:hover {
-  background: var(--bg-card-hover);
-  border-color: var(--accent-teal);
-  color: var(--accent-teal);
-}
-
 .timer-actions {
   display: flex;
   gap: 12px;
@@ -946,6 +903,180 @@ body {
   display: block;
   font-size: 2.5rem;
   margin-bottom: 12px;
+}
+
+/* ==================== GAME PICKER / ADD-GAME MODALS ==================== */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 16px;
+  z-index: 1000;
+  animation: fadeIn 0.2s ease;
+}
+
+.modal-content {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  width: 100%;
+  max-width: 480px;
+  margin-top: 64px;
+  max-height: calc(100vh - 96px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: slideUp 0.25s ease;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 20px 0;
+}
+
+.modal-header h3 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+.modal-close:hover {
+  color: var(--text-primary);
+}
+
+.modal-search-input {
+  margin: 16px 20px 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  font-family: var(--font);
+}
+
+.modal-search-input:focus {
+  outline: none;
+  border-color: var(--accent-teal);
+}
+
+.modal-results-list {
+  overflow-y: auto;
+  padding: 12px 12px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.modal-hint {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  text-align: center;
+  padding: 20px 12px;
+}
+
+.modal-result-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  background: var(--bg-card);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  font-family: var(--font);
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.modal-result-row:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--accent-teal);
+}
+
+.modal-result-thumb,
+.modal-result-thumb-placeholder {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.modal-result-thumb-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-card-hover);
+  font-size: 1.1rem;
+}
+
+.modal-result-name {
+  flex: 1;
+  min-width: 0;
+}
+
+.modal-result-year {
+  color: var(--text-muted);
+  font-size: 0.85em;
+}
+
+.modal-result-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: rgba(61, 217, 179, 0.15);
+  color: var(--accent-teal);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.modal-footer {
+  padding: 4px 20px 20px;
+}
+
+.btn-modal-secondary {
+  width: 100%;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  font-family: var(--font);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-modal-secondary:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--accent-teal);
+  color: var(--accent-teal);
 }
 
 /* ==================== ANIMATIONS ==================== */

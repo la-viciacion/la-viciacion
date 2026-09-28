@@ -305,7 +305,7 @@ function renderGames(games) {
     <article class="game-card" style="animation-delay: ${i * 0.05}s">
       <div class="game-cover-placeholder" aria-hidden="true">🎮</div>
       <div class="game-info">
-        <div class="game-title" title="${escapeHtml(g.game?.name || g.game_id)}">${escapeHtml(g.game?.name || g.game_id)}</div>
+        <div class="game-title" title="${escapeHtml(g.game_name || g.game_id)}">${escapeHtml(g.game_name || g.game_id)}</div>
         <div class="game-meta">
           <span class="game-tag ${g.completed ? 'completed' : 'playing'}">
             ${g.completed ? '✓ Completado' : '▶ Jugando'}
@@ -344,8 +344,8 @@ async function loadTimerSection(userId, games) {
 
 function renderActiveTimer(timer, games) {
   const game = games.find(g => g.game_id === timer.game_id);
-  const gameName = game?.game?.name || timer.game_id;
-  
+  const gameName = game?.game_name || timer.game_id;
+
   return `
     <div class="timer-active" data-timer='${JSON.stringify(timer)}'>
       <div class="timer-info">
@@ -360,61 +360,30 @@ function renderActiveTimer(timer, games) {
   `;
 }
 
-function renderActiveTimer(timer, games) {
-  const game = games.find(g => g.game_id === timer.game_id);
-  const gameName = game?.game?.name || timer.game_id;
-  
-  return `
-    <div class="timer-active">
-      <div class="timer-info">
-        <div class="timer-label">Jugando ahora:</div>
-        <div class="timer-game">${escapeHtml(gameName)}</div>
-        <div class="timer-duration" id="timerDuration">00:00:00</div>
-      </div>
-      <button class="btn-stop-timer" id="stopTimerBtn" data-timer-id="${timer.id}">
-        ${iconStop()} Detener
-      </button>
-    </div>
-  `;
-}
-
 function renderTimerSelector(userId, games) {
   const recentGames = games.slice(0, 5); // Last 5 games
-  
+
   return `
     <div class="timer-selector">
       <div class="timer-label">Iniciar sesión de juego:</div>
-      
-      <div class="game-selector">
-        <select id="gameSelect" class="game-select">
-          <option value="">Selecciona un juego...</option>
-          ${recentGames.map(g => `
-            <option value="${g.game_id}">
-              ${escapeHtml(g.game?.name || g.game_id)}
-            </option>
-          `).join('')}
-        </select>
-        <button class="btn-add-game" id="addGameBtn" title="Añadir nuevo juego">
-          ${iconPlus()}
-        </button>
-      </div>
-      
+
       <div class="timer-actions">
-        <button class="btn-start-timer" id="startTimerBtn" data-user-id="${userId}">
-          ${iconPlay()} Iniciar Timer
+        <button class="btn-start-timer" id="chooseGameBtn" data-user-id="${userId}">
+          ${iconPlay()} Elegir juego...
         </button>
       </div>
-      
+
+      ${recentGames.length ? `
       <div class="recent-games">
         <div class="recent-label">Juegos recientes:</div>
         <div class="recent-list">
           ${recentGames.map(g => `
             <button class="recent-game-btn" data-game-id="${g.game_id}" data-user-id="${userId}">
-              ${escapeHtml(g.game?.name || g.game_id)}
+              ${escapeHtml(g.game_name || g.game_id)}
             </button>
           `).join('')}
         </div>
-      </div>
+      </div>` : ''}
     </div>
   `;
 }
@@ -489,20 +458,14 @@ function stopTimerDisplay() {
 }
 
 function bindTimerEvents(userId, games) {
-  // Start timer button
-  const startBtn = document.getElementById('startTimerBtn');
-  if (startBtn) {
-    startBtn.addEventListener('click', () => {
-      const gameSelect = document.getElementById('gameSelect');
-      const gameId = gameSelect.value;
-      if (gameId) {
-        startTimer(userId, gameId);
-      } else {
-        alert('Por favor selecciona un juego');
-      }
+  // Choose game button (opens the game picker modal)
+  const chooseGameBtn = document.getElementById('chooseGameBtn');
+  if (chooseGameBtn) {
+    chooseGameBtn.addEventListener('click', () => {
+      openGamePickerModal(userId);
     });
   }
-  
+
   // Stop timer button
   const stopBtn = document.getElementById('stopTimerBtn');
   if (stopBtn) {
@@ -511,7 +474,7 @@ function bindTimerEvents(userId, games) {
       stopTimer(timerId, userId);
     });
   }
-  
+
   // Recent game buttons
   const recentBtns = document.querySelectorAll('.recent-game-btn');
   recentBtns.forEach(btn => {
@@ -520,15 +483,7 @@ function bindTimerEvents(userId, games) {
       startTimer(userId, gameId);
     });
   });
-  
-  // Add game button (placeholder for now)
-  const addGameBtn = document.getElementById('addGameBtn');
-  if (addGameBtn) {
-    addGameBtn.addEventListener('click', () => {
-      alert('Funcionalidad para añadir nuevo juego próximamente');
-    });
-  }
-  
+
   // Check if there's an active timer and start the display
   const activeTimerEl = document.querySelector('.timer-active');
   if (activeTimerEl) {
@@ -539,6 +494,187 @@ function bindTimerEvents(userId, games) {
       if (timerData.start_time) {
         startTimerDisplay(timerData.start_time);
       }
+    }
+  }
+}
+
+// ── Game picker / add-game modals ─────────────────────────────
+let modalSearchTimeout = null;
+
+function closeModal() {
+  const modal = document.getElementById('gvModal');
+  if (modal) modal.remove();
+  clearTimeout(modalSearchTimeout);
+}
+
+function openGamePickerModal(userId) {
+  closeModal();
+  document.body.insertAdjacentHTML('beforeend', `
+    <div class="modal-overlay" id="gvModal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Elegir juego</h3>
+          <button class="modal-close" id="modalCloseBtn" aria-label="Cerrar">&times;</button>
+        </div>
+        <input type="text" id="gamePickerSearch" class="modal-search-input" placeholder="Buscar en tu catálogo..." autocomplete="off" />
+        <div class="modal-results-list" id="gamePickerResults">
+          <div class="modal-hint">Escribe para buscar un juego</div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-modal-secondary" id="modalAddGameBtn">${iconPlus()} ¿No está? Añadir nuevo juego</button>
+        </div>
+      </div>
+    </div>
+  `);
+
+  document.getElementById('modalCloseBtn').addEventListener('click', closeModal);
+  document.getElementById('gvModal').addEventListener('click', (e) => {
+    if (e.target.id === 'gvModal') closeModal();
+  });
+  document.getElementById('modalAddGameBtn').addEventListener('click', () => {
+    openAddGameModal(userId);
+  });
+
+  const searchInput = document.getElementById('gamePickerSearch');
+  searchInput.addEventListener('input', () => {
+    clearTimeout(modalSearchTimeout);
+    const query = searchInput.value.trim();
+    modalSearchTimeout = setTimeout(() => searchGamesForPicker(query, userId), 250);
+  });
+  searchInput.focus();
+}
+
+async function searchGamesForPicker(query, userId) {
+  const resultsEl = document.getElementById('gamePickerResults');
+  if (!resultsEl) return;
+  if (query.length < 2) {
+    resultsEl.innerHTML = '<div class="modal-hint">Escribe al menos 2 caracteres</div>';
+    return;
+  }
+  resultsEl.innerHTML = '<div class="modal-hint">Buscando...</div>';
+  try {
+    const results = await apiFetch(`/games/?name=${encodeURIComponent(query)}`);
+    if (!resultsEl.isConnected) return; // modal closed while awaiting
+    if (!results || !results.length) {
+      resultsEl.innerHTML = '<div class="modal-hint">Sin resultados en tu catálogo</div>';
+      return;
+    }
+    resultsEl.innerHTML = results.map(g => `
+      <button class="modal-result-row" data-game-id="${g.id}">
+        ${g.image_url
+          ? `<img src="${g.image_url}" alt="" class="modal-result-thumb" />`
+          : '<div class="modal-result-thumb-placeholder">🎮</div>'}
+        <span class="modal-result-name">${escapeHtml(g.name)}</span>
+      </button>
+    `).join('');
+    resultsEl.querySelectorAll('.modal-result-row').forEach(btn => {
+      btn.addEventListener('click', () => {
+        closeModal();
+        startTimer(userId, btn.dataset.gameId);
+      });
+    });
+  } catch (err) {
+    if (resultsEl.isConnected) {
+      resultsEl.innerHTML = `<div class="modal-hint">Error buscando: ${escapeHtml(err.message)}</div>`;
+    }
+  }
+}
+
+function openAddGameModal(userId) {
+  closeModal();
+  document.body.insertAdjacentHTML('beforeend', `
+    <div class="modal-overlay" id="gvModal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Añadir juego nuevo</h3>
+          <button class="modal-close" id="modalCloseBtn" aria-label="Cerrar">&times;</button>
+        </div>
+        <input type="text" id="addGameSearch" class="modal-search-input" placeholder="Buscar en RAWG..." autocomplete="off" />
+        <div class="modal-results-list" id="addGameResults">
+          <div class="modal-hint">Escribe el nombre del juego</div>
+        </div>
+      </div>
+    </div>
+  `);
+
+  document.getElementById('modalCloseBtn').addEventListener('click', closeModal);
+  document.getElementById('gvModal').addEventListener('click', (e) => {
+    if (e.target.id === 'gvModal') closeModal();
+  });
+
+  const searchInput = document.getElementById('addGameSearch');
+  searchInput.addEventListener('input', () => {
+    clearTimeout(modalSearchTimeout);
+    const query = searchInput.value.trim();
+    modalSearchTimeout = setTimeout(() => searchRawgForAddGame(query, userId), 300);
+  });
+  searchInput.focus();
+}
+
+async function searchRawgForAddGame(query, userId) {
+  const resultsEl = document.getElementById('addGameResults');
+  if (!resultsEl) return;
+  if (query.length < 2) {
+    resultsEl.innerHTML = '<div class="modal-hint">Escribe al menos 2 caracteres</div>';
+    return;
+  }
+  resultsEl.innerHTML = '<div class="modal-hint">Buscando en RAWG...</div>';
+  try {
+    const candidates = await apiFetch(`/games/search-rawg?query=${encodeURIComponent(query)}`);
+    if (!resultsEl.isConnected) return; // modal closed while awaiting
+    if (!candidates || !candidates.length) {
+      resultsEl.innerHTML = '<div class="modal-hint">Sin resultados</div>';
+      return;
+    }
+    resultsEl.innerHTML = candidates.map((c, i) => `
+      <button class="modal-result-row" data-index="${i}">
+        ${c.image_url
+          ? `<img src="${c.image_url}" alt="" class="modal-result-thumb" />`
+          : '<div class="modal-result-thumb-placeholder">🎮</div>'}
+        <span class="modal-result-name">
+          ${escapeHtml(c.name)}${c.released ? ` <span class="modal-result-year">(${escapeHtml(c.released.slice(0, 4))})</span>` : ''}
+          ${c.exists_in_db ? '<span class="modal-result-badge">Ya en tu catálogo</span>' : ''}
+        </span>
+      </button>
+    `).join('');
+    resultsEl.querySelectorAll('.modal-result-row').forEach(btn => {
+      btn.addEventListener('click', () => {
+        handlePickRawgCandidate(candidates[Number(btn.dataset.index)], userId);
+      });
+    });
+  } catch (err) {
+    if (resultsEl.isConnected) {
+      resultsEl.innerHTML = `<div class="modal-hint">Error buscando: ${escapeHtml(err.message)}</div>`;
+    }
+  }
+}
+
+async function handlePickRawgCandidate(candidate, userId) {
+  const resultsEl = document.getElementById('addGameResults');
+  try {
+    if (candidate.exists_in_db && candidate.db_game_id) {
+      closeModal();
+      await startTimer(userId, candidate.db_game_id);
+      return;
+    }
+    if (resultsEl) resultsEl.innerHTML = '<div class="modal-hint">Añadiendo juego...</div>';
+    const newGame = await apiFetch('/games/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: candidate.name,
+        rawg_id: candidate.rawg_id,
+        release_date: candidate.released || null,
+        image_url: candidate.image_url || null,
+        genres: (candidate.genres || []).join(','),
+        slug: candidate.slug || null,
+      }),
+    });
+    closeModal();
+    await startTimer(userId, newGame.id);
+  } catch (err) {
+    if (resultsEl && resultsEl.isConnected) {
+      resultsEl.innerHTML = `<div class="modal-hint">Error: ${escapeHtml(err.message)}</div>`;
     }
   }
 }
