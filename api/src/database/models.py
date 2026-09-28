@@ -258,3 +258,20 @@ class RequestSync(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     request_id = Column(String(255), primary_key=True)
+
+
+class GameTimer(Base):
+    __tablename__ = "game_timers"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, nullable=False)
+    game_id = Column(String(255), nullable=False)
+    start_time = Column(DateTime, nullable=False)
+    end_time = Column(DateTime, nullable=True)
+    duration_seconds = Column(Integer, nullable=True)
+    platform = Column(String(255), nullable=True)
+    season = Column(Integer, nullable=True)
+    is_active = Column(Boolean, default=True)
+    notes = Column(String(500), nullable=True)
+
+    __table_args__ = (UniqueConstraint("user_id", "game_id", "start_time"),)

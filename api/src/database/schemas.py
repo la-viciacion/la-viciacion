@@ -220,3 +220,50 @@ class HttpExceptionDetailModel(BaseModel):
 
 class HttpException(BaseModel):
     detail: HttpExceptionDetailModel
+
+
+# Game Timer Schemas
+class GameTimerBase(BaseModel):
+    user_id: int
+    game_id: str
+    platform: str | None = None
+    season: int | None = None
+    notes: str | None = None
+
+
+class GameTimerCreate(GameTimerBase):
+    pass
+
+
+class GameTimerUpdate(BaseModel):
+    end_time: datetime.datetime | None = None
+    duration_seconds: int | None = None
+    platform: str | None = None
+    season: int | None = None
+    notes: str | None = None
+
+
+class GameTimerResponse(GameTimerBase):
+    id: int
+    start_time: datetime.datetime
+    end_time: datetime.datetime | None = None
+    duration_seconds: int | None = None
+    is_active: bool = True
+
+    class Config:
+        from_attributes = True
+
+
+class TimerStats(BaseModel):
+    user_id: int
+    game_id: str | None = None
+    total_time_seconds: int
+    total_sessions: int
+    average_session_duration: float
+    longest_session_seconds: int
+    shortest_session_seconds: int
+
+
+class ActiveTimerResponse(BaseModel):
+    is_active: bool
+    timer: GameTimerResponse | None = None
