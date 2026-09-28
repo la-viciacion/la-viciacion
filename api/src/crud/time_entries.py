@@ -10,6 +10,7 @@ from sqlalchemy import (
     or_,
     select,
     text,
+    union_all,
     update,
 )
 from sqlalchemy.orm import Session
@@ -31,26 +32,56 @@ config = Config()
 current_season = datetime.datetime.now().year
 
 
+def sessions_subquery():
+    """Normalized "played session" rows from both data sources.
+
+    Unions Clockify-era TimeEntry rows with native GameTimer rows (only
+    finished ones, is_active == False), so every aggregate query below sees
+    a single (user_id, game_id, start, end, duration) shape regardless of
+    which system tracked the session.
+    """
+    time_entry_sessions = select(
+        models.TimeEntry.user_id.label("user_id"),
+        models.TimeEntry.project_clockify_id.label("game_id"),
+        models.TimeEntry.start.label("start"),
+        models.TimeEntry.end.label("end"),
+        models.TimeEntry.duration.label("duration"),
+    )
+    game_timer_sessions = select(
+        models.GameTimer.user_id.label("user_id"),
+        # game_timers.game_id has no explicit collation (migration 002 left it
+        # at the server default), which can differ from games.id/time_entries'
+        # explicit utf8mb4_general_ci and break the UNION/joins below.
+        models.GameTimer.game_id.collate("utf8mb4_general_ci").label("game_id"),
+        models.GameTimer.start_time.label("start"),
+        models.GameTimer.end_time.label("end"),
+        models.GameTimer.duration_seconds.label("duration"),
+    ).where(models.GameTimer.is_active == False)
+    return union_all(time_entry_sessions, game_timer_sessions).subquery("sessions")
+
+
 def get_users_played_time(db: Session, season: int = current_season):
+    sessions = sessions_subquery()
     stmt = (
-        select(models.TimeEntry.user_id, func.sum(models.TimeEntry.duration))
-        .where(extract("year", models.TimeEntry.start) == season)
-        .group_by(models.TimeEntry.user_id)
+        select(sessions.c.user_id, func.sum(sessions.c.duration))
+        .where(extract("year", sessions.c.start) == season)
+        .group_by(sessions.c.user_id)
     )
     return db.execute(stmt)
 
 
 def get_user_played_time(db: Session, user_id: str, season: int = current_season):
+    sessions = sessions_subquery()
     stmt = (
         select(
-            models.TimeEntry.user_id,
-            func.sum(models.TimeEntry.duration),
+            sessions.c.user_id,
+            func.sum(sessions.c.duration),
         )
         .where(
-            models.TimeEntry.user_id == user_id,
-            extract("year", models.TimeEntry.start) == season,
+            sessions.c.user_id == user_id,
+            extract("year", sessions.c.start) == season,
         )
-        .group_by(models.TimeEntry.user_id)
+        .group_by(sessions.c.user_id)
     )
     return db.execute(stmt).first()
 
@@ -58,24 +89,21 @@ def get_user_played_time(db: Session, user_id: str, season: int = current_season
 def get_games_played_time(
     db: Session, season: int = current_season, is_active: bool = True
 ):
+    sessions = sessions_subquery()
     stmt = (
-        select(
-            models.TimeEntry.project_clockify_id, func.sum(models.TimeEntry.duration)
-        )
-        .join(models.User, models.TimeEntry.user_id == models.User.id)
+        select(sessions.c.game_id, func.sum(sessions.c.duration))
+        .join(models.User, sessions.c.user_id == models.User.id)
         .where(
-            extract("year", models.TimeEntry.start) == season,
+            extract("year", sessions.c.start) == season,
             models.User.is_active == is_active,
         )
-        .group_by(models.TimeEntry.project_clockify_id)
+        .group_by(sessions.c.game_id)
     )
     result = db.execute(stmt)
     return result
 
 
-def get_time_entry_by_date(
-    db: Session, user_id: int, date: str, mode: int
-) -> list[models.TimeEntry]:
+def get_time_entry_by_date(db: Session, user_id: int, date: str, mode: int):
     """_summary_
 
     Args:
@@ -85,64 +113,50 @@ def get_time_entry_by_date(
         mode (int): 1==, 2<=, 3>=
 
     Returns:
-        _type_: _description_
+        list[Row]: rows with (user_id, game_id, start, end, duration)
     """
+    sessions = sessions_subquery()
+    base = select(sessions).where(sessions.c.user_id == user_id)
     if mode == 1:
-        return db.query(models.TimeEntry).filter(
-            models.TimeEntry.user_id == user_id,
+        stmt = base.where(
             or_(
-                func.DATE(models.TimeEntry.start) == date,
-                func.DATE(models.TimeEntry.end) == date,
+                func.DATE(sessions.c.start) == date,
+                func.DATE(sessions.c.end) == date,
             ),
         )
     elif mode == 2:
-        return db.query(models.TimeEntry).filter(
-            models.TimeEntry.user_id == user_id,
+        stmt = base.where(
             or_(
-                func.DATE(models.TimeEntry.start) <= date,
-                func.DATE(models.TimeEntry.end) <= date,
+                func.DATE(sessions.c.start) <= date,
+                func.DATE(sessions.c.end) <= date,
             ),
         )
     elif mode == 3:
-        return db.query(models.TimeEntry).filter(
-            models.TimeEntry.user_id == user_id,
+        stmt = base.where(
             or_(
-                func.DATE(models.TimeEntry.start) >= date,
-                func.DATE(models.TimeEntry.end) >= date,
+                func.DATE(sessions.c.start) >= date,
+                func.DATE(sessions.c.end) >= date,
             ),
         )
+    else:
+        return []
+    return db.execute(stmt).all()
 
 
 def get_user_games_played_time(
     db: Session, user_id: str, game_id: str = None, season: int = current_season
-) -> list[models.TimeEntry]:
+):
+    sessions = sessions_subquery()
+    query = db.query(
+        sessions.c.game_id,
+        func.sum(sessions.c.duration),
+    ).filter(
+        sessions.c.user_id == user_id,
+        extract("year", sessions.c.start) == season,
+    )
     if game_id is not None:
-        return (
-            db.query(
-                models.TimeEntry.project_clockify_id,
-                func.sum(models.TimeEntry.duration),
-            )
-            .filter(
-                models.TimeEntry.user_id == user_id,
-                extract("year", models.TimeEntry.start) == season,
-            )
-            .filter(models.TimeEntry.project_clockify_id == game_id)
-            .group_by(models.TimeEntry.project_clockify_id)
-            .all()
-        )
-    else:
-        return (
-            db.query(
-                models.TimeEntry.project_clockify_id,
-                func.sum(models.TimeEntry.duration),
-            )
-            .filter(
-                models.TimeEntry.user_id == user_id,
-                extract("year", models.TimeEntry.start) == season,
-            )
-            .group_by(models.TimeEntry.project_clockify_id)
-            .all()
-        )
+        query = query.filter(sessions.c.game_id == game_id)
+    return query.group_by(sessions.c.game_id).all()
 
 
 def get_time_entries(
@@ -203,25 +217,24 @@ def get_played_days(
         start_date = str(current_date.year) + "-01-01"
     if end_date is None:
         end_date = "3000-12-31"
+    sessions = sessions_subquery()
     played_start_days = (
-        db.query(func.DATE(models.TimeEntry.start))
-        .filter(models.TimeEntry.user_id == user_id)
-        .filter(func.DATE(models.TimeEntry.start) >= start_date)
-        .filter(func.DATE(models.TimeEntry.start) <= end_date)
-        .filter(extract("year", models.TimeEntry.start) == season)
-        .filter(models.TimeEntry.duration >= 600)
-        # .filter(or_(models.TimeEntry.duration >= 600, models.TimeEntry.duration == None))
+        db.query(func.DATE(sessions.c.start))
+        .filter(sessions.c.user_id == user_id)
+        .filter(func.DATE(sessions.c.start) >= start_date)
+        .filter(func.DATE(sessions.c.start) <= end_date)
+        .filter(extract("year", sessions.c.start) == season)
+        .filter(sessions.c.duration >= 600)
         .distinct()
         .all()
     )
     played_end_days = (
-        db.query(func.DATE(models.TimeEntry.end))
-        .filter(models.TimeEntry.user_id == user_id)
-        .filter(func.DATE(models.TimeEntry.end) >= start_date)
-        .filter(func.DATE(models.TimeEntry.end) <= end_date)
-        .filter(extract("year", models.TimeEntry.start) == season)
-        .filter(models.TimeEntry.duration >= 600)
-        # .filter(or_(models.TimeEntry.duration >= 600, models.TimeEntry.duration == None))
+        db.query(func.DATE(sessions.c.end))
+        .filter(sessions.c.user_id == user_id)
+        .filter(func.DATE(sessions.c.end) >= start_date)
+        .filter(func.DATE(sessions.c.end) <= end_date)
+        .filter(extract("year", sessions.c.start) == season)
+        .filter(sessions.c.duration >= 600)
         .distinct()
         .all()
     )
@@ -377,7 +390,6 @@ async def sync_clockify_entries_db(
                         user=user,
                         start_date=start,
                         silent=silent,
-                        from_sync=True,
                     )
                     already_playing = users.get_game_by_id(
                         db, user.id, game_id, current_season
@@ -418,7 +430,6 @@ async def sync_clockify_entries_db(
                         game.id,
                         completed_date=start,
                         silent=silent,
-                        from_sync=True,
                     )
                 except Exception as e:
                     logger.error("Error completing game " + game_name + ": " + str(e))
@@ -440,7 +451,7 @@ def get_time_entry_by_time(
     duration: int,
     mode: int,
     season: int = current_season,
-) -> models.TimeEntry:
+):
     """_summary_
 
     Args:
@@ -450,49 +461,33 @@ def get_time_entry_by_time(
         mode (int): 1==, 2<=, 3>=
 
     Returns:
-        _type_: _description_
+        Row | None: row with (user_id, game_id, start, end, duration)
     """
+    sessions = sessions_subquery()
+    query = db.query(sessions).filter(
+        sessions.c.user_id == user_id,
+        extract("year", sessions.c.start) == season,
+    )
     if mode == 1:
-        time_entry = (
-            db.query(models.TimeEntry)
-            .filter(
-                models.TimeEntry.user_id == user_id,
-                models.TimeEntry.duration == duration,
-                extract("year", models.TimeEntry.start) == season,
-            )
-            .first()
-        )
+        time_entry = query.filter(sessions.c.duration == duration).first()
     elif mode == 2:
-        time_entry = (
-            db.query(models.TimeEntry)
-            .filter(
-                models.TimeEntry.user_id == user_id,
-                models.TimeEntry.duration <= duration,
-                extract("year", models.TimeEntry.start) == season,
-            )
-            .first()
-        )
+        time_entry = query.filter(sessions.c.duration <= duration).first()
     elif mode == 3:
-        time_entry = (
-            db.query(models.TimeEntry)
-            .filter(
-                models.TimeEntry.user_id == user_id,
-                models.TimeEntry.duration >= duration,
-                extract("year", models.TimeEntry.start) == season,
-            )
-            .first()
-        )
+        time_entry = query.filter(sessions.c.duration >= duration).first()
+    else:
+        time_entry = None
     return time_entry
 
 
 def get_played_time_by_day(db: Session, user_id: int, season: int = current_season):
+    sessions = sessions_subquery()
     played_start_days = (
-        db.query(func.DATE(models.TimeEntry.start), func.sum(models.TimeEntry.duration))
+        db.query(func.DATE(sessions.c.start), func.sum(sessions.c.duration))
         .filter(
-            models.TimeEntry.user_id == user_id,
-            extract("year", models.TimeEntry.start) == season,
+            sessions.c.user_id == user_id,
+            extract("year", sessions.c.start) == season,
         )
-        .group_by(func.DATE(models.TimeEntry.start))
+        .group_by(func.DATE(sessions.c.start))
         .all()
     )
     return sorted(played_start_days)
@@ -504,7 +499,7 @@ def get_time_entry_between_hours(
     start_hour: int,
     end_hour: int,
     season: int = current_season,
-) -> list[models.TimeEntry]:
+):
     """_summary_
 
     Args:
@@ -514,17 +509,18 @@ def get_time_entry_between_hours(
         end_hour (int): Exclude this hour (search until 1 minute before)
 
     Returns:
-        list[models.TimeEntry]: _description_
+        list[Row]: rows with (user_id, game_id, start, end, duration)
     """
-    time_entries = (
-        db.query(models.TimeEntry)
-        .filter(models.TimeEntry.user_id == user_id)
-        .filter(extract("hour", models.TimeEntry.start) >= start_hour)
-        .filter(extract("hour", models.TimeEntry.start) < end_hour)
-        .filter(extract("year", models.TimeEntry.start) == season)
+    sessions = sessions_subquery()
+    entries = (
+        db.query(sessions)
+        .filter(sessions.c.user_id == user_id)
+        .filter(extract("hour", sessions.c.start) >= start_hour)
+        .filter(extract("hour", sessions.c.start) < end_hour)
+        .filter(extract("year", sessions.c.start) == season)
         .all()
     )
-    return time_entries
+    return entries
 
 
 def get_active_time_entry_by_user(db: Session, user: models.User) -> models.TimeEntry:
@@ -535,6 +531,17 @@ def get_active_time_entry_by_user(db: Session, user: models.User) -> models.Time
         .first()
     )
     return active_time_entry
+
+
+def get_active_game_timer_by_user(db: Session, user_id: int) -> models.GameTimer:
+    return (
+        db.query(models.GameTimer)
+        .filter(
+            models.GameTimer.user_id == user_id,
+            models.GameTimer.is_active == True,
+        )
+        .first()
+    )
 
 
 def get_forgotten_timer_by_user(db: Session, user: models.User):
@@ -611,16 +618,17 @@ def get_weekly_resume(
     # else:
     #     first_day, last_day = utils.get_current_week_range_dates()
     first_day, last_day = utils.get_week_range_dates(weeks_ago)
+    sessions = sessions_subquery()
     weekly_hours = (
         db.query(
-            func.sum(models.TimeEntry.duration),
-            func.count(models.TimeEntry.id),
-            func.count(func.distinct(models.TimeEntry.project_clockify_id)),
+            func.sum(sessions.c.duration),
+            func.count(),
+            func.count(func.distinct(sessions.c.game_id)),
         )
-        .filter(models.TimeEntry.user_id == user.id)
-        .filter(func.DATE(models.TimeEntry.start) >= first_day)
-        .filter(func.DATE(models.TimeEntry.start) <= last_day)
-        .filter(models.TimeEntry.duration > 0)
+        .filter(sessions.c.user_id == user.id)
+        .filter(func.DATE(sessions.c.start) >= first_day)
+        .filter(func.DATE(sessions.c.start) <= last_day)
+        .filter(sessions.c.duration > 0)
         .all()
     )
     return weekly_hours

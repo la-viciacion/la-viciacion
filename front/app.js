@@ -241,6 +241,15 @@ async function renderHome() {
             ${infoCard('🆔', 'pink', 'ID de usuario', String(user.id), true)}
           </div>
 
+          <!-- Timer Section -->
+          <div class="section-header">
+            <h2 class="section-title">Timer de Juego</h2>
+            <div class="section-line"></div>
+          </div>
+          <div id="timerSection">
+            <div class="loading-spinner">Cargando timer...</div>
+          </div>
+
           <!-- Games -->
           <div class="section-header">
             <h2 class="section-title">Mis juegos</h2>
@@ -255,6 +264,9 @@ async function renderHome() {
 
     // Bind logout
     document.getElementById('logoutBtn').addEventListener('click', handleLogout);
+    
+    // Load timer section asynchronously
+    loadTimerSection(user.id, gamesData);
 
   } catch (err) {
     console.error(err);
@@ -305,6 +317,232 @@ function renderGames(games) {
   `).join('');
 }
 
+// ── Timer Section ───────────────────────────────────────────────
+async function loadTimerSection(userId, games) {
+  const timerSection = document.getElementById('timerSection');
+  if (!timerSection) return;
+  
+  try {
+    const activeTimer = await apiFetch(`/timers/active/${userId}`);
+    
+    if (activeTimer && activeTimer.is_active && activeTimer.timer) {
+      timerSection.innerHTML = renderActiveTimer(activeTimer.timer, games);
+      bindTimerEvents(userId, games);
+      
+      // Start timer display
+      startTimerDisplay(activeTimer.timer.start_time);
+    } else {
+      timerSection.innerHTML = renderTimerSelector(userId, games);
+      bindTimerEvents(userId, games);
+    }
+  } catch (err) {
+    console.error('Error fetching timer:', err);
+    timerSection.innerHTML = renderTimerSelector(userId, games);
+    bindTimerEvents(userId, games);
+  }
+}
+
+function renderActiveTimer(timer, games) {
+  const game = games.find(g => g.game_id === timer.game_id);
+  const gameName = game?.game?.name || timer.game_id;
+  
+  return `
+    <div class="timer-active" data-timer='${JSON.stringify(timer)}'>
+      <div class="timer-info">
+        <div class="timer-label">Jugando ahora:</div>
+        <div class="timer-game">${escapeHtml(gameName)}</div>
+        <div class="timer-duration" id="timerDuration">00:00:00</div>
+      </div>
+      <button class="btn-stop-timer" id="stopTimerBtn" data-timer-id="${timer.id}">
+        ${iconStop()} Detener
+      </button>
+    </div>
+  `;
+}
+
+function renderActiveTimer(timer, games) {
+  const game = games.find(g => g.game_id === timer.game_id);
+  const gameName = game?.game?.name || timer.game_id;
+  
+  return `
+    <div class="timer-active">
+      <div class="timer-info">
+        <div class="timer-label">Jugando ahora:</div>
+        <div class="timer-game">${escapeHtml(gameName)}</div>
+        <div class="timer-duration" id="timerDuration">00:00:00</div>
+      </div>
+      <button class="btn-stop-timer" id="stopTimerBtn" data-timer-id="${timer.id}">
+        ${iconStop()} Detener
+      </button>
+    </div>
+  `;
+}
+
+function renderTimerSelector(userId, games) {
+  const recentGames = games.slice(0, 5); // Last 5 games
+  
+  return `
+    <div class="timer-selector">
+      <div class="timer-label">Iniciar sesión de juego:</div>
+      
+      <div class="game-selector">
+        <select id="gameSelect" class="game-select">
+          <option value="">Selecciona un juego...</option>
+          ${recentGames.map(g => `
+            <option value="${g.game_id}">
+              ${escapeHtml(g.game?.name || g.game_id)}
+            </option>
+          `).join('')}
+        </select>
+        <button class="btn-add-game" id="addGameBtn" title="Añadir nuevo juego">
+          ${iconPlus()}
+        </button>
+      </div>
+      
+      <div class="timer-actions">
+        <button class="btn-start-timer" id="startTimerBtn" data-user-id="${userId}">
+          ${iconPlay()} Iniciar Timer
+        </button>
+      </div>
+      
+      <div class="recent-games">
+        <div class="recent-label">Juegos recientes:</div>
+        <div class="recent-list">
+          ${recentGames.map(g => `
+            <button class="recent-game-btn" data-game-id="${g.game_id}" data-user-id="${userId}">
+              ${escapeHtml(g.game?.name || g.game_id)}
+            </button>
+          `).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ── Timer Actions ───────────────────────────────────────────────
+async function startTimer(userId, gameId) {
+  try {
+    const response = await apiFetch('/timers/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user_id: userId,
+        game_id: gameId,
+        platform: 'Unknown',
+        season: new Date().getFullYear()
+      })
+    });
+    
+    if (response) {
+      await renderHome(); // Refresh to show active timer
+    }
+  } catch (err) {
+    console.error('Error starting timer:', err);
+    alert('Error al iniciar el timer: ' + err.message);
+  }
+}
+
+async function stopTimer(timerId, userId) {
+  try {
+    const response = await apiFetch(`/timers/stop/${timerId}?user_id=${userId}`, {
+      method: 'POST'
+    });
+    
+    if (response) {
+      await renderHome(); // Refresh to show timer selector
+    }
+  } catch (err) {
+    console.error('Error stopping timer:', err);
+    alert('Error al detener el timer: ' + err.message);
+  }
+}
+
+// ── Timer Timer Update ───────────────────────────────────────────
+let timerInterval = null;
+
+function startTimerDisplay(startTime) {
+  if (timerInterval) clearInterval(timerInterval);
+  
+  const updateTimer = () => {
+    const now = new Date();
+    const diff = Math.floor((now - new Date(startTime)) / 1000);
+    const hours = Math.floor(diff / 3600);
+    const minutes = Math.floor((diff % 3600) / 60);
+    const seconds = diff % 60;
+    
+    const durationEl = document.getElementById('timerDuration');
+    if (durationEl) {
+      durationEl.textContent = 
+        `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }
+  };
+  
+  updateTimer();
+  timerInterval = setInterval(updateTimer, 1000);
+}
+
+function stopTimerDisplay() {
+  if (timerInterval) {
+    clearInterval(timerInterval);
+    timerInterval = null;
+  }
+}
+
+function bindTimerEvents(userId, games) {
+  // Start timer button
+  const startBtn = document.getElementById('startTimerBtn');
+  if (startBtn) {
+    startBtn.addEventListener('click', () => {
+      const gameSelect = document.getElementById('gameSelect');
+      const gameId = gameSelect.value;
+      if (gameId) {
+        startTimer(userId, gameId);
+      } else {
+        alert('Por favor selecciona un juego');
+      }
+    });
+  }
+  
+  // Stop timer button
+  const stopBtn = document.getElementById('stopTimerBtn');
+  if (stopBtn) {
+    stopBtn.addEventListener('click', () => {
+      const timerId = stopBtn.dataset.timerId;
+      stopTimer(timerId, userId);
+    });
+  }
+  
+  // Recent game buttons
+  const recentBtns = document.querySelectorAll('.recent-game-btn');
+  recentBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const gameId = btn.dataset.gameId;
+      startTimer(userId, gameId);
+    });
+  });
+  
+  // Add game button (placeholder for now)
+  const addGameBtn = document.getElementById('addGameBtn');
+  if (addGameBtn) {
+    addGameBtn.addEventListener('click', () => {
+      alert('Funcionalidad para añadir nuevo juego próximamente');
+    });
+  }
+  
+  // Check if there's an active timer and start the display
+  const activeTimerEl = document.querySelector('.timer-active');
+  if (activeTimerEl) {
+    const timerInfo = activeTimerEl.querySelector('.timer-duration');
+    if (timerInfo) {
+      // Get the start time from the timer data
+      const timerData = JSON.parse(activeTimerEl.dataset.timer || '{}');
+      if (timerData.start_time) {
+        startTimerDisplay(timerData.start_time);
+      }
+    }
+  }
+}
+
 function infoCard(icon, colorClass, label, value, mono = false) {
   return `
     <div class="info-card">
@@ -317,6 +555,7 @@ function infoCard(icon, colorClass, label, value, mono = false) {
 
 // ── Logout ───────────────────────────────────────────────────
 function handleLogout() {
+  stopTimerDisplay(); // Stop timer display
   storage.clearToken();
   renderLogin();
 }
@@ -336,6 +575,15 @@ function iconEyeOff() {
 }
 function iconLogout() {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>`;
+}
+function iconPlay() {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
+}
+function iconStop() {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12"/></svg>`;
+}
+function iconPlus() {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`;
 }
 
 // ── Utils ────────────────────────────────────────────────────

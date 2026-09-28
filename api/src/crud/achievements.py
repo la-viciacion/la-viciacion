@@ -302,14 +302,14 @@ class Achievements:
                     db,
                     user.id,
                     ach.name,
-                    game_id=time_entry.project_clockify_id,
+                    game_id=time_entry.game_id,
                     date=str(time_entry.start),
                 )
                 msg = utils.get_ach_message(
                     ach,
                     user=user.name,
                     db=db,
-                    game_id=time_entry.project_clockify_id,
+                    game_id=time_entry.game_id,
                 )
                 await utils.send_message(
                     msg,
@@ -329,14 +329,14 @@ class Achievements:
                     db,
                     user.id,
                     ach.name,
-                    game_id=time_entry.project_clockify_id,
+                    game_id=time_entry.game_id,
                     date=str(time_entry.start),
                 )
                 msg = utils.get_ach_message(
                     ach,
                     user=user.name,
                     db=db,
-                    game_id=time_entry.project_clockify_id,
+                    game_id=time_entry.game_id,
                 )
                 await utils.send_message(
                     msg,
@@ -356,14 +356,14 @@ class Achievements:
                     db,
                     user.id,
                     ach.name,
-                    game_id=time_entry.project_clockify_id,
+                    game_id=time_entry.game_id,
                     date=str(time_entry.start),
                 )
                 msg = utils.get_ach_message(
                     ach,
                     user=user.name,
                     db=db,
-                    game_id=time_entry.project_clockify_id,
+                    game_id=time_entry.game_id,
                 )
                 await utils.send_message(
                     msg,
@@ -669,7 +669,7 @@ class Achievements:
         new_year = current_season + "-01-01"
         time_entry = time_entries.get_time_entry_by_date(db, user.id, new_year, 1)
         ach = AchievementsElems.HAPPY_NEW_YEAR
-        if time_entry.count() > 0 and not self.check_already_achieved(
+        if len(time_entry) > 0 and not self.check_already_achieved(
             db, user.id, ach.name
         ):
             logger.info("Set achievement happy new year")
@@ -792,7 +792,10 @@ class Achievements:
         playing: List[models.User] = []
         for user in user_list:
             has_active_time_entry = time_entries.get_active_time_entry_by_user(db, user)
-            if has_active_time_entry is not None:
+            has_active_game_timer = time_entries.get_active_game_timer_by_user(
+                db, user.id
+            )
+            if has_active_time_entry is not None or has_active_game_timer is not None:
                 playing.append(user)
         # logger.debug(
         #    "Playing users: " + str(len(playing)) + "/" + str(user_list.count())

@@ -1,4 +1,5 @@
 import datetime
+import uuid
 from typing import Union
 import random
 
@@ -10,13 +11,10 @@ from ..database import models, schemas
 from ..utils import actions
 from ..utils import actions as actions
 from ..utils import my_utils as utils
-from ..utils.clockify_api import ClockifyApi
 from ..utils.logger import LogManager
 
 log_manager = LogManager()
 logger = log_manager.get_logger()
-
-clockify_api = ClockifyApi()
 
 #################
 ##### GAMES #####
@@ -86,33 +84,12 @@ async def new_game(db: Session, game: schemas.NewGame) -> models.Game:
         logger.info(f"Game '{official_name}' already exists in DB (id: {existing_game.id})")
         return existing_game
 
-    # 3. Resolve Clockify project
-    clockify_id = game.clockify_id
-    if clockify_id is None or not utils.check_hex(clockify_id):
-        logger.info(f"Resolving Clockify project for '{official_name}'...")
-        project = clockify_api.get_or_create_project(official_name)
-        if isinstance(project, dict) and "id" in project:
-            clockify_id = project["id"]
-        else:
-            raise ValueError(f"Failed to obtain Clockify project for '{official_name}': {project}")
-    else:
-        # If project was already created in Clockify, sync its name to official name if different
-        try:
-            clockify_project = clockify_api.get_project_by_id(clockify_id)
-            if isinstance(clockify_project, dict) and clockify_project.get("name") != official_name:
-                clockify_api.update_project_name(clockify_id, official_name)
-        except Exception as e:
-            logger.warning(f"Could not update project name in Clockify: {e}")
-
-    # Double check if clockify_id already exists in DB
-    existing_by_id = db.query(models.Game).filter(models.Game.id == clockify_id).first()
-    if existing_by_id:
-        logger.info(f"Game with Clockify ID '{clockify_id}' already exists in DB")
-        return existing_by_id
+    # 3. Generate a local id for the new game
+    game_id = str(uuid.uuid4())
 
     # 4. Create and persist Game
     game_to_add = models.Game(
-        id=clockify_id,
+        id=game_id,
         name=official_name,
         dev=game_info.dev,
         steam_id=game_info.steam_id,
@@ -227,7 +204,6 @@ def update_game(db: Session, game_id: int, game: schemas.UpdateGame):
         )
         db.execute(stmt)
         db.commit()
-        clockify_api.update_project_name(game_id, name)
         return db.query(models.Game).filter(models.Game.id == game_id).first()
     except Exception as e:
         db.rollback()

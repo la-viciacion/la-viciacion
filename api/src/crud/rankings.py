@@ -4,7 +4,7 @@ from typing import Union
 from sqlalchemy import asc, create_engine, desc, func, select, text, update
 from sqlalchemy.orm import Session
 
-from ..crud import users
+from ..crud import time_entries, users
 from ..database import models, schemas
 from ..utils import actions as actions
 from ..utils import my_utils as utils
@@ -231,19 +231,19 @@ def user_completed_games(
 
 def games_last_played(db: Session, limit: int = 10):
     try:
+        sessions = time_entries.sessions_subquery()
         stmt = (
             select(
-                models.TimeEntry.project_clockify_id,
+                sessions.c.game_id,
                 models.Game.name,
-                models.TimeEntry.start,
+                sessions.c.start,
             )
-            .join(
-                models.Game,
-                models.Game.id == models.TimeEntry.project_clockify_id,
-            )
-            .order_by(desc(models.TimeEntry.start))
+            .join(models.Game, models.Game.id == sessions.c.game_id)
+            .order_by(desc(sessions.c.start))
         )
-        result = db.execute(stmt).fetchall()
+        # .mappings() so `item["name"]` string-key access works (SQLAlchemy
+        # 2.x plain Row no longer supports it, only via _mapping/.mappings()).
+        result = db.execute(stmt).mappings().fetchall()
         unique_names = set()
         unique_data = []
         for item in result:
@@ -262,17 +262,18 @@ def user_last_played_games(
     db: Session, limit: int = None, is_active: bool | None = True
 ):
     try:
+        sessions = time_entries.sessions_subquery()
         stmt = select(
-            models.TimeEntry.project_clockify_id,
-            models.TimeEntry.user_id,
-            models.TimeEntry.start,
+            sessions.c.game_id,
+            sessions.c.user_id,
+            sessions.c.start,
             models.User.name,
-        ).join(models.User, models.User.id == models.TimeEntry.user_id)
+        ).join(models.User, models.User.id == sessions.c.user_id)
 
         if is_active is not None:
             stmt = stmt.where(models.User.is_active == is_active)
 
-        stmt = stmt.order_by(desc(models.TimeEntry.start)).limit(limit)
+        stmt = stmt.order_by(desc(sessions.c.start)).limit(limit)
 
         return db.execute(stmt).fetchall()
     except Exception as e:

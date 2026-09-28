@@ -358,7 +358,6 @@ async def get_new_game_info(game) -> schemas.NewGame:
     """Resolve and build schemas.NewGame using rawg_id if provided, or by searching RAWG."""
     game_data = game if isinstance(game, dict) else (game.dict() if hasattr(game, "dict") else vars(game))
     game_name = game_data.get("name", "")
-    project_id = game_data.get("id") or game_data.get("clockify_id")
     rawg_id = game_data.get("rawg_id")
 
     details = None
@@ -373,7 +372,6 @@ async def get_new_game_info(game) -> schemas.NewGame:
 
     if details:
         return schemas.NewGame(
-            clockify_id=project_id,
             name=details["name"],
             dev=details["dev"],
             release_date=details["release_date"],
@@ -388,7 +386,6 @@ async def get_new_game_info(game) -> schemas.NewGame:
     # Safe fallback if RAWG finds nothing
     logger.warning(f"No RAWG details found for game: {game_name}. Using fallback.")
     return schemas.NewGame(
-        clockify_id=project_id,
         name=game_name,
         dev="-",
         release_date=None,

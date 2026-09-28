@@ -107,7 +107,6 @@ class GameStatistics(BaseModel):
 
 
 class NewGame(BaseModel):
-    clockify_id: Optional[str | None] = None
     name: str
     dev: Optional[str | None] = None
     release_date: Optional[datetime.date | None] = None

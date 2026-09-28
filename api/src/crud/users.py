@@ -383,7 +383,6 @@ async def add_new_game(
     start_date: str = None,
     season: int = current_season,
     silent: bool = False,
-    from_sync=False,
 ) -> models.UserGame:
     logger.info("Adding new user game...")
     try:
@@ -412,10 +411,6 @@ async def add_new_game(
                 logger.info("Error adding new user game: " + str(e))
                 raise e
         played_games = count_played_games(db, user.id)
-        if not from_sync:
-            clockify_api.create_empty_time_entry(
-                db, user.clockify_key, game_db.id, game.platform
-            )
         started_game = (
             "[" + game_db.name + "](https://rawg.io/games/" + game_db.slug + ")"
         )
@@ -509,6 +504,10 @@ def get_games(
     completed=None,
     season: int = current_season,
 ) -> list[schemas.UserGame]:
+    # Local import to avoid a circular import (crud.time_entries imports crud.users).
+    from . import time_entries as time_entries_crud
+
+    sessions = time_entries_crud.sessions_subquery()
     if completed != None:
         completed = 1 if completed == True else 0
         stmt = (
@@ -517,34 +516,35 @@ def get_games(
                 models.UserGame.platform.label("platform_id"),
                 models.Game.name.label("game_name"),
                 models.PlatformTag.name.label("platform_name"),
-                models.TimeEntry.start.label("last_played_time"),
+                sessions.c.start.label("last_played_time"),
             )
             .join(models.Game, models.UserGame.game_id == models.Game.id)
             .outerjoin(
                 models.PlatformTag, models.UserGame.platform == models.PlatformTag.id
             )
-            .join(
-                models.TimeEntry,
-                models.TimeEntry.project_clockify_id == models.Game.id,
+            .outerjoin(
+                sessions,
+                (sessions.c.game_id == models.Game.id)
+                & (sessions.c.user_id == models.UserGame.user_id),
             )
             .where(
                 models.UserGame.user_id == user_id,
                 models.UserGame.completed == completed,
                 extract("year", models.UserGame.started_date) == season,
-                models.UserGame.user_id == user_id,
-                models.TimeEntry.user_id == user_id,
             )
             .group_by(
                 models.UserGame.user_id,
                 models.UserGame.game_id,
                 models.Game.name,
                 models.UserGame.played_time,
-                models.TimeEntry.start,
+                sessions.c.start,
             )
-            .order_by(desc(models.TimeEntry.start))
+            .order_by(desc(sessions.c.start))
             .limit(limit)
         )
-        result = db.execute(stmt).fetchall()
+        # .mappings() so `item["game_name"]` string-key access works
+        # (SQLAlchemy 2.x plain Row only supports it via _mapping/.mappings()).
+        result = db.execute(stmt).mappings().fetchall()
         unique_names = set()
         unique_data = []
         for item in result:
@@ -562,33 +562,32 @@ def get_games(
                 models.UserGame.platform.label("platform_id"),
                 models.Game.name.label("game_name"),
                 models.PlatformTag.name.label("platform_name"),
-                models.TimeEntry.start.label("last_played_time"),
+                sessions.c.start.label("last_played_time"),
             )
             .join(models.Game, models.UserGame.game_id == models.Game.id)
             .outerjoin(
                 models.PlatformTag, models.UserGame.platform == models.PlatformTag.id
             )
-            .join(
-                models.TimeEntry,
-                models.TimeEntry.project_clockify_id == models.Game.id,
+            .outerjoin(
+                sessions,
+                (sessions.c.game_id == models.Game.id)
+                & (sessions.c.user_id == models.UserGame.user_id),
             )
             .where(
                 models.UserGame.user_id == user_id,
                 extract("year", models.UserGame.started_date) == season,
-                models.UserGame.user_id == user_id,
-                models.TimeEntry.user_id == user_id,
             )
             .group_by(
                 models.UserGame.user_id,
                 models.UserGame.game_id,
                 models.Game.name,
                 models.UserGame.played_time,
-                models.TimeEntry.start,
+                sessions.c.start,
             )
-            .order_by(desc(models.TimeEntry.start))
+            .order_by(desc(sessions.c.start))
             .limit(limit)
         )
-        result = db.execute(stmt).fetchall()
+        result = db.execute(stmt).mappings().fetchall()
         unique_names = set()
         unique_data = []
         for item in result:
@@ -681,7 +680,6 @@ async def complete_game(
     completed_date: str = None,
     season: int = current_season,
     silent: bool = False,
-    from_sync=False,
 ):
     current_year = datetime.datetime.now().year
     try:
@@ -689,15 +687,6 @@ async def complete_game(
         user = get_user_by_id(db, user_id)
         user_game = get_game_by_id(db, user_id, db_game.id, current_year)
         game_info = await utils.get_game_info(db_game.name)
-        if not from_sync:
-            clockify_api.create_empty_time_entry(
-                db,
-                user.clockify_key,
-                game_id,
-                user_game.platform,
-                completed=True,
-            )
-            return get_game_by_id(db, user_id, game_id, current_year)
         if completed_date is None:
             completed_date = datetime.datetime.now()
         else:
