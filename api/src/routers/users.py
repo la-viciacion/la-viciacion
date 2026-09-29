@@ -22,6 +22,7 @@ from ..utils import actions as actions
 from ..utils import messages as msg
 from ..utils import my_utils as utils
 from ..utils.logger import LogManager
+from ..utils import seasons
 
 log_manager = LogManager()
 logger = log_manager.get_logger()
@@ -284,7 +285,7 @@ async def update_completion(
         if entry.completed:
             users.uncomplete_entry(db, entry)
     elif not entry.completed:
-        if entry.season != datetime.date.today().year:
+        if entry.season != seasons.current():
             raise HTTPException(status_code=409, detail=msg.COMPLETE_ONLY_CURRENT_SEASON)
         if users.completed_in_season(db, user.id, entry.game_id, entry.season):
             raise HTTPException(status_code=409, detail=msg.ALREADY_COMPLETED_IN_SEASON)
@@ -311,7 +312,7 @@ async def add_game_to_user(
     Add new game to user list
     """
     auth.ensure_self_or_admin(active_user, username=username)
-    current_season = datetime.datetime.now().year
+    current_season = seasons.current()
     user = users.get_user_by_username(db, username)
     if user is None:
         raise HTTPException(status_code=404, detail=msg.USER_NOT_EXISTS)
@@ -368,7 +369,7 @@ async def complete_game(
     if user is None:
         logger.info("IS NONE")
         raise HTTPException(status_code=404, detail=msg.USER_NOT_EXISTS)
-    current_season = datetime.datetime.now().year
+    current_season = seasons.current()
     user_game = users.get_game_by_id(db, user.id, game_id, current_season)
     if user_game is None:
         raise HTTPException(status_code=404, detail=msg.USER_NOT_PLAYING)
@@ -399,7 +400,7 @@ async def rate_game(
     user = users.get_user_by_username(db, username)
     if user is None:
         raise HTTPException(status_code=404, detail=msg.USER_NOT_EXISTS)
-    current_season = datetime.datetime.now().year
+    current_season = seasons.current()
     user_game = users.get_game_by_id(db, user.id, game_id, current_season)
     if user_game is None:
         raise HTTPException(status_code=404, detail=msg.USER_NOT_PLAYING)

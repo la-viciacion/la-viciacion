@@ -1,4 +1,3 @@
-import datetime
 import json
 import os
 from typing import Any
@@ -51,8 +50,6 @@ class Config:
         self.SENTRY_URL = self._get_env("SENTRY_URL_API")
         self.ENVIRONMENT = self._get_env("ENVIRONMENT")
         
-        # App Config
-        self.CURRENT_SEASON = datetime.datetime.now().year
     
     def _get_env(self, key: str) -> str:
         """

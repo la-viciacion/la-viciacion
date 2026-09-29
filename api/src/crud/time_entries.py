@@ -21,6 +21,7 @@ from ..utils import actions as actions
 from ..utils import my_utils as utils
 from . import games, users
 from ..utils.logger import LogManager
+from ..utils import seasons
 
 log_manager = LogManager()
 logger = log_manager.get_logger()
@@ -40,6 +41,7 @@ def sessions_subquery():
         select(
             models.GameTimer.user_id.label("user_id"),
             models.GameTimer.game_id.label("game_id"),
+            models.GameTimer.season.label("season"),
             models.GameTimer.start_time.label("start"),
             models.GameTimer.end_time.label("end"),
             models.GameTimer.duration_seconds.label("duration"),
@@ -50,20 +52,18 @@ def sessions_subquery():
 
 
 def get_users_played_time(db: Session, season: int = None):
-    if season is None:
-        season = datetime.datetime.now().year
+    season = seasons.or_current(season)
     sessions = sessions_subquery()
     stmt = (
         select(sessions.c.user_id, func.sum(sessions.c.duration))
-        .where(extract("year", sessions.c.start) == season)
+        .where(sessions.c.season == season)
         .group_by(sessions.c.user_id)
     )
     return db.execute(stmt)
 
 
 def get_user_played_time(db: Session, user_id: str, season: int = None):
-    if season is None:
-        season = datetime.datetime.now().year
+    season = seasons.or_current(season)
     sessions = sessions_subquery()
     stmt = (
         select(
@@ -72,7 +72,7 @@ def get_user_played_time(db: Session, user_id: str, season: int = None):
         )
         .where(
             sessions.c.user_id == user_id,
-            extract("year", sessions.c.start) == season,
+            sessions.c.season == season,
         )
         .group_by(sessions.c.user_id)
     )
@@ -80,14 +80,13 @@ def get_user_played_time(db: Session, user_id: str, season: int = None):
 
 
 def get_games_played_time(db: Session, season: int = None, is_active: bool = True):
-    if season is None:
-        season = datetime.datetime.now().year
+    season = seasons.or_current(season)
     sessions = sessions_subquery()
     stmt = (
         select(sessions.c.game_id, func.sum(sessions.c.duration))
         .join(models.User, sessions.c.user_id == models.User.id)
         .where(
-            extract("year", sessions.c.start) == season,
+            sessions.c.season == season,
             models.User.is_active == is_active,
         )
         .group_by(sessions.c.game_id)
@@ -139,15 +138,14 @@ def get_time_entry_by_date(db: Session, user_id: int, date: str, mode: int):
 def get_user_games_played_time(
     db: Session, user_id: str, game_id: str = None, season: int = None
 ):
-    if season is None:
-        season = datetime.datetime.now().year
+    season = seasons.or_current(season)
     sessions = sessions_subquery()
     query = db.query(
         sessions.c.game_id,
         func.sum(sessions.c.duration),
     ).filter(
         sessions.c.user_id == user_id,
-        extract("year", sessions.c.start) == season,
+        sessions.c.season == season,
     )
     if game_id is not None:
         query = query.filter(sessions.c.game_id == game_id)
@@ -161,8 +159,7 @@ def get_played_days(
     end_date: str = None,
     season: int = None,
 ) -> tuple[list[datetime.date], list[datetime.date]]:
-    if season is None:
-        season = datetime.datetime.now().year
+    season = seasons.or_current(season)
     played_days = []
     real_played_days = []
     if start_date is None:
@@ -176,7 +173,7 @@ def get_played_days(
         .filter(sessions.c.user_id == user_id)
         .filter(func.DATE(sessions.c.start) >= start_date)
         .filter(func.DATE(sessions.c.start) <= end_date)
-        .filter(extract("year", sessions.c.start) == season)
+        .filter(sessions.c.season == season)
         .filter(sessions.c.duration >= 600)
         .distinct()
         .all()
@@ -186,7 +183,7 @@ def get_played_days(
         .filter(sessions.c.user_id == user_id)
         .filter(func.DATE(sessions.c.end) >= start_date)
         .filter(func.DATE(sessions.c.end) <= end_date)
-        .filter(extract("year", sessions.c.start) == season)
+        .filter(sessions.c.season == season)
         .filter(sessions.c.duration >= 600)
         .distinct()
         .all()
@@ -220,12 +217,11 @@ def get_time_entry_by_time(
     Returns:
         Row | None: row with (user_id, game_id, start, end, duration)
     """
-    if season is None:
-        season = datetime.datetime.now().year
+    season = seasons.or_current(season)
     sessions = sessions_subquery()
     query = db.query(sessions).filter(
         sessions.c.user_id == user_id,
-        extract("year", sessions.c.start) == season,
+        sessions.c.season == season,
     )
     if mode == 1:
         time_entry = query.filter(sessions.c.duration == duration).first()
@@ -239,14 +235,13 @@ def get_time_entry_by_time(
 
 
 def get_played_time_by_day(db: Session, user_id: int, season: int = None):
-    if season is None:
-        season = datetime.datetime.now().year
+    season = seasons.or_current(season)
     sessions = sessions_subquery()
     played_start_days = (
         db.query(func.DATE(sessions.c.start), func.sum(sessions.c.duration))
         .filter(
             sessions.c.user_id == user_id,
-            extract("year", sessions.c.start) == season,
+            sessions.c.season == season,
         )
         .group_by(func.DATE(sessions.c.start))
         .all()
@@ -255,8 +250,7 @@ def get_played_time_by_day(db: Session, user_id: int, season: int = None):
 
 
 def get_played_time_by_game_and_day(db: Session, user_id: int, season: int = None):
-    if season is None:
-        season = datetime.datetime.now().year
+    season = seasons.or_current(season)
     sessions = sessions_subquery()
     return (
         db.query(
@@ -266,7 +260,7 @@ def get_played_time_by_game_and_day(db: Session, user_id: int, season: int = Non
         )
         .filter(
             sessions.c.user_id == user_id,
-            extract("year", sessions.c.start) == season,
+            sessions.c.season == season,
         )
         .group_by(func.DATE(sessions.c.start), sessions.c.game_id)
         .all()
@@ -274,8 +268,7 @@ def get_played_time_by_game_and_day(db: Session, user_id: int, season: int = Non
 
 
 def get_played_games_count_by_day(db: Session, user_id: int, season: int = None):
-    if season is None:
-        season = datetime.datetime.now().year
+    season = seasons.or_current(season)
     sessions = sessions_subquery()
     return (
         db.query(
@@ -284,7 +277,7 @@ def get_played_games_count_by_day(db: Session, user_id: int, season: int = None)
         )
         .filter(
             sessions.c.user_id == user_id,
-            extract("year", sessions.c.start) == season,
+            sessions.c.season == season,
         )
         .group_by(func.DATE(sessions.c.start))
         .all()
@@ -309,15 +302,14 @@ def get_time_entry_between_hours(
     Returns:
         list[Row]: rows with (user_id, game_id, start, end, duration)
     """
-    if season is None:
-        season = datetime.datetime.now().year
+    season = seasons.or_current(season)
     sessions = sessions_subquery()
     entries = (
         db.query(sessions)
         .filter(sessions.c.user_id == user_id)
         .filter(extract("hour", sessions.c.start) >= start_hour)
         .filter(extract("hour", sessions.c.start) < end_hour)
-        .filter(extract("year", sessions.c.start) == season)
+        .filter(sessions.c.season == season)
         .all()
     )
     return entries

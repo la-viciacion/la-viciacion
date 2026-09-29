@@ -9,6 +9,7 @@ from ..database import models, schemas
 from ..utils import actions as actions
 from ..utils import my_utils as utils
 from ..utils.logger import LogManager
+from ..utils import seasons
 from ..config import Config
 
 log_manager = LogManager()
@@ -140,8 +141,7 @@ def user_ranking_achievements(
     season: int = None,
     is_active: bool | None = True,
 ):
-    if season is None:
-        season = datetime.datetime.now().year
+    season = seasons.or_current(season)
     try:
         stmt = (
             select(
@@ -169,8 +169,7 @@ def user_played_games(
     season: int = None,
     is_active: bool | None = True,
 ):
-    if season is None:
-        season = datetime.datetime.now().year
+    season = seasons.or_current(season)
     try:
         stmt = (
             select(
@@ -203,8 +202,7 @@ def user_completed_games(
     season: int = None,
     is_active: bool | None = True,
 ):
-    if season is None:
-        season = datetime.datetime.now().year
+    season = seasons.or_current(season)
     try:
         user_list = users.get_users(db, is_active=is_active)
         data = []
@@ -327,8 +325,7 @@ def platform_played_games(db: Session, limit: int = None):
 
 
 def user_ratio(db: Session, season: int = None, is_active: bool | None = True):
-    if season is None:
-        season = datetime.datetime.now().year
+    season = seasons.or_current(season)
     try:
         user_list = users.get_users(db, is_active=is_active)
         data = []

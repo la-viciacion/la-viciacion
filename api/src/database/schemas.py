@@ -242,7 +242,6 @@ class GameTimerBase(BaseModel):
     user_id: int
     game_id: str
     platform: str | None = None
-    season: int | None = None
     notes: str | None = None
 
 
@@ -254,12 +253,12 @@ class GameTimerUpdate(BaseModel):
     end_time: datetime.datetime | None = None
     duration_seconds: int | None = None
     platform: str | None = None
-    season: int | None = None
     notes: str | None = None
 
 
 class GameTimerResponse(GameTimerBase):
     id: int
+    season: int | None = None  # derived from start_time
     start_time: datetime.datetime
     end_time: datetime.datetime | None = None
     duration_seconds: int | None = None

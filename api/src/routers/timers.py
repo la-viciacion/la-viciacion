@@ -21,6 +21,7 @@ from ..database.schemas import (
     TimerStats,
 )
 from ..utils import actions
+from ..utils import seasons
 
 
 def get_db():
@@ -50,7 +51,6 @@ async def create_timer(db: Session, timer: GameTimerCreate) -> GameTimer:
         game_id=timer.game_id,
         start_time=datetime.datetime.now(),
         platform=timer.platform,
-        season=timer.season,
         notes=timer.notes,
         is_active=True
     )
@@ -60,7 +60,7 @@ async def create_timer(db: Session, timer: GameTimerCreate) -> GameTimer:
 
     # Make sure the user has a UserGame entry for this game/season, same as
     # the Clockify sync used to create implicitly when a time entry came in.
-    season = timer.season or datetime.datetime.now().year
+    season = seasons.current()
     user = users_crud.get_user_by_id(db, timer.user_id)
     # One UserGame per (game, platform, season): the same game on another
     # platform, or in a later year, is a new entry.
@@ -79,7 +79,6 @@ async def create_timer(db: Session, timer: GameTimerCreate) -> GameTimer:
             db,
             game=NewGameUser(game_id=timer.game_id, platform=timer.platform),
             user=user,
-            season=season,
             silent=False,
         )
 

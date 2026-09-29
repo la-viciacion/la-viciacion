@@ -16,6 +16,7 @@ from ..crud.achievements import Achievements
 from ..database import models, schemas
 from . import my_utils as utils
 from ..utils import ai_prompts as prompts
+from ..utils import seasons
 from .logger import LogManager
 
 log_manager = LogManager()
@@ -33,7 +34,7 @@ achievements = Achievements()
 async def recompute_user_stats(db: Session, user: models.User, silent: bool = False):
     """Recompute one user's aggregates/achievements from their sessions
     (game_timers, including the backfilled Clockify-era ones)."""
-    current_season = datetime.datetime.now().year
+    current_season = seasons.current()
 
     users.create_user_statistics(db, user.id)
 

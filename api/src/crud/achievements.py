@@ -13,6 +13,7 @@ from ..utils import actions as actions
 from ..utils import my_utils as utils
 from ..utils.achievements import AchievementsElems
 from ..utils.logger import LogManager
+from ..utils import seasons
 
 log_manager = LogManager()
 logger = log_manager.get_logger()
@@ -101,8 +102,7 @@ class Achievements:
     def check_already_achieved(
         self, db: Session, user_id: int, key: str, season: int = None
     ) -> bool:
-        if season is None:
-            season = datetime.datetime.now().year
+        season = seasons.or_current(season)
         ach_id = self.get_ach_by_key(db, str(key))
         already_achieved = (
             db.query(models.UserAchievement)
@@ -124,10 +124,8 @@ class Achievements:
         key: str,
         game_id: str = None,
         date: str = None,
-        season: int = None,
     ):
-        if season is None:
-            season = datetime.datetime.now().year
+        # the season is derived from the date by the database
         if date is None:
             date = datetime.datetime.now()
         else:
@@ -136,7 +134,6 @@ class Achievements:
         user_achievement = models.UserAchievement(
             user_id=user_id,
             achievement_id=ach_id[0],
-            season=season,
             date=date,
             game_id=game_id,
         )
@@ -755,8 +752,7 @@ class Achievements:
         silent: bool = False,
         season: int = None,
     ):
-        if season is None:
-            season = datetime.datetime.now().year
+        season = seasons.or_current(season)
         current_season = str(season)
         new_year = current_season + "-01-01"
         time_entry = time_entries.get_time_entry_by_date(db, user.id, new_year, 1)

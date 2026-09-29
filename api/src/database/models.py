@@ -3,6 +3,7 @@ from sqlalchemy import (
     BigInteger,
     Boolean,
     Column,
+    Computed,
     Date,
     DateTime,
     Float,
@@ -96,8 +97,9 @@ class UserGame(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer)
     game_id = Column(String(255))
-    started_date = Column(Date)
-    season = Column(Integer)
+    started_date = Column(Date, nullable=False)
+    # derived by the database from started_date: never written by the app
+    season = Column(Integer, Computed("YEAR(started_date)", persisted=False))
     platform = Column(String(255))
     completed = Column(Integer)
     completed_date = Column(Date)
@@ -106,7 +108,7 @@ class UserGame(Base):
     completion_time = Column(Integer)
 
     __table_args__ = (
-        UniqueConstraint("user_id", "game_id", "platform", "season"),
+        UniqueConstraint("user_id", "game_id", "platform", "season", name="uq_users_games_entry"),
     )
 
 
@@ -127,13 +129,12 @@ class UserAchievement(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer)
     achievement_id = Column(Integer)
-    date = Column(Date)
-    season = Column(Integer)
+    date = Column(Date, nullable=False)
+    # derived by the database from date: never written by the app
+    season = Column(Integer, Computed("YEAR(`date`)", persisted=False))
     game_id = Column(String(255))
-    __table_args__ = (
-        UniqueConstraint("user_id", "achievement_id", "date"),
-        UniqueConstraint("user_id", "achievement_id", "season"),
-    )
+    # an achievement is earned once per user and season
+    __table_args__ = (UniqueConstraint("user_id", "achievement_id", "season", name="uq_users_achievements_season"),)
 
 
 class PlatformTag(Base):
@@ -178,7 +179,8 @@ class GameTimer(Base):
     end_time = Column(DateTime, nullable=True)
     duration_seconds = Column(Integer, nullable=True)
     platform = Column(String(255), nullable=True)
-    season = Column(Integer, nullable=True)
+    # derived by the database from start_time: never written by the app
+    season = Column(Integer, Computed("YEAR(start_time)", persisted=False))
     is_active = Column(Boolean, default=True)
     notes = Column(String(500), nullable=True)
 

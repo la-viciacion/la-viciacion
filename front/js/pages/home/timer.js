@@ -84,7 +84,6 @@ export async function startTimer(gameId, platform = null) {
       user_id: userId,
       game_id: gameId,
       platform,
-      season: new Date().getFullYear(),
     }));
     if (started) await onChange();
   } catch (err) {

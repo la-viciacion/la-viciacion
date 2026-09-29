@@ -19,7 +19,7 @@ from .. import auth
 from ..crud import users as users_crud
 from ..database import models
 from ..database.database import SessionLocal
-from ..utils import actions, rawg_sync
+from ..utils import actions, rawg_sync, seasons
 from ..utils.my_utils import normalize_email, validate_email_format, validate_password_requirements, validate_username
 
 router = APIRouter(
@@ -522,11 +522,11 @@ def list_timers(
     return {"total": total, "items": [_timer_out(t, u, g) for t, u, g in rows]}
 
 
-def _ensure_library(db: Session, user_id: int, game_id: str, platform, season: int, when: datetime.datetime):
-    """Same guarantee create_timer gives: a users_games row per (game, platform, season)."""
+def _ensure_library(db: Session, user_id: int, game_id: str, platform, when: datetime.datetime):
+    """Same guarantee create_timer gives: a users_games row per (game, platform, season of `when`)."""
     exists = (
         db.query(models.UserGame)
-        .filter_by(user_id=user_id, game_id=game_id, platform=platform, season=season)
+        .filter_by(user_id=user_id, game_id=game_id, platform=platform, season=seasons.of(when))
         .first()
     )
     if exists is None:
@@ -535,7 +535,6 @@ def _ensure_library(db: Session, user_id: int, game_id: str, platform, season: i
                 user_id=user_id,
                 game_id=game_id,
                 platform=platform,
-                season=season,
                 completed=0,
                 started_date=when.date(),
             )
@@ -548,7 +547,6 @@ class TimerCreate(BaseModel):
     start_time: datetime.datetime
     end_time: datetime.datetime
     platform: Optional[str] = None
-    season: Optional[int] = None
     notes: Optional[str] = None
 
 
@@ -563,7 +561,6 @@ def create_timer(body: TimerCreate, db: Session = Depends(get_db)):
     _get_or_404(db, models.User, body.user_id, "Usuario")
     _get_or_404(db, models.Game, body.game_id, "Juego")
     _check_range(body.start_time, body.end_time)
-    season = body.season or body.start_time.year
     timer = models.GameTimer(
         user_id=body.user_id,
         game_id=body.game_id,
@@ -571,12 +568,11 @@ def create_timer(body: TimerCreate, db: Session = Depends(get_db)):
         end_time=body.end_time,
         duration_seconds=int((body.end_time - body.start_time).total_seconds()),
         platform=body.platform,
-        season=season,
         is_active=False,
         notes=body.notes,
     )
     db.add(timer)
-    _ensure_library(db, body.user_id, body.game_id, body.platform, season, body.start_time)
+    _ensure_library(db, body.user_id, body.game_id, body.platform, body.start_time)
     _commit(db, "Sesión")
     return _timer_out(timer, None, None)
 
@@ -585,7 +581,6 @@ class TimerPatch(BaseModel):
     start_time: Optional[datetime.datetime] = None
     end_time: Optional[datetime.datetime] = None
     platform: Optional[str] = None
-    season: Optional[int] = None
     notes: Optional[str] = None
 
 
@@ -657,21 +652,19 @@ class LibraryCreate(BaseModel):
     user_id: int
     game_id: str
     platform: Optional[str] = None
-    season: Optional[int] = None
+    started_date: Optional[datetime.date] = None  # its year is the entry's season (default: today)
 
 
 @router.post("/library", status_code=201)
 def create_library(body: LibraryCreate, db: Session = Depends(get_db)):
     _get_or_404(db, models.User, body.user_id, "Usuario")
     _get_or_404(db, models.Game, body.game_id, "Juego")
-    season = body.season or datetime.datetime.now().year
     row = models.UserGame(
         user_id=body.user_id,
         game_id=body.game_id,
         platform=body.platform,
-        season=season,
         completed=0,
-        started_date=datetime.date.today(),
+        started_date=body.started_date or datetime.date.today(),
     )
     db.add(row)
     _commit(db, "Biblioteca")
@@ -680,7 +673,6 @@ def create_library(body: LibraryCreate, db: Session = Depends(get_db)):
 
 class LibraryPatch(BaseModel):
     platform: Optional[str] = None
-    season: Optional[int] = None
     started_date: Optional[datetime.date] = None
     completed: Optional[bool] = None
     completed_date: Optional[datetime.date] = None
