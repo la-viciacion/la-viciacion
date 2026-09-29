@@ -838,6 +838,13 @@ def _library_query(user_id: int, entry_id: int | None = None):
 def _library_item(row, completed_keys: set, current_season: int) -> dict:
     entry = row.UserGame
     done = bool(entry.completed)
+    # why a pending entry cannot be completed (None when it can)
+    blocked = None
+    if not done:
+        if entry.season != current_season:
+            blocked = "closed_season"
+        elif (entry.game_id, entry.season) in completed_keys:
+            blocked = "completed_in_season"
     return {
         "id": entry.id,
         "game_id": entry.game_id,
@@ -852,11 +859,8 @@ def _library_item(row, completed_keys: set, current_season: int) -> dict:
         "completed": done,
         "completed_date": entry.completed_date,
         # a game can be completed once per season, and only in the running one
-        "can_complete": (
-            not done
-            and entry.season == current_season
-            and (entry.game_id, entry.season) not in completed_keys
-        ),
+        "can_complete": not done and blocked is None,
+        "complete_blocked": blocked,  # "closed_season" | "completed_in_season" | None
     }
 
 

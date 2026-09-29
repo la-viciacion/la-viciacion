@@ -72,3 +72,7 @@
 .pf-tag.done { background: rgba(61, 217, 179, 0.15); color: var(--accent-teal); }
 .pf-date-form { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
 @media (max-width: 700px) { .pf-game-actions { margin-left: 0; width: 100%; } }
+.pf-game.locked .pf-thumb { filter: grayscale(1); opacity: 0.55; }
+.pf-game.locked .pf-game-title strong { color: var(--text-secondary); }
+.pf-tag.muted { background: transparent; border: 1px solid var(--border); color: var(--text-muted); }
+.pf-lock { margin-top: 4px; font-size: 0.8rem; color: var(--text-secondary); }

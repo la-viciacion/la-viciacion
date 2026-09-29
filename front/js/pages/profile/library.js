@@ -68,9 +68,25 @@ const thumb = (g) => (g.image_url
   : html`<div class="pf-thumb pf-thumb-placeholder" aria-hidden="true">🎮</div>`);
 
 function status(g) {
-  return g.completed
-    ? html`<span class="pf-tag done">Completado${g.completed_date ? ` el ${formatDate(g.completed_date)}` : ''}</span>`
+  if (g.completed) {
+    return html`<span class="pf-tag done">Completado${g.completed_date ? ` el ${formatDate(g.completed_date)}` : ''}</span>`;
+  }
+  // an unfinished game of a closed season is no longer "in progress"
+  return g.complete_blocked === 'closed_season'
+    ? html`<span class="pf-tag muted">Sin completar</span>`
     : html`<span class="pf-tag">En curso</span>`;
+}
+
+// Why the "complete" action is not available (the API decides, we only word it).
+function blockedReason(g) {
+  switch (g.complete_blocked) {
+    case 'closed_season':
+      return `Temporada ${g.season} cerrada: solo se pueden completar juegos de la temporada actual (${season}).`;
+    case 'completed_in_season':
+      return 'Ya lo has completado esta temporada en otra plataforma.';
+    default:
+      return '';
+  }
 }
 
 // Latest day a completion may be dated: today, or the end of a past season.
@@ -93,7 +109,9 @@ function actions(g) {
   if (g.can_complete) {
     return html`<button class="pf-btn primary" data-action="complete" data-id="${g.id}" data-label="Marcar completado">Marcar completado</button>`;
   }
-  if (!g.completed) return '';
+  if (!g.completed) {
+    return html`<button class="pf-btn" disabled title="${blockedReason(g)}">Marcar completado</button>`;
+  }
   return html`
     <button class="pf-btn" data-action="edit-date" data-id="${g.id}">Cambiar fecha</button>
     <button class="pf-btn" data-action="uncomplete" data-id="${g.id}" data-label="Desmarcar">Desmarcar</button>`;
@@ -101,7 +119,7 @@ function actions(g) {
 
 function row(g) {
   return html`
-    <div class="pf-game" data-id="${g.id}">
+    <div class="pf-game ${g.complete_blocked ? 'locked' : ''}" data-id="${g.id}">
       ${thumb(g)}
       <div class="pf-row-main">
         <div class="pf-game-title"><strong>${g.game_name}</strong> ${status(g)}</div>
@@ -109,6 +127,7 @@ function row(g) {
           ${g.platform_name || 'Sin plataforma'} · Temporada ${g.season} · ${formatDuration(g.played_time)}
           ${g.last_played ? ` · Última sesión: ${formatRelative(g.last_played)}` : ''}
         </div>
+        ${g.complete_blocked ? html`<div class="pf-lock">🔒 ${blockedReason(g)}</div>` : ''}
         ${editing === g.id ? dateForm(g) : ''}
       </div>
       <div class="pf-game-actions">${editing === g.id ? '' : actions(g)}</div>
