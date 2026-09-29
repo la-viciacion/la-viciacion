@@ -1,10 +1,11 @@
-// Profile page: season stats, in-progress games (mark as completed),
-// personal data, password change and avatar.
+// Profile page: season stats, the user's games (see library.js), personal
+// data, password change and avatar.
 // All routes are /api/v1/users/{username}/...
-import { api, jsonRequest } from '../lib/api.js';
-import { formatDate, formatDuration } from '../lib/format.js';
-import { html, mount } from '../lib/html.js';
-import { PASSWORD_HINT, isValidPassword } from '../lib/password.js';
+import { api, jsonRequest } from '../../lib/api.js';
+import { formatDate, formatDuration } from '../../lib/format.js';
+import { html, mount } from '../../lib/html.js';
+import { PASSWORD_HINT, isValidPassword } from '../../lib/password.js';
+import { initLibrary } from './library.js';
 
 export const active = 'profile';
 export const mainClass = 'profile-main';
@@ -31,7 +32,18 @@ export async function render(ctx) {
 
 async function load() {
   const data = await api(userPath('profile'));
-  if (data) draw(data);
+  if (!data) return;
+  draw(data);
+  await initLibrary(main.querySelector('#pfLibrary'), { username: user.username, onChange: refreshSummary });
+}
+
+// A completion changed: refresh the numbers without redrawing the whole page.
+async function refreshSummary() {
+  const data = await api(userPath('profile'));
+  if (!data) return;
+  mount(main.querySelector('#pfStats'), statsView(data));
+  mount(main.querySelector('#pfTop'), topView(data));
+  mount(main.querySelector('#pfAchievements'), achievementsView(data));
 }
 
 // ── Templates ───────────────────────────────────────────────
@@ -47,15 +59,29 @@ function avatar(d) {
 
 const sectionTitle = (title) => html`<div class="section-header"><h2 class="section-title">${title}</h2><div class="section-line"></div></div>`;
 
-function inProgressRow(g) {
+function statsView(d) {
+  const s = d.stats;
   return html`
-    <div class="pf-row">
-      <div class="pf-row-main">
-        <strong>${g.game_name}</strong>
-        <div class="pf-sub">${g.platform_name || 'Sin plataforma'} · ${formatDuration(g.played_time)} · desde ${formatDate(g.started_date)}</div>
-      </div>
-      <button class="pf-btn primary" data-complete="${g.game_id}" data-name="${g.game_name}">Marcar completado</button>
-    </div>`;
+    ${statTile('Tiempo jugado', formatDuration(s.played_time))}
+    ${statTile('Días jugados', s.played_days)}
+    ${statTile('Juegos jugados', s.played_games)}
+    ${statTile('Completados', s.completed_games)}
+    ${statTile('Racha actual', `${s.current_streak} d`)}
+    ${statTile('Mejor racha', `${s.best_streak} d`)}
+    ${statTile('Logros', s.achievements)}`;
+}
+
+function topView(d) {
+  const max = Math.max(1, ...d.top_games.map((g) => g.played_time));
+  return d.top_games.length
+    ? html`${d.top_games.map((g) => topGameRow(g, max))}`
+    : html`<div class="pf-empty">Aún no hay tiempo registrado.</div>`;
+}
+
+function achievementsView(d) {
+  return d.achievements.length
+    ? html`${d.achievements.map((a) => html`<div class="pf-row"><div class="pf-row-main"><strong>${a.title}</strong></div><div class="pf-sub">${formatDate(a.date)}</div></div>`)}`
+    : html`<div class="pf-empty">Todavía no has conseguido logros.</div>`;
 }
 
 function topGameRow(g, max) {
@@ -68,8 +94,6 @@ function topGameRow(g, max) {
 }
 
 function draw(d) {
-  const s = d.stats;
-  const maxTop = Math.max(1, ...d.top_games.map((g) => g.played_time));
   mount(main, html`
     <div class="pf-head">
       ${avatar(d)}
@@ -83,36 +107,19 @@ function draw(d) {
       </div>
     </div>
 
-    <section class="pf-stats" aria-label="Estadísticas">
-      ${statTile('Tiempo jugado', formatDuration(s.played_time))}
-      ${statTile('Días jugados', s.played_days)}
-      ${statTile('Juegos jugados', s.played_games)}
-      ${statTile('Completados', s.completed_games)}
-      ${statTile('Racha actual', `${s.current_streak} d`)}
-      ${statTile('Mejor racha', `${s.best_streak} d`)}
-      ${statTile('Logros', s.achievements)}
-    </section>
+    <section class="pf-stats" id="pfStats" aria-label="Estadísticas">${statsView(d)}</section>
 
-    ${sectionTitle('En curso')}
-    <div class="pf-card" id="pfProgress">
-      ${d.in_progress.length ? d.in_progress.map(inProgressRow) : html`<div class="pf-empty">No tienes juegos en curso esta temporada.</div>`}
-      <div class="pf-msg" id="pfProgressMsg" role="status"></div>
-    </div>
+    ${sectionTitle('Mis juegos')}
+    <div id="pfLibrary"></div>
 
     <div class="pf-cols">
       <div>
         ${sectionTitle('Más jugados')}
-        <div class="pf-card">
-          ${d.top_games.length ? d.top_games.map((g) => topGameRow(g, maxTop)) : html`<div class="pf-empty">Aún no hay tiempo registrado.</div>`}
-        </div>
+        <div class="pf-card" id="pfTop">${topView(d)}</div>
       </div>
       <div>
         ${sectionTitle('Últimos logros')}
-        <div class="pf-card">
-          ${d.achievements.length
-            ? d.achievements.map((a) => html`<div class="pf-row"><div class="pf-row-main"><strong>${a.title}</strong></div><div class="pf-sub">${formatDate(a.date)}</div></div>`)
-            : html`<div class="pf-empty">Todavía no has conseguido logros.</div>`}
-        </div>
+        <div class="pf-card" id="pfAchievements">${achievementsView(d)}</div>
       </div>
     </div>
 
@@ -136,7 +143,6 @@ function draw(d) {
     </form>`);
 
   main.querySelector('#pfAvatarInput').addEventListener('change', changeAvatar);
-  main.querySelector('#pfProgress').addEventListener('click', completeGame);
   main.querySelector('#pfData').addEventListener('submit', saveData);
   main.querySelector('#pfPass').addEventListener('submit', changePassword);
 }
@@ -188,38 +194,6 @@ async function changeAvatar(e) {
     showAvatar(document.querySelector('.navbar-avatar'));
     flash(msg, 'Foto actualizada', true);
   } catch (err) {
-    flash(msg, err.message);
-  }
-}
-
-// ── Complete a game ─────────────────────────────────────────
-// Two-step button: first click asks, second click within 4s confirms.
-async function completeGame(e) {
-  const btn = e.target.closest('[data-complete]');
-  if (!btn) return;
-  const msg = main.querySelector('#pfProgressMsg');
-  if (!btn.dataset.armed) {
-    btn.dataset.armed = '1';
-    btn.textContent = '¿Seguro? Pulsa otra vez';
-    setTimeout(() => {
-      if (btn.isConnected && btn.dataset.armed) {
-        delete btn.dataset.armed;
-        btn.textContent = 'Marcar completado';
-      }
-    }, 4000);
-    return;
-  }
-  btn.disabled = true;
-  btn.textContent = 'Completando…';
-  flash(msg, '');
-  try {
-    await api(`${userPath('complete-game')}?game_id=${encodeURIComponent(btn.dataset.complete)}`, { method: 'PATCH' });
-    await load();
-    flash(main.querySelector('#pfProgressMsg'), `«${btn.dataset.name}» marcado como completado`, true);
-  } catch (err) {
-    btn.disabled = false;
-    delete btn.dataset.armed;
-    btn.textContent = 'Marcar completado';
     flash(msg, err.message);
   }
 }

@@ -35,8 +35,14 @@ export function formatRelative(ts, now = new Date()) {
   });
 }
 
+/** "2026-09-29" (a calendar day, no timezone) -> local Date at midnight. */
+export function parseDay(value) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value));
+  return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(value);
+}
+
 export function formatDate(value) {
-  return value ? new Date(value).toLocaleDateString(LOCALE, { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+  return value ? parseDay(value).toLocaleDateString(LOCALE, { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
 }
 
 export function formatDateTime(ts) {

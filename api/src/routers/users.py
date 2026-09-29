@@ -221,6 +221,84 @@ def change_password(
     return {"message": "Contraseña actualizada"}
 
 
+@router.get("/{username}/library")
+@version(1)
+def get_library(
+    username: str,
+    limit: int = Query(15, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    active_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Every game of the user (all seasons), most recently played first"""
+    auth.ensure_self_or_admin(active_user, username=username)
+    user = users.get_user_by_username(db, username)
+    if user is None:
+        raise HTTPException(status_code=404, detail=msg.USER_NOT_EXISTS)
+    return users.get_library(db, user.id, limit, offset)
+
+
+def _check_completion_date(entry: models.UserGame, date: datetime.date):
+    if date > datetime.date.today():
+        raise HTTPException(status_code=400, detail=msg.COMPLETION_DATE_FUTURE)
+    if date.year != entry.season:
+        raise HTTPException(
+            status_code=400,
+            detail=f"La fecha de completado debe estar en la temporada {entry.season}",
+        )
+    if entry.started_date and date < entry.started_date:
+        raise HTTPException(
+            status_code=400,
+            detail=f"La fecha de completado no puede ser anterior al inicio ({entry.started_date})",
+        )
+
+
+@router.patch("/{username}/library/{entry_id}/completion")
+@version(1)
+async def update_completion(
+    username: str,
+    entry_id: int,
+    body: schemas.CompletionUpdate,
+    silent: bool = False,
+    active_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Complete a library entry, change its completion date or unmark it.
+
+    - completed=true on a pending entry completes it: only in the current
+      season and once per game and season (announced unless silent=true).
+    - completed=true + completed_date on an already completed entry changes
+      the date (must fall inside the entry's season).
+    - completed=false unmarks it (any season); the entry itself is kept.
+    """
+    auth.ensure_self_or_admin(active_user, username=username)
+    user = users.get_user_by_username(db, username)
+    if user is None:
+        raise HTTPException(status_code=404, detail=msg.USER_NOT_EXISTS)
+    entry = users.get_library_entry(db, user.id, entry_id)
+    if entry is None:
+        raise HTTPException(status_code=404, detail=msg.ENTRY_NOT_FOUND)
+
+    if not body.completed:
+        if entry.completed:
+            users.uncomplete_entry(db, entry)
+    elif not entry.completed:
+        if entry.season != datetime.date.today().year:
+            raise HTTPException(status_code=409, detail=msg.COMPLETE_ONLY_CURRENT_SEASON)
+        if users.completed_in_season(db, user.id, entry.game_id, entry.season):
+            raise HTTPException(status_code=409, detail=msg.ALREADY_COMPLETED_IN_SEASON)
+        date = body.completed_date or datetime.date.today()
+        _check_completion_date(entry, date)
+        await users.complete_entry(db, entry, date, silent)
+    else:
+        if body.completed_date is None:
+            raise HTTPException(status_code=409, detail=msg.GAME_ALREADY_COMPLETED)
+        _check_completion_date(entry, body.completed_date)
+        users.set_completed_date(db, entry, body.completed_date)
+    return users.get_library_item(db, user.id, entry.id)
+
+
 @router.post("/{username}/new_game", response_model=schemas.UserGame)
 @version(1)
 async def add_game_to_user(

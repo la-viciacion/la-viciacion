@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { formatClock, formatDuration, formatRelative, formatTimestamp, toLocalISO } from '../js/lib/format.js';
+import { formatClock, formatDate, formatDuration, formatRelative, formatTimestamp, parseDay, toLocalISO } from '../js/lib/format.js';
 
 test('formatDuration', () => {
   assert.equal(formatDuration(0), '0 s');
@@ -29,4 +29,11 @@ test('formatTimestamp and toLocalISO', () => {
   assert.equal(formatTimestamp('2026-09-29T13:05:07'), '2026-09-29 13:05');
   assert.equal(formatTimestamp(null), '—');
   assert.equal(toLocalISO(new Date(2026, 8, 9, 3, 4, 5)), '2026-09-09T03:04:05');
+});
+
+test('parseDay keeps the calendar day whatever the timezone', () => {
+  const d = parseDay('2026-09-29');
+  assert.deepEqual([d.getFullYear(), d.getMonth(), d.getDate()], [2026, 8, 29]);
+  assert.equal(formatDate(null), '—');
+  assert.match(formatDate('2026-01-01'), /1/);
 });

@@ -69,6 +69,11 @@ class UserProfileUpdate(BaseModel):
     telegram_id: int | None = None
 
 
+class CompletionUpdate(BaseModel):
+    completed: bool
+    completed_date: datetime.date | None = None
+
+
 class PasswordChange(BaseModel):
     current_password: str
     new_password: str

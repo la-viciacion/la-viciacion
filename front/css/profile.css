@@ -61,3 +61,14 @@
 .pf-avatar-actions { display: flex; align-items: center; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
 
 .pf-avatar-actions .pf-btn { padding: 5px 12px; font-size: 0.8rem; }
+
+.pf-game { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.pf-game:last-of-type { border-bottom: 0; }
+.pf-thumb { width: 44px; height: 44px; border-radius: var(--radius-sm); object-fit: cover; flex-shrink: 0; }
+.pf-thumb-placeholder { display: flex; align-items: center; justify-content: center; background: var(--bg-card-hover); }
+.pf-game-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pf-game-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; }
+.pf-tag { font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: var(--radius-pill); background: var(--bg-card-hover); color: var(--text-secondary); }
+.pf-tag.done { background: rgba(61, 217, 179, 0.15); color: var(--accent-teal); }
+.pf-date-form { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
+@media (max-width: 700px) { .pf-game-actions { margin-left: 0; width: 100%; } }

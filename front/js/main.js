@@ -14,7 +14,7 @@ import { renderShell, showLoading } from './ui/layout.js';
 
 const ROUTES = [
   { prefix: '#/admin', load: () => import('./pages/admin/index.js') },
-  { prefix: '#/profile', load: () => import('./pages/profile.js') },
+  { prefix: '#/profile', load: () => import('./pages/profile/index.js') },
 ];
 
 let navigation = 0; // only the most recent navigation may touch the DOM

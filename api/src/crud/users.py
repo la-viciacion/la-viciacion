@@ -5,6 +5,7 @@ import random
 
 import bcrypt
 from sqlalchemy import (
+    and_,
     asc,
     create_engine,
     desc,
@@ -123,7 +124,6 @@ def get_profile(db: Session, user: models.User, season: int = None) -> dict:
         .scalar()
     )
     achievements = get_achievements(db, user.username, season)
-    in_progress = get_games(db, user.id, completed=False, season=season)
     return {
         "season": season,
         "user": {
@@ -148,16 +148,6 @@ def get_profile(db: Session, user: models.User, season: int = None) -> dict:
         ],
         "achievements": [
             {"title": r.title, "date": r.date} for r in achievements[-5:][::-1]
-        ],
-        "in_progress": [
-            {
-                "game_id": g["game_id"],
-                "game_name": g["game_name"],
-                "platform_name": g["platform_name"],
-                "played_time": g["played_time"] or 0,
-                "started_date": g["started_date"],
-            }
-            for g in in_progress
         ],
     }
 
@@ -790,6 +780,211 @@ def game_is_completed(db: Session, player, game, season: int = None) -> bool:
     return False
 
 
+# ── Library: every game of a user, with its completion state ──
+
+
+def _last_played_by_year():
+    """Latest session start per (user, game, calendar year)."""
+    year = extract("year", models.GameTimer.start_time)
+    return (
+        select(
+            models.GameTimer.user_id.label("user_id"),
+            models.GameTimer.game_id.label("game_id"),
+            year.label("year"),
+            func.max(models.GameTimer.start_time).label("last_played"),
+        )
+        .group_by(models.GameTimer.user_id, models.GameTimer.game_id, year)
+        .subquery("last_played")
+    )
+
+
+def _completed_keys(db: Session, user_id: int) -> set:
+    """(game_id, season) pairs the user has already completed."""
+    rows = (
+        db.query(models.UserGame.game_id, models.UserGame.season)
+        .filter(models.UserGame.user_id == user_id, models.UserGame.completed == 1)
+        .all()
+    )
+    return {(r.game_id, r.season) for r in rows}
+
+
+def completed_in_season(db: Session, user_id: int, game_id: str, season: int) -> bool:
+    return (game_id, season) in _completed_keys(db, user_id)
+
+
+def _library_query(user_id: int, entry_id: int | None = None):
+    last = _last_played_by_year()
+    stmt = (
+        select(
+            models.UserGame,
+            models.Game.name.label("game_name"),
+            models.Game.image_url.label("image_url"),
+            models.PlatformTag.name.label("platform_name"),
+            last.c.last_played.label("last_played"),
+        )
+        .join(models.Game, models.Game.id == models.UserGame.game_id)
+        .outerjoin(models.PlatformTag, models.PlatformTag.id == models.UserGame.platform)
+        .outerjoin(
+            last,
+            and_(
+                last.c.user_id == models.UserGame.user_id,
+                last.c.game_id == models.UserGame.game_id,
+                last.c.year == models.UserGame.season,
+            ),
+        )
+        .where(models.UserGame.user_id == user_id)
+    )
+    if entry_id is not None:
+        stmt = stmt.where(models.UserGame.id == entry_id)
+    # most recently played first; entries without sessions go last (by start date)
+    return stmt.order_by(
+        last.c.last_played.is_(None),
+        last.c.last_played.desc(),
+        models.UserGame.started_date.desc(),
+        models.UserGame.id.desc(),
+    )
+
+
+def _library_item(row, completed_keys: set, current_season: int) -> dict:
+    entry = row.UserGame
+    done = bool(entry.completed)
+    return {
+        "id": entry.id,
+        "game_id": entry.game_id,
+        "game_name": row.game_name,
+        "image_url": row.image_url,
+        "platform_id": entry.platform,
+        "platform_name": row.platform_name,
+        "season": entry.season,
+        "started_date": entry.started_date,
+        "last_played": row.last_played,
+        "played_time": entry.played_time or 0,
+        "completed": done,
+        "completed_date": entry.completed_date,
+        # a game can be completed once per season, and only in the running one
+        "can_complete": (
+            not done
+            and entry.season == current_season
+            and (entry.game_id, entry.season) not in completed_keys
+        ),
+    }
+
+
+def get_library(db: Session, user_id: int, limit: int = 15, offset: int = 0) -> dict:
+    season = datetime.datetime.now().year
+    total = db.query(models.UserGame).filter(models.UserGame.user_id == user_id).count()
+    rows = db.execute(_library_query(user_id).limit(limit).offset(offset)).all()
+    keys = _completed_keys(db, user_id)
+    return {
+        "season": season,
+        "total": total,
+        "items": [_library_item(r, keys, season) for r in rows],
+    }
+
+
+def get_library_item(db: Session, user_id: int, entry_id: int) -> dict | None:
+    row = db.execute(_library_query(user_id, entry_id)).first()
+    if row is None:
+        return None
+    return _library_item(row, _completed_keys(db, user_id), datetime.datetime.now().year)
+
+
+def get_library_entry(db: Session, user_id: int, entry_id: int) -> models.UserGame | None:
+    return db.query(models.UserGame).filter_by(id=entry_id, user_id=user_id).first()
+
+
+def uncomplete_entry(db: Session, entry: models.UserGame):
+    """Unmark a completion. The entry itself (time played, sessions) stays."""
+    try:
+        entry.completed = 0
+        entry.completed_date = None
+        db.commit()
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error("Error unmarking completion: " + str(e))
+        raise
+
+
+def set_completed_date(db: Session, entry: models.UserGame, completed_date: datetime.date):
+    try:
+        entry.completed_date = completed_date
+        db.commit()
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error("Error changing completion date: " + str(e))
+        raise
+
+
+async def complete_entry(
+    db: Session,
+    entry: models.UserGame,
+    completed_date: datetime.date | None = None,
+    silent: bool = False,
+) -> models.UserGame:
+    """
+    Mark one library entry as completed. The completion is saved first; the
+    follow-ups (average time, achievements, group announcement) are best
+    effort and never undo it.
+    """
+    try:
+        entry.completed = 1
+        entry.completed_date = completed_date or datetime.date.today()
+        db.commit()
+        logger.info("Game completed")
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error("Error completing game: " + str(e))
+        raise
+    try:
+        await _after_completion(db, entry, silent)
+    except Exception as e:
+        logger.error("Error in post-completion tasks: " + str(e))
+    return entry
+
+
+async def _after_completion(db: Session, entry: models.UserGame, silent: bool):
+    game = games.get_game_by_id(db, entry.game_id)
+    user = get_user_by_id(db, entry.user_id)
+    game_info = await utils.get_game_info(game.name)
+    avg_time = game_info["hltb"]["comp_main"] if game_info["hltb"] is not None else 0
+    games.update_avg_time_game(db, entry.game_id, avg_time)
+    game = games.get_game_by_id(db, entry.game_id)
+    completion_time = entry.played_time
+
+    # Local import to avoid a circular import (crud.achievements imports crud.users).
+    from .achievements import Achievements
+
+    await Achievements().just_in_time(
+        db, user, completion_time, avg_time, entry.game_id, silent=silent
+    )
+
+    message = (
+        user.name
+        + " acaba de completar su juego número "
+        + str(count_completed_games(db, user.id, entry.season))
+        + ": *"
+        + game.name
+        + "* en "
+        + str(utils.convert_time_to_hours(completion_time))
+        + ". La media está en "
+        + str(utils.convert_time_to_hours(avg_time))
+        + "."
+    )
+    logger.info(message)
+    new_game_info = {}
+    suggestions = games.recommended_games(db, entry.user_id, genres=game.genres)
+    if suggestions:
+        new_game = random.choice(suggestions)
+        new_game_info = {"game": new_game[2], "user": new_game[4]}
+    await utils.send_message(
+        message,
+        silent,
+        openai=True,
+        system_prompt=prompts.COMPLETED_GAME_PROMPT,
+        new_game_recommended=new_game_info,
+    )
+
+
 async def complete_game(
     db: Session,
     user_id,
@@ -798,86 +993,24 @@ async def complete_game(
     season: int = None,
     silent: bool = False,
 ):
+    """Complete the pending entry of a game in a season (current by default)."""
     if season is None:
         season = datetime.datetime.now().year
-    try:
-        db_game = games.get_game_by_id(db, game_id)
-        user = get_user_by_id(db, user_id)
-        user_game = get_game_by_id(db, user_id, db_game.id, season)
-        game_info = await utils.get_game_info(db_game.name)
-        if completed_date is None:
-            completed_date = datetime.datetime.now()
-        else:
-            completed_date = utils.convert_date_from_text(completed_date)
-        stmt = (
-            update(models.UserGame)
-            .where(
-                models.UserGame.game_id == game_id,
-                models.UserGame.user_id == user_id,
-                extract("year", models.UserGame.started_date) == season,
-            )
-            .values(
-                completed=1,
-                completed_date=completed_date,
-            )
-            .execution_options(synchronize_session="fetch")
+    entry = (
+        db.query(models.UserGame)
+        .filter(
+            models.UserGame.user_id == user_id,
+            models.UserGame.game_id == game_id,
+            models.UserGame.season == season,
+            models.UserGame.completed != 1,
         )
-        db.execute(stmt)
-        db.commit()
-        logger.info("Game completed")
-        if game_info["hltb"] is not None:
-            avg_time = game_info["hltb"]["comp_main"]
-        else:
-            avg_time = 0
-        games.update_avg_time_game(db, game_id, avg_time)
-        game = games.get_game_by_id(db, game_id)
-        num_completed_games = (
-            db.query(models.UserGame.game_id)
-            .filter_by(user_id=user_id, completed=1)
-            .count()
-        )
-        completion_time = user_game.played_time
-
-        # Local import to avoid a circular import (crud.achievements imports crud.users).
-        from .achievements import Achievements
-
-        await Achievements().just_in_time(
-            db, user, completion_time, avg_time, game_id, silent=silent
-        )
-
-        message = (
-            user.name
-            + " acaba de completar su juego número "
-            + str(num_completed_games)
-            + ": *"
-            + game.name
-            + "* en "
-            + str(utils.convert_time_to_hours(completion_time))
-            + ". La media está en "
-            + str(utils.convert_time_to_hours(avg_time))
-            + "."
-        )
-        logger.info(message)
-        new_games_recommendation = games.recommended_games(
-            db, user_id, genres=game.genres
-        )
-        new_game = random.choice(new_games_recommendation)
-        new_game_info = {}
-        new_game_info["game"] = new_game[2]
-        new_game_info["user"] = new_game[4]
-        await utils.send_message(
-            message,
-            silent,
-            openai=True,
-            system_prompt=prompts.COMPLETED_GAME_PROMPT,
-            new_game_recommended=new_game_info,
-        )
+        .order_by(models.UserGame.id)
+        .first()
+    )
+    if entry is None:
         return get_game_by_id(db, user_id, game_id, season)
-
-    except Exception as e:
-        db.rollback()
-        logger.error("Error completing game: " + str(e))
-        raise e
+    parsed = utils.convert_date_from_text(completed_date) if completed_date else None
+    return await complete_entry(db, entry, parsed, silent)
 
 
 async def rate_game(
