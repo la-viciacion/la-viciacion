@@ -85,9 +85,6 @@ def init(
         _type_: _description_
     """
     try:
-        logger.info("Creating admin users")
-        for admin in config.ADMIN_USERS:
-            users.create_admin_user(db, admin)
         achievements.populate_achievements(db)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

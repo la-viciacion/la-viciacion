@@ -18,8 +18,6 @@ class Config:
         self.TELEGRAM_ADMIN_CHAT_ID = self._get_env("TELEGRAM_ADMIN_CHAT_ID")
         
         # Admin
-        self.ADMIN_USERS = self._get_env_json("ADMIN_USERS")
-        self.DEFAULT_ADMIN_PASS = self._get_env("DEFAULT_ADMIN_PASS")
         self.GOD_ADMIN_PASS = self._get_env("GOD_ADMIN_PASS")
         
         # Database

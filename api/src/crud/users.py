@@ -37,31 +37,6 @@ config = Config()
 #################
 
 
-def create_admin_user(db: Session, username: str):
-    try:
-        db_user = db.query(models.User).filter(models.User.username == username).first()
-        if db_user is None:
-            salt = bcrypt.gensalt()
-            default_password = config.DEFAULT_ADMIN_PASS
-            # Hashing the password
-            hashed_password = bcrypt.hashpw(default_password.encode("utf-8"), salt)
-            db_user = models.User(
-                username=username, is_admin=1, password=hashed_password, is_active=1
-            )
-            db.add(db_user)
-            db.commit()
-            logger.info("Admin user created")
-        # else:
-        #     logger.warning(username + " already exists as admin")
-    except SQLAlchemyError as e:
-        db.rollback()
-        logger.error("Error creating admin user: " + str(e))
-        if "Duplicate entry" not in str(e):
-            logger.info(e)
-        else:
-            raise
-
-
 GOD_USERNAME = "admin"
 GOD_NAME = "Dios"
 

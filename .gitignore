@@ -357,8 +357,19 @@ yarn-error.log*
 # Custom files
 logs.log
 *.crt
-db/data/
-db/init/*.sql
-db/init/*.sql.gz
 assets/*
 .vscode
+
+# Secrets: any env variant except the template
+.env.*
+!.env.template
+*.pem
+*.key
+
+# Database: data dirs (db/data, db/data_, backups...) and dumps
+db/data*/
+db/init/*
+!db/init/.gitkeep
+*.sql
+*.sql.gz
+*.dump
