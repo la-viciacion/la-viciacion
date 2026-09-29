@@ -33,9 +33,6 @@ class User(Base):
     username = Column(String(255))
     password = Column(String(255))
     telegram_id = Column(BigInteger)
-    # Legacy from the Clockify era; no longer written to, kept for history.
-    clockify_id = Column(String(255))
-    clockify_key = Column(String(255))
     email = Column(String(255))
     is_admin = Column(Integer)
     is_active = Column(Integer)
@@ -149,30 +146,6 @@ class PlatformTag(Base):
     id = Column(String(255), primary_key=True)
     name = Column(String(255))
     __table_args__ = (UniqueConstraint("id"),)
-
-
-class OtherTag(Base):
-    __tablename__ = "other_tags"
-
-    id = Column(String(255), primary_key=True)
-    name = Column(String(255))
-    __table_args__ = (UniqueConstraint("id"),)
-
-
-class Log(Base):
-    __tablename__ = "logs"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    player = Column(String(255))
-    action = Column(String(255))
-    date = Column(DateTime)
-
-
-class RequestSync(Base):
-    __tablename__ = "request_sync"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    request_id = Column(String(255), primary_key=True)
 
 
 class GameTimer(Base):

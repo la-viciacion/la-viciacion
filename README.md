@@ -26,16 +26,11 @@ Everything Telegram-related is managed from the admin panel (**Notificaciones** 
 - **Settings** live in the `app_settings` table: general notifications switch, admin-alerts switch (independent), weekly summary on/off + weekday + time, and the Telegram bot token, group id and admin chat id. The token is stored encrypted (key derived from `SECRET_KEY`; if you rotate `SECRET_KEY`, enter the token again) and the panel never shows it back; only the bot (logged in as the superadmin) reads it, through `GET /manage/settings/telegram`. `TELEGRAM_TOKEN`, `TELEGRAM_GROUP_ID` and `TELEGRAM_ADMIN_CHAT_ID` in `.env` only **seed** the table the first time the API starts.
 - The **bot** reads its token and chats from the API and restarts itself (Docker brings it back) within about a minute when they change.
 - **Scheduled jobs** run inside the API process (`api/src/utils/scheduler.py`), so no external cron is needed: weekly summary (private message to each active user with a Telegram id), hourly forgotten-timer reminder, daily 05:00 streak check and the season rollover. Each run is recorded in `job_runs`, so a restart never repeats a run, and a job that was due while the API was down still runs when it returns (weekly summary: within 6 hours). Stats, achievements and ranking announcements are event-driven (they run when a timer stops or an admin edits data).
-- `POST /webhooks/sync-data` is no longer needed; if you still have an external cron calling it, remove it.
 - Each user can set their own Telegram id in their profile and admins can edit it for anyone; it is unique.
 
 ### Manual sessions
 
 From the home page a user can add a finished session by hand (**+ Sesión manual**: game, platform, start, end) and correct or delete one of their own from the expanded history of a game (**Editar**; **Ver todas** loads older ones). The API (`POST /timers/manual`, `PATCH`/`DELETE /timers/{id}`) enforces: the end after the start and not in the future, at most 24 h, **current season only** (closed seasons are frozen; admins can still edit them), and no overlap with any other session of that user, running timer included. The game cannot be changed on an existing session: delete it and add it again. Manual changes recompute the user's stats silently (nothing is announced to the group), and creating one also creates the library entry for that game/platform/season if it is missing.
-
-### Webhooks
-
-`api/src/routers/webhooks.py` lets you add your own 'public' webhooks if you need them. So, you can create an endpoint like `/tBn7NyNHAsP9WjP3sJUXglxaTATJxrfs3J2DauBV5fthwuGKq3le`, and call directly from another service without authentication like the `bot` routes (to execute other processes).
 
 ### OpenAI integration
 
@@ -96,9 +91,6 @@ Deploying v2 to a *new* environment from a backup taken on the old (Clockify-bas
    docker compose logs laviciacion-db   # look for the SQL import log lines
    docker compose logs laviciacion-api  # look for "Running upgrade ..." lines from alembic, no errors
    ```
-5. (Optional) Trigger one manual recompute so rankings/statistics reflect the imported history immediately, instead of waiting for the next scheduled sync:
-   ```bash
-   curl -H "x-api-key: <API_KEY from .env>" "http://localhost:5000/api/v1/admin/sync-data?sync_all=true"
-   ```
+5. (Optional) Trigger one manual recompute so rankings/statistics reflect the imported history immediately: log in as an admin and use **Recalcular** in the admin panel.
 
 `db/init/` itself is tracked (so it always exists on a fresh clone), but the SQL/backup files you drop into it are gitignored — never commit a real database dump.

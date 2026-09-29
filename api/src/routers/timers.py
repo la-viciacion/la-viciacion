@@ -72,8 +72,7 @@ async def create_timer(db: Session, timer: GameTimerCreate) -> GameTimer:
     db.commit()
     db.refresh(db_timer)
 
-    # Make sure the user has a UserGame entry for this game/season, same as
-    # the Clockify sync used to create implicitly when a time entry came in.
+    # Make sure the user has a UserGame entry for this game/season.
     season = seasons.current()
     user = users_crud.get_user_by_id(db, timer.user_id)
     # One UserGame per (game, platform, season): the same game on another

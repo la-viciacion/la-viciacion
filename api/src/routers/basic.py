@@ -119,24 +119,27 @@ def signup(user: schemas.UserCreate, db: Session = Depends(get_db)):
                 CustomExceptions.SignUp.EMAIL_ALREADY_EXISTS
             ).to_json(),
         )
-    validation, new_user = users.create_user(db=db, user=user)
-    if not validation:
-        if new_user == 0:
-            raise HTTPException(
-                status_code=400,
-                detail=CustomExceptions(
-                    CustomExceptions.SignUp.PASSWORD_REQUIREMENTS
-                ).to_json(),
-            )
-        if new_user == 1:
-            raise HTTPException(
-                status_code=400,
-                detail=CustomExceptions(
-                    CustomExceptions.SignUp.EMAIL_VALIDATION
-                ).to_json(),
-            )
-    user_added = users.get_user_by_username(db, user.username)
-    return user_added
+    if not utils.validate_email_format(user.email):
+        raise HTTPException(
+            status_code=400,
+            detail=CustomExceptions(CustomExceptions.SignUp.EMAIL_VALIDATION).to_json(),
+        )
+    if not utils.validate_password_requirements(user.password):
+        raise HTTPException(
+            status_code=400,
+            detail=CustomExceptions(
+                CustomExceptions.SignUp.PASSWORD_REQUIREMENTS
+            ).to_json(),
+        )
+    # whoever holds the invitation key gets an active account straight away
+    return users.insert_user(
+        db,
+        username=user.username,
+        email=user.email,
+        name=user.name,
+        password=user.password,
+        is_active=True,
+    )
 
 
 @router.post("/token", response_model=auth.Token)
@@ -172,7 +175,6 @@ async def login_for_access_token(
             "name": user.name,
             "email": user.email,
             "telegram_id": user.telegram_id,
-            "clockify_id": user.clockify_id,
             "is_admin": user.is_admin,
             "is_active": user.is_active,
         },
@@ -193,13 +195,3 @@ def active_user(user: models.User = Security(auth.get_current_active_user)):
         _type_: _description_
     """
     return user
-
-
-@router.post("/wABU7qR5s3AUuvKZcdPT3FsK7rSp5EQZ", include_in_schema=False)
-@version(1)
-async def debugging_purposes(request: Request):
-    data = await request.json()
-    # logger.debug("Timer updated: " + str(data["user"]))
-    # logger.info(len(data))
-    # logger.info("Received data: " + str(await request.json()))
-    return {"message": "Done"}

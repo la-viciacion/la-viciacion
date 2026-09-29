@@ -22,22 +22,9 @@ class User(UserBase):
     is_admin: int | None = 0
     email: str | None = None
     is_active: int | None = 0
-    clockify_id: str | None = None
-    clockify_key: str | None = None
 
     class Config:
         from_attributes = True
-
-
-class UserForAdmins(UserBase):
-    id: int
-    name: str | None = None
-    telegram_id: int | None = None
-    is_admin: int | None = 0
-    email: str | None = None
-    is_active: int | None = 0
-    clockify_id: str | None = None
-    clockify_key: str | None = None
 
 
 class UserStatistics(BaseModel):
@@ -51,16 +38,6 @@ class UserStatistics(BaseModel):
     best_unplayed_streak: int | None = None
     current_unplayed_streak: int | None = None
     best_unplayed_streak_date: datetime.date | None = None
-
-
-class UserUpdate(BaseModel):
-    name: str | None = None
-    username: str
-    password: str | None = None
-    email: str | None = None
-    telegram_id: int | None = None
-    clockify_id: str | None = None
-    clockify_key: str | None = None
 
 
 class UserProfileUpdate(BaseModel):
@@ -77,18 +54,6 @@ class CompletionUpdate(BaseModel):
 class PasswordChange(BaseModel):
     current_password: str
     new_password: str
-
-
-class UserUpdateForAdmin(BaseModel):
-    name: str | None = None
-    username: str
-    password: str | None = None
-    email: str | None = None
-    telegram_id: int | None = None
-    is_admin: int | None = None
-    is_active: int | None = None
-    clockify_id: str | None = None
-    clockify_key: str | None = None
 
 
 class TelegramUser(BaseModel):
@@ -206,26 +171,6 @@ class UserAchievement(BaseModel):
 
     class Config:
         from_attributes = True
-
-
-class TimeEntrie(BaseModel):
-    id: int | None = None
-    user_id: str | None = None
-    user_clockify_id: str | None = None
-    project_clockify_id: str | None = None
-    start: datetime.date | None = None
-    end: datetime.date | None = None
-    duration: int | None = None
-    tags: str | None = None
-
-    class Config:
-        from_attributes = True
-
-
-class Email(BaseModel):
-    receiver: list[str]
-    subject: str
-    message: str
 
 
 class HttpExceptionDetailModel(BaseModel):

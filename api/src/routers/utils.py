@@ -150,7 +150,6 @@ async def upload_achievement_image(
 async def get_achievement_image(
     achievement: str,
     db: Session = Depends(get_db),
-    # api_key: None = Security(auth.get_api_key),
 ):
     """
     Get achievement image

@@ -38,7 +38,7 @@ async def recompute_user_stats(
     announce_streak_loss: bool = False,
 ):
     """Recompute one user's aggregates/achievements from their sessions
-    (game_timers, including the backfilled Clockify-era ones)."""
+    (game_timers)."""
     current_season = seasons.current()
 
     users.create_user_statistics(db, user.id)
@@ -104,7 +104,6 @@ async def recompute_all_users_and_rankings(
     db: Session,
     silent: bool = False,
     sync_season: bool = False,
-    sync_all: bool = False,
     only_active_users: bool = True,
     user_ids: list[int] | None = None,
     announce_streak_loss: bool = False,
@@ -117,13 +116,12 @@ async def recompute_all_users_and_rankings(
     summary, forgotten-timer reminder) lives in the scheduler, not here.
     """
     start_time = time.time()
-    silent = bool(silent) or sync_season or sync_all
+    silent = bool(silent) or sync_season
 
-    if sync_season or sync_all:
+    if sync_season:
         logger.info("Resetting season/global statistics...")
-        # UserGame is intentionally NOT wiped here: it used to be rebuilt
-        # from Clockify on the next sync, but there is nothing left to
-        # rebuild it from now.
+        # UserGame is intentionally NOT wiped here: the library cannot be
+        # rebuilt from anything else.
         db.query(models.UserStatistics).delete()
         db.query(models.GameStatistics).delete()
         db.commit()
@@ -160,7 +158,7 @@ async def recompute_all_users_and_rankings(
         await achievements.teamwork(db, silent)
 
         elapsed_time = time.time() - start_time
-        if elapsed_time > 30 and not sync_all and not sync_season:
+        if elapsed_time > 30 and not sync_season:
             msg = (
                 "❗Ejecución lenta❗\n"
                 + "La última ejecución ha durado más de 30 segundos"

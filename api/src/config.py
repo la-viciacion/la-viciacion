@@ -31,7 +31,6 @@ class Config:
         
         # Security
         self.INVITATION_KEY = self._get_env("INVITATION_KEY")
-        self.API_KEY = self._get_env("API_KEY")
         self.SECRET_KEY = self._get_env("SECRET_KEY")
         self.ACCESS_TOKEN_EXPIRE_MINUTES = self._get_env("ACCESS_TOKEN_EXPIRE_MINUTES")
         
@@ -44,7 +43,7 @@ class Config:
         self.SMTP_EMAIL = self._get_env("SMTP_EMAIL")
         self.SMTP_USER = self._get_env("SMTP_USER")
         self.SMTP_PASS = self._get_env("SMTP_PASS")
-        
+
         # Monitoring
         self.SENTRY_URL = self._get_env("SENTRY_URL_API")
         self.ENVIRONMENT = self._get_env("ENVIRONMENT")

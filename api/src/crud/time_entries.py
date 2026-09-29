@@ -32,10 +32,8 @@ config = Config()
 def sessions_subquery():
     """Normalized "played session" rows.
 
-    Finished (is_active == False) GameTimer rows only - this includes the
-    Clockify-era sessions backfilled into game_timers by migration
-    004_merge_time_entries. Every aggregate query below sees a single
-    (user_id, game_id, start, end, duration) shape.
+    Finished (is_active == False) GameTimer rows only. Every aggregate query
+    below sees a single (user_id, game_id, start, end, duration) shape.
     """
     return (
         select(

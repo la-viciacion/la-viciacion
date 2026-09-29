@@ -1,8 +1,8 @@
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
-from fastapi import Depends, Header, HTTPException, Security, status
-from fastapi.security import APIKeyHeader, APIKeyQuery, OAuth2PasswordBearer
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
 
 import jwt
 
@@ -39,9 +39,6 @@ class TokenData(BaseModel):
 
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-
-
-api_key_header = APIKeyHeader(name="x-api-key", auto_error=False)
 
 
 def verify_password(plain_password: str, hashed_password: str):
@@ -130,15 +127,4 @@ def ensure_self_or_admin(
         return
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN, detail=messages.USER_NOT_ADMIN
-    )
-
-
-def get_api_key(
-    api_key_header: str = Security(api_key_header),
-) -> str:
-    if api_key_header == config.API_KEY:
-        return api_key_header
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Invalid or missing API Key",
     )

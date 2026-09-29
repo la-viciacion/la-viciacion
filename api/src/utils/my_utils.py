@@ -549,14 +549,3 @@ def get_platforms(db: Session):
     except Exception as e:
         logger.info(e)
         raise e
-
-
-def get_completed_tag(db: Session):
-    try:
-        stmt = select(
-            models.OtherTag.id,
-        ).where(models.OtherTag.name == "Completed")
-        return db.execute(stmt).fetchone()
-    except Exception as e:
-        logger.info(e)
-        raise e

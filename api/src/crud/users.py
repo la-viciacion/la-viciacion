@@ -310,52 +310,6 @@ def insert_user(
         raise
 
 
-def create_user(
-    db: Session, user: schemas.UserCreate
-) -> Union[Tuple[bool, models.User], Tuple[bool, int]]:
-    # generating the salt
-    salt = bcrypt.gensalt()
-
-    # Check password length and email format
-    if not utils.validate_email_format(user.email):
-        return (False, 1)
-    if not utils.validate_password_requirements(user.password):
-        return (False, 0)
-
-    # Hashing the password
-    hashed_password = bcrypt.hashpw(user.password.encode("utf-8"), salt)
-
-    try:
-        logger.info("Creating new user: " + str(user.username))
-        db_user = models.User(
-            username=user.username,
-            name=(user.name or "").strip() or user.username,
-            password=hashed_password,
-            email=user.email,
-        )
-        db.add(db_user)
-        db.commit()
-        try:
-            user_statistics = models.UserStatistics(
-                user_id=db_user.id, current_ranking_hours=1000
-            )
-            db.add(user_statistics)
-            db.commit()
-        except Exception as e:
-            db.rollback()
-            if "Duplicate" not in str(e):
-                logger.error("Error adding new game statistics: " + str(e))
-                raise e
-            else:
-                logger.warning("User already exists in DB")
-        return (True, -1)
-
-    except SQLAlchemyError as e:
-        db.rollback()
-        logger.error("Error creating user: " + str(e))
-        raise
-
-
 def create_user_statistics(db: Session, user_id: id):
     try:
         user_statistics = models.UserStatistics(
@@ -370,100 +324,6 @@ def create_user_statistics(db: Session, user_id: id):
         if "Duplicate" not in str(e):
             logger.error("Error creating user statistics: " + str(e))
             raise e
-
-
-def update_user(db: Session, user: schemas.UserUpdate):
-    try:
-        db_user = get_user_by_username(db, user.username)
-        name = user.name if user.name is not None else db_user.name
-        email = user.email if user.email is not None else db_user.email
-        telegram_id = (
-            user.telegram_id if user.telegram_id is not None else db_user.telegram_id
-        )
-        clockify_id = (
-            user.clockify_id if user.clockify_id is not None else db_user.clockify_id
-        )
-        clockify_key = (
-            user.clockify_key if user.clockify_key is not None else db_user.clockify_key
-        )
-        if user.password is not None:
-            salt = bcrypt.gensalt()
-
-            # Hashing the password
-            hashed_password = bcrypt.hashpw(user.password.encode("utf-8"), salt)
-            password = hashed_password
-        else:
-            password = db_user.password
-        stmt = (
-            update(models.User)
-            .where(models.User.username == user.username)
-            .values(
-                telegram_id=telegram_id,
-                name=name,
-                email=email,
-                password=password,
-                clockify_id=clockify_id,
-                clockify_key=clockify_key,
-            )
-        )
-        db.execute(stmt)
-        db.commit()
-        return (
-            db.query(models.User).filter(models.User.username == user.username).first()
-        )
-    except SQLAlchemyError as e:
-        db.rollback()
-        logger.error("Error updating user: " + str(e))
-        raise
-
-
-def update_user_as_admin(db: Session, user: schemas.UserUpdateForAdmin):
-    try:
-        db_user = get_user_by_username(db, user.username)
-        name = user.name if user.name is not None else db_user.name
-        email = user.email if user.email is not None else db_user.email
-        telegram_id = (
-            user.telegram_id if user.telegram_id is not None else db_user.telegram_id
-        )
-        is_admin = user.is_admin if user.is_admin is not None else db_user.is_admin
-        is_active = user.is_active if user.is_active is not None else db_user.is_active
-        clockify_id = (
-            user.clockify_id if user.clockify_id is not None else db_user.clockify_id
-        )
-        clockify_key = (
-            user.clockify_key if user.clockify_key is not None else db_user.clockify_key
-        )
-        if user.password is not None:
-            salt = bcrypt.gensalt()
-
-            # Hashing the password
-            hashed_password = bcrypt.hashpw(user.password.encode("utf-8"), salt)
-            password = hashed_password
-        else:
-            password = db_user.password
-        stmt = (
-            update(models.User)
-            .where(models.User.username == user.username)
-            .values(
-                telegram_id=telegram_id,
-                name=name,
-                email=email,
-                is_admin=is_admin,
-                is_active=is_active,
-                password=password,
-                clockify_id=clockify_id,
-                clockify_key=clockify_key,
-            )
-        )
-        db.execute(stmt)
-        db.commit()
-        return (
-            db.query(models.User).filter(models.User.username == user.username).first()
-        )
-    except SQLAlchemyError as e:
-        db.rollback()
-        logger.error("Error updating user: " + str(e))
-        raise
 
 
 def update_user_telegram_id(db: Session, user: schemas.TelegramUser):
@@ -1172,32 +1032,6 @@ def update_current_ranking_hours(db: Session, ranking, user_id):
     db.commit()
 
 
-def activate_account(db: Session, username: str):
-    try:
-        logger.info("Activating account...")
-        db_user = (
-            db.query(models.User)
-            .filter(models.User.username == username, models.User.is_active == 1)
-            .first()
-        )
-        if db_user:
-            return False
-        stmt = (
-            update(models.User)
-            .where(models.User.username == username)
-            .values(
-                is_active=1,
-            )
-        )
-        db.execute(stmt)
-        db.commit()
-        return True
-    except Exception as e:
-        db.rollback()
-        logger.error("Error activating account: " + str(e))
-        raise e
-
-
 ######################
 ##### STATISTICS #####
 ######################
@@ -1233,79 +1067,6 @@ def top_games(db: Session, username: str, limit: int = 10, season: int = None):
     except Exception as e:
         logger.error(e)
         raise e
-
-
-# def played_games(db: Session, username: str, limit: int = None):
-#     try:
-#         user = get_user_by_username(db, username)
-#         stmt = (
-#             select(
-#                 models.UserGame.user_id,
-#                 models.UserGame.game_id,
-#                 models.Game.name,
-#                 models.TimeEntry.start.label("last_played_time"),
-#                 models.UserGame.played_time,
-#             )
-#             .join(models.User, models.User.id == models.UserGame.user_id)
-#             .join(models.Game, models.Game.id == models.UserGame.game_id)
-#             .join(
-#                 models.TimeEntry,
-#                 models.TimeEntry.project_clockify_id == models.UserGame.game_id,
-#             )
-#             .where(
-#                 models.UserGame.user_id == user.id, models.TimeEntry.user_id == user.id
-#             )
-#             .group_by(
-#                 models.UserGame.user_id,
-#                 models.UserGame.game_id,
-#                 models.Game.name,
-#                 models.UserGame.played_time,
-#                 models.TimeEntry.start,
-#             )
-#             .order_by(desc(models.TimeEntry.start))
-#         )
-#         result = db.execute(stmt).fetchall()
-#         unique_names = set()
-#         unique_data = []
-#         for item in result:
-#             if item["name"] not in unique_names:
-#                 unique_names.add(item["name"])
-#                 unique_data.append(item)
-#             if len(unique_data) == limit:
-#                 break
-#         return unique_data
-#     except Exception as e:
-#         logger.error(e)
-#         raise e
-
-
-# def completed_games(db: Session, username: str, limit: int = None):
-#     try:
-#         user = get_user_by_username(db, username)
-#         stmt = (
-#             select(
-#                 models.UserGame.user_id,
-#                 models.UserGame.game_id,
-#                 models.Game.name,
-#                 models.UserGame.completed_date.label("completed_date"),
-#             )
-#             .join(models.User, models.User.id == models.UserGame.user_id)
-#             .join(models.Game, models.Game.id == models.UserGame.game_id)
-#             .where(models.UserGame.user_id == user.id, models.UserGame.completed == 1)
-#             .group_by(
-#                 models.UserGame.user_id,
-#                 models.UserGame.game_id,
-#                 models.Game.name,
-#                 # models.UserGame.played_time,
-#             )
-#             .order_by(desc(models.UserGame.completed_date))
-#             .distinct()
-#             .limit(limit)
-#         )
-#         return db.execute(stmt).fetchall()
-#     except Exception as e:
-#         logger.error(e)
-#         raise e
 
 
 def get_achievements(db: Session, username: str, season: int = None):
