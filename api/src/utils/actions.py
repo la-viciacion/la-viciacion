@@ -80,10 +80,13 @@ async def recompute_user_stats(db: Session, user: models.User, silent: bool = Fa
     await achievements.user_played_total_time(db, user, played_time, silent=silent)
     await achievements.user_session_time(db, user, silent=silent)
     await achievements.user_played_total_games(db, user, silent=silent)
+    await achievements.user_completed_total_games(db, user, silent=silent)
     await achievements.user_streak(
         db, user, best_streak, best_streak_date, silent=silent
     )
     await achievements.user_played_day_time(db, user, silent)
+    await achievements.user_played_hours_game_day(db, user, silent=silent)
+    await achievements.user_played_games_per_day(db, user, silent=silent)
     await achievements.happy_new_year(db, user, silent)
     await achievements.early_riser(db, user, silent)
     await achievements.nocturnal(db, user, silent)
@@ -617,7 +620,6 @@ async def weekly_resume(
         # logger.debug(msg)
         if not silent:
             await utils.send_message_to_user(user.telegram_id, msg)
-        resume["ranking"] = current_ranking
         resume["hours"] = weekly_hours
         resume["sessions"] = weekly_sessions
         resume["games"] = weekly_games

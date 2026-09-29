@@ -243,6 +243,43 @@ def get_played_time_by_day(db: Session, user_id: int, season: int = current_seas
     return sorted(played_start_days)
 
 
+def get_played_time_by_game_and_day(
+    db: Session, user_id: int, season: int = current_season
+):
+    sessions = sessions_subquery()
+    return (
+        db.query(
+            func.DATE(sessions.c.start),
+            sessions.c.game_id,
+            func.sum(sessions.c.duration),
+        )
+        .filter(
+            sessions.c.user_id == user_id,
+            extract("year", sessions.c.start) == season,
+        )
+        .group_by(func.DATE(sessions.c.start), sessions.c.game_id)
+        .all()
+    )
+
+
+def get_played_games_count_by_day(
+    db: Session, user_id: int, season: int = current_season
+):
+    sessions = sessions_subquery()
+    return (
+        db.query(
+            func.DATE(sessions.c.start),
+            func.count(func.distinct(sessions.c.game_id)),
+        )
+        .filter(
+            sessions.c.user_id == user_id,
+            extract("year", sessions.c.start) == season,
+        )
+        .group_by(func.DATE(sessions.c.start))
+        .all()
+    )
+
+
 def get_time_entry_between_hours(
     db: Session,
     user_id: int,

@@ -522,6 +522,63 @@ class Achievements:
                 image=self.get_image(db, ach.name)[0],
             )
 
+    async def user_played_hours_game_day(
+        self, db: Session, user: models.User, silent: bool = False
+    ):
+        # logger.debug("Check hours played in a single game/day achievement...")
+        ach = AchievementsElems.PLAYED_8_HOURS_GAME_DAY
+        if self.check_already_achieved(db, user.id, ach.name):
+            return
+        rows = time_entries.get_played_time_by_game_and_day(db, user.id)
+        for date, game_id, duration in rows:
+            if duration is None or game_id is None:
+                continue
+            if duration / 60 / 60 >= 8:
+                logger.info("Set achievement 8 hours game/day")
+                self.set_user_achievement(
+                    db, user.id, ach.name, game_id=game_id, date=str(date)
+                )
+                msg = utils.get_ach_message(ach, user=user.name, db=db, game_id=game_id)
+                await utils.send_message(
+                    msg,
+                    silent,
+                    image=self.get_image(db, ach.name)[0],
+                )
+                return
+
+    async def user_played_games_per_day(
+        self, db: Session, user: models.User, silent: bool = False
+    ):
+        # logger.debug("Check distinct games played in a single day achievements...")
+        rows = time_entries.get_played_games_count_by_day(db, user.id)
+        for date, distinct_games in rows:
+            if distinct_games is None:
+                continue
+            ach = AchievementsElems.PLAYED_5_GAMES_DAY
+            if distinct_games >= 5 and not self.check_already_achieved(
+                db, user.id, ach.name
+            ):
+                logger.info("Set achievement 5 games/day")
+                self.set_user_achievement(db, user.id, ach.name, date=str(date))
+                msg = utils.get_ach_message(ach, user=user.name)
+                await utils.send_message(
+                    msg,
+                    silent,
+                    image=self.get_image(db, ach.name)[0],
+                )
+            ach = AchievementsElems.PLAYED_10_GAMES_DAY
+            if distinct_games >= 10 and not self.check_already_achieved(
+                db, user.id, ach.name
+            ):
+                logger.info("Set achievement 10 games/day")
+                self.set_user_achievement(db, user.id, ach.name, date=str(date))
+                msg = utils.get_ach_message(ach, user=user.name)
+                await utils.send_message(
+                    msg,
+                    silent,
+                    image=self.get_image(db, ach.name)[0],
+                )
+
     async def user_played_total_games(
         self, db: Session, user: models.User, date: str = None, silent: bool = False
     ):
@@ -573,6 +630,38 @@ class Achievements:
             db, user.id, ach.name
         ):
             logger.info("Set achievement played 100 games")
+            self.set_user_achievement(db, user.id, ach.name)
+            msg = utils.get_ach_message(ach, user=user.name)
+            await utils.send_message(
+                msg,
+                silent,
+                image=self.get_image(db, ach.name)[0],
+            )
+
+    async def user_completed_total_games(
+        self, db: Session, user: models.User, silent: bool = False
+    ):
+        # logger.debug("Check total completed games achievements...")
+        completed_games = users.count_completed_games(db, user.id)
+        # 42
+        ach = AchievementsElems.COMPLETED_42_GAMES
+        if completed_games >= 42 and not self.check_already_achieved(
+            db, user.id, ach.name
+        ):
+            logger.info("Set achievement completed 42 games")
+            self.set_user_achievement(db, user.id, ach.name)
+            msg = utils.get_ach_message(ach, user=user.name)
+            await utils.send_message(
+                msg,
+                silent,
+                image=self.get_image(db, ach.name)[0],
+            )
+        # 100
+        ach = AchievementsElems.COMPLETED_100_GAMES
+        if completed_games >= 100 and not self.check_already_achieved(
+            db, user.id, ach.name
+        ):
+            logger.info("Set achievement completed 100 games")
             self.set_user_achievement(db, user.id, ach.name)
             msg = utils.get_ach_message(ach, user=user.name)
             await utils.send_message(
@@ -890,7 +979,7 @@ class Achievements:
         )
         return weekly_achievements
 
-    def just_in_time(
+    async def just_in_time(
         self,
         db: Session,
         user: models.User,
@@ -898,5 +987,24 @@ class Achievements:
         avg_time: int,
         game_id: str,
         date: str = None,
+        silent: bool = False,
     ):
-        return
+        # logger.debug("Check just-in-time completion achievement...")
+        if not played_time or not avg_time:
+            return
+        ach = AchievementsElems.JUST_IN_TIME
+        if self.check_already_achieved(db, user.id, ach.name):
+            return
+        # Both played_time and avg_time (HLTB comp_main) are in seconds;
+        # matched at hour granularity since an exact-second match is
+        # practically unreachable and everything else in the app buckets
+        # played time into hours anyway.
+        if round(played_time / 3600) == round(avg_time / 3600):
+            logger.info("Set achievement just in time")
+            self.set_user_achievement(db, user.id, ach.name, game_id, date=date)
+            msg = utils.get_ach_message(ach, user=user.name, db=db, game_id=game_id)
+            await utils.send_message(
+                msg,
+                silent,
+                image=self.get_image(db, ach.name)[0],
+            )
