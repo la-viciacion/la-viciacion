@@ -57,6 +57,23 @@ def validate_email_format(email):
         return False
 
 
+def normalize_email(email) -> str | None:
+    """Trim and lower-case an email; blank becomes None."""
+    return (email or "").strip().lower() or None
+
+
+def validate_username(username) -> str | None:
+    """Error message for an invalid nickname, or None when it is fine.
+    No "@" so a nickname can never be mistaken for somebody's email at login."""
+    if not (username or "").strip():
+        return "El usuario no puede estar vacío"
+    if "@" in username:
+        return 'El usuario no puede contener "@" (el email es el identificador de inicio de sesión)'
+    if any(c.isspace() for c in username):
+        return "El usuario no puede contener espacios"
+    return None
+
+
 def convert_time_to_hours(seconds) -> str:
     if seconds is None:
         return "0h0m"

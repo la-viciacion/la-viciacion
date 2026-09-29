@@ -181,9 +181,14 @@ def update_profile(
     if "name" in data and data["name"] is not None:
         data["name"] = data["name"].strip() or None
     if "email" in data:
-        data["email"] = (data["email"] or "").strip() or None
-        if data["email"] and not utils.validate_email_format(data["email"]):
+        # the email is the login identifier: it can be changed but not removed
+        data["email"] = utils.normalize_email(data["email"])
+        if not data["email"]:
+            raise HTTPException(status_code=400, detail=msg.EMAIL_REQUIRED)
+        if not utils.validate_email_format(data["email"]):
             raise HTTPException(status_code=400, detail=msg.EMAIL_INVALID)
+        if users.email_in_use(db, data["email"], exclude_user_id=user.id):
+            raise HTTPException(status_code=400, detail=msg.EMAIL_IN_USE)
     users.update_profile(db, user, data)
     return {
         "id": user.id,

@@ -118,10 +118,9 @@ function draw(d) {
 
     ${sectionTitle('Mis datos')}
     <form class="pf-card pf-form" id="pfData" novalidate>
-      <label>Usuario<input class="adm-input" type="text" value="${d.user.username}" disabled /></label>
+      <label>Usuario (apodo)<input class="adm-input" type="text" value="${d.user.username}" disabled /></label>
       <label>Nombre<input class="adm-input" type="text" name="name" value="${d.user.name || ''}" autocomplete="name" /></label>
-      <label>Email<input class="adm-input" type="email" name="email" value="${d.user.email || ''}" autocomplete="email" /></label>
-      <label>Telegram ID<input class="adm-input" type="number" name="telegram_id" value="${d.user.telegram_id ?? ''}" /></label>
+      <label>Email (con el que inicias sesión)<input class="adm-input" type="email" name="email" value="${d.user.email || ''}" autocomplete="email" /></label>
       <div class="pf-msg" id="pfDataMsg" role="status"></div>
       <div><button class="pf-btn primary" type="submit">Guardar datos</button></div>
     </form>
@@ -230,14 +229,12 @@ async function saveData(e) {
   e.preventDefault();
   const form = e.currentTarget;
   const msg = main.querySelector('#pfDataMsg');
-  const telegram = form.telegram_id.value.trim();
+  // The email identifies the account, so it is only sent when filled in.
+  const changes = { name: form.name.value };
+  if (form.email.value.trim()) changes.email = form.email.value;
   try {
-    const updated = await api(userPath('profile'), jsonRequest('PATCH', {
-      name: form.name.value,
-      email: form.email.value,
-      telegram_id: telegram === '' ? null : Number(telegram),
-    }));
-    Object.assign(user, { name: updated.name, email: updated.email, telegram_id: updated.telegram_id });
+    const updated = await api(userPath('profile'), jsonRequest('PATCH', changes));
+    Object.assign(user, { name: updated.name, email: updated.email });
     const shown = updated.name || updated.username;
     main.querySelector('.pf-title').textContent = shown;
     const navName = document.querySelector('.navbar-username');

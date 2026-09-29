@@ -16,10 +16,10 @@ export function showLogin(onSuccess) {
 
         <form id="loginForm" novalidate>
           <div class="form-group">
-            <label for="username">Usuario</label>
+            <label for="username">Email o usuario</label>
             <div class="input-wrap">
               ${iconUser()}
-              <input type="text" id="username" name="username" placeholder="tu_usuario" autocomplete="username" required />
+              <input type="text" id="username" name="username" placeholder="tu@email.com o usuario" autocomplete="username" required />
             </div>
           </div>
 

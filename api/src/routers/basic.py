@@ -100,12 +100,23 @@ def signup(user: schemas.UserCreate, db: Session = Depends(get_db)):
                 CustomExceptions.SignUp.INVALID_INVITATION_KEY
             ).to_json(),
         )
+    user.email = utils.normalize_email(user.email) or ""
+    username_error = utils.validate_username(user.username)
+    if username_error:
+        raise HTTPException(status_code=400, detail=username_error)
     db_user = users.get_user_by_username(db, username=user.username)
     if db_user:
         raise HTTPException(
             status_code=400,
             detail=CustomExceptions(
                 CustomExceptions.SignUp.USER_ALREADY_EXISTS
+            ).to_json(),
+        )
+    if users.email_in_use(db, user.email):
+        raise HTTPException(
+            status_code=400,
+            detail=CustomExceptions(
+                CustomExceptions.SignUp.EMAIL_ALREADY_EXISTS
             ).to_json(),
         )
     validation, new_user = users.create_user(db=db, user=user)

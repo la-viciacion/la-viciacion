@@ -15,10 +15,10 @@ const inputId = (f) => `f_${f.key}`;
 
 function fieldHtml(f, value) {
   const id = inputId(f);
-  const v = value ?? '';
+  const v = value ?? f.default ?? '';
   switch (f.type) {
     case 'checkbox':
-      return html`<label class="adm-check"><input type="checkbox" id="${id}" ${value ? html`checked` : ''} /> ${f.label}</label>`;
+      return html`<label class="adm-check"><input type="checkbox" id="${id}" ${v ? html`checked` : ''} /> ${f.label}</label>`;
     case 'platform': {
       const known = platformList();
       return html`<label>${f.label}<select class="adm-input" id="${id}">
@@ -127,7 +127,15 @@ async function submit(entity, row, fields, modal, admin) {
 
   for (const f of fields) {
     if (f.type === 'password') {
-      newPassword = document.getElementById(inputId(f)).value || null;
+      // Editing: an optional new password sent separately. Creating: a normal field.
+      const typed = document.getElementById(inputId(f)).value || null;
+      if (row) { newPassword = typed; continue; }
+      if (f.required && typed === null) { errorEl.textContent = `Falta: ${f.label}`; return; }
+      if (typed !== null && !isValidPassword(typed)) {
+        errorEl.textContent = `La contraseña debe tener ${PASSWORD_HINT.toLowerCase()}`;
+        return;
+      }
+      body[f.key] = typed;
       continue;
     }
     const value = readField(f);

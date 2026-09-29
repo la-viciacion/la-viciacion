@@ -216,11 +216,79 @@ def get_user_by_username(db: Session, username: str) -> models.User:
         raise
 
 
+def get_user_by_login(db: Session, identifier: str) -> models.User | None:
+    """
+    Find the user that logs in with a username or an email.
+    The username wins; the email match is case-insensitive and only counts
+    when it is unambiguous (an email shared by two accounts logs nobody in).
+    """
+    identifier = (identifier or "").strip()
+    if not identifier:
+        return None
+    user = get_user_by_username(db, identifier)
+    if user:
+        return user
+    try:
+        matches = (
+            db.query(models.User)
+            .filter(func.lower(models.User.email) == identifier.lower())
+            .limit(2)
+            .all()
+        )
+    except SQLAlchemyError as e:
+        logger.error("Error getting user by email: " + str(e))
+        raise
+    return matches[0] if len(matches) == 1 else None
+
+
+def email_in_use(db: Session, email: str, exclude_user_id: int | None = None) -> bool:
+    """True if another account already has this email (case-insensitive)."""
+    query = db.query(models.User.id).filter(
+        func.lower(models.User.email) == email.strip().lower()
+    )
+    if exclude_user_id is not None:
+        query = query.filter(models.User.id != exclude_user_id)
+    return query.first() is not None
+
+
 def get_user_by_id(db: Session, id: int) -> models.User:
     try:
         return db.query(models.User).filter(models.User.id == id).first()
     except SQLAlchemyError as e:
         logger.error("Error getting user by id: " + str(e))
+        raise
+
+
+def insert_user(
+    db: Session,
+    *,
+    username: str,
+    email: str,
+    name: str | None,
+    password: str,
+    is_admin: bool = False,
+    is_active: bool = False,
+) -> models.User:
+    """Insert a user (already validated) plus its statistics row."""
+    hashed = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    try:
+        db_user = models.User(
+            username=username,
+            name=name,
+            email=email,
+            password=hashed,
+            is_admin=int(is_admin),
+            is_active=int(is_active),
+        )
+        db.add(db_user)
+        db.flush()
+        db.add(models.UserStatistics(user_id=db_user.id, current_ranking_hours=1000))
+        db.commit()
+        db.refresh(db_user)
+        return db_user
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error("Error inserting user: " + str(e))
         raise
 
 

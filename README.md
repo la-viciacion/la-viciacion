@@ -8,6 +8,13 @@ Copy `.env.template` to `.env` and fill in your values. That single file is read
 
 `docker-compose.yml` and the `Dockerfile`s are ready to use as they are; they contain no secrets.
 
+### Users and login
+
+- Accounts are created by an admin in the panel (Usuarios, "Nuevo usuario"); public sign-up is parked. The admin sets the initial password and shares it with the user, who can change it from their profile.
+- The **email** is the login identifier (unique, stored lower-case). The **username** is the user's unique nickname (no `@`, no spaces). At login either one is accepted.
+- On every start the API creates/restores the emergency admin `admin` ("Dios") with `GOD_ADMIN_PASS`.
+- The session lasts `ACCESS_TOKEN_EXPIRE_MINUTES` minutes from login (10080 = 7 days) and is not renewed.
+
 ### Webhooks
 
 `api/src/routers/webhooks.py` lets you add your own 'public' webhooks if you need them. So, you can create an endpoint like `/tBn7NyNHAsP9WjP3sJUXglxaTATJxrfs3J2DauBV5fthwuGKq3le`, and call directly from another service without authentication like the `bot` routes (to execute other processes).

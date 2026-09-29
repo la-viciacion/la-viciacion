@@ -39,7 +39,8 @@ class User(Base):
     is_active = Column(Integer)
     avatar = Column(LargeBinary)
 
-    __table_args__ = (UniqueConstraint("username"),)
+    # email is the login identifier, username the (unique) nickname
+    __table_args__ = (UniqueConstraint("username"), UniqueConstraint("email", name="uq_users_email"))
 
 
 class UserStatistics(Base):

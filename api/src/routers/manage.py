@@ -16,10 +16,11 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .. import auth
+from ..crud import users as users_crud
 from ..database import models
 from ..database.database import SessionLocal
 from ..utils import actions, rawg_sync
-from ..utils.my_utils import validate_password_requirements
+from ..utils.my_utils import normalize_email, validate_email_format, validate_password_requirements, validate_username
 
 router = APIRouter(
     prefix="/manage",
@@ -136,6 +137,64 @@ def list_users(
     return {"total": total, "items": [_user_out(u, sessions.get(u.id, 0), library.get(u.id, 0)) for u in users]}
 
 
+def _checked_email(db: Session, email, *, exclude_user_id=None, required=True):
+    """Normalized email that is valid and free (None allowed when not required)."""
+    email = normalize_email(email)
+    if not email:
+        if required:
+            raise HTTPException(status_code=400, detail="El email es obligatorio")
+        return None
+    if not validate_email_format(email):
+        raise HTTPException(status_code=400, detail="El email no es válido")
+    if users_crud.email_in_use(db, email, exclude_user_id=exclude_user_id):
+        raise HTTPException(status_code=409, detail="Ese email ya está en uso por otra cuenta")
+    return email
+
+
+def _check_username(db: Session, username: str, *, exclude_user_id=None):
+    error = validate_username(username)
+    if error:
+        raise HTTPException(status_code=400, detail=error)
+    other = users_crud.get_user_by_username(db, username)
+    if other and other.id != exclude_user_id:
+        raise HTTPException(status_code=409, detail="Ese usuario ya existe")
+
+
+class UserCreateBody(BaseModel):
+    email: str
+    username: str
+    name: Optional[str] = None
+    password: str
+    is_admin: bool = False
+    is_active: bool = True
+
+
+@router.post("/users", status_code=201)
+def create_user(body: UserCreateBody, db: Session = Depends(get_db)):
+    """Create an account (the only way to add users for now)."""
+    email = _checked_email(db, body.email)
+    username = body.username.strip()
+    _check_username(db, username)
+    if not validate_password_requirements(body.password):
+        raise HTTPException(
+            status_code=400,
+            detail="La contraseña debe tener 12-24 caracteres, mayúscula, minúscula, número y un carácter especial",
+        )
+    try:
+        user = users_crud.insert_user(
+            db,
+            username=username,
+            email=email,
+            name=(body.name or "").strip() or None,
+            password=body.password,
+            is_admin=body.is_admin,
+            is_active=body.is_active,
+        )
+    except IntegrityError:
+        raise HTTPException(status_code=409, detail="Ese email o usuario ya existe")
+    return _user_out(user)
+
+
 class UserPatch(BaseModel):
     name: Optional[str] = None
     username: Optional[str] = None
@@ -156,10 +215,11 @@ def patch_user(
     data = body.model_dump(exclude_unset=True)
     if user.id == admin.id and (data.get("is_admin") is False or data.get("is_active") is False):
         raise HTTPException(status_code=400, detail="No puedes quitarte el rol de admin ni desactivarte a ti mismo")
+    if "email" in data:
+        data["email"] = _checked_email(db, data["email"], exclude_user_id=user.id, required=False)
     if data.get("username") is not None:
         data["username"] = data["username"].strip()
-        if not data["username"]:
-            raise HTTPException(status_code=400, detail="El usuario no puede estar vacío")
+        _check_username(db, data["username"], exclude_user_id=user.id)
     for field in ("is_admin", "is_active"):
         if field in data and data[field] is not None:
             data[field] = int(data[field])

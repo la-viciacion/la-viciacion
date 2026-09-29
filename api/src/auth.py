@@ -56,8 +56,9 @@ def get_password_hash(password: str):
     return hashed_password
 
 
-def authenticate_user(db, username: str, password: str):
-    user = users.get_user_by_username(db, username)
+def authenticate_user(db, login: str, password: str):
+    """`login` is a username or an email."""
+    user = users.get_user_by_login(db, login)
     if not user:
         return False
     if not verify_password(password, user.password):
