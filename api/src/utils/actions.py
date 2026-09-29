@@ -30,11 +30,10 @@ achievements = Achievements()
 
 async def recompute_user_stats(db: Session, user: models.User, silent: bool = False):
     """Recompute one user's aggregates/achievements from their sessions
-    (native game_timers + historical Clockify time_entries)."""
+    (game_timers, including the backfilled Clockify-era ones)."""
     current_season = datetime.datetime.now().year
 
     users.create_user_statistics(db, user.id)
-    users.create_user_statistics_historical(db, user.id)
 
     await check_forgotten_timer(db, user)
 
@@ -99,8 +98,8 @@ async def recompute_all_users_and_rankings(
 ):
     """Recompute every user's stats plus global rankings/achievements.
 
-    Replaces the old Clockify-driven sync_data now that sessions come from
-    game_timers (+ frozen historical time_entries). Triggered by the cron
+    Replaces the old Clockify-driven sync_data now that every session (native
+    and backfilled Clockify-era) lives in game_timers. Triggered by the cron
     hitting /webhooks/sync-data (for the time-gated checks: streak-loss at
     05:00, weekly resume Monday 09:00, season rollover Jan 1) and right
     after a native timer stops (routers/timers.py).
@@ -195,7 +194,7 @@ async def recompute_after_timer_stop():
 def streak_days(
     db: Session,
     user: models.User,
-    played_dates: list[models.TimeEntry],
+    played_dates: list[datetime.date],
     current_season: int,
 ):
     """

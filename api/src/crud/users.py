@@ -187,22 +187,6 @@ def create_user_statistics(db: Session, user_id: id):
             raise e
 
 
-def create_user_statistics_historical(db: Session, user_id: id):
-    try:
-        user_statistics = models.UserStatisticsHistorical(
-            user_id=user_id, current_ranking_hours=1000
-        )
-        db.add(user_statistics)
-        db.commit()
-        db.refresh(user_statistics)
-
-    except SQLAlchemyError as e:
-        db.rollback()
-        if "Duplicate" not in str(e):
-            logger.error("Error creating user statistics historical: " + str(e))
-            raise e
-
-
 def update_user(db: Session, user: schemas.UserUpdate):
     try:
         db_user = get_user_by_username(db, user.username)
@@ -575,9 +559,7 @@ def get_game_by_id(db: Session, user_id, game_id, season) -> models.UserGame:
     )
 
 
-def update_played_days(
-    db: Session, user_id: int, season_played_days: int, total_played_days: int = None
-):
+def update_played_days(db: Session, user_id: int, season_played_days: int):
     try:
         stmt = (
             update(models.UserStatistics)
@@ -590,19 +572,6 @@ def update_played_days(
         db.rollback()
         logger.error(e)
         raise e
-    if total_played_days is not None:
-        try:
-            stmt = (
-                update(models.UserStatisticsHistorical)
-                .where(models.UserStatisticsHistorical.user_id == user_id)
-                .values(played_days=total_played_days)
-            )
-            db.execute(stmt)
-            db.commit()
-        except Exception as e:
-            db.rollback()
-            logger.error(e)
-            raise e
 
 
 def update_played_time(db: Session, user_id, played_time):
@@ -616,13 +585,6 @@ def update_played_time(db: Session, user_id, played_time):
         )
         db.execute(stmt)
         db.commit()
-        # stmt = (
-        #     update(models.UserStatisticsHistorical)
-        #     .where(models.UserStatisticsHistorical.user_id == user_id)
-        #     .values(played_time=played_time)
-        # )
-        # db.execute(stmt)
-        # db.commit()
     except Exception as e:
         logger.error(e)
         raise e

@@ -10,7 +10,6 @@ from sqlalchemy import (
     or_,
     select,
     text,
-    union_all,
     update,
 )
 from sqlalchemy.orm import Session
@@ -31,31 +30,24 @@ current_season = datetime.datetime.now().year
 
 
 def sessions_subquery():
-    """Normalized "played session" rows from both data sources.
+    """Normalized "played session" rows.
 
-    Unions Clockify-era TimeEntry rows with native GameTimer rows (only
-    finished ones, is_active == False), so every aggregate query below sees
-    a single (user_id, game_id, start, end, duration) shape regardless of
-    which system tracked the session.
+    Finished (is_active == False) GameTimer rows only - this includes the
+    Clockify-era sessions backfilled into game_timers by migration
+    004_merge_time_entries. Every aggregate query below sees a single
+    (user_id, game_id, start, end, duration) shape.
     """
-    time_entry_sessions = select(
-        models.TimeEntry.user_id.label("user_id"),
-        models.TimeEntry.project_clockify_id.label("game_id"),
-        models.TimeEntry.start.label("start"),
-        models.TimeEntry.end.label("end"),
-        models.TimeEntry.duration.label("duration"),
+    return (
+        select(
+            models.GameTimer.user_id.label("user_id"),
+            models.GameTimer.game_id.label("game_id"),
+            models.GameTimer.start_time.label("start"),
+            models.GameTimer.end_time.label("end"),
+            models.GameTimer.duration_seconds.label("duration"),
+        )
+        .where(models.GameTimer.is_active == False)
+        .subquery("sessions")
     )
-    game_timer_sessions = select(
-        models.GameTimer.user_id.label("user_id"),
-        # game_timers.game_id has no explicit collation (migration 002 left it
-        # at the server default), which can differ from games.id/time_entries'
-        # explicit utf8mb4_general_ci and break the UNION/joins below.
-        models.GameTimer.game_id.collate("utf8mb4_general_ci").label("game_id"),
-        models.GameTimer.start_time.label("start"),
-        models.GameTimer.end_time.label("end"),
-        models.GameTimer.duration_seconds.label("duration"),
-    ).where(models.GameTimer.is_active == False)
-    return union_all(time_entry_sessions, game_timer_sessions).subquery("sessions")
 
 
 def get_users_played_time(db: Session, season: int = current_season):
@@ -157,57 +149,13 @@ def get_user_games_played_time(
     return query.group_by(sessions.c.game_id).all()
 
 
-def get_time_entries(
-    db: Session, start_date: str = None, season: int = current_season
-) -> list[models.TimeEntry]:
-    if start_date:
-        # logger.debug(start_date)
-        return (
-            db.query(models.TimeEntry)
-            .filter(models.TimeEntry.start >= start_date)
-            .order_by(models.TimeEntry.user_id)
-        )
-    else:
-        return (
-            db.query(models.TimeEntry)
-            .filter(extract("year", models.TimeEntry.start) == season)
-            .order_by(models.TimeEntry.user_id)
-        )
-
-
-def get_time_entries_by_user(
-    db: Session,
-    user_id: int,
-    start_date: str = None,
-    season: int = current_season,
-) -> list[models.TimeEntry]:
-    if start_date:
-        # logger.debug(start_date)
-        return db.query(models.TimeEntry).filter(
-            models.TimeEntry.user_id == user_id,
-            models.TimeEntry.start >= start_date,
-        )
-    else:
-        # logger.debug("Get ALL time entries for user " + str(user_id))
-        time_entries = (
-            db.query(models.TimeEntry)
-            .filter(
-                models.TimeEntry.user_id == user_id,
-                extract("year", models.TimeEntry.start) == season,
-            )
-            .order_by(models.TimeEntry.project_clockify_id)
-            .all()
-        )
-        return time_entries
-
-
 def get_played_days(
     db: Session,
     user_id: int,
     start_date: str = None,
     end_date: str = None,
     season: int = current_season,
-) -> list[models.TimeEntry]:
+) -> tuple[list[datetime.date], list[datetime.date]]:
     played_days = []
     real_played_days = []
     if start_date is None:
@@ -349,9 +297,7 @@ def get_forgotten_game_timers(
     return query.all()
 
 
-def get_weekly_resume(
-    db: Session, user: models.User, weeks_ago: int = 0
-) -> list[models.TimeEntry]:
+def get_weekly_resume(db: Session, user: models.User, weeks_ago: int = 0):
     """_summary_
 
     Args:
@@ -360,7 +306,7 @@ def get_weekly_resume(
         mode (int, optional): 0 = last week. 1 = current week. Defaults to 0.
 
     Returns:
-        list[models.TimeEntry]: _description_
+        list[Row]: rows with (sum(duration), session count, distinct game count)
     """
     # if mode == 0:
     #     first_day, last_day = utils.get_last_week_range_dates()
@@ -382,11 +328,3 @@ def get_weekly_resume(
         .all()
     )
     return weekly_hours
-
-
-def delete_time_entry(db: Session, time_entry_id: str):
-    try:
-        db.query(models.TimeEntry).filter(models.TimeEntry.id == time_entry_id).delete()
-        db.commit()
-    except Exception as e:
-        logger.error(e)
