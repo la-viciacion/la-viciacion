@@ -104,6 +104,12 @@ async function load() {
   const st = state[current];
   const tab = current;
   const panel = document.getElementById('admPanel');
+  if (entity.custom) {
+    mount(panel, html`<div class="loading-spinner">Cargando...</div>`);
+    const { render: renderSettings } = await import('./settings.js');
+    if (tab === current) await renderSettings(panel);
+    return;
+  }
   mount(panel, panelView(entity, st, true));
   try {
     const result = await api(`${entity.endpoint}?${queryFor(entity, st)}`);

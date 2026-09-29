@@ -12,6 +12,7 @@ from sqlalchemy import (
     Interval,
     LargeBinary,
     String,
+    Text,
     UniqueConstraint,
     text,
 )
@@ -41,7 +42,12 @@ class User(Base):
     avatar = Column(LargeBinary)
 
     # email is the login identifier, username the (unique) nickname
-    __table_args__ = (UniqueConstraint("username"), UniqueConstraint("email", name="uq_users_email"))
+    __table_args__ = (
+        UniqueConstraint("username"),
+        UniqueConstraint("email", name="uq_users_email"),
+        # the bot recognizes people by it; NULL (not set) may repeat
+        UniqueConstraint("telegram_id", name="uq_users_telegram_id"),
+    )
 
 
 class UserStatistics(Base):
@@ -185,3 +191,24 @@ class GameTimer(Base):
     notes = Column(String(500), nullable=True)
 
     __table_args__ = (UniqueConstraint("user_id", "game_id", "start_time"),)
+
+
+class AppSetting(Base):
+    """Settings edited from the admin panel (see utils/settings.py)."""
+
+    __tablename__ = "app_settings"
+
+    key = Column(String(100), primary_key=True)
+    value = Column(Text, nullable=False)
+    updated_at = Column(DateTime, server_default=text("CURRENT_TIMESTAMP"), onupdate=text("CURRENT_TIMESTAMP"))
+    updated_by = Column(Integer, nullable=True)  # users.id
+
+
+class JobRun(Base):
+    """Last run of each scheduled job (see utils/scheduler.py)."""
+
+    __tablename__ = "job_runs"
+
+    job = Column(String(100), primary_key=True)
+    last_run_at = Column(DateTime, nullable=False)
+    last_status = Column(String(255), nullable=True)

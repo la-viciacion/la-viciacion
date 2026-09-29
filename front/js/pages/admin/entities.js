@@ -26,6 +26,7 @@ export const ENTITIES = {
     columns: [
       { label: 'Usuario', render: (r) => html`<strong>${r.username}</strong><div class="adm-sub">${r.name || ''}</div>` },
       { label: 'Email', render: (r) => r.email || '—' },
+      { label: 'Telegram', render: (r) => r.telegram_id ?? '—' },
       { label: 'Sesiones', render: (r) => r.sessions },
       { label: 'Biblioteca', render: (r) => r.library },
       { label: 'Estado', render: (r) => html`${r.is_admin ? badge('Admin', 'purple') : ''}${badge(r.is_active ? 'Activo' : 'Inactivo', r.is_active ? 'green' : 'red')}` },
@@ -34,6 +35,7 @@ export const ENTITIES = {
       { key: 'email', label: 'Email (inicio de sesión)', type: 'text' },
       { key: 'username', label: 'Usuario (apodo)', type: 'text', required: true },
       { key: 'name', label: 'Nombre', type: 'text' },
+      { key: 'telegram_id', label: 'Telegram ID (el bot lo usa para escribirle)', type: 'number' },
       { key: 'is_admin', label: 'Administrador', type: 'checkbox' },
       { key: 'is_active', label: 'Activo', type: 'checkbox' },
       { key: 'new_password', label: 'Nueva contraseña (dejar vacío para no cambiarla)', type: 'password' },
@@ -42,6 +44,7 @@ export const ENTITIES = {
       { key: 'email', label: 'Email (inicio de sesión)', type: 'text', required: true },
       { key: 'username', label: 'Usuario (apodo)', type: 'text', required: true },
       { key: 'name', label: 'Nombre', type: 'text' },
+      { key: 'telegram_id', label: 'Telegram ID (opcional)', type: 'number' },
       { key: 'password', label: 'Contraseña (compártela con el usuario)', type: 'password', required: true },
       { key: 'is_admin', label: 'Administrador', type: 'checkbox' },
       { key: 'is_active', label: 'Activo', type: 'checkbox', default: true },
@@ -177,5 +180,8 @@ export const ENTITIES = {
     canDelete: false,
   },
 };
+
+// Not a table: a custom panel (see settings.js)
+ENTITIES.settings = { label: 'Notificaciones', custom: true };
 
 export const TABS = Object.keys(ENTITIES);

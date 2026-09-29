@@ -11,6 +11,7 @@ from .config import Config
 from .database import models
 from .database.database import SessionLocal, engine
 from .crud import users as users_crud
+from .utils import scheduler, settings
 from .routers import admin, basic, bot, games, manage, statistics, timers, users, utils, webhooks
 from .utils.logger import LogManager
 
@@ -69,6 +70,7 @@ models.Base.metadata.create_all(bind=engine)
 
 with SessionLocal() as db:
     users_crud.ensure_god_user(db)
+    settings.seed_from_env(db)
 
 app = FastAPI(title="LaViciacion API", version="0.1.0")
 
@@ -84,6 +86,12 @@ app.include_router(utils.router)
 app.include_router(webhooks.router)
 
 app = VersionedFastAPI(app, version_format="{major}", prefix_format="/api/v{major}")
+
+
+@app.on_event("startup")
+def start_scheduler():
+    scheduler.start()
+
 
 app.add_middleware(
     CORSMiddleware,

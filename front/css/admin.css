@@ -151,3 +151,13 @@
 .adm-amb { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 0; border-bottom: 1px dashed var(--border); }
 
 .adm-amb strong { width: 100%; font-size: 0.88rem; }
+
+.adm-settings { display: flex; flex-direction: column; gap: 16px; max-width: 720px; }
+.adm-set-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; }
+.adm-set-card h3 { font-size: 1rem; }
+.adm-set-card label { display: flex; flex-direction: column; gap: 6px; font-size: 0.85rem; color: var(--text-secondary); font-weight: 600; }
+.adm-set-check { flex-direction: row !important; align-items: flex-start; gap: 10px; }
+.adm-set-check > span { display: flex; flex-direction: column; gap: 2px; color: var(--text-primary); }
+.adm-set-row { display: flex; gap: 12px; flex-wrap: wrap; }
+.adm-set-row label { flex: 1; min-width: 140px; }
+.adm-set-actions { padding: 0; }

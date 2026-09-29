@@ -241,6 +241,14 @@ def email_in_use(db: Session, email: str, exclude_user_id: int | None = None) ->
     return query.first() is not None
 
 
+def telegram_id_in_use(db: Session, telegram_id: int, exclude_user_id: int | None = None) -> bool:
+    """True if another account already uses this Telegram id."""
+    query = db.query(models.User.id).filter(models.User.telegram_id == telegram_id)
+    if exclude_user_id is not None:
+        query = query.filter(models.User.id != exclude_user_id)
+    return query.first() is not None
+
+
 def get_user_by_id(db: Session, id: int) -> models.User:
     try:
         return db.query(models.User).filter(models.User.id == id).first()
@@ -258,6 +266,7 @@ def insert_user(
     password: str,
     is_admin: bool = False,
     is_active: bool = False,
+    telegram_id: int | None = None,
 ) -> models.User:
     """Insert a user (already validated) plus its statistics row."""
     hashed = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
@@ -269,6 +278,7 @@ def insert_user(
             password=hashed,
             is_admin=int(is_admin),
             is_active=int(is_active),
+            telegram_id=telegram_id,
         )
         db.add(db_user)
         db.flush()

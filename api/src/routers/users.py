@@ -190,6 +190,8 @@ def update_profile(
             raise HTTPException(status_code=400, detail=msg.EMAIL_INVALID)
         if users.email_in_use(db, data["email"], exclude_user_id=user.id):
             raise HTTPException(status_code=400, detail=msg.EMAIL_IN_USE)
+    if data.get("telegram_id") is not None and users.telegram_id_in_use(db, data["telegram_id"], exclude_user_id=user.id):
+        raise HTTPException(status_code=400, detail=msg.TELEGRAM_ID_IN_USE)
     users.update_profile(db, user, data)
     return {
         "id": user.id,

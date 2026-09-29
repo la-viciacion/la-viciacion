@@ -11,6 +11,7 @@ from ..database import models, schemas
 from ..database.database import SessionLocal, engine
 from ..routers import admin, games, statistics, users, utils
 from ..utils import actions as actions
+from ..utils import settings
 from ..utils.logger import LogManager
 
 log_manager = LogManager()
@@ -33,6 +34,20 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+@router.get("/settings")
+@version(1)
+def get_bot_settings(db: Session = Depends(get_db)):
+    """Telegram token and chats for the bot process (protected by the API key).
+    `version` changes when any of them does, so the bot knows when to restart."""
+    values = settings.get_all(db)
+    return {
+        "token": values["telegram.token"],
+        "group_id": values["telegram.group_id"],
+        "admin_chat_id": values["telegram.admin_chat_id"],
+        "version": settings.telegram_version(db),
+    }
 
 
 #################

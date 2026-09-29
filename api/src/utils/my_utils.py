@@ -16,6 +16,7 @@ from ..database import models, schemas
 from .achievements import AchievementsElems
 from ..clients.open_ai import OpenAIClient
 from ..utils import ai_prompts as prompts
+from . import settings
 from ..utils.logger import LogManager
 
 log_manager = LogManager()
@@ -402,6 +403,12 @@ async def send_message(
     system_prompt=prompts.DEFAULT_SYSTEM_PROMPT,
     new_game_recommended=None,
 ):
+    if not silent and not settings.get("notifications.enabled"):
+        logger.info("Notifications are disabled. Message not sent.")
+        return
+    if not silent and not (settings.get("telegram.token") and settings.get("telegram.group_id")):
+        logger.warning("Telegram token or group not configured. Message not sent.")
+        return
     if not silent:
         logger.info("Preparing message...")
         if openai:
@@ -423,7 +430,7 @@ async def send_message(
                     msg = completion.choices[0].message.content
             except Exception as e:
                 logger.info("Error generating completion: " + str(e))
-        bot = telegram.Bot(config.TELEGRAM_TOKEN)
+        bot = telegram.Bot(settings.get("telegram.token"))
         async with bot:
             retries = 0
             max_retries = 3
@@ -433,13 +440,13 @@ async def send_message(
                     if image is None:
                         await bot.send_message(
                             text=msg,
-                            chat_id=config.TELEGRAM_GROUP_ID,
+                            chat_id=settings.get("telegram.group_id"),
                             parse_mode=telegram.constants.ParseMode.MARKDOWN,
                         )
                         break
                     else:
                         await bot.send_photo(
-                            chat_id=config.TELEGRAM_GROUP_ID,
+                            chat_id=settings.get("telegram.group_id"),
                             photo=image,
                             caption=msg,
                             parse_mode=telegram.constants.ParseMode.MARKDOWN,
@@ -457,8 +464,13 @@ async def send_message(
 
 
 async def send_message_to_user(user_telegram_id, msg):
-    # logger.info("Sending message to user " + str(user_telegram_id) + "...")
-    bot = telegram.Bot(config.TELEGRAM_TOKEN)
+    if not settings.get("notifications.enabled"):
+        logger.info("Notifications are disabled. Message to user not sent.")
+        return
+    if user_telegram_id is None or not settings.get("telegram.token"):
+        logger.warning("User without Telegram id or bot not configured. Message not sent.")
+        return
+    bot = telegram.Bot(settings.get("telegram.token"))
     async with bot:
         retries = 0
         max_retries = 3
@@ -481,12 +493,15 @@ async def send_message_to_user(user_telegram_id, msg):
 
 
 async def send_message_to_admins(db: Session, msg):
+    if not settings.get("notifications.admin_alerts") or not settings.get("telegram.token"):
+        logger.info("Admin alerts are disabled or the bot is not configured. Message not sent.")
+        return
     logger.info("Sending message to admins...")
     users_db = users.get_users(db)
     try:
         for user in users_db:
-            if user.is_admin:
-                bot = telegram.Bot(config.TELEGRAM_TOKEN)
+            if user.is_admin and user.telegram_id is not None:
+                bot = telegram.Bot(settings.get("telegram.token"))
                 async with bot:
                     await bot.send_message(
                         text=msg,
@@ -496,6 +511,20 @@ async def send_message_to_admins(db: Session, msg):
                 logger.info("Message sent successfully!")
     except Exception as e:
         logger.info(e)
+
+
+async def send_test_message(sent_by: str) -> None:
+    """Diagnostic message to the configured group (ignores the notification switch).
+    Raises if Telegram refuses it, so the admin sees why."""
+    token, group = settings.get("telegram.token"), settings.get("telegram.group_id")
+    if not token or not group:
+        raise ValueError("Falta el token del bot o el ID del grupo")
+    bot = telegram.Bot(token)
+    async with bot:
+        await bot.send_message(
+            chat_id=group,
+            text="✅ Mensaje de prueba de La Viciación (enviado por " + sent_by + ")",
+        )
 
 
 def get_ach_message(

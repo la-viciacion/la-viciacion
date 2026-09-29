@@ -31,14 +31,17 @@ achievements = Achievements()
 ########################
 
 
-async def recompute_user_stats(db: Session, user: models.User, silent: bool = False):
+async def recompute_user_stats(
+    db: Session,
+    user: models.User,
+    silent: bool = False,
+    announce_streak_loss: bool = False,
+):
     """Recompute one user's aggregates/achievements from their sessions
     (game_timers, including the backfilled Clockify-era ones)."""
     current_season = seasons.current()
 
     users.create_user_statistics(db, user.id)
-
-    await check_forgotten_timer(db, user)
 
     played_days_season, real_played_days_season = time_entries.get_played_days(
         db, user.id
@@ -55,7 +58,9 @@ async def recompute_user_stats(db: Session, user: models.User, silent: bool = Fa
         best_unplayed_streak,
         current_unplayed_streak,
     ) = streak_days(db, user, real_played_days_season, current_season)
-    await check_streaks(db, user, current_streak, best_streak, silent=silent)
+    await check_streaks(
+        db, user, current_streak, best_streak, silent=silent, announce_loss=announce_streak_loss
+    )
     users.update_streaks(
         db,
         user.id,
@@ -102,18 +107,16 @@ async def recompute_all_users_and_rankings(
     sync_all: bool = False,
     only_active_users: bool = True,
     user_ids: list[int] | None = None,
+    announce_streak_loss: bool = False,
 ):
     """Recompute every user's stats plus global rankings/achievements.
 
-    Replaces the old Clockify-driven sync_data now that every session (native
-    and backfilled Clockify-era) lives in game_timers. Triggered by the cron
-    hitting /webhooks/sync-data (for the time-gated checks: streak-loss at
-    05:00, weekly resume Monday 09:00, season rollover Jan 1) and right
-    after a native timer stops (routers/timers.py).
+    Event-driven: it runs right after a native timer stops (routers/timers.py),
+    after an admin edit, and from the scheduler (utils/scheduler.py) for the
+    daily streak check and the season rollover. The time-gated work (weekly
+    summary, forgotten-timer reminder) lives in the scheduler, not here.
     """
     start_time = time.time()
-    current_date = datetime.datetime.now()
-    week_day, hour, minute = current_date.weekday(), current_date.hour, current_date.minute
     silent = bool(silent) or sync_season or sync_all
 
     if sync_season or sync_all:
@@ -121,17 +124,6 @@ async def recompute_all_users_and_rankings(
         # UserGame is intentionally NOT wiped here: it used to be rebuilt
         # from Clockify on the next sync, but there is nothing left to
         # rebuild it from now.
-        db.query(models.UserStatistics).delete()
-        db.query(models.GameStatistics).delete()
-        db.commit()
-
-    # Reset current-season stats on new year rollover
-    if (
-        current_date.month == 1
-        and current_date.day == 1
-        and current_date.hour == 0
-        and current_date.minute == 0
-    ):
         db.query(models.UserStatistics).delete()
         db.query(models.GameStatistics).delete()
         db.commit()
@@ -147,7 +139,9 @@ async def recompute_all_users_and_rankings(
         logger.info("########################")
         for user in users_db:
             calculation_start_time = time.time()
-            await recompute_user_stats(db, user, silent=silent)
+            await recompute_user_stats(
+                db, user, silent=silent, announce_streak_loss=announce_streak_loss
+            )
             logger.debug(
                 "Time spent on calculations: "
                 + str(time.time() - calculation_start_time)
@@ -164,11 +158,6 @@ async def recompute_all_users_and_rankings(
         await ranking_games_hours(db, silent=silent)
         await ranking_players_hours(db, silent=silent)
         await achievements.teamwork(db, silent)
-
-        # Check weekly resume only on monday at 9:00
-        if week_day == 0 and hour == 9 and minute == 0:
-            for user in users.get_users(db):
-                await weekly_resume(db, user, weeks_ago=1, silent=silent)
 
         elapsed_time = time.time() - start_time
         if elapsed_time > 30 and not sync_all and not sync_season:
@@ -202,8 +191,8 @@ def recompute_after_timer_stop(user_id: int | None = None, silent: bool = False)
     new order even in silent mode, so a silent run here would swallow the
     change and the cron would never announce it.
 
-    Only the user who stopped the timer is recomputed; the time-gated checks
-    for everyone else stay with the cron hitting /webhooks/sync-data.
+    Only the user who stopped the timer is recomputed; the time-driven checks
+    for everyone else belong to the scheduler (utils/scheduler.py).
     """
     from ..database.database import SessionLocal
 
@@ -321,9 +310,10 @@ async def check_streaks(
     current_streak: int,
     best_streak: int,
     silent: bool = False,
+    announce_loss: bool = False,
 ):
-    hour = datetime.datetime.now().hour
-    minutes = datetime.datetime.now().minute
+    # announce_loss is only set by the daily scheduler run, so a lost streak is
+    # announced once (at 05:00), not every time a timer stops
     # Check if user lose streak
     current_db_streaks_data = users.get_streaks(db, user.username)[0]
     # logger.info(current_streaks_data[0])
@@ -334,8 +324,7 @@ async def check_streaks(
         current_db_streak is not None
         and current_streak == 0
         and current_db_streak > 10
-        and hour == 5
-        and minutes == 0
+        and announce_loss
     ):
         msg = (
             user.name
@@ -533,10 +522,11 @@ async def ranking_players_hours(db: Session, silent: bool):
 
 
 async def check_forgotten_timer(db: Session, user: models.User):
-    current_time = datetime.datetime.now().time()
-    minutes = current_time.minute
+    """Remind a user about a timer running for too long (the scheduler calls this hourly)."""
+    if user.telegram_id is None:
+        return
     forgotten_timer = time_entries.get_forgotten_game_timers(db, user_id=user.id)
-    if forgotten_timer and minutes == 0:
+    if forgotten_timer:
         logger.info(user.name + " has an active timer for more than 4 hours")
         msg = (
             "Hola, "

@@ -11,10 +11,9 @@ class Config:
         # fall back to the shared .env at the repo root (never overrides os.environ).
         load_dotenv(find_dotenv(usecwd=True))
 
-        # Telegram
-        self.TELEGRAM_TOKEN = self._get_env("TELEGRAM_TOKEN")
-        self.TELEGRAM_GROUP_ID = self._get_env("TELEGRAM_GROUP_ID")
-        self.TELEGRAM_ADMIN_CHAT_ID = self._get_env("TELEGRAM_ADMIN_CHAT_ID")
+        # Telegram token and chats live in the app_settings table (admin panel);
+        # TELEGRAM_TOKEN / TELEGRAM_GROUP_ID / TELEGRAM_ADMIN_CHAT_ID in .env only
+        # seed it the first time (see utils/settings.py).
         
         # Admin
         self.GOD_ADMIN_PASS = self._get_env("GOD_ADMIN_PASS")

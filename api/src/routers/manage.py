@@ -19,7 +19,7 @@ from .. import auth
 from ..crud import users as users_crud
 from ..database import models
 from ..database.database import SessionLocal
-from ..utils import actions, rawg_sync, seasons
+from ..utils import actions, my_utils, rawg_sync, seasons, settings
 from ..utils.my_utils import normalize_email, validate_email_format, validate_password_requirements, validate_username
 
 router = APIRouter(
@@ -160,10 +160,16 @@ def _check_username(db: Session, username: str, *, exclude_user_id=None):
         raise HTTPException(status_code=409, detail="Ese usuario ya existe")
 
 
+def _check_telegram_id(db: Session, telegram_id, *, exclude_user_id=None):
+    if telegram_id is not None and users_crud.telegram_id_in_use(db, telegram_id, exclude_user_id=exclude_user_id):
+        raise HTTPException(status_code=409, detail="Ese ID de Telegram ya está en uso por otra cuenta")
+
+
 class UserCreateBody(BaseModel):
     email: str
     username: str
     name: Optional[str] = None
+    telegram_id: Optional[int] = None
     password: str
     is_admin: bool = False
     is_active: bool = True
@@ -175,6 +181,7 @@ def create_user(body: UserCreateBody, db: Session = Depends(get_db)):
     email = _checked_email(db, body.email)
     username = body.username.strip()
     _check_username(db, username)
+    _check_telegram_id(db, body.telegram_id)
     if not validate_password_requirements(body.password):
         raise HTTPException(
             status_code=400,
@@ -189,6 +196,7 @@ def create_user(body: UserCreateBody, db: Session = Depends(get_db)):
             password=body.password,
             is_admin=body.is_admin,
             is_active=body.is_active,
+            telegram_id=body.telegram_id,
         )
     except IntegrityError:
         raise HTTPException(status_code=409, detail="Ese email o usuario ya existe")
@@ -215,6 +223,8 @@ def patch_user(
     data = body.model_dump(exclude_unset=True)
     if user.id == admin.id and (data.get("is_admin") is False or data.get("is_active") is False):
         raise HTTPException(status_code=400, detail="No puedes quitarte el rol de admin ni desactivarte a ti mismo")
+    if data.get("telegram_id") is not None:
+        _check_telegram_id(db, data["telegram_id"], exclude_user_id=user.id)
     if "email" in data:
         data["email"] = _checked_email(db, data["email"], exclude_user_id=user.id, required=False)
     if data.get("username") is not None:
@@ -743,3 +753,38 @@ def patch_achievement(achievement_id: int, body: AchievementPatch, db: Session =
         setattr(ach, k, v)
     db.commit()
     return {"id": ach.id, "key": ach.key, "title": ach.title, "message": ach.message}
+
+
+# ── Notification settings (Telegram, weekly summary) ────────────
+
+
+@router.get("/settings")
+def get_settings(db: Session = Depends(get_db)):
+    """Settings for the admin panel (the Telegram token is never returned, only whether it is set)."""
+    jobs = {j.job: {"last_run_at": j.last_run_at, "last_status": j.last_status} for j in db.query(models.JobRun).all()}
+    return {"values": settings.public_view(db), "jobs": jobs}
+
+
+class SettingsBody(BaseModel):
+    values: dict
+
+
+@router.put("/settings")
+def put_settings(body: SettingsBody, admin: models.User = Depends(auth.require_admin), db: Session = Depends(get_db)):
+    """Change several settings at once; nothing is stored if one of them is invalid."""
+    try:
+        changed = settings.set_values(db, body.values, user_id=admin.id)
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"changed": changed, "values": settings.public_view(db)}
+
+
+@router.post("/settings/test-message")
+async def send_test_message(admin: models.User = Depends(auth.require_admin)):
+    """Send a diagnostic message to the configured group."""
+    try:
+        await my_utils.send_test_message(admin.username)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Telegram no lo ha aceptado: {e}")
+    return {"message": "Mensaje enviado"}

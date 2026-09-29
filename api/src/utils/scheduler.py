@@ -1,0 +1,209 @@
+"""In-process scheduler: the time-driven work that used to depend on an
+external cron calling the API every minute.
+
+Stats, achievements and ranking announcements are event-driven (they run when
+a timer stops or an admin edits data). Only what nothing else can trigger
+remains here:
+
+  weekly_summary    once a week at the configured day/time (admin panel)
+  forgotten_timers  every hour, reminds who has a timer running for too long
+  daily_streaks     every day at 05:00, recompute + announce lost streaks
+  season_rollover   when the year changes, reset season stats and recompute
+
+Every run is recorded in `job_runs`, so a restart never repeats a run and a job
+that was due while the API was down still runs when it comes back, within a
+grace window (a summary is not sent on Thursday because the server was off on
+Monday). The due-time logic is in pure functions to be testable without clocks.
+"""
+import asyncio
+import datetime
+import threading
+
+from sqlalchemy import update
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
+from ..crud import users
+from ..database import models
+from ..database.database import SessionLocal
+from . import actions, seasons, settings
+from .logger import LogManager
+
+log_manager = LogManager()
+logger = log_manager.get_logger()
+
+TICK_SECONDS = 30
+STARTUP_DELAY_SECONDS = 5
+
+WEEKLY_GRACE = datetime.timedelta(hours=6)
+HOURLY_GRACE = datetime.timedelta(minutes=10)
+DAILY_GRACE = datetime.timedelta(hours=3)
+DAILY_STREAKS_HOUR = 5
+
+
+# ── when is something due (pure) ────────────────────────────
+def weekly_slot(now: datetime.datetime, weekday: int, hhmm: str) -> datetime.datetime:
+    """Latest occurrence (<= now) of `weekday` (0 = Monday) at HH:MM."""
+    hour, minute = (int(part) for part in hhmm.split(":"))
+    days_back = (now.weekday() - weekday) % 7
+    slot = (now - datetime.timedelta(days=days_back)).replace(hour=hour, minute=minute, second=0, microsecond=0)
+    if slot > now:
+        slot -= datetime.timedelta(days=7)
+    return slot
+
+
+def daily_slot(now: datetime.datetime, hour: int) -> datetime.datetime:
+    slot = now.replace(hour=hour, minute=0, second=0, microsecond=0)
+    return slot - datetime.timedelta(days=1) if slot > now else slot
+
+
+def hourly_slot(now: datetime.datetime) -> datetime.datetime:
+    return now.replace(minute=0, second=0, microsecond=0)
+
+
+def is_due(now: datetime.datetime, slot: datetime.datetime, last_run: datetime.datetime | None, grace: datetime.timedelta) -> bool:
+    """Due when the slot has passed, is still inside the grace window and has not run since."""
+    return (now - slot) <= grace and (last_run is None or last_run < slot)
+
+
+# ── job bookkeeping ─────────────────────────────────────────
+def _last_run(db: Session, job: str) -> datetime.datetime | None:
+    row = db.get(models.JobRun, job)
+    return row.last_run_at if row else None
+
+
+def _claim(db: Session, job: str, slot: datetime.datetime, now: datetime.datetime) -> bool:
+    """Atomically mark the job as run for this slot; False if somebody else already did."""
+    if db.get(models.JobRun, job) is None:
+        try:
+            db.add(models.JobRun(job=job, last_run_at=now, last_status="running"))
+            db.commit()
+            return True
+        except IntegrityError:
+            db.rollback()
+            return False
+    result = db.execute(
+        update(models.JobRun)
+        .where(models.JobRun.job == job, models.JobRun.last_run_at < slot)
+        .values(last_run_at=now, last_status="running")
+    )
+    db.commit()
+    return result.rowcount == 1
+
+
+def _finish(db: Session, job: str, status: str) -> None:
+    db.execute(update(models.JobRun).where(models.JobRun.job == job).values(last_status=status[:255]))
+    db.commit()
+
+
+def _run(db: Session, job: str, coroutine_factory, use_lock: bool = False) -> None:
+    logger.info(f"Scheduled job {job} starting")
+    try:
+        if use_lock:
+            with actions._recompute_lock:
+                status = asyncio.run(coroutine_factory())
+        else:
+            status = asyncio.run(coroutine_factory())
+        _finish(db, job, f"ok: {status}" if status else "ok")
+    except Exception as e:
+        logger.error(f"Scheduled job {job} failed: {e}")
+        _finish(db, job, f"error: {e}")
+
+
+# ── the jobs ────────────────────────────────────────────────
+async def _weekly_summary(db: Session) -> str:
+    sent = 0
+    for user in users.get_users(db):
+        if user.telegram_id is None:
+            continue
+        await actions.weekly_resume(db, user, weeks_ago=1, silent=False)
+        sent += 1
+    return f"{sent} users"
+
+
+async def _forgotten_timers(db: Session) -> str:
+    for user in users.get_users(db):
+        await actions.check_forgotten_timer(db, user)
+    return ""
+
+
+async def _daily_streaks(db: Session) -> str:
+    await actions.recompute_all_users_and_rankings(db, silent=False, announce_streak_loss=True)
+    return ""
+
+
+async def _new_season(db: Session) -> str:
+    # silent: the season reset must not announce a ranking shuffle
+    await actions.recompute_all_users_and_rankings(db, silent=True, sync_season=True)
+    return ""
+
+
+def _season_rollover(db: Session, now: datetime.datetime) -> None:
+    """Season stats are wiped once when the year changes, whenever the server notices."""
+    current = str(seasons.of(now))
+    row = db.get(models.JobRun, "season_rollover")
+    if row is None:  # first start: remember the season, do not reset anything
+        db.add(models.JobRun(job="season_rollover", last_run_at=now, last_status=current))
+        db.commit()
+        return
+    if row.last_status == current:
+        return
+    claimed = db.execute(
+        update(models.JobRun)
+        .where(models.JobRun.job == "season_rollover", models.JobRun.last_status == row.last_status)
+        .values(last_status=current, last_run_at=now)
+    )
+    db.commit()
+    if claimed.rowcount == 1:
+        logger.info(f"New season {current}: resetting season statistics")
+        _run(db, "season_rollover_recompute", lambda: _new_season(db), use_lock=True)
+        db.execute(update(models.JobRun).where(models.JobRun.job == "season_rollover").values(last_status=current))
+        db.commit()
+
+
+# ── the loop ────────────────────────────────────────────────
+def tick(now: datetime.datetime | None = None) -> None:
+    """Run whatever is due. Called every TICK_SECONDS by the scheduler thread."""
+    now = now or datetime.datetime.now()
+    with SessionLocal() as db:
+        _season_rollover(db, now)
+
+        notifications = settings.get("notifications.enabled")
+
+        if notifications and settings.get("weekly.enabled"):
+            slot = weekly_slot(now, settings.get("weekly.weekday"), settings.get("weekly.time"))
+            if is_due(now, slot, _last_run(db, "weekly_summary"), WEEKLY_GRACE) and _claim(db, "weekly_summary", slot, now):
+                _run(db, "weekly_summary", lambda: _weekly_summary(db))
+
+        if notifications:
+            slot = hourly_slot(now)
+            if is_due(now, slot, _last_run(db, "forgotten_timers"), HOURLY_GRACE) and _claim(db, "forgotten_timers", slot, now):
+                _run(db, "forgotten_timers", lambda: _forgotten_timers(db))
+
+        slot = daily_slot(now, DAILY_STREAKS_HOUR)
+        if is_due(now, slot, _last_run(db, "daily_streaks"), DAILY_GRACE) and _claim(db, "daily_streaks", slot, now):
+            _run(db, "daily_streaks", lambda: _daily_streaks(db), use_lock=True)
+
+
+_thread: threading.Thread | None = None
+
+
+def start() -> None:
+    """Start the scheduler thread (once per process)."""
+    global _thread
+    if _thread is not None and _thread.is_alive():
+        return
+    stop = threading.Event()
+
+    def loop() -> None:
+        stop.wait(STARTUP_DELAY_SECONDS)
+        while not stop.is_set():
+            try:
+                tick()
+            except Exception as e:
+                logger.error(f"Scheduler tick failed: {e}")
+            stop.wait(TICK_SECONDS)
+
+    _thread = threading.Thread(target=loop, name="scheduler", daemon=True)
+    _thread.start()
+    logger.info("Scheduler started")
