@@ -27,7 +27,7 @@ js/main.js          hash router + session handling
 js/lib/             html (escaping template tag), api, format, password, platforms
 js/ui/              layout (navbar shell), modal, toast, icons
 js/pages/           login, profile, home/ (timer, history, game picker), admin/ (entities, form, dialogs, rawg-sync)
-sw.js               service worker (network-first for code, cache-first for icons)
+sw.js               pass-through service worker (caches nothing; keeps the app installable)
 tests/              node:test unit tests for js/lib
 ```
 
