@@ -63,7 +63,7 @@ function renderLogin() {
     <div class="login-page">
       <div class="login-card">
         <div class="login-brand">
-          <img src="icon.svg" alt="La Viciación logo" class="login-logo" />
+          <img src="icon-192.png" alt="La Viciación logo" class="login-logo" />
           <h1>La Viciación</h1>
           <p>Accede a tu cuenta de gamer</p>
         </div>
@@ -252,7 +252,7 @@ function renderNavbar(user, avatarUrl, active = 'home') {
   return `
     <nav class="navbar" role="navigation" aria-label="Navegación principal">
       <a href="#" class="navbar-brand" aria-label="La Viciación inicio">
-        <img src="icon.svg" alt="" class="navbar-logo" aria-hidden="true" />
+        <img src="icon-64.png" alt="" class="navbar-logo" aria-hidden="true" />
         La Viciación
       </a>
       <div class="navbar-actions">

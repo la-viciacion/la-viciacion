@@ -1,4 +1,4 @@
-const CACHE_NAME = 'lv-cache-v12';
+const CACHE_NAME = 'lv-cache-v13';
 const ASSETS = [
   '/',
   '/index.html',
@@ -8,7 +8,8 @@ const ASSETS = [
   '/profile.js',
   '/admin-rawg.js',
   '/manifest.json',
-  '/icon.svg',
+  '/icon-64.png',
+  '/icon-192.png',
 ];
 
 self.addEventListener('install', (e) => {

@@ -135,9 +135,10 @@ body {
 }
 
 .login-logo {
-  width: 64px;
-  height: 64px;
-  border-radius: var(--radius-md);
+  width: 120px;
+  height: 120px;
+  border-radius: var(--radius-lg);
+  object-fit: cover;
   box-shadow: var(--shadow-glow);
 }
 
@@ -332,6 +333,7 @@ body {
   width: 32px;
   height: 32px;
   border-radius: 8px;
+  object-fit: cover;
   flex-shrink: 0;
 }
 
