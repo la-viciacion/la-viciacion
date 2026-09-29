@@ -220,6 +220,7 @@
   cursor: pointer; white-space: nowrap; transition: all 0.2s ease;
 }
 .btn-manual:hover { background: var(--bg-card-hover); }
+.manual-session-row { display: flex; justify-content: center; margin: 4px 0 16px; }
 .session-end { display: flex; align-items: center; gap: 10px; }
 .btn-session {
   background: transparent; border: 1px solid var(--border); color: var(--text-secondary);

@@ -28,6 +28,8 @@ export async function render({ user, main, isCurrent }) {
     <div class="section-header">
       <h2 class="section-title">Mis sesiones</h2>
       <div class="section-line"></div>
+    </div>
+    <div class="manual-session-row">
       <button class="btn-manual" id="manualSessionBtn">+ Sesión manual</button>
     </div>
     <div id="historyList" class="history-list">
