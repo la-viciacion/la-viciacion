@@ -14,7 +14,6 @@ from ..config import Config
 log_manager = LogManager()
 logger = log_manager.get_logger()
 config = Config()
-current_season = datetime.datetime.now().year
 
 ####################
 ##### RANKINGS #####
@@ -138,9 +137,11 @@ def user_current_streak(db: Session, limit: int = None, is_active: bool | None =
 def user_ranking_achievements(
     db: Session,
     limit: int = None,
-    season: int = current_season,
+    season: int = None,
     is_active: bool | None = True,
 ):
+    if season is None:
+        season = datetime.datetime.now().year
     try:
         stmt = (
             select(
@@ -165,9 +166,11 @@ def user_ranking_achievements(
 def user_played_games(
     db: Session,
     limit: int = None,
-    season: int = current_season,
+    season: int = None,
     is_active: bool | None = True,
 ):
+    if season is None:
+        season = datetime.datetime.now().year
     try:
         stmt = (
             select(
@@ -197,9 +200,11 @@ def user_played_games(
 def user_completed_games(
     db: Session,
     limit: int = None,
-    season: int = current_season,
+    season: int = None,
     is_active: bool | None = True,
 ):
+    if season is None:
+        season = datetime.datetime.now().year
     try:
         user_list = users.get_users(db, is_active=is_active)
         data = []
@@ -321,9 +326,9 @@ def platform_played_games(db: Session, limit: int = None):
         raise e
 
 
-def user_ratio(
-    db: Session, season: int = current_season, is_active: bool | None = True
-):
+def user_ratio(db: Session, season: int = None, is_active: bool | None = True):
+    if season is None:
+        season = datetime.datetime.now().year
     try:
         user_list = users.get_users(db, is_active=is_active)
         data = []

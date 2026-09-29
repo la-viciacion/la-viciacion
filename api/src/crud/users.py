@@ -31,7 +31,6 @@ log_manager = LogManager()
 logger = log_manager.get_logger()
 
 config = Config()
-current_season = datetime.datetime.now().year
 
 #################
 ##### USERS #####
@@ -333,9 +332,11 @@ async def add_new_game(
     game: schemas.NewGameUser,
     user: models.User,
     start_date: str = None,
-    season: int = current_season,
+    season: int = None,
     silent: bool = False,
 ) -> models.UserGame:
+    if season is None:
+        season = datetime.datetime.now().year
     logger.info("Adding new user game...")
     try:
         if start_date is None:
@@ -390,26 +391,24 @@ async def add_new_game(
 
 
 def update_game(db: Session, game: models.UserGame, entry_id):
-    current_year = datetime.datetime.now().year
-    if current_year == current_season:
-        try:
-            stmt = (
-                update(models.UserGame)
-                .where(
-                    models.UserGame.id == entry_id,
-                    or_(
-                        models.UserGame.platform == game.platform,
-                    ),
-                )
-                .values(platform=game.platform)
+    try:
+        stmt = (
+            update(models.UserGame)
+            .where(
+                models.UserGame.id == entry_id,
+                or_(
+                    models.UserGame.platform == game.platform,
+                ),
             )
-            db.execute(stmt)
-            db.commit()
-        except SQLAlchemyError as e:
-            db.rollback()
-            if "Duplicate" not in str(e):
-                logger.error("Error updating game: " + str(e))
-                raise e
+            .values(platform=game.platform)
+        )
+        db.execute(stmt)
+        db.commit()
+    except SQLAlchemyError as e:
+        db.rollback()
+        if "Duplicate" not in str(e):
+            logger.error("Error updating game: " + str(e))
+            raise e
 
 
 def update_played_time_game(
@@ -417,8 +416,10 @@ def update_played_time_game(
     user_id: str,
     game_id: str,
     time: int,
-    season: int = current_season,
+    season: int = None,
 ):
+    if season is None:
+        season = datetime.datetime.now().year
     try:
         stmt = (
             update(models.UserGame)
@@ -439,7 +440,9 @@ def update_played_time_game(
         raise
 
 
-def count_played_games(db: Session, user_id: int, season: int = current_season):
+def count_played_games(db: Session, user_id: int, season: int = None):
+    if season is None:
+        season = datetime.datetime.now().year
     try:
         return (
             db.query(models.UserGame).filter_by(user_id=user_id, season=season).count()
@@ -449,7 +452,9 @@ def count_played_games(db: Session, user_id: int, season: int = current_season):
         raise e
 
 
-def count_completed_games(db: Session, user_id: int, season: int = current_season):
+def count_completed_games(db: Session, user_id: int, season: int = None):
+    if season is None:
+        season = datetime.datetime.now().year
     try:
         return (
             db.query(models.UserGame)
@@ -466,8 +471,10 @@ def get_games(
     user_id,
     limit=None,
     completed=None,
-    season: int = current_season,
+    season: int = None,
 ) -> list[schemas.UserGame]:
+    if season is None:
+        season = datetime.datetime.now().year
     # Local import to avoid a circular import (crud.time_entries imports crud.users).
     from . import time_entries as time_entries_crud
 
@@ -587,9 +594,7 @@ def update_played_days(db: Session, user_id: int, season_played_days: int):
 
 
 def update_played_time(db: Session, user_id, played_time):
-    # current_year = datetime.datetime.now().year
     try:
-        # if current_year == current_season:
         stmt = (
             update(models.UserStatistics)
             .where(models.UserStatistics.user_id == user_id)
@@ -602,7 +607,9 @@ def update_played_time(db: Session, user_id, played_time):
         raise e
 
 
-def game_is_completed(db: Session, player, game, season: int = current_season) -> bool:
+def game_is_completed(db: Session, player, game, season: int = None) -> bool:
+    if season is None:
+        season = datetime.datetime.now().year
     stmt = select(models.UserGame).where(
         models.UserGame.game == game,
         models.UserGame.player == player,
@@ -620,14 +627,15 @@ async def complete_game(
     user_id,
     game_id,
     completed_date: str = None,
-    season: int = current_season,
+    season: int = None,
     silent: bool = False,
 ):
-    current_year = datetime.datetime.now().year
+    if season is None:
+        season = datetime.datetime.now().year
     try:
         db_game = games.get_game_by_id(db, game_id)
         user = get_user_by_id(db, user_id)
-        user_game = get_game_by_id(db, user_id, db_game.id, current_year)
+        user_game = get_game_by_id(db, user_id, db_game.id, season)
         game_info = await utils.get_game_info(db_game.name)
         if completed_date is None:
             completed_date = datetime.datetime.now()
@@ -696,7 +704,7 @@ async def complete_game(
             system_prompt=prompts.COMPLETED_GAME_PROMPT,
             new_game_recommended=new_game_info,
         )
-        return get_game_by_id(db, user_id, game_id, current_year)
+        return get_game_by_id(db, user_id, game_id, season)
 
     except Exception as e:
         db.rollback()
@@ -709,8 +717,10 @@ async def rate_game(
     user_id,
     game_id,
     score,
-    season: int = current_season,
+    season: int = None,
 ) -> models.UserGame:
+    if season is None:
+        season = datetime.datetime.now().year
     try:
         stmt = (
             update(models.UserGame)
@@ -872,9 +882,9 @@ def activate_account(db: Session, username: str):
 ######################
 
 
-def top_games(
-    db: Session, username: str, limit: int = 10, season: int = current_season
-):
+def top_games(db: Session, username: str, limit: int = 10, season: int = None):
+    if season is None:
+        season = datetime.datetime.now().year
     try:
         user = get_user_by_username(db, username)
         stmt = (
@@ -978,7 +988,9 @@ def top_games(
 #         raise e
 
 
-def get_achievements(db: Session, username: str, season: int = current_season):
+def get_achievements(db: Session, username: str, season: int = None):
+    if season is None:
+        season = datetime.datetime.now().year
     try:
         user = get_user_by_username(db, username)
         stmt = (
