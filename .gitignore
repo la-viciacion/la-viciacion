@@ -362,6 +362,3 @@ db/init/*.sql
 db/init/*.sql.gz
 assets/*
 .vscode
-webhooks.py
-ai_prompts.py
-read_messages.py

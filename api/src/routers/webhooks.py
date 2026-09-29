@@ -8,13 +8,13 @@ from ..database.database import SessionLocal
 from ..utils import actions as actions
 from ..utils.logger import LogManager
 from ..config import Config
+
+config = Config()
 import threading
 
 log_manager = LogManager()
 logger = log_manager.get_logger()
 process_lock = threading.Lock()
-config = Config()
-
 router = APIRouter(
     prefix="/webhooks", tags=["Webhooks"], responses={404: {"description": "Not found"}}
 )

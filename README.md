@@ -10,11 +10,11 @@ Copy `.env.template` to `.env` and fill in your values. That single file is read
 
 ### Webhooks
 
-Copy `api/src/routers/webhooks_template.py` to `api/src/routers/webhooks.py`. This file allows to create your own 'public' webhooks if you need. So, you can create an endpoint like `/tBn7NyNHAsP9WjP3sJUXglxaTATJxrfs3J2DauBV5fthwuGKq3le`, and call directly from another service without authentication like the `bot` routes (to execute other processes).
+`api/src/routers/webhooks.py` lets you add your own 'public' webhooks if you need them. So, you can create an endpoint like `/tBn7NyNHAsP9WjP3sJUXglxaTATJxrfs3J2DauBV5fthwuGKq3le`, and call directly from another service without authentication like the `bot` routes (to execute other processes).
 
 ### OpenAI integration
 
-If you want to use OpenAI integration (adding your API key to .env file), you need to copy `api/src/utils/ai_prompts_template.py` to `api/src/utils/ai_prompts.py`. Then, you could adjust the prompts for the predefined notifications.
+To use the OpenAI integration, set `OPENAI_API_KEY` in `.env`. The prompts for the predefined notifications live in `api/src/utils/ai_prompts.py`; adjust them as you like.
 
 ## Deployment (Docker Compose)
 
