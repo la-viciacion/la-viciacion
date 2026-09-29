@@ -3,16 +3,15 @@ import json
 import os
 from typing import Any
 
-from dotenv import dotenv_values
+from dotenv import find_dotenv, load_dotenv
 
 
 class Config:
     def __init__(self):
-        # Load variables from .env file as fallback
-        # In Docker, os.environ will already have the variables (from env_file)
-        # In local development, .env will be used
-        self._dotenv_config = dotenv_values(".env")
-        
+        # In Docker the variables come from env_file. For local development,
+        # fall back to the shared .env at the repo root (never overrides os.environ).
+        load_dotenv(find_dotenv(usecwd=True))
+
         # Telegram
         self.TELEGRAM_TOKEN = self._get_env("TELEGRAM_TOKEN")
         self.TELEGRAM_GROUP_ID = self._get_env("TELEGRAM_GROUP_ID")
@@ -61,7 +60,7 @@ class Config:
         Gets an environment variable.
         Priority: os.environ (Docker) > .env (local development)
         """
-        value = os.getenv(key) or self._dotenv_config.get(key)
+        value = os.getenv(key)
         if value is None:
             raise ValueError(f"Environment variable '{key}' not found")
         return value
@@ -74,12 +73,9 @@ class Config:
 
     @property
     def RAWG_API_KEY(self) -> str:
-        try:
-            direct_key = os.getenv("RAWG_API_KEY") or self._dotenv_config.get("RAWG_API_KEY")
-            if direct_key:
-                return direct_key
-        except Exception:
-            pass
+        direct_key = os.getenv("RAWG_API_KEY")
+        if direct_key:
+            return direct_key
         if self.RAWG_URL and "key=" in self.RAWG_URL:
             import urllib.parse
             parsed = urllib.parse.urlparse(self.RAWG_URL)

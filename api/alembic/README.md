@@ -72,4 +72,4 @@ Migrations use the same environment variables as the main application:
 - `MARIADB_USER`
 - `MARIADB_PASSWORD`
 
-These are loaded from `.env` in development or from Docker environment in production.
+These come from the Docker environment (`env_file: .env`), or from the root `.env` when running locally.

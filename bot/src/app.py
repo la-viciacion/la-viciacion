@@ -1,6 +1,5 @@
 import telegram
 import telegram.ext.filters as FILTERS
-from dotenv import dotenv_values
 from routes.admin_routes import AdminRoutes
 from routes.basic_routes import BasicRoutes
 from routes.data_routes import DataRoutes

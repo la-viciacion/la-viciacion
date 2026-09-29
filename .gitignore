@@ -357,12 +357,9 @@ yarn-error.log*
 # Custom files
 logs.log
 *.crt
-# .gitlab-ci.yml
 db/data/
 db/init/*.sql
 db/init/*.sql.gz
-docker-compose.yml
-Dockerfile
 assets/*
 .vscode
 webhooks.py

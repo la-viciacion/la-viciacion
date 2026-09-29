@@ -4,9 +4,9 @@
 
 ### Environment
 
-Copy `.env.template` to `.env`, `api/.env.template` to `api/.env` and `bot/.env.template` to `bot/.env`, then fill each with your values.
+Copy `.env.template` to `.env` and fill in your values. That single file is read by every service (`api`, `bot` and `db`) through `env_file` in `docker-compose.yml`; when running the api or bot outside Docker they fall back to that same `.env`. Variables already present in the environment always win over the file.
 
-Copy `docker-compose-template.yml` to `docker-compose.yml` and adjust it to your environment (exposed ports, etc.) if needed.
+`docker-compose.yml` and the `Dockerfile`s are ready to use as they are; they contain no secrets.
 
 ### Webhooks
 
@@ -46,7 +46,7 @@ Deploying v2 to a *new* environment from a backup taken on the old (Clockify-bas
    ```
 5. (Optional) Trigger one manual recompute so rankings/statistics reflect the imported history immediately, instead of waiting for the next scheduled sync:
    ```bash
-   curl -H "x-api-key: <API_KEY from api/.env>" "http://localhost:5000/api/v1/admin/sync-data?sync_all=true"
+   curl -H "x-api-key: <API_KEY from .env>" "http://localhost:5000/api/v1/admin/sync-data?sync_all=true"
    ```
 
 `db/init/` itself is tracked (so it always exists on a fresh clone), but the SQL/backup files you drop into it are gitignored — never commit a real database dump.

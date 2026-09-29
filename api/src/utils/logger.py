@@ -4,13 +4,10 @@ import sys
 import os
 from logging.handlers import TimedRotatingFileHandler
 
-from dotenv import dotenv_values
+from dotenv import find_dotenv, load_dotenv
 
-try:
-    config = dotenv_values(".env")
-    LOG_LEVEL = config["API_LOG_LEVEL"]
-except Exception:
-    LOG_LEVEL = os.environ["API_LOG_LEVEL"]
+load_dotenv(find_dotenv(usecwd=True))
+LOG_LEVEL = os.environ["API_LOG_LEVEL"]
 
 if LOG_LEVEL == "DEBUG":
     LOG_LEVEL = logging.DEBUG

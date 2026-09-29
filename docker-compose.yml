@@ -1,48 +1,42 @@
 services:
 
   laviciacion-front:
-    build:
-      context: ./front
-      dockerfile: Dockerfile
+    build: ./front
     image: laviciacion-front
     container_name: laviciacion-front
     restart: unless-stopped
-    env_file: ./front/.env
     networks:
       - la-viciacion
     ports:
       - 3000:3000
 
   laviciacion-bot:
-    build:
-      context: ./bot
-      dockerfile: Dockerfile
-    container_name: laviciacion-bot
+    build: ./bot
     image: laviciacion-bot
-    env_file: ./bot/.env
+    container_name: laviciacion-bot
+    env_file: .env
     restart: unless-stopped
     volumes:
-     - ./bot:/app
+      - ./bot/logs:/app/logs
     networks:
       - la-viciacion
     depends_on:
-      laviciacion-api:
-        condition: service_started
+      - laviciacion-api
 
   laviciacion-api:
-    build:
-      context: ./api
-      dockerfile: Dockerfile
-    container_name: laviciacion-api
+    build: ./api
     image: laviciacion-api
-    env_file: ./api/.env
-    ports:
-      - 5000:5000
-    volumes:
-      - ./api:/app
+    container_name: laviciacion-api
+    env_file: .env
     restart: unless-stopped
+    volumes:
+      - ./api/logs:/app/logs
     networks:
       - la-viciacion
+    # The front proxies /api to this container; the port is only published on
+    # localhost for direct access (curl, docs, admin sync).
+    ports:
+      - 127.0.0.1:5000:5000
     depends_on:
       laviciacion-db:
         condition: service_healthy
@@ -50,16 +44,19 @@ services:
   laviciacion-db:
     image: mariadb
     container_name: laviciacion-db
+    env_file: .env
+    restart: unless-stopped
     volumes:
       - ./db/data:/var/lib/mysql
       # Any .sql/.sql.gz/.sh dropped here is imported automatically by
       # MariaDB, but ONLY the first time it starts up (empty ./db/data).
       # Use it to seed a fresh environment from a pre-migration backup.
       - ./db/init:/docker-entrypoint-initdb.d:ro
-    env_file: .env
-    restart: unless-stopped
     networks:
       - la-viciacion
+    # Only published on localhost (DB clients, backups).
+    ports:
+      - 127.0.0.1:3307:3306
     healthcheck:
       # MARIADB_HOST (from .env) makes the client dial the container IP instead
       # of the local socket, where the healthcheck user has no grant.
@@ -68,9 +65,6 @@ services:
       timeout: 5s
       retries: 30
       start_period: 30s
-    # Uncomment ports config to expose DB outside docker network
-    # ports:
-    #   - 3307:3306
 
 networks:
   la-viciacion:
