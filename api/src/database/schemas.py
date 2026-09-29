@@ -249,6 +249,24 @@ class GameTimerCreate(GameTimerBase):
     pass
 
 
+class ManualSessionCreate(BaseModel):
+    """A finished session entered by hand."""
+
+    user_id: int | None = None  # default: the logged-in user (admins may pass another)
+    game_id: str
+    platform: str
+    start_time: datetime.datetime
+    end_time: datetime.datetime
+    notes: str | None = None
+
+
+class SessionUpdate(BaseModel):
+    platform: str | None = None
+    start_time: datetime.datetime | None = None
+    end_time: datetime.datetime | None = None
+    notes: str | None = None
+
+
 class GameTimerUpdate(BaseModel):
     end_time: datetime.datetime | None = None
     duration_seconds: int | None = None

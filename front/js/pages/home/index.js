@@ -2,8 +2,9 @@
 import { html, mount } from '../../lib/html.js';
 import { loadPlatforms } from '../../lib/platforms.js';
 import { closeAllModals } from '../../ui/modal.js';
-import { initGamePicker, openGamePicker } from './game-picker.js';
+import { initGamePicker, startTimerFlow } from './game-picker.js';
 import { initHistory, loadHistory, onHistoryClick } from './history.js';
+import { initSessions, openManualSession, openSessionForm } from './sessions.js';
 import { initTimer, loadTimerCard, startTimer, stopClock } from './timer.js';
 
 export const active = 'home';
@@ -27,15 +28,22 @@ export async function render({ user, main, isCurrent }) {
     <div class="section-header">
       <h2 class="section-title">Mis sesiones</h2>
       <div class="section-line"></div>
+      <button class="btn-manual" id="manualSessionBtn">+ Sesión manual</button>
     </div>
     <div id="historyList" class="history-list">
       <div class="loading-spinner">Cargando historial...</div>
     </div>
     <div class="history-more" id="historyMore"></div>`);
 
-  initTimer({ userId: user.id, onChange: refresh, onChoose: openGamePicker });
+  initTimer({ userId: user.id, onChange: refresh, onChoose: startTimerFlow });
   initGamePicker(user.id);
-  initHistory({ userId: user.id, onContinue: (group) => startTimer(group.game_id, group.platform) });
+  initSessions({ userId: user.id, onChange: refresh });
+  initHistory({
+    userId: user.id,
+    onContinue: (group) => startTimer(group.game_id, group.platform),
+    onEditSession: (group, session) => openSessionForm({ game: { id: group.game_id, name: group.game_name || group.game_id }, session }),
+  });
+  main.querySelector('#manualSessionBtn').addEventListener('click', openManualSession);
   main.querySelector('#historyList').addEventListener('click', onHistoryClick);
   main.querySelector('#historyMore').addEventListener('click', onHistoryClick);
 

@@ -225,6 +225,9 @@ def patch_user(
         raise HTTPException(status_code=400, detail="No puedes quitarte el rol de admin ni desactivarte a ti mismo")
     if data.get("telegram_id") is not None:
         _check_telegram_id(db, data["telegram_id"], exclude_user_id=user.id)
+    if "name" in data:
+        # never empty: messages and rankings print it (falls back to the nickname)
+        data["name"] = (data["name"] or "").strip() or (data.get("username") or user.username).strip()
     if "email" in data:
         data["email"] = _checked_email(db, data["email"], exclude_user_id=user.id, required=False)
     if data.get("username") is not None:
@@ -532,25 +535,6 @@ def list_timers(
     return {"total": total, "items": [_timer_out(t, u, g) for t, u, g in rows]}
 
 
-def _ensure_library(db: Session, user_id: int, game_id: str, platform, when: datetime.datetime):
-    """Same guarantee create_timer gives: a users_games row per (game, platform, season of `when`)."""
-    exists = (
-        db.query(models.UserGame)
-        .filter_by(user_id=user_id, game_id=game_id, platform=platform, season=seasons.of(when))
-        .first()
-    )
-    if exists is None:
-        db.add(
-            models.UserGame(
-                user_id=user_id,
-                game_id=game_id,
-                platform=platform,
-                completed=0,
-                started_date=when.date(),
-            )
-        )
-
-
 class TimerCreate(BaseModel):
     user_id: int
     game_id: str
@@ -582,7 +566,7 @@ def create_timer(body: TimerCreate, db: Session = Depends(get_db)):
         notes=body.notes,
     )
     db.add(timer)
-    _ensure_library(db, body.user_id, body.game_id, body.platform, body.start_time)
+    users_crud.ensure_library_entry(db, body.user_id, body.game_id, body.platform, body.start_time)
     _commit(db, "Sesión")
     return _timer_out(timer, None, None)
 

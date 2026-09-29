@@ -56,3 +56,11 @@ export const formatTimestamp = (ts) => (ts ? String(ts).replace('T', ' ').slice(
 export function toLocalISO(d) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
+
+/** Date or "2026-09-29T13:05:07" -> "2026-09-29T13:05" (value of a datetime-local input). */
+export function toInputValue(value) {
+  return toLocalISO(value instanceof Date ? value : new Date(value)).slice(0, 16);
+}
+
+/** "2026-09-29T13:05" (datetime-local input) -> "2026-09-29T13:05:00" (what the API expects). */
+export const fromInputValue = (value) => (value.length === 16 ? `${value}:00` : value);

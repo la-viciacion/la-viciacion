@@ -2,13 +2,14 @@ import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
-from sqlalchemy import func
+from sqlalchemy import func, or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .. import auth
 from ..crud import users as users_crud
 from ..database.database import SessionLocal
-from ..database.models import Game, GameTimer, User, UserGame
+from ..database.models import Game, GameTimer, PlatformTag, User, UserGame
 from ..database.schemas import (
     ActiveTimerResponse,
     GameTimerCreate,
@@ -17,7 +18,9 @@ from ..database.schemas import (
     GameTimerResponse,
     GamePlatformsResponse,
     GameTimerUpdate,
+    ManualSessionCreate,
     NewGameUser,
+    SessionUpdate,
     TimerStats,
 )
 from ..utils import actions
@@ -29,7 +32,7 @@ def get_db():
     try:
         yield db
     finally:
-        db.close
+        db.close()
 
 
 # Timer CRUD operations
@@ -46,10 +49,21 @@ async def create_timer(db: Session, timer: GameTimerCreate) -> GameTimer:
             detail="User already has an active timer. Stop it first."
         )
 
+    # A timer never starts before the user's last finished session ended (manual
+    # entries may end a minute "ahead" of the server clock): one game at a time.
+    last_end = (
+        db.query(func.max(GameTimer.end_time))
+        .filter(GameTimer.user_id == timer.user_id)
+        .scalar()
+    )
+    started = datetime.datetime.now()
+    if last_end is not None and last_end > started:
+        started = last_end
+
     db_timer = GameTimer(
         user_id=timer.user_id,
         game_id=timer.game_id,
-        start_time=datetime.datetime.now(),
+        start_time=started,
         platform=timer.platform,
         notes=timer.notes,
         is_active=True
@@ -222,6 +236,137 @@ def get_timer_stats(db: Session, user_id: int, game_id: Optional[str] = None) ->
     )
 
 
+# ── Manual sessions: enter, correct or remove a finished session ──────────
+
+MAX_SESSION = datetime.timedelta(hours=24)
+FUTURE_SLACK = datetime.timedelta(minutes=1)
+
+
+def _reject(code: int, message: str):
+    raise HTTPException(status_code=code, detail=message)
+
+
+def _check_season(current_user: User, *days: datetime.date | datetime.datetime):
+    """Only the running season can be edited by its owner (closed seasons are frozen; admins may)."""
+    current = seasons.current()
+    if not current_user.is_admin and any(seasons.of(d) != current for d in days):
+        _reject(400, f"Solo se pueden registrar, editar o borrar sesiones de la temporada actual ({current})")
+
+
+def validate_session(
+    db: Session,
+    current_user: User,
+    user_id: int,
+    start: datetime.datetime,
+    end: datetime.datetime,
+    exclude_id: int | None = None,
+) -> None:
+    """Rules for a finished session (create and edit): sensible times, current season,
+    and no overlap with anything else the same user played (or is playing)."""
+    if end <= start:
+        _reject(400, "El fin debe ser posterior al inicio")
+    if end > datetime.datetime.now() + FUTURE_SLACK:
+        _reject(400, "La sesión no puede terminar en el futuro")
+    if end - start > MAX_SESSION:
+        _reject(400, "Una sesión no puede durar más de 24 horas")
+    _check_season(current_user, start, end)
+
+    overlapping = (
+        db.query(GameTimer)
+        .filter(
+            GameTimer.user_id == user_id,
+            GameTimer.start_time < end,
+            or_(GameTimer.end_time.is_(None), GameTimer.end_time > start),
+        )
+    )
+    if exclude_id is not None:
+        overlapping = overlapping.filter(GameTimer.id != exclude_id)
+    other = overlapping.first()
+    if other is not None:
+        game = db.query(Game).filter(Game.id == other.game_id).first()
+        when = other.start_time.strftime("%d/%m %H:%M") + (
+            "" if other.end_time is None else " a " + other.end_time.strftime("%H:%M")
+        )
+        _reject(409, f"Se solapa con otra sesión ({game.name if game else other.game_id}, {when})")
+
+
+def _valid_platform(db: Session, platform: str | None) -> str:
+    if not platform or db.query(PlatformTag.id).filter(PlatformTag.id == platform).first() is None:
+        _reject(400, "Plataforma no válida")
+    return platform
+
+
+def _commit_session(db: Session) -> None:
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        _reject(409, "Ya tienes una sesión de ese juego que empieza a esa hora")
+
+
+def create_manual_session(db: Session, current_user: User, body: ManualSessionCreate) -> GameTimer:
+    user_id = body.user_id if body.user_id is not None else current_user.id
+    auth.ensure_self_or_admin(current_user, user_id=user_id)
+    if db.query(Game.id).filter(Game.id == body.game_id).first() is None:
+        _reject(404, "Juego no encontrado")
+    platform = _valid_platform(db, body.platform)
+    validate_session(db, current_user, user_id, body.start_time, body.end_time)
+
+    timer = GameTimer(
+        user_id=user_id,
+        game_id=body.game_id,
+        start_time=body.start_time,
+        end_time=body.end_time,
+        duration_seconds=int((body.end_time - body.start_time).total_seconds()),
+        platform=platform,
+        notes=body.notes,
+        is_active=False,
+    )
+    db.add(timer)
+    # the library entry of that game/platform/season, without announcing "new game"
+    users_crud.ensure_library_entry(db, user_id, body.game_id, platform, body.start_time)
+    _commit_session(db)
+    db.refresh(timer)
+    return timer
+
+
+def _own_finished_session(db: Session, current_user: User, timer_id: int) -> GameTimer:
+    timer = db.query(GameTimer).filter(GameTimer.id == timer_id).first()
+    if timer is None:
+        _reject(404, "Sesión no encontrada")
+    auth.ensure_self_or_admin(current_user, user_id=timer.user_id)
+    if timer.is_active:
+        _reject(409, "Es un timer en curso: páralo antes de editarlo")
+    return timer
+
+
+def update_session(db: Session, current_user: User, timer_id: int, body: SessionUpdate) -> GameTimer:
+    timer = _own_finished_session(db, current_user, timer_id)
+    data = body.model_dump(exclude_unset=True)
+    start = data.get("start_time") or timer.start_time
+    end = data.get("end_time") or timer.end_time
+    # a session of a closed season cannot be edited by its owner, nor moved out of the current one
+    _check_season(current_user, timer.start_time)
+    validate_session(db, current_user, timer.user_id, start, end, exclude_id=timer.id)
+    if "platform" in data:
+        timer.platform = _valid_platform(db, data["platform"])
+    if "notes" in data:
+        timer.notes = data["notes"]
+    timer.start_time, timer.end_time = start, end
+    timer.duration_seconds = int((end - start).total_seconds())
+    users_crud.ensure_library_entry(db, timer.user_id, timer.game_id, timer.platform, start)
+    _commit_session(db)
+    db.refresh(timer)
+    return timer
+
+
+def delete_session(db: Session, current_user: User, timer_id: int) -> None:
+    timer = _own_finished_session(db, current_user, timer_id)
+    _check_season(current_user, timer.start_time)
+    db.delete(timer)
+    db.commit()
+
+
 # FastAPI Router
 router = APIRouter(
     prefix="/timers",
@@ -240,6 +385,48 @@ async def start_timer(
     """Start a new game timer for a user"""
     auth.ensure_self_or_admin(current_user, user_id=timer.user_id)
     return await create_timer(db, timer)
+
+
+@router.post("/manual", response_model=GameTimerResponse, status_code=status.HTTP_201_CREATED)
+def create_manual_session_endpoint(
+    body: ManualSessionCreate,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Add a finished session by hand: game, platform, start and end."""
+    timer = create_manual_session(db, current_user, body)
+    # silent: retroactive entries do not announce rankings/achievements to the group
+    background_tasks.add_task(actions.recompute_after_timer_stop, timer.user_id, True)
+    return timer
+
+
+@router.patch("/{timer_id}", response_model=GameTimerResponse)
+def update_session_endpoint(
+    timer_id: int,
+    body: SessionUpdate,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Correct a finished session (platform, start, end)."""
+    timer = update_session(db, current_user, timer_id, body)
+    background_tasks.add_task(actions.recompute_after_timer_stop, timer.user_id, True)
+    return timer
+
+
+@router.delete("/{timer_id}")
+def delete_session_endpoint(
+    timer_id: int,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Remove a finished session (entered by mistake)."""
+    owner = db.query(GameTimer.user_id).filter(GameTimer.id == timer_id).scalar()
+    delete_session(db, current_user, timer_id)
+    background_tasks.add_task(actions.recompute_after_timer_stop, owner, True)
+    return {"message": "Sesión eliminada"}
 
 
 @router.get("/active/{user_id}", response_model=ActiveTimerResponse)

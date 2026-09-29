@@ -1,5 +1,7 @@
-// "Nuevo timer" flow: pick a game (own catalogue or RAWG) -> pick a platform
-// -> start the timer. Each step is a modal.
+// Game picker (own catalogue, or add one from RAWG) shared by two flows:
+//   "Nuevo timer": pick a game -> pick a platform -> start the timer
+//   "Sesión manual": pick a game -> fill the session form (see sessions.js)
+// Each step is a modal; the picker hands the chosen game to `onPick(id, name)`.
 import { api, jsonRequest } from '../../lib/api.js';
 import { html, mount } from '../../lib/html.js';
 import { platformList, platformName } from '../../lib/platforms.js';
@@ -35,7 +37,7 @@ function bindSearch(modal, inputId, search, delay = 250) {
 }
 
 // ── Step 1: choose a game from the user's catalogue ─────────
-export function openGamePicker() {
+export function openGamePicker(onPick) {
   const modal = openStep(html`
     ${modalHeader('Elegir juego')}
     <input type="text" id="gamePickerSearch" class="modal-search-input" placeholder="Buscar en tu catálogo..." autocomplete="off" />
@@ -43,11 +45,14 @@ export function openGamePicker() {
     <div class="modal-footer">
       <button class="btn-modal-secondary" id="modalAddGameBtn">${iconPlus()} ¿No está? Añadir nuevo juego</button>
     </div>`);
-  modal.el.querySelector('#modalAddGameBtn').addEventListener('click', openAddGame);
-  bindSearch(modal, 'gamePickerSearch', (query) => searchCatalogue(modal, query));
+  modal.el.querySelector('#modalAddGameBtn').addEventListener('click', () => openAddGame(onPick));
+  bindSearch(modal, 'gamePickerSearch', (query) => searchCatalogue(modal, query, onPick));
 }
 
-async function searchCatalogue(modal, query) {
+/** "Nuevo timer": pick a game, then its platform, then start. */
+export const startTimerFlow = () => openGamePicker(chooseTimerPlatform);
+
+async function searchCatalogue(modal, query, onPick) {
   const results = modal.el.querySelector('#gamePickerResults');
   if (query.length < 2) return mount(results, hint('Escribe al menos 2 caracteres'));
   mount(results, hint('Buscando...'));
@@ -64,7 +69,7 @@ async function searchCatalogue(modal, query) {
       if (!row) return;
       const game = games.find((g) => String(g.id) === row.dataset.gameId);
       closeAllModals();
-      chooseTimerPlatform(row.dataset.gameId, game?.name);
+      onPick(row.dataset.gameId, game?.name);
     };
   } catch (err) {
     if (results.isConnected) mount(results, hint(`Error buscando: ${err.message}`));
@@ -72,15 +77,15 @@ async function searchCatalogue(modal, query) {
 }
 
 // ── Step 1b: add a game from RAWG ───────────────────────────
-function openAddGame() {
+function openAddGame(onPick) {
   const modal = openStep(html`
     ${modalHeader('Añadir juego nuevo')}
     <input type="text" id="addGameSearch" class="modal-search-input" placeholder="Buscar en RAWG..." autocomplete="off" />
     <div class="modal-results-list" id="addGameResults">${hint('Escribe el nombre del juego')}</div>`);
-  bindSearch(modal, 'addGameSearch', (query) => searchRawg(modal, query), 300);
+  bindSearch(modal, 'addGameSearch', (query) => searchRawg(modal, query, onPick), 300);
 }
 
-async function searchRawg(modal, query) {
+async function searchRawg(modal, query, onPick) {
   const results = modal.el.querySelector('#addGameResults');
   if (query.length < 2) return mount(results, hint('Escribe al menos 2 caracteres'));
   mount(results, hint('Buscando en RAWG...'));
@@ -98,18 +103,18 @@ async function searchRawg(modal, query) {
       </button>`)}`);
     results.onclick = (e) => {
       const row = e.target.closest('.modal-result-row');
-      if (row) pickRawgCandidate(results, candidates[Number(row.dataset.index)]);
+      if (row) pickRawgCandidate(results, candidates[Number(row.dataset.index)], onPick);
     };
   } catch (err) {
     if (results.isConnected) mount(results, hint(`Error buscando: ${err.message}`));
   }
 }
 
-async function pickRawgCandidate(results, candidate) {
+async function pickRawgCandidate(results, candidate, onPick) {
   try {
     if (candidate.exists_in_db && candidate.db_game_id) {
       closeAllModals();
-      return chooseTimerPlatform(candidate.db_game_id, candidate.name);
+      return onPick(candidate.db_game_id, candidate.name);
     }
     mount(results, hint('Añadiendo juego...'));
     const game = await api('/games/', jsonRequest('POST', {
@@ -121,8 +126,7 @@ async function pickRawgCandidate(results, candidate) {
       slug: candidate.slug || null,
     }));
     closeAllModals();
-    // Brand-new game: it can't have any history, go straight to platform choice.
-    openPlatformStep(game.id, game.name, []);
+    onPick(game.id, game.name);
   } catch (err) {
     if (results.isConnected) mount(results, hint(`Error: ${err.message}`));
   }

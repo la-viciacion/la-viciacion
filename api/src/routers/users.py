@@ -179,8 +179,9 @@ def update_profile(
     if user is None:
         raise HTTPException(status_code=404, detail=msg.USER_NOT_EXISTS)
     data = body.model_dump(exclude_unset=True)
-    if "name" in data and data["name"] is not None:
-        data["name"] = data["name"].strip() or None
+    if "name" in data:
+        # never empty: messages and rankings print it (falls back to the nickname)
+        data["name"] = (data["name"] or "").strip() or user.username
     if "email" in data:
         # the email is the login identifier: it can be changed but not removed
         data["email"] = utils.normalize_email(data["email"])

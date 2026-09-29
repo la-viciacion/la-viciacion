@@ -29,6 +29,10 @@ Everything Telegram-related is managed from the admin panel (**Notificaciones** 
 - `POST /webhooks/sync-data` is no longer needed; if you still have an external cron calling it, remove it.
 - Each user can set their own Telegram id in their profile and admins can edit it for anyone; it is unique.
 
+### Manual sessions
+
+From the home page a user can add a finished session by hand (**+ Sesión manual**: game, platform, start, end) and correct or delete one of their own from the expanded history of a game (**Editar**; **Ver todas** loads older ones). The API (`POST /timers/manual`, `PATCH`/`DELETE /timers/{id}`) enforces: the end after the start and not in the future, at most 24 h, **current season only** (closed seasons are frozen; admins can still edit them), and no overlap with any other session of that user, running timer included. The game cannot be changed on an existing session: delete it and add it again. Manual changes recompute the user's stats silently (nothing is announced to the group), and creating one also creates the library entry for that game/platform/season if it is missing.
+
 ### Webhooks
 
 `api/src/routers/webhooks.py` lets you add your own 'public' webhooks if you need them. So, you can create an endpoint like `/tBn7NyNHAsP9WjP3sJUXglxaTATJxrfs3J2DauBV5fthwuGKq3le`, and call directly from another service without authentication like the `bot` routes (to execute other processes).

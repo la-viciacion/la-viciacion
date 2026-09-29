@@ -10,11 +10,13 @@ const PAGE_SIZE = 8; // games per page
 
 const state = { userId: null, groups: [], total: 0, expanded: new Set() };
 let onContinue = () => {};
+let onEditSession = () => {};
 
-/** onContinue(group): the user pressed "Seguir" on a game. */
+/** onContinue(group): "Seguir" on a game. onEditSession(group, session): "Editar" on a session. */
 export function initHistory(options) {
   state.userId = options.userId;
   onContinue = options.onContinue;
+  onEditSession = options.onEditSession;
   state.groups = [];
   state.total = 0;
   state.expanded = new Set();
@@ -88,11 +90,26 @@ function groupRow(g) {
           ${g.sessions.map((s) => html`
             <li>
               <span>${formatDateTime(s.start_time)}${s.platform ? ` · ${platformName(s.platform)}` : ''}</span>
-              <span class="session-duration">${formatDuration(s.duration_seconds || 0)}</span>
+              <span class="session-end">
+                <span class="session-duration">${formatDuration(s.duration_seconds || 0)}</span>
+                <button class="btn-session" data-action="edit-session" data-game-id="${g.game_id}" data-timer-id="${s.id}" aria-label="Editar sesión">Editar</button>
+              </span>
             </li>`)}
-          ${hidden > 0 ? html`<li class="session-more">… y ${hidden} sesiones anteriores</li>` : ''}
+          ${hidden > 0 ? html`<li class="session-more">… y ${hidden} sesiones anteriores
+            <button class="btn-session" data-action="all-sessions" data-game-id="${g.game_id}">Ver todas</button></li>` : ''}
         </ul>` : ''}
     </article>`;
+}
+
+// The history keeps the latest sessions per game; "Ver todas" loads the rest.
+async function loadAllSessions(gameId) {
+  const group = state.groups.find((x) => x.game_id === gameId);
+  if (!group) return;
+  const all = await api(`/timers/history/${state.userId}?game_id=${encodeURIComponent(gameId)}&limit=500`);
+  if (all) {
+    group.sessions = all.filter((s) => !s.is_active);
+    renderHistory();
+  }
 }
 
 /** Delegated click handler for #historyList and #historyMore. */
@@ -107,6 +124,18 @@ export function onHistoryClick(e) {
     if (group) onContinue(group);
     return;
   }
+  const edit = e.target.closest('[data-action="edit-session"]');
+  if (edit) {
+    const group = state.groups.find((x) => x.game_id === edit.dataset.gameId);
+    const session = group?.sessions.find((s) => String(s.id) === edit.dataset.timerId);
+    if (group && session) {
+      onEditSession(group, session);
+    }
+    return;
+  }
+  const all = e.target.closest('[data-action="all-sessions"]');
+  if (all) return loadAllSessions(all.dataset.gameId);
+
   const row = e.target.closest('[data-action="toggle"]');
   if (row) {
     const id = row.closest('.history-group').dataset.gameId;

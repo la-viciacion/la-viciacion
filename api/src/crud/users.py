@@ -241,6 +241,23 @@ def email_in_use(db: Session, email: str, exclude_user_id: int | None = None) ->
     return query.first() is not None
 
 
+def ensure_library_entry(
+    db: Session, user_id: int, game_id: str, platform: str | None, when: datetime.date | datetime.datetime
+) -> bool:
+    """Make sure the user has a library entry for (game, platform, season of `when`).
+    Adds it (not committed, no announcement) if missing; returns whether it did."""
+    day = when.date() if isinstance(when, datetime.datetime) else when
+    exists = (
+        db.query(models.UserGame)
+        .filter_by(user_id=user_id, game_id=game_id, platform=platform, season=seasons.of(day))
+        .first()
+    )
+    if exists is not None:
+        return False
+    db.add(models.UserGame(user_id=user_id, game_id=game_id, platform=platform, completed=0, started_date=day))
+    return True
+
+
 def telegram_id_in_use(db: Session, telegram_id: int, exclude_user_id: int | None = None) -> bool:
     """True if another account already uses this Telegram id."""
     query = db.query(models.User.id).filter(models.User.telegram_id == telegram_id)
@@ -273,7 +290,8 @@ def insert_user(
     try:
         db_user = models.User(
             username=username,
-            name=name,
+            # messages and rankings print the name, so it is never empty
+            name=(name or "").strip() or username,
             email=email,
             password=hashed,
             is_admin=int(is_admin),
@@ -311,7 +329,7 @@ def create_user(
         logger.info("Creating new user: " + str(user.username))
         db_user = models.User(
             username=user.username,
-            name=user.name,
+            name=(user.name or "").strip() or user.username,
             password=hashed_password,
             email=user.email,
         )
