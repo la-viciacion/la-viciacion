@@ -256,15 +256,14 @@ function renderNavbar(user, avatarUrl, active = 'home') {
         La Viciación
       </a>
       <div class="navbar-actions">
-        ${user.is_admin ? `
-          <a href="#" class="navbar-link ${active === 'home' ? 'active' : ''}">Inicio</a>
-          <a href="#/admin" class="navbar-link ${active === 'admin' ? 'active' : ''}">Admin</a>` : ''}
-        <div class="navbar-user" title="@${escapeHtml(user.username)}">
+        <a href="#" class="navbar-link ${active === 'home' ? 'active' : ''}">Inicio</a>
+        ${user.is_admin ? `<a href="#/admin" class="navbar-link ${active === 'admin' ? 'active' : ''}">Admin</a>` : ''}
+        <a href="#/profile" class="navbar-user ${active === 'profile' ? 'active' : ''}" title="Mi perfil (@${escapeHtml(user.username)})">
           ${avatarUrl
             ? `<img src="${avatarUrl}" alt="" class="navbar-avatar" />`
             : `<div class="navbar-avatar navbar-avatar-placeholder" aria-hidden="true">${initial}</div>`}
           <span class="navbar-username">${escapeHtml(user.name || user.username)}</span>
-        </div>
+        </a>
         <button class="btn-logout" id="logoutBtn" aria-label="Cerrar sesión">
           ${iconLogout()} Salir
         </button>
@@ -883,10 +882,40 @@ async function renderAdminPage() {
   }
 }
 
+// ── Profile page (lazy-loaded) ───────────────────────────────
+async function renderProfilePage() {
+  const gen = ++renderGen;
+  stopTimerDisplay();
+  renderPage('<div id="loading-overlay"><div class="spinner"></div></div>');
+  try {
+    const user = await apiFetch('/auth/active_user');
+    if (!user || gen !== renderGen) return;
+    const avatarBlob = await apiFetch(`/users/${user.username}/avatar`).catch(() => null);
+    const avatarUrl = avatarBlob instanceof Blob ? URL.createObjectURL(avatarBlob) : null;
+    if (gen !== renderGen) return;
+    renderPage(`
+      <div class="home-page">
+        ${renderNavbar(user, avatarUrl, 'profile')}
+        <main class="home-main profile-main" id="profileRoot"></main>
+      </div>
+    `);
+    document.getElementById('logoutBtn').addEventListener('click', handleLogout);
+    const { initProfile } = await import('./profile.js');
+    if (gen !== renderGen) return;
+    await initProfile(document.getElementById('profileRoot'), { apiFetch, escapeHtml, me: user });
+  } catch (err) {
+    console.error(err);
+    if (gen !== renderGen) return;
+    storage.clearToken();
+    renderLogin();
+  }
+}
+
 // ── Routing ──────────────────────────────────────────────────
 async function route() {
   if (!storage.getToken()) return renderLogin();
   if (location.hash.startsWith('#/admin')) return renderAdminPage();
+  if (location.hash.startsWith('#/profile')) return renderProfilePage();
   return renderHome();
 }
 

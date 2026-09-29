@@ -149,6 +149,73 @@ def update_user(
     return users.update_user(db=db, user=user)
 
 
+@router.get("/{username}/profile")
+@version(1)
+def get_profile(
+    username: str,
+    active_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Main stats, in-progress games and personal data of a user"""
+    auth.ensure_self_or_admin(active_user, username=username)
+    user = users.get_user_by_username(db, username)
+    if user is None:
+        raise HTTPException(status_code=404, detail=msg.USER_NOT_EXISTS)
+    return users.get_profile(db, user)
+
+
+@router.patch("/{username}/profile")
+@version(1)
+def update_profile(
+    username: str,
+    body: schemas.UserProfileUpdate,
+    active_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Edit own name, email and Telegram id"""
+    auth.ensure_self_or_admin(active_user, username=username)
+    user = users.get_user_by_username(db, username)
+    if user is None:
+        raise HTTPException(status_code=404, detail=msg.USER_NOT_EXISTS)
+    data = body.model_dump(exclude_unset=True)
+    if "name" in data and data["name"] is not None:
+        data["name"] = data["name"].strip() or None
+    if "email" in data:
+        data["email"] = (data["email"] or "").strip() or None
+        if data["email"] and not utils.validate_email_format(data["email"]):
+            raise HTTPException(status_code=400, detail=msg.EMAIL_INVALID)
+    users.update_profile(db, user, data)
+    return {
+        "id": user.id,
+        "username": user.username,
+        "name": user.name,
+        "email": user.email,
+        "telegram_id": user.telegram_id,
+    }
+
+
+@router.post("/{username}/password")
+@version(1)
+def change_password(
+    username: str,
+    body: schemas.PasswordChange,
+    active_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Change own password (the current one is required)"""
+    if active_user.username != username:
+        raise HTTPException(status_code=403, detail=msg.USER_NOT_ADMIN)
+    user = users.get_user_by_username(db, username)
+    if user is None:
+        raise HTTPException(status_code=404, detail=msg.USER_NOT_EXISTS)
+    if not auth.verify_password(body.current_password, user.password):
+        raise HTTPException(status_code=400, detail=msg.PASSWORD_WRONG)
+    if not utils.validate_password_requirements(body.new_password):
+        raise HTTPException(status_code=400, detail=msg.PASSWORD_RULES)
+    users.change_password(db, user, body.new_password)
+    return {"message": "Contraseña actualizada"}
+
+
 @router.post("/{username}/new_game", response_model=schemas.UserGame)
 @version(1)
 async def add_game_to_user(
@@ -305,6 +372,10 @@ async def get_avatar(
         raise HTTPException(status_code=404, detail=msg.USER_NOT_EXISTS)
     try:
         data = users.get_avatar(db, username)
-        return Response(content=data[0], media_type="image/*")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    if not data or not data[0]:
+        raise HTTPException(status_code=404, detail="Avatar not found")
+    image = bytes(data[0])
+    media_type = "image/png" if image.startswith(b"\x89PNG") else "image/jpeg"
+    return Response(content=image, media_type=media_type)

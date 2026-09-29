@@ -80,6 +80,88 @@ def ensure_god_user(db: Session):
         raise
 
 
+def update_profile(db: Session, user: models.User, data: dict) -> models.User:
+    """Update the self-service profile fields (only the ones present in data)."""
+    try:
+        for field in ("name", "email", "telegram_id"):
+            if field in data:
+                setattr(user, field, data[field])
+        db.commit()
+        db.refresh(user)
+        return user
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error("Error updating profile: " + str(e))
+        raise
+
+
+def change_password(db: Session, user: models.User, new_password: str):
+    try:
+        user.password = bcrypt.hashpw(
+            new_password.encode("utf-8"), bcrypt.gensalt()
+        ).decode("utf-8")
+        db.commit()
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error("Error changing password: " + str(e))
+        raise
+
+
+def get_profile(db: Session, user: models.User, season: int = None) -> dict:
+    """Main stats of a user for the profile page."""
+    if season is None:
+        season = datetime.datetime.now().year
+    stats = (
+        db.query(models.UserStatistics).filter_by(user_id=user.id).first()
+    )
+    played_time = (
+        db.query(func.coalesce(func.sum(models.UserGame.played_time), 0))
+        .filter(
+            models.UserGame.user_id == user.id,
+            extract("year", models.UserGame.started_date) == season,
+        )
+        .scalar()
+    )
+    achievements = get_achievements(db, user.username, season)
+    in_progress = get_games(db, user.id, completed=False, season=season)
+    return {
+        "season": season,
+        "user": {
+            "id": user.id,
+            "username": user.username,
+            "name": user.name,
+            "email": user.email,
+            "telegram_id": user.telegram_id,
+        },
+        "stats": {
+            "played_time": int(played_time or 0),
+            "played_days": (stats.played_days if stats else 0) or 0,
+            "played_games": count_played_games(db, user.id, season),
+            "completed_games": count_completed_games(db, user.id, season),
+            "current_streak": (stats.current_streak if stats else 0) or 0,
+            "best_streak": (stats.best_streak if stats else 0) or 0,
+            "achievements": len(achievements),
+        },
+        "top_games": [
+            {"game_id": r.game_id, "game_name": r.game_name, "played_time": r.played_time or 0}
+            for r in top_games(db, user.username, limit=5, season=season)
+        ],
+        "achievements": [
+            {"title": r.title, "date": r.date} for r in achievements[-5:][::-1]
+        ],
+        "in_progress": [
+            {
+                "game_id": g["game_id"],
+                "game_name": g["game_name"],
+                "platform_name": g["platform_name"],
+                "played_time": g["played_time"] or 0,
+                "started_date": g["started_date"],
+            }
+            for g in in_progress
+        ],
+    }
+
+
 def get_users(db: Session, is_active: bool = True) -> list[models.User]:
     """
     Get users based on their active status.

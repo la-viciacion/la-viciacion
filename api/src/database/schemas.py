@@ -63,6 +63,17 @@ class UserUpdate(BaseModel):
     clockify_key: str | None = None
 
 
+class UserProfileUpdate(BaseModel):
+    name: str | None = None
+    email: str | None = None
+    telegram_id: int | None = None
+
+
+class PasswordChange(BaseModel):
+    current_password: str
+    new_password: str
+
+
 class UserUpdateForAdmin(BaseModel):
     name: str | None = None
     username: str

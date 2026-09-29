@@ -1,10 +1,11 @@
-const CACHE_NAME = 'lv-cache-v10';
+const CACHE_NAME = 'lv-cache-v12';
 const ASSETS = [
   '/',
   '/index.html',
   '/style.css',
   '/app.js',
   '/admin.js',
+  '/profile.js',
   '/admin-rawg.js',
   '/manifest.json',
   '/icon.svg',
