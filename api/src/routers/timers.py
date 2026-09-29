@@ -5,9 +5,10 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, s
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from .. import auth
 from ..crud import users as users_crud
 from ..database.database import SessionLocal
-from ..database.models import Game, GameTimer, UserGame
+from ..database.models import Game, GameTimer, User, UserGame
 from ..database.schemas import (
     ActiveTimerResponse,
     GameTimerCreate,
@@ -223,18 +224,33 @@ def get_timer_stats(db: Session, user_id: int, game_id: Optional[str] = None) ->
 
 
 # FastAPI Router
-router = APIRouter(prefix="/timers", tags=["timers"])
+router = APIRouter(
+    prefix="/timers",
+    tags=["timers"],
+    # Every route needs a logged-in user; each one also checks the data
+    # belongs to them (or that they are an admin).
+)
 
 
 @router.post("/start", response_model=GameTimerResponse)
-async def start_timer(timer: GameTimerCreate, db: Session = Depends(get_db)):
+async def start_timer(
+    timer: GameTimerCreate,
+    current_user: User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db),
+):
     """Start a new game timer for a user"""
+    auth.ensure_self_or_admin(current_user, user_id=timer.user_id)
     return await create_timer(db, timer)
 
 
 @router.get("/active/{user_id}", response_model=ActiveTimerResponse)
-def get_active_timer_endpoint(user_id: int, db: Session = Depends(get_db)):
+def get_active_timer_endpoint(
+    user_id: int,
+    current_user: User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db),
+):
     """Get the currently active timer for a user"""
+    auth.ensure_self_or_admin(current_user, user_id=user_id)
     active_timer = get_active_timer(db, user_id)
     
     if active_timer:
@@ -254,9 +270,11 @@ def stop_timer_endpoint(
     timer_id: int,
     user_id: int,
     background_tasks: BackgroundTasks,
+    current_user: User = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db),
 ):
     """Stop an active timer"""
+    auth.ensure_self_or_admin(current_user, user_id=user_id)
     timer = stop_timer(db, timer_id, user_id)
     background_tasks.add_task(actions.recompute_after_timer_stop, user_id)
     return timer
@@ -267,9 +285,11 @@ def get_timer_history_endpoint(
     user_id: int, 
     game_id: Optional[str] = None, 
     limit: int = 100,
+    current_user: User = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """Get timer history for a user, optionally filtered by game"""
+    auth.ensure_self_or_admin(current_user, user_id=user_id)
     return get_timer_history(db, user_id, game_id, limit)
 
 
@@ -279,16 +299,24 @@ def get_grouped_timer_history_endpoint(
     limit: int = Query(10, ge=1, le=50),
     offset: int = Query(0, ge=0),
     sessions_per_game: int = Query(10, ge=1, le=50),
+    current_user: User = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db),
 ):
     """Timer history grouped by game (one row per game), newest game first"""
+    auth.ensure_self_or_admin(current_user, user_id=user_id)
     return get_grouped_timer_history(db, user_id, limit, offset, sessions_per_game)
 
 
 @router.get("/history/{user_id}/platforms/{game_id}", response_model=GamePlatformsResponse)
-def get_game_platforms_endpoint(user_id: int, game_id: str, db: Session = Depends(get_db)):
+def get_game_platforms_endpoint(
+    user_id: int,
+    game_id: str,
+    current_user: User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db),
+):
     """What the user has already played of a game: whether there is any history
     and which platforms were used (most recent first)."""
+    auth.ensure_self_or_admin(current_user, user_id=user_id)
     rows = (
         db.query(GameTimer.platform)
         .filter(
@@ -330,7 +358,9 @@ def get_game_platforms_endpoint(user_id: int, game_id: str, db: Session = Depend
 def get_timer_stats_endpoint(
     user_id: int, 
     game_id: Optional[str] = None,
+    current_user: User = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """Get timer statistics for a user, optionally filtered by game"""
+    auth.ensure_self_or_admin(current_user, user_id=user_id)
     return get_timer_stats(db, user_id, game_id)

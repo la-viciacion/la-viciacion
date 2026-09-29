@@ -118,7 +118,7 @@ async def upload_achievement_image(
     # file: Annotated[UploadFile, File(description="A file read as UploadFile")],
     file: UploadFile,
     db: Session = Depends(get_db),
-    user: models.User = Security(auth.get_current_active_user),
+    user: models.User = Depends(auth.require_admin),
 ):
     """
     Upload achievement image

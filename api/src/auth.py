@@ -14,6 +14,7 @@ from .config import Config
 from .crud import users
 from .database import models
 from .database.database import SessionLocal
+from .utils import messages
 
 config = Config()
 ALGORITHM = "HS256"
@@ -103,6 +104,32 @@ async def get_current_active_user(
     if not current_user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
     return current_user
+
+
+def require_admin(
+    current_user: Annotated[models.User, Depends(get_current_active_user)]
+):
+    """Dependency: only admins get through."""
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail=messages.USER_NOT_ADMIN
+        )
+    return current_user
+
+
+def ensure_self_or_admin(
+    current_user: models.User, user_id: int | None = None, username: str | None = None
+):
+    """Only the owner of the data (by id or username) or an admin may touch it."""
+    if current_user.is_admin:
+        return
+    if (user_id is not None and current_user.id == user_id) or (
+        username is not None and current_user.username == username
+    ):
+        return
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN, detail=messages.USER_NOT_ADMIN
+    )
 
 
 def get_api_key(

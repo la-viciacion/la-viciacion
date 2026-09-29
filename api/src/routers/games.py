@@ -137,7 +137,10 @@ async def create_game(game: schemas.NewGame, db: Session = Depends(get_db)):
 @router.put("/{game_id}", response_model=schemas.Game, status_code=200)
 @version(1)
 async def update_game(
-    game_id: str, game: schemas.UpdateGame, db: Session = Depends(get_db)
+    game_id: str,
+    game: schemas.UpdateGame,
+    admin: models.User = Depends(auth.require_admin),
+    db: Session = Depends(get_db),
 ):
     """_summary_
 
@@ -161,7 +164,11 @@ async def update_game(
 @router.get("/recommendations/{user_id}")
 @version(1)
 async def get_recommendations(
-    user_id: int, genres: str = None, limit: int = None, db: Session = Depends(get_db)
+    user_id: int,
+    genres: str = None,
+    limit: int = None,
+    active_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db),
 ):
     """_summary_
 
@@ -172,6 +179,7 @@ async def get_recommendations(
     Returns:
         _type_: _description_
     """
+    auth.ensure_self_or_admin(active_user, user_id=user_id)
     genres_list = []
     if genres is not None:
         genres_list = genres.split(",")

@@ -51,7 +51,9 @@ class RankingUsersTypes(str, Enum):
 
 @router.get("/", response_model=list[schemas.User])
 @version(1)
-def get_users(db: Session = Depends(get_db)):
+def get_users(
+    admin: models.User = Depends(auth.require_admin), db: Session = Depends(get_db)
+):
     """_summary_
 
     Args:
@@ -66,7 +68,11 @@ def get_users(db: Session = Depends(get_db)):
 
 @router.get("/{username}", response_model=schemas.User)
 @version(1)
-def get_user(username: str, db: Session = Depends(get_db)):
+def get_user(
+    username: str,
+    active_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db),
+):
     """_summary_
 
     Args:
@@ -79,6 +85,7 @@ def get_user(username: str, db: Session = Depends(get_db)):
     Returns:
         _type_: _description_
     """
+    auth.ensure_self_or_admin(active_user, username=username)
     user_db = users.get_user_by_username(db, username)
     if user_db is None:
         raise HTTPException(status_code=404, detail=msg.USER_NOT_EXISTS)
@@ -87,7 +94,11 @@ def get_user(username: str, db: Session = Depends(get_db)):
 
 @router.get("/{username}/weekly-resume")
 @version(1)
-async def get_weekly_resume(username: str, db: Session = Depends(get_db)):
+async def get_weekly_resume(
+    username: str,
+    active_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db),
+):
     """_summary_
 
     Args:
@@ -100,6 +111,7 @@ async def get_weekly_resume(username: str, db: Session = Depends(get_db)):
     Returns:
         _type_: _description_
     """
+    auth.ensure_self_or_admin(active_user, username=username)
     user_db = users.get_user_by_username(db, username)
     if user_db is None:
         raise HTTPException(status_code=404, detail=msg.USER_NOT_EXISTS)
@@ -140,11 +152,15 @@ def update_user(
 @router.post("/{username}/new_game", response_model=schemas.UserGame)
 @version(1)
 async def add_game_to_user(
-    username: str, game: schemas.NewGameUser, db: Session = Depends(get_db)
+    username: str,
+    game: schemas.NewGameUser,
+    active_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db),
 ):
     """
     Add new game to user list
     """
+    auth.ensure_self_or_admin(active_user, username=username)
     current_season = datetime.datetime.now().year
     user = users.get_user_by_username(db, username)
     if user is None:
@@ -173,8 +189,10 @@ def get_games(
     username: str,
     limit: int = None,
     completed: bool = None,
+    active_user: models.User = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db),
 ):
+    auth.ensure_self_or_admin(active_user, username=username)
     user = users.get_user_by_username(db, username=username)
     if user is None:
         raise HTTPException(status_code=404, detail=msg.USER_NOT_EXISTS)
@@ -184,10 +202,16 @@ def get_games(
 
 @router.patch("/{username}/complete-game", response_model=schemas.UserGame)
 @version(1)
-async def complete_game(username: str, game_id: str, db: Session = Depends(get_db)):
+async def complete_game(
+    username: str,
+    game_id: str,
+    active_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db),
+):
     """
     Complete game by username
     """
+    auth.ensure_self_or_admin(active_user, username=username)
     user = users.get_user_by_username(db, username)
     logger.info("USER:")
     logger.info(user)
@@ -212,11 +236,16 @@ async def complete_game(username: str, game_id: str, db: Session = Depends(get_d
 @router.patch("/{username}/rate-game")
 @version(1)
 async def rate_game(
-    username: str, game_id: str, score: float, db: Session = Depends(get_db)
+    username: str,
+    game_id: str,
+    score: float,
+    active_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db),
 ):
     """
     Rate game
     """
+    auth.ensure_self_or_admin(active_user, username=username)
     user = users.get_user_by_username(db, username)
     if user is None:
         raise HTTPException(status_code=404, detail=msg.USER_NOT_EXISTS)
@@ -237,8 +266,10 @@ async def upload_avatar(
     username: str,
     # file: Annotated[UploadFile, File(description="A file read as UploadFile")],
     file: UploadFile,
+    active_user: models.User = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db),
 ):
+    auth.ensure_self_or_admin(active_user, username=username)
     allowed_types = ["image/jpeg", "image/jpg", "image/png"]
     if file.content_type not in allowed_types:
         logger.info(msg.FILE_TYPE_NOT_ALLOWED)
@@ -265,8 +296,10 @@ async def upload_avatar(
 @version(1)
 async def get_avatar(
     username: str,
+    active_user: models.User = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db),
 ):
+    auth.ensure_self_or_admin(active_user, username=username)
     if not users.get_user_by_username(db, username):
         logger.info(msg.USER_NOT_EXISTS)
         raise HTTPException(status_code=404, detail=msg.USER_NOT_EXISTS)

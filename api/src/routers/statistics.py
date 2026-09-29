@@ -116,6 +116,7 @@ class UserStatisticsTypes(str, Enum):
 def get_user_statistics(
     username: str,
     ranking: str = None,
+    active_user: models.User = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db),
 ):
     """_summary_
@@ -128,6 +129,7 @@ def get_user_statistics(
     Returns:
         _type_: _description_
     """
+    auth.ensure_self_or_admin(active_user, username=username)
     if ranking is not None:
         rankings_list = ranking.split(",")
     else:
