@@ -187,7 +187,7 @@ async def recompute_all_users_and_rankings(
 _recompute_lock = threading.Lock()
 
 
-def recompute_after_timer_stop(user_id: int | None = None):
+def recompute_after_timer_stop(user_id: int | None = None, silent: bool = False):
     """Background-task entrypoint for routers/timers.py::stop_timer_endpoint.
 
     Deliberately a plain `def`: Starlette runs it in a worker thread. The
@@ -210,7 +210,7 @@ def recompute_after_timer_stop(user_id: int | None = None):
         db = SessionLocal()
         try:
             await recompute_all_users_and_rankings(
-                db, silent=False, user_ids=None if user_id is None else [user_id]
+                db, silent=silent, user_ids=None if user_id is None else [user_id]
             )
         finally:
             db.close()

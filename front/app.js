@@ -33,7 +33,15 @@ async function apiFetch(path, options = {}) {
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: 'Error desconocido' }));
-    throw new Error(err.detail || `HTTP ${res.status}`);
+    const detail = err.detail;
+    // detail can be a string, an object ({message, counts}) or a 422 list of issues
+    const message = typeof detail === 'string' ? detail
+      : Array.isArray(detail) ? detail.map(d => d.msg).join('; ')
+      : detail?.message || `HTTP ${res.status}`;
+    const error = new Error(message);
+    error.status = res.status;
+    error.detail = detail;
+    throw error;
   }
 
   const ct = res.headers.get('content-type') || '';
@@ -154,7 +162,7 @@ async function handleLogin(e) {
 
     const data = await res.json();
     storage.setToken(data.access_token);
-    await renderHome();
+    await route();
   } catch (err) {
     showLoginError(err.message);
     btn.disabled = false;
@@ -173,7 +181,12 @@ function showLoginError(msg) {
 const HISTORY_PAGE_SIZE = 8;   // games per page in the history list
 const historyState = { groups: [], total: 0, expanded: new Set(), hasActive: false, userId: null };
 
+// Only the most recent render may touch the DOM: a route change (or a redirect
+// firing hashchange) can start a second render while the first is awaiting.
+let renderGen = 0;
+
 async function renderHome() {
+  const gen = ++renderGen;
   stopTimerDisplay();
   renderPage(`
     <div id="loading-overlay">
@@ -188,6 +201,7 @@ async function renderHome() {
     await loadPlatforms();
     const avatarBlob = await apiFetch(`/users/${user.username}/avatar`).catch(() => null);
     const avatarUrl = avatarBlob instanceof Blob ? URL.createObjectURL(avatarBlob) : null;
+    if (gen !== renderGen) return;
 
     historyState.userId = user.id;
     historyState.groups = [];
@@ -223,15 +237,17 @@ async function renderHome() {
 
     // Active timer first: it decides whether "continue playing" buttons are enabled.
     await loadTimerSection(user.id);
+    if (gen !== renderGen) return;
     await loadHistory(true);
   } catch (err) {
     console.error(err);
+    if (gen !== renderGen) return;
     storage.clearToken();
     renderLogin();
   }
 }
 
-function renderNavbar(user, avatarUrl) {
+function renderNavbar(user, avatarUrl, active = 'home') {
   const initial = escapeHtml(user.name?.[0]?.toUpperCase() || user.username[0].toUpperCase());
   return `
     <nav class="navbar" role="navigation" aria-label="Navegación principal">
@@ -240,6 +256,9 @@ function renderNavbar(user, avatarUrl) {
         La Viciación
       </a>
       <div class="navbar-actions">
+        ${user.is_admin ? `
+          <a href="#" class="navbar-link ${active === 'home' ? 'active' : ''}">Inicio</a>
+          <a href="#/admin" class="navbar-link ${active === 'admin' ? 'active' : ''}">Admin</a>` : ''}
         <div class="navbar-user" title="@${escapeHtml(user.username)}">
           ${avatarUrl
             ? `<img src="${avatarUrl}" alt="" class="navbar-avatar" />`
@@ -265,6 +284,7 @@ async function loadTimerSection(userId) {
     if (active && active.is_active && active.timer) {
       historyState.hasActive = true;
       const game = await apiFetch(`/games/${encodeURIComponent(active.timer.game_id)}`).catch(() => null);
+      if (!timerSection.isConnected) return;   // page was re-rendered meanwhile
       timerSection.innerHTML = renderActiveTimer(active.timer, game);
       document.getElementById('stopTimerBtn').addEventListener('click', (e) => {
         stopTimer(e.currentTarget.dataset.timerId, userId);
@@ -275,6 +295,7 @@ async function loadTimerSection(userId) {
   } catch (err) {
     console.error('Error fetching timer:', err);
   }
+  if (!timerSection.isConnected) return;
   timerSection.innerHTML = renderTimerIdle();
   document.getElementById('chooseGameBtn').addEventListener('click', () => openGamePickerModal(userId));
 }
@@ -819,9 +840,10 @@ function iconPlus() {
 
 // ── Utils ────────────────────────────────────────────────────
 function escapeHtml(str) {
-  const d = document.createElement('div');
-  d.textContent = str;
-  return d.innerHTML;
+  // Also escapes quotes: values are interpolated into double-quoted attributes.
+  return String(str ?? '').replace(/[&<>"']/g, (c) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
 }
 
 // ── Service Worker ───────────────────────────────────────────
@@ -831,11 +853,46 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-// ── Boot ─────────────────────────────────────────────────────
-(async () => {
-  if (storage.getToken()) {
-    await renderHome();
-  } else {
+// ── Admin panel (lazy-loaded, admins only) ───────────────────
+async function renderAdminPage() {
+  const gen = ++renderGen;
+  renderPage('<div id="loading-overlay"><div class="spinner"></div></div>');
+  try {
+    const user = await apiFetch('/auth/active_user');
+    if (!user || gen !== renderGen) return;
+    if (!user.is_admin) {           // the API enforces this too; this is just UX
+      history.replaceState(null, '', location.pathname);   // no hashchange => single render
+      return renderHome();
+    }
+    stopTimerDisplay();
+    renderPage(`
+      <div class="home-page">
+        ${renderNavbar(user, null, 'admin')}
+        <main class="home-main admin-main" id="adminRoot"></main>
+      </div>
+    `);
+    document.getElementById('logoutBtn').addEventListener('click', handleLogout);
+    const { initAdmin } = await import('./admin.js');
+    if (gen !== renderGen) return;
+    await initAdmin(document.getElementById('adminRoot'), { apiFetch, escapeHtml, me: user });
+  } catch (err) {
+    console.error(err);
+    if (gen !== renderGen) return;
+    storage.clearToken();
     renderLogin();
   }
-})();
+}
+
+// ── Routing ──────────────────────────────────────────────────
+async function route() {
+  if (!storage.getToken()) return renderLogin();
+  if (location.hash.startsWith('#/admin')) return renderAdminPage();
+  return renderHome();
+}
+
+window.addEventListener('hashchange', () => {
+  if (storage.getToken()) route();
+});
+
+// ── Boot ─────────────────────────────────────────────────────
+route();
