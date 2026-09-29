@@ -4,7 +4,7 @@
 //  Routes used:
 //    POST /api/v1/token          → login
 //    GET  /api/v1/auth/active_user → get user info
-//    GET  /api/v1/users/{username}/games → user games
+//    GET  /api/v1/timers/history/{id}/grouped → session history per game
 //    GET  /api/v1/users/{username}/avatar → avatar image
 // ============================================================
 
@@ -169,9 +169,12 @@ function showLoginError(msg) {
   el.classList.add('visible');
 }
 
-// ── Home page ────────────────────────────────────────────────
+// ── Home page (time tracking) ────────────────────────────────
+const HISTORY_PAGE_SIZE = 8;   // games per page in the history list
+const historyState = { groups: [], total: 0, expanded: new Set(), hasActive: false, userId: null };
+
 async function renderHome() {
-  // Skeleton placeholder while loading
+  stopTimerDisplay();
   renderPage(`
     <div id="loading-overlay">
       <div class="spinner"></div>
@@ -182,92 +185,45 @@ async function renderHome() {
     const user = await apiFetch('/auth/active_user');
     if (!user) return;
 
-    // Fetch games (non-blocking)
-    const [games, avatarBlob] = await Promise.allSettled([
-      apiFetch(`/users/${user.username}/games`),
-      apiFetch(`/users/${user.username}/avatar`),
-    ]);
+    await loadPlatforms();
+    const avatarBlob = await apiFetch(`/users/${user.username}/avatar`).catch(() => null);
+    const avatarUrl = avatarBlob instanceof Blob ? URL.createObjectURL(avatarBlob) : null;
 
-    const avatarUrl = avatarBlob.status === 'fulfilled' && avatarBlob.value instanceof Blob
-      ? URL.createObjectURL(avatarBlob.value)
-      : null;
-
-    const gamesData = games.status === 'fulfilled' ? (games.value || []) : [];
-    const completedCount = gamesData.filter(g => g.completed).length;
+    historyState.userId = user.id;
+    historyState.groups = [];
+    historyState.total = 0;
+    historyState.expanded = new Set();
 
     renderPage(`
       <div class="home-page">
-        ${renderNavbar(user)}
+        ${renderNavbar(user, avatarUrl)}
 
         <main class="home-main">
-          <!-- Profile Hero -->
-          <section class="profile-hero" aria-label="Perfil del usuario">
-            <div class="profile-avatar-wrap">
-              ${avatarUrl
-                ? `<img src="${avatarUrl}" alt="Avatar de ${user.username}" class="profile-avatar" />`
-                : `<div class="profile-avatar-placeholder" aria-hidden="true">${user.name?.[0]?.toUpperCase() || '?'}</div>`
-              }
-              ${user.is_active ? '<div class="online-dot" title="Activo"></div>' : ''}
-            </div>
-
-            <div class="profile-info">
-              <h1 class="profile-name">${escapeHtml(user.name || user.username)}</h1>
-              <div class="profile-username">@${escapeHtml(user.username)}</div>
-              <div class="profile-badges">
-                ${user.is_admin ? '<span class="badge badge-admin">⚡ Admin</span>' : ''}
-                <span class="badge ${user.is_active ? 'badge-active' : 'badge-inactive'}">
-                  ${user.is_active ? '✓ Activo' : '✗ Inactivo'}
-                </span>
-              </div>
-            </div>
-
-            <div class="profile-stats">
-              <div class="stat-value">${gamesData.length}</div>
-              <div class="stat-label">Juegos</div>
-              <div class="stat-value" style="margin-top:12px">${completedCount}</div>
-              <div class="stat-label">Completados</div>
-            </div>
+          <section id="timerSection" aria-label="Timer">
+            <div class="loading-spinner">Cargando timer...</div>
           </section>
 
-          <!-- Info Cards -->
           <div class="section-header">
-            <h2 class="section-title">Información</h2>
+            <h2 class="section-title">Mis sesiones</h2>
             <div class="section-line"></div>
           </div>
-          <div class="info-grid" style="margin-bottom:40px">
-            ${infoCard('📧', 'teal', 'Correo electrónico', escapeHtml(user.email || '—'), false)}
-            ${user.telegram_id ? infoCard('✈️', 'gold', 'Telegram ID', escapeHtml(String(user.telegram_id)), true) : ''}
-            ${user.clockify_id ? infoCard('⏱️', 'purple', 'Clockify ID', escapeHtml(user.clockify_id), true) : ''}
-            ${infoCard('🆔', 'pink', 'ID de usuario', String(user.id), true)}
+          <div id="historyList" class="history-list">
+            <div class="loading-spinner">Cargando historial...</div>
           </div>
-
-          <!-- Timer Section -->
-          <div class="section-header">
-            <h2 class="section-title">Timer de Juego</h2>
-            <div class="section-line"></div>
-          </div>
-          <div id="timerSection">
-            <div class="loading-spinner">Cargando timer...</div>
-          </div>
-
-          <!-- Games -->
-          <div class="section-header">
-            <h2 class="section-title">Mis juegos</h2>
-            <div class="section-line"></div>
-          </div>
-          <div class="games-grid" id="gamesGrid">
-            ${renderGames(gamesData)}
-          </div>
+          <div class="history-more" id="historyMore"></div>
         </main>
       </div>
     `);
 
-    // Bind logout
     document.getElementById('logoutBtn').addEventListener('click', handleLogout);
-    
-    // Load timer section asynchronously
-    loadTimerSection(user.id, gamesData);
+    document.getElementById('historyList').addEventListener('click', onHistoryClick);
+    document.getElementById('historyMore').addEventListener('click', (e) => {
+      if (e.target.closest('#historyMoreBtn')) loadHistory(false);
+    });
 
+    // Active timer first: it decides whether "continue playing" buttons are enabled.
+    await loadTimerSection(user.id);
+    await loadHistory(true);
   } catch (err) {
     console.error(err);
     storage.clearToken();
@@ -275,7 +231,8 @@ async function renderHome() {
   }
 }
 
-function renderNavbar(user) {
+function renderNavbar(user, avatarUrl) {
+  const initial = escapeHtml(user.name?.[0]?.toUpperCase() || user.username[0].toUpperCase());
   return `
     <nav class="navbar" role="navigation" aria-label="Navegación principal">
       <a href="#" class="navbar-brand" aria-label="La Viciación inicio">
@@ -283,6 +240,12 @@ function renderNavbar(user) {
         La Viciación
       </a>
       <div class="navbar-actions">
+        <div class="navbar-user" title="@${escapeHtml(user.username)}">
+          ${avatarUrl
+            ? `<img src="${avatarUrl}" alt="" class="navbar-avatar" />`
+            : `<div class="navbar-avatar navbar-avatar-placeholder" aria-hidden="true">${initial}</div>`}
+          <span class="navbar-username">${escapeHtml(user.name || user.username)}</span>
+        </div>
         <button class="btn-logout" id="logoutBtn" aria-label="Cerrar sesión">
           ${iconLogout()} Salir
         </button>
@@ -291,65 +254,37 @@ function renderNavbar(user) {
   `;
 }
 
-function renderGames(games) {
-  if (!games.length) {
-    return `
-      <div class="empty-state">
-        <span>🎮</span>
-        No tienes juegos registrados todavía.
-      </div>
-    `;
-  }
-
-  return games.map((g, i) => `
-    <article class="game-card" style="animation-delay: ${i * 0.05}s">
-      <div class="game-cover-placeholder" aria-hidden="true">🎮</div>
-      <div class="game-info">
-        <div class="game-title" title="${escapeHtml(g.game_name || g.game_id)}">${escapeHtml(g.game_name || g.game_id)}</div>
-        <div class="game-meta">
-          <span class="game-tag ${g.completed ? 'completed' : 'playing'}">
-            ${g.completed ? '✓ Completado' : '▶ Jugando'}
-          </span>
-        </div>
-        ${g.score != null ? `<div class="game-score">⭐ ${g.score.toFixed(1)}</div>` : ''}
-      </div>
-    </article>
-  `).join('');
-}
-
 // ── Timer Section ───────────────────────────────────────────────
-async function loadTimerSection(userId, games) {
+async function loadTimerSection(userId) {
   const timerSection = document.getElementById('timerSection');
   if (!timerSection) return;
-  
+
+  historyState.hasActive = false;
   try {
-    const activeTimer = await apiFetch(`/timers/active/${userId}`);
-    
-    if (activeTimer && activeTimer.is_active && activeTimer.timer) {
-      timerSection.innerHTML = renderActiveTimer(activeTimer.timer, games);
-      bindTimerEvents(userId, games);
-      
-      // Start timer display
-      startTimerDisplay(activeTimer.timer.start_time);
-    } else {
-      timerSection.innerHTML = renderTimerSelector(userId, games);
-      bindTimerEvents(userId, games);
+    const active = await apiFetch(`/timers/active/${userId}`);
+    if (active && active.is_active && active.timer) {
+      historyState.hasActive = true;
+      const game = await apiFetch(`/games/${encodeURIComponent(active.timer.game_id)}`).catch(() => null);
+      timerSection.innerHTML = renderActiveTimer(active.timer, game);
+      document.getElementById('stopTimerBtn').addEventListener('click', (e) => {
+        stopTimer(e.currentTarget.dataset.timerId, userId);
+      });
+      startTimerDisplay(active.timer.start_time);
+      return;
     }
   } catch (err) {
     console.error('Error fetching timer:', err);
-    timerSection.innerHTML = renderTimerSelector(userId, games);
-    bindTimerEvents(userId, games);
   }
+  timerSection.innerHTML = renderTimerIdle();
+  document.getElementById('chooseGameBtn').addEventListener('click', () => openGamePickerModal(userId));
 }
 
-function renderActiveTimer(timer, games) {
-  const game = games.find(g => g.game_id === timer.game_id);
-  const gameName = game?.game_name || timer.game_id;
-
+function renderActiveTimer(timer, game) {
+  const gameName = game?.name || timer.game_id;
   return `
-    <div class="timer-active" data-timer='${JSON.stringify(timer)}'>
+    <div class="timer-active">
       <div class="timer-info">
-        <div class="timer-label">Jugando ahora:</div>
+        <div class="timer-label"><span class="live-dot"></span> Jugando ahora</div>
         <div class="timer-game">${escapeHtml(gameName)}</div>
         <div class="timer-duration" id="timerDuration">00:00:00</div>
       </div>
@@ -360,36 +295,165 @@ function renderActiveTimer(timer, games) {
   `;
 }
 
-function renderTimerSelector(userId, games) {
-  const recentGames = games.slice(0, 5); // Last 5 games
-
+function renderTimerIdle() {
   return `
-    <div class="timer-selector">
-      <div class="timer-label">Iniciar sesión de juego:</div>
-
-      <div class="timer-actions">
-        <button class="btn-start-timer" id="chooseGameBtn" data-user-id="${userId}">
-          ${iconPlay()} Elegir juego...
-        </button>
+    <div class="timer-idle">
+      <div class="timer-idle-text">
+        <div class="timer-idle-title">¿A qué toca jugar?</div>
+        <div class="timer-idle-sub">Inicia un timer y registra tu sesión.</div>
       </div>
-
-      ${recentGames.length ? `
-      <div class="recent-games">
-        <div class="recent-label">Juegos recientes:</div>
-        <div class="recent-list">
-          ${recentGames.map(g => `
-            <button class="recent-game-btn" data-game-id="${g.game_id}" data-user-id="${userId}">
-              ${escapeHtml(g.game_name || g.game_id)}
-            </button>
-          `).join('')}
-        </div>
-      </div>` : ''}
+      <button class="btn-start-timer" id="chooseGameBtn">
+        ${iconPlay()} Nuevo timer
+      </button>
     </div>
   `;
 }
 
+// ── History (grouped by game) ───────────────────────────────────
+async function loadHistory(reset) {
+  const list = document.getElementById('historyList');
+  if (!list) return;
+  const btn = document.getElementById('historyMoreBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Cargando...'; }
+
+  try {
+    const offset = reset ? 0 : historyState.groups.length;
+    const page = await apiFetch(
+      `/timers/history/${historyState.userId}/grouped?limit=${HISTORY_PAGE_SIZE}&offset=${offset}`
+    );
+    if (!page) return;
+    historyState.total = page.total_games;
+    historyState.groups = reset ? page.groups : historyState.groups.concat(page.groups);
+  } catch (err) {
+    list.innerHTML = `<div class="empty-state"><span>⚠️</span>Error cargando el historial: ${escapeHtml(err.message)}</div>`;
+    return;
+  }
+  renderHistory();
+}
+
+function renderHistory() {
+  const list = document.getElementById('historyList');
+  const more = document.getElementById('historyMore');
+  if (!list) return;
+
+  if (!historyState.groups.length) {
+    list.innerHTML = `
+      <div class="empty-state">
+        <span>⏱️</span>
+        Aún no tienes sesiones registradas. ¡Inicia tu primer timer!
+      </div>`;
+    more.innerHTML = '';
+    return;
+  }
+
+  list.innerHTML = historyState.groups.map(renderHistoryGroup).join('');
+
+  const remaining = historyState.total - historyState.groups.length;
+  more.innerHTML = remaining > 0
+    ? `<button class="btn-load-more" id="historyMoreBtn">Mostrar más (${remaining})</button>`
+    : '';
+}
+
+function renderHistoryGroup(g) {
+  const name = g.game_name || g.game_id;
+  const multi = g.session_count > 1;
+  const open = historyState.expanded.has(g.game_id);
+  const canPlay = !historyState.hasActive;
+  const hidden = g.session_count - g.sessions.length;
+
+  return `
+    <article class="history-group ${open ? 'open' : ''}" data-game-id="${escapeHtml(g.game_id)}">
+      <div class="history-row ${multi ? 'expandable' : ''}" ${multi ? `data-action="toggle" role="button" tabindex="0" aria-expanded="${open}"` : ''}>
+        ${g.image_url
+          ? `<img src="${escapeHtml(g.image_url)}" alt="" class="history-thumb" loading="lazy" />`
+          : '<div class="history-thumb history-thumb-placeholder" aria-hidden="true">🎮</div>'}
+        <div class="history-main">
+          <div class="history-title" title="${escapeHtml(name)}">${escapeHtml(name)}</div>
+          <div class="history-meta">
+            <span>${formatRelative(g.last_played)}</span>
+            <span class="dot">·</span>
+            <span>${formatDuration(g.total_seconds)}${multi ? ' en total' : ''}</span>
+            ${multi ? `<span class="session-pill">${g.session_count} sesiones</span>` : ''}
+            ${g.platforms.map(p => `<span class="platform-pill">${escapeHtml(platformName(p))}</span>`).join('')}
+          </div>
+        </div>
+        <button class="btn-continue" data-action="continue" data-game-id="${escapeHtml(g.game_id)}"
+                ${canPlay ? '' : 'disabled title="Ya tienes un timer activo"'} aria-label="Seguir jugando a ${escapeHtml(name)}">
+          ${iconPlay()} <span>Seguir</span>
+        </button>
+        ${multi ? `<span class="history-chevron" aria-hidden="true">${iconChevron()}</span>` : ''}
+      </div>
+      ${multi && open ? `
+        <ul class="history-sessions">
+          ${g.sessions.map(s => `
+            <li>
+              <span>${formatDateTime(s.start_time)}${s.platform ? ` · ${escapeHtml(platformName(s.platform))}` : ''}</span>
+              <span class="session-duration">${formatDuration(s.duration_seconds || 0)}</span>
+            </li>`).join('')}
+          ${hidden > 0 ? `<li class="session-more">… y ${hidden} sesiones anteriores</li>` : ''}
+        </ul>` : ''}
+    </article>
+  `;
+}
+
+function onHistoryClick(e) {
+  const cont = e.target.closest('[data-action="continue"]');
+  if (cont) {
+    if (!cont.disabled) {
+      // Reuse the info of the most recent session (same platform).
+      const g = historyState.groups.find(x => x.game_id === cont.dataset.gameId);
+      startTimer(historyState.userId, g.game_id, g.platform);
+    }
+    return;
+  }
+  const row = e.target.closest('[data-action="toggle"]');
+  if (row) {
+    const id = row.closest('.history-group').dataset.gameId;
+    if (historyState.expanded.has(id)) historyState.expanded.delete(id);
+    else historyState.expanded.add(id);
+    renderHistory();
+  }
+}
+
+// ── Formatting ──────────────────────────────────────────────────
+// The API returns naive local timestamps (datetime.now() on the server).
+function parseTs(ts) {
+  return new Date(ts);
+}
+
+function formatDuration(totalSeconds) {
+  const s = Math.max(0, Math.round(totalSeconds));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  if (h > 0) return m ? `${h} h ${m} min` : `${h} h`;
+  if (m > 0) return `${m} min`;
+  return `${s} s`;
+}
+
+function formatRelative(ts) {
+  const d = parseTs(ts);
+  const startOfDay = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate());
+  const days = Math.round((startOfDay(new Date()) - startOfDay(d)) / 86400000);
+  if (days <= 0) return 'Hoy';
+  if (days === 1) return 'Ayer';
+  if (days < 7) return `Hace ${days} días`;
+  return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: d.getFullYear() === new Date().getFullYear() ? undefined : 'numeric' });
+}
+
+function formatDateTime(ts) {
+  const d = parseTs(ts);
+  return d.toLocaleString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+
+// Re-render only the timer card and the history, keeping the page in place.
+async function refreshTracking(userId) {
+  stopTimerDisplay();
+  await loadTimerSection(userId);
+  await loadHistory(true);
+}
+
 // ── Timer Actions ───────────────────────────────────────────────
-async function startTimer(userId, gameId) {
+async function startTimer(userId, gameId, platform = null) {
   try {
     const response = await apiFetch('/timers/start', {
       method: 'POST',
@@ -397,13 +461,13 @@ async function startTimer(userId, gameId) {
       body: JSON.stringify({
         user_id: userId,
         game_id: gameId,
-        platform: 'Unknown',
+        platform,
         season: new Date().getFullYear()
       })
     });
-    
+
     if (response) {
-      await renderHome(); // Refresh to show active timer
+      await refreshTracking(userId);
     }
   } catch (err) {
     console.error('Error starting timer:', err);
@@ -416,9 +480,9 @@ async function stopTimer(timerId, userId) {
     const response = await apiFetch(`/timers/stop/${timerId}?user_id=${userId}`, {
       method: 'POST'
     });
-    
+
     if (response) {
-      await renderHome(); // Refresh to show timer selector
+      await refreshTracking(userId); // no full-page reload: just timer + history
     }
   } catch (err) {
     console.error('Error stopping timer:', err);
@@ -426,26 +490,25 @@ async function stopTimer(timerId, userId) {
   }
 }
 
-// ── Timer Timer Update ───────────────────────────────────────────
+// ── Timer display ────────────────────────────────────────────────
 let timerInterval = null;
 
 function startTimerDisplay(startTime) {
   if (timerInterval) clearInterval(timerInterval);
-  
+
   const updateTimer = () => {
-    const now = new Date();
-    const diff = Math.floor((now - new Date(startTime)) / 1000);
+    const diff = Math.max(0, Math.floor((new Date() - parseTs(startTime)) / 1000));
     const hours = Math.floor(diff / 3600);
     const minutes = Math.floor((diff % 3600) / 60);
     const seconds = diff % 60;
-    
+
     const durationEl = document.getElementById('timerDuration');
     if (durationEl) {
-      durationEl.textContent = 
+      durationEl.textContent =
         `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
     }
   };
-  
+
   updateTimer();
   timerInterval = setInterval(updateTimer, 1000);
 }
@@ -457,45 +520,82 @@ function stopTimerDisplay() {
   }
 }
 
-function bindTimerEvents(userId, games) {
-  // Choose game button (opens the game picker modal)
-  const chooseGameBtn = document.getElementById('chooseGameBtn');
-  if (chooseGameBtn) {
-    chooseGameBtn.addEventListener('click', () => {
-      openGamePickerModal(userId);
-    });
-  }
+// ── Platform selection ──────────────────────────────────────────
+let platformNames = {};
 
-  // Stop timer button
-  const stopBtn = document.getElementById('stopTimerBtn');
-  if (stopBtn) {
-    stopBtn.addEventListener('click', () => {
-      const timerId = stopBtn.dataset.timerId;
-      stopTimer(timerId, userId);
-    });
+async function loadPlatforms() {
+  try {
+    const list = await apiFetch('/utils/platforms');
+    platformNames = Object.fromEntries((list || []).map(p => [p.id, p.name]));
+  } catch (err) {
+    console.error('Error loading platforms:', err);
   }
+}
 
-  // Recent game buttons
-  const recentBtns = document.querySelectorAll('.recent-game-btn');
-  recentBtns.forEach(btn => {
+function platformName(id) {
+  return platformNames[id] || id;
+}
+
+// Decides how to start a timer for a game picked from the search:
+// never played -> ask the platform; played before -> same platform or another one.
+async function beginTimerForGame(userId, gameId, gameName) {
+  let info = { has_history: false, platforms: [] };
+  try {
+    info = await apiFetch(`/timers/history/${userId}/platforms/${encodeURIComponent(gameId)}`) || info;
+  } catch (err) {
+    console.error('Error fetching game platforms:', err);
+  }
+  openPlatformModal(userId, gameId, gameName, info.platforms, false, info.has_history);
+}
+
+function openPlatformModal(userId, gameId, gameName, used, forceAll = false, hasHistory = used.length > 0) {
+  closeModal();
+  const showAll = forceAll || used.length === 0;  // no known platform to offer as "same"
+  const options = Object.keys(platformNames);
+
+  const body = showAll
+    ? `<div class="modal-hint">${forceAll ? 'Elige la nueva plataforma' : hasHistory ? 'Ya has jugado a este juego, pero no consta la plataforma. ¿En cuál juegas?' : 'Este juego es nuevo para ti. ¿En qué plataforma juegas?'}</div>
+       <div class="modal-results-list">
+         ${options.map(id => `
+           <button class="modal-result-row" data-platform="${escapeHtml(id)}">
+             <span class="modal-result-name">${escapeHtml(platformName(id))}${used.includes(id) ? ' <span class="modal-result-badge">Ya usada</span>' : ''}</span>
+           </button>`).join('') || '<div class="modal-hint">No hay plataformas disponibles</div>'}
+       </div>`
+    : `<div class="modal-hint">Ya has jugado a este juego. ¿En qué plataforma?</div>
+       <div class="modal-results-list">
+         ${used.map((id, i) => `
+           <button class="modal-result-row" data-platform="${escapeHtml(id)}">
+             <span class="modal-result-name">${escapeHtml(platformName(id))}${i === 0 ? ' <span class="modal-result-badge">Misma que la última vez</span>' : ''}</span>
+           </button>`).join('')}
+       </div>
+       <div class="modal-footer">
+         <button class="btn-modal-secondary" id="otherPlatformBtn">${iconPlus()} Otra plataforma</button>
+       </div>`;
+
+  document.body.insertAdjacentHTML('beforeend', `
+    <div class="modal-overlay" id="gvModal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>${escapeHtml(gameName || 'Plataforma')}</h3>
+          <button class="modal-close" id="modalCloseBtn" aria-label="Cerrar">&times;</button>
+        </div>
+        ${body}
+      </div>
+    </div>
+  `);
+
+  document.getElementById('modalCloseBtn').addEventListener('click', closeModal);
+  document.getElementById('gvModal').addEventListener('click', (e) => {
+    if (e.target.id === 'gvModal') closeModal();
+  });
+  document.querySelectorAll('#gvModal [data-platform]').forEach(btn => {
     btn.addEventListener('click', () => {
-      const gameId = btn.dataset.gameId;
-      startTimer(userId, gameId);
+      closeModal();
+      startTimer(userId, gameId, btn.dataset.platform);
     });
   });
-
-  // Check if there's an active timer and start the display
-  const activeTimerEl = document.querySelector('.timer-active');
-  if (activeTimerEl) {
-    const timerInfo = activeTimerEl.querySelector('.timer-duration');
-    if (timerInfo) {
-      // Get the start time from the timer data
-      const timerData = JSON.parse(activeTimerEl.dataset.timer || '{}');
-      if (timerData.start_time) {
-        startTimerDisplay(timerData.start_time);
-      }
-    }
-  }
+  const other = document.getElementById('otherPlatformBtn');
+  if (other) other.addEventListener('click', () => openPlatformModal(userId, gameId, gameName, used, true, hasHistory));
 }
 
 // ── Game picker / add-game modals ─────────────────────────────
@@ -569,8 +669,9 @@ async function searchGamesForPicker(query, userId) {
     `).join('');
     resultsEl.querySelectorAll('.modal-result-row').forEach(btn => {
       btn.addEventListener('click', () => {
+        const game = results.find(g => String(g.id) === btn.dataset.gameId);
         closeModal();
-        startTimer(userId, btn.dataset.gameId);
+        beginTimerForGame(userId, btn.dataset.gameId, game?.name);
       });
     });
   } catch (err) {
@@ -654,7 +755,7 @@ async function handlePickRawgCandidate(candidate, userId) {
   try {
     if (candidate.exists_in_db && candidate.db_game_id) {
       closeModal();
-      await startTimer(userId, candidate.db_game_id);
+      await beginTimerForGame(userId, candidate.db_game_id, candidate.name);
       return;
     }
     if (resultsEl) resultsEl.innerHTML = '<div class="modal-hint">Añadiendo juego...</div>';
@@ -671,22 +772,13 @@ async function handlePickRawgCandidate(candidate, userId) {
       }),
     });
     closeModal();
-    await startTimer(userId, newGame.id);
+    // Brand-new game: it can't have any history, go straight to platform choice.
+    openPlatformModal(userId, newGame.id, newGame.name, []);
   } catch (err) {
     if (resultsEl && resultsEl.isConnected) {
       resultsEl.innerHTML = `<div class="modal-hint">Error: ${escapeHtml(err.message)}</div>`;
     }
   }
-}
-
-function infoCard(icon, colorClass, label, value, mono = false) {
-  return `
-    <div class="info-card">
-      <div class="info-card-icon ${colorClass}">${icon}</div>
-      <div class="info-card-label">${label}</div>
-      <div class="info-card-value ${mono ? 'mono' : ''}">${value}</div>
-    </div>
-  `;
 }
 
 // ── Logout ───────────────────────────────────────────────────
@@ -717,6 +809,9 @@ function iconPlay() {
 }
 function iconStop() {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12"/></svg>`;
+}
+function iconChevron() {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>`;
 }
 function iconPlus() {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`;

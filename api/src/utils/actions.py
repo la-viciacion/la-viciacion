@@ -1,6 +1,8 @@
+import asyncio
 import datetime
 import json
 import re
+import threading
 import time
 from typing import Union
 
@@ -98,6 +100,7 @@ async def recompute_all_users_and_rankings(
     sync_season: bool = False,
     sync_all: bool = False,
     only_active_users: bool = True,
+    user_ids: list[int] | None = None,
 ):
     """Recompute every user's stats plus global rankings/achievements.
 
@@ -134,6 +137,8 @@ async def recompute_all_users_and_rankings(
 
     achievements.populate_achievements(db)
     users_db = users.get_users(db, only_active_users)
+    if user_ids is not None:
+        users_db = [u for u in users_db if u.id in user_ids]
 
     try:
         logger.info("########################")
@@ -177,21 +182,44 @@ async def recompute_all_users_and_rankings(
         await utils.send_message_to_admins(db, "Error on sync: " + str(e))
 
 
-async def recompute_after_timer_stop():
+# Serializes post-stop recomputes: two people stopping timers at once must not
+# run the same checks concurrently (duplicate achievements/notifications).
+_recompute_lock = threading.Lock()
+
+
+def recompute_after_timer_stop(user_id: int | None = None):
     """Background-task entrypoint for routers/timers.py::stop_timer_endpoint.
 
-    Opens its own DB session (the request-scoped one is already closed by
-    the time a BackgroundTask runs).
+    Deliberately a plain `def`: Starlette runs it in a worker thread. The
+    recompute is a long chain of blocking DB/OpenAI calls wrapped in async
+    functions, so running it on the event loop would freeze every other
+    request (the front's refresh right after stopping) until it finished.
+    It gets its own DB session (the request-scoped one is already closed by
+    the time a BackgroundTask runs) and its own event loop.
+
+    Runs with notifications on (silent=False): the ranking checks persist the
+    new order even in silent mode, so a silent run here would swallow the
+    change and the cron would never announce it.
+
+    Only the user who stopped the timer is recomputed; the time-gated checks
+    for everyone else stay with the cron hitting /webhooks/sync-data.
     """
     from ..database.database import SessionLocal
 
-    db = SessionLocal()
-    try:
-        await recompute_all_users_and_rankings(db, silent=True)
-    except Exception as e:
-        logger.error("Error recomputing stats after timer stop: " + str(e))
-    finally:
-        db.close()
+    async def _run():
+        db = SessionLocal()
+        try:
+            await recompute_all_users_and_rankings(
+                db, silent=False, user_ids=None if user_id is None else [user_id]
+            )
+        finally:
+            db.close()
+
+    with _recompute_lock:
+        try:
+            asyncio.run(_run())
+        except Exception as e:
+            logger.error("Error recomputing stats after timer stop: " + str(e))
 
 
 def streak_days(

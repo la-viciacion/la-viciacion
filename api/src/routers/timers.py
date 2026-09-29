@@ -1,16 +1,20 @@
 import datetime
 from typing import List, Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..crud import users as users_crud
 from ..database.database import SessionLocal
-from ..database.models import GameTimer
+from ..database.models import Game, GameTimer, UserGame
 from ..database.schemas import (
     ActiveTimerResponse,
     GameTimerCreate,
+    GameTimerGroup,
+    GameTimerGroupPage,
     GameTimerResponse,
+    GamePlatformsResponse,
     GameTimerUpdate,
     NewGameUser,
     TimerStats,
@@ -57,7 +61,18 @@ async def create_timer(db: Session, timer: GameTimerCreate) -> GameTimer:
     # the Clockify sync used to create implicitly when a time entry came in.
     season = timer.season or datetime.datetime.now().year
     user = users_crud.get_user_by_id(db, timer.user_id)
-    already_playing = users_crud.get_game_by_id(db, timer.user_id, timer.game_id, season)
+    # One UserGame per (game, platform, season): the same game on another
+    # platform, or in a later year, is a new entry.
+    already_playing = (
+        db.query(UserGame)
+        .filter_by(
+            user_id=timer.user_id,
+            game_id=timer.game_id,
+            platform=timer.platform,
+            season=season,
+        )
+        .first()
+    )
     if already_playing is None and user is not None:
         await users_crud.add_new_game(
             db,
@@ -106,6 +121,66 @@ def get_timer_history(db: Session, user_id: int, game_id: Optional[str] = None, 
         query = query.filter(GameTimer.game_id == game_id)
     
     return query.order_by(GameTimer.start_time.desc()).limit(limit).all()
+
+
+def get_grouped_timer_history(
+    db: Session, user_id: int, limit: int, offset: int, sessions_per_game: int
+) -> GameTimerGroupPage:
+    """Finished sessions collapsed per game, most recently played game first."""
+    finished = (GameTimer.user_id == user_id, GameTimer.is_active == False)
+
+    total_games = (
+        db.query(func.count(func.distinct(GameTimer.game_id))).filter(*finished).scalar() or 0
+    )
+
+    page = (
+        db.query(
+            GameTimer.game_id,
+            func.max(GameTimer.start_time).label("last_played"),
+            func.coalesce(func.sum(GameTimer.duration_seconds), 0).label("total_seconds"),
+            func.count(GameTimer.id).label("session_count"),
+        )
+        .filter(*finished)
+        .group_by(GameTimer.game_id)
+        .order_by(func.max(GameTimer.start_time).desc())
+        .limit(limit)
+        .offset(offset)
+        .all()
+    )
+
+    groups: List[GameTimerGroup] = []
+    for row in page:
+        game = db.query(Game).filter(Game.id == row.game_id).first()
+        sessions = (
+            db.query(GameTimer)
+            .filter(*finished, GameTimer.game_id == row.game_id)
+            .order_by(GameTimer.start_time.desc())
+            .limit(sessions_per_game)
+            .all()
+        )
+        platforms = [
+            r.platform
+            for r in db.query(GameTimer.platform)
+            .filter(*finished, GameTimer.game_id == row.game_id, GameTimer.platform.isnot(None))
+            .group_by(GameTimer.platform)
+            .order_by(func.max(GameTimer.start_time).desc())
+            .all()
+        ]
+        groups.append(
+            GameTimerGroup(
+                game_id=row.game_id,
+                game_name=game.name if game else None,
+                image_url=game.image_url if game else None,
+                platform=sessions[0].platform if sessions else None,
+                platforms=platforms,
+                last_played=row.last_played,
+                total_seconds=int(row.total_seconds),
+                session_count=row.session_count,
+                sessions=sessions,
+            )
+        )
+
+    return GameTimerGroupPage(groups=groups, total_games=total_games)
 
 
 def get_timer_stats(db: Session, user_id: int, game_id: Optional[str] = None) -> TimerStats:
@@ -183,7 +258,7 @@ def stop_timer_endpoint(
 ):
     """Stop an active timer"""
     timer = stop_timer(db, timer_id, user_id)
-    background_tasks.add_task(actions.recompute_after_timer_stop)
+    background_tasks.add_task(actions.recompute_after_timer_stop, user_id)
     return timer
 
 
@@ -196,6 +271,59 @@ def get_timer_history_endpoint(
 ):
     """Get timer history for a user, optionally filtered by game"""
     return get_timer_history(db, user_id, game_id, limit)
+
+
+@router.get("/history/{user_id}/grouped", response_model=GameTimerGroupPage)
+def get_grouped_timer_history_endpoint(
+    user_id: int,
+    limit: int = Query(10, ge=1, le=50),
+    offset: int = Query(0, ge=0),
+    sessions_per_game: int = Query(10, ge=1, le=50),
+    db: Session = Depends(get_db),
+):
+    """Timer history grouped by game (one row per game), newest game first"""
+    return get_grouped_timer_history(db, user_id, limit, offset, sessions_per_game)
+
+
+@router.get("/history/{user_id}/platforms/{game_id}", response_model=GamePlatformsResponse)
+def get_game_platforms_endpoint(user_id: int, game_id: str, db: Session = Depends(get_db)):
+    """What the user has already played of a game: whether there is any history
+    and which platforms were used (most recent first)."""
+    rows = (
+        db.query(GameTimer.platform)
+        .filter(
+            GameTimer.user_id == user_id,
+            GameTimer.game_id == game_id,
+            GameTimer.platform.isnot(None),
+        )
+        .group_by(GameTimer.platform)
+        .order_by(func.max(GameTimer.start_time).desc())
+        .all()
+    )
+    platforms = [r.platform for r in rows]
+    # Platforms registered on the user's library entry also count (sessions
+    # without a platform, or a game added without any timer yet).
+    library = (
+        db.query(UserGame.platform)
+        .filter(
+            UserGame.user_id == user_id,
+            UserGame.game_id == game_id,
+            UserGame.platform.isnot(None),
+        )
+        .order_by(UserGame.season.desc())
+        .all()
+    )
+    for r in library:
+        if r.platform not in platforms:
+            platforms.append(r.platform)
+
+    has_history = bool(platforms) or (
+        db.query(GameTimer.id)
+        .filter(GameTimer.user_id == user_id, GameTimer.game_id == game_id)
+        .first()
+        is not None
+    )
+    return GamePlatformsResponse(has_history=has_history, platforms=platforms)
 
 
 @router.get("/stats/{user_id}", response_model=TimerStats)

@@ -263,6 +263,31 @@ class TimerStats(BaseModel):
     shortest_session_seconds: int
 
 
+class GameTimerGroup(BaseModel):
+    """All finished sessions of one game, collapsed into a single history row."""
+
+    game_id: str
+    game_name: str | None = None
+    image_url: str | None = None
+    platform: str | None = None  # platform of the most recent session
+    platforms: list[str] = []  # every platform used, most recent first
+    last_played: datetime.datetime
+    total_seconds: int
+    session_count: int
+    # Most recent sessions first, capped by the endpoint's sessions_per_game.
+    sessions: list[GameTimerResponse]
+
+
+class GamePlatformsResponse(BaseModel):
+    has_history: bool
+    platforms: list[str]
+
+
+class GameTimerGroupPage(BaseModel):
+    groups: list[GameTimerGroup]
+    total_games: int
+
+
 class ActiveTimerResponse(BaseModel):
     is_active: bool
     timer: GameTimerResponse | None = None
