@@ -9,7 +9,7 @@ import { formatDuration, formatTimestamp } from '../../lib/format.js';
 import { html } from '../../lib/html.js';
 import { platformName } from '../../lib/platforms.js';
 import { badge } from './components.js';
-import { closeTimerNow, mergeGames, uploadAchievementImage } from './dialogs.js';
+import { closeTimerNow, uploadAchievementImage } from './dialogs.js';
 
 const platformField = { key: 'platform', label: 'Plataforma', type: 'platform' };
 const duration = (sec) => (sec == null ? '—' : formatDuration(sec));
@@ -88,7 +88,6 @@ export const ENTITIES = {
     name: (r) => r.name,
     actions: [
       { label: 'Sesiones', run: (r, admin) => admin.jumpTo('timers', { game_id: r.id, game_name: r.name }) },
-      { label: 'Fusionar…', run: (r, admin) => mergeGames(r, admin) },
     ],
     toolbarActions: [{ act: 'rawg-sync', label: 'Sincronizar con RAWG…' }],
     canDelete: true,

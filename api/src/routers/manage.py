@@ -377,58 +377,6 @@ def delete_game(game_id: str, force: bool = False, db: Session = Depends(get_db)
     return {"message": "Juego eliminado"}
 
 
-class MergeBody(BaseModel):
-    target_id: str
-
-
-@router.post("/games/{game_id}/merge")
-def merge_game(game_id: str, body: MergeBody, db: Session = Depends(get_db)):
-    """Move everything from `game_id` (duplicate) into `target_id`, then delete it.
-
-    Rows that would collide with an existing one on the target (same session
-    start, or same user+platform+season in the library) are dropped from the
-    duplicate instead of moved.
-    """
-    if game_id == body.target_id:
-        raise HTTPException(status_code=400, detail="El origen y el destino son el mismo juego")
-    source = _get_or_404(db, models.Game, game_id, "Juego origen")
-    target = _get_or_404(db, models.Game, body.target_id, "Juego destino")
-
-    moved = {"sesiones": 0, "biblioteca": 0, "logros": 0}
-    dropped = {"sesiones": 0, "biblioteca": 0, "logros": 0}
-
-    taken_starts = {
-        (t.user_id, t.start_time) for t in db.query(models.GameTimer).filter_by(game_id=target.id)
-    }
-    for t in db.query(models.GameTimer).filter_by(game_id=source.id).all():
-        if (t.user_id, t.start_time) in taken_starts:
-            db.delete(t)
-            dropped["sesiones"] += 1
-        else:
-            t.game_id = target.id
-            moved["sesiones"] += 1
-
-    taken_lib = {
-        (u.user_id, u.platform, u.season) for u in db.query(models.UserGame).filter_by(game_id=target.id)
-    }
-    for u in db.query(models.UserGame).filter_by(game_id=source.id).all():
-        if (u.user_id, u.platform, u.season) in taken_lib:
-            db.delete(u)
-            dropped["biblioteca"] += 1
-        else:
-            u.game_id = target.id
-            moved["biblioteca"] += 1
-
-    # users_achievements.game_id is informational; repoint it (no game-based uniqueness).
-    n = db.query(models.UserAchievement).filter_by(game_id=source.id).update({"game_id": target.id})
-    moved["logros"] = n
-
-    db.query(models.GameStatistics).filter_by(game_id=source.id).delete()
-    db.delete(source)
-    _commit(db, "Fusión")
-    return {"message": "Juegos fusionados", "moved": moved, "dropped": dropped}
-
-
 # ── RAWG sync (intensive: consumes the monthly RAWG quota) ──────
 
 RAWG_SYNC_PHRASE = "SINCRONIZAR"

@@ -1,4 +1,4 @@
-// Admin dialogs and one-off actions (confirm, game picker, merge, delete...).
+// Admin dialogs and one-off actions (confirm, game picker, delete...).
 // Everything that changes data takes `admin` = { reload } to refresh the view.
 import { api, jsonRequest } from '../../lib/api.js';
 import { toLocalISO } from '../../lib/format.js';
@@ -87,20 +87,6 @@ export async function deleteRow(entity, row, admin) {
   } catch (err) {
     toast(err.message, 'err');
   }
-}
-
-export async function mergeGames(source, admin) {
-  const target = await pickGame(`Fusionar «${source.name}» en…`);
-  if (!target) return;
-  if (target.id === source.id) return toast('Elige otro juego', 'err');
-  const ok = await confirmDialog('Fusionar juegos', html`
-    <p>Todas las sesiones y entradas de biblioteca de <strong>${source.name}</strong> pasarán a <strong>${target.name}</strong>, y <strong>${source.name}</strong> se eliminará.</p>
-    <p>Los registros que coincidan con uno ya existente en el destino se descartan.</p>`, { danger: true, ok: 'Fusionar' });
-  if (!ok) return;
-  const r = await api(`/manage/games/${source.id}/merge`, jsonRequest('POST', { target_id: target.id }));
-  const fmt = (o) => Object.entries(o).filter(([, v]) => v).map(([k, v]) => `${v} ${k}`).join(', ') || 'nada';
-  toast(`Fusionado. Movido: ${fmt(r.moved)}. Descartado: ${fmt(r.dropped)}.`);
-  await admin.reload();
 }
 
 export async function closeTimerNow(row, admin) {

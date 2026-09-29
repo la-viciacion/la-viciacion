@@ -367,7 +367,7 @@ def apply_one(db, game_id: str, rawg_id: int, overwrite: bool = False) -> dict:
         models.Game.rawg_id == rawg_id, models.Game.id != game_id
     ).first()
     if taken:
-        raise ValueError(f"Ese id de RAWG ya lo tiene «{taken.name}»; fusiona los duplicados")
+        raise ValueError(f"Ese id de RAWG ya lo tiene «{taken.name}»")
     client = _Client(max_calls=3)
     det = _details(client, rawg_id, _needs_steam(game, overwrite))
     changed = _apply(game, det, overwrite)
