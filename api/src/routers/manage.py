@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 from .. import auth
 from ..database import models
 from ..database.database import SessionLocal
-from ..utils import actions
+from ..utils import actions, rawg_sync
 from ..utils.my_utils import validate_password_requirements
 
 router = APIRouter(
@@ -354,6 +354,67 @@ def merge_game(game_id: str, body: MergeBody, db: Session = Depends(get_db)):
     db.delete(source)
     _commit(db, "Fusión")
     return {"message": "Juegos fusionados", "moved": moved, "dropped": dropped}
+
+
+# ── RAWG sync (intensive: consumes the monthly RAWG quota) ──────
+
+RAWG_SYNC_PHRASE = "SINCRONIZAR"
+
+
+@router.get("/rawg-sync/estimate")
+def rawg_sync_estimate(overwrite: bool = False, db: Session = Depends(get_db)):
+    """How many games/calls a sync would take. Makes no RAWG request."""
+    return rawg_sync.estimate(db, overwrite)
+
+
+@router.get("/rawg-sync/status")
+def rawg_sync_status():
+    return rawg_sync.status()
+
+
+class RawgSyncBody(BaseModel):
+    confirm: str                       # must equal RAWG_SYNC_PHRASE (the panel asks for it twice)
+    max_calls: int = 2000
+    overwrite: bool = False
+
+
+@router.post("/rawg-sync/start", status_code=202)
+def rawg_sync_start(body: RawgSyncBody):
+    if body.confirm != RAWG_SYNC_PHRASE:
+        raise HTTPException(status_code=400, detail="Confirmación incorrecta")
+    if not 1 <= body.max_calls <= 20000:
+        raise HTTPException(status_code=400, detail="max_calls debe estar entre 1 y 20000")
+    try:
+        started = rawg_sync.start(body.max_calls, body.overwrite)
+    except RuntimeError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    if not started:
+        raise HTTPException(status_code=409, detail="Ya hay una sincronización en curso")
+    return rawg_sync.status()
+
+
+@router.post("/rawg-sync/cancel")
+def rawg_sync_cancel():
+    return {"cancelling": rawg_sync.cancel()}
+
+
+class RawgApplyBody(BaseModel):
+    game_id: str
+    rawg_id: int
+    overwrite: bool = False
+
+
+@router.post("/rawg-sync/apply")
+def rawg_sync_apply(body: RawgApplyBody, db: Session = Depends(get_db)):
+    """Resolve an ambiguous game by choosing its RAWG entry (1-2 RAWG calls)."""
+    try:
+        return rawg_sync.apply_one(db, body.game_id, body.rawg_id, body.overwrite)
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except (ConnectionError, rawg_sync.RawgFatal) as e:
+        raise HTTPException(status_code=502, detail=str(e))
 
 
 # ── Sessions (game_timers) ──────────────────────────────────────

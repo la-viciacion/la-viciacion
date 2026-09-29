@@ -161,6 +161,7 @@ const ENTITIES = {
       { label: 'Sesiones', run: (r) => jumpTo('timers', { game_id: r.id, game_name: r.name }) },
       { label: 'Fusionar…', run: (r) => mergeDialog(r) },
     ],
+    toolbarActions: [{ act: 'rawg-sync', label: 'Sincronizar con RAWG…' }],
     canDelete: true,
     deleteNote: 'Se borrarán también sus sesiones, entradas de biblioteca y estadísticas.',
   },
@@ -373,6 +374,7 @@ function renderPanel(ent, st, loading) {
         : '<button class="adm-btn" data-act="filter-game">Filtrar por juego…</button>') : ''}
       ${ent.filters?.includes('active') ? `<label class="adm-check"><input type="checkbox" id="admFilterActive" ${f.active ? 'checked' : ''}/> Solo en curso</label>` : ''}
       <span class="adm-spacer"></span>
+      ${(ent.toolbarActions || []).map((a) => `<button class="adm-btn" data-act="${a.act}">${esc(a.label)}</button>`).join('')}
       ${ent.createFields ? `<button class="adm-btn primary" data-act="create">+ ${esc(ent.createLabel)}</button>` : ''}
     </div>`;
 
@@ -448,6 +450,10 @@ async function onClick(e) {
       case 'prev': st.offset = Math.max(0, st.offset - PAGE); return load();
       case 'next': st.offset += PAGE; return load();
       case 'recompute': return recomputeDialog();
+      case 'rawg-sync': {
+        const { rawgSyncFlow } = await import('./admin-rawg.js');
+        return rawgSyncFlow({ api, esc, openModal, toast, jsonReq, onDone: () => { load(); refreshOverview(); } });
+      }
       case 'create': return openForm(ent, null);
       case 'edit': return openForm(ent, row);
       case 'delete': return deleteRow(ent, row);
