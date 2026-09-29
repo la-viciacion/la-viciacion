@@ -10,6 +10,7 @@ from fastapi_versioning import VersionedFastAPI
 from .config import Config
 from .database import models
 from .database.database import SessionLocal, engine
+from .crud import users as users_crud
 from .routers import admin, basic, bot, games, manage, statistics, timers, users, utils, webhooks
 from .utils.logger import LogManager
 
@@ -65,6 +66,9 @@ uvicorn_logger = logging.getLogger("uvicorn.access")
 uvicorn_logger.addFilter(EndpointFilter(excluded_paths))
 
 models.Base.metadata.create_all(bind=engine)
+
+with SessionLocal() as db:
+    users_crud.ensure_god_user(db)
 
 app = FastAPI(title="LaViciacion API", version="0.1.0")
 

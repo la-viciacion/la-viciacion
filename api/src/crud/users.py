@@ -62,6 +62,49 @@ def create_admin_user(db: Session, username: str):
             raise
 
 
+GOD_USERNAME = "admin"
+GOD_NAME = "Dios"
+
+
+def ensure_god_user(db: Session):
+    """
+    Emergency administrator: make sure the "admin" user ("Dios") exists, is active,
+    is admin and has the password defined in GOD_ADMIN_PASS. Runs on every API start,
+    so restarting the API always restores access even if the account was altered.
+    """
+    if not config.GOD_ADMIN_PASS:
+        raise ValueError("GOD_ADMIN_PASS must not be empty")
+    try:
+        hashed_password = bcrypt.hashpw(
+            config.GOD_ADMIN_PASS.encode("utf-8"), bcrypt.gensalt()
+        ).decode("utf-8")
+        db_user = (
+            db.query(models.User).filter(models.User.username == GOD_USERNAME).first()
+        )
+        if db_user is None:
+            db.add(
+                models.User(
+                    name=GOD_NAME,
+                    username=GOD_USERNAME,
+                    password=hashed_password,
+                    is_admin=1,
+                    is_active=1,
+                )
+            )
+            logger.info("God admin user created")
+        else:
+            db_user.name = GOD_NAME
+            db_user.password = hashed_password
+            db_user.is_admin = 1
+            db_user.is_active = 1
+            logger.info("God admin user restored")
+        db.commit()
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error("Error ensuring god admin user: " + str(e))
+        raise
+
+
 def get_users(db: Session, is_active: bool = True) -> list[models.User]:
     """
     Get users based on their active status.
