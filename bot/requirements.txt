@@ -1,4 +1,4 @@
-python_telegram_bot==21.4
-python-dotenv
-requests
-sentry-sdk==2.13.0
+python_telegram_bot==22.8
+python-dotenv==1.2.3
+requests==2.34.2
+sentry-sdk==2.71.0
