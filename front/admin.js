@@ -125,10 +125,10 @@ const ENTITIES = {
       { key: 'telegram_id', label: 'Telegram ID', type: 'number' },
       { key: 'is_admin', label: 'Administrador', type: 'checkbox' },
       { key: 'is_active', label: 'Activo', type: 'checkbox' },
+      { key: 'new_password', label: 'Nueva contraseña (dejar vacío para no cambiarla)', type: 'password' },
     ],
     name: (r) => r.username,
     actions: [
-      { label: 'Contraseña', run: (r) => passwordDialog(r) },
       { label: 'Sesiones', run: (r) => jumpTo('timers', { user_id: r.id }) },
     ],
     canDelete: true,
@@ -488,6 +488,8 @@ function fieldHtml(f, value) {
       return `<label>${esc(f.label)}<select class="adm-input" id="${id}"><option value="">Elegir…</option>${users.map((u) => `<option value="${u.id}">${esc(u.username)}</option>`).join('')}</select></label>`;
     case 'game':
       return `<div class="adm-field-game"><span>${esc(f.label)}</span><div><span class="adm-picked" id="${id}_name">Ninguno</span> <button type="button" class="adm-btn sm" data-pickfor="${f.key}">Elegir…</button></div><input type="hidden" id="${id}" /></div>`;
+    case 'password':
+      return `<div class="adm-field-pw"><span>${esc(f.label)}</span><div><input class="adm-input" type="password" id="${id}" autocomplete="new-password" /><button type="button" class="adm-btn sm" data-pw-show="${id}">Mostrar</button><button type="button" class="adm-btn sm" data-pw-gen="${id}">Generar</button></div><div class="adm-sub">12-24 caracteres, con mayúscula, minúscula, número y un carácter especial.</div></div>`;
     case 'datetime':
       return `<label>${esc(f.label)}<input class="adm-input" type="datetime-local" step="1" id="${id}" value="${esc(String(v).slice(0, 19))}" /></label>`;
     case 'date':
@@ -512,6 +514,22 @@ function readField(f) {
   }
 }
 
+// Same rules as the API (validate_password_requirements)
+const PASSWORD_RE = [/^.{12,24}$/, /[A-Z]/, /[a-z]/, /\d/, /[!@#$%^&*()_+{}[\]:;<>,.?/~\-]/];
+
+function generatePassword(length = 16) {
+  const sets = ['ABCDEFGHJKLMNPQRSTUVWXYZ', 'abcdefghijkmnopqrstuvwxyz', '23456789', '!@#$%&*?'];
+  const rand = (n) => crypto.getRandomValues(new Uint32Array(1))[0] % n;
+  const all = sets.join('');
+  const chars = sets.map((s) => s[rand(s.length)]);
+  while (chars.length < length) chars.push(all[rand(all.length)]);
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = rand(i + 1);
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+  return chars.join('');
+}
+
 function openForm(ent, row) {
   const creating = !row;
   const fields = creating ? ent.createFields : ent.fields;
@@ -527,6 +545,22 @@ function openForm(ent, row) {
     </form>`, { wide: true });
 
   m.el.addEventListener('click', async (e) => {
+    const show = e.target.closest('[data-pw-show]');
+    if (show) {
+      const input = m.el.querySelector(`#${show.dataset.pwShow}`);
+      input.type = input.type === 'password' ? 'text' : 'password';
+      show.textContent = input.type === 'password' ? 'Mostrar' : 'Ocultar';
+      return;
+    }
+    const gen = e.target.closest('[data-pw-gen]');
+    if (gen) {
+      const input = m.el.querySelector(`#${gen.dataset.pwGen}`);
+      input.value = generatePassword();
+      input.type = 'text';
+      m.el.querySelector(`[data-pw-show="${gen.dataset.pwGen}"]`).textContent = 'Ocultar';
+      input.select();
+      return;
+    }
     const pick = e.target.closest('[data-pickfor]');
     if (!pick) return;
     const g = await pickGame();
@@ -541,17 +575,29 @@ function openForm(ent, row) {
     const errEl = m.el.querySelector('#admFormError');
     errEl.textContent = '';
     const body = {};
+    let newPassword = null;
     for (const f of fields) {
+      if (f.type === 'password') {
+        newPassword = document.getElementById(`f_${f.key}`).value || null;
+        continue;
+      }
       let val = f.type === 'game' ? (document.getElementById(`f_${f.key}`).value || null) : readField(f);
       if (f.required && (val === null || val === '')) { errEl.textContent = `Falta: ${f.label}`; return; }
       if (f.omitEmpty && val === null) continue;
       body[f.key] = val;
     }
+    if (newPassword !== null && !PASSWORD_RE.every((re) => re.test(newPassword))) {
+      errEl.textContent = 'La contraseña debe tener 12-24 caracteres, mayúscula, minúscula, número y un carácter especial';
+      return;
+    }
     try {
       if (creating) await api(ent.endpoint, jsonReq('POST', body));
-      else await api(`${ent.endpoint}/${row.id}`, jsonReq('PATCH', body));
+      else {
+        await api(`${ent.endpoint}/${row.id}`, jsonReq('PATCH', body));
+        if (newPassword !== null) await api(`${ent.endpoint}/${row.id}/password`, jsonReq('POST', { password: newPassword }));
+      }
       m.close();
-      toast(creating ? 'Creado' : 'Guardado');
+      toast(creating ? 'Creado' : newPassword !== null ? 'Guardado y contraseña cambiada' : 'Guardado');
       await load();
       refreshOverview();
     } catch (err) {
@@ -592,26 +638,6 @@ async function deleteRow(ent, row) {
 }
 
 // ── Special actions ─────────────────────────────────────────
-function passwordDialog(user) {
-  const m = openModal(`
-    <div class="modal-header"><h3>Contraseña · ${esc(user.username)}</h3><button class="modal-close" data-close aria-label="Cerrar">&times;</button></div>
-    <form class="adm-form" id="admPw" novalidate>
-      <label>Nueva contraseña<input class="adm-input" type="password" id="admPwInput" autocomplete="new-password" /></label>
-      <div class="adm-sub">12-24 caracteres, con mayúscula, minúscula, número y un carácter especial.</div>
-      <div class="adm-error" id="admPwErr" role="alert"></div>
-      <div class="adm-actions"><button type="button" class="adm-btn" data-close>Cancelar</button><button class="adm-btn primary" type="submit">Cambiar</button></div>
-    </form>`);
-  m.el.querySelector('#admPw').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    try {
-      await api(`/manage/users/${user.id}/password`, jsonReq('POST', { password: m.el.querySelector('#admPwInput').value }));
-      m.close();
-      toast('Contraseña actualizada');
-    } catch (err) { m.el.querySelector('#admPwErr').textContent = err.message; }
-  });
-  m.el.querySelector('#admPwInput').focus();
-}
-
 async function mergeDialog(source) {
   const target = await pickGame(`Fusionar «${source.name}» en…`);
   if (!target) return;

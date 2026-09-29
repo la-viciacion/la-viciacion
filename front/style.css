@@ -1236,6 +1236,9 @@ body {
 .adm-form label.adm-check { flex-direction: row; }
 .adm-field-game { display: flex; flex-direction: column; gap: 6px; font-size: 0.85rem; color: var(--text-secondary); font-weight: 600; }
 .adm-field-game > div { display: flex; align-items: center; gap: 10px; }
+.adm-field-pw { display: flex; flex-direction: column; gap: 6px; font-size: 0.85rem; color: var(--text-secondary); font-weight: 600; }
+.adm-field-pw > div:first-of-type { display: flex; align-items: center; gap: 8px; }
+.adm-field-pw .adm-input { flex: 1; font-family: monospace; }
 .adm-picked { color: var(--text-primary); }
 .adm-actions { display: flex; justify-content: flex-end; gap: 10px; padding: 16px 20px 20px; }
 .adm-form .adm-actions { padding: 4px 0 0; }
