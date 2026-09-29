@@ -61,7 +61,9 @@ services:
     networks:
       - la-viciacion
     healthcheck:
-      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      # MARIADB_HOST (from .env) makes the client dial the container IP instead
+      # of the local socket, where the healthcheck user has no grant.
+      test: ["CMD-SHELL", "MARIADB_HOST=localhost healthcheck.sh --connect --innodb_initialized"]
       interval: 5s
       timeout: 5s
       retries: 30
