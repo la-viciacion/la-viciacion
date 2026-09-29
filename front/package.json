@@ -1,13 +1,17 @@
 {
   "name": "la-viciacion-front",
   "version": "1.0.0",
-  "description": "La Viciación PWA front-end",
+  "description": "La Viciaci\u00c3\u00b3n PWA front-end",
   "private": true,
   "scripts": {
     "dev": "npx serve . -p 3000 -s",
-    "preview": "npx serve . -p 3000 -s"
+    "lint": "eslint .",
+    "test": "node --test"
   },
   "devDependencies": {
-    "serve": "^14.2.4"
-  }
+    "@eslint/js": "^9.0.0",
+    "eslint": "^9.0.0",
+    "globals": "^15.0.0"
+  },
+  "type": "module"
 }

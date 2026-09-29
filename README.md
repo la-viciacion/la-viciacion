@@ -16,6 +16,33 @@ Copy `.env.template` to `.env` and fill in your values. That single file is read
 
 To use the OpenAI integration, set `OPENAI_API_KEY` in `.env`. The prompts for the predefined notifications live in `api/src/utils/ai_prompts.py`; adjust them as you like.
 
+## Front
+
+Plain HTML/CSS/JS (no framework, no build step) served by nginx. Layout of `front/`:
+
+```
+index.html          shell: CSS links + js/main.js
+css/                one stylesheet per area (base, login, navbar, home, modal, admin, profile)
+js/main.js          hash router + session handling
+js/lib/             html (escaping template tag), api, format, password, platforms
+js/ui/              layout (navbar shell), modal, toast, icons
+js/pages/           login, profile, home/ (timer, history, game picker), admin/ (entities, form, dialogs, rawg-sync)
+sw.js               service worker (network-first for code, cache-first for icons)
+tests/              node:test unit tests for js/lib
+```
+
+All markup is built with the ``html`` tagged template (`js/lib/html.js`), which escapes every interpolated value by default; write ``mount(el, html`...`)`` instead of assigning strings to `innerHTML`.
+
+Development (needs Node 20+):
+
+```bash
+cd front
+npm install
+npm test        # unit tests
+npm run lint    # ESLint
+npm run dev     # static server on :3000 (the API must be reachable at /api)
+```
+
 ## Deployment (Docker Compose)
 
 The stack is four services orchestrated by `docker-compose.yml`: `laviciacion-db` (MariaDB), `laviciacion-api` (FastAPI), `laviciacion-bot` (the Telegram bot) and `laviciacion-front` (the PWA). The API's container runs `alembic upgrade head` automatically on every start (see `api/entrypoint.sh`) before serving requests, so schema migrations are never a manual step — and `laviciacion-api` won't even start until `laviciacion-db` reports healthy (`depends_on` + a MariaDB healthcheck), so a slow first boot doesn't race the migration.

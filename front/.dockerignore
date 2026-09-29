@@ -1,2 +1,8 @@
 Dockerfile
 .dockerignore
+node_modules/
+tests/
+eslint.config.js
+package.json
+package-lock.json
+laViciacionLogo.jpg
