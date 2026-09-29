@@ -29,30 +29,13 @@ class MyUtils:
         self.silent = silent
         # Conversation routes
         (
-            self.ACTIVATE_ACCOUNT,
             self.MAIN_MENU,
             self.MY_ROUTES,
             self.RANKING_ROUTES,
-            self.INFO_GAME,
-            self.SEND_MESSAGE,
-            self.EXCEL_STUFF,
-            self.EXCEL_TIME_SELECT_GAME,
-            self.EXCEL_ADD_TIME,
-            self.EXCEL_CONFIRM_TIME,
-            self.EXCEL_COMPLETE_GAME,
-            self.EXCEL_CONFIRM_COMPLETED,
-            self.EXCEL_RATE_GAME,
-            self.EXCEL_RATE_GAME_RATING,
-            self.EXCEL_CONFIRM_RATE,
-            self.EXCEL_START_TIMER,
-            self.EXCEL_START_TIMER_COMPLETED,
-            self.EXCEL_STOP_TIMER,
-        ) = range(18)
+        ) = range(3)
 
     def make_request(self, method, url, json=None):
-        headers = {"x-api-key": config.API_KEY}
-        response = requests.request(method, url=url, headers=headers, json=json)
-        return response
+        return config.request(method, url, json=json)
 
     async def send_message(self, msg):
         async with self.bot:
@@ -91,19 +74,12 @@ class MyUtils:
             logger.info(url)
             response = self.make_request("GET", url)
             if response.status_code == 200:
-                user = {"username": username, "telegram_id": user_id}
-                url = config.API_URL + "/users"
-                response = self.make_request("PATCH", url, json=user)
-                logger.info(response.json())
                 return True, response.json()
-            else:
-                logger.info("STATUS CODE: " + str(response.status_code))
-                logger.info(
-                    "Error on request to check valid chat: " + str(response.status_code)
-                )
-                logger.info(response.json())
-                logger.info("Response above.")
-                return False, {"error": "not_found"}
+            logger.info(
+                "Error on request to check valid chat: " + str(response.status_code)
+            )
+            logger.info(response.json())
+            return False, {"error": "not_found"}
         except Exception as e:
             logger.info("Error checking valid chat: " + str(e))
             if "Max retries exceeded" in str(e):

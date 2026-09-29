@@ -5,6 +5,11 @@ forbidden = (
     + "Por favor, ponte en contacto con algún administrador."
 )
 
+inactive = (
+    "Tu cuenta todavía no está activa. "
+    + "Por favor, ponte en contacto con algún administrador."
+)
+
 api_error = (
     "Parece que hay problemas con la API. "
     + "Por favor, ponte en contacto con algún administrador."

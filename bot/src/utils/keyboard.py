@@ -2,44 +2,15 @@ from telegram import InlineKeyboardButton
 
 EXIT = "❌ Salir"
 
-ACTIVATE_ACCOUNT = [
-    [
-        InlineKeyboardButton("🔓 Activa tu cuenta", callback_data="activate_account"),
-    ],
-    [
-        InlineKeyboardButton(EXIT, callback_data="cancel"),
-    ],
-]
-
 MAIN_MENU = [
     [
         InlineKeyboardButton("🕺 Mis estadísticas", callback_data="my_data"),
         InlineKeyboardButton("🏅 Rankings", callback_data="rankings"),
     ],
     [
-        InlineKeyboardButton("📎 Actualizar datos", callback_data="update_data"),
-    ],
-    [
         InlineKeyboardButton(EXIT, callback_data="cancel"),
     ],
 ]
-
-ADMIN_MENU = [
-    [
-        InlineKeyboardButton("🕺 Mis estadísticas", callback_data="my_data"),
-        InlineKeyboardButton("🏅 Rankings", callback_data="rankings"),
-    ],
-    [
-        InlineKeyboardButton("📎 Actualizar datos", callback_data="update_data"),
-    ],
-    [
-        InlineKeyboardButton(EXIT, callback_data="cancel"),
-    ],
-    [
-        InlineKeyboardButton("📢 Enviar notificación", callback_data="send_message"),
-    ],
-]
-
 
 MY_DATA = [
     [
@@ -88,14 +59,6 @@ RANKING_MENU = [
         InlineKeyboardButton("🔙 Atrás", callback_data="back"),
         InlineKeyboardButton(EXIT, callback_data="cancel"),
     ],
-]
-
-YES_NO = [["✅ Sí", "❌ No"]]
-
-DATA_ACTIONS = [
-    ["✅ Completar juego"],
-    ["📝 Puntuar juego"],
-    [EXIT],
 ]
 
 CANCEL = [EXIT]

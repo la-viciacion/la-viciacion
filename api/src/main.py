@@ -12,7 +12,7 @@ from .database import models
 from .database.database import SessionLocal, engine
 from .crud import users as users_crud
 from .utils import scheduler, settings
-from .routers import admin, basic, bot, games, manage, statistics, timers, users, utils, webhooks
+from .routers import admin, basic, games, manage, statistics, timers, users, utils, webhooks
 from .utils.logger import LogManager
 
 log_manager = LogManager()
@@ -81,7 +81,6 @@ app.include_router(games.router)
 app.include_router(statistics.router)
 app.include_router(timers.router)
 app.include_router(manage.router)
-app.include_router(bot.router)
 app.include_router(utils.router)
 app.include_router(webhooks.router)
 

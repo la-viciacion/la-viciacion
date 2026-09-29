@@ -1,4 +1,3 @@
-import json
 import logging
 import os
 import threading
@@ -15,9 +14,11 @@ WATCH_SECONDS = 60
 class Config:
     """Bot configuration (a singleton: every module asks for it).
 
-    The Telegram token and chats are edited from the admin panel and served by
-    the API (GET /bot/settings); the bot restarts itself when they change so it
-    picks them up (Docker's restart policy brings it back). The TELEGRAM_*
+    The bot is read-only: it logs into the API as the superadmin ("admin" with
+    GOD_ADMIN_PASS) and only uses the generic endpoints. The Telegram token and
+    chats are edited from the admin panel and served by the API
+    (GET /manage/settings/telegram); the bot restarts itself when they change so
+    it picks them up (Docker's restart policy brings it back). The TELEGRAM_*
     variables of .env are only a fallback if the API has nothing yet.
     """
 
@@ -39,21 +40,40 @@ class Config:
             # fall back to the shared .env at the repo root (never overrides os.environ).
             load_dotenv(find_dotenv(usecwd=True))
 
-            self.ADMIN_USERS = json.loads(os.environ["ADMIN_USERS"])
-            self.API_URL = os.environ["API_URL"] + "/bot"
-            self.API_KEY = os.environ["API_KEY"]
-            self.SECRET_KEY = os.environ["SECRET_KEY"]
-            self.ACCESS_TOKEN_EXPIRE_MINUTES = os.environ["ACCESS_TOKEN_EXPIRE_MINUTES"]
+            self.API_URL = os.environ["API_URL"]
+            self.API_USER = "admin"
+            self.API_PASSWORD = os.environ["GOD_ADMIN_PASS"]
             self.SENTRY_URL = os.environ["SENTRY_URL_BOT"]
             self.ENVIRONMENT = os.environ["ENVIRONMENT"]
-            self.OPENAI_API_KEY = os.environ["OPENAI_API_KEY"]
 
             self._load_telegram()
             self._ready = True
             threading.Thread(target=self._watch, name="settings-watch", daemon=True).start()
 
+    def login(self) -> None:
+        """Get a fresh superadmin token from the API."""
+        response = requests.post(
+            f"{self.API_URL}/token",
+            data={"username": self.API_USER, "password": self.API_PASSWORD},
+            timeout=10,
+        )
+        response.raise_for_status()
+        self._token = response.json()["access_token"]
+
+    def request(self, method: str, url: str, **kwargs) -> requests.Response:
+        """Authenticated request; logs in on first use and again if the token expired."""
+        kwargs.setdefault("timeout", 10)
+        for attempt in (1, 2):
+            if not getattr(self, "_token", None):
+                self.login()
+            headers = {"Authorization": f"Bearer {self._token}"}
+            response = requests.request(method, url, headers=headers, **kwargs)
+            if response.status_code != 401 or attempt == 2:
+                return response
+            self._token = None
+
     def _fetch(self) -> dict:
-        response = requests.get(f"{self.API_URL}/settings", headers={"x-api-key": self.API_KEY}, timeout=10)
+        response = self.request("GET", f"{self.API_URL}/manage/settings/telegram")
         response.raise_for_status()
         return response.json()
 

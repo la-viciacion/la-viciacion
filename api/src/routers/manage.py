@@ -753,6 +753,19 @@ class SettingsBody(BaseModel):
     values: dict
 
 
+@router.get("/settings/telegram")
+def get_telegram_settings(db: Session = Depends(get_db)):
+    """Telegram token and chats for the bot process (the token is returned here on purpose).
+    `version` changes when any of them does, so the bot knows when to restart."""
+    values = settings.get_all(db)
+    return {
+        "token": values["telegram.token"],
+        "group_id": values["telegram.group_id"],
+        "admin_chat_id": values["telegram.admin_chat_id"],
+        "version": settings.telegram_version(db),
+    }
+
+
 @router.put("/settings")
 def put_settings(body: SettingsBody, admin: models.User = Depends(auth.require_admin), db: Session = Depends(get_db)):
     """Change several settings at once; nothing is stored if one of them is invalid."""
