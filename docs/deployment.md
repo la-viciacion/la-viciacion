@@ -11,7 +11,7 @@ Docker Compose, four containers on the `la-viciacion` network:
 | `laviciacion-front` | `front/Dockerfile` (`nginx:alpine`, static files copied in) | `3000` | Proxies `/api/` to the API; `no-cache` on html/js/css; SPA fallback to `index.html` |
 | `laviciacion-api` | `api/Dockerfile` (`python:3.13-slim-bookworm`) | `127.0.0.1:5000` | `entrypoint.sh`: wait for DB → `alembic upgrade head` → `uvicorn` (`--proxy-headers`) |
 | `laviciacion-bot` | `bot/Dockerfile` (`python:3.11-slim-bookworm`) | none | Depends on the API; restarts itself when Telegram settings change |
-| `laviciacion-db` | `mariadb` (official) | `127.0.0.1:3307` | Healthcheck gates the API start; data in `./db/data` |
+| `laviciacion-db` | `mariadb` (official) | `127.0.0.1:3307` | Healthcheck gates the API start; data in `./db/data` (or a named volume, see [Database storage](#database-storage-linux-vs-windows)) |
 
 All use `restart: unless-stopped` and read `.env` through `env_file` (front excepted). Logs of api/bot are bind-mounted to `./api/logs` and `./bot/logs`.
 
@@ -25,6 +25,15 @@ Single `.env` (template: `.env.template`). Production checklist:
 - `ENVIRONMENT=production`; Sentry DSNs if wanted.
 - Push notifications (optional) need HTTPS in front of the app; their VAPID keys are generated from the panel, not set in `.env`.
 - `SECRET_KEY` also derives the key that encrypts the Telegram token: rotate it only if you can re-enter the token from the panel (it invalidates all sessions too).
+
+## Database storage (Linux vs Windows)
+
+`DB_DATA` in `.env` chooses where MariaDB keeps its files (`docker-compose.yml`, db service):
+
+- **Unset (default): `./db/data`**, a bind mount. It is what a Linux server (the VPS) uses, and the data is visible on disk.
+- **`DB_DATA=laviciacion_db_data`: a Docker named volume.** Use it on **Windows (Docker Desktop)**. There `./db/data` is a `9p/drvfs` share on which MariaDB 12+ cannot rebuild a table (InnoDB cannot rename the `.ibd` of a table it is rebuilding), so migrations such as `012_drop_derived_stats` fail with `errno 194 "Tablespace is missing for a table"` (verified 2026-09-30: MariaDB 11.8 works on the bind mount, 12.3 and 13.0 fail, 13.0 works on a named volume). Any future migration that rebuilds a table would hit it too.
+
+With a named volume the data is not in the repo folder: take backups with `mariadb-dump` (see below). To move an existing Windows database to the volume: dump it, `docker compose down`, set `DB_DATA`, start the stack with an empty volume and import the dump (or drop it in `db/init/` for the first boot). The Linux/VPS setup does not need any change.
 
 ## TLS and exposure
 

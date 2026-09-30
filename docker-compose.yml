@@ -47,7 +47,11 @@ services:
     env_file: .env
     restart: unless-stopped
     volumes:
-      - ./db/data:/var/lib/mysql
+      # Where MariaDB keeps its data. Default: the ./db/data folder (a bind mount: what a Linux
+      # server should use). On Windows/Docker Desktop that folder is a network-like share on which
+      # MariaDB 12+ cannot rebuild tables (migration 012 fails), so there set DB_DATA in .env to a
+      # plain name (e.g. laviciacion_db_data): Docker then uses a named volume instead.
+      - ${DB_DATA:-./db/data}:/var/lib/mysql
       # Any .sql/.sql.gz/.sh dropped here is imported automatically by
       # MariaDB, but ONLY the first time it starts up (empty ./db/data).
       # Use it to seed a fresh environment from a pre-migration backup.
@@ -68,3 +72,7 @@ services:
 
 networks:
   la-viciacion:
+
+volumes:
+  # only created when DB_DATA names it (see the db service)
+  laviciacion_db_data:
