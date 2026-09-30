@@ -10,6 +10,7 @@ from telegram import (
 )
 from telegram.ext import ContextTypes, ConversationHandler
 from utils.config import Config
+from utils.duration import format_duration
 from utils.my_utils import MyUtils
 from utils.logger import LogManager
 
@@ -51,7 +52,7 @@ class MyRoutes:
                 + ". "
                 + str(elem["game_name"])
                 + " ("
-                + str(utils.convert_time_to_hours(elem["played_time"]))
+                + str(format_duration(elem["played_time"]))
                 + ")"
                 + "\n"
             )
@@ -72,7 +73,7 @@ class MyRoutes:
         ranking = utils.load_json_response(ranking[0])
         msg = "Este es tu top de juegos:\n"
         for i, elem in enumerate(ranking["data"]):
-            played_time = utils.convert_time_to_hours(elem["played_time"])
+            played_time = format_duration(elem["played_time"])
             msg = (
                 msg
                 + str(i + 1)

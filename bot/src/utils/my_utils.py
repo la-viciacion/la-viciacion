@@ -144,13 +144,5 @@ class MyUtils:
         in_group = update.message.chat.type != access.PRIVATE
         await update.message.reply_text(msgs.start(update.message.from_user.first_name, in_group))
 
-    def convert_time_to_hours(self, seconds):
-        if seconds is None:
-            return "00:00"
-        seconds = int(seconds)
-        hours = seconds // 3600
-        minutes = (seconds % 3600) // 60
-        return f"{hours:02d}:{minutes:02d}"
-
     def load_json_response(self, response):
         return json.loads(json.dumps(response))

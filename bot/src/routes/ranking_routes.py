@@ -11,6 +11,7 @@ from telegram import (
 )
 from telegram.ext import ContextTypes, ConversationHandler
 from utils.config import Config
+from utils.duration import format_duration
 from utils.my_utils import MyUtils
 from utils.logger import LogManager
 
@@ -49,7 +50,7 @@ class RankingRoutes:
                 + ". "
                 + str(elem["name"])
                 + ": "
-                + str(utils.convert_time_to_hours(elem["played_time"]))
+                + str(format_duration(elem["played_time"]))
                 + "\n"
             )
         await utils.response_conversation(update, context, msg)
@@ -220,7 +221,7 @@ class RankingRoutes:
                 + ". "
                 + str(elem["name"])
                 + ": "
-                + str(utils.convert_time_to_hours(elem["played_time"]))
+                + str(format_duration(elem["played_time"]))
                 + "\n"
             )
         await utils.response_conversation(update, context, msg)
