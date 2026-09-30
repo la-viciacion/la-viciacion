@@ -13,6 +13,8 @@ Until then: work on the current branch, small commits, no tags or releases.
 
 ## Known debt / candidate improvements
 
+- **Push notifications, next steps** (the wiring exists, see README): design how long messages (rankings) and images (achievements) fit into a push (short text + opening the relevant page, `image` in the payload, per-event titles); decide whether the weekly summary should also reach users without a Telegram id (`_weekly_summary` still skips them); test on real Android and iOS devices before enabling it in production.
+
 - **A completely empty database cannot be migrated**: migration 001 alters `games`, which only exists in a v1 backup, so `alembic upgrade head` fails on a fresh install (found 2026-09-29 while testing 010; the README claims the opposite). Needs a baseline (e.g. an idempotent `000` creating the v1 tables) or a documented bootstrap. Until then the only supported path is importing a v1/current dump.
 
 - No DB-backed API tests: add integration tests against a throwaway MariaDB (migrations from empty and from previous revision, timers/manual-session rules, authorization). Today only the static integrity of the Alembic history is tested automatically; the DB-backed steps of the [migrations checklist](migrations.md#verification-checklist-all-mandatory-before-considering-a-migration-done) are manual.

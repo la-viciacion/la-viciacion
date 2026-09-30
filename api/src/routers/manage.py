@@ -19,7 +19,7 @@ from .. import auth
 from ..crud import users as users_crud
 from ..database import models
 from ..database.database import SessionLocal
-from ..utils import actions, my_utils, rawg_sync, seasons, settings
+from ..utils import actions, my_utils, push, rawg_sync, seasons, settings
 from ..utils.my_utils import normalize_email, validate_email_format, validate_password_requirements, validate_username
 
 router = APIRouter(
@@ -853,12 +853,39 @@ def get_telegram_settings(db: Session = Depends(get_db)):
 @router.put("/settings")
 def put_settings(body: SettingsBody, admin: models.User = Depends(auth.require_admin), db: Session = Depends(get_db)):
     """Change several settings at once; nothing is stored if one of them is invalid."""
+    if any(key.startswith("push.vapid") for key in body.values):
+        raise HTTPException(status_code=400, detail="Las claves VAPID se generan con «Generar claves», no se escriben")
     try:
         changed = settings.set_values(db, body.values, user_id=admin.id)
     except ValueError as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
     return {"changed": changed, "values": settings.public_view(db)}
+
+
+@router.post("/settings/push-keys")
+def generate_push_keys(replace: bool = False, admin: models.User = Depends(auth.require_admin), db: Session = Depends(get_db)):
+    """Generate the VAPID keys for Web Push. Replacing existing keys invalidates every subscribed device."""
+    current = settings.get_all(db)
+    if current["push.vapid_private"] and not replace:
+        raise HTTPException(status_code=409, detail="Ya hay claves; reemplazarlas obliga a todos a volver a activar los avisos")
+    public, private = push.generate_vapid_keys()
+    settings.set_values(db, {"push.vapid_public": public, "push.vapid_private": private}, user_id=admin.id)
+    if replace:
+        db.query(models.PushSubscription).delete()
+        db.commit()
+    return {"public_key": public}
+
+
+@router.post("/settings/test-push")
+async def send_test_push(admin: models.User = Depends(auth.require_admin)):
+    """Send a diagnostic notice to the devices of the calling admin."""
+    if not push.is_ready():
+        raise HTTPException(status_code=409, detail="Activa los avisos push y genera las claves primero")
+    sent, failed = await push.notify_user(admin.id, "Prueba de aviso\nSi lo lees, las notificaciones push funcionan.", tag="test")
+    if sent == 0:
+        raise HTTPException(status_code=404, detail="No hay ningún dispositivo tuyo suscrito" if failed == 0 else "Ningún dispositivo lo ha aceptado")
+    return {"sent": sent, "failed": failed}
 
 
 @router.post("/settings/test-message")

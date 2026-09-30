@@ -18,6 +18,7 @@ requests==2.34.2
 howlongtobeatpy==1.0.23
 rawg==1.2.0
 python_telegram_bot==22.8
+pywebpush==2.5.0
 Pillow==12.3.0
 sentry-sdk[fastapi]==2.71.0
 openai==3.20.0

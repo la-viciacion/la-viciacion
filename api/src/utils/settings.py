@@ -37,6 +37,7 @@ class Spec:
     type: str  # "bool" | "int" | "str"
     default: Any = None
     secret: bool = False
+    hint: bool = True  # a secret shows its last characters in the panel unless this is False
     env: str | None = None  # variable that seeds the value the first time
     check: Callable[[Any], str | None] | None = None  # error message or None
 
@@ -57,12 +58,25 @@ def _weekday(value: int) -> str | None:
     return None if 0 <= value <= 6 else "El día debe estar entre 0 (lunes) y 6 (domingo)"
 
 
+def _contact(value: str) -> str | None:
+    return None if re.fullmatch(r"(mailto:[^@\s]+@[^@\s]+|https://\S+)", value) else "Debe ser mailto:correo@dominio o una URL https"
+
+
+def _vapid_public(value: str) -> str | None:
+    return None if re.fullmatch(r"[A-Za-z0-9_-]{80,100}", value) else "Clave pública VAPID no válida"
+
+
 REGISTRY: dict[str, Spec] = {
     "notifications.enabled": Spec("bool", True),
     "notifications.admin_alerts": Spec("bool", True),
     "weekly.enabled": Spec("bool", True),
     "weekly.weekday": Spec("int", 0, check=_weekday),  # 0 = Monday
     "weekly.time": Spec("str", "09:00", check=_time),
+    # Web Push (utils/push.py). The keys are generated from the panel, never typed.
+    "push.enabled": Spec("bool", False),
+    "push.contact": Spec("str", None, check=_contact),
+    "push.vapid_public": Spec("str", None, check=_vapid_public),
+    "push.vapid_private": Spec("str", None, secret=True, hint=False),
     "telegram.token": Spec("str", None, secret=True, env="TELEGRAM_TOKEN", check=_token),
     "telegram.group_id": Spec("str", None, env="TELEGRAM_GROUP_ID", check=_chat_id),
     "telegram.admin_chat_id": Spec("str", None, env="TELEGRAM_ADMIN_CHAT_ID", check=_chat_id),
@@ -157,7 +171,7 @@ def public_view(db: Session) -> dict[str, Any]:
     for key, spec in REGISTRY.items():
         if spec.secret:
             secret = values[key]
-            out[key] = {"is_set": bool(secret), "hint": ("…" + secret[-4:]) if secret else None}
+            out[key] = {"is_set": bool(secret), "hint": ("…" + secret[-4:]) if secret and spec.hint else None}
         else:
             out[key] = values[key]
     return out

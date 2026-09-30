@@ -36,6 +36,14 @@ Everything Telegram-related is managed from the admin panel (**Notificaciones** 
 
 Swagger/ReDoc/`openapi.json` are disabled by default because they publish every endpoint. For local development set `API_DOCS_ENABLED=true` in `.env` and open `/api/v1/docs`.
 
+### Push notifications (installed PWA)
+
+A second channel next to Telegram, **off by default**. To turn it on: in the admin panel, **Notificaciones → Avisos en la app (push)**, press **Generar claves**, set a contact (`mailto:`) if you do not want the `SMTP_EMAIL` one and enable it. It needs HTTPS. Then each user activates it on each device from their profile (**Avisos en este dispositivo**); on iPhone/iPad the app must be added to the home screen first (iOS 16.4+).
+
+- What goes to the Telegram group is also pushed to every device that has group notices on (a per-device switch); private notices (a forgotten timer, the weekly summary) go only to that user's devices.
+- Expired devices are removed automatically. Regenerating the keys unsubscribes every device.
+- The pushed text is the same message as Telegram's without Markdown, cut to a title and a short body; how long messages and images fit is pending (see `docs/roadmap.md`).
+
 ### Revoking achievements
 
 In the admin panel, **Logros concedidos** lists what each player has unlocked (filter by user or game). **Editar** changes the date it was obtained (its year is the season) and **Revocar** removes it without announcing anything. Achievements are re-evaluated on every check (after each stopped timer, the 05:00 job and the admin **Comprobar logros**), so if the player still meets the condition it will be unlocked again: correct the data that triggered it first (e.g. a wrong session).

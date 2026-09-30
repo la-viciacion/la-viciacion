@@ -155,3 +155,21 @@ class JobRun(Base):
     job = Column(String(100), primary_key=True)
     last_run_at = Column(DateTime, nullable=False)
     last_status = Column(String(255), nullable=True)
+
+
+class PushSubscription(Base):
+    """A device that receives Web Push notifications (see utils/push.py)."""
+
+    __tablename__ = "push_subscriptions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, nullable=False, index=True)
+    endpoint = Column(String(700), nullable=False)
+    p256dh = Column(String(255), nullable=False)
+    auth = Column(String(255), nullable=False)
+    # also receive what goes to the Telegram group (private notices always arrive)
+    receive_group = Column(Boolean, nullable=False, server_default=text("1"))
+    user_agent = Column(String(255), nullable=True)
+    created_at = Column(DateTime, server_default=text("CURRENT_TIMESTAMP"))
+
+    __table_args__ = (UniqueConstraint("endpoint", name="uq_push_subscriptions_endpoint"),)

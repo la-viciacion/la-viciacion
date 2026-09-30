@@ -15,6 +15,7 @@ from ..crud import games, rankings, time_entries, users
 from ..crud.achievements import Achievements
 from ..database import models, schemas
 from . import my_utils as utils
+from . import push
 from ..utils import ai_prompts as prompts
 from ..utils import seasons, streaks
 from .logger import LogManager
@@ -156,6 +157,16 @@ async def announce_lost_streak(user: models.User, played_dates: list[datetime.da
 # between runs, so there is no stored position that could go out of date.
 
 
+def push_has_devices(user_id: int) -> bool:
+    """Does the user have a device subscribed to push notifications?"""
+    from ..database.database import SessionLocal
+
+    if not push.is_ready():
+        return False
+    with SessionLocal() as db:
+        return db.query(models.PushSubscription.id).filter_by(user_id=user_id).first() is not None
+
+
 def ranking_snapshot(db: Session) -> dict:
     """Order of the players (by hours) and of the games (by hours) right now."""
     return {
@@ -257,7 +268,7 @@ async def announce_ranking_changes(db: Session, before: dict, silent: bool):
 
 async def check_forgotten_timer(db: Session, user: models.User):
     """Remind a user about a timer running for too long (the scheduler calls this hourly)."""
-    if user.telegram_id is None:
+    if user.telegram_id is None and not push_has_devices(user.id):
         return
     forgotten_timer = time_entries.get_forgotten_game_timers(db, user_id=user.id)
     if forgotten_timer:
@@ -269,7 +280,7 @@ async def check_forgotten_timer(db: Session, user: models.User):
             + " Si es correcto, sigue disfrutando. Si te has olvidado de pararlo,"
             + " párala y edita la sesión con el tiempo correcto."
         )
-        await utils.send_message_to_user(user.telegram_id, msg)
+        await utils.send_message_to_user(user.telegram_id, msg, user_id=user.id)
 
 
 async def weekly_resume(
@@ -367,7 +378,7 @@ async def weekly_resume(
 
         # logger.debug(msg)
         if not silent:
-            await utils.send_message_to_user(user.telegram_id, msg)
+            await utils.send_message_to_user(user.telegram_id, msg, user_id=user.id)
         resume["hours"] = weekly_hours
         resume["sessions"] = weekly_sessions
         resume["games"] = weekly_games

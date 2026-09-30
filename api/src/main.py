@@ -12,7 +12,7 @@ from .database import models
 from .database.database import SessionLocal, engine
 from .crud import users as users_crud
 from .utils import scheduler, settings
-from .routers import basic, games, manage, statistics, timers, users, utils
+from .routers import basic, games, manage, push, statistics, timers, users, utils
 from .utils.logger import LogManager
 
 log_manager = LogManager()
@@ -80,6 +80,7 @@ app.include_router(games.router)
 app.include_router(statistics.router)
 app.include_router(timers.router)
 app.include_router(manage.router)
+app.include_router(push.router)
 app.include_router(utils.router)
 
 app = VersionedFastAPI(app, version_format="{major}", prefix_format="/api/v{major}")

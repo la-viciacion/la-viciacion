@@ -6,6 +6,7 @@ import { formatDate, formatDuration } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
 import { PASSWORD_HINT, isValidPassword } from '../../lib/password.js';
 import { initLibrary } from './library.js';
+import { initPush } from './push.js';
 
 export const active = 'profile';
 export const mainClass = 'profile-main';
@@ -35,6 +36,7 @@ async function load() {
   if (!data) return;
   draw(data);
   await initLibrary(main.querySelector('#pfLibrary'), { username: user.username, onChange: refreshSummary });
+  initPush(main.querySelector('#pfPush')).catch(() => {}); // optional: never breaks the page
 }
 
 // A completion changed: refresh the numbers without redrawing the whole page.
@@ -133,6 +135,8 @@ function draw(d) {
       <div class="pf-msg" id="pfDataMsg" role="status"></div>
       <div><button class="pf-btn primary" type="submit">Guardar datos</button></div>
     </form>
+
+    <div id="pfPush"></div>
 
     ${sectionTitle('Cambiar contraseña')}
     <form class="pf-card pf-form" id="pfPass" novalidate>

@@ -16,7 +16,7 @@ from ..database import models, schemas
 from .achievements import AchievementsElems
 from ..clients.open_ai import OpenAIClient
 from ..utils import ai_prompts as prompts
-from . import settings
+from . import push, settings
 from ..utils.logger import LogManager
 
 log_manager = LogManager()
@@ -406,8 +406,9 @@ async def send_message(
     if not silent and not settings.get("notifications.enabled"):
         logger.info("Notifications are disabled. Message not sent.")
         return
-    if not silent and not (settings.get("telegram.token") and settings.get("telegram.group_id")):
-        logger.warning("Telegram token or group not configured. Message not sent.")
+    telegram_ready = bool(settings.get("telegram.token") and settings.get("telegram.group_id"))
+    if not silent and not (telegram_ready or push.is_ready()):
+        logger.warning("Neither Telegram nor push are configured. Message not sent.")
         return
     if not silent:
         logger.info("Preparing message...")
@@ -430,6 +431,10 @@ async def send_message(
                     msg = completion.choices[0].message.content
             except Exception as e:
                 logger.info("Error generating completion: " + str(e))
+        await push.notify_group(msg)  # never raises: it must not affect Telegram
+        if not telegram_ready:
+            logger.info("Telegram is not configured. Message sent by push only.")
+            return
         bot = telegram.Bot(settings.get("telegram.token"))
         async with bot:
             retries = 0
@@ -463,10 +468,13 @@ async def send_message(
         logger.info("Silent mode. Message not sent.")
 
 
-async def send_message_to_user(user_telegram_id, msg):
+async def send_message_to_user(user_telegram_id, msg, user_id=None):
+    """Private notice: Telegram (if the user has an id) and, given `user_id`, their pushed devices."""
     if not settings.get("notifications.enabled"):
         logger.info("Notifications are disabled. Message to user not sent.")
         return
+    if user_id is not None:
+        await push.notify_user(user_id, msg, tag="private")
     if user_telegram_id is None or not settings.get("telegram.token"):
         logger.warning("User without Telegram id or bot not configured. Message not sent.")
         return

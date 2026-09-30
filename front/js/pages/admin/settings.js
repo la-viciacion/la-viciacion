@@ -23,6 +23,7 @@ function lastRun(job) {
 
 function view(values, jobs) {
   const token = values['telegram.token'];
+  const vapid = values['push.vapid_private'];
   return html`
     <form class="adm-settings" id="admSettings" novalidate>
       <section class="adm-set-card">
@@ -55,6 +56,19 @@ function view(values, jobs) {
         <div><button type="button" class="adm-btn" data-set-act="test">Enviar mensaje de prueba al grupo</button></div>
       </section>
 
+      <section class="adm-set-card">
+        <h3>Avisos en la app (push)</h3>
+        ${check('push.enabled', 'Enviar avisos a la app instalada', 'Además de Telegram: los avisos del grupo llegan a los dispositivos que los hayan activado y los privados (timer olvidado…) solo al usuario. Necesita las notificaciones activadas y HTTPS.')}
+        <label>Contacto para los servicios push
+          <input class="adm-input" type="text" name="push.contact" placeholder="mailto:tu@correo.com" />
+        </label>
+        <div class="adm-sub">${vapid.is_set ? 'Claves generadas.' : 'Todavía no hay claves: genera unas para poder activar los avisos.'}</div>
+        <div class="adm-set-row">
+          <button type="button" class="adm-btn" data-set-act="push-keys">${vapid.is_set ? 'Regenerar claves…' : 'Generar claves'}</button>
+          <button type="button" class="adm-btn" data-set-act="push-test">Enviar aviso de prueba a mis dispositivos</button>
+        </div>
+      </section>
+
       <div class="adm-error" role="alert"></div>
       <div class="adm-actions adm-set-actions"><button class="adm-btn primary" type="submit">Guardar cambios</button></div>
     </form>`;
@@ -79,6 +93,7 @@ function collect(form) {
       continue;
     }
     const now = field.type === 'checkbox' ? field.checked : field.type === 'select-one' ? Number(field.value) : field.value.trim();
+    if (now === '' && before == null) continue; // an optional text left empty
     if (now !== before) changes[key] = now;
   }
   return changes;
@@ -109,17 +124,45 @@ async function sendTest() {
   }
 }
 
+async function generateKeys(replace) {
+  if (replace) {
+    const ok = await confirmDialog('Regenerar claves', html`<p>Todos los dispositivos suscritos dejarán de recibir avisos y cada usuario tendrá que volver a activarlos.</p>`, { danger: true, ok: 'Regenerar' });
+    if (!ok) return;
+  }
+  try {
+    await api(`/manage/settings/push-keys${replace ? '?replace=true' : ''}`, { method: 'POST' });
+    toast('Claves generadas');
+    await render(panel);
+  } catch (err) {
+    toast(err.message, 'err');
+  }
+}
+
+async function sendTestPush() {
+  try {
+    const { sent } = await api('/manage/settings/test-push', { method: 'POST' });
+    toast(`Aviso enviado a ${sent} dispositivo${sent === 1 ? '' : 's'}`);
+  } catch (err) {
+    toast(err.message, 'err');
+  }
+}
+
 export async function render(target) {
   panel = target;
   try {
     const { values, jobs } = await api('/manage/settings');
-    loaded = Object.fromEntries(Object.entries(values).filter(([key]) => key !== 'telegram.token'));
+    loaded = Object.fromEntries(Object.entries(values).filter(([key]) => key !== 'telegram.token' && !key.startsWith('push.vapid')));
     loaded['telegram.token'] = null;
     mount(panel, view(values, jobs));
     const form = panel.querySelector('#admSettings');
     fill(form, values);
     form.addEventListener('submit', (e) => { e.preventDefault(); save(form); });
-    form.addEventListener('click', (e) => { if (e.target.closest('[data-set-act="test"]')) sendTest(); });
+    form.addEventListener('click', (e) => {
+      const act = e.target.closest('[data-set-act]')?.dataset.setAct;
+      if (act === 'test') sendTest();
+      else if (act === 'push-keys') generateKeys(values['push.vapid_private'].is_set);
+      else if (act === 'push-test') sendTestPush();
+    });
   } catch (err) {
     mount(panel, errorState(err.message));
   }

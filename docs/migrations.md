@@ -70,7 +70,7 @@ alembic stamp <id>             # DANGEROUS: rewrites the recorded version withou
 - `alembic stamp` and manual edits of `alembic_version` are last-resort recovery tools; never use them without understanding the exact DB state and without a backup.
 - If `upgrade head` fails in production: **do not retry blindly and do not `stamp`**. Read the error, inspect which steps were applied (the migrations are idempotent, so a re-run after fixing the cause converges), or restore the pre-deploy backup. The API container will keep restarting until the migration succeeds (`entrypoint.sh` uses `set -e`), which is intentional: the app never runs on a half-migrated schema.
 - `entrypoint.sh` waits up to 60 s for the DB before migrating; a fresh import of a large backup can take longer than the MariaDB healthcheck suggests.
-- Importing a pre-v2 backup (`db/init/`) relies on migrations 001–011 handling that legacy schema; do not "simplify" old migrations.
+- Importing a pre-v2 backup (`db/init/`) relies on migrations 001–013 handling that legacy schema; do not "simplify" old migrations.
 
 ## Forbidden
 
