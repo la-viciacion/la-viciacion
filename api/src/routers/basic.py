@@ -1,4 +1,5 @@
 import hmac
+import ipaddress
 from datetime import timedelta
 from typing import Annotated
 
@@ -31,8 +32,22 @@ LOGIN_BY_CLIENT = AttemptLimiter(max_failures=40, window_seconds=15 * 60)
 SIGNUP_KEY = AttemptLimiter(max_failures=10, window_seconds=15 * 60)
 
 
-def _client(request: Request) -> str:
-    return request.client.host if request.client else "unknown"
+def client_key(host: str | None) -> str | None:
+    """Address to count failed logins against, or None when it says nothing about the caller.
+
+    Behind the nginx proxy the peer is a container on the private network, the same for
+    everybody: counting it would let anyone lock all the others out. A real client
+    address only shows up when uvicorn is told which proxies to trust (FORWARDED_ALLOW_IPS).
+    """
+    try:
+        address = ipaddress.ip_address(host or "")
+    except ValueError:
+        return None
+    return None if address.is_private or address.is_loopback else host
+
+
+def _client(request: Request) -> str | None:
+    return client_key(request.client.host if request.client else None)
 
 
 def _block_if_limited(*retry_after_seconds: int) -> None:
@@ -168,11 +183,14 @@ async def login_for_access_token(
     """
     account = form_data.username.strip().lower()[:255]
     client = _client(request)
-    _block_if_limited(LOGIN_BY_ACCOUNT.retry_after(account), LOGIN_BY_CLIENT.retry_after(client))
+    _block_if_limited(
+        LOGIN_BY_ACCOUNT.retry_after(account), LOGIN_BY_CLIENT.retry_after(client) if client else 0
+    )
     user = auth.authenticate_user(db, form_data.username, form_data.password)
     if not user:
         LOGIN_BY_ACCOUNT.fail(account)
-        LOGIN_BY_CLIENT.fail(client)
+        if client:
+            LOGIN_BY_CLIENT.fail(client)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",

@@ -4,9 +4,9 @@ In memory and per process: enough for a single API replica (see docs/architectur
 a restart forgets the counters. Time is passed in so it is testable without clocks.
 
 Two limiters are used for the login: one per account name (stops guessing one
-password) and a looser one per client address. Behind the nginx proxy the client
-address may be the proxy's, in which case the second one simply acts as a global
-cap on failed logins, which is fine for a small private app.
+password) and a looser one per client address. The per-client one is only used when
+the API knows the real client address (see `client_key` in routers/basic.py); a
+private peer such as the nginx container would put everybody in the same bucket.
 """
 import threading
 import time
