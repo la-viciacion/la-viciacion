@@ -1,4 +1,4 @@
-"""Failed-attempt limiter for the public endpoints (login, sign-up).
+"""Failed-attempt limiter for the public login endpoint.
 
 In memory and per process: enough for a single API replica (see docs/architecture.md);
 a restart forgets the counters. Time is passed in so it is testable without clocks.

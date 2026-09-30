@@ -1,9 +1,8 @@
-import hmac
 import ipaddress
 from datetime import timedelta
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Security, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Security, status
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi_versioning import version
 from sqlalchemy.orm import Session
@@ -11,12 +10,8 @@ from sqlalchemy.orm import Session
 from .. import auth
 from ..auth import get_db
 from ..config import Config
-from ..crud import users
 from ..database import models, schemas
-from ..utils import actions as actions
 from ..utils import messages as msg
-from ..utils import my_utils as utils
-from ..utils.custom_exceptions import CustomExceptions
 from ..utils.logger import LogManager
 from ..utils.rate_limit import AttemptLimiter
 
@@ -25,11 +20,10 @@ logger = log_manager.get_logger()
 
 config = Config()
 
-# Failed attempts: per account name (guessing one password), per client (spraying)
-# and for wrong invitation keys. Blocked callers get a 429 until the window passes.
+# Failed logins: per account name (guessing one password) and per client (spraying).
+# Blocked callers get a 429 until the window passes.
 LOGIN_BY_ACCOUNT = AttemptLimiter(max_failures=5, window_seconds=15 * 60)
 LOGIN_BY_CLIENT = AttemptLimiter(max_failures=40, window_seconds=15 * 60)
-SIGNUP_KEY = AttemptLimiter(max_failures=10, window_seconds=15 * 60)
 
 
 def client_key(host: str | None) -> str | None:
@@ -76,77 +70,11 @@ def hello_world(request: Request):
 
 @router.get("/keepalive")
 @version(1)
-def hello_world(request: Request):
+def keepalive(request: Request):
     """
     Keepalive endpoint
     """
     return "Yup, I'm alive!"
-
-
-@router.post(
-    "/signup",
-    response_model=schemas.User,
-)
-@version(1)
-def signup(request: Request, user: schemas.UserCreate, db: Session = Depends(get_db)):
-    """Register new user
-
-    Password requirements:
-    - Length must be between 12 and 24 characters
-    - 1 Uppercase letter
-    - 1 Lowercase letter
-    - 1 Number
-    - 1 Special character
-    """
-    _block_if_limited(SIGNUP_KEY.retry_after("signup"))
-    if not hmac.compare_digest(user.invitation_key.encode(), config.INVITATION_KEY.encode()):
-        SIGNUP_KEY.fail("signup")
-        raise HTTPException(
-            status_code=400,
-            detail=CustomExceptions(
-                CustomExceptions.SignUp.INVALID_INVITATION_KEY
-            ).to_json(),
-        )
-    user.email = utils.normalize_email(user.email) or ""
-    username_error = utils.validate_username(user.username)
-    if username_error:
-        raise HTTPException(status_code=400, detail=username_error)
-    db_user = users.get_user_by_username(db, username=user.username)
-    if db_user:
-        raise HTTPException(
-            status_code=400,
-            detail=CustomExceptions(
-                CustomExceptions.SignUp.USER_ALREADY_EXISTS
-            ).to_json(),
-        )
-    if users.email_in_use(db, user.email):
-        raise HTTPException(
-            status_code=400,
-            detail=CustomExceptions(
-                CustomExceptions.SignUp.EMAIL_ALREADY_EXISTS
-            ).to_json(),
-        )
-    if not utils.validate_email_format(user.email):
-        raise HTTPException(
-            status_code=400,
-            detail=CustomExceptions(CustomExceptions.SignUp.EMAIL_VALIDATION).to_json(),
-        )
-    if not utils.validate_password_requirements(user.password):
-        raise HTTPException(
-            status_code=400,
-            detail=CustomExceptions(
-                CustomExceptions.SignUp.PASSWORD_REQUIREMENTS
-            ).to_json(),
-        )
-    # whoever holds the invitation key gets an active account straight away
-    return users.insert_user(
-        db,
-        username=user.username,
-        email=user.email,
-        name=user.name,
-        password=user.password,
-        is_active=True,
-    )
 
 
 @router.post("/token", response_model=auth.Token)

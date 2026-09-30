@@ -30,7 +30,6 @@ class Config:
         self.OPENAI_MODEL = self._get_env("OPENAI_MODEL")
         
         # Security
-        self.INVITATION_KEY = self._get_env("INVITATION_KEY")
         self.SECRET_KEY = self._get_env("SECRET_KEY")
         self.ACCESS_TOKEN_EXPIRE_MINUTES = self._get_env("ACCESS_TOKEN_EXPIRE_MINUTES")
         

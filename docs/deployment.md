@@ -19,7 +19,7 @@ All use `restart: unless-stopped` and read `.env` through `env_file` (front exce
 
 Single `.env` (template: `.env.template`). Production checklist:
 
-- Strong unique values for `GOD_ADMIN_PASS`, `SECRET_KEY`, `INVITATION_KEY`, `MARIADB_*`.
+- Strong unique values for `GOD_ADMIN_PASS`, `SECRET_KEY`, `MARIADB_*`.
 - `CORS_ORIGINS` is a JSON list with the real public origin(s).
 - `TZ` set (drives the current season and the scheduled job times).
 - `ENVIRONMENT=production`; Sentry DSNs if wanted.

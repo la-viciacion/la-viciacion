@@ -12,7 +12,6 @@ TELEGRAM_ID_IN_USE = "Ese ID de Telegram ya está en uso por otra cuenta"
 EMAIL_IN_USE = "Ese email ya está en uso por otra cuenta"
 FORGOTTEN_HOURS_INVALID = "Las horas deben ser un número entero entre {min} y {max}"
 USER_NOT_ADMIN ="You are not allowed to do this action"
-INVALID_INVITATION_KEY = "The Invitation Key is not a valid key"
 
 GAME_ALREADY_COMPLETED = "Game is already completed"
 

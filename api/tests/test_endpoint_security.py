@@ -19,7 +19,6 @@ PUBLIC = {
     ("GET", "/"),
     ("GET", "/keepalive"),
     ("POST", "/token"),  # login; throttled
-    ("POST", "/signup"),  # needs the invitation key; throttled
     ("GET", "/utils/achievement-image/{achievement}"),  # loaded by <img>, which cannot send a token
 }
 

@@ -10,13 +10,6 @@ class UserBase(BaseModel):
     username: str
 
 
-class UserCreate(UserBase):
-    email: str
-    name: str
-    password: str
-    invitation_key: str
-
-
 class User(UserBase):
     id: int
     name: str | None = None

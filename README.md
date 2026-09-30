@@ -10,10 +10,10 @@ Copy `.env.template` to `.env` and fill in your values. That single file is read
 
 ### Users and login
 
-- Accounts are created by an admin in the panel (Usuarios, "Nuevo usuario"); public sign-up is parked. The admin sets the initial password and shares it with the user, who can change it from their profile.
+- Accounts are created by an admin in the panel (Usuarios, "Nuevo usuario"); there is no public sign-up. The admin sets the initial password and shares it with the user, who can change it from their profile.
 - The **email** is the login identifier (unique, stored lower-case). The **username** is the user's unique nickname (no `@`, no spaces). At login either one is accepted.
 - On every start the API creates/restores the emergency admin `admin` ("Dios") with `GOD_ADMIN_PASS`.
-- Login is limited to 5 failed attempts per account and, when the real client address is known (see `FORWARDED_ALLOW_IPS` in `.env.template`), 40 per client every 15 minutes (then HTTP 429 until the window passes); wrong invitation keys at sign-up are limited too. Counters live in memory, so a restart clears them. Accounts created by sign-up are active from the start; a disabled account gets a 403 after a correct password.
+- Login is limited to 5 failed attempts per account and, when the real client address is known (see `FORWARDED_ALLOW_IPS` in `.env.template`), 40 per client every 15 minutes (then HTTP 429 until the window passes). Counters live in memory, so a restart clears them. A disabled account gets a 403 after a correct password.
 - Changing or resetting a password (by the user or by an admin) logs that account out everywhere: the token carries a fingerprint of the password hash. Deploying the version that introduced it also closes every existing session once.
 - The session lasts `ACCESS_TOKEN_EXPIRE_MINUTES` minutes from login (10080 = 7 days) and is not renewed.
 

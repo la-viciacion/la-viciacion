@@ -20,8 +20,6 @@ Until then: work on the current branch, small commits, no tags or releases.
 - The bot has no tests.
 - `platform_tags` (the platform catalogue) can only be edited by hand in the DB (a new deployment gets a default list from migration 015; databases from v1 keep their old Clockify tag ids); add an admin panel section to manage platforms.
 - A new deployment ends with empty `_archived_*` tables (migration 005 renames the v1 `*_historical` tables that 000 had to create). Harmless; a migration that drops the archives that are empty would tidy it up.
-- `POST /signup` (with `INVITATION_KEY`) is not used by the front yet (admins create accounts); accounts created through it are active from the start.
 - `utils/email.py` is kept for the upcoming e-mail features; nothing calls it yet.
 - `crud/users.py` (~1300 lines) and `utils/actions.py` are large; split by responsibility when touched.
 - Sentry `traces_sample_rate`/`profiles_sample_rate` are 1.0; tune for production.
-- Public sign-up is parked (admins create accounts).

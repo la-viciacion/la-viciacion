@@ -19,3 +19,12 @@ class ClientKeyTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class NoSignupTests(unittest.TestCase):
+    def test_there_is_no_public_registration_route(self):
+        from src.routers import basic
+
+        paths = {route.path for route in basic.router.routes}
+        self.assertNotIn("/signup", paths)
+        self.assertEqual(paths, {"/", "/keepalive", "/token", "/auth/active_user"})
