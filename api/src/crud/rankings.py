@@ -9,7 +9,7 @@ from ..database import models, schemas
 from ..utils import actions as actions
 from ..utils import my_utils as utils
 from ..utils.logger import LogManager
-from ..utils import seasons
+from ..utils import seasons, streaks
 from ..config import Config
 
 log_manager = LogManager()
@@ -21,118 +21,49 @@ config = Config()
 ####################
 
 
-def user_hours_players(
-    db: Session, limit: int = None, is_active: bool | None = True
-) -> list[models.User]:
-    try:
-        stmt = select(
-            models.User.id.label("user_id"),
-            models.User.name,
-            models.UserStatistics.played_time,
-        ).join(models.UserStatistics, models.User.id == models.UserStatistics.user_id)
-        if is_active is not None:
-            stmt = stmt.where(models.User.is_active == is_active)
-
-        stmt = stmt.order_by(desc(models.UserStatistics.played_time)).limit(limit)
-
-        return db.execute(stmt).fetchall()
-    except Exception as e:
-        logger.error("Error retrieving user hours players: " + str(e))
-        raise
+def user_hours_players(db: Session, limit: int = None, is_active: bool | None = True) -> list[dict]:
+    rows = time_entries.players_played_time(db, is_active=is_active)
+    return rows[:limit] if limit else rows
 
 
-def user_current_ranking(db: Session, user: models.User, is_active: bool | None = True):
-    """
-    Get the current ranking hours for a specific user, optionally filtering by active status.
-
-    Args:
-        db (Session): DB Session
-        user (models.User): The user to get the ranking for.
-        is_active (bool | None, optional): Filter by active status.
-                                           True for active, False for inactive, None for all.
-
-    Returns:
-        list: Current ranking hours for the user.
-    """
-    try:
-        stmt = (
-            select(
-                models.UserStatistics.current_ranking_hours,
-            )
-            .filter(models.UserStatistics.user_id == user.id)
-            .join(
-                models.UserStatistics, models.User.id == models.UserStatistics.user_id
-            )
-        )
-
-        # Apply is_active filter if provided
-        if is_active is not None:
-            stmt = stmt.join(models.User).where(models.User.is_active == is_active)
-
-        return db.execute(stmt).fetchall()
-    except Exception as e:
-        logger.error("Error retrieving user current ranking: " + str(e))
-        raise
+def _players_with_dates(db: Session, is_active: bool | None):
+    """(user row, played days) for every player, for the rankings derived from the days played."""
+    names = {row["user_id"]: row["name"] for row in time_entries.players_played_time(db, is_active=is_active)}
+    return [(user_id, names[user_id], days) for user_id, days in time_entries.players_played_dates(db, is_active=is_active).items()]
 
 
-def user_days_played(
-    db: Session, limit: int = None, is_active: bool | None = True
-) -> list[models.User]:
-    try:
-        stmt = select(
-            models.User.id.label("user_id"),
-            models.User.name,
-            models.UserStatistics.played_days,
-        ).join(models.UserStatistics, models.User.id == models.UserStatistics.user_id)
-
-        if is_active is not None:
-            stmt = stmt.where(models.User.is_active == is_active)
-
-        stmt = stmt.order_by(desc(models.UserStatistics.played_days)).limit(limit)
-
-        return db.execute(stmt).fetchall()
-    except Exception as e:
-        logger.error("Error getting user days player: " + str(e))
-        raise e
+def user_days_played(db: Session, limit: int = None, is_active: bool | None = True) -> list[dict]:
+    rows = [
+        {"user_id": user_id, "name": name, "played_days": len(days)}
+        for user_id, name, days in _players_with_dates(db, is_active)
+    ]
+    rows.sort(key=lambda r: (-r["played_days"], r["user_id"]))
+    return rows[:limit] if limit else rows
 
 
-def user_best_streak(db: Session, limit: int = None, is_active: bool | None = True):
-    try:
-        stmt = select(
-            models.User.id.label("user_id"),
-            models.User.name,
-            models.UserStatistics.best_streak,
-            models.UserStatistics.best_streak_date,
-        ).join(models.UserStatistics, models.User.id == models.UserStatistics.user_id)
-
-        if is_active is not None:
-            stmt = stmt.where(models.User.is_active == is_active)
-
-        stmt = stmt.order_by(desc(models.UserStatistics.best_streak)).limit(limit)
-
-        return db.execute(stmt).fetchall()
-    except Exception as e:
-        logger.error("Error getting user best streak: " + str(e))
-        raise e
+def _streaks(db: Session, is_active: bool | None):
+    today = datetime.date.today()
+    season = seasons.current()
+    for user_id, name, days in _players_with_dates(db, is_active):
+        yield user_id, name, streaks.streak_summary(days, today, season)
 
 
-def user_current_streak(db: Session, limit: int = None, is_active: bool | None = True):
-    try:
-        stmt = select(
-            models.User.id.label("user_id"),
-            models.User.name,
-            models.UserStatistics.current_streak,
-        ).join(models.UserStatistics, models.User.id == models.UserStatistics.user_id)
+def user_best_streak(db: Session, limit: int = None, is_active: bool | None = True) -> list[dict]:
+    rows = [
+        {"user_id": user_id, "name": name, "best_streak": summary[1], "best_streak_date": summary[0]}
+        for user_id, name, summary in _streaks(db, is_active)
+    ]
+    rows.sort(key=lambda r: (-r["best_streak"], r["user_id"]))
+    return rows[:limit] if limit else rows
 
-        if is_active is not None:
-            stmt = stmt.where(models.User.is_active == is_active)
 
-        stmt = stmt.order_by(desc(models.UserStatistics.current_streak)).limit(limit)
-
-        return db.execute(stmt).fetchall()
-    except Exception as e:
-        logger.error("Error getting user current streak: " + str(e))
-        raise e
+def user_current_streak(db: Session, limit: int = None, is_active: bool | None = True) -> list[dict]:
+    rows = [
+        {"user_id": user_id, "name": name, "current_streak": summary[2]}
+        for user_id, name, summary in _streaks(db, is_active)
+    ]
+    rows.sort(key=lambda r: (-r["current_streak"], r["user_id"]))
+    return rows[:limit] if limit else rows
 
 
 def user_ranking_achievements(
@@ -282,24 +213,8 @@ def user_last_played_games(
         raise e
 
 
-def games_most_played(db: Session, limit: int = 10):
-    try:
-        stmt = (
-            select(
-                (models.Game.id).label("game_id"),
-                models.Game.name,
-                models.GameStatistics.played_time,
-            )
-            .join(
-                models.GameStatistics, models.Game.id == models.GameStatistics.game_id
-            )
-            .order_by(desc(models.GameStatistics.played_time))
-            .limit(limit)
-        )
-        return db.execute(stmt).fetchall()
-    except Exception as e:
-        logger.info(e)
-        raise e
+def games_most_played(db: Session, limit: int = 10) -> list[dict]:
+    return time_entries.games_played_time(db, limit=limit)
 
 
 def platform_played_games(db: Session, limit: int = None):

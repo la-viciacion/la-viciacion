@@ -6,7 +6,7 @@ import { html, mount } from '../../lib/html.js';
 import { loadPlatforms } from '../../lib/platforms.js';
 import { toast } from '../../ui/toast.js';
 import { errorState, overviewStats, store } from './components.js';
-import { deleteRow, pickGame, recomputeDialog } from './dialogs.js';
+import { checkAchievementsDialog, deleteRow, pickGame } from './dialogs.js';
 import { ENTITIES, TABS } from './entities.js';
 import { openForm } from './form.js';
 
@@ -62,7 +62,7 @@ function drawLayout(overview) {
   mount(root, html`
     <div class="adm-head">
       <h1 class="adm-title">Panel de administración</h1>
-      <button class="adm-btn" data-act="recompute">Recalcular estadísticas</button>
+      <button class="adm-btn" data-act="check-achievements">Comprobar logros</button>
     </div>
     <div class="adm-stats" id="admStats">${overviewStats(overview)}</div>
     <div class="adm-tabs" role="tablist">
@@ -251,7 +251,7 @@ async function onClick(e) {
       }
       case 'prev': st.offset = Math.max(0, st.offset - PAGE); return load();
       case 'next': st.offset += PAGE; return load();
-      case 'recompute': return recomputeDialog();
+      case 'check-achievements': return checkAchievementsDialog();
       case 'rawg-sync': {
         const { rawgSyncFlow } = await import('./rawg-sync.js');
         return rawgSyncFlow({ onDone: admin.reload });

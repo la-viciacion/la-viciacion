@@ -31,7 +31,7 @@ clients/open_ai.py OpenAI client wrapper
 
 Routers: `basic` (login, token, `/auth/active_user`, keepalive), `users` (profile, library, avatar, password), `games`, `timers` (start/stop/manual/edit/history), `statistics`, `manage` (**admin panel API**: users, games, timers, library, achievements and awarded achievements (`/manage/user-achievements`: list, change date, revoke), RAWG sync, settings; router-level `require_admin`), `utils` (platforms, achievements, playing).
 
-Utils worth knowing: `seasons.py` (single source of the season concept), `actions.py` (recompute stats/rankings/streaks, announcements, weekly resume), `scheduler.py`, `settings.py` (runtime settings), `achievements.py`, `rawg_sync.py`, `messages.py` (Spanish user-facing error strings), `custom_exceptions.py`, `logger.py`.
+Utils worth knowing: `seasons.py` (single source of the season concept), `actions.py` (achievement checks, ranking/streak announcements, weekly resume), `streaks.py` (pure streak maths), `rate_limit.py`, `images.py`, `scheduler.py`, `settings.py` (runtime settings), `achievements.py`, `rawg_sync.py`, `messages.py` (Spanish user-facing error strings), `custom_exceptions.py`, `logger.py`.
 
 ### Layering rule
 
@@ -39,11 +39,11 @@ Utils worth knowing: `seasons.py` (single source of the season concept), `action
 
 ### Sync vs async
 
-Routes and helpers are a mix of `def` and `async def`; the DB layer is synchronous SQLAlchemy. Do not introduce async DB drivers. Long/background work uses `BackgroundTasks` (see `manage.py` recompute and RAWG sync) or the scheduler thread.
+Routes and helpers are a mix of `def` and `async def`; the DB layer is synchronous SQLAlchemy. Do not introduce async DB drivers. Long/background work uses `BackgroundTasks` (see `manage.py` check-achievements and RAWG sync) or the scheduler thread.
 
 ## Data model (`database/models.py`)
 
-Tables: `users`, `users_statistics`, `games`, `games_statistics`, `users_games` (the per-user **library entry**, unique per user/game/platform/season), `game_timers` (sessions: running timers and finished/manual ones), `achievements`, `users_achievements` (once per user and season), `platform_tags` (platform catalogue; its ids are what `platform` columns store), `app_settings`, `job_runs`.
+Tables: `users`, `games`, `users_games` (the per-user **library entry**, unique per user/game/platform/season), `game_timers` (sessions: running timers and finished/manual ones), `achievements`, `users_achievements` (once per user and season), `platform_tags` (platform catalogue; its ids are what `platform` columns store), `app_settings`, `job_runs`.
 
 Notes:
 - `game_timers` is the only sessions table (time entries were merged into it in migration 004). `is_active` = running timer; `duration_seconds` is set on stop.
@@ -55,8 +55,11 @@ Notes:
 
 - **Seasons** = calendar years. `season` columns are `Computed` (generated, virtual) from the row date: `users_games.started_date`, `game_timers.start_time`, `users_achievements.date`. The current season is the server date's year (`TZ` must be set).
 - **One game at a time per user**: at most one running timer; a new timer never starts before the user's last session ended; manual sessions must not overlap any other session (running timer included).
-- **Manual sessions** (`POST /timers/manual`, `PATCH|DELETE /timers/{id}`): end after start, not in the future, ≤ 24 h, current season only for regular users (admins may edit closed seasons), game cannot be changed on an existing session. Manual changes recompute stats silently (no group announcements).
-- **Stats, achievements and ranking announcements are event-driven**: they run when a timer stops or an admin edits data (`actions.recompute_*`), not on a schedule.
+- **Manual sessions** (`POST /timers/manual`, `PATCH|DELETE /timers/{id}`): end after start, not in the future, ≤ 24 h, current season only for regular users (admins may edit closed seasons), game cannot be changed on an existing session. Manual changes check achievements silently (no group announcements).
+- **Derived data is never stored.** Totals, rankings, played days and streaks are computed from the sessions (`game_timers`) whenever they are requested (`crud/rankings.py`, `crud/time_entries.py`, `utils/streaks.py`); the time of a library entry is the sum of its sessions. There are no statistics tables to keep in sync, and a new season simply starts empty. Only what cannot be derived is stored: unlocked achievements (`users_achievements`), completions and scores.
+- **Achievements are event-driven**: `actions.check_users` runs when a timer stops or an admin asks for it (**Comprobar logros**), and daily at 05:00 from the scheduler.
+- **Ranking announcements compare before and after**: the stop-timer endpoint takes `actions.ranking_snapshot` before stopping and the background task (`after_session_change`) announces how the players and games rankings moved. No last-announced position is remembered; manual sessions and edits are silent.
+- **A lost streak** (more than 10 days) is announced by the 05:00 check on the one day the last played day is two days ago (`streaks.lost_streak`).
 - **Completion** of a game is only allowed for the current season, once per season, date not in the future.
 
 ## Auth
@@ -71,7 +74,7 @@ Notes:
 
 ## Scheduler (`utils/scheduler.py`)
 
-Runs inside the API process (thread ticking every 30 s). Jobs: `weekly_summary`, `forgotten_timers` (hourly), `daily_streaks` (05:00), `season_rollover`. Each run is recorded in `job_runs` (claimed atomically) so restarts never repeat a run, and a job due while the API was down still runs within a grace window. The due-time logic is pure functions (`weekly_slot`, `daily_slot`, `hourly_slot`, `is_due`) covered by `api/tests/test_scheduler.py`. **Run only one API replica**: scaling out would need the claim/lock logic reviewed.
+Runs inside the API process (thread ticking every 30 s). Jobs: `weekly_summary`, `forgotten_timers` (hourly), `daily_streaks` (05:00: achievements check + lost streaks). There is no season-rollover job: rankings are computed per season on demand. Each run is recorded in `job_runs` (claimed atomically) so restarts never repeat a run, and a job due while the API was down still runs within a grace window. The due-time logic is pure functions (`weekly_slot`, `daily_slot`, `hourly_slot`, `is_due`) covered by `api/tests/test_scheduler.py`. **Run only one API replica**: scaling out would need the claim/lock logic reviewed.
 
 ## Runtime settings (`utils/settings.py`)
 

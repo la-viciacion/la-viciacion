@@ -85,16 +85,16 @@ def overview(db: Session = Depends(get_db)):
     }
 
 
-class RecomputeBody(BaseModel):
+class CheckAchievementsBody(BaseModel):
     user_id: Optional[int] = None
     silent: bool = True
 
 
-@router.post("/recompute", status_code=202)
-def recompute(body: RecomputeBody, background_tasks: BackgroundTasks):
-    """Recompute stats/achievements/rankings (all users, or one) in background."""
-    background_tasks.add_task(actions.recompute_after_timer_stop, body.user_id, body.silent)
-    return {"message": "Recálculo en marcha"}
+@router.post("/check-achievements", status_code=202)
+def check_achievements(body: CheckAchievementsBody, background_tasks: BackgroundTasks):
+    """Check the achievements of all users, or one, against their sessions (in background)."""
+    background_tasks.add_task(actions.after_session_change, body.user_id, body.silent)
+    return {"message": "Comprobación en marcha"}
 
 
 # ── Users ───────────────────────────────────────────────────────
@@ -284,7 +284,6 @@ def delete_user(
     db.query(models.GameTimer).filter_by(user_id=user_id).delete()
     db.query(models.UserGame).filter_by(user_id=user_id).delete()
     db.query(models.UserAchievement).filter_by(user_id=user_id).delete()
-    db.query(models.UserStatistics).filter_by(user_id=user_id).delete()
     db.delete(user)
     db.commit()
     return {"message": "Usuario eliminado"}
@@ -392,7 +391,6 @@ def delete_game(game_id: str, force: bool = False, db: Session = Depends(get_db)
     db.query(models.GameTimer).filter_by(game_id=game_id).delete()
     db.query(models.UserGame).filter_by(game_id=game_id).delete()
     db.query(models.UserAchievement).filter_by(game_id=game_id).delete()
-    db.query(models.GameStatistics).filter_by(game_id=game_id).delete()
     db.delete(game)
     db.commit()
     return {"message": "Juego eliminado"}
@@ -818,7 +816,7 @@ def patch_user_achievement(award_id: int, body: UserAchievementPatch, db: Sessio
 @router.delete("/user-achievements/{award_id}")
 def revoke_user_achievement(award_id: int, db: Session = Depends(get_db)):
     """Revoke an unlocked achievement. Nothing is announced. If the player still meets its
-    condition, the next recompute unlocks it again: fix the data behind it first."""
+    condition, the next achievement check unlocks it again: fix the data behind it first."""
     ua = _get_or_404(db, models.UserAchievement, award_id, "Logro concedido")
     db.delete(ua)
     db.commit()

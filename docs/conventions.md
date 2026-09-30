@@ -20,7 +20,7 @@
 - Dates: server-local naive datetimes (`TZ` set); use `seasons.current()` / `seasons.of()`; never compute a season by hand and never write `season`.
 - Use SQLAlchemy 2 style queries; parametrize everything, never format user input into SQL. Raw SQL is acceptable only in migrations (with bound params for values).
 - Pin new dependencies in `requirements.txt` with `==`. Keep `api` and `bot` requirements independent.
-- Blocking or long work (RAWG sync, mass recompute) goes to `BackgroundTasks`/scheduler, not inline in a request.
+- Blocking or long work (RAWG sync, mass achievement checks) goes to `BackgroundTasks`/scheduler, not inline in a request.
 - The scheduler is single-process: keep jobs idempotent and recorded in `job_runs`.
 
 ## Front (JavaScript)

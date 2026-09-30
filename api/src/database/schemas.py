@@ -27,19 +27,6 @@ class User(UserBase):
         from_attributes = True
 
 
-class UserStatistics(BaseModel):
-    user_id: int
-    played_time: int | None = 0
-    current_ranking_hours: int | None = None
-    current_streak: int | None = 0
-    best_streak: int | None = 0
-    best_streak_date: datetime.date | None = None
-    played_days: int | None = 0
-    best_unplayed_streak: int | None = None
-    current_unplayed_streak: int | None = None
-    best_unplayed_streak_date: datetime.date | None = None
-
-
 class UserProfileUpdate(BaseModel):
     name: str | None = None
     email: str | None = None
@@ -72,16 +59,6 @@ class Game(BaseModel):
     avg_time: int | None = 0
     slug: str | None = None
     rawg_id: int | None = None
-
-    class Config:
-        from_attributes = True
-
-
-class GameStatistics(BaseModel):
-    game_id: str
-    played_time: int | None = 0
-    avg_time: int | None = 0
-    current_ranking: Optional[int | None] = 10000000
 
     class Config:
         from_attributes = True

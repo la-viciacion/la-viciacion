@@ -21,7 +21,7 @@ Single `.env` (template: `.env.template`). Production checklist:
 
 - Strong unique values for `GOD_ADMIN_PASS`, `SECRET_KEY`, `INVITATION_KEY`, `MARIADB_*`.
 - `CORS_ORIGINS` is a JSON list with the real public origin(s).
-- `TZ` set (drives the season rollover and scheduled job times).
+- `TZ` set (drives the current season and the scheduled job times).
 - `ENVIRONMENT=production`; Sentry DSNs if wanted.
 - `SECRET_KEY` also derives the key that encrypts the Telegram token: rotate it only if you can re-enter the token from the panel (it invalidates all sessions too).
 

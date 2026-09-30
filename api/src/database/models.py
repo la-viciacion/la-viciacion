@@ -47,25 +47,6 @@ class User(Base):
     )
 
 
-class UserStatistics(Base):
-    __tablename__ = "users_statistics"
-
-    user_id = Column(Integer, primary_key=True)
-    played_time = Column(Integer)
-    current_ranking_hours = Column(Integer)
-    current_streak = Column(Integer)
-    best_streak = Column(Integer)
-    best_streak_date = Column(Date)
-    played_days = Column(Integer)
-    best_unplayed_streak = Column(Integer)
-    current_unplayed_streak = Column(Integer)
-    best_unplayed_streak_date = Column(Date)
-    played_games = Column(Integer)
-    completed_games = Column(Integer)
-
-    __table_args__ = (UniqueConstraint("user_id"),)
-
-
 class Game(Base):
     __tablename__ = "games"
 
@@ -83,17 +64,6 @@ class Game(Base):
     __table_args__ = (UniqueConstraint("name"),)
 
 
-class GameStatistics(Base):
-    __tablename__ = "games_statistics"
-
-    game_id = Column(String(255), primary_key=True)
-    played_time = Column(Integer)
-    avg_time = Column(Integer)
-    current_ranking = Column(Integer)
-
-    __table_args__ = (UniqueConstraint("game_id"),)
-
-
 class UserGame(Base):
     __tablename__ = "users_games"
 
@@ -107,7 +77,7 @@ class UserGame(Base):
     completed = Column(Integer)
     completed_date = Column(Date)
     score = Column(Float)
-    played_time = Column(Integer)
+    # time played is not stored: it is the sum of the sessions (crud/time_entries.entry_played_time)
     completion_time = Column(Integer)
 
     __table_args__ = (

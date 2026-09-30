@@ -2,7 +2,9 @@ import datetime
 from typing import Union, Tuple
 
 from sqlalchemy import (
+    Integer,
     asc,
+    cast,
     create_engine,
     desc,
     extract,
@@ -46,6 +48,83 @@ def sessions_subquery():
         )
         .where(models.GameTimer.is_active == False)
         .subquery("sessions")
+    )
+
+
+def players_played_time(db: Session, season: int = None, is_active: bool | None = True) -> list[dict]:
+    """Every player with the seconds played in the season (0 if none), most first."""
+    season = seasons.or_current(season)
+    sessions = sessions_subquery()
+    total = (
+        select(sessions.c.user_id, func.sum(sessions.c.duration).label("seconds"))
+        .where(sessions.c.season == season)
+        .group_by(sessions.c.user_id)
+        .subquery()
+    )
+    played = cast(func.coalesce(total.c.seconds, 0), Integer).label("played_time")
+    stmt = select(models.User.id.label("user_id"), models.User.name, played).outerjoin(
+        total, total.c.user_id == models.User.id
+    )
+    if is_active is not None:
+        stmt = stmt.where(models.User.is_active == is_active)
+    rows = db.execute(stmt.order_by(desc(played), models.User.id)).all()
+    return [dict(row._mapping) for row in rows]
+
+
+def players_played_dates(db: Session, season: int = None, is_active: bool | None = True) -> dict:
+    """{user_id: sorted list of the days played in the season} (sessions of 10 minutes or more).
+
+    Every player is a key, with an empty list when they have not played."""
+    season = seasons.or_current(season)
+    sessions = sessions_subquery()
+    players = select(models.User.id)
+    if is_active is not None:
+        players = players.where(models.User.is_active == is_active)
+    days = {user_id: [] for (user_id,) in db.execute(players).all()}
+    stmt = (
+        select(sessions.c.user_id, func.DATE(sessions.c.start))
+        .where(sessions.c.season == season, sessions.c.duration >= 600)
+        .distinct()
+    )
+    for user_id, day in db.execute(stmt).all():
+        if user_id in days:
+            days[user_id].append(day)
+    return {user_id: sorted(values) for user_id, values in days.items()}
+
+
+def games_played_time(db: Session, season: int = None, limit: int | None = None, is_active: bool | None = True) -> list[dict]:
+    """Games with the seconds played in the season, most first (only games that were played)."""
+    season = seasons.or_current(season)
+    sessions = sessions_subquery()
+    played = cast(func.sum(sessions.c.duration), Integer).label("played_time")
+    stmt = (
+        select(sessions.c.game_id.label("game_id"), models.Game.name, played)
+        .join(models.User, sessions.c.user_id == models.User.id)
+        .join(models.Game, models.Game.id == sessions.c.game_id)
+        .where(sessions.c.season == season)
+        .group_by(sessions.c.game_id, models.Game.name)
+        .having(func.sum(sessions.c.duration) > 0)
+        .order_by(desc(played), models.Game.name)
+    )
+    if is_active is not None:
+        stmt = stmt.where(models.User.is_active == is_active)
+    if limit is not None:
+        stmt = stmt.limit(limit)
+    return [dict(row._mapping) for row in db.execute(stmt).all()]
+
+
+def entry_played_time():
+    """Seconds played per (user, game, season): the time of a library entry."""
+    sessions = sessions_subquery()
+    return (
+        select(
+            sessions.c.user_id.label("user_id"),
+            sessions.c.game_id.label("game_id"),
+            sessions.c.season.label("season"),
+            cast(func.sum(sessions.c.duration), Integer).label("played_time"),
+        )
+        .group_by(sessions.c.user_id, sessions.c.game_id, sessions.c.season)
+        .subquery("entry_time")
     )
 
 

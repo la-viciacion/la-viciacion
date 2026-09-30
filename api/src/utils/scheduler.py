@@ -1,14 +1,14 @@
 """In-process scheduler: the time-driven work that used to depend on an
 external cron calling the API every minute.
 
-Stats, achievements and ranking announcements are event-driven (they run when
-a timer stops or an admin edits data). Only what nothing else can trigger
-remains here:
+Achievements and ranking announcements are event-driven (they run when a timer
+stops or an admin edits data); totals, rankings and streaks are computed from the
+sessions when asked for, so nothing has to be reset when the season changes. Only
+what nothing else can trigger remains here:
 
   weekly_summary    once a week at the configured day/time (admin panel)
   forgotten_timers  every hour, reminds who has a timer running for too long
-  daily_streaks     every day at 05:00, recompute + announce lost streaks
-  season_rollover   when the year changes, reset season stats and recompute
+  daily_streaks     every day at 05:00, checks achievements + announces lost streaks
 
 Every run is recorded in `job_runs`, so a restart never repeats a run and a job
 that was due while the API was down still runs when it comes back, within a
@@ -100,7 +100,7 @@ def _run(db: Session, job: str, coroutine_factory, use_lock: bool = False) -> No
     logger.info(f"Scheduled job {job} starting")
     try:
         if use_lock:
-            with actions._recompute_lock:
+            with actions._check_lock:
                 status = asyncio.run(coroutine_factory())
         else:
             status = asyncio.run(coroutine_factory())
@@ -128,37 +128,8 @@ async def _forgotten_timers(db: Session) -> str:
 
 
 async def _daily_streaks(db: Session) -> str:
-    await actions.recompute_all_users_and_rankings(db, silent=False, announce_streak_loss=True)
+    await actions.check_users(db, silent=False, announce_streak_loss=True)
     return ""
-
-
-async def _new_season(db: Session) -> str:
-    # silent: the season reset must not announce a ranking shuffle
-    await actions.recompute_all_users_and_rankings(db, silent=True, sync_season=True)
-    return ""
-
-
-def _season_rollover(db: Session, now: datetime.datetime) -> None:
-    """Season stats are wiped once when the year changes, whenever the server notices."""
-    current = str(seasons.of(now))
-    row = db.get(models.JobRun, "season_rollover")
-    if row is None:  # first start: remember the season, do not reset anything
-        db.add(models.JobRun(job="season_rollover", last_run_at=now, last_status=current))
-        db.commit()
-        return
-    if row.last_status == current:
-        return
-    claimed = db.execute(
-        update(models.JobRun)
-        .where(models.JobRun.job == "season_rollover", models.JobRun.last_status == row.last_status)
-        .values(last_status=current, last_run_at=now)
-    )
-    db.commit()
-    if claimed.rowcount == 1:
-        logger.info(f"New season {current}: resetting season statistics")
-        _run(db, "season_rollover_recompute", lambda: _new_season(db), use_lock=True)
-        db.execute(update(models.JobRun).where(models.JobRun.job == "season_rollover").values(last_status=current))
-        db.commit()
 
 
 # ── the loop ────────────────────────────────────────────────
@@ -166,8 +137,6 @@ def tick(now: datetime.datetime | None = None) -> None:
     """Run whatever is due. Called every TICK_SECONDS by the scheduler thread."""
     now = now or datetime.datetime.now()
     with SessionLocal() as db:
-        _season_rollover(db, now)
-
         notifications = settings.get("notifications.enabled")
 
         if notifications and settings.get("weekly.enabled"):

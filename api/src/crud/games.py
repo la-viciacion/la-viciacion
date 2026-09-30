@@ -106,12 +106,6 @@ async def new_game(db: Session, game: schemas.NewGame) -> models.Game:
         db.refresh(game_to_add)
         game_added = game_to_add
 
-        # 5. Initialize statistics
-        try:
-            create_game_statistics(db, game_added.id)
-        except Exception as e:
-            logger.warning(f"Error initializing statistics for {official_name}: {e}")
-
         logger.info(f"Game '{official_name}' successfully added to DB with id {game_added.id}")
         return game_added
     except Exception as e:
@@ -125,22 +119,6 @@ async def new_game(db: Session, game: schemas.NewGame) -> models.Game:
         if existing:
             return existing
         raise e
-
-
-def create_game_statistics(db: Session, game_id: int):
-    try:
-        game_statistics = models.GameStatistics(
-            game_id=game_id, current_ranking=1000000
-        )
-        db.add(game_statistics)
-        db.commit()
-        db.refresh(game_statistics)
-
-    except SQLAlchemyError as e:
-        db.rollback()
-        if "Duplicate" not in str(e):
-            logger.info("Error creating games statistics: " + str(e))
-            raise e
 
 
 def update_avg_time_game(db: Session, game_id: str, avg_time: int):
@@ -195,57 +173,3 @@ def update_game(db: Session, game_id: int, game: schemas.UpdateGame):
         raise RuntimeError(error_message) from e
 
 
-def update_total_played_time(db: Session, game_id, total_played):
-    """Set a game's total played time, creating its statistics row if it has none
-    (a season reset wipes them, and games added before them never had one)."""
-    try:
-        stmt = (
-            update(models.GameStatistics)
-            .where(models.GameStatistics.game_id == game_id)
-            .values(played_time=total_played)
-        )
-        if db.execute(stmt).rowcount == 0:
-            db.add(models.GameStatistics(game_id=game_id, played_time=total_played, current_ranking=1000000))
-        db.commit()
-    except Exception as e:
-        logger.info(e)
-        raise e
-
-
-def get_most_played_time(db: Session, limit: int = None) -> list[models.GameStatistics]:
-    if limit is not None:
-        return (
-            db.query(models.GameStatistics)
-            .order_by(desc(models.GameStatistics.played_time))
-            .limit(limit)
-        )
-    else:
-        return db.query(models.GameStatistics).order_by(
-            desc(models.GameStatistics.played_time)
-        )
-
-
-def current_ranking_hours(db: Session, limit: int = 11) -> list[models.GameStatistics]:
-    try:
-        return (
-            db.query(models.GameStatistics)
-            .order_by(asc(models.GameStatistics.current_ranking))
-            .limit(limit)
-        )
-    except Exception as e:
-        logger.info(e)
-
-
-def update_current_ranking_hours(db: Session, i, game_id):
-    try:
-        stmt = (
-            update(models.GameStatistics)
-            .where(models.GameStatistics.game_id == game_id)
-            .values(current_ranking=i)
-        )
-        db.execute(stmt)
-        db.commit()
-    except Exception as e:
-        logger.info(
-            "Error updating current ranking for game " + str(game_id) + ". " + str(e)
-        )

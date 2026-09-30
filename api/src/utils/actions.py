@@ -16,7 +16,7 @@ from ..crud.achievements import Achievements
 from ..database import models, schemas
 from . import my_utils as utils
 from ..utils import ai_prompts as prompts
-from ..utils import seasons
+from ..utils import seasons, streaks
 from .logger import LogManager
 
 log_manager = LogManager()
@@ -26,72 +26,41 @@ config = Config()
 achievements = Achievements()
 
 
-########################
-##### BASIC ROUTES #####
-########################
+##############################
+##### ACHIEVEMENT CHECKS #####
+##############################
+# Nothing about rankings, totals or streaks is stored: they are computed from the
+# sessions whenever they are needed (crud/rankings.py). What is stored is only what
+# cannot be derived: the achievements a player has unlocked.
 
 
-async def recompute_user_stats(
+async def check_user(
     db: Session,
     user: models.User,
     silent: bool = False,
     announce_streak_loss: bool = False,
 ):
-    """Recompute one user's aggregates/achievements from their sessions
-    (game_timers)."""
+    """Check every achievement of one user against their sessions and library."""
     current_season = seasons.current()
+    today = datetime.date.today()
 
-    users.create_user_statistics(db, user.id)
-
-    played_days_season, real_played_days_season = time_entries.get_played_days(
-        db, user.id
-    )
-    users.update_played_days(db, user.id, len(real_played_days_season))
-    await achievements.user_played_total_days(
-        db, user, real_played_days_season, silent=silent
-    )
-    (
-        best_streak_date,
-        best_streak,
-        current_streak,
-        best_unplayed_streak_date,
-        best_unplayed_streak,
-        current_unplayed_streak,
-    ) = streak_days(db, user, real_played_days_season, current_season)
-    await check_streaks(
-        db, user, current_streak, best_streak, silent=silent, announce_loss=announce_streak_loss
-    )
-    users.update_streaks(
-        db,
-        user.id,
-        current_streak,
-        best_streak,
-        best_streak_date,
-        best_unplayed_streak,
-        best_unplayed_streak_date,
-        current_unplayed_streak,
-    )
-    played_time_games = time_entries.get_user_games_played_time(db, user.id)
-    for game in played_time_games:
-        if game[1] is not None:
-            users.update_played_time_game(db, user.id, game[0], game[1])
+    played_days = time_entries.get_played_days(db, user.id)[1]
+    await achievements.user_played_total_days(db, user, played_days, silent=silent)
+    best_streak_date, best_streak = streaks.streak_summary(played_days, today, current_season)[:2]
+    if announce_streak_loss:
+        await announce_lost_streak(user, played_days, today, silent)
+    for game_id, played_time in time_entries.get_user_games_played_time(db, user.id):
+        if played_time is not None:
             await achievements.user_played_hours_game(
-                db=db,
-                user=user,
-                game_id=game[0],
-                played_time=game[1],
-                silent=silent,
+                db=db, user=user, game_id=game_id, played_time=played_time, silent=silent
             )
     played_time = time_entries.get_user_played_time(db, user.id)
     played_time = played_time[1] if played_time is not None else 0
-    users.update_played_time(db, user.id, played_time)
     await achievements.user_played_total_time(db, user, played_time, silent=silent)
     await achievements.user_session_time(db, user, silent=silent)
     await achievements.user_played_total_games(db, user, silent=silent)
     await achievements.user_completed_total_games(db, user, silent=silent)
-    await achievements.user_streak(
-        db, user, best_streak, best_streak_date, silent=silent
-    )
+    await achievements.user_streak(db, user, best_streak, best_streak_date, silent=silent)
     await achievements.user_played_day_time(db, user, silent)
     await achievements.user_played_hours_game_day(db, user, silent=silent)
     await achievements.user_played_games_per_day(db, user, silent=silent)
@@ -100,418 +69,185 @@ async def recompute_user_stats(
     await achievements.nocturnal(db, user, silent)
 
 
-async def recompute_all_users_and_rankings(
+async def check_users(
     db: Session,
     silent: bool = False,
-    sync_season: bool = False,
     only_active_users: bool = True,
     user_ids: list[int] | None = None,
     announce_streak_loss: bool = False,
 ):
-    """Recompute every user's stats plus global rankings/achievements.
+    """Check the achievements of every user (or of `user_ids`).
 
-    Event-driven: it runs right after a native timer stops (routers/timers.py),
-    after an admin edit, and from the scheduler (utils/scheduler.py) for the
-    daily streak check and the season rollover. The time-gated work (weekly
-    summary, forgotten-timer reminder) lives in the scheduler, not here.
+    Event-driven: it runs right after a timer stops (routers/timers.py), from the
+    admin panel, and from the scheduler (utils/scheduler.py) for the daily check.
     """
     start_time = time.time()
-    silent = bool(silent) or sync_season
-
-    if sync_season:
-        logger.info("Resetting season/global statistics...")
-        # UserGame is intentionally NOT wiped here: the library cannot be
-        # rebuilt from anything else.
-        db.query(models.UserStatistics).delete()
-        db.query(models.GameStatistics).delete()
-        db.commit()
-
     achievements.populate_achievements(db)
     users_db = users.get_users(db, only_active_users)
     if user_ids is not None:
         users_db = [u for u in users_db if u.id in user_ids]
-
     try:
-        logger.info("########################")
-        logger.info("##### USER CHECKS ######")
-        logger.info("########################")
         for user in users_db:
-            calculation_start_time = time.time()
-            await recompute_user_stats(
-                db, user, silent=silent, announce_streak_loss=announce_streak_loss
-            )
-            logger.debug(
-                "Time spent on calculations: "
-                + str(time.time() - calculation_start_time)
-            )
-
-        logger.info("#########################")
-        logger.info("#### GENERAL CHECKS #####")
-        logger.info("#########################")
-
-        played_time_games = time_entries.get_games_played_time(db)
-        for game in played_time_games:
-            games.update_total_played_time(db, game[0], game[1])
-
-        await ranking_games_hours(db, silent=silent)
-        await ranking_players_hours(db, silent=silent)
+            await check_user(db, user, silent=silent, announce_streak_loss=announce_streak_loss)
         await achievements.teamwork(db, silent)
-
         elapsed_time = time.time() - start_time
-        if elapsed_time > 30 and not sync_season:
-            msg = (
-                "❗Ejecución lenta❗\n"
-                + "La última ejecución ha durado más de 30 segundos"
+        if elapsed_time > 30:
+            await utils.send_message_to_admins(
+                db, "❗Ejecución lenta❗\nLa última comprobación ha durado más de 30 segundos"
             )
-            await utils.send_message_to_admins(db, msg)
         logger.info("Elapsed time: " + str(elapsed_time))
     except Exception as e:
-        logger.error("Error on sync: " + str(e))
-        await utils.send_message_to_admins(db, "Error on sync: " + str(e))
+        logger.error("Error checking achievements: " + str(e))
+        await utils.send_message_to_admins(db, "Error checking achievements: " + str(e))
 
 
-# Serializes post-stop recomputes: two people stopping timers at once must not
-# run the same checks concurrently (duplicate achievements/notifications).
-_recompute_lock = threading.Lock()
+# Serializes the checks that follow a session: two people stopping timers at once must
+# not run the same checks concurrently (duplicate achievements/notifications).
+_check_lock = threading.Lock()
 
 
-def recompute_after_timer_stop(user_id: int | None = None, silent: bool = False):
-    """Background-task entrypoint for routers/timers.py::stop_timer_endpoint.
+def after_session_change(
+    user_id: int | None = None,
+    silent: bool = False,
+    ranking_before: dict | None = None,
+):
+    """Background-task entrypoint for routers/timers.py and the admin panel.
 
-    Deliberately a plain `def`: Starlette runs it in a worker thread. The
-    recompute is a long chain of blocking DB/OpenAI calls wrapped in async
-    functions, so running it on the event loop would freeze every other
-    request (the front's refresh right after stopping) until it finished.
-    It gets its own DB session (the request-scoped one is already closed by
-    the time a BackgroundTask runs) and its own event loop.
+    Deliberately a plain `def`: Starlette runs it in a worker thread. The checks are a
+    long chain of blocking DB/OpenAI calls wrapped in async functions, so running them
+    on the event loop would freeze every other request until they finished. It gets its
+    own DB session (the request-scoped one is already closed by the time a
+    BackgroundTask runs) and its own event loop.
 
-    Runs with notifications on (silent=False): the ranking checks persist the
-    new order even in silent mode, so a silent run here would swallow the
-    change and the cron would never announce it.
-
-    Only the user who stopped the timer is recomputed; the time-driven checks
-    for everyone else belong to the scheduler (utils/scheduler.py).
+    `ranking_before` is the snapshot taken before the change (see ranking_snapshot); when
+    given and not silent, the ranking changes it caused are announced.
     """
     from ..database.database import SessionLocal
 
     async def _run():
         db = SessionLocal()
         try:
-            await recompute_all_users_and_rankings(
-                db, silent=silent, user_ids=None if user_id is None else [user_id]
-            )
+            await check_users(db, silent=silent, user_ids=None if user_id is None else [user_id])
+            if ranking_before is not None:
+                await announce_ranking_changes(db, ranking_before, silent)
         finally:
             db.close()
 
-    with _recompute_lock:
+    with _check_lock:
         try:
             asyncio.run(_run())
         except Exception as e:
-            logger.error("Error recomputing stats after timer stop: " + str(e))
+            logger.error("Error checking after a session change: " + str(e))
 
 
-def streak_days(
-    db: Session,
-    user: models.User,
-    played_dates: list[datetime.date],
-    current_season: int,
-):
-    """
-    TODO:
-    """
-    max_streak = 0
-    start_streak_date = None
-    end_max_streak_date = None
-    current_streak = 0
-    try:
-        if len(played_dates) == 0:
-            end_max_streak_date = datetime.datetime.strptime(
-                str(current_season) + "-01-01", "%Y-%m-%d"
-            )
-            return end_max_streak_date, 0, 0, end_max_streak_date, 0, 0
-        elif len(played_dates) == 1:
-            end_max_streak_date = played_dates[0]
-            max_streak = 1
-            current_streak = 1
-        for i in range(1, len(played_dates)):
-            # Check diff between current and last date
-            diff = (played_dates[i] - played_dates[i - 1]).days
-            if diff == 1:
-                if current_streak == 0:
-                    start_streak_date = played_dates[i - 1]
-                current_streak += 1
-            else:
-                if current_streak >= max_streak:
-                    max_streak = current_streak
-                    end_max_streak_date = played_dates[i - 1]
-                current_streak = 0
-        # Check last date to add this day to the streak. If last d
-        today = datetime.date.today()
-        # Add last elem to streak if its yesterday
-        if (today - played_dates[-1]).days == 1:
-            current_streak += 1
-        # Add today to streak if the last elem is today
-        if (today - played_dates[-1]).days == 0:
-            current_streak += 1
-
-        # Check if current streak (with today) is longer than best (without today)
-        if current_streak > max_streak:
-            max_streak = current_streak
-            end_max_streak_date = played_dates[-1]
-
-        # Check is there is more than 1 day without play
-        if (today - played_dates[-1]).days > 1:
-            current_streak = 0
-    except Exception as e:
-        logger.error("Error calculating streak days: " + str(e))
-
-    # Unplayed days
-    max_gap = 0
-    end_max_gap_date = None
-    current_gap = 0
-
-    try:
-        for i in range(1, len(played_dates)):
-            gap = (played_dates[i] - played_dates[i - 1]).days - 1
-            if gap > 0:
-                # Update current gap
-                current_gap = gap
-                # Update max gap
-                if gap >= max_gap:
-                    max_gap = gap
-                    end_max_gap_date = played_dates[i]
-
-        # Check unplayed days for today
-        last_gap = (today - played_dates[-1]).days - 1
-        if last_gap > 0:
-            current_gap = last_gap
-            # If last gap is longer than max gap, update max gap
-            if last_gap > max_gap:
-                max_gap = last_gap
-                end_max_gap_date = today
-    except Exception as e:
-        logger.error("Error calculating unplayed days: " + str(e))
-
-    return (
-        end_max_streak_date,
-        max_streak,
-        current_streak,
-        end_max_gap_date,
-        max_gap,
-        current_gap,
-    )
-
-
-async def check_streaks(
-    db: Session,
-    user: models.User,
-    current_streak: int,
-    best_streak: int,
-    silent: bool = False,
-    announce_loss: bool = False,
-):
-    # announce_loss is only set by the daily scheduler run, so a lost streak is
-    # announced once (at 05:00), not every time a timer stops
-    # Check if user lose streak
-    current_db_streaks_data = users.get_streaks(db, user.username)[0]
-    # logger.info(current_streaks_data[0])
-    current_db_streak = current_db_streaks_data[0]
-    best_db_streak = current_db_streaks_data[1]
-    best_db_streak_date = current_db_streaks_data[2]
-    if (
-        current_db_streak is not None
-        and current_streak == 0
-        and current_db_streak > 10
-        and announce_loss
-    ):
-        msg = (
-            user.name
-            + " acaba de perder la racha de "
-            + str(current_db_streak)
-            + " días."
-        )
+async def announce_lost_streak(user: models.User, played_dates: list[datetime.date], today: datetime.date, silent: bool):
+    """Announce a streak of more than 10 days on the day it is lost (daily check)."""
+    lost = streaks.lost_streak(played_dates, today)
+    if lost is not None:
+        msg = user.name + " acaba de perder la racha de " + str(lost) + " días."
         logger.info(msg)
         await utils.send_message(msg, silent)
-    # TODO: Check this to avoid daily notifications when the streak is not lost
-    # if best_db_streak is not None and best_streak > best_db_streak:
-    #     msg = (
-    #         user.name
-    #         + " acaba de superar su mejor racha de "
-    #         + str(best_db_streak)
-    #         + " días."
-    #     )
-    #     logger.info(msg)
-    #     await utils.send_message(msg, silent)
 
 
 ####################
 ##### RANKINGS #####
 ####################
+# Announcements compare the ranking before and after a change: nothing is remembered
+# between runs, so there is no stored position that could go out of date.
 
 
-async def ranking_games_hours(db: Session, silent: bool):
-    # logger.debug("Checking games ranking hours...")
+def ranking_snapshot(db: Session) -> dict:
+    """Order of the players (by hours) and of the games (by hours) right now."""
+    return {
+        "players": [row["user_id"] for row in rankings.user_hours_players(db)],
+        "games": [row["game_id"] for row in time_entries.games_played_time(db)],
+    }
+
+
+def position_change(previous: int, current: int) -> tuple[int, str]:
+    """(places climbed, arrow text) of an item that was at `previous` and is now at `current`."""
+    climbed = previous - current
+    if climbed > 0:
+        return climbed, f"↑{climbed}"
+    if climbed < 0:
+        return climbed, f"↓{-climbed}"
+    return 0, "="
+
+
+def decorate_name(name: str, climbed: int) -> str:
+    """Bold and emoji for a name according to how far it moved."""
+    if climbed != 0:
+        name = "*" + name + "*"
+    if climbed > 1:
+        return "🔥 " + name
+    if climbed == 1:
+        return "⬆️ " + name
+    if climbed < -1:
+        return "🔻 " + name
+    if climbed == -1:
+        return "⬇️ " + name
+    return name
+
+
+def _previous_positions(before_ids: list) -> dict:
+    return {item: position for position, item in enumerate(before_ids, start=1)}
+
+
+def order_changed(before_ids: list, after_ids: list) -> bool:
+    """Did the relative order of the items present in both lists change?"""
+    common = set(before_ids) & set(after_ids)
+    return [i for i in before_ids if i in common] != [i for i in after_ids if i in common]
+
+
+def players_ranking_message(before_ids: list, players: list[dict]) -> str | None:
+    """Message for the players ranking, or None if the order did not change."""
+    after_ids = [p["user_id"] for p in players]
+    if not order_changed(before_ids, after_ids):
+        return None
+    previous = _previous_positions(before_ids)
+    msg = "📣 Actualización del ránking de horas 📣\n"
+    for position, player in enumerate(players, start=1):
+        climbed, arrow = position_change(previous.get(player["user_id"], position), position)
+        name = decorate_name(str(player["name"]), climbed)
+        hours = utils.convert_time_to_hours(player["played_time"] or 0)
+        msg += f"{position}. {name}: {hours} ({arrow})\n"
+    return msg
+
+
+def games_ranking_message(before_ids: list, games_now: list[dict]) -> str | None:
+    """Message for the top 10 of games, or None if the top 10 did not change."""
+    top = games_now[:10]
+    if [g["game_id"] for g in top] == before_ids[:10]:
+        return None
+    previous = _previous_positions(before_ids)
+    msg = "📣 Actualización del ránking de juegos 📣\n"
+    for position, game in enumerate(top, start=1):
+        climbed, arrow = position_change(previous.get(game["game_id"], position), position)
+        name = decorate_name(str(game["name"]), climbed)
+        msg += f"{position}. {name}: {utils.convert_time_to_hours(game['played_time'])} ({arrow})\n"
+    # a game that was in the top 10 and is now 11th has fallen out of it
+    if len(games_now) > 10 and previous.get(games_now[10]["game_id"], 11) < 11:
+        dropped = games_now[10]
+        msg += "----------\n"
+        msg += f"11. {dropped['name']}: {utils.convert_time_to_hours(dropped['played_time'])} (💀)\n"
+    return msg
+
+
+async def announce_ranking_changes(db: Session, before: dict, silent: bool):
+    """Announce how the players and games rankings moved since `before` (a ranking_snapshot)."""
+    if silent:
+        return
     try:
-        msg = ""
-        most_played_games = games.get_most_played_time(db, 11)
-        most_played: list[models.GameStatistics] = []
-        most_played_to_check = []  # Only for easy check with current ranking
-        for game in most_played_games:
-            most_played.append(game)
-            most_played_to_check.append(game.game_id)
-        result = games.current_ranking_hours(db)
-        current: list[models.Game] = []
-        current_to_check = []  # Only for easy check with most played
-        for game in result:
-            current.append(game)
-            current_to_check.append(game.game_id)
-        if current_to_check[:10] == most_played_to_check[:10]:
-            msg = "No changes in TOP 10 games ranking"
-            logger.info("No changes in TOP 10 games ranking")
-        else:
-            logger.info("Changes in TOP 10 games ranking")
-            msg = "📣 Actualización del ránking de juegos 📣\n"
-            i = 0
-            for game in most_played:
-                if i <= 10:
-                    game_name = games.get_game_by_id(db, game.game_id).name
-                    time = game.played_time
-                    current = game.current_ranking
-                    diff_raw = current - (i + 1)
-                    diff = str(diff_raw)
-                    # This adds '+' sign to games that up position (positive diff has not '+' sign)
-                    if diff_raw > 0:
-                        diff = "+" + diff
-                    diff = diff.replace("+", "↑")
-                    diff = diff.replace("-", "↓")
-                    if diff != "0":
-                        game_name = "*" + game_name + "*"
-                    else:
-                        diff = diff.replace("0", "=")
-                    if diff_raw > 1:
-                        game_name = "🔥 " + game_name
-                    if diff_raw == 1:
-                        game_name = "⬆️ " + game_name
-                    if diff_raw < 0:
-                        if diff_raw < -1:
-                            game_name = "🔻 " + game_name
-                        else:
-                            game_name = "⬇️ " + game_name
-                    # Only to check if game has fall of the top10
-                    # Then, always break
-                    if i == 10 and "↓" in diff:
-                        msg = msg + "----------\n"
-                        msg = (
-                            msg
-                            + str(i + 1)
-                            + ". "
-                            + game_name
-                            + ": "
-                            + str(utils.convert_time_to_hours(time))
-                            + " ("
-                            + "💀"
-                            + ")"
-                            + "\n"
-                        )
-                        break
-                    elif i < 10:
-                        msg = (
-                            msg
-                            + str(i + 1)
-                            + ". "
-                            + game_name
-                            + ": "
-                            + str(utils.convert_time_to_hours(time))
-                            + " ("
-                            + diff
-                            + ")"
-                            + "\n"
-                        )
-                    if i == 10:
-                        break
-                i += 1
-            await utils.send_message(
-                msg, silent, openai=True, system_prompt=prompts.RANKING_GAMES_PROMPT
-            )
-            logger.info(msg)
+        message = games_ranking_message(before["games"], time_entries.games_played_time(db))
+        if message:
+            logger.info(message)
+            await utils.send_message(message, silent, openai=True, system_prompt=prompts.RANKING_GAMES_PROMPT)
+        message = players_ranking_message(before["players"], rankings.user_hours_players(db))
+        if message:
+            logger.info(message)
+            await utils.send_message(message, silent, openai=True, system_prompt=prompts.RANKING_USER_PROMPT)
     except Exception as e:
-        logger.error("Error in check ranking games: " + str(e))
-    # logger.debug("Updating games ranking...")
-    most_played = games.get_most_played_time(db)
-    i = 1
-    for game in most_played:
-        games.update_current_ranking_hours(db, i, game.game_id)
-        i += 1
-
-
-async def ranking_players_hours(db: Session, silent: bool):
-    # logger.debug("Ranking player hours...")
-    played_time_db = users.played_time(db)
-    most_played: list[models.User] = []
-    most_played_to_check = []  # Only for easy check with current ranking
-    for player in played_time_db:
-        most_played.append(player)
-        most_played_to_check.append(player.user_id)
-    current_ranking_db = users.current_ranking_hours(db)
-    current: list[models.User] = []
-    current_to_check = []  # Only for easy check with most played
-    for player in current_ranking_db:
-        current.append(player)
-        current_to_check.append(player.user_id)
-    if current_to_check == most_played_to_check:
-        logger.info("No changes in player ranking")
-    else:
-        logger.info("Changes in player ranking")
-        msg = "📣 Actualización del ránking de horas 📣\n"
-        for i, player in enumerate(played_time_db):
-            name = str(users.get_user_by_id(db, player.user_id).name)
-            hours = player.played_time
-            if hours is None:
-                hours = 0
-            current = player.current_ranking_hours
-            diff_raw = current - (i + 1)
-            diff = str(diff_raw)
-            # This adds '+' sign to games that up position (positive diff has not '+' sign)
-            if diff_raw > 0:
-                diff = "+" + diff
-            diff = diff.replace("+", "↑")
-            diff = diff.replace("-", "↓")
-            if diff != "0":
-                name = "*" + str(name) + "*"
-            else:
-                diff = diff.replace("0", "=")
-            if diff_raw > 1:
-                name = "🔥 " + name
-            if diff_raw == 1:
-                name = "⬆️ " + name
-            if diff_raw < 0:
-                if diff_raw < -1:
-                    name = "🔻 " + name
-                else:
-                    name = "⬇️ " + name
-            msg = (
-                msg
-                + str(i + 1)
-                + ". "
-                + name
-                + ": "
-                + str(utils.convert_time_to_hours(hours))
-                + " ("
-                + diff
-                + ")"
-                + "\n"
-            )
-            users.update_current_ranking_hours(db, i + 1, player.user_id)
-        await utils.send_message(
-            msg, silent, openai=True, system_prompt=prompts.RANKING_USER_PROMPT
-        )
-        logger.info(msg)
-    # logger.debug("Updating players ranking...")
-    current_ranking = users.current_ranking_hours(db)
-    i = 1
-    for user in current_ranking:
-        users.update_current_ranking_hours(db, i, user.user_id)
-        i += 1
+        logger.error("Error announcing ranking changes: " + str(e))
 
 
 ##################
@@ -604,13 +340,8 @@ async def weekly_resume(
         achievements_diff = int(weekly_achievements) - int(last_weekly_achievements)
         if achievements_diff > 0:
             achievements_diff = "+" + str(achievements_diff)
-        # current_ranking = rankings.user_current_ranking(db, user)
-        # current_ranking = str(current_ranking[0][0])
         msg = (
             "🤖*Aquí está tu resumen semanal*********🤖\n"
-            # + "Ranking actual: "
-            # + current_ranking
-            # + "\n"
             + "Horas: "
             + utils.convert_time_to_hours(weekly_hours)
             + " ("

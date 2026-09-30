@@ -396,7 +396,7 @@ def create_manual_session_endpoint(
     """Add a finished session by hand: game, platform, start and end."""
     timer = create_manual_session(db, current_user, body)
     # silent: retroactive entries do not announce rankings/achievements to the group
-    background_tasks.add_task(actions.recompute_after_timer_stop, timer.user_id, True)
+    background_tasks.add_task(actions.after_session_change, timer.user_id, True)
     return timer
 
 
@@ -410,7 +410,7 @@ def update_session_endpoint(
 ):
     """Correct a finished session (platform, start, end)."""
     timer = update_session(db, current_user, timer_id, body)
-    background_tasks.add_task(actions.recompute_after_timer_stop, timer.user_id, True)
+    background_tasks.add_task(actions.after_session_change, timer.user_id, True)
     return timer
 
 
@@ -424,7 +424,7 @@ def delete_session_endpoint(
     """Remove a finished session (entered by mistake)."""
     owner = db.query(GameTimer.user_id).filter(GameTimer.id == timer_id).scalar()
     delete_session(db, current_user, timer_id)
-    background_tasks.add_task(actions.recompute_after_timer_stop, owner, True)
+    background_tasks.add_task(actions.after_session_change, owner, True)
     return {"message": "Sesión eliminada"}
 
 
@@ -460,8 +460,9 @@ def stop_timer_endpoint(
 ):
     """Stop an active timer"""
     auth.ensure_self_or_admin(current_user, user_id=user_id)
+    ranking_before = actions.ranking_snapshot(db)
     timer = stop_timer(db, timer_id, user_id)
-    background_tasks.add_task(actions.recompute_after_timer_stop, user_id)
+    background_tasks.add_task(actions.after_session_change, user_id, False, ranking_before)
     return timer
 
 

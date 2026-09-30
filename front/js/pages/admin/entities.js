@@ -109,7 +109,7 @@ export const ENTITIES = {
     ],
     toolbarActions: [{ act: 'rawg-sync', label: 'Sincronizar con RAWG…' }],
     canDelete: true,
-    deleteNote: 'Se borrarán también sus sesiones, entradas de biblioteca y estadísticas.',
+    deleteNote: 'Se borrarán también sus sesiones, entradas de biblioteca y logros.',
   },
 
   timers: {
