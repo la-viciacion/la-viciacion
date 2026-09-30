@@ -44,8 +44,9 @@ With a named volume the data is not in the repo folder: take backups with `maria
 | 11.8.9 | works (Windows/Docker Desktop) | not tested |
 | 12.3.3 | **fails at migration 012** (Windows/Docker Desktop) | not tested |
 | 13.0.2 | **fails at migration 012** (Windows/Docker Desktop) | works |
+| latest, untagged (Linux VPS) | works (production, 2026-09-30) | not needed |
 
-A bind mount on Linux (ext4, the VPS) was **not** tested; it is the ordinary setup and nothing points at a problem there, but say so if it fails. The symptom of the Windows problem is the API looping with `OperationalError: (1025, "Error on rename of './<db>/users_games' to './<db>/#sql-backup-...' (errno: 194 "Tablespace is missing for a table")` while the db log says `InnoDB: Cannot rename ... because the source file does not exist`. It is not a data or migration bug: the fix is `DB_DATA` (above) on Windows.
+**Linux server (the production VPS), `image: mariadb` without a tag (the latest release at deploy time), data on the `./db/data` bind mount: works.** The code-review release (migrations `015` and `016` included) was deployed there on 2026-09-30 and came up without problems. So the failure below is specific to Docker Desktop on Windows, not to MariaDB 12+ in general. The symptom of the Windows problem is the API looping with `OperationalError: (1025, "Error on rename of './<db>/users_games' to './<db>/#sql-backup-...' (errno: 194 "Tablespace is missing for a table")` while the db log says `InnoDB: Cannot rename ... because the source file does not exist`. It is not a data or migration bug: the fix is `DB_DATA` (above) on Windows.
 
 Rules of thumb:
 
