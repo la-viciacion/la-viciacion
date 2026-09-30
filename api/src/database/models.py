@@ -79,12 +79,12 @@ class UserGame(Base):
     __tablename__ = "users_games"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer)
-    game_id = Column(String(255))
+    user_id = Column(Integer, ForeignKey("users.id", name="fk_users_games_user"))
+    game_id = Column(String(255), ForeignKey("games.id", name="fk_users_games_game"))
     started_date = Column(Date, nullable=False)
     # derived by the database from started_date: never written by the app
     season = Column(Integer, Computed("YEAR(started_date)", persisted=False))
-    platform = Column(String(255))
+    platform = Column(String(255), ForeignKey("platform_tags.id", name="fk_users_games_platform"))
     completed = Column(Integer)
     completed_date = Column(Date)
     score = Column(Float)
@@ -111,12 +111,12 @@ class UserAchievement(Base):
     __tablename__ = "users_achievements"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer)
-    achievement_id = Column(Integer)
+    user_id = Column(Integer, ForeignKey("users.id", name="fk_users_achievements_user"))
+    achievement_id = Column(Integer, ForeignKey("achievements.id", name="fk_users_achievements_ach"))
     date = Column(Date, nullable=False)
     # derived by the database from date: never written by the app
     season = Column(Integer, Computed("YEAR(`date`)", persisted=False))
-    game_id = Column(String(255))
+    game_id = Column(String(255), ForeignKey("games.id", name="fk_users_achievements_game"))
     # an achievement is earned once per user and season
     __table_args__ = (UniqueConstraint("user_id", "achievement_id", "season", name="uq_users_achievements_season"),)
 
@@ -133,12 +133,12 @@ class GameTimer(Base):
     __tablename__ = "game_timers"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, nullable=False)
-    game_id = Column(String(255), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id", name="fk_game_timers_user"), nullable=False)
+    game_id = Column(String(255), ForeignKey("games.id", name="fk_game_timers_game"), nullable=False)
     start_time = Column(DateTime, nullable=False)
     end_time = Column(DateTime, nullable=True)
     duration_seconds = Column(Integer, nullable=True)
-    platform = Column(String(255), nullable=True)
+    platform = Column(String(255), ForeignKey("platform_tags.id", name="fk_game_timers_platform"), nullable=True)
     # derived by the database from start_time: never written by the app
     season = Column(Integer, Computed("YEAR(start_time)", persisted=False))
     is_active = Column(Boolean, default=True)
@@ -155,7 +155,10 @@ class AppSetting(Base):
     key = Column(String(100), primary_key=True)
     value = Column(Text, nullable=False)
     updated_at = Column(DateTime, server_default=text("CURRENT_TIMESTAMP"), onupdate=text("CURRENT_TIMESTAMP"))
-    updated_by = Column(Integer, nullable=True)  # users.id
+    # who edited it; ON DELETE SET NULL
+    updated_by = Column(
+        Integer, ForeignKey("users.id", name="fk_app_settings_updated_by", ondelete="SET NULL"), nullable=True
+    )
 
 
 class JobRun(Base):
@@ -174,7 +177,9 @@ class PushSubscription(Base):
     __tablename__ = "push_subscriptions"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, nullable=False, index=True)
+    user_id = Column(
+        Integer, ForeignKey("users.id", name="fk_push_subscriptions_user", ondelete="CASCADE"), nullable=False, index=True
+    )
     endpoint = Column(String(700), nullable=False)
     p256dh = Column(String(255), nullable=False)
     auth = Column(String(255), nullable=False)

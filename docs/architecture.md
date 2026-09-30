@@ -46,6 +46,7 @@ Routes and helpers are a mix of `def` and `async def`; the DB layer is synchrono
 Tables: `users`, `games`, `users_games` (the per-user **library entry**, unique per user/game/platform/season), `game_timers` (sessions: running timers and finished/manual ones), `achievements`, `users_achievements` (once per user and season), `platform_tags` (platform catalogue; its ids are what `platform` columns store), `user_settings` (personal preferences, see below), `app_settings`, `job_runs`.
 
 Notes:
+- **Foreign keys** (migration 016): `game_timers`, `users_games` and `users_achievements` point at `users`, `games`, `platform_tags` and `achievements`; `push_subscriptions.user_id` cascades and `app_settings.updated_by` is set to NULL when the user goes. The rest is RESTRICT: a user or game that still has sessions, library entries or achievements cannot be deleted, which is why `routers/manage.py` removes them first (after asking for confirmation). New tables that reference another one must declare their key in the model and in a migration.
 - `game_timers` is the only sessions table (time entries were merged into it in migration 004). `is_active` = running timer; `duration_seconds` is set on stop.
 - Nothing from Clockify remains in the schema (migration 010 dropped `users.clockify_*` and the `request_sync`, `logs` and `other_tags` tables); migrations 001-009 keep referring to it only to import old v1 backups.
 - Login identifiers: `email` (unique, lower-case) and `username` (unique nickname, no `@`, no spaces); `telegram_id` is unique when set.

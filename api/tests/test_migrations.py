@@ -135,5 +135,25 @@ class PlatformSeedTests(unittest.TestCase):
         self.assertIn("pc", ids)
 
 
+class ForeignKeyMigrationTests(unittest.TestCase):
+    def test_the_migration_and_the_models_declare_the_same_keys(self):
+        from src.database import models
+
+        migration = load_migration("016_foreign_keys")
+        declared = {
+            (fk.name, table.name, fk.parent.name, fk.column.table.name, fk.column.name, fk.ondelete)
+            for table in models.Base.metadata.tables.values()
+            for fk in table.foreign_keys
+            if table.name != "user_settings"  # created with its key by 014
+        }
+        self.assertEqual(declared, set(migration.KEYS))
+
+    def test_it_refuses_instead_of_fixing_and_says_where(self):
+        source = (VERSIONS_DIR / "016_foreign_keys.py").read_text(encoding="utf-8")
+        self.assertIn("nothing was changed", source)
+        self.assertNotIn("DELETE FROM", source)
+        self.assertNotIn("UPDATE ", source.replace("ON UPDATE", ""))
+
+
 if __name__ == "__main__":
     unittest.main()

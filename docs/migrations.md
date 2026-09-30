@@ -46,6 +46,7 @@ Use `api/alembic/versions/008_season_as_generated_column.py` and `009_settings_j
 Migrations 001-014 were written to upgrade a **v1 backup**, so they assume the v1 tables exist. `000_baseline_v1` creates those tables (only the ones the chain needs, exact v1 DDL, each only if missing), so an empty database walks the same path and ends in the same schema as an upgraded v1 backup; on a v1 backup or an already migrated database it does nothing. Verified 2026-09-30 by migrating an empty database and a v1 backup into throwaway MariaDBs and comparing `information_schema`: the only differences are the `_archived_time_entries_legacy` and `_archived_users_games_2024` tables that only a real v1 backup has, and the default collation of the tables that migrations 002, 009, 013 and 014 create without one (they follow the server's).
 
 - `001`'s `down_revision` was changed once, from `None` to `000_baseline_v1`, to make the baseline the root. It is metadata: it does not affect a database that already has a recorded revision.
+- `016_foreign_keys` adds the foreign keys. It aborts, changing nothing, and lists the offending rows if any reference points at nothing (`API` keeps restarting until they are fixed, see above); it is the model for adding constraints to a populated database.
 - `015_seed_platforms` gives a database with no platforms the default catalogue (data migration, only if `platform_tags` is empty).
 - Keep `000` and the old migrations as they are: they are what makes "empty database → head" and "v1 backup → head" the same road.
 
