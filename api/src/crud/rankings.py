@@ -83,7 +83,7 @@ def user_ranking_achievements(
                 func.count(models.UserAchievement.achievement_id).label("achievements"),
                 models.User.name,
             )
-            .filter(models.UserAchievement.season == season)
+            .filter(models.UserAchievement.season == season, models.not_god())
             .join(models.User, models.User.id == models.UserAchievement.user_id)
             .group_by(models.UserAchievement.user_id, models.User.name)
             .order_by(func.count(models.UserAchievement.achievement_id).desc(), models.UserAchievement.user_id)
@@ -111,7 +111,7 @@ def user_played_games(
                 func.count(func.distinct(models.UserGame.game_id)).label("played_games"),
                 models.User.name,
             )
-            .filter(models.UserGame.season == season)
+            .filter(models.UserGame.season == season, models.not_god())
             .join(models.User, models.User.id == models.UserGame.user_id)
         )
 
@@ -143,6 +143,7 @@ def library_counts(db: Session, season: int = None, is_active: bool | None = Tru
             models.UserGame,
             and_(models.UserGame.user_id == models.User.id, models.UserGame.season == season),
         )
+        .where(models.not_god())
         .group_by(models.User.id, models.User.name)
     )
     if is_active is not None:
@@ -173,6 +174,8 @@ def games_last_played(db: Session, limit: int = 10):
         # group and cut first (game ids only), then look the names up for the few that remain
         latest = (
             select(sessions.c.game_id, last)
+            .join(models.User, models.User.id == sessions.c.user_id)
+            .where(models.not_god())
             .group_by(sessions.c.game_id)
             .order_by(desc(last))
             .limit(limit)
@@ -207,6 +210,8 @@ def platform_played_games(db: Session, limit: int = None):
                 models.PlatformTag,
                 models.UserGame.platform == models.PlatformTag.id,
             )
+            .join(models.User, models.User.id == models.UserGame.user_id)
+            .where(models.not_god())
             .group_by(models.UserGame.platform)
             .order_by(func.count(models.UserGame.platform).desc())
             .limit(limit)

@@ -32,6 +32,12 @@ Debes añadir, además, la media de tiempo que se indica en el mensaje original.
 usuario, sino la media que se tarda en completar ese juego.
 """
 
+NEW_GAME_RECOMMENDATION = """
+Al final del mensaje, añade una frase corta y divertida recomendando al usuario el juego que se indica
+a continuación, diciendo que lo tiene o lo ha jugado la persona indicada. Debes incluir siempre el
+nombre del juego y el de esa persona.
+"""
+
 RANKING_USER_PROMPT = """
 Tu función es crear una frase divertida basándote
 en la clasificación proporcionada por el usuario, teniendo en cuenta que la temática debe ser de videojuegos.

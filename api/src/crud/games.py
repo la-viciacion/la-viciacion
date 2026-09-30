@@ -60,7 +60,7 @@ def recommended_games(
         )
         .join(models.Game, models.UserGame.game_id == models.Game.id)
         .join(models.User, models.UserGame.user_id == models.User.id)
-        .filter(models.UserGame.user_id != user_id)
+        .filter(models.UserGame.user_id != user_id, models.not_god(), models.User.is_active == 1)
         .filter(models.UserGame.game_id.notin_(played_by_user))
         .filter(or_(*genres_filter) if genres_filter else true())
         .limit(limit)
@@ -77,6 +77,47 @@ def recommended_games(
             unique_recommended_games.append(game)
             seen_game_ids.add(game[0])
     return unique_recommended_games
+
+
+def recommendations_for(db: Session, user_id: int, limit: int = 12) -> list[dict]:
+    """Games other (active) players have and `user_id` has never had in their library, any season.
+
+    The ones more players share come first, then those more of them completed, then by name, so the
+    answer is the same until somebody's library changes."""
+    owned = select(models.UserGame.game_id).where(models.UserGame.user_id == user_id)
+    player = func.coalesce(models.User.name, models.User.username)
+    rows = (
+        db.query(
+            models.Game.id, models.Game.name, models.Game.genres, models.Game.image_url,
+            models.User.id, player, models.UserGame.completed,
+        )
+        .select_from(models.UserGame)
+        .join(models.Game, models.UserGame.game_id == models.Game.id)
+        .join(models.User, models.UserGame.user_id == models.User.id)
+        .filter(
+            models.UserGame.user_id != user_id,
+            models.UserGame.game_id.notin_(owned),
+            models.User.is_active == 1,
+            models.not_god(),
+        )
+        .all()
+    )
+    found: dict[str, dict] = {}
+    completed_by: dict[str, set[int]] = {}
+    for game_id, name, genres, image_url, owner_id, owner, completed in rows:
+        item = found.setdefault(
+            game_id,
+            {"game_id": game_id, "game_name": name, "genres": genre_list(genres), "image_url": image_url, "players": []},
+        )
+        if owner not in item["players"]:
+            item["players"].append(owner)
+        if completed:
+            completed_by.setdefault(game_id, set()).add(owner_id)
+    for game_id, item in found.items():
+        item["players"].sort(key=str.lower)
+        item["completed_by"] = len(completed_by.get(game_id, ()))
+    ranked = sorted(found.values(), key=lambda i: (-len(i["players"]), -i["completed_by"], i["game_name"].lower()))
+    return ranked[:limit]
 
 
 async def new_game(db: Session, game: schemas.NewGame) -> models.Game:

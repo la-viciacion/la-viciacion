@@ -167,7 +167,7 @@ def _deliver(devices: list[tuple], payload: dict, private_pem: str, subject: str
 
 def active_users_only(query):
     """Devices of accounts that are still active: a disabled user gets no notices."""
-    active = select(models.User.id).where(models.User.is_active == 1)
+    active = select(models.User.id).where(models.User.is_active == 1, models.not_god())
     return query.filter(models.PushSubscription.user_id.in_(active))
 
 

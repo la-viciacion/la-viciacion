@@ -61,8 +61,10 @@ def players_played_time(db: Session, season: int = None, is_active: bool | None 
         .subquery()
     )
     played = cast(func.coalesce(total.c.seconds, 0), Integer).label("played_time")
-    stmt = select(models.User.id.label("user_id"), models.User.name, played).outerjoin(
-        total, total.c.user_id == models.User.id
+    stmt = (
+        select(models.User.id.label("user_id"), models.User.name, played)
+        .outerjoin(total, total.c.user_id == models.User.id)
+        .where(models.not_god())
     )
     if is_active is not None:
         stmt = stmt.where(models.User.is_active == is_active)
@@ -76,7 +78,7 @@ def players_played_dates(db: Session, season: int = None, is_active: bool | None
     Every player is a key, with an empty list when they have not played."""
     season = seasons.or_current(season)
     sessions = sessions_subquery()
-    players = select(models.User.id)
+    players = select(models.User.id).where(models.not_god())
     if is_active is not None:
         players = players.where(models.User.is_active == is_active)
     days = {user_id: [] for (user_id,) in db.execute(players).all()}
@@ -100,7 +102,7 @@ def games_played_time(db: Session, season: int = None, limit: int | None = None,
         select(sessions.c.game_id.label("game_id"), models.Game.name, played)
         .join(models.User, sessions.c.user_id == models.User.id)
         .join(models.Game, models.Game.id == sessions.c.game_id)
-        .where(sessions.c.season == season)
+        .where(sessions.c.season == season, models.not_god())
         .group_by(sessions.c.game_id, models.Game.name)
         .having(func.sum(sessions.c.duration) > 0)
         .order_by(desc(played), models.Game.name)

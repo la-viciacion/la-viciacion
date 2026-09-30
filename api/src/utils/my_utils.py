@@ -81,13 +81,12 @@ def validate_username(username) -> str | None:
     return None
 
 
-def convert_time_to_hours(seconds) -> str:
+def format_duration(seconds) -> str:
+    """3725 -> '01h02m'. Units are spelled out so nobody reads it as minutes and seconds."""
     if seconds is None:
-        return "00:00"
+        return "00h00m"
     seconds = int(seconds)  # SQL sums come back as Decimal
-    hours = seconds // 3600
-    minutes = (seconds % 3600) // 60
-    return f"{hours:02d}:{minutes:02d}"
+    return f"{seconds // 3600:02d}h{seconds % 3600 // 60:02d}m"
 
 
 def convert_date_from_text(date: str):
@@ -381,8 +380,10 @@ async def send_message(
     image=None,
     openai=False,
     system_prompt=prompts.DEFAULT_SYSTEM_PROMPT,
-    new_game_recommended=None,
+    new_game_recommended: dict | None = None,
 ):
+    """`new_game_recommended` ({"game", "user"}) is suggested at the end of the notice: by the AI when
+    it rewrites the message, as a plain line when it does not (no key, or it failed)."""
     if not silent and not settings.get("notifications.enabled"):
         logger.info("Notifications are disabled. Message not sent.")
         return
@@ -392,17 +393,13 @@ async def send_message(
         return
     if not silent:
         logger.info("Preparing message...")
+        rewritten = False
         if openai:
             try:
-                # logger.debug("Original message: " + msg)
-                # logger.debug("System prompt: " + system_prompt)
-                if new_game_recommended is not None:
-                    system_prompt += "\n" + prompts.NEW_GAME_RECOMENDATION + "\n"
-                    system_prompt += (
-                        "Juego recomendado: " + str(new_game_recommended["game"]) + "\n"
-                    )
+                if new_game_recommended:
+                    system_prompt += "\n" + prompts.NEW_GAME_RECOMMENDATION + "\n"
+                    system_prompt += "Juego recomendado: " + str(new_game_recommended["game"]) + "\n"
                     system_prompt += "Jugado por: " + str(new_game_recommended["user"])
-                    # logger.info(system_prompt)
                 # the client is synchronous: keep it off the event loop
                 completion = await asyncio.to_thread(
                     oai_client.chat_completion, user_prompt=msg, system_prompt=system_prompt
@@ -410,8 +407,14 @@ async def send_message(
                 if completion is not None:
                     logger.info(completion.choices[0].message.content)
                     msg = completion.choices[0].message.content
+                    rewritten = True
             except Exception as e:
                 logger.info("Error generating completion: " + str(e))
+        if new_game_recommended and not rewritten:
+            msg += (
+                f"\n\n🎮 ¿Te apetece probar *{escape_markdown(new_game_recommended['game'])}*? "
+                f"Lo tiene {escape_markdown(new_game_recommended['user'])}."
+            )
         await push.notify_group(msg)  # never raises: it must not affect Telegram
         if not telegram_ready:
             logger.info("Telegram is not configured. Message sent by push only.")

@@ -284,7 +284,7 @@ def players_ranking_message(before_ids: list, players: list[dict]) -> str | None
     for position, player in enumerate(players, start=1):
         climbed, arrow = position_change(previous.get(player["user_id"], position), position)
         name = decorate_name(str(player["name"]), climbed)
-        hours = utils.convert_time_to_hours(player["played_time"] or 0)
+        hours = utils.format_duration(player["played_time"] or 0)
         msg += f"{position}. {name}: {hours} ({arrow})\n"
     return msg
 
@@ -299,12 +299,12 @@ def games_ranking_message(before_ids: list, games_now: list[dict]) -> str | None
     for position, game in enumerate(top, start=1):
         climbed, arrow = position_change(previous.get(game["game_id"], position), position)
         name = decorate_name(str(game["name"]), climbed)
-        msg += f"{position}. {name}: {utils.convert_time_to_hours(game['played_time'])} ({arrow})\n"
+        msg += f"{position}. {name}: {utils.format_duration(game['played_time'])} ({arrow})\n"
     # a game that was in the top 10 and is now 11th has fallen out of it
     if len(games_now) > 10 and previous.get(games_now[10]["game_id"], 11) < 11:
         dropped = games_now[10]
         msg += "----------\n"
-        msg += f"11. {dropped['name']}: {utils.convert_time_to_hours(dropped['played_time'])} (💀)\n"
+        msg += f"11. {dropped['name']}: {utils.format_duration(dropped['played_time'])} (💀)\n"
     return msg
 
 
@@ -426,9 +426,9 @@ async def weekly_resume(
         msg = (
             "🤖 *Aquí está tu resumen semanal* 🤖\n"
             + "Horas: "
-            + utils.convert_time_to_hours(weekly_hours)
+            + utils.format_duration(weekly_hours)
             + " ("
-            + signed_difference(hours_diff, utils.convert_time_to_hours)
+            + signed_difference(hours_diff, utils.format_duration)
             + ")\n"
             + "Sesiones: "
             + weekly_sessions

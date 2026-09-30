@@ -47,6 +47,15 @@ class User(Base):
     )
 
 
+GOD_USERNAME = "admin"
+
+
+def not_god():
+    """Condition that leaves out the emergency account: it is a door, not a player, so it never
+    appears in rankings, statistics, notices or the lists of people (only the admin panel lists it)."""
+    return User.username != GOD_USERNAME
+
+
 class UserSettings(Base):
     """Personal preferences, one row per user (see utils/user_settings.py).
 

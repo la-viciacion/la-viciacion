@@ -7,12 +7,12 @@ from src.utils import my_utils as utils
 
 class HoursFormatTests(unittest.TestCase):
     def test_hours_and_minutes(self):
-        self.assertEqual(utils.convert_time_to_hours(3600 * 12 + 34 * 60 + 56), "12:34")
-        self.assertEqual(utils.convert_time_to_hours(59), "00:00")
-        self.assertEqual(utils.convert_time_to_hours(None), "00:00")
+        self.assertEqual(utils.format_duration(3600 * 12 + 34 * 60 + 56), "12h34m")
+        self.assertEqual(utils.format_duration(59), "00h00m")
+        self.assertEqual(utils.format_duration(None), "00h00m")
 
     def test_sql_sums_arrive_as_decimal(self):
-        self.assertEqual(utils.convert_time_to_hours(decimal.Decimal(5400)), "01:30")
+        self.assertEqual(utils.format_duration(decimal.Decimal(5400)), "01h30m")
 
 
 class SignedDifferenceTests(unittest.TestCase):
@@ -22,5 +22,5 @@ class SignedDifferenceTests(unittest.TestCase):
         self.assertEqual(actions.signed_difference(0), "=")
 
     def test_hours_keep_their_sign(self):
-        self.assertEqual(actions.signed_difference(-1800, utils.convert_time_to_hours), "-00:30")
-        self.assertEqual(actions.signed_difference(5400, utils.convert_time_to_hours), "+01:30")
+        self.assertEqual(actions.signed_difference(-1800, utils.format_duration), "-00h30m")
+        self.assertEqual(actions.signed_difference(5400, utils.format_duration), "+01h30m")

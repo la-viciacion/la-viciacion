@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from .. import auth
 from ..auth import get_db
-from ..crud import users
+from ..crud import games, users
 from ..database import models, schemas
 from ..utils import actions, images
 from ..utils import messages as msg
@@ -202,6 +202,20 @@ def get_library(
     auth.ensure_self_or_admin(active_user, username=username)
     user = _target_user(db, active_user, username)
     return users.get_library(db, user.id, limit, offset)
+
+
+@router.get("/{username}/recommendations")
+@version(1)
+def get_recommendations(
+    username: str,
+    limit: int = Query(12, ge=1, le=50),
+    active_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Games the other players have and the user has never had, the most shared first"""
+    auth.ensure_self_or_admin(active_user, username=username)
+    user = _target_user(db, active_user, username)
+    return games.recommendations_for(db, user.id, limit)
 
 
 def _check_completion_date(entry: models.UserGame, date: datetime.date):

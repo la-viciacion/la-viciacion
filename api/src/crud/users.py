@@ -39,7 +39,7 @@ config = Config()
 #################
 
 
-GOD_USERNAME = "admin"
+GOD_USERNAME = models.GOD_USERNAME
 GOD_NAME = "Dios"
 
 
@@ -160,7 +160,7 @@ def get_profile(db: Session, user: models.User, season: int = None) -> dict:
 
 def get_users(db: Session, is_active: bool = True) -> list[models.User]:
     """
-    Get users based on their active status.
+    Get the players based on their active status (never the emergency account).
 
     Args:
         db (Session): DB Session
@@ -171,7 +171,7 @@ def get_users(db: Session, is_active: bool = True) -> list[models.User]:
         list[models.User]: List of users based on the filter.
     """
     try:
-        query = db.query(models.User)
+        query = db.query(models.User).filter(models.not_god())
         if is_active is True:  # Apply filter only if is_active is not None
             query = query.filter(models.User.is_active == is_active)
         return query.all()
@@ -714,13 +714,13 @@ async def after_completion(db: Session, entry: models.UserGame, silent: bool):
         + ": *"
         + game.name
         + "* en "
-        + str(utils.convert_time_to_hours(completion_time))
+        + str(utils.format_duration(completion_time))
         + ". La media está en "
-        + str(utils.convert_time_to_hours(avg_time))
+        + str(utils.format_duration(avg_time))
         + "."
     )
     logger.info(message)
-    new_game_info = {}
+    new_game_info = None
     suggestions = games.recommended_games(db, entry.user_id, genres=game.genres)
     if suggestions:
         new_game = random.choice(suggestions)
