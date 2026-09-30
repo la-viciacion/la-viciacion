@@ -10,6 +10,9 @@ When running the API outside Docker, `MARIADB_HOST` must point to a reachable DB
 
 ## Run the stack
 
+**On Windows set `DB_DATA=laviciacion_db_data` in your `.env`** (line commented in `.env.template`) before the first `up`: the database then lives in a Docker named volume. With the default `./db/data` bind mount, MariaDB 12+ cannot rebuild tables on Docker Desktop and migration 012 fails (`errno: 194 "Tablespace is missing for a table"`). Backups then go through `mariadb-dump`, not by copying `db/data`. See [deployment.md](deployment.md#database-storage-linux-vs-windows).
+
+
 ```bash
 docker compose up -d --build           # everything
 docker compose up -d --build laviciacion-api   # rebuild one service

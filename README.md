@@ -94,6 +94,8 @@ The stack is four services orchestrated by `docker-compose.yml`: `laviciacion-db
 docker compose up -d --build
 ```
 
+> **Windows (Docker Desktop):** add `DB_DATA=laviciacion_db_data` to `.env` before the first start (see `.env.template`), so the database lives in a Docker volume instead of `./db/data`. On that folder MariaDB 12+ cannot rebuild tables and the migrations fail. On Linux leave it unset. Details and tested versions: [docs/deployment.md](docs/deployment.md#database-storage-linux-vs-windows).
+
 MariaDB starts with an empty database and the API's `alembic upgrade head` builds the whole schema from scratch (migration `000_baseline_v1` creates the starting tables, the rest run in order, and `015_seed_platforms` adds a default list of platforms). On start the API also creates the `admin` user from `GOD_ADMIN_PASS`, the achievements and the push keys. Nothing else to do: fill in `.env` and run it.
 
 ### Migrating an existing (pre-v2) database into a new environment

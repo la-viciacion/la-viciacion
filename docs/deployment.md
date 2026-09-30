@@ -35,6 +35,24 @@ Single `.env` (template: `.env.template`). Production checklist:
 
 With a named volume the data is not in the repo folder: take backups with `mariadb-dump` (see below). To move an existing Windows database to the volume: dump it, `docker compose down`, set `DB_DATA`, start the stack with an empty volume and import the dump (or drop it in `db/init/` for the first boot). The Linux/VPS setup does not need any change.
 
+### MariaDB version
+
+`docker-compose.yml` uses `image: mariadb` without a tag, so a rebuild or a pull moves to whatever the latest release is (13.0 at the time of writing). What was tested (2026-09-30, a v1 backup migrated from scratch to `016_foreign_keys`, then the API started):
+
+| MariaDB | Data on `./db/data` (bind mount) | Data on a named volume |
+|---|---|---|
+| 11.8.9 | works (Windows/Docker Desktop) | not tested |
+| 12.3.3 | **fails at migration 012** (Windows/Docker Desktop) | not tested |
+| 13.0.2 | **fails at migration 012** (Windows/Docker Desktop) | works |
+
+A bind mount on Linux (ext4, the VPS) was **not** tested; it is the ordinary setup and nothing points at a problem there, but say so if it fails. The symptom of the Windows problem is the API looping with `OperationalError: (1025, "Error on rename of './<db>/users_games' to './<db>/#sql-backup-...' (errno: 194 "Tablespace is missing for a table")` while the db log says `InnoDB: Cannot rename ... because the source file does not exist`. It is not a data or migration bug: the fix is `DB_DATA` (above) on Windows.
+
+Rules of thumb:
+
+- **Do not change the major version of a database that already has data by editing the image.** MariaDB does not support downgrading a data directory: going from 13 back to 11.8 (or the other way after a rollback) may refuse to start. Move between versions with a `mariadb-dump` and an empty data directory.
+- Tables created by migrations 002, 009, 013 and 014 take the server's default collation, which differs between MariaDB versions (it was `utf8mb4_uca1400_ai_ci` on 13.0); the v1 tables and `game_timers.game_id` are `utf8mb4_general_ci`. A foreign key needs both columns to have the same collation, so `016` converts `game_timers.platform` to match `platform_tags.id`; keep it in mind before comparing string columns of different tables.
+- To pin a version, set `image: mariadb:11.8` (LTS) in the compose file. Decide it once for all environments; see [roadmap](roadmap.md).
+
 ## TLS and exposure
 
 The compose file publishes the front on `:3000` (plain HTTP) and the API/DB only on localhost. TLS termination and the public domain are expected to be handled by a reverse proxy in front of the front container (not part of this repo). Do not publish the DB or the API directly.
@@ -51,6 +69,18 @@ Migrations run automatically on API start, so a deploy that includes a migration
 
 - Take a DB backup **before** deploying a migration (see below); read [migrations.md](migrations.md#operating-migrations) for what to do if it fails. If the API container loops on restart, the migration is failing: check the logs, do not stamp.
 - The API is a single replica (in-process scheduler). Do not scale it horizontally.
+
+### Deploying the v2 migrations (000-016) onto an existing database
+
+The first deploy of the code-review release (2026-09-30) runs `015_seed_platforms` and `016_foreign_keys` on your data (`000_baseline_v1` does nothing when the tables exist). Before it:
+
+1. **Back up** (see below). This is the only way back: `000` cannot be downgraded and `016` only drops its keys.
+2. Deploy as usual and read `docker compose logs -f laviciacion-api`.
+3. `015` adds a default list of platforms **only if `platform_tags` is empty**; a database with platforms is untouched.
+4. `016` adds the foreign keys (sessions, library entries and achievements point at users, games, platforms and achievements; push devices go with their user). **If some row points at something that no longer exists, the migration aborts without changing anything** and the API container keeps restarting (`restart: unless-stopped`) until the data is fixed. The log lists, per column, how many rows, some of the offending values and the `SELECT` that shows them. Typical causes: a game or user deleted by hand, a platform renamed or removed, a session with an empty `game_id`. Fix them (point them at the right record or delete them, your call: the migration never does it for you), and the next restart applies it. `docker compose logs laviciacion-api | grep -A12 "Cannot add the foreign keys"` finds the report.
+5. Healthy signs: `Running upgrade 014_user_settings -> 015_seed_platforms`, `... -> 016_foreign_keys`, then `Scheduler started` and `GET /api/v1/` answering.
+
+After `016` the database rejects what used to be kept by hand: deleting a user or a game that still has sessions, library entries or achievements fails (the admin panel already asks for confirmation and removes them first).
 - Front and API are deployed together; keep API changes backwards compatible with the previously cached front where feasible (the front is revalidated on every load, so mismatch windows are short).
 
 ## Backups and restore
@@ -64,7 +94,7 @@ Backups (`*.sql`, `*.sql.gz`, `*.dump`) are gitignored; store them outside the r
 
 ## Rollback
 
-Code rollback: check out the previous revision and `docker compose up -d --build`. If a migration was applied, either restore the pre-deploy backup or run `alembic downgrade` only when that migration defines a real downgrade. Prefer restore from backup for anything destructive.
+Code rollback: check out the previous revision and `docker compose up -d --build` (the previous code works on the schema after `015`/`016`; what it did that the keys forbid, such as storing a session of a game that does not exist, would now fail instead of being stored). If a migration was applied, either restore the pre-deploy backup or run `alembic downgrade` only when that migration defines a real downgrade. Prefer restore from backup for anything destructive.
 
 ## Health
 

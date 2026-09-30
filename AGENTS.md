@@ -55,6 +55,7 @@ Full details in [docs/development.md](docs/development.md).
 ## Working agreements
 
 - **Language**: code, identifiers, comments, commit messages and docs in English. The **UI and API user-facing error messages are in Spanish** (`api/src/utils/messages.py`, front strings); keep that.
+- **Database storage / MariaDB:** on Windows/Docker Desktop set `DB_DATA=laviciacion_db_data` in `.env` (a named volume); the default `./db/data` bind mount breaks table-rebuilding migrations on MariaDB 12+. Never change the MariaDB major version of a database that has data by editing the image. Details: [docs/deployment.md](docs/deployment.md#database-storage-linux-vs-windows).
 - Match the surrounding code style; comments explain *why*, not *what*. No dead code, no commented-out blocks.
 - Keep changes focused; do not refactor unrelated code in the same change.
 - Before finishing a change: run the API and front tests, lint the front, and if you touched behaviour described in `README.md` or `docs/`, update those docs in the same change.
