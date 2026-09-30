@@ -461,8 +461,8 @@ def get_games(
     # Local import to avoid a circular import (crud.time_entries imports crud.users).
     from . import time_entries as time_entries_crud
 
-    entry_time = time_entries_crud.entry_played_time()
-    last = _last_played_by_year()
+    entry_time = time_entries_crud.entry_played_time(user_id)
+    last = _last_played_by_year(user_id)
     stmt = (
         select(
             models.UserGame.__table__,
@@ -516,18 +516,17 @@ def get_game_by_id(db: Session, user_id, game_id, season) -> models.UserGame:
 # ── Library: every game of a user, with its completion state ──
 
 
-def _last_played_by_year():
-    """Latest session start per (user, game, season)."""
-    return (
-        select(
-            models.GameTimer.user_id.label("user_id"),
-            models.GameTimer.game_id.label("game_id"),
-            models.GameTimer.season.label("season"),
-            func.max(models.GameTimer.start_time).label("last_played"),
-        )
-        .group_by(models.GameTimer.user_id, models.GameTimer.game_id, models.GameTimer.season)
-        .subquery("last_played")
+def _last_played_by_year(user_id: int | None = None):
+    """Latest session start per (user, game, season), of one user when given (see entry_played_time)."""
+    stmt = select(
+        models.GameTimer.user_id.label("user_id"),
+        models.GameTimer.game_id.label("game_id"),
+        models.GameTimer.season.label("season"),
+        func.max(models.GameTimer.start_time).label("last_played"),
     )
+    if user_id is not None:
+        stmt = stmt.where(models.GameTimer.user_id == user_id)
+    return stmt.group_by(models.GameTimer.user_id, models.GameTimer.game_id, models.GameTimer.season).subquery("last_played")
 
 
 def _completed_keys(db: Session, user_id: int) -> set:
@@ -547,8 +546,8 @@ def completed_in_season(db: Session, user_id: int, game_id: str, season: int) ->
 def _library_query(user_id: int, entry_id: int | None = None):
     from . import time_entries as time_entries_crud
 
-    last = _last_played_by_year()
-    entry_time = time_entries_crud.entry_played_time()
+    last = _last_played_by_year(user_id)
+    entry_time = time_entries_crud.entry_played_time(user_id)
     stmt = (
         select(
             models.UserGame,
@@ -761,7 +760,7 @@ def top_games(db: Session, username: str, limit: int = 10, season: int = None):
     season = seasons.or_current(season)
     try:
         user = get_user_by_username(db, username)
-        entry_time = time_entries_crud.entry_played_time()
+        entry_time = time_entries_crud.entry_played_time(user.id)
         played = func.coalesce(entry_time.c.played_time, 0)
         stmt = (
             select(
@@ -825,7 +824,7 @@ def get_achievements(db: Session, username: str, season: int = None):
                 models.UserAchievement.achievement_id,
                 models.Achievement.id,
             )
-            .order_by(asc(models.UserAchievement.date))
+            .order_by(asc(models.UserAchievement.date), asc(models.UserAchievement.id))
         )
         return db.execute(stmt).fetchall()
     except Exception as e:

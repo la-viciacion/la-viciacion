@@ -57,6 +57,10 @@ class EngineTests(unittest.TestCase):
         self.assertTrue(engine.pool._pre_ping)
         self.assertLess(engine.pool._recycle, 8 * 3600)
 
+    def test_the_pool_covers_every_worker_thread(self):
+        # 40 request threads by default, plus the scheduler and the background checks
+        self.assertGreaterEqual(engine.pool.size() + engine.pool._max_overflow, 40 + 10)
+
 
 if __name__ == "__main__":
     unittest.main()

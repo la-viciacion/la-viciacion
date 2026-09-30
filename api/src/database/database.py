@@ -7,7 +7,10 @@ config = Config()
 
 engine = create_engine(
     f"mysql+pymysql://{config.DB_USER}:{config.DB_PASS}@{config.DB_HOST}/{config.DB_NAME}",
-    pool_size=20,
+    # a request thread holds a connection while it works: as many as the server has worker threads
+    # (40 by default) plus the scheduler and the background checks, so nobody waits for one
+    pool_size=30,
+    max_overflow=30,
     # MariaDB drops connections idle for longer than its wait_timeout (8 h by default): check a
     # connection before using it and retire old ones, or the first request after a quiet night fails
     pool_pre_ping=True,

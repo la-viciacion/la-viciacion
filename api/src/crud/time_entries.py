@@ -112,19 +112,21 @@ def games_played_time(db: Session, season: int = None, limit: int | None = None,
     return [dict(row._mapping) for row in db.execute(stmt).all()]
 
 
-def entry_played_time():
-    """Seconds played per (user, game, season): the time of a library entry."""
+def entry_played_time(user_id: int | None = None):
+    """Seconds played per (user, game, season): the time of a library entry.
+
+    With `user_id` only that user's sessions are summed: the caller filters by that user
+    anyway, and saying it here keeps the database from summing everybody's first."""
     sessions = sessions_subquery()
-    return (
-        select(
-            sessions.c.user_id.label("user_id"),
-            sessions.c.game_id.label("game_id"),
-            sessions.c.season.label("season"),
-            cast(func.sum(sessions.c.duration), Integer).label("played_time"),
-        )
-        .group_by(sessions.c.user_id, sessions.c.game_id, sessions.c.season)
-        .subquery("entry_time")
+    stmt = select(
+        sessions.c.user_id.label("user_id"),
+        sessions.c.game_id.label("game_id"),
+        sessions.c.season.label("season"),
+        cast(func.sum(sessions.c.duration), Integer).label("played_time"),
     )
+    if user_id is not None:
+        stmt = stmt.where(sessions.c.user_id == user_id)
+    return stmt.group_by(sessions.c.user_id, sessions.c.game_id, sessions.c.season).subquery("entry_time")
 
 
 def get_user_played_time(db: Session, user_id: str, season: int = None):

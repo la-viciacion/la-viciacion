@@ -1,6 +1,6 @@
-import datetime
-import sentry_sdk
 import logging
+
+import sentry_sdk
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,6 +14,7 @@ from .utils import push as push_utils
 from .utils import scheduler, settings
 from .routers import basic, games, manage, push, statistics, timers, users, utils
 from .utils.logger import LogManager
+from .utils.request_log import RequestLogMiddleware
 
 log_manager = LogManager()
 logger = log_manager.get_logger()
@@ -104,28 +105,4 @@ app.add_middleware(
 )
 
 
-@app.middleware("http")
-async def add_timestamp_to_logs(request, call_next):
-    # Exclude logs from specific paths
-    if request.url.path in full_excluded_paths:
-        response = await call_next(request)
-        return response
-    else:
-        start_time = datetime.datetime.now()
-        response = await call_next(request)
-        end_time = datetime.datetime.now()
-
-        duration = end_time - start_time
-
-        query_params = request.query_params
-
-        if query_params:
-            query_str = f"?{query_params}"
-        else:
-            query_str = ""
-
-        logger.info(
-            f'REQUEST - "{request.method} {request.url.path}{query_str}" - {response.status_code} - {duration}'
-        )
-
-        return response
+app.add_middleware(RequestLogMiddleware, excluded_paths=full_excluded_paths)
