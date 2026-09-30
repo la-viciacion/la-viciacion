@@ -39,7 +39,33 @@ class StreakSummaryTests(unittest.TestCase):
         short_run = days(D(2026, 9, 28), 3)
         _, best, current, *_ = streaks.streak_summary(long_run + short_run, TODAY, 2026)
         self.assertEqual(current, 3)
-        self.assertGreaterEqual(best, 9)
+        self.assertEqual(best, 10)
+
+
+class StreakLengthTests(unittest.TestCase):
+    def test_old_run_counts_every_day(self):
+        _, best, current, *_ = streaks.streak_summary(days(D(2026, 9, 1), 3), TODAY, 2026)
+        self.assertEqual((best, current), (3, 0))
+
+    def test_runs_in_the_middle_count_every_day(self):
+        played = days(D(2026, 9, 1), 3) + [D(2026, 9, 10)] + days(D(2026, 9, 29), 2)
+        best_date, best, current, *_ = streaks.streak_summary(played, TODAY, 2026)
+        self.assertEqual((best, current), (3, 2))
+        self.assertEqual(best_date, D(2026, 9, 3))
+
+    def test_single_days_are_streaks_of_one(self):
+        played = [D(2026, 9, 1), D(2026, 9, 5), D(2026, 9, 9)]
+        _, best, current, *_ = streaks.streak_summary(played, TODAY, 2026)
+        self.assertEqual((best, current), (1, 0))
+
+    def test_single_day_today_is_current(self):
+        _, best, current, *_ = streaks.streak_summary([TODAY], TODAY, 2026)
+        self.assertEqual((best, current), (1, 1))
+
+    def test_later_run_wins_a_tie(self):
+        played = days(D(2026, 9, 1), 3) + days(D(2026, 9, 10), 3)
+        best_date, best, *_ = streaks.streak_summary(played, TODAY, 2026)
+        self.assertEqual((best, best_date), (3, D(2026, 9, 12)))
 
 
 class LostStreakTests(unittest.TestCase):
