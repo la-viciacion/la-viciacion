@@ -23,7 +23,7 @@ from ..utils import actions as actions
 from ..utils import my_utils as utils
 from . import games, users
 from ..utils.logger import LogManager
-from ..utils import seasons
+from ..utils import seasons, user_settings
 
 log_manager = LogManager()
 logger = log_manager.get_logger()
@@ -404,7 +404,7 @@ def get_active_game_timer_by_user(db: Session, user_id: int) -> models.GameTimer
 
 
 def get_forgotten_game_timers(
-    db: Session, user_id: int = None, hours: int = 4
+    db: Session, user_id: int = None, hours: int = user_settings.DEFAULT_FORGOTTEN_TIMER_HOURS
 ) -> list[models.GameTimer]:
     time_threshold = datetime.datetime.now() - datetime.timedelta(hours=hours)
     query = db.query(models.GameTimer).filter(

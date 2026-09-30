@@ -33,6 +33,11 @@ class UserProfileUpdate(BaseModel):
     telegram_id: int | None = None
 
 
+class UserSettingsUpdate(BaseModel):
+    # whole hours; None goes back to the default (the range is checked in the route)
+    forgotten_timer_hours: int | None = None
+
+
 class CompletionUpdate(BaseModel):
     completed: bool
     completed_date: datetime.date | None = None

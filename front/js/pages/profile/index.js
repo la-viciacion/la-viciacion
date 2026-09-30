@@ -1,6 +1,6 @@
 // Profile page: a header with the season stats and three tabs so nothing needs a
 // long scroll: Resumen (top games, achievements), Mis juegos (see library.js) and
-// Ajustes (personal data, push notifications, password). The games and the
+// Ajustes (personal data, reminders, push notifications, password). The games and the
 // settings load the first time their tab is opened.
 // All routes are /api/v1/users/{username}/...
 import { api, jsonRequest } from '../../lib/api.js';
@@ -8,6 +8,7 @@ import { formatDate, formatDuration } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
 import { PASSWORD_HINT, isValidPassword } from '../../lib/password.js';
 import { initLibrary } from './library.js';
+import { initPreferences } from './preferences.js';
 import { initPush } from './push.js';
 
 export const active = 'profile';
@@ -66,7 +67,10 @@ function showTab(id) {
   if (opened.has(id)) return;
   opened.add(id);
   if (id === 'juegos') initLibrary(main.querySelector('#pfLibrary'), { username: user.username, onChange: refreshSummary });
-  if (id === 'ajustes') initPush(main.querySelector('#pfPush')).catch(() => {}); // optional: never breaks the page
+  if (id === 'ajustes') {
+    initPreferences(main.querySelector('#pfPrefs'), { path: userPath('settings') }).catch(() => {});
+    initPush(main.querySelector('#pfPush')).catch(() => {}); // optional: never breaks the page
+  }
 }
 
 function onTabKey(e) {
@@ -189,6 +193,8 @@ function draw(d) {
       <div><button class="pf-btn primary" type="submit">Guardar datos</button></div>
     </form>
 
+    <div id="pfPrefs"></div>
+
     <div id="pfPush"></div>
 
     </div>
@@ -204,8 +210,6 @@ function draw(d) {
     </form>
     </div>
     </div>
-
-    <div id="pfPush"></div>
     </section>`);
 
   main.querySelector('.pf-tabs').addEventListener('click', (e) => {

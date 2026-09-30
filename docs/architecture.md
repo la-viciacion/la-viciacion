@@ -43,7 +43,7 @@ Routes and helpers are a mix of `def` and `async def`; the DB layer is synchrono
 
 ## Data model (`database/models.py`)
 
-Tables: `users`, `games`, `users_games` (the per-user **library entry**, unique per user/game/platform/season), `game_timers` (sessions: running timers and finished/manual ones), `achievements`, `users_achievements` (once per user and season), `platform_tags` (platform catalogue; its ids are what `platform` columns store), `app_settings`, `job_runs`.
+Tables: `users`, `games`, `users_games` (the per-user **library entry**, unique per user/game/platform/season), `game_timers` (sessions: running timers and finished/manual ones), `achievements`, `users_achievements` (once per user and season), `platform_tags` (platform catalogue; its ids are what `platform` columns store), `user_settings` (personal preferences, see below), `app_settings`, `job_runs`.
 
 Notes:
 - `game_timers` is the only sessions table (time entries were merged into it in migration 004). `is_active` = running timer; `duration_seconds` is set on stop.
@@ -79,7 +79,11 @@ Runs inside the API process (thread ticking every 30 s). Jobs: `weekly_summary`,
 
 ## Runtime settings (`utils/settings.py`)
 
-Table `app_settings`; keys are validated/coerced by `settings.coerce`. The Telegram token is stored encrypted (key derived from `SECRET_KEY`; rotating `SECRET_KEY` requires re-entering it) and is never returned to the panel. `.env` values (`TELEGRAM_*`) only seed the table the first time.
+Table `app_settings` (global, admin-edited); keys are validated/coerced by `settings.coerce`. The Telegram token is stored encrypted (key derived from `SECRET_KEY`; rotating `SECRET_KEY` requires re-entering it) and is never returned to the panel. `.env` values (`TELEGRAM_*`) only seed the table the first time.
+
+## Personal settings (`utils/user_settings.py`)
+
+Table `user_settings`: one row per user, one typed nullable column per preference; NULL (or no row) means "use the default", and the defaults live in code. Each new preference is an additive `ADD COLUMN ... NULL` migration. Edited by the user (or an admin) through `GET/PATCH /users/{username}/settings` from Profile → Ajustes; `null` resets one to its default. Today: `forgotten_timer_hours` (whole hours, 1-24, default 4), read by the hourly `forgotten_timers` job, so the reminder can arrive up to an hour after the chosen time.
 
 ## Front (`front/`)
 

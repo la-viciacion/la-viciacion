@@ -17,7 +17,7 @@ from ..database import models, schemas
 from . import my_utils as utils
 from . import push
 from ..utils import ai_prompts as prompts
-from ..utils import seasons, streaks
+from ..utils import seasons, streaks, user_settings
 from .logger import LogManager
 
 log_manager = LogManager()
@@ -267,16 +267,20 @@ async def announce_ranking_changes(db: Session, before: dict, silent: bool):
 
 
 async def check_forgotten_timer(db: Session, user: models.User):
-    """Remind a user about a timer running for too long (the scheduler calls this hourly)."""
+    """Remind a user about a timer running for too long (the scheduler calls this hourly).
+
+    "Too long" is the user's own setting, or the default when they never set it.
+    """
     if user.telegram_id is None and not push_has_devices(user.id):
         return
-    forgotten_timer = time_entries.get_forgotten_game_timers(db, user_id=user.id)
+    hours = user_settings.forgotten_timer_hours(db, user.id)
+    forgotten_timer = time_entries.get_forgotten_game_timers(db, user_id=user.id, hours=hours)
     if forgotten_timer:
-        logger.info(user.name + " has an active timer for more than 4 hours")
+        logger.info(f"{user.name} has an active timer for more than {hours} hours")
         msg = (
             "Hola, "
             + user.name
-            + ". Tienes un timer activo desde hace más de 4 horas."
+            + f". Tienes un timer activo desde hace más de {hours} {'hora' if hours == 1 else 'horas'}."
             + " Si es correcto, sigue disfrutando. Si te has olvidado de pararlo,"
             + " párala y edita la sesión con el tiempo correcto."
         )

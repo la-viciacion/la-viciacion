@@ -23,7 +23,7 @@ from ..utils import images
 from ..utils import messages as msg
 from ..utils import my_utils as utils
 from ..utils.logger import LogManager
-from ..utils import seasons
+from ..utils import seasons, user_settings
 
 log_manager = LogManager()
 logger = log_manager.get_logger()
@@ -172,6 +172,46 @@ def update_profile(
         "email": user.email,
         "telegram_id": user.telegram_id,
     }
+
+
+@router.get("/{username}/settings")
+@version(1)
+def get_settings(
+    username: str,
+    active_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Personal preferences (None = the default applies) and the defaults"""
+    auth.ensure_self_or_admin(active_user, username=username)
+    user = users.get_user_by_username(db, username)
+    if user is None:
+        raise HTTPException(status_code=404, detail=msg.USER_NOT_EXISTS)
+    return user_settings.get(db, user.id)
+
+
+@router.patch("/{username}/settings")
+@version(1)
+def update_settings(
+    username: str,
+    body: schemas.UserSettingsUpdate,
+    active_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Change personal preferences; null resets one to its default"""
+    auth.ensure_self_or_admin(active_user, username=username)
+    user = users.get_user_by_username(db, username)
+    if user is None:
+        raise HTTPException(status_code=404, detail=msg.USER_NOT_EXISTS)
+    changes = body.model_dump(exclude_unset=True)
+    hours = changes.get("forgotten_timer_hours")
+    if hours is not None and not user_settings.valid_forgotten_timer_hours(hours):
+        raise HTTPException(
+            status_code=400,
+            detail=msg.FORGOTTEN_HOURS_INVALID.format(
+                min=user_settings.MIN_FORGOTTEN_TIMER_HOURS, max=user_settings.MAX_FORGOTTEN_TIMER_HOURS
+            ),
+        )
+    return user_settings.update(db, user.id, changes)
 
 
 @router.post("/{username}/password")

@@ -11,6 +11,7 @@ from sqlalchemy import (
     Integer,
     Interval,
     LargeBinary,
+    SmallInteger,
     String,
     Text,
     UniqueConstraint,
@@ -45,6 +46,20 @@ class User(Base):
         # the bot recognizes people by it; NULL (not set) may repeat
         UniqueConstraint("telegram_id", name="uq_users_telegram_id"),
     )
+
+
+class UserSettings(Base):
+    """Personal preferences, one row per user (see utils/user_settings.py).
+
+    Every column is NULL until the user sets it, and NULL means "use the default".
+    """
+
+    __tablename__ = "user_settings"
+
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    # hours a timer may run before the user is reminded about it
+    forgotten_timer_hours = Column(SmallInteger, nullable=True)
+    updated_at = Column(DateTime, server_default=text("CURRENT_TIMESTAMP"), onupdate=text("CURRENT_TIMESTAMP"))
 
 
 class Game(Base):
