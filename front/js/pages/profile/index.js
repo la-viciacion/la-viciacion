@@ -1,5 +1,7 @@
-// Profile page: season stats, the user's games (see library.js), personal
-// data, password change and avatar.
+// Profile page: a header with the season stats and three tabs so nothing needs a
+// long scroll: Resumen (top games, achievements), Mis juegos (see library.js) and
+// Ajustes (personal data, push notifications, password). The games and the
+// settings load the first time their tab is opened.
 // All routes are /api/v1/users/{username}/...
 import { api, jsonRequest } from '../../lib/api.js';
 import { formatDate, formatDuration } from '../../lib/format.js';
@@ -13,9 +15,16 @@ export const mainClass = 'profile-main';
 
 const AVATAR_SIZE = 256;
 
+const TABS = [
+  ['resumen', 'Resumen'],
+  ['juegos', 'Mis juegos'],
+  ['ajustes', 'Ajustes'],
+];
+
 let main;
 let user;
 let avatarUrl;
+let opened; // tabs already initialised
 
 const userPath = (suffix) => `/users/${encodeURIComponent(user.username)}/${suffix}`;
 
@@ -35,8 +44,38 @@ async function load() {
   const data = await api(userPath('profile'));
   if (!data) return;
   draw(data);
-  await initLibrary(main.querySelector('#pfLibrary'), { username: user.username, onChange: refreshSummary });
-  initPush(main.querySelector('#pfPush')).catch(() => {}); // optional: never breaks the page
+  opened = new Set();
+  showTab(tabFromHash());
+}
+
+const tabFromHash = () => {
+  const id = location.hash.split('/')[2];
+  return TABS.some(([tab]) => tab === id) ? id : TABS[0][0];
+};
+
+// Tabs do not touch the router: replaceState changes the URL without a hashchange.
+function showTab(id) {
+  main.querySelectorAll('.pf-tab').forEach((tab) => {
+    const on = tab.dataset.tab === id;
+    tab.classList.toggle('active', on);
+    tab.setAttribute('aria-selected', String(on));
+    tab.tabIndex = on ? 0 : -1;
+  });
+  main.querySelectorAll('.pf-panel').forEach((panel) => { panel.hidden = panel.id !== `pfPanel-${id}`; });
+  history.replaceState(null, '', `#/profile/${id}`);
+  if (opened.has(id)) return;
+  opened.add(id);
+  if (id === 'juegos') initLibrary(main.querySelector('#pfLibrary'), { username: user.username, onChange: refreshSummary });
+  if (id === 'ajustes') initPush(main.querySelector('#pfPush')).catch(() => {}); // optional: never breaks the page
+}
+
+function onTabKey(e) {
+  const move = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
+  if (!move) return;
+  const tabs = [...main.querySelectorAll('.pf-tab')];
+  const next = tabs[(tabs.indexOf(document.activeElement) + move + tabs.length) % tabs.length];
+  showTab(next.dataset.tab);
+  next.focus();
 }
 
 // A completion changed: refresh the numbers without redrawing the whole page.
@@ -111,20 +150,30 @@ function draw(d) {
 
     <section class="pf-stats" id="pfStats" aria-label="Estadísticas">${statsView(d)}</section>
 
-    ${sectionTitle('Mis juegos')}
-    <div id="pfLibrary"></div>
+    <nav class="pf-tabs" role="tablist" aria-label="Secciones del perfil">
+      ${TABS.map(([id, label]) => html`<button class="pf-tab" role="tab" type="button" id="pfTab-${id}" aria-controls="pfPanel-${id}" data-tab="${id}">${label}</button>`)}
+    </nav>
 
-    <div class="pf-cols">
-      <div>
-        ${sectionTitle('Más jugados')}
-        <div class="pf-card" id="pfTop">${topView(d)}</div>
+    <section class="pf-panel" role="tabpanel" id="pfPanel-resumen" aria-labelledby="pfTab-resumen">
+      <div class="pf-cols">
+        <div>
+          ${sectionTitle('Más jugados')}
+          <div class="pf-card" id="pfTop">${topView(d)}</div>
+        </div>
+        <div>
+          ${sectionTitle('Últimos logros')}
+          <div class="pf-card" id="pfAchievements">${achievementsView(d)}</div>
+        </div>
       </div>
-      <div>
-        ${sectionTitle('Últimos logros')}
-        <div class="pf-card" id="pfAchievements">${achievementsView(d)}</div>
-      </div>
-    </div>
+    </section>
 
+    <section class="pf-panel" role="tabpanel" id="pfPanel-juegos" aria-labelledby="pfTab-juegos" hidden>
+      <div id="pfLibrary"></div>
+    </section>
+
+    <section class="pf-panel" role="tabpanel" id="pfPanel-ajustes" aria-labelledby="pfTab-ajustes" hidden>
+    <div class="pf-cols pf-cols-top">
+    <div>
     ${sectionTitle('Mis datos')}
     <form class="pf-card pf-form" id="pfData" novalidate>
       <label>Usuario (apodo)<input class="adm-input" type="text" value="${d.user.username}" disabled /></label>
@@ -138,6 +187,8 @@ function draw(d) {
 
     <div id="pfPush"></div>
 
+    </div>
+    <div>
     ${sectionTitle('Cambiar contraseña')}
     <form class="pf-card pf-form" id="pfPass" novalidate>
       <label>Contraseña actual<input class="adm-input" type="password" name="current" autocomplete="current-password" /></label>
@@ -146,8 +197,18 @@ function draw(d) {
       <div class="pf-sub">${PASSWORD_HINT}</div>
       <div class="pf-msg" id="pfPassMsg" role="status"></div>
       <div><button class="pf-btn primary" type="submit">Cambiar contraseña</button></div>
-    </form>`);
+    </form>
+    </div>
+    </div>
 
+    <div id="pfPush"></div>
+    </section>`);
+
+  main.querySelector('.pf-tabs').addEventListener('click', (e) => {
+    const tab = e.target.closest('.pf-tab');
+    if (tab) showTab(tab.dataset.tab);
+  });
+  main.querySelector('.pf-tabs').addEventListener('keydown', onTabKey);
   main.querySelector('#pfAvatarInput').addEventListener('change', changeAvatar);
   main.querySelector('#pfData').addEventListener('submit', saveData);
   main.querySelector('#pfPass').addEventListener('submit', changePassword);

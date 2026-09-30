@@ -22,6 +22,32 @@
 
 .pf-empty { color: var(--text-muted); font-size: 0.9rem; }
 
+/* On a phone the seven tiles must not push the tabs off the screen */
+@media (max-width: 600px) {
+  .pf-stats { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .pf-stat { padding: 10px 12px; }
+  .pf-stat-value { font-size: 1.05rem; }
+  .pf-stat-label { font-size: 0.72rem; }
+  .pf-title { font-size: 1.4rem; }
+  .pf-avatar { width: 64px; height: 64px; }
+  .pf-tabs { margin-top: 16px; }
+  .pf-tab { padding: 10px 14px; }
+}
+
+/* Tabs */
+.pf-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin: 22px 0 6px; overflow-x: auto; scrollbar-width: none; }
+.pf-tabs::-webkit-scrollbar { display: none; }
+.pf-tab {
+  background: none; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap;
+  color: var(--text-secondary); font: inherit; font-size: 0.95rem; font-weight: 600; padding: 10px 18px; cursor: pointer;
+  transition: color 0.2s ease, border-color 0.2s ease;
+}
+.pf-tab:hover { color: var(--text-primary); }
+.pf-tab.active { color: var(--accent-teal); border-bottom-color: var(--accent-teal); }
+.pf-tab:focus-visible { outline: 2px solid var(--accent-teal); outline-offset: -2px; border-radius: var(--radius-sm); }
+.pf-panel[hidden] { display: none; }
+.pf-panel { animation: fadeIn 0.25s ease; }
+
 .pf-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 20px; }
 
 @media (max-width: 700px) {

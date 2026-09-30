@@ -31,13 +31,19 @@ export function needsInstall(userAgent, standalone) {
 export const pushSupported = () =>
   typeof navigator !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
 
+// `ready` never settles if the worker failed to register: do not hang the page on it
 async function registration() {
-  return navigator.serviceWorker.ready;
+  const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('El navegador no ha podido activar el servicio de notificaciones')), 4000));
+  return Promise.race([navigator.serviceWorker.ready, timeout]);
 }
 
-/** This device's current subscription, or null. */
+/** This device's current subscription, or null (also when notifications cannot work here). */
 export async function currentSubscription() {
-  return (await registration()).pushManager.getSubscription();
+  try {
+    return await (await registration()).pushManager.getSubscription();
+  } catch {
+    return null;
+  }
 }
 
 /** Ask for permission, subscribe this device and register it on the server. */
