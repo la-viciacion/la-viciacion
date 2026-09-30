@@ -3,7 +3,7 @@ import uuid
 from typing import Union
 import random
 
-from sqlalchemy import asc, create_engine, delete, desc, func, select, text, update, or_
+from sqlalchemy import asc, create_engine, delete, desc, func, select, text, true, update, or_
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -35,10 +35,21 @@ def get_game_by_id(db: Session, game_id: int) -> models.Game:
     return db.query(models.Game).filter(models.Game.id == game_id).first()
 
 
+def genre_list(genres: str | list[str] | None) -> list[str]:
+    """Genres as a clean list: `games.genres` is one comma separated string."""
+    if genres is None:
+        return []
+    if isinstance(genres, str):
+        genres = genres.split(",")
+    return [g.strip() for g in genres if g and g.strip()]
+
+
 def recommended_games(
-    db: Session, user_id: int, genres: list[str] = [], limit: int = None
+    db: Session, user_id: int, genres: str | list[str] | None = None, limit: int = None
 ):
-    genres_filter = [models.Game.genres.ilike(f"%{genre}%") for genre in genres]
+    """Games (of those genres, if any) that other players have and `user_id` has never played."""
+    genres_filter = [models.Game.genres.ilike(f"%{genre}%") for genre in genre_list(genres)]
+    played_by_user = select(models.UserGame.game_id).where(models.UserGame.user_id == user_id)
     unplayed_games = (
         db.query(
             models.UserGame.game_id,
@@ -50,7 +61,8 @@ def recommended_games(
         .join(models.Game, models.UserGame.game_id == models.Game.id)
         .join(models.User, models.UserGame.user_id == models.User.id)
         .filter(models.UserGame.user_id != user_id)
-        .filter(or_(*genres_filter))
+        .filter(models.UserGame.game_id.notin_(played_by_user))
+        .filter(or_(*genres_filter) if genres_filter else true())
         .limit(limit)
     )
     recommended_games = []

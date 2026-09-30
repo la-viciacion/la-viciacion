@@ -785,9 +785,12 @@ async def _after_completion(db: Session, entry: models.UserGame, silent: bool):
     game = games.get_game_by_id(db, entry.game_id)
     user = get_user_by_id(db, entry.user_id)
     game_info = await utils.get_game_info(game.name)
-    avg_time = game_info["hltb"]["comp_main"] if game_info["hltb"] is not None else 0
-    games.update_avg_time_game(db, entry.game_id, avg_time)
-    game = games.get_game_by_id(db, entry.game_id)
+    hltb = game_info["hltb"]
+    # a failed lookup must not wipe the time the game already has
+    avg_time = (hltb["comp_main"] if hltb is not None else 0) or game.avg_time or 0
+    if avg_time != game.avg_time:
+        games.update_avg_time_game(db, entry.game_id, avg_time)
+        game = games.get_game_by_id(db, entry.game_id)
     from . import time_entries as time_entries_crud
 
     completion_time = sum(
