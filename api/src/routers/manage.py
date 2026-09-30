@@ -146,13 +146,11 @@ def list_users(
     return {"total": total, "items": [_user_out(u, sessions.get(u.id, 0), library.get(u.id, 0)) for u in users]}
 
 
-def _checked_email(db: Session, email, *, exclude_user_id=None, required=True):
-    """Normalized email that is valid and free (None allowed when not required)."""
+def _checked_email(db: Session, email, *, exclude_user_id=None):
+    """Normalized email that is valid and free: it is the login identifier, so it is required."""
     email = normalize_email(email)
     if not email:
-        if required:
-            raise HTTPException(status_code=400, detail="El email es obligatorio")
-        return None
+        raise HTTPException(status_code=400, detail="El email es obligatorio")
     if not validate_email_format(email):
         raise HTTPException(status_code=400, detail="El email no es válido")
     if users_crud.email_in_use(db, email, exclude_user_id=exclude_user_id):
@@ -238,7 +236,7 @@ def patch_user(
         # never empty: messages and rankings print it (falls back to the nickname)
         data["name"] = (data["name"] or "").strip() or (data.get("username") or user.username).strip()
     if "email" in data:
-        data["email"] = _checked_email(db, data["email"], exclude_user_id=user.id, required=False)
+        data["email"] = _checked_email(db, data["email"], exclude_user_id=user.id)
     if data.get("username") is not None:
         data["username"] = data["username"].strip()
         _check_username(db, data["username"], exclude_user_id=user.id)
