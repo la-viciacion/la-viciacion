@@ -29,6 +29,7 @@ self.addEventListener('push', (event) => {
       body: data.body || '',
       icon: 'icon-192.png',
       badge: 'icon-64.png',
+      image: data.image || undefined, // large picture: Android and desktop only
       tag: data.tag || undefined,
       renotify: Boolean(data.tag), // a newer notice with the same tag replaces the old one but still alerts
       data: { url: data.url || '/' },

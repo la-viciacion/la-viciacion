@@ -17,4 +17,4 @@ export const overviewStats = (ov) => [
 export const errorState = (message) => html`<div class="empty-state"><span>⚠️</span>${message}</div>`;
 
 /** Runs in the admin panel state: users (for selects) loaded once at start. */
-export const store = { users: [], achievements: [] };
+export const store = { users: [], achievements: [], me: null };

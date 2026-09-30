@@ -229,7 +229,8 @@ ENTITIES.awards = {
   deleteNote: 'El logro se revoca sin avisar por Telegram. Si el jugador sigue cumpliendo la condición, el próximo recálculo (o el de las 05:00) lo volverá a conceder: corrige antes los datos que lo provocaron.',
 };
 
-// Not a table: a custom panel (see settings.js)
-ENTITIES.settings = { label: 'Notificaciones', custom: true };
+// Not tables: custom panels, each one a module exporting render(panel) (settings.js, announce.js)
+ENTITIES.settings = { label: 'Notificaciones', custom: 'settings' };
+ENTITIES.announce = { label: 'Avisos', custom: 'announce' };
 
 export const TABS = Object.keys(ENTITIES);

@@ -33,8 +33,9 @@ const admin = {
   },
 };
 
-export async function render({ main }) {
+export async function render({ main, user }) {
   root = main;
+  store.me = user.id;
   current = 'users';
   mount(root, html`<div class="loading-spinner">Cargando panel...</div>`);
 
@@ -112,8 +113,8 @@ async function load() {
   const panel = document.getElementById('admPanel');
   if (entity.custom) {
     mount(panel, html`<div class="loading-spinner">Cargando...</div>`);
-    const { render: renderSettings } = await import('./settings.js');
-    if (tab === current) await renderSettings(panel);
+    const { render: renderCustom } = await import(`./${entity.custom}.js`);
+    if (tab === current) await renderCustom(panel);
     return;
   }
   mount(panel, panelView(entity, st, true));

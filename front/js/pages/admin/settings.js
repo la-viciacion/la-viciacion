@@ -5,7 +5,7 @@ import { api, jsonRequest } from '../../lib/api.js';
 import { formatDateTime } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
 import { toast } from '../../ui/toast.js';
-import { errorState, store } from './components.js';
+import { errorState } from './components.js';
 import { confirmDialog } from './dialogs.js';
 
 const WEEKDAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
@@ -64,23 +64,8 @@ function view(values, jobs, pushDevices) {
         </label>
         <div class="adm-sub">${vapid.is_set ? 'Las claves del servidor se crearon solas al arrancar; son las mismas para todos los usuarios.' : 'Sin claves (se crean al arrancar la API).'}</div>
         <div class="adm-sub">${pushDevices.devices} dispositivo${pushDevices.devices === 1 ? '' : 's'} suscrito${pushDevices.devices === 1 ? '' : 's'} (${pushDevices.users} usuario${pushDevices.users === 1 ? '' : 's'}).</div>
-        <div class="adm-set-row">
-          <label>Enviar aviso de prueba a
-            <select class="adm-input" id="admPushTarget">
-              <option value="me">Mis dispositivos</option>
-              <option value="user">Un usuario…</option>
-              <option value="all">Todos los dispositivos suscritos</option>
-            </select>
-          </label>
-          <label id="admPushUserWrap" hidden>Usuario
-            <select class="adm-input" id="admPushUser">${store.users.map((u) => html`<option value="${u.id}">${u.username}</option>`)}</select>
-          </label>
-        </div>
-        <label>Mensaje <input class="adm-input" type="text" id="admPushMessage" maxlength="200" placeholder="Si lo lees, las notificaciones push funcionan." /></label>
-        <div class="adm-set-row">
-          <button type="button" class="adm-btn" data-set-act="push-test">Enviar aviso de prueba</button>
-          <button type="button" class="adm-btn" data-set-act="push-keys">Regenerar claves…</button>
-        </div>
+        <div class="adm-sub">Para redactar y enviar avisos (o probarlos en tus dispositivos) usa la pestaña <strong>Avisos</strong>.</div>
+        <div><button type="button" class="adm-btn" data-set-act="push-keys">Regenerar claves…</button></div>
       </section>
 
       <div class="adm-error" role="alert"></div>
@@ -152,22 +137,6 @@ async function generateKeys(replace) {
   }
 }
 
-async function sendTestPush(form) {
-  const target = form.querySelector('#admPushTarget').value;
-  const body = { target, message: form.querySelector('#admPushMessage').value.trim() || null };
-  if (target === 'user') body.user_id = Number(form.querySelector('#admPushUser').value);
-  if (target === 'all') {
-    const ok = await confirmDialog('Aviso de prueba', html`<p>Se enviará a <strong>todos</strong> los dispositivos suscritos, de todos los usuarios.</p>`, { ok: 'Enviar' });
-    if (!ok) return;
-  }
-  try {
-    const { sent } = await api('/manage/settings/test-push', jsonRequest('POST', body));
-    toast(`Aviso enviado a ${sent} dispositivo${sent === 1 ? '' : 's'}`);
-  } catch (err) {
-    toast(err.message, 'err');
-  }
-}
-
 export async function render(target) {
   panel = target;
   try {
@@ -182,10 +151,6 @@ export async function render(target) {
       const act = e.target.closest('[data-set-act]')?.dataset.setAct;
       if (act === 'test') sendTest();
       else if (act === 'push-keys') generateKeys(values['push.vapid_private'].is_set);
-      else if (act === 'push-test') sendTestPush(form);
-    });
-    form.addEventListener('change', (e) => {
-      if (e.target.id === 'admPushTarget') form.querySelector('#admPushUserWrap').hidden = e.target.value !== 'user';
     });
   } catch (err) {
     mount(panel, errorState(err.message));

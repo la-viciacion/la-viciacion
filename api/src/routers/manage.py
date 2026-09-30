@@ -20,7 +20,10 @@ from ..crud import users as users_crud
 from ..database import models
 from ..database.database import SessionLocal
 from ..utils import actions, my_utils, push, rawg_sync, seasons, settings
+from ..utils.logger import LogManager
 from ..utils.my_utils import normalize_email, validate_email_format, validate_password_requirements, validate_username
+
+logger = LogManager().get_logger()
 
 router = APIRouter(
     prefix="/manage",
@@ -881,32 +884,57 @@ def generate_push_keys(replace: bool = False, admin: models.User = Depends(auth.
     return {"public_key": public}
 
 
-class TestPushBody(BaseModel):
-    target: str = Field("me", pattern="^(me|all|user)$")
+class AnnouncementBody(BaseModel):
+    title: str = Field(min_length=1, max_length=push.TITLE_MAX)
+    body: Optional[str] = Field(None, max_length=push.ANNOUNCEMENT_BODY_MAX)
+    url: Optional[str] = Field(None, max_length=200)
+    image: Optional[str] = Field(None, max_length=500)
+    audience: str = Field("me", pattern="^(me|user|group|all)$")
     user_id: Optional[int] = None
-    message: Optional[str] = Field(None, max_length=200)
 
 
-@router.post("/settings/test-push")
-async def send_test_push(
-    body: TestPushBody | None = None,
+@router.get("/push/audience")
+def push_audience(db: Session = Depends(get_db)):
+    """How many devices/users can receive a notice, by audience (for the composer)."""
+    q = db.query(models.PushSubscription)
+    return {
+        "ready": push.is_ready(),
+        "all": {"devices": q.count(), "users": q.with_entities(func.count(func.distinct(models.PushSubscription.user_id))).scalar()},
+        "group": {
+            "devices": q.filter(models.PushSubscription.receive_group == True).count(),  # noqa: E712
+            "users": q.filter(models.PushSubscription.receive_group == True)  # noqa: E712
+            .with_entities(func.count(func.distinct(models.PushSubscription.user_id)))
+            .scalar(),
+        },
+        "users": {
+            user_id: devices
+            for user_id, devices in q.with_entities(models.PushSubscription.user_id, func.count(models.PushSubscription.id))
+            .group_by(models.PushSubscription.user_id)
+            .all()
+        },
+    }
+
+
+@router.post("/push/announce")
+async def send_announcement(
+    body: AnnouncementBody,
     admin: models.User = Depends(auth.require_admin),
     db: Session = Depends(get_db),
 ):
-    """Send a test notice to the admin's devices ("me"), to one user's ("user") or to every subscribed device ("all")."""
-    body = body or TestPushBody()
+    """Send a notice written by an admin to their own devices ("me"), one user's, the group ones or everybody's."""
     if not push.is_ready():
         raise HTTPException(status_code=409, detail="Los avisos push no están listos: revisa que estén activados")
-    message = "Prueba de aviso\n" + (body.message or "Si lo lees, las notificaciones push funcionan.")
-    if body.target == "all":
-        sent, failed = await push.notify_everyone(message, tag="test")
-    else:
-        user_id = admin.id
-        if body.target == "user":
-            if body.user_id is None:
-                raise HTTPException(status_code=400, detail="Falta elegir el usuario")
-            user_id = _get_or_404(db, models.User, body.user_id, "Usuario").id
-        sent, failed = await push.notify_user(user_id, message, tag="test")
+    try:
+        payload = push.build_announcement(body.title, body.body, body.url, body.image)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    user_id = admin.id
+    if body.audience == "user":
+        if body.user_id is None:
+            raise HTTPException(status_code=400, detail="Falta elegir el usuario")
+        user_id = _get_or_404(db, models.User, body.user_id, "Usuario").id
+    sent, failed = await push.deliver(payload, body.audience, user_id)
+    logger.info(f"Announcement by {admin.username} to {body.audience}: {sent} sent, {failed} failed")
     if sent == 0:
         detail = "Ningún dispositivo lo ha aceptado" if failed else "No hay ningún dispositivo suscrito en ese destino"
         raise HTTPException(status_code=404, detail=detail)

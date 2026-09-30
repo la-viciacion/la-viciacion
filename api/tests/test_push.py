@@ -104,6 +104,70 @@ class DisabledTests(unittest.TestCase):
         self.assertEqual(seen["payload"]["tag"], "test")
 
 
+class AnnouncementTests(unittest.TestCase):
+    def test_a_valid_announcement(self):
+        payload = push.build_announcement("  Mantenimiento  ", "Esta noche a las 3", "#/profile", "https://img.example/a.png")
+        self.assertEqual(payload, {"title": "Mantenimiento", "body": "Esta noche a las 3", "url": "#/profile", "tag": None, "image": "https://img.example/a.png"})
+
+    def test_body_link_and_image_are_optional(self):
+        payload = push.build_announcement("Hola")
+        self.assertEqual((payload["body"], payload["url"], "image" in payload), ("", "/", False))
+
+    def test_rejects_what_cannot_be_sent(self):
+        bad = [
+            dict(title="  "),
+            dict(title="T" * (push.TITLE_MAX + 1)),
+            dict(title="ok", body="b" * (push.ANNOUNCEMENT_BODY_MAX + 1)),
+            dict(title="ok", url="https://evil.example/"),
+            dict(title="ok", url="//evil.example"),
+            dict(title="ok", url="javascript:alert(1)"),
+            dict(title="ok", image="http://img.example/a.png"),
+            dict(title="ok", image="data:image/png;base64,AAAA"),
+        ]
+        for kwargs in bad:
+            with self.assertRaises(ValueError, msg=str(kwargs)):
+                push.build_announcement(**kwargs)
+
+    def test_the_payload_stays_far_below_the_web_push_limit(self):
+        payload = push.build_announcement("T" * push.TITLE_MAX, "b" * push.ANNOUNCEMENT_BODY_MAX, "/", "https://x.example/" + "a" * 400)
+        self.assertLess(len(__import__("json").dumps(payload).encode()), 4096)
+
+
+class DeliverTests(unittest.TestCase):
+    def deliver(self, audience, user_id=None):
+        import asyncio
+
+        captured = {"query": mock.MagicMock()}
+
+        async def fake_send(selector, payload):
+            selector(captured["query"])
+            return 2, 0
+
+        with mock.patch.object(push, "is_ready", return_value=True), mock.patch.object(push, "_send", fake_send):
+            result = asyncio.run(push.deliver({"title": "t"}, audience, user_id))
+        return result, captured
+
+    def test_every_audience_is_filtered_differently(self):
+        for audience in ("me", "user", "group"):
+            result, captured = self.deliver(audience, 5)
+            self.assertEqual(result, (2, 0))
+            captured["query"].filter.assert_called_once()
+        result, captured = self.deliver("all")
+        captured["query"].filter.assert_not_called()
+
+    def test_unknown_audience(self):
+        import asyncio
+
+        with mock.patch.object(push, "is_ready", return_value=True), self.assertRaises(ValueError):
+            asyncio.run(push.deliver({"title": "t"}, "nobody"))
+
+    def test_nothing_is_sent_when_push_is_not_ready(self):
+        import asyncio
+
+        with mock.patch.object(push, "is_ready", return_value=False):
+            self.assertEqual(asyncio.run(push.deliver({"title": "t"}, "all")), (0, 0))
+
+
 class EnsureKeysTests(unittest.TestCase):
     def run_ensure(self, stored):
         db = mock.MagicMock()

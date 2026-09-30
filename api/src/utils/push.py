@@ -34,6 +34,8 @@ config = Config()
 APP_NAME = "La Viciación"
 TITLE_MAX = 80
 BODY_MAX = 200
+ANNOUNCEMENT_BODY_MAX = 240
+PAYLOAD_MAX_BYTES = 3500  # the Web Push limit is 4096 bytes once encrypted
 TTL_SECONDS = 3600  # a notice that could not be delivered within the hour is stale
 MAX_DEVICES_PER_USER = 10
 
@@ -59,6 +61,34 @@ def build_payload(message: str, url: str = "/", tag: str | None = None) -> dict:
     else:
         title, body = lines[0], " · ".join(lines[1:])
     return {"title": _shorten(title, TITLE_MAX), "body": _shorten(body, BODY_MAX), "url": url, "tag": tag}
+
+
+def build_announcement(title: str, body: str | None = None, url: str | None = None, image: str | None = None) -> dict:
+    """A notice written by an admin. Raises ValueError with a message for the panel if it cannot be sent.
+
+    Plain text only (no Markdown or HTML). `url` is where a tap opens the app (a path or a #/ route of
+    this site), `image` an https picture shown large on Android and desktop (iOS ignores it).
+    """
+    title = (title or "").strip()
+    body = (body or "").strip()
+    if not title:
+        raise ValueError("El título es obligatorio")
+    if len(title) > TITLE_MAX:
+        raise ValueError(f"El título admite {TITLE_MAX} caracteres como máximo")
+    if len(body) > ANNOUNCEMENT_BODY_MAX:
+        raise ValueError(f"El mensaje admite {ANNOUNCEMENT_BODY_MAX} caracteres como máximo")
+    url = (url or "").strip() or "/"
+    if not re.fullmatch(r"(/(?!/)|#/)[\w\-./?=&%#]*", url):
+        raise ValueError("El enlace debe ser una ruta de la app (por ejemplo / o #/profile)")
+    image = (image or "").strip() or None
+    if image and not re.fullmatch(r"https://[^\s]{4,480}", image):
+        raise ValueError("La imagen debe ser una URL https")
+    payload = {"title": title, "body": body, "url": url, "tag": None}
+    if image:
+        payload["image"] = image
+    if len(json.dumps(payload).encode()) > PAYLOAD_MAX_BYTES:
+        raise ValueError("El aviso es demasiado grande")
+    return payload
 
 
 # ── keys and settings ───────────────────────────────────────
@@ -144,6 +174,31 @@ async def _send(query_filter, payload: dict) -> tuple[int, int]:
             db.commit()
         logger.info(f"Removed {len(gone)} expired push subscriptions")
     return sent, failed
+
+
+AUDIENCES = ("me", "user", "group", "all")
+
+
+async def deliver(payload: dict, audience: str, user_id: int | None = None) -> tuple[int, int]:
+    """Send a prepared payload to `audience`: one user's devices ("me"/"user" with `user_id`),
+    the devices that want group notices ("group") or every device ("all"). Returns (sent, failed)."""
+    if not is_ready():
+        return 0, 0
+    if audience in ("me", "user"):
+        selector = lambda q: q.filter(models.PushSubscription.user_id == user_id)  # noqa: E731
+    elif audience == "group":
+        selector = lambda q: q.filter(models.PushSubscription.receive_group == True)  # noqa: E712,E731
+    elif audience == "all":
+        selector = lambda q: q  # noqa: E731
+    else:
+        raise ValueError("Destino desconocido")
+    try:
+        sent, failed = await _send(selector, payload)
+        logger.info(f"Push announcement to {audience}: {sent} sent, {failed} failed")
+        return sent, failed
+    except Exception as e:
+        logger.error(f"Push announcement to {audience} failed: {e}")
+        return 0, 0
 
 
 async def notify_group(message: str, tag: str | None = "group") -> None:
