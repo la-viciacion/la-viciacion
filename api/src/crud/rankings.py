@@ -162,29 +162,20 @@ def user_completed_games(
 
 
 def games_last_played(db: Session, limit: int = 10):
+    """The games played most recently, each once, with the start of their latest session."""
     try:
         sessions = time_entries.sessions_subquery()
+        last = func.max(sessions.c.start).label("start")
         stmt = (
-            select(
-                sessions.c.game_id,
-                models.Game.name,
-                sessions.c.start,
-            )
+            select(sessions.c.game_id, models.Game.name, last)
             .join(models.Game, models.Game.id == sessions.c.game_id)
-            .order_by(desc(sessions.c.start))
+            .group_by(sessions.c.game_id, models.Game.name)
+            .order_by(desc(last))
+            .limit(limit)
         )
         # .mappings() so `item["name"]` string-key access works (SQLAlchemy
         # 2.x plain Row no longer supports it, only via _mapping/.mappings()).
-        result = db.execute(stmt).mappings().fetchall()
-        unique_names = set()
-        unique_data = []
-        for item in result:
-            if item["name"] not in unique_names:
-                unique_names.add(item["name"])
-                unique_data.append(item)
-            if len(unique_data) == limit:
-                break
-        return unique_data
+        return db.execute(stmt).mappings().all()
     except Exception as e:
         logger.info(e)
         raise e

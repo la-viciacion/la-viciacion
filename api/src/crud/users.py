@@ -480,6 +480,19 @@ def count_completed_games(db: Session, user_id: int, season: int = None):
         raise e
 
 
+def first_entry_per_game(rows, limit: int | None = None) -> list:
+    """The first row of each game, in the order given, at most `limit` of them."""
+    seen, unique = set(), []
+    for row in rows:
+        if row["game_id"] in seen:
+            continue
+        seen.add(row["game_id"])
+        unique.append(row)
+        if limit is not None and len(unique) == limit:
+            break
+    return unique
+
+
 def get_games(
     db: Session,
     user_id,
@@ -487,110 +500,55 @@ def get_games(
     completed=None,
     season: int = None,
 ) -> list[schemas.UserGame]:
+    """One row per game the user has in the library of the season, most recently played first.
+
+    A game on two platforms counts once (its most recently played entry)."""
     season = seasons.or_current(season)
     # Local import to avoid a circular import (crud.time_entries imports crud.users).
     from . import time_entries as time_entries_crud
 
-    sessions = time_entries_crud.sessions_subquery()
     entry_time = time_entries_crud.entry_played_time()
-    entry_time_join = and_(
-        entry_time.c.user_id == models.UserGame.user_id,
-        entry_time.c.game_id == models.UserGame.game_id,
-        entry_time.c.season == models.UserGame.season,
+    last = _last_played_by_year()
+    stmt = (
+        select(
+            models.UserGame.__table__,
+            func.coalesce(entry_time.c.played_time, 0).label("played_time"),
+            models.UserGame.platform.label("platform_id"),
+            models.Game.name.label("game_name"),
+            models.PlatformTag.name.label("platform_name"),
+            last.c.last_played.label("last_played_time"),
+        )
+        .join(models.Game, models.UserGame.game_id == models.Game.id)
+        .outerjoin(models.PlatformTag, models.UserGame.platform == models.PlatformTag.id)
+        .outerjoin(
+            last,
+            and_(
+                last.c.user_id == models.UserGame.user_id,
+                last.c.game_id == models.UserGame.game_id,
+                last.c.season == models.UserGame.season,
+            ),
+        )
+        .outerjoin(
+            entry_time,
+            and_(
+                entry_time.c.user_id == models.UserGame.user_id,
+                entry_time.c.game_id == models.UserGame.game_id,
+                entry_time.c.season == models.UserGame.season,
+            ),
+        )
+        .where(models.UserGame.user_id == user_id, models.UserGame.season == season)
+        .order_by(
+            last.c.last_played.is_(None),
+            last.c.last_played.desc(),
+            models.UserGame.started_date.desc(),
+            models.UserGame.id.desc(),
+        )
     )
-    if completed != None:
-        completed = 1 if completed == True else 0
-        stmt = (
-            select(
-                models.UserGame.__table__,
-                func.coalesce(entry_time.c.played_time, 0).label("played_time"),
-                models.UserGame.platform.label("platform_id"),
-                models.Game.name.label("game_name"),
-                models.PlatformTag.name.label("platform_name"),
-                sessions.c.start.label("last_played_time"),
-            )
-            .join(models.Game, models.UserGame.game_id == models.Game.id)
-            .outerjoin(
-                models.PlatformTag, models.UserGame.platform == models.PlatformTag.id
-            )
-            .outerjoin(
-                sessions,
-                (sessions.c.game_id == models.Game.id)
-                & (sessions.c.user_id == models.UserGame.user_id),
-            )
-            .outerjoin(entry_time, entry_time_join)
-            .where(
-                models.UserGame.user_id == user_id,
-                models.UserGame.completed == completed,
-                models.UserGame.season == season,
-            )
-            .group_by(
-                models.UserGame.user_id,
-                models.UserGame.game_id,
-                models.Game.name,
-                entry_time.c.played_time,
-                sessions.c.start,
-            )
-            .order_by(desc(sessions.c.start))
-            .limit(limit)
-        )
-        # .mappings() so `item["game_name"]` string-key access works
-        # (SQLAlchemy 2.x plain Row only supports it via _mapping/.mappings()).
-        result = db.execute(stmt).mappings().fetchall()
-        unique_names = set()
-        unique_data = []
-        for item in result:
-            if item["game_name"] not in unique_names:
-                unique_names.add(item["game_name"])
-                unique_data.append(item)
-            if len(unique_data) == limit:
-                break
-        return unique_data
-
-    else:
-        stmt = (
-            select(
-                models.UserGame.__table__,
-                func.coalesce(entry_time.c.played_time, 0).label("played_time"),
-                models.UserGame.platform.label("platform_id"),
-                models.Game.name.label("game_name"),
-                models.PlatformTag.name.label("platform_name"),
-                sessions.c.start.label("last_played_time"),
-            )
-            .join(models.Game, models.UserGame.game_id == models.Game.id)
-            .outerjoin(
-                models.PlatformTag, models.UserGame.platform == models.PlatformTag.id
-            )
-            .outerjoin(
-                sessions,
-                (sessions.c.game_id == models.Game.id)
-                & (sessions.c.user_id == models.UserGame.user_id),
-            )
-            .outerjoin(entry_time, entry_time_join)
-            .where(
-                models.UserGame.user_id == user_id,
-                models.UserGame.season == season,
-            )
-            .group_by(
-                models.UserGame.user_id,
-                models.UserGame.game_id,
-                models.Game.name,
-                entry_time.c.played_time,
-                sessions.c.start,
-            )
-            .order_by(desc(sessions.c.start))
-            .limit(limit)
-        )
-        result = db.execute(stmt).mappings().fetchall()
-        unique_names = set()
-        unique_data = []
-        for item in result:
-            if item["game_name"] not in unique_names:
-                unique_names.add(item["game_name"])
-                unique_data.append(item)
-            if len(unique_data) == limit:
-                break
-        return unique_data
+    if completed is not None:
+        stmt = stmt.where(func.coalesce(models.UserGame.completed, 0) == (1 if completed else 0))
+    # a user has tens of entries per season: deduplicate here, after the ordering, so `limit`
+    # counts games and not rows
+    return first_entry_per_game(db.execute(stmt).mappings().all(), limit)
 
 
 def get_game_by_id(db: Session, user_id, game_id, season) -> models.UserGame:
