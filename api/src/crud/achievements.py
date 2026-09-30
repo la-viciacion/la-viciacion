@@ -583,11 +583,11 @@ class Achievements:
         self, db: Session, user: models.User, date: str = None, silent: bool = False
     ):
         # logger.debug("Check total played games achievements...")
-        played_games = users.get_games(db, user.id)
+        played_games = users.count_played_games(db, user.id)  # distinct games
         # 10
-        # logger.info("Played games for " + user.name + ": " + str(len(played_games)))
+        # logger.info("Played games for " + user.name + ": " + str(played_games))
         ach = AchievementsElems.PLAYED_10_GAMES
-        if len(played_games) >= 10 and not self.check_already_achieved(
+        if played_games >= 10 and not self.check_already_achieved(
             db, user.id, ach.name
         ):
             logger.info("Set achievement played 10 games")
@@ -600,7 +600,7 @@ class Achievements:
             )
         # 42
         ach = AchievementsElems.PLAYED_42_GAMES
-        if len(played_games) >= 42 and not self.check_already_achieved(
+        if played_games >= 42 and not self.check_already_achieved(
             db, user.id, ach.name
         ):
             logger.info("Set achievement played 42 games")
@@ -613,7 +613,7 @@ class Achievements:
             )
         # 50
         ach = AchievementsElems.PLAYED_50_GAMES
-        if len(played_games) >= 50 and not self.check_already_achieved(
+        if played_games >= 50 and not self.check_already_achieved(
             db, user.id, ach.name
         ):
             logger.info("Set achievement played 50 games")
@@ -626,7 +626,7 @@ class Achievements:
             )
         # 100
         ach = AchievementsElems.PLAYED_100_GAMES
-        if len(played_games) >= 100 and not self.check_already_achieved(
+        if played_games >= 100 and not self.check_already_achieved(
             db, user.id, ach.name
         ):
             logger.info("Set achievement played 100 games")
@@ -910,6 +910,23 @@ class Achievements:
                 )
             else:
                 logger.info("All users unlocked this achievement")
+
+    async def timer_started(
+        self, db: Session, user: models.User, start_time: datetime.datetime, silent: bool = False
+    ):
+        """Achievements decided by the moment a timer starts (early riser, nocturnal)."""
+        for ach, first_hour, last_hour in (
+            (AchievementsElems.EARLY_RISER, 5, 6),
+            (AchievementsElems.NOCTURNAL, 2, 5),
+        ):
+            if not first_hour <= start_time.hour < last_hour:
+                continue
+            if self.check_already_achieved(db, user.id, ach.name):
+                continue
+            logger.info("Set achievement " + ach.name + " on timer start")
+            self.set_user_achievement(db, user.id, ach.name, date=str(start_time))
+            msg = utils.get_ach_message(ach, user=user.name)
+            await utils.send_message(msg, silent, image=self.get_image(db, ach.name)[0])
 
     async def early_riser(self, db: Session, user: models.User, silent: bool):
         # logger.debug("Checking early riser achievement...")

@@ -88,11 +88,19 @@ async def create_timer(db: Session, timer: GameTimerCreate) -> GameTimer:
         .first()
     )
     if already_playing is None and user is not None:
+        # "new game" is announced the first time the user plays a game in a season,
+        # whatever the platform: the same game on another platform is only a new entry
+        first_time_in_season = (
+            db.query(UserGame.id)
+            .filter_by(user_id=timer.user_id, game_id=timer.game_id, season=season)
+            .first()
+            is None
+        )
         await users_crud.add_new_game(
             db,
             game=NewGameUser(game_id=timer.game_id, platform=timer.platform),
             user=user,
-            silent=False,
+            silent=not first_time_in_season,
         )
 
     return db_timer
@@ -378,12 +386,15 @@ router = APIRouter(
 @router.post("/start", response_model=GameTimerResponse)
 async def start_timer(
     timer: GameTimerCreate,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db),
 ):
     """Start a new game timer for a user"""
     auth.ensure_self_or_admin(current_user, user_id=timer.user_id)
-    return await create_timer(db, timer)
+    started = await create_timer(db, timer)
+    background_tasks.add_task(actions.after_timer_start, started.user_id, started.start_time)
+    return started
 
 
 @router.post("/manual", response_model=GameTimerResponse, status_code=status.HTTP_201_CREATED)

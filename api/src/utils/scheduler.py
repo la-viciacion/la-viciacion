@@ -114,7 +114,7 @@ def _run(db: Session, job: str, coroutine_factory, use_lock: bool = False) -> No
 async def _weekly_summary(db: Session) -> str:
     sent = 0
     for user in users.get_users(db):
-        if user.telegram_id is None:
+        if user.telegram_id is None and not actions.push_has_devices(user.id):
             continue
         await actions.weekly_resume(db, user, weeks_ago=1, silent=False)
         sent += 1

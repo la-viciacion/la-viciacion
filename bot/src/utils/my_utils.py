@@ -146,6 +146,7 @@ class MyUtils:
     def convert_time_to_hours(self, seconds):
         if seconds is None:
             return "00:00"
+        seconds = int(seconds)
         hours = seconds // 3600
         minutes = (seconds % 3600) // 60
         return f"{hours:02d}:{minutes:02d}"

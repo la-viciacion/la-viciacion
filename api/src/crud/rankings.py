@@ -105,7 +105,7 @@ def user_played_games(
         stmt = (
             select(
                 models.UserGame.user_id,
-                func.count(models.UserGame.game_id).label("played_games"),
+                func.count(func.distinct(models.UserGame.game_id)).label("played_games"),
                 models.User.name,
             )
             .filter(models.UserGame.season == season)
@@ -117,7 +117,7 @@ def user_played_games(
 
         stmt = (
             stmt.group_by(models.UserGame.user_id, models.User.name)
-            .order_by(func.count(models.UserGame.game_id).desc(), models.UserGame.user_id)
+            .order_by(func.count(func.distinct(models.UserGame.game_id)).desc(), models.UserGame.user_id)
             .limit(limit)
         )
 

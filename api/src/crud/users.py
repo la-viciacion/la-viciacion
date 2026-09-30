@@ -435,7 +435,9 @@ def count_played_games(db: Session, user_id: int, season: int = None):
     season = seasons.or_current(season)
     try:
         return (
-            db.query(models.UserGame).filter_by(user_id=user_id, season=season).count()
+            db.query(func.count(func.distinct(models.UserGame.game_id)))
+            .filter(models.UserGame.user_id == user_id, models.UserGame.season == season)
+            .scalar()
         )
     except SQLAlchemyError as e:
         logger.error("Error counting played games: " + str(e))
@@ -784,9 +786,11 @@ async def _after_completion(db: Session, entry: models.UserGame, silent: bool):
     # Local import to avoid a circular import (crud.achievements imports crud.users).
     from .achievements import Achievements
 
-    await Achievements().just_in_time(
+    achievements = Achievements()
+    await achievements.just_in_time(
         db, user, completion_time, avg_time, entry.game_id, silent=silent
     )
+    await achievements.user_completed_total_games(db, user, silent=silent)
 
     message = (
         user.name

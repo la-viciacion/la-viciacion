@@ -141,6 +141,34 @@ def after_session_change(
             logger.error("Error checking after a session change: " + str(e))
 
 
+def after_timer_start(user_id: int, start_time: datetime.datetime):
+    """Background-task entrypoint for a timer that has just started.
+
+    Only what a running timer can unlock is checked here (the rest needs a finished
+    session and is checked when it stops): the time of day it started at and
+    teamwork, which counts the timers running right now.
+    """
+    from ..database.database import SessionLocal
+
+    async def _run():
+        db = SessionLocal()
+        try:
+            achievements.populate_achievements(db)
+            user = users.get_user_by_id(db, user_id)
+            if user is not None:
+                await achievements.timer_started(db, user, start_time)
+                await achievements.user_played_total_games(db, user)
+            await achievements.teamwork(db, silent=False)
+        finally:
+            db.close()
+
+    with _check_lock:
+        try:
+            asyncio.run(_run())
+        except Exception as e:
+            logger.error("Error checking after a timer start: " + str(e))
+
+
 async def announce_lost_streak(user: models.User, played_dates: list[datetime.date], today: datetime.date, silent: bool):
     """Announce a streak of more than 10 days on the day it is lost (daily check)."""
     lost = streaks.lost_streak(played_dates, today)
@@ -287,6 +315,13 @@ async def check_forgotten_timer(db: Session, user: models.User):
         await utils.send_message_to_user(user.telegram_id, msg, user_id=user.id)
 
 
+def signed_difference(difference: int, render=str) -> str:
+    """"+3", "-2" or "=" for the change of a figure since the week before."""
+    if difference == 0:
+        return "="
+    return ("+" if difference > 0 else "-") + render(abs(difference))
+
+
 async def weekly_resume(
     db: Session, user: models.User, weeks_ago: int = 0, silent: bool = False
 ):
@@ -334,35 +369,28 @@ async def weekly_resume(
         if last_weekly_hours is None:
             last_weekly_hours = 0
         hours_diff = int(weekly_hours) - int(last_weekly_hours)
-        hours_diff_str = ""
-        if hours_diff >= 0:
-            hours_diff_str = "+"
         logger.info("Weekly resume sessions:")
         logger.info("This week: " + str(weekly_sessions))
         logger.info("Last week: " + str(last_weekly_sessions))
         sessions_diff = int(weekly_sessions) - int(last_weekly_sessions)
-        if sessions_diff > 0:
-            sessions_diff = "+" + str(sessions_diff)
+        sessions_diff = signed_difference(sessions_diff)
         logger.info("Weekly resume games:")
         logger.info("This week: " + str(weekly_games))
         logger.info("Last week: " + str(last_weekly_games))
         games_diff = int(weekly_games) - int(last_weekly_games)
-        if games_diff > 0:
-            games_diff = "+" + str(games_diff)
+        games_diff = signed_difference(games_diff)
         logger.info("Weekly resume achievements:")
         logger.info("This week: " + str(weekly_achievements))
         logger.info("Last week: " + str(last_weekly_achievements))
         achievements_diff = int(weekly_achievements) - int(last_weekly_achievements)
-        if achievements_diff > 0:
-            achievements_diff = "+" + str(achievements_diff)
+        achievements_diff = signed_difference(achievements_diff)
         msg = (
-            "🤖*Aquí está tu resumen semanal*********🤖\n"
+            "🤖 *Aquí está tu resumen semanal* 🤖\n"
             + "Horas: "
             + utils.convert_time_to_hours(weekly_hours)
             + " ("
-            + hours_diff_str
-            + str(utils.convert_time_to_hours(hours_diff))
-            + ") \n"
+            + signed_difference(hours_diff, utils.convert_time_to_hours)
+            + ")\n"
             + "Sesiones: "
             + weekly_sessions
             + " ("
