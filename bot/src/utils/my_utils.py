@@ -21,6 +21,14 @@ logger = log_manager.get_logger()
 config = Config()
 
 
+class ApiError(Exception):
+    """The API did not give a usable answer."""
+
+    def __init__(self, status_code: int):
+        super().__init__(f"API error {status_code}")
+        self.status_code = status_code
+
+
 class MyUtils:
     """_summary_"""
 
@@ -36,6 +44,18 @@ class MyUtils:
 
     def make_request(self, method, url, json=None):
         return config.request(method, url, json=json)
+
+    def fetch_json(self, method, url, json=None):
+        """Request the API and return the parsed body; raise ApiError if it did not answer 200 with JSON."""
+        response = self.make_request(method, url, json=json)
+        if response.status_code != 200:
+            logger.error(f"API answered {response.status_code} to {method} {url}: {response.text[:200]}")
+            raise ApiError(response.status_code)
+        try:
+            return response.json()
+        except ValueError:
+            logger.error(f"API answered a non-JSON body to {method} {url}: {response.text[:200]}")
+            raise ApiError(response.status_code)
 
     async def send_message(self, msg):
         async with self.bot:

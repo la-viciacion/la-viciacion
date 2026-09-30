@@ -117,7 +117,7 @@ async def get_weekly_resume(
     user_db = users.get_user_by_username(db, username)
     if user_db is None:
         raise HTTPException(status_code=404, detail=msg.USER_NOT_EXISTS)
-    resume = await actions.weekly_resume(db, user_db, mode=1, silent=True)
+    resume = await actions.weekly_resume(db, user_db, weeks_ago=0, silent=True)
     return resume
 
 

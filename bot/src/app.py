@@ -63,6 +63,22 @@ if config.SENTRY_URL is not None and config.SENTRY_URL != "":
 
 
 
+async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Any failure ends in a short message for the user instead of silence."""
+    logger.error("Unhandled error", exc_info=context.error)
+    if not isinstance(update, Update):
+        return
+    text = "Ahora mismo no puedo consultar los datos. Inténtalo de nuevo en unos minutos."
+    try:
+        if update.callback_query:
+            await update.callback_query.answer()
+            await update.callback_query.edit_message_text(text)
+        elif update.effective_message:
+            await update.effective_message.reply_text(text)
+    except Exception as e:
+        logger.error(f"Could not tell the user about the error: {e}")
+
+
 async def post_init(application: Application):
     await application.bot.set_my_commands(
         [
@@ -75,6 +91,7 @@ async def post_init(application: Application):
 
 def main() -> None:
     app = ApplicationBuilder().token(config.TELEGRAM_TOKEN).post_init(post_init).build()
+    app.add_error_handler(on_error)
     conv_handler = ConversationHandler(
         entry_points=[
             CommandHandler("menu", basic_routes.menu),

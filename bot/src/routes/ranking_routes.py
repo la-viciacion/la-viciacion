@@ -47,9 +47,9 @@ class RankingRoutes:
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ) -> None:
         logger.info("Ranking hours")
-        ranking = utils.make_request(
+        ranking = utils.fetch_json(
             "GET", config.API_URL + "/statistics/rankings?ranking=user_hours"
-        ).json()
+        )
         ranking = utils.load_json_response(ranking[0])
         msg = "Así está el ranking de horas de vicio:\n"
         for i, elem in enumerate(ranking["data"]):
@@ -68,9 +68,9 @@ class RankingRoutes:
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ) -> None:
         logger.info("Ranking days")
-        ranking = utils.make_request(
+        ranking = utils.fetch_json(
             "GET", config.API_URL + "/statistics/rankings?ranking=user_days"
-        ).json()
+        )
         ranking = utils.load_json_response(ranking[0])
         msg = "Así está el ranking de días de vicio:\n"
         for i, elem in enumerate(ranking["data"]):
@@ -89,9 +89,9 @@ class RankingRoutes:
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ) -> None:
         logger.info("Ranking played")
-        ranking = utils.make_request(
+        ranking = utils.fetch_json(
             "GET", config.API_URL + "/statistics/rankings?ranking=user_played_games"
-        ).json()
+        )
         ranking = utils.load_json_response(ranking[0])
         msg = "Ranking de juegos jugados:\n"
         for i, elem in enumerate(ranking["data"]):
@@ -129,9 +129,9 @@ class RankingRoutes:
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ) -> None:
         logger.info("Ranking achievements")
-        ranking = utils.make_request(
+        ranking = utils.fetch_json(
             "GET", config.API_URL + "/statistics/rankings?ranking=achievements"
-        ).json()
+        )
         ranking = utils.load_json_response(ranking[0])
         msg = "Ranking de logros:\n"
         for i, elem in enumerate(ranking["data"]):
@@ -151,9 +151,9 @@ class RankingRoutes:
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ) -> None:
         logger.info("Ranking streak")
-        ranking = utils.make_request(
+        ranking = utils.fetch_json(
             "GET", config.API_URL + "/statistics/rankings?ranking=user_best_streak"
-        ).json()
+        )
         ranking = utils.load_json_response(ranking[0])
         msg = "Así va el ranking de racha de días:\n"
         for i, elem in enumerate(ranking["data"]):
@@ -172,9 +172,9 @@ class RankingRoutes:
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ) -> None:
         logger.info("Ranking current streak")
-        ranking = utils.make_request(
+        ranking = utils.fetch_json(
             "GET", config.API_URL + "/statistics/rankings?ranking=user_current_streak"
-        ).json()
+        )
         ranking = utils.load_json_response(ranking[0])
         msg = "Estas són las rachas de días actuales:\n"
         for i, elem in enumerate(ranking["data"]):
@@ -193,9 +193,9 @@ class RankingRoutes:
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ) -> None:
         logger.info("Ranking ratio")
-        ranking = utils.make_request(
+        ranking = utils.fetch_json(
             "GET", config.API_URL + "/statistics/rankings?ranking=user_ratio"
-        ).json()
+        )
         ranking = utils.load_json_response(ranking[0])
         msg = "Estas són las rachas de días actuales:\n"
         for i, elem in enumerate(ranking["data"]):
@@ -214,9 +214,9 @@ class RankingRoutes:
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ) -> None:
         logger.info("Ranking completed games")
-        ranking = utils.make_request(
+        ranking = utils.fetch_json(
             "GET", config.API_URL + "/statistics/rankings?ranking=user_completed_games"
-        ).json()
+        )
         ranking = utils.load_json_response(ranking[0])
         msg = "Ranking de juegos completados:\n"
         for i, elem in enumerate(ranking["data"]):
@@ -241,9 +241,9 @@ class RankingRoutes:
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ) -> None:
         logger.info("Ranking last played")
-        ranking = utils.make_request(
+        ranking = utils.fetch_json(
             "GET", config.API_URL + "/statistics/rankings?ranking=games_last_played"
-        ).json()
+        )
         ranking = utils.load_json_response(ranking[0])
         msg = "Ranking últimos juegos jugados:\n"
         for i, elem in enumerate(ranking["data"]):
@@ -254,9 +254,9 @@ class RankingRoutes:
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ) -> None:
         logger.info("Ranking most played")
-        ranking = utils.make_request(
+        ranking = utils.fetch_json(
             "GET", config.API_URL + "/statistics/rankings?ranking=games_most_played"
-        ).json()
+        )
         ranking = utils.load_json_response(ranking[0])
         msg = "Ranking de juegos más jugados:\n"
         for i, elem in enumerate(ranking["data"]):

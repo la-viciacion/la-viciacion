@@ -2,6 +2,7 @@ from enum import Enum
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi_versioning import version
+from sqlalchemy import Row
 from sqlalchemy.orm import Session
 
 from .. import auth
@@ -29,6 +30,15 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+def plain(data):
+    """Query rows as JSON-friendly dicts (FastAPI cannot serialize SQLAlchemy `Row`s)."""
+    if isinstance(data, Row):
+        return dict(data._mapping)
+    if isinstance(data, (list, tuple)):
+        return [plain(item) for item in data]
+    return data
 
 
 class RankingStatisticsTypes(str, Enum):
@@ -96,7 +106,7 @@ def get_ranking_statistics(
         else:
             data = {"message": "More rankings are coming"}
         content["type"] = ranking_type
-        content["data"] = data
+        content["data"] = plain(data)
         response.append(content)
     return response
 
@@ -154,6 +164,6 @@ def get_user_statistics(
             data = {"message": ranking_type + " is not a valid ranking"}
         content["type"] = ranking_type
         content["len_data"] = len(data)
-        content["data"] = data
+        content["data"] = plain(data)
         response.append(content)
     return response

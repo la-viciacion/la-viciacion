@@ -196,13 +196,16 @@ def update_game(db: Session, game_id: int, game: schemas.UpdateGame):
 
 
 def update_total_played_time(db: Session, game_id, total_played):
+    """Set a game's total played time, creating its statistics row if it has none
+    (a season reset wipes them, and games added before them never had one)."""
     try:
         stmt = (
             update(models.GameStatistics)
             .where(models.GameStatistics.game_id == game_id)
             .values(played_time=total_played)
         )
-        db.execute(stmt)
+        if db.execute(stmt).rowcount == 0:
+            db.add(models.GameStatistics(game_id=game_id, played_time=total_played, current_ranking=1000000))
         db.commit()
     except Exception as e:
         logger.info(e)

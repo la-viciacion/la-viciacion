@@ -37,10 +37,10 @@ class MyRoutes:
         logger.info("My games")
         query = update.callback_query
         username = query.from_user.username
-        ranking = utils.make_request(
+        ranking = utils.fetch_json(
             "GET",
             config.API_URL + "/statistics/users/" + username + "?ranking=played_games",
-        ).json()
+        )
         ranking = utils.load_json_response(ranking[0])
         num_games = len(ranking["data"])
         msg = f"Has jugado a {num_games} juegos. Estos son los 10 últimos:\n"
@@ -65,10 +65,10 @@ class MyRoutes:
         logger.info("My top games")
         query = update.callback_query
         username = query.from_user.username
-        ranking = utils.make_request(
+        ranking = utils.fetch_json(
             "GET",
             config.API_URL + "/statistics/users/" + username + "?ranking=top_games",
-        ).json()
+        )
         ranking = utils.load_json_response(ranking[0])
         msg = "Este es tu top de juegos:\n"
         for i, elem in enumerate(ranking["data"]):
@@ -92,13 +92,13 @@ class MyRoutes:
         logger.info("My completed games")
         query = update.callback_query
         username = query.from_user.username
-        ranking = utils.make_request(
+        ranking = utils.fetch_json(
             "GET",
             config.API_URL
             + "/statistics/users/"
             + username
             + "?ranking=completed_games",
-        ).json()
+        )
         ranking = utils.load_json_response(ranking[0])
         msg = "Estos son tus últimos juegos completados:\n"
         for i, elem in enumerate(ranking["data"]):
@@ -112,10 +112,10 @@ class MyRoutes:
         logger.info("My achievements")
         query = update.callback_query
         username = query.from_user.username
-        ranking = utils.make_request(
+        ranking = utils.fetch_json(
             "GET",
             config.API_URL + "/statistics/users/" + username + "?ranking=achievements",
-        ).json()
+        )
         ranking = utils.load_json_response(ranking[0])
         msg = "Estos son tus logros:\n"
         for i, elem in enumerate(ranking["data"]):
@@ -129,10 +129,10 @@ class MyRoutes:
         logger.info("My streak")
         query = update.callback_query
         username = query.from_user.username
-        ranking = utils.make_request(
+        ranking = utils.fetch_json(
             "GET",
             config.API_URL + "/statistics/users/" + username + "?ranking=streak",
-        ).json()
+        )
         ranking = utils.load_json_response(ranking[0])
         msg = "Estos son tus rachas:\n"
         data = ranking["data"]
