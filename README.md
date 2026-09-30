@@ -28,6 +28,10 @@ Everything Telegram-related is managed from the admin panel (**Notificaciones** 
 - **Scheduled jobs** run inside the API process (`api/src/utils/scheduler.py`), so no external cron is needed: weekly summary (private message to each active user with a Telegram id), hourly forgotten-timer reminder, daily 05:00 streak check and the season rollover. Each run is recorded in `job_runs`, so a restart never repeats a run, and a job that was due while the API was down still runs when it returns (weekly summary: within 6 hours). Stats, achievements and ranking announcements are event-driven (they run when a timer stops or an admin edits data).
 - Each user can set their own Telegram id in their profile and admins can edit it for anyone; it is unique.
 
+### Revoking achievements
+
+In the admin panel, **Logros concedidos** lists what each player has unlocked (filter by user or game). **Editar** changes the date it was obtained (its year is the season) and **Revocar** removes it without announcing anything. Achievements are re-evaluated on every recompute (after each stopped timer, the 05:00 job and the admin **Recalcular**), so if the player still meets the condition it will be unlocked again: correct the data that triggered it first (e.g. a wrong session).
+
 ### Manual sessions
 
 From the home page a user can add a finished session by hand (**+ Sesión manual**: game, platform, start, end) and correct or delete one of their own from the expanded history of a game (**Editar**; **Ver todas** loads older ones). The API (`POST /timers/manual`, `PATCH`/`DELETE /timers/{id}`) enforces: the end after the start and not in the future, at most 24 h, **current season only** (closed seasons are frozen; admins can still edit them), and no overlap with any other session of that user, running timer included. The game cannot be changed on an existing session: delete it and add it again. Manual changes recompute the user's stats silently (nothing is announced to the group), and creating one also creates the library entry for that game/platform/season if it is missing.

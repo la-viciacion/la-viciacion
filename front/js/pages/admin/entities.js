@@ -2,7 +2,7 @@
 // index.js renders the toolbar, table, pager, forms and delete flow from this.
 //
 // Entity: { label, endpoint, search?, filters?, columns, fields, createFields?,
-//           createLabel?, name(row), actions?, toolbarActions?, canDelete, deleteNote? }
+//           createLabel?, name(row), actions?, toolbarActions?, canDelete, deleteLabel?, deleteNote? }
 // Column: { label, render(row) -> html``, filter?(row) -> filters to apply on click }
 // Action: { label, show?(row), run(row, admin) }   admin = { jumpTo, reload }
 import { formatDuration, formatTimestamp } from '../../lib/format.js';
@@ -178,6 +178,24 @@ export const ENTITIES = {
     actions: [{ label: 'Imagen…', run: (r, admin) => uploadAchievementImage(r, admin) }],
     canDelete: false,
   },
+};
+
+ENTITIES.awards = {
+  label: 'Logros concedidos',
+  endpoint: '/manage/user-achievements',
+  filters: ['user', 'game'],
+  columns: [
+    userColumn,
+    { label: 'Logro', render: (r) => html`<strong>${r.title || r.key}</strong><div class="adm-sub">${r.key || ''}</div>` },
+    { label: 'Juego', render: (r) => r.game || r.game_id || '—', filter: (r) => (r.game_id ? { game_id: r.game_id, game_name: r.game } : {}) },
+    { label: 'Fecha', render: (r) => r.date },
+    { label: 'Temp.', render: (r) => r.season ?? '—' },
+  ],
+  fields: [{ key: 'date', label: 'Fecha en la que se obtuvo (su año es la temporada)', type: 'date', required: true }],
+  name: (r) => `${r.user || r.user_id} · ${r.title || r.key}`,
+  canDelete: true,
+  deleteLabel: 'Revocar',
+  deleteNote: 'El logro se revoca sin avisar por Telegram. Si el jugador sigue cumpliendo la condición, el próximo recálculo (o el de las 05:00) lo volverá a conceder: corrige antes los datos que lo provocaron.',
 };
 
 // Not a table: a custom panel (see settings.js)

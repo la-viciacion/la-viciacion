@@ -687,6 +687,74 @@ def patch_achievement(achievement_id: int, body: AchievementPatch, db: Session =
     return {"id": ach.id, "key": ach.key, "title": ach.title, "message": ach.message}
 
 
+# ── Awarded achievements (what each player has unlocked) ────────
+
+
+def _award_out(ua: models.UserAchievement, username, ach, game_name) -> dict:
+    return {
+        "id": ua.id,
+        "user_id": ua.user_id,
+        "user": username,
+        "achievement_id": ua.achievement_id,
+        "key": ach.key if ach else None,
+        "title": ach.title if ach else None,
+        "game_id": ua.game_id,
+        "game": game_name,
+        "date": ua.date,
+        "season": ua.season,
+    }
+
+
+@router.get("/user-achievements")
+def list_user_achievements(
+    user_id: Optional[int] = None,
+    game_id: Optional[str] = None,
+    achievement_id: Optional[int] = None,
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+):
+    q = (
+        db.query(models.UserAchievement, models.User.username, models.Achievement, models.Game.name)
+        .outerjoin(models.User, models.User.id == models.UserAchievement.user_id)
+        .outerjoin(models.Achievement, models.Achievement.id == models.UserAchievement.achievement_id)
+        .outerjoin(models.Game, models.Game.id == models.UserAchievement.game_id)
+    )
+    if user_id is not None:
+        q = q.filter(models.UserAchievement.user_id == user_id)
+    if game_id:
+        q = q.filter(models.UserAchievement.game_id == game_id)
+    if achievement_id is not None:
+        q = q.filter(models.UserAchievement.achievement_id == achievement_id)
+    total = q.count()
+    rows = q.order_by(models.UserAchievement.date.desc(), models.UserAchievement.id.desc()).limit(limit).offset(offset).all()
+    return {"total": total, "items": [_award_out(*row) for row in rows]}
+
+
+class UserAchievementPatch(BaseModel):
+    date: datetime.date
+
+
+@router.patch("/user-achievements/{award_id}")
+def patch_user_achievement(award_id: int, body: UserAchievementPatch, db: Session = Depends(get_db)):
+    """Change the date an achievement was unlocked (its year decides the season)."""
+    ua = _get_or_404(db, models.UserAchievement, award_id, "Logro concedido")
+    ua.date = body.date
+    _commit(db, "Logro concedido")
+    db.refresh(ua)
+    return _award_out(ua, None, None, None)
+
+
+@router.delete("/user-achievements/{award_id}")
+def revoke_user_achievement(award_id: int, db: Session = Depends(get_db)):
+    """Revoke an unlocked achievement. Nothing is announced. If the player still meets its
+    condition, the next recompute unlocks it again: fix the data behind it first."""
+    ua = _get_or_404(db, models.UserAchievement, award_id, "Logro concedido")
+    db.delete(ua)
+    db.commit()
+    return {"message": "Logro revocado"}
+
+
 # ── Notification settings (Telegram, weekly summary) ────────────
 
 

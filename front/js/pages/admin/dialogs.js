@@ -66,10 +66,11 @@ export function pickGame(title = 'Elegir juego') {
 /** Delete a row; rows with dependants come back as 409 + counts and need a second, explicit confirmation. */
 export async function deleteRow(entity, row, admin) {
   const url = `${entity.endpoint}/${row.id}`;
-  const title = `Borrar · ${entity.name(row)}`;
+  const verb = entity.deleteLabel || 'Borrar';
+  const title = `${verb} · ${entity.name(row)}`;
   try {
     try {
-      const ok = await confirmDialog(title, html`<p>Esta acción no se puede deshacer.</p>${entity.deleteNote ? html`<p>${entity.deleteNote}</p>` : ''}`, { danger: true, ok: 'Borrar' });
+      const ok = await confirmDialog(title, html`<p>Esta acción no se puede deshacer.</p>${entity.deleteNote ? html`<p>${entity.deleteNote}</p>` : ''}`, { danger: true, ok: verb });
       if (!ok) return;
       await api(url, { method: 'DELETE' });
     } catch (err) {

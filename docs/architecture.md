@@ -29,7 +29,7 @@ utils/             domain logic and integrations (see below)
 clients/open_ai.py OpenAI client wrapper
 ```
 
-Routers: `basic` (login, token, `/auth/active_user`, keepalive), `users` (profile, library, avatar, password), `games`, `timers` (start/stop/manual/edit/history), `statistics`, `manage` (**admin panel API**: users, games, timers, library, achievements, RAWG sync, settings; router-level `require_admin`), `utils` (platforms, achievements, playing).
+Routers: `basic` (login, token, `/auth/active_user`, keepalive), `users` (profile, library, avatar, password), `games`, `timers` (start/stop/manual/edit/history), `statistics`, `manage` (**admin panel API**: users, games, timers, library, achievements and awarded achievements (`/manage/user-achievements`: list, change date, revoke), RAWG sync, settings; router-level `require_admin`), `utils` (platforms, achievements, playing).
 
 Utils worth knowing: `seasons.py` (single source of the season concept), `actions.py` (recompute stats/rankings/streaks, announcements, weekly resume), `scheduler.py`, `settings.py` (runtime settings), `achievements.py`, `rawg_sync.py`, `messages.py` (Spanish user-facing error strings), `custom_exceptions.py`, `logger.py`.
 

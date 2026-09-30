@@ -159,7 +159,7 @@ function rowView(entity, r, i) {
       <td class="adm-row-actions">
         ${actions}
         <button class="adm-btn sm" data-act="edit" data-i="${i}">Editar</button>
-        ${entity.canDelete ? html`<button class="adm-btn sm danger" data-act="delete" data-i="${i}">Borrar</button>` : ''}
+        ${entity.canDelete ? html`<button class="adm-btn sm danger" data-act="delete" data-i="${i}">${entity.deleteLabel || 'Borrar'}</button>` : ''}
       </td>
     </tr>`;
 }
