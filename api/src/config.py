@@ -44,6 +44,9 @@ class Config:
         self.SMTP_USER = self._get_env("SMTP_USER")
         self.SMTP_PASS = self._get_env("SMTP_PASS")
 
+        # Interactive API docs (Swagger/ReDoc/openapi.json): off unless asked for
+        self.API_DOCS_ENABLED = os.getenv("API_DOCS_ENABLED", "false").strip().lower() in ("1", "true", "yes")
+
         # Monitoring
         self.SENTRY_URL = self._get_env("SENTRY_URL_API")
         self.ENVIRONMENT = self._get_env("ENVIRONMENT")

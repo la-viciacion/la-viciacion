@@ -13,6 +13,7 @@
 
 - Follow the layering `router → crud/utils → models`.
 - Use Pydantic schemas (`database/schemas.py`) for request bodies and `response_model`; validate at the schema/route level, enforce invariants in the business layer too (the API is the last line of defence, the front's checks are UX).
+- Never return `str(e)` in a 500: log the error and answer with `messages.INTERNAL_ERROR`. Validate uploads by content (`utils/images.py`).
 - Authorization on every route (see AGENTS.md rule 3). Check ownership with `auth.ensure_self_or_admin`. Admin-only routers use `dependencies=[Depends(auth.require_admin)]`.
 - Use `get_db` dependencies; commit explicitly; on `IntegrityError` roll back and translate to a 4xx with a Spanish message from `messages.py`.
 - Dates: server-local naive datetimes (`TZ` set); use `seasons.current()` / `seasons.of()`; never compute a season by hand and never write `season`.

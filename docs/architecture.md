@@ -63,7 +63,11 @@ Notes:
 
 - Users log in with email or username + password (`POST /token`, OAuth2 password form); JWT valid `ACCESS_TOKEN_EXPIRE_MINUTES`, not renewed. The front stores it and sends `Authorization: Bearer`; a 401 clears the session.
 - `admin` user ("Dios") is re-created/restored on every API start with `GOD_ADMIN_PASS`. Public sign-up is parked; admins create accounts.
-- There are no public or API-key endpoints (the old webhooks and `/admin` routers were removed). Adding a public route is a security decision: document it here and in the README.
+- The only endpoints reachable without a token are `GET /`, `GET /keepalive`, `POST /token` (the only login), `POST /signup` (invitation key) and `GET /utils/achievement-image/{key}` (loaded by `<img>`). `tests/test_endpoint_security.py` fixes that list and fails on any other open route, on any `/manage` route that is not admin-only and on any per-user route that never checks the owner. A new public endpoint is a security decision: add it to the test's `PUBLIC` set on purpose and document it here.
+- Failed logins and wrong invitation keys are throttled in memory (`utils/rate_limit.py`, HTTP 429). It is per process, another reason to run a single API replica.
+- Tokens carry `pwv`, a keyed digest of the password hash (`auth.password_fingerprint`); `get_current_user` rejects tokens whose digest no longer matches, so a password change revokes older sessions.
+- Uploaded images are validated by content (`utils/images.py`: real PNG/JPEG, size and pixel limits), never by the declared content type. 500 responses must not echo exception text: log it and return `messages.INTERNAL_ERROR`.
+- Interactive docs are removed unless `API_DOCS_ENABLED=true` (see `main.py`).
 
 ## Scheduler (`utils/scheduler.py`)
 

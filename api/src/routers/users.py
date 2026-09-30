@@ -17,8 +17,9 @@ from sqlalchemy.orm import Session
 from .. import auth
 from ..crud import games, time_entries, users
 from ..database import models, schemas
-from ..database.database import SessionLocal, engine
+from ..database.database import SessionLocal
 from ..utils import actions as actions
+from ..utils import images
 from ..utils import messages as msg
 from ..utils import my_utils as utils
 from ..utils.logger import LogManager
@@ -27,7 +28,7 @@ from ..utils import seasons
 log_manager = LogManager()
 logger = log_manager.get_logger()
 
-models.Base.metadata.create_all(bind=engine)
+AVATAR_MAX_BYTES = 2 * 1024 * 1024
 
 router = APIRouter(
     prefix="/users",
@@ -182,8 +183,7 @@ def change_password(
     db: Session = Depends(get_db),
 ):
     """Change own password (the current one is required)"""
-    if active_user.username != username:
-        raise HTTPException(status_code=403, detail=msg.USER_NOT_ADMIN)
+    auth.ensure_self(active_user, username)
     user = users.get_user_by_username(db, username)
     if user is None:
         raise HTTPException(status_code=404, detail=msg.USER_NOT_EXISTS)
@@ -381,7 +381,8 @@ async def rate_game(
         return await users.rate_game(db, user.id, game_id, score)
     except Exception as e:
         logger.info(e)
-        raise HTTPException(status_code=500, detail="Error rating game_user: " + str(e))
+        logger.error("Error rating game: " + str(e))
+        raise HTTPException(status_code=500, detail=msg.INTERNAL_ERROR)
 
 
 @router.patch("/{username}/avatar")
@@ -394,26 +395,20 @@ async def upload_avatar(
     db: Session = Depends(get_db),
 ):
     auth.ensure_self_or_admin(active_user, username=username)
-    allowed_types = ["image/jpeg", "image/jpg", "image/png"]
-    if file.content_type not in allowed_types:
-        logger.info(msg.FILE_TYPE_NOT_ALLOWED)
-        raise HTTPException(
-            status_code=400,
-            detail=msg.FILE_TYPE_NOT_ALLOWED,
-        )
     if not users.get_user_by_username(db, username):
         logger.info(msg.USER_NOT_EXISTS)
         raise HTTPException(status_code=404, detail=msg.USER_NOT_EXISTS)
-    logger.info("File size: " + str(file.size))
-    if file.size > 2097152:
-        logger.info(msg.FILE_TOO_BIG)
-        raise HTTPException(status_code=400, detail=msg.FILE_TOO_BIG)
+    data = await file.read(AVATAR_MAX_BYTES + 1)
     try:
-        data = await file.read()
+        images.validate_image(data, AVATAR_MAX_BYTES)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=msg.FILE_TOO_BIG if str(e) == "too_big" else msg.FILE_TYPE_NOT_ALLOWED)
+    try:
         users.upload_avatar(db, username, data)
         return "Avatar uploaded"
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("Error saving avatar: " + str(e))
+        raise HTTPException(status_code=500, detail=msg.INTERNAL_ERROR)
 
 
 @router.get("/{username}/avatar")
@@ -430,7 +425,8 @@ async def get_avatar(
     try:
         data = users.get_avatar(db, username)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("Error reading avatar: " + str(e))
+        raise HTTPException(status_code=500, detail=msg.INTERNAL_ERROR)
     if not data or not data[0]:
         raise HTTPException(status_code=404, detail="Avatar not found")
     image = bytes(data[0])

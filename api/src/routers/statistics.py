@@ -7,14 +7,12 @@ from sqlalchemy.orm import Session
 from .. import auth
 from ..crud import rankings, users
 from ..database import models, schemas
-from ..database.database import SessionLocal, engine
+from ..database.database import SessionLocal
 from ..utils import actions as actions
 from ..utils.logger import LogManager
 
 log_manager = LogManager()
 logger = log_manager.get_logger()
-
-models.Base.metadata.create_all(bind=engine)
 
 router = APIRouter(
     prefix="/statistics",

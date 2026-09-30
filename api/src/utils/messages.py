@@ -26,3 +26,7 @@ EMAIL_VALIDATION = "The email has not a valid email format"
 
 ACHIEVEMENT_NOT_EXISTS = "Achievement not exists"
 FILE_TOO_BIG_ACHIEVEMENTS = "File is too big. Max size is 1MB"
+
+INTERNAL_ERROR = "Error interno. Inténtalo de nuevo más tarde"
+TOO_MANY_ATTEMPTS = "Demasiados intentos fallidos. Vuelve a intentarlo en {minutes} min"
+ACCOUNT_DISABLED = "Cuenta desactivada. Habla con un administrador"

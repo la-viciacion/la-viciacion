@@ -26,8 +26,9 @@ from .. import auth
 from ..crud import games, time_entries, users
 from ..crud.achievements import Achievements
 from ..database import models, schemas
-from ..database.database import SessionLocal, engine
+from ..database.database import SessionLocal
 from ..utils import actions as actions
+from ..utils import images
 from ..utils import messages as msg
 from ..utils import my_utils as utils
 from ..utils.logger import LogManager
@@ -35,11 +36,11 @@ from ..utils.logger import LogManager
 log_manager = LogManager()
 logger = log_manager.get_logger()
 
-models.Base.metadata.create_all(bind=engine)
-
 achievements = Achievements()
 
 # To add dependency for active user: dependencies=[Depends(auth.get_current_active_user)],
+ACHIEVEMENT_IMAGE_MAX_BYTES = 1024000
+
 router = APIRouter(
     prefix="/utils",
     tags=["Utils"],
@@ -123,26 +124,23 @@ async def upload_achievement_image(
     """
     Upload achievement image
     """
-    allowed_types = ["image/jpeg", "image/jpg", "image/png"]
-    if file.content_type not in allowed_types:
-        logger.info(msg.FILE_TYPE_NOT_ALLOWED)
-        raise HTTPException(
-            status_code=400,
-            detail=msg.FILE_TYPE_NOT_ALLOWED,
-        )
     if not achievements.get_ach_by_key(db, achievement):
         logger.info(msg.ACHIEVEMENT_NOT_EXISTS)
         raise HTTPException(status_code=404, detail=msg.ACHIEVEMENT_NOT_EXISTS)
-    logger.info("File size: " + str(file.size))
-    if file.size > 1024000:
-        logger.info(msg.FILE_TOO_BIG_ACHIEVEMENTS)
-        raise HTTPException(status_code=400, detail=msg.FILE_TOO_BIG)
+    data = await file.read(ACHIEVEMENT_IMAGE_MAX_BYTES + 1)
     try:
-        data = await file.read()
+        images.validate_image(data, ACHIEVEMENT_IMAGE_MAX_BYTES)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=msg.FILE_TOO_BIG_ACHIEVEMENTS if str(e) == "too_big" else msg.FILE_TYPE_NOT_ALLOWED,
+        )
+    try:
         achievements.upload_image(db, achievement, data)
         return "Image uploaded"
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("Error saving achievement image: " + str(e))
+        raise HTTPException(status_code=500, detail=msg.INTERNAL_ERROR)
 
 
 @router.get("/achievement-image/{achievement}")
@@ -165,7 +163,8 @@ async def get_achievement_image(
         # print(format_type)
         return Response(content=data[0], media_type="image/" + format_type)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("Error reading achievement image: " + str(e))
+        raise HTTPException(status_code=500, detail=msg.INTERNAL_ERROR)
 
 
 # @router.get("/sentry-debug")

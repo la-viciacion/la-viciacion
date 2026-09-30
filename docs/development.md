@@ -18,7 +18,7 @@ docker compose down                    # keeps db/data
 ```
 
 - Front: http://localhost:3000 (API proxied at `/api/`)
-- API: http://127.0.0.1:5000 (docs at `/api/v1/docs`)
+- API: http://127.0.0.1:5000 (interactive docs at `/api/v1/docs` only with `API_DOCS_ENABLED=true` in `.env`)
 - DB: `127.0.0.1:3307`
 - The API container runs `alembic upgrade head` on every start (`api/entrypoint.sh`).
 - Logs are written to `api/logs/` and `bot/logs/` (gitignored).

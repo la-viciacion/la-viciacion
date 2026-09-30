@@ -1,3 +1,5 @@
+import hashlib
+import hmac
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
@@ -63,6 +65,15 @@ def authenticate_user(db, login: str, password: str):
     return user
 
 
+def password_fingerprint(user) -> str:
+    """Short keyed digest of the stored password hash.
+
+    It travels inside the token (claim `pwv`), so changing or resetting the
+    password invalidates every session issued before, without extra storage.
+    """
+    return hmac.new(config.SECRET_KEY.encode(), str(user.password).encode(), hashlib.sha256).hexdigest()[:16]
+
+
 def create_access_token(data: dict, expires_delta: timedelta | None = None):
     to_encode = data.copy()
     if expires_delta:
@@ -93,6 +104,8 @@ async def get_current_user(
     user = users.get_user_by_username(db, username=token_data.username)
     if user is None:
         raise credentials_exception
+    if not hmac.compare_digest(str(payload.get("pwv", "")), password_fingerprint(user)):
+        raise credentials_exception  # issued before the last password change
     return user
 
 
@@ -113,6 +126,14 @@ def require_admin(
             status_code=status.HTTP_403_FORBIDDEN, detail=messages.USER_NOT_ADMIN
         )
     return current_user
+
+
+def ensure_self(current_user: models.User, username: str):
+    """Only the account owner, admins included: for actions that need the owner's own consent."""
+    if current_user.username != username:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail=messages.USER_NOT_ADMIN
+        )
 
 
 def ensure_self_or_admin(

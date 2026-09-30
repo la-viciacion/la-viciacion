@@ -84,6 +84,24 @@ app.include_router(utils.router)
 
 app = VersionedFastAPI(app, version_format="{major}", prefix_format="/api/v{major}")
 
+# Swagger/ReDoc/openapi.json list every endpoint: only served when API_DOCS_ENABLED=true
+DOCS_PATHS = ("/docs", "/redoc", "/openapi.json", "/docs/oauth2-redirect")
+
+
+def remove_docs(application: FastAPI) -> None:
+    application.router.routes[:] = [
+        r
+        for r in application.router.routes
+        if not getattr(r, "path", "").endswith(DOCS_PATHS)
+    ]
+    for route in application.router.routes:
+        if isinstance(getattr(route, "app", None), FastAPI):
+            remove_docs(route.app)
+
+
+if not config.API_DOCS_ENABLED:
+    remove_docs(app)
+
 
 @app.on_event("startup")
 def start_scheduler():
