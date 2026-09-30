@@ -310,14 +310,17 @@ async def announce_ranking_changes(db: Session, before: dict, silent: bool):
 
 
 async def check_forgotten_timer(db: Session, user: models.User):
-    """Remind a user about a timer running for too long (the scheduler calls this hourly).
+    """Remind a user about a timer running for too long (the scheduler calls this hourly, and each
+    timer is reminded about once: in the run that follows it crossing the line).
 
     "Too long" is the user's own setting, or the default when they never set it.
     """
     if user.telegram_id is None and not push_has_devices(user.id):
         return
     hours = user_settings.forgotten_timer_hours(db, user.id)
-    forgotten_timer = time_entries.get_forgotten_game_timers(db, user_id=user.id, hours=hours)
+    forgotten_timer = time_entries.get_forgotten_game_timers(
+        db, user_id=user.id, hours=hours, newly_forgotten=True
+    )
     if forgotten_timer:
         logger.info(f"{user.name} has an active timer for more than {hours} hours")
         msg = (

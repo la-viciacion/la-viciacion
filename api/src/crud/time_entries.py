@@ -404,13 +404,20 @@ def get_active_game_timer_by_user(db: Session, user_id: int) -> models.GameTimer
 
 
 def get_forgotten_game_timers(
-    db: Session, user_id: int = None, hours: int = user_settings.DEFAULT_FORGOTTEN_TIMER_HOURS
+    db: Session,
+    user_id: int = None,
+    hours: int = user_settings.DEFAULT_FORGOTTEN_TIMER_HOURS,
+    newly_forgotten: bool = False,
 ) -> list[models.GameTimer]:
+    """Running timers older than `hours`. With `newly_forgotten`, only those that crossed the
+    line during the last hour, so an hourly job reminds about each timer once."""
     time_threshold = datetime.datetime.now() - datetime.timedelta(hours=hours)
     query = db.query(models.GameTimer).filter(
         models.GameTimer.is_active == True,
         models.GameTimer.start_time < time_threshold,
     )
+    if newly_forgotten:
+        query = query.filter(models.GameTimer.start_time >= time_threshold - datetime.timedelta(hours=1))
     if user_id is not None:
         query = query.filter(models.GameTimer.user_id == user_id)
     return query.all()
