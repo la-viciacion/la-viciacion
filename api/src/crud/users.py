@@ -264,6 +264,28 @@ def ensure_library_entry(
     return True
 
 
+def drop_empty_entry(db: Session, user_id: int, game_id: str, platform: str | None, season: int) -> bool:
+    """Delete the library entry (game, platform, season) if nothing is left in it: no session
+    (the caller flushed its change first), no completion and no score. Not committed."""
+    entry = (
+        db.query(models.UserGame)
+        .filter_by(user_id=user_id, game_id=game_id, platform=platform, season=season)
+        .first()
+    )
+    if entry is None or entry.completed or entry.score is not None:
+        return False
+    has_sessions = (
+        db.query(models.GameTimer.id)
+        .filter_by(user_id=user_id, game_id=game_id, platform=platform, season=season)
+        .first()
+        is not None
+    )
+    if has_sessions:
+        return False
+    db.delete(entry)
+    return True
+
+
 def telegram_id_in_use(db: Session, telegram_id: int, exclude_user_id: int | None = None) -> bool:
     """True if another account already uses this Telegram id."""
     query = db.query(models.User.id).filter(models.User.telegram_id == telegram_id)

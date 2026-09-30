@@ -366,6 +366,7 @@ def _own_finished_session(db: Session, current_user: User, timer_id: int) -> Gam
 
 def update_session(db: Session, current_user: User, timer_id: int, body: SessionUpdate) -> GameTimer:
     timer = _own_finished_session(db, current_user, timer_id)
+    old_entry = (timer.platform, seasons.of(timer.start_time))
     data = body.model_dump(exclude_unset=True)
     start = data.get("start_time") or timer.start_time
     end = data.get("end_time") or timer.end_time
@@ -379,6 +380,10 @@ def update_session(db: Session, current_user: User, timer_id: int, body: Session
     timer.start_time, timer.end_time = start, end
     timer.duration_seconds = int((end - start).total_seconds())
     users_crud.ensure_library_entry(db, timer.user_id, timer.game_id, timer.platform, start)
+    # moving a session to another platform or season must not leave its old entry empty behind
+    db.flush()
+    if old_entry != (timer.platform, seasons.of(start)):
+        users_crud.drop_empty_entry(db, timer.user_id, timer.game_id, *old_entry)
     _commit_session(db)
     db.refresh(timer)
     return timer
