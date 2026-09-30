@@ -16,9 +16,9 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .. import auth
+from ..auth import get_db
 from ..crud import users as users_crud
 from ..database import models
-from ..database.database import SessionLocal
 from ..utils import actions, my_utils, push, rawg_sync, seasons, settings
 from ..database.schemas import NOTES_MAX
 from ..utils.logger import LogManager
@@ -31,14 +31,6 @@ router = APIRouter(
     tags=["Manage"],
     dependencies=[Depends(auth.require_admin)],
 )
-
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 
 def _commit(db: Session, what: str):

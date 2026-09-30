@@ -23,10 +23,10 @@ from fastapi_versioning import version
 from sqlalchemy.orm import Session
 
 from .. import auth
+from ..auth import get_db
 from ..crud import games, time_entries, users
 from ..crud.achievements import Achievements
 from ..database import models, schemas
-from ..database.database import SessionLocal
 from ..utils import actions as actions
 from ..utils import images
 from ..utils import messages as msg
@@ -46,15 +46,6 @@ router = APIRouter(
     tags=["Utils"],
     responses={404: {"description": "Not found"}},
 )
-
-
-# Dependency
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 
 @router.get("/platforms")

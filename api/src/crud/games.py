@@ -9,7 +9,6 @@ from sqlalchemy.orm import Session
 
 from ..database import models, schemas
 from ..utils import actions
-from ..utils import actions as actions
 from ..utils import my_utils as utils
 from ..utils.logger import LogManager
 

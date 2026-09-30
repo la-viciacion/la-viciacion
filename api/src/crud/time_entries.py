@@ -19,7 +19,6 @@ from sqlalchemy.orm import Session
 from ..config import Config
 from ..database import models, schemas
 from ..utils import actions
-from ..utils import actions as actions
 from ..utils import my_utils as utils
 from . import games, users
 from ..utils.logger import LogManager

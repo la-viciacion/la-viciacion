@@ -5,8 +5,8 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from .. import auth
+from ..auth import get_db
 from ..database import models
-from ..database.database import SessionLocal
 from ..utils import push, settings
 
 router = APIRouter(
@@ -14,14 +14,6 @@ router = APIRouter(
     tags=["Push"],
     dependencies=[Depends(auth.get_current_active_user)],
 )
-
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 
 class Keys(BaseModel):

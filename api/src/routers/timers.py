@@ -7,8 +7,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .. import auth
+from ..auth import get_db
 from ..crud import users as users_crud
-from ..database.database import SessionLocal
 from ..database.models import Game, GameTimer, PlatformTag, User, UserGame
 from ..database.schemas import (
     ActiveTimerResponse,
@@ -24,14 +24,6 @@ from ..database.schemas import (
 )
 from ..utils import actions
 from ..utils import seasons
-
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 
 # Timer CRUD operations

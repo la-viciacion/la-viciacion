@@ -6,9 +6,9 @@ from sqlalchemy import Row
 from sqlalchemy.orm import Session
 
 from .. import auth
+from ..auth import get_db
 from ..crud import rankings, users
 from ..database import models, schemas
-from ..database.database import SessionLocal
 from ..utils import actions as actions
 from ..utils.logger import LogManager
 
@@ -21,15 +21,6 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
     dependencies=[Depends(auth.get_current_active_user)],
 )
-
-
-# Dependency
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 
 def plain(data):
