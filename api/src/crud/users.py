@@ -382,7 +382,8 @@ async def add_new_game(
             if "Duplicate" not in str(e):
                 logger.info("Error adding new user game: " + str(e))
                 raise e
-        played_games = count_played_games(db, user.id)
+        # the season of the new entry, not the running one: a backdated start belongs to its own season
+        played_games = count_played_games(db, user.id, seasons.of(started_date))
         started_game = (
             "[" + game_db.name + "](https://rawg.io/games/" + game_db.slug + ")"
         )
