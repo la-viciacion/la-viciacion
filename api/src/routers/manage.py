@@ -59,6 +59,12 @@ def _confirm_or_409(counts: dict, force: bool):
         raise HTTPException(status_code=409, detail={"message": "Tiene datos asociados", "counts": counts})
 
 
+def _sorted(query, column, order: str, tie_breaker):
+    """ORDER BY `column` (asc/desc); the id keeps pages stable when values repeat."""
+    direction = column.desc() if order == "desc" else column.asc()
+    return query.order_by(direction, tie_breaker.desc() if order == "desc" else tie_breaker.asc())
+
+
 def _like(term: str) -> str:
     return "%" + term.replace("%", r"\%").replace("_", r"\_") + "%"
 
@@ -478,6 +484,10 @@ def list_timers(
     user_id: Optional[int] = None,
     game_id: Optional[str] = None,
     active: Optional[bool] = None,
+    season: Optional[int] = None,
+    platform: Optional[str] = None,
+    sort: str = Query("start", pattern="^(user|game|start|end|duration|platform|season)$"),
+    order: str = Query("desc", pattern="^(asc|desc)$"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
@@ -493,8 +503,21 @@ def list_timers(
         q = q.filter(models.GameTimer.game_id == game_id)
     if active is not None:
         q = q.filter(models.GameTimer.is_active == active)
+    if season is not None:
+        q = q.filter(models.GameTimer.season == season)
+    if platform:
+        q = q.filter(models.GameTimer.platform == platform)
     total = q.count()
-    rows = q.order_by(models.GameTimer.start_time.desc()).limit(limit).offset(offset).all()
+    columns = {
+        "user": models.User.username,
+        "game": models.Game.name,
+        "start": models.GameTimer.start_time,
+        "end": models.GameTimer.end_time,
+        "duration": models.GameTimer.duration_seconds,
+        "platform": models.GameTimer.platform,
+        "season": models.GameTimer.season,
+    }
+    rows = _sorted(q, columns[sort], order, models.GameTimer.id).limit(limit).offset(offset).all()
     return {"total": total, "items": [_timer_out(t, u, g) for t, u, g in rows]}
 
 
@@ -587,6 +610,11 @@ def _library_out(u: models.UserGame, user_name: Optional[str], game_name: Option
 def list_library(
     user_id: Optional[int] = None,
     game_id: Optional[str] = None,
+    season: Optional[int] = None,
+    platform: Optional[str] = None,
+    completed: Optional[str] = Query(None, pattern="^(yes|no)$"),
+    sort: str = Query("season", pattern="^(user|game|platform|season|started|completed|score)$"),
+    order: str = Query("desc", pattern="^(asc|desc)$"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
@@ -600,8 +628,23 @@ def list_library(
         q = q.filter(models.UserGame.user_id == user_id)
     if game_id:
         q = q.filter(models.UserGame.game_id == game_id)
+    if season is not None:
+        q = q.filter(models.UserGame.season == season)
+    if platform:
+        q = q.filter(models.UserGame.platform == platform)
+    if completed:
+        q = q.filter(models.UserGame.completed == 1 if completed == "yes" else func.coalesce(models.UserGame.completed, 0) == 0)
     total = q.count()
-    rows = q.order_by(models.UserGame.season.desc(), models.UserGame.id.desc()).limit(limit).offset(offset).all()
+    columns = {
+        "user": models.User.username,
+        "game": models.Game.name,
+        "platform": models.UserGame.platform,
+        "season": models.UserGame.season,
+        "started": models.UserGame.started_date,
+        "completed": models.UserGame.completed_date,
+        "score": models.UserGame.score,
+    }
+    rows = _sorted(q, columns[sort], order, models.UserGame.id).limit(limit).offset(offset).all()
     return {"total": total, "items": [_library_out(u, un, gn) for u, un, gn in rows]}
 
 
@@ -725,6 +768,9 @@ def list_user_achievements(
     user_id: Optional[int] = None,
     game_id: Optional[str] = None,
     achievement_id: Optional[int] = None,
+    season: Optional[int] = None,
+    sort: str = Query("date", pattern="^(user|achievement|game|date|season)$"),
+    order: str = Query("desc", pattern="^(asc|desc)$"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
@@ -741,8 +787,17 @@ def list_user_achievements(
         q = q.filter(models.UserAchievement.game_id == game_id)
     if achievement_id is not None:
         q = q.filter(models.UserAchievement.achievement_id == achievement_id)
+    if season is not None:
+        q = q.filter(models.UserAchievement.season == season)
     total = q.count()
-    rows = q.order_by(models.UserAchievement.date.desc(), models.UserAchievement.id.desc()).limit(limit).offset(offset).all()
+    columns = {
+        "user": models.User.username,
+        "achievement": models.Achievement.title,
+        "game": models.Game.name,
+        "date": models.UserAchievement.date,
+        "season": models.UserAchievement.season,
+    }
+    rows = _sorted(q, columns[sort], order, models.UserAchievement.id).limit(limit).offset(offset).all()
     return {"total": total, "items": [_award_out(*row) for row in rows]}
 
 

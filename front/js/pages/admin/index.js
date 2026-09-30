@@ -41,7 +41,8 @@ export async function render({ main }) {
   let overview;
   try {
     await loadPlatforms();
-    const [users, ov] = await Promise.all([api('/manage/users?limit=200'), api('/manage/overview')]);
+    const [users, ov, achievements] = await Promise.all([api('/manage/users?limit=200'), api('/manage/overview'), api('/manage/achievements')]);
+    store.achievements = (achievements || []).map((a) => ({ id: a.id, title: a.title }));
     store.users = (users?.items || []).map((u) => ({ id: u.id, username: u.username, name: u.name }));
     overview = ov;
   } catch (err) {
@@ -147,7 +148,7 @@ function toolbarView(entity, st) {
       ${entity.filters?.includes('active') ? html`<label class="adm-check"><input type="checkbox" id="admFilterActive" ${f.active ? html`checked` : ''} /> Solo en curso</label>` : ''}
       ${(entity.selects || []).map((s) => html`
         <select class="adm-input" data-filter="${s.key}" aria-label="${s.label}">
-          ${s.options.map(([value, label]) => html`<option value="${value}" ${(f[s.key] || '') === value ? html`selected` : ''}>${label}</option>`)}
+          ${(typeof s.options === 'function' ? s.options() : s.options).map(([value, label]) => html`<option value="${value}" ${(f[s.key] || '') === value ? html`selected` : ''}>${label}</option>`)}
         </select>`)}
       <span class="adm-spacer"></span>
       ${(entity.toolbarActions || []).map((a) => html`<button class="adm-btn" data-act="${a.act}">${a.label}</button>`)}

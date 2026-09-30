@@ -5,20 +5,29 @@
 //           createLabel?, name(row), actions?, toolbarActions?, canDelete, deleteLabel?, deleteNote?,
 //           selects?, defaultSort? }
 // Column: { label, render(row) -> html``, filter?(row) -> filters to apply on click, sort? (API sort key) }
-// Select: { key, label, options: [[value, label], ...] }   sent to the API as ?key=value
+// Select: { key, label, options: [[value, label], ...] | () => [...] }   sent to the API as ?key=value
 // Action: { label, show?(row), run(row, admin) }   admin = { jumpTo, reload }
 import { formatDuration, formatTimestamp } from '../../lib/format.js';
 import { html } from '../../lib/html.js';
-import { platformName } from '../../lib/platforms.js';
-import { badge } from './components.js';
+import { platformList, platformName } from '../../lib/platforms.js';
+import { badge, store } from './components.js';
 import { closeTimerNow, uploadAchievementImage } from './dialogs.js';
 
 const platformField = { key: 'platform', label: 'Plataforma', type: 'platform' };
 const duration = (sec) => (sec == null ? '—' : formatDuration(sec));
 const platform = (id) => platformName(id) || '—';
 
-const userColumn = { label: 'Usuario', render: (r) => r.user || r.user_id, filter: (r) => ({ user_id: r.user_id }) };
-const gameColumn = { label: 'Juego', render: (r) => r.game || r.game_id, filter: (r) => ({ game_id: r.game_id, game_name: r.game }) };
+// Filters shared by the tables that have seasons / platforms (options are read when the toolbar is drawn)
+const firstSeason = 2023;
+const seasonSelect = {
+  key: 'season',
+  label: 'Temporada',
+  options: () => [['', 'Temporada: todas'], ...Array.from({ length: new Date().getFullYear() - firstSeason + 1 }, (_, i) => String(new Date().getFullYear() - i)).map((y) => [y, y])],
+};
+const platformSelect = { key: 'platform', label: 'Plataforma', options: () => [['', 'Plataforma: todas'], ...platformList().map((p) => [p.id, p.name])] };
+
+const userColumn = { label: 'Usuario', sort: 'user', render: (r) => r.user || r.user_id, filter: (r) => ({ user_id: r.user_id }) };
+const gameColumn = { label: 'Juego', sort: 'game', render: (r) => r.game || r.game_id, filter: (r) => ({ game_id: r.game_id, game_name: r.game }) };
 
 export const ENTITIES = {
   users: {
@@ -107,14 +116,16 @@ export const ENTITIES = {
     label: 'Sesiones',
     endpoint: '/manage/timers',
     filters: ['user', 'game', 'active'],
+    selects: [seasonSelect, platformSelect],
+    defaultSort: { key: 'start', dir: 'desc' },
     columns: [
       userColumn,
       gameColumn,
-      { label: 'Inicio', render: (r) => formatTimestamp(r.start_time) },
-      { label: 'Fin', render: (r) => (r.is_active ? badge('En curso', 'orange') : formatTimestamp(r.end_time)) },
-      { label: 'Duración', render: (r) => duration(r.duration_seconds) },
-      { label: 'Plataforma', render: (r) => platform(r.platform) },
-      { label: 'Temp.', render: (r) => r.season ?? '—' },
+      { label: 'Inicio', sort: 'start', render: (r) => formatTimestamp(r.start_time) },
+      { label: 'Fin', sort: 'end', render: (r) => (r.is_active ? badge('En curso', 'orange') : formatTimestamp(r.end_time)) },
+      { label: 'Duración', sort: 'duration', render: (r) => duration(r.duration_seconds) },
+      { label: 'Plataforma', sort: 'platform', render: (r) => platform(r.platform) },
+      { label: 'Temp.', sort: 'season', render: (r) => r.season ?? '—' },
     ],
     fields: [
       { key: 'start_time', label: 'Inicio', type: 'datetime', required: true },
@@ -142,14 +153,20 @@ export const ENTITIES = {
     label: 'Biblioteca',
     endpoint: '/manage/library',
     filters: ['user', 'game'],
+    selects: [
+      seasonSelect,
+      platformSelect,
+      { key: 'completed', label: 'Completado', options: [['', 'Completado: todos'], ['yes', 'Completados'], ['no', 'Sin completar']] },
+    ],
+    defaultSort: { key: 'season', dir: 'desc' },
     columns: [
       userColumn,
       gameColumn,
-      { label: 'Plataforma', render: (r) => platform(r.platform) },
-      { label: 'Temp.', render: (r) => r.season ?? '—' },
-      { label: 'Inicio', render: (r) => r.started_date || '—' },
-      { label: 'Completado', render: (r) => (r.completed ? badge(`Sí ${r.completed_date || ''}`, 'green') : badge('No', 'gray')) },
-      { label: 'Nota', render: (r) => (r.score != null ? r.score : '—') },
+      { label: 'Plataforma', sort: 'platform', render: (r) => platform(r.platform) },
+      { label: 'Temp.', sort: 'season', render: (r) => r.season ?? '—' },
+      { label: 'Inicio', sort: 'started', render: (r) => r.started_date || '—' },
+      { label: 'Completado', sort: 'completed', render: (r) => (r.completed ? badge(`Sí ${r.completed_date || ''}`, 'green') : badge('No', 'gray')) },
+      { label: 'Nota', sort: 'score', render: (r) => (r.score != null ? r.score : '—') },
     ],
     fields: [
       platformField,
@@ -193,12 +210,17 @@ ENTITIES.awards = {
   label: 'Logros concedidos',
   endpoint: '/manage/user-achievements',
   filters: ['user', 'game'],
+  selects: [
+    { key: 'achievement_id', label: 'Logro', options: () => [['', 'Logro: todos'], ...store.achievements.map((a) => [String(a.id), a.title])] },
+    seasonSelect,
+  ],
+  defaultSort: { key: 'date', dir: 'desc' },
   columns: [
     userColumn,
-    { label: 'Logro', render: (r) => html`<strong>${r.title || r.key}</strong><div class="adm-sub">${r.key || ''}</div>` },
-    { label: 'Juego', render: (r) => r.game || r.game_id || '—', filter: (r) => (r.game_id ? { game_id: r.game_id, game_name: r.game } : {}) },
-    { label: 'Fecha', render: (r) => r.date },
-    { label: 'Temp.', render: (r) => r.season ?? '—' },
+    { label: 'Logro', sort: 'achievement', render: (r) => html`<strong>${r.title || r.key}</strong><div class="adm-sub">${r.key || ''}</div>` },
+    { label: 'Juego', sort: 'game', render: (r) => r.game || r.game_id || '—', filter: (r) => (r.game_id ? { game_id: r.game_id, game_name: r.game } : {}) },
+    { label: 'Fecha', sort: 'date', render: (r) => r.date },
+    { label: 'Temp.', sort: 'season', render: (r) => r.season ?? '—' },
   ],
   fields: [{ key: 'date', label: 'Fecha en la que se obtuvo (su año es la temporada)', type: 'date', required: true }],
   name: (r) => `${r.user || r.user_id} · ${r.title || r.key}`,
