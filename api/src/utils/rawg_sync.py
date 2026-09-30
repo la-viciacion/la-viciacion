@@ -24,6 +24,7 @@ from ..config import Config
 from ..database import models
 from ..database.database import SessionLocal
 from .logger import LogManager
+from .redaction import redact_rawg_key
 
 logger = LogManager().get_logger()
 config = Config()
@@ -57,11 +58,6 @@ def _blank(v) -> bool:
     return v is None or (isinstance(v, str) and v.strip() in ("", "-"))
 
 
-def _clean(msg: str) -> str:
-    key = config.RAWG_API_KEY
-    return msg.replace(key, "***") if key else msg
-
-
 class _Client:
     """Counts every request against the budget and enforces the cap."""
 
@@ -80,7 +76,7 @@ class _Client:
             try:
                 resp = requests.get(f"{RAWG}{path}", params={"key": self.key, **params}, timeout=15)
             except requests.RequestException as e:
-                raise ConnectionError(_clean(str(e)))
+                raise ConnectionError(redact_rawg_key(str(e)))
             # One retry for transient upstream errors (each try counts as a call).
             if resp.status_code in (502, 503, 504) and attempt == 1 and self.budget_left():
                 continue
@@ -333,19 +329,19 @@ def _run(max_calls: int, overwrite: bool):
             except ConnectionError as e:
                 db.rollback()
                 consecutive_errors += 1
-                _push("errors", {"game_id": game.id, "name": game.name, "error": _clean(str(e))})
+                _push("errors", {"game_id": game.id, "name": game.name, "error": redact_rawg_key(str(e))})
                 if consecutive_errors >= MAX_CONSECUTIVE_ERRORS:
                     reason = "errors"
                     break
             except Exception as e:                # DB or logic error on one game: keep going
                 db.rollback()
-                _push("errors", {"game_id": game.id, "name": game.name, "error": _clean(str(e))})
+                _push("errors", {"game_id": game.id, "name": game.name, "error": redact_rawg_key(str(e))})
             _bump("processed")
     except RawgFatal as e:
         reason = f"rawg: {e}"
     except Exception as e:
-        logger.error("RAWG sync crashed: " + _clean(str(e)))
-        reason = f"crash: {_clean(str(e))}"
+        logger.error("RAWG sync crashed: " + redact_rawg_key(str(e)))
+        reason = f"crash: {redact_rawg_key(str(e))}"
     finally:
         db.close()
         _set(

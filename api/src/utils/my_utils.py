@@ -18,6 +18,7 @@ from .achievements import AchievementsElems
 from ..clients.open_ai import OpenAIClient
 from ..utils import ai_prompts as prompts
 from . import push, settings
+from .redaction import redact_rawg_key
 from ..utils.logger import LogManager
 
 log_manager = LogManager()
@@ -176,12 +177,12 @@ async def search_rawg_games(query: str, db: Session = None) -> list[schemas.Rawg
     try:
         resp = await _http_get(url, params, timeout=10)
         if not resp.ok:
-            logger.error(f"RAWG search error {resp.status_code}: {resp.content}")
+            logger.error(f"RAWG search error {resp.status_code}: {redact_rawg_key(resp.content)}")
             return []
         data = resp.json()
         results = data.get("results", [])
     except Exception as e:
-        logger.error(f"Error searching RAWG for '{query}': {e}")
+        logger.error(f"Error searching RAWG for '{query}': {redact_rawg_key(e)}")
         return []
 
     candidates = []
@@ -244,11 +245,11 @@ async def get_game_details_by_rawg_id(rawg_id: int) -> dict | None:
     try:
         resp = await _http_get(url, params, timeout=10)
         if not resp.ok:
-            logger.error(f"RAWG details error {resp.status_code}: {resp.content}")
+            logger.error(f"RAWG details error {resp.status_code}: {redact_rawg_key(resp.content)}")
             return None
         data = resp.json()
     except Exception as e:
-        logger.error(f"Error fetching RAWG details for id {rawg_id}: {e}")
+        logger.error(f"Error fetching RAWG details for id {rawg_id}: {redact_rawg_key(e)}")
         return None
 
     name = data.get("name", "")
@@ -279,7 +280,7 @@ async def get_game_details_by_rawg_id(rawg_id: int) -> dict | None:
                         steam_id = match.group(1)
                         break
     except Exception as e:
-        logger.warning(f"Error fetching stores for RAWG game {rawg_id}: {e}")
+        logger.warning(f"Error fetching stores for RAWG game {rawg_id}: {redact_rawg_key(e)}")
 
     # HLTB for estimated playtime (and fallback for dev/steam_id)
     avg_time = 0
@@ -330,7 +331,7 @@ async def get_game_info(game: str):
                 if results:
                     rawg_content = results[0]
         except Exception as e:
-            logger.warning(f"Error fetching RAWG for {game}: {e}")
+            logger.warning(f"Error fetching RAWG for {game}: {redact_rawg_key(e)}")
 
     # HLTB
     clean_game = re.sub(r"[:/]", "", game)
