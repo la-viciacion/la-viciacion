@@ -129,23 +129,27 @@ class Achievements:
             logger.error("Error getting image: " + str(e))
             raise
 
+    def achieved_keys(self, db: Session, user_id: int, keys, season: int = None) -> set[str]:
+        """Which of the achievements `keys` the user already has in the season: one query."""
+        keys = [str(key) for key in keys]
+        if not keys:
+            return set()
+        rows = (
+            db.query(models.Achievement.key)
+            .join(models.UserAchievement, models.UserAchievement.achievement_id == models.Achievement.id)
+            .filter(
+                models.UserAchievement.user_id == user_id,
+                models.UserAchievement.season == seasons.or_current(season),
+                models.Achievement.key.in_(keys),
+            )
+            .all()
+        )
+        return {key for (key,) in rows}
+
     def check_already_achieved(
         self, db: Session, user_id: int, key: str, season: int = None
     ) -> bool:
-        season = seasons.or_current(season)
-        ach_id = self.get_ach_by_key(db, str(key))
-        already_achieved = (
-            db.query(models.UserAchievement)
-            .filter(
-                models.UserAchievement.user_id == user_id,
-                models.UserAchievement.achievement_id == ach_id[0],
-                models.UserAchievement.season == season,
-            )
-            .first()
-        )
-        if already_achieved is None:
-            return False
-        return True
+        return bool(self.achieved_keys(db, user_id, [key], season))
 
     def set_user_achievement(
         self,
@@ -202,8 +206,12 @@ class Achievements:
         """Unlock every achievement of `thresholds` ((achievement, needed) pairs) that `value` reaches.
 
         `date_for(needed)` gives the date it was earned (default: now)."""
-        for ach, needed in thresholds:
-            if value >= needed and not self.check_already_achieved(db, user.id, ach.name):
+        reached = [(ach, needed) for ach, needed in thresholds if value >= needed]
+        if not reached:
+            return  # the common case costs no query at all
+        have = self.achieved_keys(db, user.id, [ach.name for ach, _ in reached])
+        for ach, needed in reached:
+            if ach.name not in have:
                 await self._award(db, user, ach, silent, date=date_for(needed))
 
     async def _unlock_if_new(
@@ -235,25 +243,51 @@ class Achievements:
             db, user, played_time / 60 / 60, TOTAL_HOURS, silent, date_for=lambda needed: date
         )
 
+    async def _unlock_first_day_reaching(
+        self,
+        db: Session,
+        user: models.User,
+        days: list,
+        thresholds: tuple,
+        silent: bool,
+    ):
+        """`days` is (date, value) rows: unlock each achievement of `thresholds` that has not been
+        earned yet, dated the first day whose value reaches it. One query, however many days there are."""
+        have = self.achieved_keys(db, user.id, [ach.name for ach, _ in thresholds])
+        days = sorted((day, value) for day, value in days if value is not None)
+        for ach, needed in thresholds:
+            if ach.name in have:
+                continue
+            first = next((day for day, value in days if value >= needed), None)
+            if first is not None:
+                await self._award(db, user, ach, silent, date=str(first))
+
     async def user_played_day_time(
         self,
         db: Session,
         user: models.User,
         silent: bool = False,
     ):
-        for played_day in time_entries.get_played_time_by_day(db, user.id):
-            if played_day[1] is None:
-                continue
-            day = str(played_day[0])
-            await self._unlock_reached(
-                db, user, played_day[1] / 60 / 60, HOURS_IN_A_DAY, silent, date_for=lambda needed: day
-            )
+        days = [
+            (day, seconds / 60 / 60 if seconds is not None else None)
+            for day, seconds in time_entries.get_played_time_by_day(db, user.id)
+        ]
+        await self._unlock_first_day_reaching(db, user, days, HOURS_IN_A_DAY, silent)
 
     async def user_session_time(
         self, db: Session, user: models.User, silent: bool = False
     ):
+        have = self.achieved_keys(
+            db,
+            user.id,
+            [
+                AchievementsElems.PLAYED_LESS_5_MIN_SESSION.name,
+                AchievementsElems.PLAYED_4_HOURS_SESSION.name,
+                AchievementsElems.PLAYED_8_HOURS_SESSION.name,
+            ],
+        )
         # -5 min
-        if not self.check_already_achieved(db, user.id, AchievementsElems.PLAYED_LESS_5_MIN_SESSION.name):
+        if AchievementsElems.PLAYED_LESS_5_MIN_SESSION.name not in have:
             entry = time_entries.get_time_entry_by_time(db, user.id, 5 * 60, 2)
             if entry is not None:
                 await self._award(
@@ -265,7 +299,7 @@ class Achievements:
             (AchievementsElems.PLAYED_4_HOURS_SESSION, 4),
             (AchievementsElems.PLAYED_8_HOURS_SESSION, 8),
         ):
-            if not self.check_already_achieved(db, user.id, ach.name):
+            if ach.name not in have:
                 entry = time_entries.get_time_entry_by_time(db, user.id, hours * 60 * 60, 3)
                 if entry is not None:
                     await self._award(db, user, ach, silent, date=str(entry.start), game_id=entry.game_id)
@@ -294,12 +328,8 @@ class Achievements:
     async def user_played_games_per_day(
         self, db: Session, user: models.User, silent: bool = False
     ):
-        for date, distinct_games in time_entries.get_played_games_count_by_day(db, user.id):
-            if distinct_games is None:
-                continue
-            await self._unlock_reached(
-                db, user, distinct_games, GAMES_IN_A_DAY, silent, date_for=lambda needed: str(date)
-            )
+        days = time_entries.get_played_games_count_by_day(db, user.id)
+        await self._unlock_first_day_reaching(db, user, [tuple(row) for row in days], GAMES_IN_A_DAY, silent)
 
     async def user_played_total_games(
         self, db: Session, user: models.User, date: str = None, silent: bool = False

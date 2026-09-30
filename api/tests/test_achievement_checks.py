@@ -108,6 +108,41 @@ class AchievementCheckTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.sent.await_args.args[1], True)
         self.assertEqual(list(self.awarded()), ["PLAYED_7_DAYS"])
 
+    async def test_games_per_day_is_dated_the_earliest_day_that_reached_it(self):
+        rows = [(datetime.date(YEAR, 5, 9), 6), (datetime.date(YEAR, 5, 2), 12), (datetime.date(YEAR, 5, 4), 3)]
+        with mock.patch.object(ach_module.time_entries, "get_played_games_count_by_day", return_value=rows):
+            await self.ach.user_played_games_per_day(self.db, USER)
+        got = self.awarded()
+        self.assertEqual(got["PLAYED_5_GAMES_DAY"][0], datetime.date(YEAR, 5, 2))
+        self.assertEqual(got["PLAYED_10_GAMES_DAY"][0], datetime.date(YEAR, 5, 2))
+
+    async def test_days_already_earned_are_not_awarded_again(self):
+        rows = [(datetime.date(YEAR, 5, 2), 12)]
+        with mock.patch.object(ach_module.time_entries, "get_played_games_count_by_day", return_value=rows):
+            await self.ach.user_played_games_per_day(self.db, USER)
+            await self.ach.user_played_games_per_day(self.db, USER)
+        self.assertEqual(self.sent.await_count, 2)
+
+
+class QueryEconomyTests(unittest.IsolatedAsyncioTestCase):
+    async def test_a_check_costs_one_query_per_group_not_one_per_threshold(self):
+        from sqlalchemy import event
+
+        db = make_session()
+        ach = Achievements()
+        ach.populate_achievements(db)
+        queries = []
+        event.listen(db.get_bind(), "before_cursor_execute", lambda *a: queries.append(a[2]))
+        days = [(datetime.date(YEAR, 1, 1) + datetime.timedelta(days=i), 9 * 3600) for i in range(40)]
+        with mock.patch.object(ach_module.utils, "send_message", mock.AsyncMock()),                 mock.patch.object(ach_module.time_entries, "get_played_time_by_day", return_value=days):
+            queries.clear()
+            await ach.user_streak(db, USER, 0)  # nothing reached: no query
+            self.assertEqual(queries, [])
+            await ach.user_played_day_time(db, USER)
+        selects = [q for q in queries if q.lstrip().upper().startswith("SELECT") and "achievements" in q.lower()]
+        # one look-up of what is already earned, however many days there are (the rest is the awards)
+        self.assertEqual(sum("IN (" in q for q in selects), 1)
+
 
 if __name__ == "__main__":
     unittest.main()
