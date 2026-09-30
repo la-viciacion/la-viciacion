@@ -1,5 +1,7 @@
-// "Notificaciones" tab: general switches, weekly summary schedule, the Telegram bot
-// (token, group, admin chat) and the AI that writes the notices (provider, key, model).
+// Settings pages of the admin panel: general switches, weekly summary schedule, the Telegram bot
+// (token, group, admin chat), the AI that writes the notices (provider, key, model), push and mail.
+// They are all one form split in cards; each page (see entities.js) shows the cards listed in its
+// `sections`, and saving sends only the fields on screen that changed.
 // Values live in the app_settings table; the API never returns a secret (the Telegram
 // token, the AI key), only whether it is set.
 import { api, jsonRequest } from '../../lib/api.js';
@@ -10,11 +12,13 @@ import { errorState } from './components.js';
 import { confirmDialog } from './dialogs.js';
 
 const SECRETS = ['telegram.token', 'ai.api_key']; // never loaded back: sent only when something is typed
+const READ_ONLY = ['mail']; // cards with nothing to save
 const AI_PROVIDERS = [['google', 'Google (Gemini)'], ['openai', 'OpenAI']];
 
 const WEEKDAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
 let panel;
+let sections = []; // cards of the page on screen
 let loaded = {}; // values as the server has them
 let aiUses = []; // where the AI writes: label, original prompt and whether it was changed
 
@@ -52,14 +56,15 @@ function view(values, jobs, pushDevices, mail, aiUses) {
   const token = values['telegram.token'];
   const aiKey = values['ai.api_key'];
   const vapid = values['push.vapid_private'];
-  return html`
-    <form class="adm-settings" id="admSettings" novalidate>
+  const cards = {
+    notifications: html`
       <section class="adm-set-card">
         <h3>Notificaciones</h3>
         ${check('notifications.enabled', 'Notificaciones activadas', 'Apagado, no se envía nada al grupo ni mensajes privados a los usuarios (resumen semanal, avisos de timer olvidado…).')}
         ${check('notifications.admin_alerts', 'Avisos a administradores', 'Errores y ejecuciones lentas, por mensaje privado a los admins con ID de Telegram. Funciona aunque las notificaciones generales estén apagadas.')}
-      </section>
+      </section>`,
 
+    weekly: html`
       <section class="adm-set-card">
         <h3>Resumen semanal</h3>
         ${check('weekly.enabled', 'Enviar el resumen semanal', 'Mensaje privado a cada usuario activo con ID de Telegram. Necesita las notificaciones activadas.')}
@@ -70,8 +75,9 @@ function view(values, jobs, pushDevices, mail, aiUses) {
           <label>Hora <input class="adm-input" type="time" name="weekly.time" required /></label>
         </div>
         <div class="adm-sub">Si el servidor está apagado a esa hora, se envía al volver siempre que no hayan pasado más de 6 horas. ${lastRun(jobs.weekly_summary)}</div>
-      </section>
+      </section>`,
 
+    telegram: html`
       <section class="adm-set-card">
         <h3>Telegram</h3>
         <label>Token del bot
@@ -82,8 +88,9 @@ function view(values, jobs, pushDevices, mail, aiUses) {
         <label>ID del chat de administración <input class="adm-input" type="text" name="telegram.admin_chat_id" inputmode="numeric" /></label>
         <div class="adm-sub">El bot se reinicia solo (en un minuto aproximadamente) cuando cambia alguno de estos valores. Los grupos tienen IDs negativos.</div>
         <div><button type="button" class="adm-btn" data-set-act="test">Enviar mensaje de prueba al grupo</button></div>
-      </section>
+      </section>`,
 
+    ai: html`
       <section class="adm-set-card">
         <h3>Inteligencia artificial</h3>
         ${check('ai.enabled', 'Usar IA en los avisos', 'Apagada, los avisos salen con el texto original. Necesita una clave guardada para funcionar.')}
@@ -97,14 +104,16 @@ function view(values, jobs, pushDevices, mail, aiUses) {
         <label>Modelo <input class="adm-input" type="text" name="ai.model" placeholder="Vacío: el modelo por defecto del proveedor" /></label>
         <div class="adm-sub">Se aplica al momento, sin reiniciar. La clave se guarda cifrada y no se vuelve a mostrar. Por defecto: Google <code>gemini-2.5-flash</code>, OpenAI <code>gpt-4o-mini</code>.</div>
         <div><button type="button" class="adm-btn" data-set-act="test-ai" ${aiKey.is_set ? '' : html`disabled`}>Probar la IA</button></div>
-      </section>
+      </section>`,
 
+    aiuses: html`
       <section class="adm-set-card">
         <h3>Avisos que usan la IA</h3>
         <div class="adm-sub">Cada aviso se puede activar o desactivar por separado (con la IA general apagada no se usa ninguno), y sus instrucciones se pueden cambiar. Mientras no las cambies, siguen las que trae la aplicación; al restaurarlas vuelven a seguirlas.</div>
         ${aiUses.map((use) => aiUse(use))}
-      </section>
+      </section>`,
 
+    push: html`
       <section class="adm-set-card">
         <h3>Avisos en la app (push)</h3>
         ${check('push.enabled', 'Enviar avisos a la app instalada', 'Función activa para todos por defecto; nadie recibe nada hasta que cada usuario lo active en su perfil («Avisos en la app») y elija en qué dispositivos. Los avisos del grupo llegan a quien los marque y los privados (timer olvidado…) solo a su usuario. Necesita las notificaciones activadas y HTTPS.')}
@@ -113,20 +122,26 @@ function view(values, jobs, pushDevices, mail, aiUses) {
         </label>
         <div class="adm-sub">${vapid.is_set ? 'Las claves del servidor se crearon solas al arrancar; son las mismas para todos los usuarios.' : 'Sin claves (se crean al arrancar la API).'}</div>
         <div class="adm-sub">${pushDevices.devices} dispositivo${pushDevices.devices === 1 ? '' : 's'} suscrito${pushDevices.devices === 1 ? '' : 's'} (${pushDevices.users} usuario${pushDevices.users === 1 ? '' : 's'}).</div>
-        <div class="adm-sub">Para redactar y enviar avisos (o probarlos en tus dispositivos) usa la pestaña <strong>Avisos</strong>.</div>
+        <div class="adm-sub">Para redactar y enviar avisos (o probarlos en tus dispositivos) usa <strong>Redactar aviso</strong>.</div>
         <div><button type="button" class="adm-btn" data-set-act="push-keys">Regenerar claves…</button></div>
-      </section>
+      </section>`,
 
+    mail: html`
       <section class="adm-set-card">
         <h3>Correo (recuperar contraseña)</h3>
         <div class="adm-sub">${mailStatus(mail)}</div>
         <div class="adm-sub">Se configura en el <code>.env</code> (<code>PUBLIC_URL</code>, <code>SMTP_*</code>) y se aplica al reiniciar la API. El inicio de sesión ofrece «¿Has olvidado tu contraseña?» y este correo es el que lleva el enlace.</div>
         <div class="adm-sub">${mail.test_recipient ? `La prueba se envía a tu email: ${mail.test_recipient}.` : 'Tu cuenta no tiene email: añádelo en Usuarios → Editar para poder recibir la prueba.'}</div>
         <div><button type="button" class="adm-btn" data-set-act="test-email" ${mail.configured && mail.test_recipient ? '' : html`disabled`}>Enviar correo de prueba a mi cuenta</button></div>
-      </section>
-
-      <div class="adm-error" role="alert"></div>
-      <div class="adm-actions adm-set-actions"><button class="adm-btn primary" type="submit">Guardar cambios</button></div>
+      </section>`,
+  };
+  const editable = sections.some((id) => !READ_ONLY.includes(id));
+  return html`
+    <form class="adm-settings" id="admSettings" novalidate>
+      ${sections.map((id) => cards[id])}
+      ${editable ? html`
+        <div class="adm-error" role="alert"></div>
+        <div class="adm-actions adm-set-actions"><button class="adm-btn primary" type="submit">Guardar cambios</button></div>` : ''}
     </form>`;
 }
 
@@ -174,7 +189,7 @@ async function save(form) {
   try {
     await api('/manage/settings', jsonRequest('PUT', { values: changes }));
     toast('Ajustes guardados');
-    await render(panel);
+    await render(panel, { entity: { sections } });
   } catch (err) {
     errorEl.textContent = err.message;
   }
@@ -231,14 +246,15 @@ async function generateKeys(replace) {
   try {
     await api(`/manage/settings/push-keys${replace ? '?replace=true' : ''}`, { method: 'POST' });
     toast('Claves generadas');
-    await render(panel);
+    await render(panel, { entity: { sections } });
   } catch (err) {
     toast(err.message, 'err');
   }
 }
 
-export async function render(target) {
+export async function render(target, { entity }) {
   panel = target;
+  sections = entity.sections;
   try {
     const { values, jobs, push_devices: pushDevices, mail, ai_uses: uses } = await api('/manage/settings');
     aiUses = uses;

@@ -1,9 +1,5 @@
 /* Admin panel */
 
-.adm-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
-
-.adm-title { font-size: 1.6rem; font-weight: 800; color: var(--text-primary); }
-
 .adm-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 24px; }
 
 .adm-stat { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px 16px; }
@@ -12,16 +8,63 @@
 
 .adm-stat-l { font-size: 0.8rem; color: var(--text-secondary); margin-top: 2px; }
 
-.adm-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 16px; overflow-x: auto; }
+/* Layout: sidebar + content */
+.adm-shell { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 28px; align-items: start; }
 
-.adm-tab {
-  background: none; border: none; color: var(--text-secondary); font: inherit; font-weight: 600;
-  padding: 10px 16px; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap;
+.adm-side { position: sticky; top: 76px; }
+
+.adm-side-toggle { display: none; }
+
+.adm-nav { display: flex; flex-direction: column; gap: 18px; }
+
+.adm-nav-group { display: flex; flex-direction: column; gap: 2px; }
+
+.adm-nav-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); padding: 0 12px 4px; }
+
+.adm-nav-item {
+  background: none; border: none; border-left: 3px solid transparent; border-radius: var(--radius-sm); color: var(--text-secondary);
+  font: inherit; font-weight: 600; font-size: 0.92rem; text-align: left; padding: 8px 12px; cursor: pointer;
 }
 
-.adm-tab:hover { color: var(--text-primary); }
+.adm-nav-item:hover { color: var(--text-primary); background: var(--bg-card); }
 
-.adm-tab.active { color: var(--accent-teal); border-bottom-color: var(--accent-teal); }
+.adm-nav-item.active { color: var(--accent-teal); background: rgba(61,217,179,0.1); border-left-color: var(--accent-teal); }
+
+.adm-page-head { margin-bottom: 18px; }
+
+.adm-desc { color: var(--text-secondary); font-size: 0.92rem; margin-top: 4px; }
+
+.adm-desc:empty { display: none; }
+
+@media (max-width: 860px) {
+  .adm-shell { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .adm-side { position: static; }
+  .adm-side-toggle {
+    display: flex; justify-content: space-between; align-items: center; gap: 12px; width: 100%;
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-secondary);
+    font: inherit; font-weight: 600; padding: 12px 14px; cursor: pointer;
+  }
+  .adm-side-toggle span:last-child { color: var(--accent-teal); }
+  .adm-nav { display: none; margin-top: 8px; padding: 12px 6px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); }
+  .adm-side.open .adm-nav { display: flex; }
+}
+
+/* Home */
+.adm-home { display: flex; flex-direction: column; gap: 18px; }
+
+.adm-home .adm-stats { margin-bottom: 0; }
+
+.adm-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 16px 18px; }
+
+.adm-card h2 { font-size: 1rem; margin-bottom: 10px; }
+
+.adm-attn { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 10px 0; border-top: 1px solid var(--border); font-size: 0.9rem; }
+
+.adm-attn:first-of-type { border-top: none; }
+
+.adm-ok { color: var(--accent-teal); font-size: 0.9rem; }
+
+.adm-quick { display: flex; flex-wrap: wrap; gap: 10px; }
 
 .adm-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 14px; }
 
@@ -73,6 +116,24 @@
 .adm-table tbody tr:hover { background: var(--bg-card-hover); }
 
 .adm-row-actions { display: flex; gap: 6px; justify-content: flex-end; white-space: nowrap; }
+
+/* Row menu: the list is fixed over the page (index.js places it) so the scrolling table does not clip it */
+.adm-menu { position: relative; }
+
+.adm-menu > summary { list-style: none; cursor: pointer; }
+
+.adm-menu > summary::-webkit-details-marker { display: none; }
+
+.adm-menu-list {
+  position: fixed; z-index: 30; min-width: 150px; display: flex; flex-direction: column; padding: 4px;
+  background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm); box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+
+.adm-menu-item { background: none; border: none; border-radius: 6px; color: var(--text-primary); font: inherit; font-size: 0.85rem; text-align: left; padding: 8px 10px; cursor: pointer; }
+
+.adm-menu-item:hover { background: var(--bg-card-hover); }
+
+.adm-menu-item.danger { color: #f87171; }
 
 .adm-sub { color: var(--text-muted); font-size: 0.78rem; margin-top: 2px; }
 

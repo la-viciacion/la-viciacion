@@ -1,14 +1,16 @@
 // Admin panel (admins only). All data goes through /api/v1/manage/*, which the
-// API restricts to admins. One generic controller renders the toolbar, table
-// and pager of whichever tab is active; tabs are described in entities.js.
+// API restricts to admins. A sidebar (nav.js) picks the section, whose address is
+// #/admin/<section>; one generic controller renders the toolbar, table and pager of
+// a data section, described in entities.js, and custom sections draw themselves.
 import { api } from '../../lib/api.js';
 import { html, mount } from '../../lib/html.js';
 import { loadPlatforms } from '../../lib/platforms.js';
 import { toast } from '../../ui/toast.js';
-import { errorState, overviewStats, store } from './components.js';
+import { errorState, store } from './components.js';
 import { checkAchievementsDialog, deleteRow, pickGame } from './dialogs.js';
 import { ENTITIES, TABS } from './entities.js';
 import { openForm } from './form.js';
+import { GROUPS, hashFor, tabFromHash } from './nav.js';
 
 export const active = 'admin';
 export const mainClass = 'admin-main';
@@ -18,36 +20,48 @@ const PAGE = 25;
 
 const state = Object.fromEntries(TABS.map((t) => [t, { filters: {}, search: '', offset: 0, data: null, sort: ENTITIES[t].defaultSort ? { ...ENTITIES[t].defaultSort } : null }]));
 let root;
-let current = 'users';
+let current = 'home';
 let searchTimer;
 
 // What entities/dialogs may call back into.
 const admin = {
-  jumpTo(tab, filters) {
-    state[tab].filters = { ...filters };
-    state[tab].offset = 0;
-    setTab(tab);
+  jumpTo,
+  open(tab) {
+    return jumpTo(tab, state[tab].filters);
+  },
+  async create(tab) {
+    await jumpTo(tab, {});
+    return openForm(ENTITIES[tab], null, admin);
   },
   async reload() {
     // the platform lists of the forms and filters are cached: a rename or a new platform must show up
     await loadPlatforms();
-    await Promise.all([load(), refreshOverview()]);
+    await load();
   },
 };
+
+function jumpTo(tab, filters) {
+  state[tab].filters = { ...filters };
+  state[tab].offset = 0;
+  return setTab(tab);
+}
+
+export function dispose() {
+  window.removeEventListener('scroll', closeMenus, true);
+  window.removeEventListener('resize', closeMenus);
+}
 
 export async function render({ main, user }) {
   root = main;
   store.me = user.id;
-  current = 'users';
+  current = tabFromHash(location.hash, TABS);
   mount(root, html`<div class="loading-spinner">Cargando panel...</div>`);
 
-  let overview;
   try {
     await loadPlatforms();
-    const [users, ov, achievements] = await Promise.all([api('/manage/users?limit=200'), api('/manage/overview'), api('/manage/achievements')]);
+    const [users, achievements] = await Promise.all([api('/manage/users?limit=200'), api('/manage/achievements')]);
     store.achievements = (achievements || []).map((a) => ({ id: a.id, title: a.title }));
     store.users = (users?.items || []).map((u) => ({ id: u.id, username: u.username, name: u.name }));
-    overview = ov;
   } catch (err) {
     mount(root, errorState(err.message));
     return;
@@ -56,36 +70,84 @@ export async function render({ main, user }) {
   root.addEventListener('click', onClick);
   root.addEventListener('input', onInput);
   root.addEventListener('change', onChange);
-  drawLayout(overview);
+  window.addEventListener('scroll', closeMenus, true);
+  window.addEventListener('resize', closeMenus);
+  drawLayout();
   await load();
 }
 
 // ── Layout ──────────────────────────────────────────────────
-function drawLayout(overview) {
+function navView() {
+  return GROUPS.map((group) => html`
+    <div class="adm-nav-group">
+      ${group.label ? html`<div class="adm-nav-label">${group.label}</div>` : ''}
+      ${group.items.map((t) => html`<button class="adm-nav-item ${t === current ? 'active' : ''}" data-tab="${t}" ${t === current ? html`aria-current="page"` : ''}>${ENTITIES[t].nav || ENTITIES[t].label}</button>`)}
+    </div>`);
+}
+
+function drawLayout() {
   mount(root, html`
-    <div class="adm-head">
-      <h1 class="adm-title">Panel de administración</h1>
-      <button class="adm-btn" data-act="check-achievements">Comprobar logros</button>
-    </div>
-    <div class="adm-stats" id="admStats">${overviewStats(overview)}</div>
-    <div class="adm-tabs" role="tablist">
-      ${TABS.map((t) => html`<button class="adm-tab ${t === current ? 'active' : ''}" role="tab" data-tab="${t}">${ENTITIES[t].label}</button>`)}
-    </div>
-    <div id="admPanel"></div>`);
+    <div class="adm-shell">
+      <aside class="adm-side">
+        <button class="adm-side-toggle" data-act="toggle-nav" aria-expanded="false">
+          <span>Panel de administración</span><span id="admNavCurrent"></span>
+        </button>
+        <nav class="adm-nav" aria-label="Secciones del panel">${navView()}</nav>
+      </aside>
+      <section class="adm-content">
+        <header class="adm-page-head">
+          <h1 class="adm-title" id="admTitle"></h1>
+          <p class="adm-desc" id="admDesc"></p>
+        </header>
+        <div id="admPanel"></div>
+      </section>
+    </div>`);
+  drawHeading();
 }
 
-async function refreshOverview() {
-  try {
-    const overview = await api('/manage/overview');
-    const el = document.getElementById('admStats');
-    if (el) mount(el, html`${overviewStats(overview)}`);
-  } catch { /* cosmetic */ }
+function drawHeading() {
+  const entity = ENTITIES[current];
+  document.getElementById('admTitle').textContent = entity.label;
+  document.getElementById('admDesc').textContent = entity.description || '';
+  document.getElementById('admNavCurrent').textContent = entity.nav || entity.label;
+  root.querySelectorAll('.adm-nav-item').forEach((b) => {
+    const on = b.dataset.tab === current;
+    b.classList.toggle('active', on);
+    if (on) b.setAttribute('aria-current', 'page');
+    else b.removeAttribute('aria-current');
+  });
 }
 
+// Moving inside the panel adds a history entry without a hashchange, so the page is not rebuilt.
 function setTab(tab) {
   current = tab;
-  root.querySelectorAll('.adm-tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
-  load();
+  if (location.hash !== hashFor(tab)) history.pushState(null, '', hashFor(tab));
+  drawHeading();
+  closeNav();
+  window.scrollTo(0, 0);
+  return load();
+}
+
+function closeNav() {
+  root.querySelector('.adm-side')?.classList.remove('open');
+  root.querySelector('.adm-side-toggle')?.setAttribute('aria-expanded', 'false');
+}
+
+// Row menus ("⋯") are placed over the page, since the table scrolls on its own.
+function closeMenus() {
+  document.querySelectorAll('.adm-menu[open]').forEach((m) => { m.open = false; });
+}
+
+function toggleMenu(menu) {
+  const wasOpen = menu.open;
+  closeMenus();
+  if (wasOpen) return;
+  menu.open = true;
+  const button = menu.querySelector('summary').getBoundingClientRect();
+  const list = menu.querySelector('.adm-menu-list');
+  const below = button.bottom + 4;
+  list.style.top = `${below + list.offsetHeight > window.innerHeight ? Math.max(4, button.top - list.offsetHeight - 4) : below}px`;
+  list.style.right = `${window.innerWidth - button.right}px`;
 }
 
 // ── Load & render the current tab ───────────────────────────
@@ -116,7 +178,7 @@ async function load() {
   if (entity.custom) {
     mount(panel, html`<div class="loading-spinner">Cargando...</div>`);
     const { render: renderCustom } = await import(`./${entity.custom}.js`);
-    if (tab === current) await renderCustom(panel);
+    if (tab === current) await renderCustom(panel, { entity, admin });
     return;
   }
   mount(panel, panelView(entity, st, true));
@@ -163,16 +225,20 @@ function rowView(entity, r, i) {
   const cells = entity.columns.map((c, col) => (c.filter
     ? html`<td><button class="adm-link" data-act="cell-filter" data-col="${col}" data-i="${i}" title="Filtrar">${c.render(r)}</button></td>`
     : html`<td>${c.render(r)}</td>`));
-  const actions = (entity.actions || []).map((a, index) => (!a.show || a.show(r)
-    ? html`<button class="adm-btn sm" data-act="row-action" data-a="${index}" data-i="${i}">${a.label}</button>`
+  const extras = (entity.actions || []).map((a, index) => (!a.show || a.show(r)
+    ? html`<button class="adm-menu-item" data-act="row-action" data-a="${index}" data-i="${i}">${a.label}</button>`
     : ''));
+  if (entity.canDelete) extras.push(html`<button class="adm-menu-item danger" data-act="delete" data-i="${i}">${entity.deleteLabel || 'Borrar'}</button>`);
   return html`
     <tr>
       ${cells}
       <td class="adm-row-actions">
-        ${actions}
         <button class="adm-btn sm" data-act="edit" data-i="${i}">Editar</button>
-        ${entity.canDelete ? html`<button class="adm-btn sm danger" data-act="delete" data-i="${i}">${entity.deleteLabel || 'Borrar'}</button>` : ''}
+        ${extras.some((x) => x !== '') ? html`
+          <details class="adm-menu">
+            <summary class="adm-btn sm" aria-label="Más acciones">⋯</summary>
+            <div class="adm-menu-list">${extras}</div>
+          </details>` : ''}
       </td>
     </tr>`;
 }
@@ -236,6 +302,12 @@ function onChange(e) {
 }
 
 async function onClick(e) {
+  const summary = e.target.closest('.adm-menu > summary');
+  if (summary) {
+    e.preventDefault(); // toggled by hand, to place the list
+    return toggleMenu(summary.parentElement);
+  }
+  closeMenus();
   const tabButton = e.target.closest('[data-tab]');
   if (tabButton) return setTab(tabButton.dataset.tab);
   const button = e.target.closest('[data-act]');
@@ -246,6 +318,11 @@ async function onClick(e) {
   const row = button.dataset.i != null ? st.data?.items?.[Number(button.dataset.i)] : null;
   try {
     switch (button.dataset.act) {
+      case 'toggle-nav': {
+        const open = root.querySelector('.adm-side').classList.toggle('open');
+        button.setAttribute('aria-expanded', String(open));
+        return;
+      }
       case 'sort': {
         const key = button.dataset.key;
         st.sort = { key, dir: st.sort?.key === key && st.sort.dir === 'asc' ? 'desc' : 'asc' };

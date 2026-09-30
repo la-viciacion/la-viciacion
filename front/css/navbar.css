@@ -117,7 +117,7 @@
 
 .navbar-link.active { color: var(--accent-teal); background: rgba(61,217,179,0.12); }
 
-.admin-main { max-width: 1200px; }
+.admin-main { max-width: 1360px; }
 
 .navbar-user {
   text-decoration: none; padding: 4px 12px 4px 5px; border-radius: var(--radius-pill);

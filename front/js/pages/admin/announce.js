@@ -133,7 +133,7 @@ export async function render(target) {
   try {
     audience = await api('/manage/push/audience');
     if (!audience.ready) {
-      mount(panel, errorState('Los avisos push no están activados (pestaña Notificaciones).'));
+      mount(panel, errorState('Los avisos push no están activados (actívalos en Avisos en la app).'));
       return;
     }
     mount(panel, view());

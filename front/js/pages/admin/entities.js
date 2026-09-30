@@ -1,12 +1,13 @@
-// Declarative description of every admin tab. The generic controller in
+// Declarative description of every admin section (its place in the sidebar is in nav.js). The generic controller in
 // index.js renders the toolbar, table, pager, forms and delete flow from this.
 //
-// Entity: { label, endpoint, search?, filters?, columns, fields, createFields?,
+// Entity: { label, nav? (shorter name for the sidebar), description? (line under the title), endpoint, search?, filters?, columns, fields, createFields?,
 //           createLabel?, name(row), actions?, toolbarActions?, canDelete, deleteLabel?, deleteNote?,
 //           selects?, defaultSort? }
+//         or a custom page: { label, custom (module in this folder exporting render(panel, { entity, admin })) }
 // Column: { label, render(row) -> html``, filter?(row) -> filters to apply on click, sort? (API sort key) }
 // Select: { key, label, options: [[value, label], ...] | () => [...] }   sent to the API as ?key=value
-// Action: { label, show?(row), run(row, admin) }   admin = { jumpTo, reload }
+// Action: { label, show?(row), run(row, admin) }   admin = { jumpTo, open, reload }
 import { formatDuration, formatTimestamp } from '../../lib/format.js';
 import { html } from '../../lib/html.js';
 import { platformList, platformName } from '../../lib/platforms.js';
@@ -32,6 +33,7 @@ const gameColumn = { label: 'Juego', sort: 'game', render: (r) => r.game || r.ga
 export const ENTITIES = {
   users: {
     label: 'Usuarios',
+    description: 'Cuentas de los jugadores. Las crea un administrador; no hay registro público.',
     endpoint: '/manage/users',
     search: true,
     columns: [
@@ -71,6 +73,7 @@ export const ENTITIES = {
 
   games: {
     label: 'Juegos',
+    description: 'Catálogo de juegos compartido por todos. Los metadatos y portadas vienen de RAWG.',
     endpoint: '/manage/games',
     search: true,
     defaultSort: { key: 'name', dir: 'asc' },
@@ -114,6 +117,7 @@ export const ENTITIES = {
 
   platforms: {
     label: 'Plataformas',
+    description: 'Plataformas que se pueden elegir en sesiones y biblioteca.',
     endpoint: '/manage/platforms',
     paged: false,
     columns: [
@@ -135,6 +139,7 @@ export const ENTITIES = {
 
   timers: {
     label: 'Sesiones',
+    description: 'Todas las sesiones de juego, en curso o cerradas. La temporada sale de la fecha de inicio.',
     endpoint: '/manage/timers',
     filters: ['user', 'game', 'active'],
     selects: [seasonSelect, platformSelect],
@@ -172,6 +177,7 @@ export const ENTITIES = {
 
   library: {
     label: 'Biblioteca',
+    description: 'Juegos de la biblioteca de cada jugador por temporada, con su estado y nota.',
     endpoint: '/manage/library',
     filters: ['user', 'game'],
     selects: [
@@ -209,6 +215,9 @@ export const ENTITIES = {
 
   achievements: {
     label: 'Logros',
+    nav: 'Catálogo',
+    description: 'Logros que se pueden conseguir: su título, mensaje e imagen.',
+    toolbarActions: [{ act: 'check-achievements', label: 'Comprobar logros' }],
     endpoint: '/manage/achievements',
     paged: false,
     columns: [
@@ -229,6 +238,9 @@ export const ENTITIES = {
 
 ENTITIES.awards = {
   label: 'Logros concedidos',
+  nav: 'Concedidos',
+  description: 'Qué ha desbloqueado cada jugador y cuándo.',
+  toolbarActions: [{ act: 'check-achievements', label: 'Comprobar logros' }],
   endpoint: '/manage/user-achievements',
   filters: ['user', 'game'],
   selects: [
@@ -250,8 +262,34 @@ ENTITIES.awards = {
   deleteNote: 'El logro se revoca sin avisar por Telegram. Si el jugador sigue cumpliendo la condición, el próximo recálculo (o el de las 05:00) lo volverá a conceder: corrige antes los datos que lo provocaron.',
 };
 
-// Not tables: custom panels, each one a module exporting render(panel) (settings.js, announce.js)
-ENTITIES.settings = { label: 'Notificaciones', custom: 'settings' };
-ENTITIES.announce = { label: 'Avisos', custom: 'announce' };
+// Not tables: custom pages, each one a module exporting render(panel, { entity, admin }).
+ENTITIES.home = { label: 'Inicio', description: 'Resumen de la aplicación y lo que necesita atención.', custom: 'home' };
+ENTITIES.announce = { label: 'Avisos push', nav: 'Redactar aviso', description: 'Escribe un aviso y envíalo a los dispositivos de la app.', custom: 'announce' };
+ENTITIES.telegram = {
+  label: 'Telegram y resumen semanal',
+  nav: 'Telegram',
+  description: 'Bot de Telegram, interruptor general de notificaciones y resumen semanal.',
+  custom: 'settings',
+  sections: ['notifications', 'weekly', 'telegram'],
+};
+ENTITIES.push = {
+  label: 'Avisos en la app',
+  description: 'Configuración de los avisos push y dispositivos suscritos.',
+  custom: 'settings',
+  sections: ['push'],
+};
+ENTITIES.ai = {
+  label: 'Inteligencia artificial',
+  nav: 'IA',
+  description: 'Proveedor, clave y modelo de la IA que redacta algunos avisos, y las instrucciones de cada uno.',
+  custom: 'settings',
+  sections: ['ai', 'aiuses'],
+};
+ENTITIES.mail = {
+  label: 'Correo',
+  description: 'Estado del correo con el que se recupera la contraseña.',
+  custom: 'settings',
+  sections: ['mail'],
+};
 
 export const TABS = Object.keys(ENTITIES);
