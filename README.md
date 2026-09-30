@@ -63,6 +63,10 @@ In the admin panel, **Logros concedidos** lists what each player has unlocked (f
 
 From the home page a user can add a finished session by hand (**+ Sesión manual**: game, platform, start, end) and correct or delete one of their own from the expanded history of a game (**Editar**; **Ver todas** loads older ones). The API (`POST /timers/manual`, `PATCH`/`DELETE /timers/{id}`) enforces: the end after the start and not in the future, at most 24 h, **current season only** (closed seasons are frozen; admins can still edit them), and no overlap with any other session of that user, running timer included. The game cannot be changed on an existing session: delete it and add it again. Manual changes check the user's achievements silently (nothing is announced to the group), and creating one also creates the library entry for that game/platform/season if it is missing.
 
+### Recommendations
+
+The **Recomendados** tab of the profile lists games the other players have and you have never had (in any season), the most shared first. The bot shows the first ten from its **Recomendados** button. Nothing is stored: it is computed from the libraries when the tab opens. When somebody completes a game, the group notice also suggests a game with a similar genre that somebody else has (written by the AI if OpenAI is configured, as a plain line if not).
+
 ### OpenAI integration
 
 To use the OpenAI integration, set `OPENAI_API_KEY` in `.env`. The prompts for the predefined notifications live in `api/src/utils/ai_prompts.py`; adjust them as you like.
