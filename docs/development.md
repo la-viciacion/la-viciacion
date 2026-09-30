@@ -28,7 +28,9 @@ docker compose down                    # keeps db/data
 ```bash
 # API (unittest; from api/, needs env vars from the root .env)
 cd api
-python -m unittest discover -s tests -t .
+python -m venv venv                        # once; venv/ is gitignored
+venv/Scripts/python.exe -m pip install -r requirements.txt   # Linux/macOS: venv/bin/python
+venv/Scripts/python.exe -m unittest discover -s tests -t .
 
 # Front (from front/)
 cd front
@@ -38,7 +40,7 @@ npm run lint      # ESLint
 npm run dev       # static server on :3000 (API must be reachable at /api)
 ```
 
-There is no test suite for the bot and no DB-backed API tests yet: existing tests cover pure logic (`scheduler`, `settings`, `my_utils`) and the static integrity of the Alembic history (`test_migrations.py`, which needs `alembic` installed) and front `js/lib` + `pages/home/sessions`. Prefer extracting pure functions so new logic can be tested the same way (see [roadmap](roadmap.md) for planned integration tests).
+Run the API tests with the venv, not the global Python: `test_migrations.py` needs `alembic` and the other pinned dependencies. There is no test suite for the bot. API tests cover pure logic (`scheduler`, `settings`, `my_utils`), the static integrity of the Alembic history, and queries against an in-memory SQLite database (`tests/sqlite_db.py`, which registers `YEAR()` for the generated `season` columns); anything MariaDB-specific still needs a real database. Front tests cover `js/lib` and `pages/home/sessions`. Prefer extracting pure functions so new logic can be tested the same way (see [roadmap](roadmap.md) for planned integration tests).
 
 ## Database and migrations
 
