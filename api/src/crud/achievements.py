@@ -32,37 +32,28 @@ class Achievements:
         self.silent = silent
 
     def populate_achievements(self, db: Session):
-        # logger.debug("Populating achievements")
-        for achievement in list(AchievementsElems):
-            key = achievement.name
-            title = achievement.value["title"]
-            message = achievement.value["message"]
-            ach_db = (
-                db.query(models.Achievement)
-                .filter(models.Achievement.key == key)
-                .first()
-            )
-            if ach_db is None:
-                try:
-                    achievement = models.Achievement(
-                        key=key, title=title, message=message
+        """Create the achievements of the code that the table does not have yet.
+
+        Existing rows are left alone: from then on the database is the source of truth, so
+        the title and message an admin edits (PATCH /manage/achievements) are kept.
+        """
+        existing = {key for (key,) in db.query(models.Achievement.key).all()}
+        missing = [a for a in AchievementsElems if a.name not in existing]
+        if not missing:
+            return
+        try:
+            for achievement in missing:
+                db.add(
+                    models.Achievement(
+                        key=achievement.name,
+                        title=achievement.value["title"],
+                        message=achievement.value["message"],
                     )
-                    db.add(achievement)
-                    db.commit()
-                    # db.refresh(achievement)
-                except SQLAlchemyError as e:
-                    db.rollback()
-                    logger.error("Error adding achievement: " + str(e))
-            else:
-                # logger.info("Updating achievement")
-                stmt = (
-                    update(models.Achievement)
-                    .where(models.Achievement.key == key)
-                    .values(title=title, message=message)
                 )
-                db.execute(stmt)
-                db.commit()
-            # print(achievement, "->", achievement.value)
+            db.commit()
+        except SQLAlchemyError as e:
+            db.rollback()
+            logger.error("Error adding achievements: " + str(e))
 
     def get_achievements_list(self, db: Session) -> list[models.Achievement]:
         return db.query(models.Achievement)

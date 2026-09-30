@@ -83,7 +83,6 @@ async def check_users(
     admin panel, and from the scheduler (utils/scheduler.py) for the daily check.
     """
     start_time = time.time()
-    achievements.populate_achievements(db)
     users_db = users.get_users(db, only_active_users)
     if user_ids is not None:
         users_db = [u for u in users_db if u.id in user_ids]
@@ -166,7 +165,6 @@ def after_timer_start(user_id: int, start_time: datetime.datetime, new_game_id: 
     async def _run():
         db = SessionLocal()
         try:
-            achievements.populate_achievements(db)
             user = users.get_user_by_id(db, user_id)
             if user is not None:
                 if new_game_id is not None:
