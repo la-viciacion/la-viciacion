@@ -68,7 +68,6 @@ export const ENTITIES = {
     selects: [
       { key: 'usage', label: 'Uso', options: [['', 'Uso: todos'], ['used', 'Con sesiones o jugadores'], ['unused', 'Sin uso']] },
       { key: 'rawg', label: 'RAWG', options: [['', 'RAWG: todos'], ['linked', 'Enlazados a RAWG'], ['unlinked', 'Sin enlazar']] },
-      { key: 'image', label: 'Imagen', options: [['', 'Imagen: todas'], ['with', 'Con imagen'], ['without', 'Sin imagen']] },
     ],
     columns: [
       {

@@ -320,7 +320,6 @@ def _game_out(g: models.Game, sessions: int = 0, players: int = 0) -> dict:
 def list_games(
     search: Optional[str] = None,
     rawg: Optional[str] = Query(None, pattern="^(linked|unlinked)$"),
-    image: Optional[str] = Query(None, pattern="^(with|without)$"),
     usage: Optional[str] = Query(None, pattern="^(used|unused)$"),
     sort: str = Query("name", pattern="^(name|release_date|sessions|players)$"),
     order: str = Query("asc", pattern="^(asc|desc)$"),
@@ -328,7 +327,7 @@ def list_games(
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
-    """Games with their usage. Filters: linked to RAWG, has a cover, used (has sessions or players)."""
+    """Games with their usage. Filters: linked to RAWG, used (has sessions or players)."""
     session_counts = (
         db.query(models.GameTimer.game_id.label("gid"), func.count(models.GameTimer.id).label("n"))
         .group_by(models.GameTimer.game_id)
@@ -350,9 +349,6 @@ def list_games(
         q = q.filter(models.Game.name.like(_like(search)))
     if rawg:
         q = q.filter(models.Game.rawg_id.isnot(None) if rawg == "linked" else models.Game.rawg_id.is_(None))
-    if image:
-        has_image = (models.Game.image_url.isnot(None)) & (models.Game.image_url != "")
-        q = q.filter(has_image if image == "with" else ~has_image)
     if usage:
         in_use = (sessions > 0) | (players > 0)
         q = q.filter(in_use if usage == "used" else ~in_use)
