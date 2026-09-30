@@ -36,12 +36,16 @@ class Config:
         # CORS
         self.CORS_ORIGINS = self._get_env_json("CORS_ORIGINS")
         
-        # SMTP
-        self.SMTP_HOST = self._get_env("SMTP_HOST")
-        self.SMTP_PORT = self._get_env("SMTP_PORT")
-        self.SMTP_EMAIL = self._get_env("SMTP_EMAIL")
-        self.SMTP_USER = self._get_env("SMTP_USER")
-        self.SMTP_PASS = self._get_env("SMTP_PASS")
+        # Outgoing mail (password recovery). Optional: without SMTP_HOST, SMTP_EMAIL and
+        # PUBLIC_URL the feature is off and the API answers "not configured".
+        self.SMTP_HOST = os.getenv("SMTP_HOST", "").strip()
+        self.SMTP_PORT = int(os.getenv("SMTP_PORT", "587") or 587)
+        self.SMTP_EMAIL = os.getenv("SMTP_EMAIL", "").strip()  # the From address
+        self.SMTP_USER = os.getenv("SMTP_USER", "").strip() or self.SMTP_EMAIL
+        self.SMTP_PASS = os.getenv("SMTP_PASS", "")
+        self.SMTP_SECURITY = os.getenv("SMTP_SECURITY", "starttls").strip().lower()  # starttls | ssl | none (local testing)
+        # Where the app is reached from outside (the recovery link points there), e.g. https://lavi.example.com
+        self.PUBLIC_URL = os.getenv("PUBLIC_URL", "").strip().rstrip("/")
 
         # Interactive API docs (Swagger/ReDoc/openapi.json): off unless asked for
         self.API_DOCS_ENABLED = os.getenv("API_DOCS_ENABLED", "false").strip().lower() in ("1", "true", "yes")
@@ -66,6 +70,11 @@ class Config:
         Gets an environment variable and parses it as JSON.
         """
         return json.loads(self._get_env(key))
+
+    @property
+    def MAIL_ENABLED(self) -> bool:
+        """Can the API send the recovery email? (SMTP server, sender and the public address of the app)"""
+        return bool(self.SMTP_HOST and self.SMTP_EMAIL and self.PUBLIC_URL)
 
     @property
     def RAWG_API_KEY(self) -> str:

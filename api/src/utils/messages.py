@@ -26,4 +26,8 @@ FILE_TOO_BIG_ACHIEVEMENTS = "File is too big. Max size is 1MB"
 
 INTERNAL_ERROR = "Error interno. Inténtalo de nuevo más tarde"
 TOO_MANY_ATTEMPTS = "Demasiados intentos fallidos. Vuelve a intentarlo en {minutes} min"
+RECOVERY_NOT_CONFIGURED = "La recuperación de contraseña por correo no está configurada. Pídele a un administrador que te la cambie"
+RECOVERY_REQUESTED = "Si existe una cuenta con ese usuario o email y tiene un correo, te hemos enviado un enlace para elegir una nueva contraseña (vale 1 hora)"
+RECOVERY_LINK_INVALID = "El enlace no es válido o ha caducado. Pide uno nuevo"
+PASSWORD_RESET_DONE = "Contraseña cambiada. Ya puedes entrar con la nueva"
 ACCOUNT_DISABLED = "Cuenta desactivada. Habla con un administrador"

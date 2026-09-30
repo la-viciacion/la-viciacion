@@ -150,6 +150,24 @@ class GameTimer(Base):
     __table_args__ = (UniqueConstraint("user_id", "game_id", "start_time"),)
 
 
+class PasswordReset(Base):
+    """A one-time password recovery link (see utils/password_reset.py). Only the hash of the
+    token is stored: a copy of the database cannot be used to reset anybody's password."""
+
+    __tablename__ = "password_resets"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(
+        Integer, ForeignKey("users.id", name="fk_password_resets_user", ondelete="CASCADE"), nullable=False, index=True
+    )
+    token_hash = Column(String(64), nullable=False)
+    created_at = Column(DateTime, nullable=False)  # UTC
+    expires_at = Column(DateTime, nullable=False)  # UTC
+    used_at = Column(DateTime, nullable=True)  # UTC
+
+    __table_args__ = (UniqueConstraint("token_hash", name="uq_password_resets_token"),)
+
+
 class AppSetting(Base):
     """Settings edited from the admin panel (see utils/settings.py)."""
 

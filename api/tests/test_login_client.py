@@ -27,4 +27,4 @@ class NoSignupTests(unittest.TestCase):
 
         paths = {route.path for route in basic.router.routes}
         self.assertNotIn("/signup", paths)
-        self.assertEqual(paths, {"/", "/keepalive", "/token", "/auth/active_user"})
+        self.assertEqual(paths, {"/", "/keepalive", "/token", "/auth/active_user", "/auth/forgot-password", "/auth/reset-password"})

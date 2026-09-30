@@ -19,6 +19,8 @@ PUBLIC = {
     ("GET", "/"),
     ("GET", "/keepalive"),
     ("POST", "/token"),  # login; throttled
+    ("POST", "/auth/forgot-password"),  # same answer for any account; throttled; needs mail configured
+    ("POST", "/auth/reset-password"),  # needs the emailed one-time token; throttled
     ("GET", "/utils/achievement-image/{achievement}"),  # loaded by <img>, which cannot send a token
 }
 

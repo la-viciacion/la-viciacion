@@ -43,7 +43,7 @@ GOD_USERNAME = "admin"
 GOD_NAME = "Dios"
 
 
-def _hash_password(password: str) -> str:
+def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
@@ -71,7 +71,7 @@ def ensure_god_user(db: Session):
                 models.User(
                     name=GOD_NAME,
                     username=GOD_USERNAME,
-                    password=_hash_password(config.GOD_ADMIN_PASS),
+                    password=hash_password(config.GOD_ADMIN_PASS),
                     is_admin=1,
                     is_active=1,
                 )
@@ -82,7 +82,7 @@ def ensure_god_user(db: Session):
             # a new hash on every start would change the token fingerprint (auth.password_fingerprint)
             # and log the admin out each time: only replace it when the password really differs
             if not _matches_password(config.GOD_ADMIN_PASS, db_user.password):
-                db_user.password = _hash_password(config.GOD_ADMIN_PASS)
+                db_user.password = hash_password(config.GOD_ADMIN_PASS)
             db_user.is_admin = 1
             db_user.is_active = 1
             logger.info("God admin user restored")

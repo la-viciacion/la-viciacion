@@ -103,7 +103,13 @@ def generate_vapid_keys() -> tuple[str, str]:
 
 def contact() -> str:
     """Contact the push services can use to reach the sender (mailto: or https: URL)."""
-    return settings.get("push.contact") or f"mailto:{config.SMTP_EMAIL}"
+    configured = settings.get("push.contact")
+    if configured:
+        return configured
+    if config.SMTP_EMAIL:
+        return f"mailto:{config.SMTP_EMAIL}"
+    # the push services accept a mailto: or an https URL as the sender's contact
+    return config.PUBLIC_URL if config.PUBLIC_URL.startswith("https://") else "mailto:admin@localhost"
 
 
 def is_ready() -> bool:
