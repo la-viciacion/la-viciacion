@@ -1,6 +1,5 @@
 from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import declarative_base, sessionmaker
 
 from ..config import Config
 
@@ -9,6 +8,10 @@ config = Config()
 engine = create_engine(
     f"mysql+pymysql://{config.DB_USER}:{config.DB_PASS}@{config.DB_HOST}/{config.DB_NAME}",
     pool_size=20,
+    # MariaDB drops connections idle for longer than its wait_timeout (8 h by default): check a
+    # connection before using it and retire old ones, or the first request after a quiet night fails
+    pool_pre_ping=True,
+    pool_recycle=1800,
 )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
