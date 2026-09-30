@@ -79,6 +79,25 @@ def is_ready() -> bool:
     return bool(settings.get("push.enabled") and settings.get("push.vapid_public") and settings.get("push.vapid_private"))
 
 
+def ensure_vapid_keys(db) -> bool:
+    """Create the server's VAPID keys on the first start (or when the stored ones cannot be read).
+
+    There is one pair for the whole server, never one per user. If the private key is
+    missing or unreadable (SECRET_KEY changed), the old public key is useless: new keys are
+    made and every device is dropped, because it subscribed to the old ones.
+    Returns True if keys were created.
+    """
+    values = settings.get_all(db)
+    if values["push.vapid_public"] and values["push.vapid_private"]:
+        return False
+    public, private = generate_vapid_keys()
+    settings.set_values(db, {"push.vapid_public": public, "push.vapid_private": private})
+    dropped = db.query(models.PushSubscription).delete()
+    db.commit()
+    logger.info(f"Push keys created{f' ({dropped} old devices dropped)' if dropped else ''}")
+    return True
+
+
 # ── delivery ────────────────────────────────────────────────
 def _deliver(devices: list[tuple], payload: dict, private_pem: str, subject: str) -> tuple[int, list[int], int]:
     """Blocking. Returns (sent, ids of subscriptions that no longer exist, failures)."""

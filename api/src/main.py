@@ -11,6 +11,7 @@ from .config import Config
 from .database import models
 from .database.database import SessionLocal, engine
 from .crud import users as users_crud
+from .utils import push as push_utils
 from .utils import scheduler, settings
 from .routers import basic, games, manage, push, statistics, timers, users, utils
 from .utils.logger import LogManager
@@ -71,6 +72,7 @@ models.Base.metadata.create_all(bind=engine)
 with SessionLocal() as db:
     users_crud.ensure_god_user(db)
     settings.seed_from_env(db)
+    push_utils.ensure_vapid_keys(db)  # the routers' `push` module has the same name
 
 app = FastAPI(title="LaViciacion API", version="0.1.0")
 

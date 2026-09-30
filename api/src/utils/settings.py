@@ -73,7 +73,7 @@ REGISTRY: dict[str, Spec] = {
     "weekly.weekday": Spec("int", 0, check=_weekday),  # 0 = Monday
     "weekly.time": Spec("str", "09:00", check=_time),
     # Web Push (utils/push.py). The keys are generated from the panel, never typed.
-    "push.enabled": Spec("bool", False),
+    "push.enabled": Spec("bool", True),
     "push.contact": Spec("str", None, check=_contact),
     "push.vapid_public": Spec("str", None, check=_vapid_public),
     "push.vapid_private": Spec("str", None, secret=True, hint=False),

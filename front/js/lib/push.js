@@ -15,6 +15,19 @@ export function subscriptionBody(subscription, receiveGroup, userAgent = '') {
   return { endpoint, keys: { p256dh: keys.p256dh, auth: keys.auth }, receive_group: receiveGroup, user_agent: userAgent.slice(0, 255) || null };
 }
 
+/** "Chrome · Android" from a user agent string (best effort, only to tell devices apart). */
+export function deviceLabel(userAgent) {
+  const ua = userAgent || '';
+  const system = /iPhone|iPad|iPod/.test(ua) ? 'iOS' : /Android/.test(ua) ? 'Android' : /Windows/.test(ua) ? 'Windows' : /Mac OS X|Macintosh/.test(ua) ? 'macOS' : /Linux/.test(ua) ? 'Linux' : '';
+  const browser = /Edg\//.test(ua) ? 'Edge' : /OPR\/|Opera/.test(ua) ? 'Opera' : /Firefox|FxiOS/.test(ua) ? 'Firefox' : /Chrome|CriOS/.test(ua) ? 'Chrome' : /Safari/.test(ua) ? 'Safari' : '';
+  return [browser, system].filter(Boolean).join(' · ') || 'Dispositivo';
+}
+
+/** iPhone/iPad only deliver push to an app added to the home screen. */
+export function needsInstall(userAgent, standalone) {
+  return /iPhone|iPad|iPod/.test(userAgent || '') && !standalone;
+}
+
 export const pushSupported = () =>
   typeof navigator !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
 
@@ -36,16 +49,13 @@ export async function enablePush({ publicKey, receiveGroup }) {
   await api('/push/subscribe', jsonRequest('POST', subscriptionBody(subscription, receiveGroup, navigator.userAgent)));
 }
 
-/** Forget this device on the server and in the browser. */
-export async function disablePush() {
-  const subscription = await currentSubscription();
-  if (!subscription) return;
-  await api('/push/unsubscribe', jsonRequest('POST', { endpoint: subscription.endpoint }));
-  await subscription.unsubscribe();
+/** Forget a device of the user on the server (and in the browser if it is this one). */
+export async function removeDevice(endpoint) {
+  await api('/push/unsubscribe', jsonRequest('POST', { endpoint }));
+  const subscription = pushSupported() ? await currentSubscription() : null;
+  if (subscription && subscription.endpoint === endpoint) await subscription.unsubscribe();
 }
 
-export async function setReceiveGroup(receiveGroup) {
-  const subscription = await currentSubscription();
-  if (!subscription) return;
-  await api('/push/subscription', jsonRequest('PATCH', { endpoint: subscription.endpoint, receive_group: receiveGroup }));
+export async function setReceiveGroup(endpoint, receiveGroup) {
+  await api('/push/subscription', jsonRequest('PATCH', { endpoint, receive_group: receiveGroup }));
 }

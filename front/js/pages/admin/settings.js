@@ -58,13 +58,13 @@ function view(values, jobs) {
 
       <section class="adm-set-card">
         <h3>Avisos en la app (push)</h3>
-        ${check('push.enabled', 'Enviar avisos a la app instalada', 'Además de Telegram: los avisos del grupo llegan a los dispositivos que los hayan activado y los privados (timer olvidado…) solo al usuario. Necesita las notificaciones activadas y HTTPS.')}
+        ${check('push.enabled', 'Enviar avisos a la app instalada', 'Función activa para todos por defecto; nadie recibe nada hasta que cada usuario lo active en su perfil («Avisos en la app») y elija en qué dispositivos. Los avisos del grupo llegan a quien los marque y los privados (timer olvidado…) solo a su usuario. Necesita las notificaciones activadas y HTTPS.')}
         <label>Contacto para los servicios push
-          <input class="adm-input" type="text" name="push.contact" placeholder="mailto:tu@correo.com" />
+          <input class="adm-input" type="text" name="push.contact" placeholder="mailto:tu@correo.com (vacío: usa el correo SMTP)" />
         </label>
-        <div class="adm-sub">${vapid.is_set ? 'Claves generadas.' : 'Todavía no hay claves: genera unas para poder activar los avisos.'}</div>
+        <div class="adm-sub">${vapid.is_set ? 'Las claves del servidor se crearon solas al arrancar; son las mismas para todos los usuarios.' : 'Sin claves (se crean al arrancar la API).'}</div>
         <div class="adm-set-row">
-          <button type="button" class="adm-btn" data-set-act="push-keys">${vapid.is_set ? 'Regenerar claves…' : 'Generar claves'}</button>
+          <button type="button" class="adm-btn" data-set-act="push-keys">Regenerar claves…</button>
           <button type="button" class="adm-btn" data-set-act="push-test">Enviar aviso de prueba a mis dispositivos</button>
         </div>
       </section>

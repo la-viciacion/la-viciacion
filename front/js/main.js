@@ -11,6 +11,7 @@ import { api, loadAvatarUrl, session, setUnauthorizedHandler } from './lib/api.j
 import * as home from './pages/home/index.js';
 import { showLogin } from './pages/login.js';
 import { renderShell, showLoading } from './ui/layout.js';
+import { inviteToPush } from './ui/push-invite.js';
 
 const ROUTES = [
   { prefix: '#/admin', load: () => import('./pages/admin/index.js') },
@@ -58,6 +59,7 @@ async function route() {
     const main = renderShell({ user, avatarUrl, active: page.active, mainClass: page.mainClass, onLogout: logout });
     currentPage = page;
     await page.render({ user, main, avatarUrl, isCurrent });
+    inviteToPush().catch(() => {}); // optional: never blocks or breaks a page
   } catch (err) {
     console.error(err);
     if (!isCurrent()) return;

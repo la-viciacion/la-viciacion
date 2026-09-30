@@ -87,5 +87,32 @@ class DisabledTests(unittest.TestCase):
         send.assert_not_called()
 
 
+class EnsureKeysTests(unittest.TestCase):
+    def run_ensure(self, stored):
+        db = mock.MagicMock()
+        db.query.return_value.delete.return_value = 3
+        with mock.patch.object(push.settings, "get_all", return_value=stored), mock.patch.object(push.settings, "set_values") as store:
+            created = push.ensure_vapid_keys(db)
+        return created, store, db
+
+    def test_keys_are_created_on_the_first_start(self):
+        created, store, db = self.run_ensure({"push.vapid_public": None, "push.vapid_private": None})
+        self.assertTrue(created)
+        values = store.call_args.args[1]
+        self.assertEqual(set(values), {"push.vapid_public", "push.vapid_private"})
+        self.assertIn("PRIVATE KEY", values["push.vapid_private"])
+        db.query.return_value.delete.assert_called_once()  # devices of the old keys are useless
+
+    def test_existing_keys_are_left_alone(self):
+        created, store, db = self.run_ensure({"push.vapid_public": "pub", "push.vapid_private": "priv"})
+        self.assertFalse(created)
+        store.assert_not_called()
+        db.query.assert_not_called()
+
+    def test_an_unreadable_private_key_is_replaced(self):
+        created, _, _ = self.run_ensure({"push.vapid_public": "pub", "push.vapid_private": None})
+        self.assertTrue(created)
+
+
 if __name__ == "__main__":
     unittest.main()

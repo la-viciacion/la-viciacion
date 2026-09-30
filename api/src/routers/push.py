@@ -56,7 +56,15 @@ def get_config(
     return {
         "enabled": ready,
         "public_key": settings.get("push.vapid_public") if ready else None,
-        "devices": [{"endpoint": d.endpoint, "receive_group": bool(d.receive_group)} for d in devices],
+        "devices": [
+            {
+                "endpoint": d.endpoint,
+                "receive_group": bool(d.receive_group),
+                "user_agent": d.user_agent,
+                "created_at": d.created_at,
+            }
+            for d in devices
+        ],
     }
 
 
