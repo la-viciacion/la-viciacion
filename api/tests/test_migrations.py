@@ -63,7 +63,7 @@ class MigrationHistoryTests(unittest.TestCase):
             match = FILENAME.match(name)
             self.assertIsNotNone(match, f"{name}: expected NNN_short_name.py")
             numbers.append(int(match.group(1)))
-        self.assertEqual(numbers, list(range(1, len(files) + 1)), "numbers must be 001, 002, ... with no gaps or repeats")
+        self.assertEqual(numbers, list(range(len(files))), "numbers must be 000, 001, ... with no gaps or repeats")
 
         chain = [rev for rev in reversed(self.revisions)]  # oldest first
         for name, rev in zip(files, chain):
@@ -80,6 +80,59 @@ class MigrationHistoryTests(unittest.TestCase):
             functions = {n.name for n in tree.body if isinstance(n, ast.FunctionDef)}
             self.assertIn("upgrade", functions, rev.revision)
             self.assertIn("downgrade", functions, rev.revision)
+
+
+def load_migration(name: str):
+    import importlib.util
+
+    path = VERSIONS_DIR / f"{name}.py"
+    spec = importlib.util.spec_from_file_location(f"migration_{name}", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+class BaselineTests(unittest.TestCase):
+    """000 lets an empty database walk the chain that was written for v1 backups."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.baseline = load_migration("000_baseline_v1")
+
+    def test_it_is_the_only_root_and_001_follows_it(self):
+        script = load_script_directory()
+        self.assertEqual(script.get_bases(), ["000_baseline_v1"])
+        self.assertEqual(script.get_revision("001_add_rawg_id").down_revision, "000_baseline_v1")
+
+    def test_it_never_drops_anything(self):
+        with self.assertRaises(RuntimeError):
+            self.baseline.downgrade()
+
+    def test_every_table_is_created_only_if_missing(self):
+        source = (VERSIONS_DIR / "000_baseline_v1.py").read_text(encoding="utf-8")
+        self.assertIn("if table not in existing", source)
+        self.assertNotIn("DROP ", source.upper().replace("DROPPING", ""))
+
+    def test_it_creates_what_the_first_migrations_need(self):
+        names = [table for table, _, _ in self.baseline.TABLES]
+        self.assertEqual(len(names), len(set(names)))
+        # 001 alters games, 003 reads time_entries and games_statistics, 005 renames the four
+        # historical tables, 006-009 alter users, users_games and users_achievements
+        needed = {
+            "games", "users", "users_games", "users_achievements", "achievements", "platform_tags",
+            "time_entries", "games_statistics", "time_entries_historical", "users_games_historical",
+            "games_statistics_historical", "users_statistics_historical",
+        }
+        self.assertEqual(set(names), needed)
+
+
+class PlatformSeedTests(unittest.TestCase):
+    def test_default_platforms_have_unique_ids_that_fit_the_column(self):
+        platforms = load_migration("015_seed_platforms").PLATFORMS
+        ids = [id_ for id_, _ in platforms]
+        self.assertEqual(len(ids), len(set(ids)))
+        self.assertTrue(all(0 < len(i) <= 255 for i in ids))
+        self.assertIn("pc", ids)
 
 
 if __name__ == "__main__":

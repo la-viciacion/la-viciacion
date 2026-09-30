@@ -4,7 +4,7 @@
 
 ## Ground rules
 
-1. **Alembic is the only schema authority.** Any change to `api/src/database/models.py` that affects the schema ships with a migration in the same change. Nobody edits the DB by hand, and nobody relies on `create_all` (it exists in `main.py` only as a leftover; see [roadmap](roadmap.md)).
+1. **Alembic is the only schema authority.** Any change to `api/src/database/models.py` that affects the schema ships with a migration in the same change. Nobody edits the DB by hand, and nothing creates tables at runtime (`main.py` no longer calls `create_all`).
 2. **Applied migrations are immutable.** Never edit, rename, renumber, reorder or delete a migration that may have run anywhere (any dev copy of the DB, staging, production). Fix forward with a new migration. Editing is allowed only for a migration that has never left your working tree, and only before it is committed/pushed.
 3. **Linear history, a single head.** No branches, no merge revisions, no branch labels. If two changes both add a migration, the second one is rebased onto the first (renumber it and change its `down_revision` *before* it is ever applied anywhere).
 4. **Never run a migration against production without a fresh, verified backup** (see [deployment](deployment.md#backups-and-restore)). Migrations run automatically on API start, so *deploying* is *migrating*.
@@ -14,7 +14,7 @@
 
 ## Conventions
 
-- **File**: `api/alembic/versions/NNN_short_name.py`, `NNN` = next three-digit number, no gaps.
+- **File**: `api/alembic/versions/NNN_short_name.py`, `NNN` = next three-digit number, no gaps. The history starts at `000_baseline_v1`.
 - **Revision id**: `NNN_short_name`, **at most 32 characters** (the `alembic_version.version_num` column is `VARCHAR(32)`; a longer id fails at the very end of the migration, leaving the DDL applied but the version unrecorded). It must start with the same `NNN_` as the file. Note the id can be shorter than the filename slug (e.g. `008_season_generated` in `008_season_as_generated_column.py`).
 - **`down_revision`** is the id of the previous migration. The first one is `None`.
 - **Docstring** (mandatory): what changes and *why*, what data it touches, what it refuses to do, and whether/how the downgrade works and what it loses.
@@ -40,6 +40,14 @@ Use `api/alembic/versions/008_season_as_generated_column.py` and `009_settings_j
 - **Downgrade**: implement it whenever it can be done without inventing data, and say in the docstring what it cannot restore. If it is genuinely impossible (destructive upgrade), `downgrade()` must `raise RuntimeError("irreversible: restore the pre-migration backup")` rather than silently doing nothing.
 - **Large tables**: prefer operations that do not rebuild the table (e.g. `VIRTUAL` generated columns), and say so.
 - **Autogenerate is a draft, never the result.** `alembic revision --autogenerate` may be used to get a starting point, but the output must be reviewed line by line: it misses generated columns, server defaults and renames (it emits drop+add, which **loses data**), and produces noise from type comparison.
+
+## The baseline (000) and the empty database
+
+Migrations 001-014 were written to upgrade a **v1 backup**, so they assume the v1 tables exist. `000_baseline_v1` creates those tables (only the ones the chain needs, exact v1 DDL, each only if missing), so an empty database walks the same path and ends in the same schema as an upgraded v1 backup; on a v1 backup or an already migrated database it does nothing. Verified 2026-09-30 by migrating an empty database and a v1 backup into throwaway MariaDBs and comparing `information_schema`: the only differences are the `_archived_time_entries_legacy` and `_archived_users_games_2024` tables that only a real v1 backup has, and the default collation of the tables that migrations 002, 009, 013 and 014 create without one (they follow the server's).
+
+- `001`'s `down_revision` was changed once, from `None` to `000_baseline_v1`, to make the baseline the root. It is metadata: it does not affect a database that already has a recorded revision.
+- `015_seed_platforms` gives a database with no platforms the default catalogue (data migration, only if `platform_tags` is empty).
+- Keep `000` and the old migrations as they are: they are what makes "empty database → head" and "v1 backup → head" the same road.
 
 ## Verification checklist (all mandatory before considering a migration done)
 

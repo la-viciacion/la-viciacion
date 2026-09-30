@@ -15,12 +15,10 @@ Until then: work on the current branch, small commits, no tags or releases.
 
 - **Push notifications, next steps** (the wiring exists, see README): design how long messages (rankings) and images (achievements) fit into a push (short text + opening the relevant page, `image` in the payload, per-event titles); decide whether the weekly summary should also reach users without a Telegram id (`_weekly_summary` still skips them); test on real Android and iOS devices before deploying it (it is on by default).
 
-- **A completely empty database cannot be migrated**: migration 001 alters `games`, which only exists in a v1 backup, so `alembic upgrade head` fails on a fresh install (found 2026-09-29 while testing 010; the README claims the opposite). Needs a baseline (e.g. an idempotent `000` creating the v1 tables) or a documented bootstrap. Until then the only supported path is importing a v1/current dump.
-
 - No DB-backed API tests: add integration tests against a throwaway MariaDB (migrations from empty and from previous revision, timers/manual-session rules, authorization). Today only the static integrity of the Alembic history is tested automatically; the DB-backed steps of the [migrations checklist](migrations.md#verification-checklist-all-mandatory-before-considering-a-migration-done) are manual.
-- `main.py` still runs `create_all` at import, which can create tables behind Alembic's back; remove it once a migration-only bootstrap is verified.
 - The bot has no tests.
-- `platform_tags` (the platform catalogue) can only be edited by hand in the DB and its ids are the old Clockify tag ids; add an admin panel section to manage platforms.
+- `platform_tags` (the platform catalogue) can only be edited by hand in the DB (a new deployment gets a default list from migration 015; databases from v1 keep their old Clockify tag ids); add an admin panel section to manage platforms.
+- A new deployment ends with empty `_archived_*` tables (migration 005 renames the v1 `*_historical` tables that 000 had to create). Harmless; a migration that drops the archives that are empty would tidy it up.
 - `POST /signup` (with `INVITATION_KEY`) is not used by the front yet (admins create accounts); accounts created through it are active from the start.
 - `utils/email.py` is kept for the upcoming e-mail features; nothing calls it yet.
 - `crud/users.py` (~1300 lines) and `utils/actions.py` are large; split by responsibility when touched.
