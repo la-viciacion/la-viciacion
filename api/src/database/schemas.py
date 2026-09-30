@@ -50,11 +50,6 @@ class PasswordChange(BaseModel):
     new_password: str
 
 
-class TelegramUser(BaseModel):
-    username: str
-    telegram_id: int
-
-
 class Game(BaseModel):
     id: str
     name: str
@@ -193,13 +188,6 @@ class SessionUpdate(BaseModel):
     platform: str | None = None
     start_time: datetime.datetime | None = None
     end_time: datetime.datetime | None = None
-    notes: str | None = Field(default=None, max_length=NOTES_MAX)
-
-
-class GameTimerUpdate(BaseModel):
-    end_time: datetime.datetime | None = None
-    duration_seconds: int | None = None
-    platform: str | None = None
     notes: str | None = Field(default=None, max_length=NOTES_MAX)
 
 

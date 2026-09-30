@@ -180,30 +180,6 @@ def get_users(db: Session, is_active: bool = True) -> list[models.User]:
         raise
 
 
-def is_admin(db: Session, username: str) -> models.User:
-    try:
-        return (
-            db.query(models.User)
-            .filter(models.User.username == username, models.User.is_admin == 1)
-            .first()
-        )
-    except SQLAlchemyError as e:
-        logger.error("Error checking is user is admin: " + str(e))
-        raise
-
-
-def is_active(db: Session, username: str) -> models.User:
-    try:
-        return (
-            db.query(models.User)
-            .filter(models.User.username == username, models.User.is_active == 1)
-            .first()
-        )
-    except SQLAlchemyError as e:
-        logger.error("Error checking is user is active: " + str(e))
-        raise
-
-
 def get_user_by_username(db: Session, username: str) -> models.User:
     try:
         return db.query(models.User).filter(models.User.username == username).first()
@@ -336,26 +312,6 @@ def insert_user(
         raise
 
 
-def update_user_telegram_id(db: Session, user: schemas.TelegramUser):
-    try:
-        stmt = (
-            update(models.User)
-            .where(models.User.username == user.username)
-            .values(
-                telegram_id=user.telegram_id,
-            )
-        )
-        db.execute(stmt)
-        db.commit()
-        return (
-            db.query(models.User).filter(models.User.username == user.username).first()
-        )
-    except SQLAlchemyError as e:
-        db.rollback()
-        logger.error("Error updating TelegramID user: " + str(e))
-        raise
-
-
 def upload_avatar(db: Session, username: str, avatar: bytes):
     try:
         stmt = (
@@ -453,27 +409,6 @@ async def add_new_game(
         db.rollback()
         logger.error("Error adding new game user: " + str(e))
         raise
-
-
-def update_game(db: Session, game: models.UserGame, entry_id):
-    try:
-        stmt = (
-            update(models.UserGame)
-            .where(
-                models.UserGame.id == entry_id,
-                or_(
-                    models.UserGame.platform == game.platform,
-                ),
-            )
-            .values(platform=game.platform)
-        )
-        db.execute(stmt)
-        db.commit()
-    except SQLAlchemyError as e:
-        db.rollback()
-        if "Duplicate" not in str(e):
-            logger.error("Error updating game: " + str(e))
-            raise e
 
 
 def count_played_games(db: Session, user_id: int, season: int = None):
@@ -579,20 +514,6 @@ def get_game_by_id(db: Session, user_id, game_id, season) -> models.UserGame:
         .filter_by(user_id=user_id, game_id=game_id, season=season)
         .first()
     )
-
-
-def game_is_completed(db: Session, player, game, season: int = None) -> bool:
-    season = seasons.or_current(season)
-    stmt = select(models.UserGame).where(
-        models.UserGame.game == game,
-        models.UserGame.player == player,
-        models.UserGame.completed == 1,
-        models.UserGame.season == season,
-    )
-    game = db.execute(stmt).first()
-    if game:
-        return True
-    return False
 
 
 # ── Library: every game of a user, with its completion state ──

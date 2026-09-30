@@ -128,17 +128,6 @@ def entry_played_time():
     )
 
 
-def get_users_played_time(db: Session, season: int = None):
-    season = seasons.or_current(season)
-    sessions = sessions_subquery()
-    stmt = (
-        select(sessions.c.user_id, func.sum(sessions.c.duration))
-        .where(sessions.c.season == season)
-        .group_by(sessions.c.user_id)
-    )
-    return db.execute(stmt)
-
-
 def get_user_played_time(db: Session, user_id: str, season: int = None):
     season = seasons.or_current(season)
     sessions = sessions_subquery()
@@ -154,22 +143,6 @@ def get_user_played_time(db: Session, user_id: str, season: int = None):
         .group_by(sessions.c.user_id)
     )
     return db.execute(stmt).first()
-
-
-def get_games_played_time(db: Session, season: int = None, is_active: bool = True):
-    season = seasons.or_current(season)
-    sessions = sessions_subquery()
-    stmt = (
-        select(sessions.c.game_id, func.sum(sessions.c.duration))
-        .join(models.User, sessions.c.user_id == models.User.id)
-        .where(
-            sessions.c.season == season,
-            models.User.is_active == is_active,
-        )
-        .group_by(sessions.c.game_id)
-    )
-    result = db.execute(stmt)
-    return result
 
 
 def get_time_entry_by_date(db: Session, user_id: int, date: str, mode: int):
@@ -436,11 +409,6 @@ def get_weekly_resume(db: Session, user: models.User, weeks_ago: int = 0):
     Returns:
         list[Row]: rows with (sum(duration), session count, distinct game count)
     """
-    # if mode == 0:
-    #     first_day, last_day = utils.get_last_week_range_dates()
-    #     first_day, last_day = utils.get_week_range_dates(1)
-    # else:
-    #     first_day, last_day = utils.get_current_week_range_dates()
     first_day, last_day = utils.get_week_range_dates(weeks_ago)
     sessions = sessions_subquery()
     weekly_hours = (

@@ -974,10 +974,6 @@ class Achievements:
         Returns:
             _type_: _description_
         """
-        # if mode == 0:
-        #     first_day, last_day = utils.get_last_week_range_dates()
-        # else:
-        #     first_day, last_day = utils.get_current_week_range_dates()
         first_day, last_day = utils.get_week_range_dates(weeks_ago)
         weekly_achievements = (
             db.query(func.count(models.UserAchievement.id))

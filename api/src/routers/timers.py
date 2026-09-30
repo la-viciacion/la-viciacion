@@ -17,7 +17,6 @@ from ..database.schemas import (
     GameTimerGroupPage,
     GameTimerResponse,
     GamePlatformsResponse,
-    GameTimerUpdate,
     ManualSessionCreate,
     NewGameUser,
     SessionUpdate,

@@ -222,19 +222,6 @@ async def notify_group(message: str, tag: str | None = "group") -> None:
         logger.error(f"Push to group failed: {e}")
 
 
-async def notify_everyone(message: str, tag: str | None = None) -> tuple[int, int]:
-    """A notice for every subscribed device, whatever its group preference. Returns (sent, failed)."""
-    if not is_ready():
-        return 0, 0
-    try:
-        sent, failed = await _send(lambda q: q, build_payload(message, tag=tag))
-        logger.info(f"Push to everyone: {sent} sent, {failed} failed")
-        return sent, failed
-    except Exception as e:
-        logger.error(f"Push to everyone failed: {e}")
-        return 0, 0
-
-
 async def notify_user(user_id: int, message: str, tag: str | None = None) -> tuple[int, int]:
     """A private notice for one user, on all of their devices. Returns (sent, failed)."""
     if not is_ready():

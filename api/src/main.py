@@ -2,7 +2,6 @@ import datetime
 import sentry_sdk
 import logging
 
-from sentry_sdk.types import Event, Hint
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi_versioning import VersionedFastAPI
@@ -24,27 +23,13 @@ logger = log_manager.get_logger()
 config = Config()
 
 
-def before_send(event: Event, hint: Hint):
-    # modify event here
-    # logger.info("------BEFORE SENTRY------")
-    # logger.info("Hint:")
-    exc_info_str = str(hint.get("exc_info"))
-    # logger.info(exc_info_str)
-    return event
-
-
 if config.SENTRY_URL is not None and config.SENTRY_URL != "":
     sentry_sdk.init(
         dsn=config.SENTRY_URL,
-        # Set traces_sample_rate to 1.0 to capture 100%
-        # of transactions for tracing.
-        traces_sample_rate=1.0,
-        # Set profiles_sample_rate to 1.0 to profile 100%
-        # of sampled transactions.
-        # We recommend adjusting this value in production.
-        profiles_sample_rate=1.0,
+        # a sample is enough for a small private app; errors are always reported
+        traces_sample_rate=0.1,
+        profiles_sample_rate=0.1,
         environment=config.ENVIRONMENT,
-        before_send=before_send,
     )
 
 

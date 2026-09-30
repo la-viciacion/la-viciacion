@@ -2,12 +2,10 @@ import asyncio
 import datetime
 import json
 import re
-from io import BytesIO
 
 import requests
 import telegram
 from howlongtobeatpy import HowLongToBeat
-from PIL import Image
 from sqlalchemy import asc, create_engine, desc, func, or_, select, text, update
 from sqlalchemy.orm import Session
 
@@ -91,12 +89,6 @@ def convert_time_to_hours(seconds) -> str:
     return f"{hours:02d}:{minutes:02d}"
 
 
-def convert_hours_minutes_to_seconds(time) -> int:
-    if time is None:
-        return 0
-    return time * 3600
-
-
 def convert_date_from_text(date: str):
     # logger.debug("Converting date")
     if date is None or date == "":
@@ -118,46 +110,6 @@ def get_week_range_dates(weeks_diff: int = 0):
     )
     last_day_n_weeks_ago = first_day_n_weeks_ago + datetime.timedelta(days=6)
     return first_day_n_weeks_ago.date(), last_day_n_weeks_ago.date()
-
-
-def get_last_week_range_dates():
-    current_date = datetime.datetime.now()
-    first_day_current_week = current_date - datetime.timedelta(
-        days=current_date.weekday()
-    )
-    first_day_last_week = first_day_current_week - datetime.timedelta(days=7)
-    last_day_last_week = first_day_current_week - datetime.timedelta(days=1)
-    return first_day_last_week.date(), last_day_last_week.date()
-
-
-def get_current_week_range_dates():
-    current_date = datetime.datetime.now()
-    first_day_current_week = current_date - datetime.timedelta(
-        days=current_date.weekday()
-    )
-    last_day_current_week = first_day_current_week + datetime.timedelta(days=6)
-    return first_day_current_week.date(), last_day_current_week.date()
-
-
-def day_of_the_year(date):
-    date = datetime.datetime.strptime(date, "%Y-%m-%d %H:%M:%S")
-    return date.timetuple().tm_yday
-
-
-def date_from_day_of_the_year(day):
-    current_date = datetime.datetime.now()
-    start_date_base = datetime.datetime.strptime(
-        str(current_date.year) + "-01-01", "%Y-%m-%d"
-    )
-    start_date = datetime.datetime(
-        start_date_base.year, start_date_base.month, start_date_base.day
-    )
-    current_date = start_date + datetime.timedelta(days=day - 1)
-    return current_date.strftime("%Y-%m-%d")
-
-
-def date_from_datetime(datetime: str):
-    return datetime.split(" ")[0]
 
 
 async def _http_get(url: str, params: dict, timeout: int):
@@ -389,22 +341,6 @@ async def get_new_game_info(game) -> schemas.NewGame:
         slug="",
         rawg_id=None,
     )
-
-
-def convert_blob_to_image(
-    blob_data,
-    output_format: str,
-):
-    try:
-        image = Image.open(BytesIO(blob_data))
-        converted_image = BytesIO()
-        image.save(converted_image, format=output_format)
-        converted_data = converted_image.getvalue()
-
-        return converted_data
-    except Exception as e:
-        print(f"Error converting image: {e}")
-        raise
 
 
 TELEGRAM_RETRIES = 3
