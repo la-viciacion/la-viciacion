@@ -29,6 +29,8 @@ const admin = {
     setTab(tab);
   },
   async reload() {
+    // the platform lists of the forms and filters are cached: a rename or a new platform must show up
+    await loadPlatforms();
     await Promise.all([load(), refreshOverview()]);
   },
 };

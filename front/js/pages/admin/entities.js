@@ -112,6 +112,27 @@ export const ENTITIES = {
     deleteNote: 'Se borrarán también sus sesiones, entradas de biblioteca y logros.',
   },
 
+  platforms: {
+    label: 'Plataformas',
+    endpoint: '/manage/platforms',
+    paged: false,
+    columns: [
+      { label: 'Plataforma', render: (r) => html`<strong>${r.name}</strong><div class="adm-sub">${r.id}</div>` },
+      { label: 'Sesiones', render: (r) => r.sessions },
+      { label: 'Biblioteca', render: (r) => r.library },
+    ],
+    fields: [{ key: 'name', label: 'Nombre', type: 'text', required: true }],
+    createFields: [{ key: 'name', label: 'Nombre', type: 'text', required: true }],
+    createLabel: 'Nueva plataforma',
+    name: (r) => r.name,
+    actions: [
+      { label: 'Sesiones', show: (r) => r.sessions > 0, run: (r, admin) => admin.jumpTo('timers', { platform: r.id }) },
+      { label: 'Biblioteca', show: (r) => r.library > 0, run: (r, admin) => admin.jumpTo('library', { platform: r.id }) },
+    ],
+    canDelete: true,
+    deleteNote: 'Solo se puede borrar una plataforma que ninguna sesión ni entrada de biblioteca use. Renombrarla no afecta a lo que ya la tiene.',
+  },
+
   timers: {
     label: 'Sesiones',
     endpoint: '/manage/timers',

@@ -47,6 +47,8 @@ A second channel next to Telegram, **on by default**, with nothing to set up: th
 
 ### Revoking achievements
 
+The **Plataformas** tab of the admin panel manages the platform catalogue used by sessions and library entries: add one (its id is made from the name and never changes), rename it (everything that uses it follows), and delete one that nothing uses (a platform that still has sessions or library entries is refused and the message says how many). **Sesiones** and **Biblioteca** next to a platform jump to those rows.
+
 In the admin panel, **Logros concedidos** lists what each player has unlocked (filter by user or game). **Editar** changes the date it was obtained (its year is the season) and **Revocar** removes it without announcing anything. Achievements are re-evaluated on every check (after each stopped timer, the 05:00 job and the admin **Comprobar logros**), so if the player still meets the condition it will be unlocked again: correct the data that triggered it first (e.g. a wrong session).
 
 ### Manual sessions
