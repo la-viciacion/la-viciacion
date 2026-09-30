@@ -6,6 +6,15 @@
 
 .pf-sub { color: var(--text-secondary); font-size: 0.85rem; }
 
+.pf-season { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 4px 0 10px; }
+
+.pf-season-badge {
+  background: rgba(61,217,179,0.12); border: 1px solid var(--border-accent); color: var(--accent-teal);
+  font-size: 0.8rem; font-weight: 700; padding: 4px 12px; border-radius: var(--radius-pill); white-space: nowrap;
+}
+
+.pf-note { margin: 4px 0 10px; }
+
 .pf-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 8px; }
 
 .pf-stat { background: var(--gradient-card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px 16px; }

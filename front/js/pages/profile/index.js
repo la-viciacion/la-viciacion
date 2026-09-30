@@ -140,7 +140,7 @@ function draw(d) {
       ${avatar(d)}
       <div class="pf-head-text">
         <h1 class="pf-title">${d.user.name || d.user.username}</h1>
-        <div class="pf-sub">@${d.user.username} · Temporada ${d.season}</div>
+        <div class="pf-sub">@${d.user.username}</div>
         <div class="pf-avatar-actions">
           <label class="pf-btn">Cambiar foto<input type="file" id="pfAvatarInput" accept="image/png,image/jpeg" hidden /></label>
           <span class="pf-msg" id="pfAvatarMsg" role="status"></span>
@@ -148,7 +148,10 @@ function draw(d) {
       </div>
     </div>
 
-    <section class="pf-stats" id="pfStats" aria-label="Estadísticas">${statsView(d)}</section>
+    <div class="pf-season">
+      <span class="pf-season-badge">Temporada ${d.season}</span>
+    </div>
+    <section class="pf-stats" id="pfStats" aria-label="Estadísticas de la temporada ${d.season}">${statsView(d)}</section>
 
     <nav class="pf-tabs" role="tablist" aria-label="Secciones del perfil">
       ${TABS.map(([id, label]) => html`<button class="pf-tab" role="tab" type="button" id="pfTab-${id}" aria-controls="pfPanel-${id}" data-tab="${id}">${label}</button>`)}
@@ -157,17 +160,18 @@ function draw(d) {
     <section class="pf-panel" role="tabpanel" id="pfPanel-resumen" aria-labelledby="pfTab-resumen">
       <div class="pf-cols">
         <div>
-          ${sectionTitle('Más jugados')}
+          ${sectionTitle(`Más jugados en ${d.season}`)}
           <div class="pf-card" id="pfTop">${topView(d)}</div>
         </div>
         <div>
-          ${sectionTitle('Últimos logros')}
+          ${sectionTitle(`Logros de ${d.season}`)}
           <div class="pf-card" id="pfAchievements">${achievementsView(d)}</div>
         </div>
       </div>
     </section>
 
     <section class="pf-panel" role="tabpanel" id="pfPanel-juegos" aria-labelledby="pfTab-juegos" hidden>
+      <div class="pf-sub pf-note">Aquí aparecen los juegos de todas las temporadas; la temporada de cada uno va indicada.</div>
       <div id="pfLibrary"></div>
     </section>
 
