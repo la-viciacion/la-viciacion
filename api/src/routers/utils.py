@@ -44,7 +44,7 @@ def platforms(
 
 @router.patch("/achievement-image/{achievement}")
 @version(1)
-async def upload_achievement_image(
+def upload_achievement_image(
     achievement: str,
     # file: Annotated[UploadFile, File(description="A file read as UploadFile")],
     file: UploadFile,
@@ -57,7 +57,7 @@ async def upload_achievement_image(
     if not achievements.get_ach_by_key(db, achievement):
         logger.info(msg.ACHIEVEMENT_NOT_EXISTS)
         raise HTTPException(status_code=404, detail=msg.ACHIEVEMENT_NOT_EXISTS)
-    data = await file.read(ACHIEVEMENT_IMAGE_MAX_BYTES + 1)
+    data = file.file.read(ACHIEVEMENT_IMAGE_MAX_BYTES + 1)
     try:
         images.validate_image(data, ACHIEVEMENT_IMAGE_MAX_BYTES)
     except ValueError as e:
@@ -75,7 +75,7 @@ async def upload_achievement_image(
 
 @router.get("/achievement-image/{achievement}")
 @version(1)
-async def get_achievement_image(
+def get_achievement_image(
     achievement: str,
     db: Session = Depends(get_db),
 ):

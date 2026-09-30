@@ -368,14 +368,13 @@ async def announce_new_game(
         logger.error("Error announcing new game: " + str(e))
 
 
-async def add_new_game(
+def add_new_game(
     db: Session,
     game: schemas.NewGameUser,
     user: models.User,
     start_date: str = None,
-    silent: bool = False,
-    announce: bool = True,
 ) -> models.UserGame:
+    """Add a library entry for the game. Announcing it is a separate, slow step (announce_new_game)."""
     logger.info("Adding new user game...")
     try:
         if start_date is None:
@@ -401,8 +400,6 @@ async def add_new_game(
             if "Duplicate" not in str(e):
                 logger.info("Error adding new user game: " + str(e))
                 raise e
-        if announce:
-            await announce_new_game(db, user, game_db, started_date, silent)
         logger.info("Game added!")
         return user_game
     except SQLAlchemyError as e:
@@ -666,17 +663,13 @@ def set_completed_date(db: Session, entry: models.UserGame, completed_date: date
         raise
 
 
-async def complete_entry(
+def complete_entry(
     db: Session,
     entry: models.UserGame,
     completed_date: datetime.date | None = None,
-    silent: bool = False,
 ) -> models.UserGame:
-    """
-    Mark one library entry as completed. The completion is saved first; the
-    follow-ups (average time, achievements, group announcement) are best
-    effort and never undo it.
-    """
+    """Mark one library entry as completed. The follow-ups (average time, achievements,
+    group announcement) are slow and best effort: see after_completion, run in the background."""
     try:
         entry.completed = 1
         entry.completed_date = completed_date or datetime.date.today()
@@ -686,14 +679,10 @@ async def complete_entry(
         db.rollback()
         logger.error("Error completing game: " + str(e))
         raise
-    try:
-        await _after_completion(db, entry, silent)
-    except Exception as e:
-        logger.error("Error in post-completion tasks: " + str(e))
     return entry
 
 
-async def _after_completion(db: Session, entry: models.UserGame, silent: bool):
+async def after_completion(db: Session, entry: models.UserGame, silent: bool):
     game = games.get_game_by_id(db, entry.game_id)
     user = get_user_by_id(db, entry.user_id)
     game_info = await utils.get_game_info(game.name)

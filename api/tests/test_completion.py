@@ -46,7 +46,7 @@ class AfterCompletionAvgTimeTests(unittest.IsolatedAsyncioTestCase):
                 mock.patch.object(users.utils, "send_message", new=mock.AsyncMock()), \
                 mock.patch("src.crud.time_entries.get_user_games_played_time", return_value=[]), \
                 mock.patch("src.crud.achievements.Achievements", return_value=ach):
-            await users._after_completion(mock.MagicMock(), entry, silent=True)
+            await users.after_completion(mock.MagicMock(), entry, silent=True)
         return update, ach
 
     async def test_a_failed_lookup_keeps_the_stored_time(self):

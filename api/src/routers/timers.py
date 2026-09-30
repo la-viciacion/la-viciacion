@@ -37,7 +37,7 @@ def check_new_timer(db: Session, timer: GameTimerCreate) -> None:
         _valid_platform(db, timer.platform)
 
 
-async def create_timer(db: Session, timer: GameTimerCreate) -> tuple[GameTimer, bool]:
+def create_timer(db: Session, timer: GameTimerCreate) -> tuple[GameTimer, bool]:
     """Start the timer. Returns it and whether the group must be told about a new game
     (the announcement is slow, so the caller sends it in the background)."""
     check_new_timer(db, timer)
@@ -101,11 +101,8 @@ async def create_timer(db: Session, timer: GameTimerCreate) -> tuple[GameTimer, 
             .first()
             is None
         )
-        await users_crud.add_new_game(
-            db,
-            game=NewGameUser(game_id=timer.game_id, platform=timer.platform),
-            user=user,
-            announce=False,
+        users_crud.add_new_game(
+            db, game=NewGameUser(game_id=timer.game_id, platform=timer.platform), user=user
         )
 
     return db_timer, announce
@@ -357,7 +354,7 @@ router = APIRouter(
 
 
 @router.post("/start", response_model=GameTimerResponse)
-async def start_timer(
+def start_timer(
     timer: GameTimerCreate,
     background_tasks: BackgroundTasks,
     current_user: User = Depends(auth.get_current_active_user),
@@ -365,7 +362,7 @@ async def start_timer(
 ):
     """Start a new game timer for a user"""
     auth.ensure_self_or_admin(current_user, user_id=timer.user_id)
-    started, new_game = await create_timer(db, timer)
+    started, new_game = create_timer(db, timer)
     background_tasks.add_task(
         actions.after_timer_start,
         started.user_id,

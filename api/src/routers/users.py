@@ -2,6 +2,7 @@ import datetime
 
 from fastapi import (
     APIRouter,
+    BackgroundTasks,
     Depends,
     HTTPException,
     Query,
@@ -15,7 +16,7 @@ from .. import auth
 from ..auth import get_db
 from ..crud import users
 from ..database import models, schemas
-from ..utils import images
+from ..utils import actions, images
 from ..utils import messages as msg
 from ..utils import my_utils as utils
 from ..utils.logger import LogManager
@@ -225,10 +226,11 @@ def _check_completion_date(entry: models.UserGame, date: datetime.date):
 
 @router.patch("/{username}/library/{entry_id}/completion")
 @version(1)
-async def update_completion(
+def update_completion(
     username: str,
     entry_id: int,
     body: schemas.CompletionUpdate,
+    background_tasks: BackgroundTasks,
     silent: bool = False,
     active_user: models.User = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db),
@@ -260,7 +262,9 @@ async def update_completion(
             raise HTTPException(status_code=409, detail=msg.ALREADY_COMPLETED_IN_SEASON)
         date = body.completed_date or datetime.date.today()
         _check_completion_date(entry, date)
-        await users.complete_entry(db, entry, date, silent)
+        users.complete_entry(db, entry, date)
+        # the notice and the achievements take seconds (HLTB, OpenAI, Telegram): not in this request
+        background_tasks.add_task(actions.after_completion, entry.id, silent)
     else:
         if body.completed_date is None:
             raise HTTPException(status_code=409, detail=msg.GAME_ALREADY_COMPLETED)
@@ -271,7 +275,7 @@ async def update_completion(
 
 @router.patch("/{username}/avatar")
 @version(1)
-async def upload_avatar(
+def upload_avatar(
     username: str,
     # file: Annotated[UploadFile, File(description="A file read as UploadFile")],
     file: UploadFile,
@@ -282,7 +286,7 @@ async def upload_avatar(
     if not users.get_user_by_username(db, username):
         logger.info(msg.USER_NOT_EXISTS)
         raise HTTPException(status_code=404, detail=msg.USER_NOT_EXISTS)
-    data = await file.read(AVATAR_MAX_BYTES + 1)
+    data = file.file.read(AVATAR_MAX_BYTES + 1)
     try:
         images.validate_image(data, AVATAR_MAX_BYTES)
     except ValueError as e:
@@ -297,7 +301,7 @@ async def upload_avatar(
 
 @router.get("/{username}/avatar")
 @version(1)
-async def get_avatar(
+def get_avatar(
     username: str,
     active_user: models.User = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db),

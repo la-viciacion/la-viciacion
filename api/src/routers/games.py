@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi_versioning import version
+from starlette.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
 from .. import auth
@@ -54,7 +55,7 @@ async def search_rawg(query: str, db: Session = Depends(get_db)):
 
 @router.get("/{game_id}", response_model=schemas.Game)
 @version(1)
-async def get_game_by_id(game_id: str, db: Session = Depends(get_db)):
+def get_game_by_id(game_id: str, db: Session = Depends(get_db)):
     """_summary_
 
     Args:
@@ -78,6 +79,11 @@ async def get_game_by_id(game_id: str, db: Session = Depends(get_db)):
 @version(1)
 async def create_game(game: schemas.NewGame, db: Session = Depends(get_db)):
     """Add a new game to DB, resolving details via RAWG."""
+    await run_in_threadpool(_refuse_duplicates, db, game)
+    return await games.new_game(db=db, game=game)
+
+
+def _refuse_duplicates(db: Session, game: schemas.NewGame) -> None:
     if game.rawg_id:
         existing = (
             db.query(models.Game)
@@ -91,12 +97,11 @@ async def create_game(game: schemas.NewGame, db: Session = Depends(get_db)):
     for game_db in games_db:
         if game_db.name.strip().lower() == game.name.strip().lower():
             raise HTTPException(status_code=400, detail="Game already in DB")
-    return await games.new_game(db=db, game=game)
 
 
 @router.put("/{game_id}", response_model=schemas.Game, status_code=200)
 @version(1)
-async def update_game(
+def update_game(
     game_id: str,
     game: schemas.UpdateGame,
     admin: models.User = Depends(auth.require_admin),

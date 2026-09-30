@@ -4,6 +4,7 @@ import json
 import re
 
 import requests
+from starlette.concurrency import run_in_threadpool
 import telegram
 from howlongtobeatpy import HowLongToBeat
 from sqlalchemy import asc, create_engine, desc, func, or_, select, text, update
@@ -139,51 +140,53 @@ async def search_rawg_games(query: str, db: Session = None) -> list[schemas.Rawg
 
     candidates = []
     for item in results:
-        rawg_id = item.get("id")
-        name = item.get("name", "")
-        slug = item.get("slug", "")
-        released = item.get("released")
-        image_url = item.get("background_image")
-        genres = [g["name"] for g in item.get("genres", []) if "name" in g]
-        platforms = [
-            p.get("platform", {}).get("name")
-            for p in item.get("platforms", [])
-            if p.get("platform", {}).get("name")
-        ]
-        rating = item.get("rating")
-        metacritic = item.get("metacritic")
-
-        exists_in_db = False
-        db_game_id = None
-        if db is not None and (rawg_id or slug or name):
-            filters = []
-            if rawg_id:
-                filters.append(models.Game.rawg_id == rawg_id)
-            if slug:
-                filters.append(models.Game.slug == slug)
-            if name:
-                filters.append(models.Game.name == name)
-            existing = db.query(models.Game).filter(or_(*filters)).first()
-            if existing:
-                exists_in_db = True
-                db_game_id = existing.id
-
         candidates.append(
             schemas.RawgGameCandidate(
-                rawg_id=rawg_id,
-                name=name,
-                slug=slug,
-                released=released,
-                image_url=image_url,
-                genres=genres,
-                platforms=platforms,
-                rating=rating,
-                metacritic=metacritic,
-                exists_in_db=exists_in_db,
-                db_game_id=db_game_id,
+                rawg_id=item.get("id"),
+                name=item.get("name", ""),
+                slug=item.get("slug", ""),
+                released=item.get("released"),
+                image_url=item.get("background_image"),
+                genres=[g["name"] for g in item.get("genres", []) if "name" in g],
+                platforms=[
+                    p.get("platform", {}).get("name")
+                    for p in item.get("platforms", [])
+                    if p.get("platform", {}).get("name")
+                ],
+                rating=item.get("rating"),
+                metacritic=item.get("metacritic"),
             )
         )
+    if db is not None and candidates:
+        await run_in_threadpool(mark_existing_games, db, candidates)
     return candidates
+
+
+def mark_existing_games(db: Session, candidates: list[schemas.RawgGameCandidate]) -> None:
+    """Flag the candidates that are already in the games table (same RAWG id, slug or name): one query."""
+    rawg_ids = {c.rawg_id for c in candidates if c.rawg_id}
+    slugs = {c.slug for c in candidates if c.slug}
+    names = {c.name for c in candidates if c.name}
+    filters = []
+    if rawg_ids:
+        filters.append(models.Game.rawg_id.in_(rawg_ids))
+    if slugs:
+        filters.append(models.Game.slug.in_(slugs))
+    if names:
+        filters.append(models.Game.name.in_(names))
+    if not filters:
+        return
+    games_db = db.query(models.Game.id, models.Game.rawg_id, models.Game.slug, models.Game.name).filter(or_(*filters)).all()
+    for candidate in candidates:
+        for game in games_db:
+            if (
+                (candidate.rawg_id and game.rawg_id == candidate.rawg_id)
+                or (candidate.slug and game.slug == candidate.slug)
+                or (candidate.name and game.name == candidate.name)
+            ):
+                candidate.exists_in_db = True
+                candidate.db_game_id = game.id
+                break
 
 
 async def get_game_details_by_rawg_id(rawg_id: int) -> dict | None:

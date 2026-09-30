@@ -184,6 +184,27 @@ def after_timer_start(user_id: int, start_time: datetime.datetime, new_game_id: 
             logger.error("Error checking after a timer start: " + str(e))
 
 
+def after_completion(entry_id: int, silent: bool = False):
+    """Background-task entrypoint for a completed library entry: average time, achievements and the
+    group announcement. Best effort: the completion itself is already saved."""
+    from ..database.database import SessionLocal
+
+    async def _run():
+        db = SessionLocal()
+        try:
+            entry = db.get(models.UserGame, entry_id)
+            if entry is not None:
+                await users.after_completion(db, entry, silent)
+        finally:
+            db.close()
+
+    with _check_lock:
+        try:
+            asyncio.run(_run())
+        except Exception as e:
+            logger.error("Error in post-completion tasks: " + str(e))
+
+
 async def announce_lost_streak(user: models.User, played_dates: list[datetime.date], today: datetime.date, silent: bool):
     """Announce a streak of more than 10 days on the day it is lost (daily check)."""
     lost = streaks.lost_streak(played_dates, today)

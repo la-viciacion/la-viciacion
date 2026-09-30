@@ -151,7 +151,7 @@ def signup(request: Request, user: schemas.UserCreate, db: Session = Depends(get
 
 @router.post("/token", response_model=auth.Token)
 @version(1)
-async def login_for_access_token(
+def login_for_access_token(
     request: Request,
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
     db: Session = Depends(get_db),

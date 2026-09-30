@@ -3,6 +3,7 @@ import uuid
 from typing import Union
 import random
 
+from starlette.concurrency import run_in_threadpool
 from sqlalchemy import asc, create_engine, delete, desc, func, select, text, true, update, or_
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -81,11 +82,16 @@ def recommended_games(
 async def new_game(db: Session, game: schemas.NewGame) -> models.Game:
     logger.info(f"Adding new game to DB: {game.name} (rawg_id: {game.rawg_id})")
 
-    # 1. Resolve official game data from RAWG first
+    # 1. Resolve official game data from RAWG first (network: awaited, off the DB)
     game_info = await utils.get_new_game_info(game)
+    # 2. everything else is database work: keep it off the event loop
+    return await run_in_threadpool(_store_game, db, game, game_info)
+
+
+def _store_game(db: Session, game: schemas.NewGame, game_info: schemas.NewGame) -> models.Game:
     official_name = game_info.name if game_info.name else game.name
 
-    # 2. Check if the game already exists in DB by rawg_id or official name
+    # Check if the game already exists in DB by rawg_id or official name
     existing_game = None
     if game_info.rawg_id:
         existing_game = db.query(models.Game).filter(models.Game.rawg_id == game_info.rawg_id).first()
@@ -95,10 +101,10 @@ async def new_game(db: Session, game: schemas.NewGame) -> models.Game:
         logger.info(f"Game '{official_name}' already exists in DB (id: {existing_game.id})")
         return existing_game
 
-    # 3. Generate a local id for the new game
+    # Generate a local id for the new game
     game_id = str(uuid.uuid4())
 
-    # 4. Create and persist Game
+    # Create and persist Game
     game_to_add = models.Game(
         id=game_id,
         name=official_name,
