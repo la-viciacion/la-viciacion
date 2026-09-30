@@ -43,6 +43,17 @@ GOD_USERNAME = "admin"
 GOD_NAME = "Dios"
 
 
+def _hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+
+def _matches_password(password: str, stored: str | None) -> bool:
+    try:
+        return bool(stored) and bcrypt.checkpw(password.encode("utf-8"), stored.encode("utf-8"))
+    except ValueError:  # not a bcrypt hash
+        return False
+
+
 def ensure_god_user(db: Session):
     """
     Emergency administrator: make sure the "admin" user ("Dios") exists, is active,
@@ -52,9 +63,6 @@ def ensure_god_user(db: Session):
     if not config.GOD_ADMIN_PASS:
         raise ValueError("GOD_ADMIN_PASS must not be empty")
     try:
-        hashed_password = bcrypt.hashpw(
-            config.GOD_ADMIN_PASS.encode("utf-8"), bcrypt.gensalt()
-        ).decode("utf-8")
         db_user = (
             db.query(models.User).filter(models.User.username == GOD_USERNAME).first()
         )
@@ -63,7 +71,7 @@ def ensure_god_user(db: Session):
                 models.User(
                     name=GOD_NAME,
                     username=GOD_USERNAME,
-                    password=hashed_password,
+                    password=_hash_password(config.GOD_ADMIN_PASS),
                     is_admin=1,
                     is_active=1,
                 )
@@ -71,7 +79,10 @@ def ensure_god_user(db: Session):
             logger.info("God admin user created")
         else:
             db_user.name = GOD_NAME
-            db_user.password = hashed_password
+            # a new hash on every start would change the token fingerprint (auth.password_fingerprint)
+            # and log the admin out each time: only replace it when the password really differs
+            if not _matches_password(config.GOD_ADMIN_PASS, db_user.password):
+                db_user.password = _hash_password(config.GOD_ADMIN_PASS)
             db_user.is_admin = 1
             db_user.is_active = 1
             logger.info("God admin user restored")
