@@ -32,6 +32,27 @@ def plain(data):
     return data
 
 
+class _SharedRankingData:
+    """What several rankings need, computed the first time and reused within one request."""
+
+    def __init__(self, db: Session):
+        self._db = db
+        self._players = None
+        self._counts = None
+
+    @property
+    def players(self):  # days played by every player: days, best and current streak
+        if self._players is None:
+            self._players = rankings.players_with_dates(self._db)
+        return self._players
+
+    @property
+    def counts(self):  # library entries and completions per player: completed games, ratio
+        if self._counts is None:
+            self._counts = rankings.library_counts(self._db)
+        return self._counts
+
+
 class RankingStatisticsTypes(str, Enum):
     user_hours = "user_hours"
     user_days = "user_days"
@@ -67,25 +88,26 @@ def get_ranking_statistics(
         rankings_list = ranking.split(",")
     else:
         rankings_list = [elem.value for elem in RankingStatisticsTypes]
+    shared = _SharedRankingData(db)
     response = []
     for ranking_type in rankings_list:
         content = {}
         if ranking_type == RankingStatisticsTypes.user_hours:
             data = rankings.user_hours_players(db)
         elif ranking_type == RankingStatisticsTypes.user_days:
-            data = rankings.user_days_played(db)
+            data = rankings.user_days_played(db, players=shared.players)
         elif ranking_type == RankingStatisticsTypes.user_played_games:
             data = rankings.user_played_games(db)
         elif ranking_type == RankingStatisticsTypes.user_completed_games:
-            data = rankings.user_completed_games(db)
+            data = rankings.user_completed_games(db, counts=shared.counts)
         elif ranking_type == RankingStatisticsTypes.achievements:
             data = rankings.user_ranking_achievements(db)
         elif ranking_type == RankingStatisticsTypes.user_ratio:
-            data = rankings.user_ratio(db)
+            data = rankings.user_ratio(db, counts=shared.counts)
         elif ranking_type == RankingStatisticsTypes.user_current_streak:
-            data = rankings.user_current_streak(db)
+            data = rankings.user_current_streak(db, players=shared.players)
         elif ranking_type == RankingStatisticsTypes.user_best_streak:
-            data = rankings.user_best_streak(db)
+            data = rankings.user_best_streak(db, players=shared.players)
         elif ranking_type == RankingStatisticsTypes.games_most_played:
             data = rankings.games_most_played(db)
         elif ranking_type == RankingStatisticsTypes.platform_played:

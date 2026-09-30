@@ -1,7 +1,7 @@
 import datetime
 from typing import Union
 
-from sqlalchemy import asc, create_engine, desc, func, select, text, update
+from sqlalchemy import and_, asc, case, create_engine, desc, func, select, text, update
 from sqlalchemy.orm import Session
 
 from ..crud import time_entries, users
@@ -26,41 +26,44 @@ def user_hours_players(db: Session, limit: int = None, is_active: bool | None = 
     return rows[:limit] if limit else rows
 
 
-def _players_with_dates(db: Session, is_active: bool | None):
-    """(user row, played days) for every player, for the rankings derived from the days played."""
+def players_with_dates(db: Session, is_active: bool | None = True):
+    """(user_id, name, played days) of every player, for the rankings derived from the days played.
+
+    Three rankings need it (days, best and current streak): a caller that asks for several
+    computes it once and passes it as `players`."""
     names = {row["user_id"]: row["name"] for row in time_entries.players_played_time(db, is_active=is_active)}
     return [(user_id, names[user_id], days) for user_id, days in time_entries.players_played_dates(db, is_active=is_active).items()]
 
 
-def user_days_played(db: Session, limit: int = None, is_active: bool | None = True) -> list[dict]:
+def user_days_played(db: Session, limit: int = None, is_active: bool | None = True, players=None) -> list[dict]:
     rows = [
         {"user_id": user_id, "name": name, "played_days": len(days)}
-        for user_id, name, days in _players_with_dates(db, is_active)
+        for user_id, name, days in (players if players is not None else players_with_dates(db, is_active))
     ]
     rows.sort(key=lambda r: (-r["played_days"], r["user_id"]))
     return rows[:limit] if limit else rows
 
 
-def _streaks(db: Session, is_active: bool | None):
+def _streaks(db: Session, is_active: bool | None, players=None):
     today = datetime.date.today()
     season = seasons.current()
-    for user_id, name, days in _players_with_dates(db, is_active):
+    for user_id, name, days in (players if players is not None else players_with_dates(db, is_active)):
         yield user_id, name, streaks.streak_summary(days, today, season)
 
 
-def user_best_streak(db: Session, limit: int = None, is_active: bool | None = True) -> list[dict]:
+def user_best_streak(db: Session, limit: int = None, is_active: bool | None = True, players=None) -> list[dict]:
     rows = [
         {"user_id": user_id, "name": name, "best_streak": summary[1], "best_streak_date": summary[0]}
-        for user_id, name, summary in _streaks(db, is_active)
+        for user_id, name, summary in _streaks(db, is_active, players)
     ]
     rows.sort(key=lambda r: (-r["best_streak"], r["user_id"]))
     return rows[:limit] if limit else rows
 
 
-def user_current_streak(db: Session, limit: int = None, is_active: bool | None = True) -> list[dict]:
+def user_current_streak(db: Session, limit: int = None, is_active: bool | None = True, players=None) -> list[dict]:
     rows = [
         {"user_id": user_id, "name": name, "current_streak": summary[2]}
-        for user_id, name, summary in _streaks(db, is_active)
+        for user_id, name, summary in _streaks(db, is_active, players)
     ]
     rows.sort(key=lambda r: (-r["current_streak"], r["user_id"]))
     return rows[:limit] if limit else rows
@@ -127,38 +130,39 @@ def user_played_games(
         raise e
 
 
+def library_counts(db: Session, season: int = None, is_active: bool | None = True) -> list[dict]:
+    """Per player: library entries of the season and how many are completed (one query).
+
+    Every player is there, with zeros when they have no entries."""
+    season = seasons.or_current(season)
+    completed = func.coalesce(func.sum(case((models.UserGame.completed == 1, 1), else_=0)), 0)
+    stmt = (
+        select(models.User.id, models.User.name, func.count(models.UserGame.game_id), completed)
+        .select_from(models.User)
+        .outerjoin(
+            models.UserGame,
+            and_(models.UserGame.user_id == models.User.id, models.UserGame.season == season),
+        )
+        .group_by(models.User.id, models.User.name)
+    )
+    if is_active is not None:
+        stmt = stmt.where(models.User.is_active == is_active)
+    return [
+        {"user_id": user_id, "name": name, "entries": entries, "completed": int(done)}
+        for user_id, name, entries, done in db.execute(stmt).all()
+    ]
+
+
 def user_completed_games(
     db: Session,
     limit: int = None,
     season: int = None,
     is_active: bool | None = True,
+    counts=None,
 ):
-    season = seasons.or_current(season)
-    try:
-        user_list = users.get_users(db, is_active=is_active)
-        data = []
-        for user in user_list:
-            user_data = {}
-            stmt = (
-                select(
-                    func.count(models.UserGame.game_id),
-                )
-                .filter(models.UserGame.user_id == user.id)
-                .filter(models.UserGame.completed == 1)
-                .filter(models.UserGame.season == season)
-                .limit(limit)
-            )
-            completed = db.execute(stmt).fetchone()[0]
-            user_data["user_id"] = user.id
-            user_data["name"] = user.name
-            user_data["completed_games"] = completed
-            data.append(user_data)
-
-        ordered_data = sorted(data, key=lambda x: (-x["completed_games"], x["user_id"]))
-        return ordered_data
-    except Exception as e:
-        logger.error("Error getting user completed games: " + str(e))
-        raise e
+    counts = counts if counts is not None else library_counts(db, season, is_active)
+    data = [{"user_id": c["user_id"], "name": c["name"], "completed_games": c["completed"]} for c in counts]
+    return sorted(data, key=lambda x: (-x["completed_games"], x["user_id"]))
 
 
 def games_last_played(db: Session, limit: int = 10):
@@ -166,12 +170,18 @@ def games_last_played(db: Session, limit: int = 10):
     try:
         sessions = time_entries.sessions_subquery()
         last = func.max(sessions.c.start).label("start")
-        stmt = (
-            select(sessions.c.game_id, models.Game.name, last)
-            .join(models.Game, models.Game.id == sessions.c.game_id)
-            .group_by(sessions.c.game_id, models.Game.name)
+        # group and cut first (game ids only), then look the names up for the few that remain
+        latest = (
+            select(sessions.c.game_id, last)
+            .group_by(sessions.c.game_id)
             .order_by(desc(last))
             .limit(limit)
+            .subquery("latest")
+        )
+        stmt = (
+            select(latest.c.game_id, models.Game.name, latest.c.start)
+            .join(models.Game, models.Game.id == latest.c.game_id)
+            .order_by(desc(latest.c.start))
         )
         # .mappings() so `item["name"]` string-key access works (SQLAlchemy
         # 2.x plain Row no longer supports it, only via _mapping/.mappings()).
@@ -207,44 +217,14 @@ def platform_played_games(db: Session, limit: int = None):
         raise e
 
 
-def user_ratio(db: Session, season: int = None, is_active: bool | None = True):
-    season = seasons.or_current(season)
-    try:
-        user_list = users.get_users(db, is_active=is_active)
-        data = []
-        for user in user_list:
-            user_data = {}
-            stmt = (
-                select(
-                    func.count(models.UserGame.game_id),
-                )
-                .filter(models.UserGame.user_id == user.id)
-                .filter(models.UserGame.season == season)
-            )
-            played = db.execute(stmt).fetchone()[0]
-
-            stmt = (
-                select(
-                    func.count(models.UserGame.game_id),
-                )
-                .filter(models.UserGame.user_id == user.id)
-                .filter(models.UserGame.completed == 1)
-                .filter(models.UserGame.season == season)
-            )
-            completed = db.execute(stmt).fetchone()[0]
-
-            if played == 0 or completed == 0:
-                ratio = 0
-            else:
-                ratio = round((completed / played), 2)
-
-            user_data["user_id"] = user.id
-            user_data["name"] = user.name
-            user_data["ratio"] = ratio
-            data.append(user_data)
-
-        ordered_data = sorted(data, key=lambda x: (-x["ratio"], x["user_id"]))
-        return ordered_data
-    except Exception as e:
-        logger.error("Error calculating user ratio: " + str(e))
-        raise e
+def user_ratio(db: Session, season: int = None, is_active: bool | None = True, counts=None):
+    counts = counts if counts is not None else library_counts(db, season, is_active)
+    data = [
+        {
+            "user_id": c["user_id"],
+            "name": c["name"],
+            "ratio": round(c["completed"] / c["entries"], 2) if c["entries"] and c["completed"] else 0,
+        }
+        for c in counts
+    ]
+    return sorted(data, key=lambda x: (-x["ratio"], x["user_id"]))
