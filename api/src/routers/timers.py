@@ -36,7 +36,19 @@ def get_db():
 
 
 # Timer CRUD operations
+def check_new_timer(db: Session, timer: GameTimerCreate) -> None:
+    """The game (and the platform, when given) of a new timer must exist: nothing in the
+    schema enforces it and a timer of an unknown game breaks every page that lists it."""
+    if db.query(User.id).filter(User.id == timer.user_id).first() is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado")
+    if db.query(Game.id).filter(Game.id == timer.game_id).first() is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Juego no encontrado")
+    if timer.platform is not None:
+        _valid_platform(db, timer.platform)
+
+
 async def create_timer(db: Session, timer: GameTimerCreate) -> GameTimer:
+    check_new_timer(db, timer)
     # Check if user already has an active timer
     active_timer = db.query(GameTimer).filter(
         GameTimer.user_id == timer.user_id,
