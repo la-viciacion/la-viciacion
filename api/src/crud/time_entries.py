@@ -296,10 +296,12 @@ def get_time_entry_by_time(
     """
     season = seasons.or_current(season)
     sessions = sessions_subquery()
+    # sessions of no duration never count; the earliest one that matches is the one that earned it
     query = db.query(sessions).filter(
         sessions.c.user_id == user_id,
         sessions.c.season == season,
-    )
+        sessions.c.duration > 0,
+    ).order_by(sessions.c.start)
     if mode == 1:
         time_entry = query.filter(sessions.c.duration == duration).first()
     elif mode == 2:

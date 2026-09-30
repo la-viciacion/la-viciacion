@@ -285,7 +285,7 @@ class Achievements:
         ach = AchievementsElems.PLAYED_LESS_5_MIN_SESSION
         if not self.check_already_achieved(db, user.id, ach.name):
             time_entry = time_entries.get_time_entry_by_time(db, user.id, 5 * 60, 2)
-            if time_entry is not None and time_entry.duration > 0:
+            if time_entry is not None:
                 logger.info("Set achievement less 5 minutes session")
                 self.set_user_achievement(
                     db,
