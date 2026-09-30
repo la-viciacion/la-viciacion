@@ -8,6 +8,7 @@ MAIN_MENU = [
         InlineKeyboardButton("🏅 Rankings", callback_data="rankings"),
     ],
     [
+        InlineKeyboardButton("🎲 Recomendados", callback_data="recommendations"),
         InlineKeyboardButton(EXIT, callback_data="cancel"),
     ],
 ]

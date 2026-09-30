@@ -1,6 +1,6 @@
 import unittest
 
-from src.utils.duration import format_duration
+from src.utils.duration import format_duration, format_players
 
 
 class FormatDurationTests(unittest.TestCase):
@@ -17,6 +17,17 @@ class FormatDurationTests(unittest.TestCase):
 
     def test_more_than_99_hours_keeps_all_digits(self):
         self.assertEqual(format_duration(120 * 3600), "120h00m")
+
+
+class FormatPlayersTests(unittest.TestCase):
+    def test_lists_up_to_three_names(self):
+        self.assertEqual(format_players([]), "")
+        self.assertEqual(format_players(["Ana"]), "Ana")
+        self.assertEqual(format_players(["Ana", "Bob"]), "Ana y Bob")
+        self.assertEqual(format_players(["Ana", "Bob", "Cris"]), "Ana, Bob y Cris")
+
+    def test_counts_the_rest(self):
+        self.assertEqual(format_players(["Ana", "Bob", "Cris", "Dan", "Eva"]), "Ana, Bob, Cris y 2 más")
 
 
 if __name__ == "__main__":

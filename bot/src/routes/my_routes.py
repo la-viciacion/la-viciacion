@@ -10,12 +10,14 @@ from telegram import (
 )
 from telegram.ext import ContextTypes, ConversationHandler
 from utils.config import Config
-from utils.duration import format_duration
+from utils.duration import format_duration, format_players
 from utils.my_utils import MyUtils
 from utils.logger import LogManager
 
 log_manager = LogManager()
 logger = log_manager.get_logger()
+
+RECOMMENDATIONS = 10
 
 utils = MyUtils()
 config = Config()
@@ -141,4 +143,21 @@ class MyRoutes:
         msg = msg + "Mejor racha: " + str(data["best_streak"]) + "\n"
         msg = msg + "Fin mejor racha: " + str(data["best_streak_date"])
 
+        await utils.response_conversation(update, context, msg)
+
+    async def recommendations(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ) -> None:
+        logger.info("Recommendations")
+        username = context.user_data["app_user"]["username"]
+        games = utils.fetch_json(
+            "GET",
+            config.API_URL + "/users/" + username + "/recommendations?limit=" + str(RECOMMENDATIONS),
+        )
+        if not games:
+            msg = "No hay nada que recomendarte: ya has probado todo lo que tienen los demás."
+        else:
+            msg = "Juegos que tienen los demás y tú no has jugado:\n"
+            for i, elem in enumerate(games):
+                msg += f"{i + 1}. {elem['game_name']} ({format_players(elem['players'])})\n"
         await utils.response_conversation(update, context, msg)

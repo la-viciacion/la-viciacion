@@ -104,6 +104,9 @@ def main() -> None:
                 CallbackQueryHandler(
                     ranking_routes.rankings, pattern="^" + "rankings" + "$"
                 ),
+                CallbackQueryHandler(
+                    my_routes.recommendations, pattern="^" + "recommendations" + "$"
+                ),
                 CallbackQueryHandler(basic_routes.end, pattern="^" + "cancel" + "$"),
             ],
             utils.MY_ROUTES: [
