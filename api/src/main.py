@@ -2,13 +2,12 @@ import datetime
 import sentry_sdk
 import logging
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi_versioning import VersionedFastAPI
 
 from .config import Config
-from .database import models
-from .database.database import SessionLocal, engine
+from .database.database import SessionLocal
 from .crud import users as users_crud
 from .crud.achievements import Achievements
 from .utils import push as push_utils
@@ -52,8 +51,6 @@ excluded_paths = ["/keepalive"]
 full_excluded_paths = [f"{base_path}{path}" for path in excluded_paths]
 uvicorn_logger = logging.getLogger("uvicorn.access")
 uvicorn_logger.addFilter(EndpointFilter(excluded_paths))
-
-models.Base.metadata.create_all(bind=engine)
 
 with SessionLocal() as db:
     users_crud.ensure_god_user(db)

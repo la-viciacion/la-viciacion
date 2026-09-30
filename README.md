@@ -94,7 +94,7 @@ The stack is four services orchestrated by `docker-compose.yml`: `laviciacion-db
 docker compose up -d --build
 ```
 
-MariaDB starts with an empty database, and the API's `alembic upgrade head` creates the schema from scratch (all migrations run in order). Nothing else to do.
+MariaDB starts with an empty database and the API's `alembic upgrade head` builds the whole schema from scratch (migration `000_baseline_v1` creates the starting tables, the rest run in order, and `015_seed_platforms` adds a default list of platforms). On start the API also creates the `admin` user from `GOD_ADMIN_PASS`, the achievements and the push keys. Nothing else to do: fill in `.env` and run it.
 
 ### Migrating an existing (pre-v2) database into a new environment
 

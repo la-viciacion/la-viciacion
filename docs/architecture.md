@@ -17,7 +17,7 @@ Telegram bot (bot) ── HTTP, superadmin token ────────┘   �
 ## API (`api/src/`)
 
 ```
-main.py            app assembly: Sentry, create_all (safety net only), god user + settings seed,
+main.py            app assembly: Sentry, god user + settings + achievements + VAPID seed,
                    routers, VersionedFastAPI (prefix /api/v1), CORS, request-timing middleware, scheduler start
 config.py          Config: reads env vars (fails loudly if one is missing); falls back to root .env
 auth.py            bcrypt, JWT (HS256), get_db, get_current_user/_active_user, require_admin,
