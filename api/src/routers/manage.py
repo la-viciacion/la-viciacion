@@ -20,6 +20,7 @@ from ..crud import users as users_crud
 from ..database import models
 from ..database.database import SessionLocal
 from ..utils import actions, my_utils, push, rawg_sync, seasons, settings
+from ..database.schemas import NOTES_MAX
 from ..utils.logger import LogManager
 from ..utils.my_utils import normalize_email, validate_email_format, validate_password_requirements, validate_username
 
@@ -527,7 +528,7 @@ class TimerCreate(BaseModel):
     start_time: datetime.datetime
     end_time: datetime.datetime
     platform: Optional[str] = None
-    notes: Optional[str] = None
+    notes: Optional[str] = Field(None, max_length=NOTES_MAX)
 
 
 def _check_range(start: datetime.datetime, end: Optional[datetime.datetime]):
@@ -561,7 +562,7 @@ class TimerPatch(BaseModel):
     start_time: Optional[datetime.datetime] = None
     end_time: Optional[datetime.datetime] = None
     platform: Optional[str] = None
-    notes: Optional[str] = None
+    notes: Optional[str] = Field(None, max_length=NOTES_MAX)
 
 
 @router.patch("/timers/{timer_id}")

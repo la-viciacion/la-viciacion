@@ -349,7 +349,7 @@ async def add_game_to_user(
 @version(1)
 def get_games(
     username: str,
-    limit: int = None,
+    limit: int | None = Query(None, ge=1, le=500),
     completed: bool = None,
     active_user: models.User = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db),

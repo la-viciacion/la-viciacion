@@ -503,7 +503,7 @@ def stop_timer_endpoint(
 def get_timer_history_endpoint(
     user_id: int, 
     game_id: Optional[str] = None, 
-    limit: int = 100,
+    limit: int = Query(100, ge=1, le=500),
     current_user: User = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db)
 ):
