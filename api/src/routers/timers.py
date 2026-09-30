@@ -47,7 +47,9 @@ def check_new_timer(db: Session, timer: GameTimerCreate) -> None:
         _valid_platform(db, timer.platform)
 
 
-async def create_timer(db: Session, timer: GameTimerCreate) -> GameTimer:
+async def create_timer(db: Session, timer: GameTimerCreate) -> tuple[GameTimer, bool]:
+    """Start the timer. Returns it and whether the group must be told about a new game
+    (the announcement is slow, so the caller sends it in the background)."""
     check_new_timer(db, timer)
     # Check if user already has an active timer
     active_timer = db.query(GameTimer).filter(
@@ -99,10 +101,11 @@ async def create_timer(db: Session, timer: GameTimerCreate) -> GameTimer:
         )
         .first()
     )
+    announce = False
     if already_playing is None and user is not None:
         # "new game" is announced the first time the user plays a game in a season,
         # whatever the platform: the same game on another platform is only a new entry
-        first_time_in_season = (
+        announce = (
             db.query(UserGame.id)
             .filter_by(user_id=timer.user_id, game_id=timer.game_id, season=season)
             .first()
@@ -112,10 +115,10 @@ async def create_timer(db: Session, timer: GameTimerCreate) -> GameTimer:
             db,
             game=NewGameUser(game_id=timer.game_id, platform=timer.platform),
             user=user,
-            silent=not first_time_in_season,
+            announce=False,
         )
 
-    return db_timer
+    return db_timer, announce
 
 
 def get_active_timer(db: Session, user_id: int) -> Optional[GameTimer]:
@@ -404,8 +407,13 @@ async def start_timer(
 ):
     """Start a new game timer for a user"""
     auth.ensure_self_or_admin(current_user, user_id=timer.user_id)
-    started = await create_timer(db, timer)
-    background_tasks.add_task(actions.after_timer_start, started.user_id, started.start_time)
+    started, new_game = await create_timer(db, timer)
+    background_tasks.add_task(
+        actions.after_timer_start,
+        started.user_id,
+        started.start_time,
+        started.game_id if new_game else None,
+    )
     return started
 
 

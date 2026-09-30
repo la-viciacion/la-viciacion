@@ -350,7 +350,7 @@ def get_avatar(db: Session, username: str):
         raise
 
 
-async def _announce_new_game(
+async def announce_new_game(
     db: Session, user: models.User, game_db: models.Game, started_date, silent: bool
 ) -> None:
     """Tell the group a user started a game. The entry is already saved: a failure here is only logged."""
@@ -385,6 +385,7 @@ async def add_new_game(
     user: models.User,
     start_date: str = None,
     silent: bool = False,
+    announce: bool = True,
 ) -> models.UserGame:
     logger.info("Adding new user game...")
     try:
@@ -411,7 +412,8 @@ async def add_new_game(
             if "Duplicate" not in str(e):
                 logger.info("Error adding new user game: " + str(e))
                 raise e
-        await _announce_new_game(db, user, game_db, started_date, silent)
+        if announce:
+            await announce_new_game(db, user, game_db, started_date, silent)
         logger.info("Game added!")
         return user_game
     except SQLAlchemyError as e:

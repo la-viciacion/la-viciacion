@@ -152,12 +152,14 @@ def after_session_change(
             logger.error("Error checking after a session change: " + str(e))
 
 
-def after_timer_start(user_id: int, start_time: datetime.datetime):
+def after_timer_start(user_id: int, start_time: datetime.datetime, new_game_id: str | None = None):
     """Background-task entrypoint for a timer that has just started.
 
     Only what a running timer can unlock is checked here (the rest needs a finished
     session and is checked when it stops): the time of day it started at and
-    teamwork, which counts the timers running right now.
+    teamwork, which counts the timers running right now. `new_game_id` is set when it is the
+    first time the user plays that game this season: the group hears about it here, so the
+    request that started the timer does not wait for the notification.
     """
     from ..database.database import SessionLocal
 
@@ -167,6 +169,10 @@ def after_timer_start(user_id: int, start_time: datetime.datetime):
             achievements.populate_achievements(db)
             user = users.get_user_by_id(db, user_id)
             if user is not None:
+                if new_game_id is not None:
+                    game = games.get_game_by_id(db, new_game_id)
+                    if game is not None:
+                        await users.announce_new_game(db, user, game, start_time.date(), silent=False)
                 await achievements.timer_started(db, user, start_time)
                 await achievements.user_played_total_games(db, user)
             await achievements.teamwork(db, silent=False)

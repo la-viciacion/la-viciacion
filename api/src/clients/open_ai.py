@@ -9,6 +9,8 @@ logger = log_manager.get_logger()
 
 config = Config()
 
+OPENAI_TIMEOUT_SECONDS = 30  # the library default is 10 minutes: far too long for a chat notice
+
 
 class OpenAIClient:
     _instance = None  # Variable to store the instance
@@ -24,7 +26,7 @@ class OpenAIClient:
                 if config.OPENAI_API_KEY:
                     # logger.debug("Creating OpenAI client...")
                     try:
-                        self.client = OpenAI(api_key=config.OPENAI_API_KEY)
+                        self.client = OpenAI(api_key=config.OPENAI_API_KEY, timeout=OPENAI_TIMEOUT_SECONDS)
                     except Exception as e:
                         logger.error(e)
                 else:

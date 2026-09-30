@@ -42,7 +42,7 @@ class TelegramSendTests(unittest.IsolatedAsyncioTestCase):
 
 class EscapeMarkdownTests(unittest.TestCase):
     def test_formatting_characters_are_escaped(self):
-        self.assertEqual(my_utils.escape_markdown("a_b*c[d`e"), "a\_b\*c\[d\`e")
+        self.assertEqual(my_utils.escape_markdown("a_b*c[d`e"), "a\\_b\\*c\\[d\\`e")
 
     def test_plain_names_are_untouched(self):
         self.assertEqual(my_utils.escape_markdown("Toni Miquel"), "Toni Miquel")
@@ -76,7 +76,7 @@ class NewGameAnnouncementTests(unittest.IsolatedAsyncioTestCase):
         user = types.SimpleNamespace(id=1, name="Ana_B")
         with mock.patch.object(users_crud, "count_played_games", return_value=3), \
                 mock.patch.object(users_crud.utils, "send_message", send):
-            await users_crud._announce_new_game(None, user, game, __import__("datetime").date(2026, 1, 1), False)
+            await users_crud.announce_new_game(None, user, game, __import__("datetime").date(2026, 1, 1), False)
 
     async def test_a_game_without_slug_is_announced_without_link(self):
         send = mock.AsyncMock()
@@ -84,7 +84,7 @@ class NewGameAnnouncementTests(unittest.IsolatedAsyncioTestCase):
         text = send.await_args.args[0]
         self.assertIn("Doom", text)
         self.assertNotIn("rawg.io", text)
-        self.assertIn("Ana\_B", text)
+        self.assertIn("Ana\\_B", text)
 
     async def test_a_failing_announcement_does_not_propagate(self):
         send = mock.AsyncMock(side_effect=RuntimeError("down"))

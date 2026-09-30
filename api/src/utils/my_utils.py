@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 import json
 import re
@@ -158,6 +159,11 @@ def date_from_datetime(datetime: str):
     return datetime.split(" ")[0]
 
 
+async def _http_get(url: str, params: dict, timeout: int):
+    """`requests` blocks: run it in a thread so the event loop keeps serving everybody else."""
+    return await asyncio.to_thread(requests.get, url, params=params, timeout=timeout)
+
+
 async def search_rawg_games(query: str, db: Session = None) -> list[schemas.RawgGameCandidate]:
     """Search games in RAWG.io and return candidates, checking if they exist in the DB."""
     api_key = config.RAWG_API_KEY
@@ -168,7 +174,7 @@ async def search_rawg_games(query: str, db: Session = None) -> list[schemas.Rawg
     url = "https://api.rawg.io/api/games"
     params = {"key": api_key, "search": query, "page": 1, "page_size": 10}
     try:
-        resp = requests.get(url, params=params, timeout=10)
+        resp = await _http_get(url, params, timeout=10)
         if not resp.ok:
             logger.error(f"RAWG search error {resp.status_code}: {resp.content}")
             return []
@@ -236,7 +242,7 @@ async def get_game_details_by_rawg_id(rawg_id: int) -> dict | None:
     url = f"https://api.rawg.io/api/games/{rawg_id}"
     params = {"key": api_key}
     try:
-        resp = requests.get(url, params=params, timeout=10)
+        resp = await _http_get(url, params, timeout=10)
         if not resp.ok:
             logger.error(f"RAWG details error {resp.status_code}: {resp.content}")
             return None
@@ -260,8 +266,8 @@ async def get_game_details_by_rawg_id(rawg_id: int) -> dict | None:
     # Steam ID from stores endpoint
     steam_id = ""
     try:
-        stores_resp = requests.get(
-            f"https://api.rawg.io/api/games/{rawg_id}/stores", params=params, timeout=6
+        stores_resp = await _http_get(
+            f"https://api.rawg.io/api/games/{rawg_id}/stores", params, timeout=6
         )
         if stores_resp.ok:
             stores_data = stores_resp.json().get("results", [])
@@ -318,7 +324,7 @@ async def get_game_info(game: str):
         try:
             url = "https://api.rawg.io/api/games"
             params = {"key": api_key, "search": game, "page": 1, "page_size": 1}
-            game_request = requests.get(url, params=params, timeout=10)
+            game_request = await _http_get(url, params, timeout=10)
             if game_request.ok:
                 results = game_request.json().get("results", [])
                 if results:
@@ -457,8 +463,9 @@ async def send_message(
                     )
                     system_prompt += "Jugado por: " + str(new_game_recommended["user"])
                     # logger.info(system_prompt)
-                completion = oai_client.chat_completion(
-                    user_prompt=msg, system_prompt=system_prompt
+                # the client is synchronous: keep it off the event loop
+                completion = await asyncio.to_thread(
+                    oai_client.chat_completion, user_prompt=msg, system_prompt=system_prompt
                 )
                 if completion is not None:
                     logger.info(completion.choices[0].message.content)
