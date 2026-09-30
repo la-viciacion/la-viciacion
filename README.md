@@ -41,6 +41,7 @@ Swagger/ReDoc/`openapi.json` are disabled by default because they publish every 
 A second channel next to Telegram, **on by default**, with nothing to set up: the API creates its VAPID keys (one pair for the whole server, shared by all users) on the first start and uses `SMTP_EMAIL` as the contact towards the push services unless **Notificaciones → Avisos en la app (push)** sets another one or turns the feature off. It needs HTTPS. Nobody is subscribed automatically (browsers require a click and a permission per device): the app offers it once after login, and each user chooses for themselves, from their profile (**Avisos en la app**), which of their devices get notifications and whether each also gets the group ones; on iPhone/iPad the app must be added to the home screen first (iOS 16.4+).
 
 - What goes to the Telegram group is also pushed to every device that has group notices on (a per-device switch); private notices (a forgotten timer, the weekly summary) go only to that user's devices.
+- From **Notificaciones → Avisos en la app (push)** an admin can send a test notice (with a custom text) to their own devices, to one user's or to every subscribed device, and see how many devices and users are subscribed.
 - Expired devices are removed automatically. Regenerating the keys unsubscribes every device.
 - The pushed text is the same message as Telegram's without Markdown, cut to a title and a short body; how long messages and images fit is pending (see `docs/roadmap.md`).
 

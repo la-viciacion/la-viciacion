@@ -10,7 +10,7 @@ from typing import Optional
 
 from bcrypt import gensalt, hashpw
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -830,7 +830,11 @@ def revoke_user_achievement(award_id: int, db: Session = Depends(get_db)):
 def get_settings(db: Session = Depends(get_db)):
     """Settings for the admin panel (the Telegram token is never returned, only whether it is set)."""
     jobs = {j.job: {"last_run_at": j.last_run_at, "last_status": j.last_status} for j in db.query(models.JobRun).all()}
-    return {"values": settings.public_view(db), "jobs": jobs}
+    push_devices = {
+        "devices": db.query(func.count(models.PushSubscription.id)).scalar(),
+        "users": db.query(func.count(func.distinct(models.PushSubscription.user_id))).scalar(),
+    }
+    return {"values": settings.public_view(db), "jobs": jobs, "push_devices": push_devices}
 
 
 class SettingsBody(BaseModel):
@@ -877,14 +881,35 @@ def generate_push_keys(replace: bool = False, admin: models.User = Depends(auth.
     return {"public_key": public}
 
 
+class TestPushBody(BaseModel):
+    target: str = Field("me", pattern="^(me|all|user)$")
+    user_id: Optional[int] = None
+    message: Optional[str] = Field(None, max_length=200)
+
+
 @router.post("/settings/test-push")
-async def send_test_push(admin: models.User = Depends(auth.require_admin)):
-    """Send a diagnostic notice to the devices of the calling admin."""
+async def send_test_push(
+    body: TestPushBody | None = None,
+    admin: models.User = Depends(auth.require_admin),
+    db: Session = Depends(get_db),
+):
+    """Send a test notice to the admin's devices ("me"), to one user's ("user") or to every subscribed device ("all")."""
+    body = body or TestPushBody()
     if not push.is_ready():
-        raise HTTPException(status_code=409, detail="Activa los avisos push y genera las claves primero")
-    sent, failed = await push.notify_user(admin.id, "Prueba de aviso\nSi lo lees, las notificaciones push funcionan.", tag="test")
+        raise HTTPException(status_code=409, detail="Los avisos push no están listos: revisa que estén activados")
+    message = "Prueba de aviso\n" + (body.message or "Si lo lees, las notificaciones push funcionan.")
+    if body.target == "all":
+        sent, failed = await push.notify_everyone(message, tag="test")
+    else:
+        user_id = admin.id
+        if body.target == "user":
+            if body.user_id is None:
+                raise HTTPException(status_code=400, detail="Falta elegir el usuario")
+            user_id = _get_or_404(db, models.User, body.user_id, "Usuario").id
+        sent, failed = await push.notify_user(user_id, message, tag="test")
     if sent == 0:
-        raise HTTPException(status_code=404, detail="No hay ningún dispositivo tuyo suscrito" if failed == 0 else "Ningún dispositivo lo ha aceptado")
+        detail = "Ningún dispositivo lo ha aceptado" if failed else "No hay ningún dispositivo suscrito en ese destino"
+        raise HTTPException(status_code=404, detail=detail)
     return {"sent": sent, "failed": failed}
 
 

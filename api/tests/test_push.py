@@ -84,7 +84,24 @@ class DisabledTests(unittest.TestCase):
 
             asyncio.run(push.notify_group("hola"))
             self.assertEqual(asyncio.run(push.notify_user(1, "hola")), (0, 0))
+            self.assertEqual(asyncio.run(push.notify_everyone("hola")), (0, 0))
         send.assert_not_called()
+
+    def test_everyone_uses_no_filter_and_reports_the_counts(self):
+        import asyncio
+
+        query = mock.MagicMock()
+        seen = {}
+
+        async def fake_send(query_filter, payload):
+            seen["query"] = query_filter(query)
+            seen["payload"] = payload
+            return 3, 1
+
+        with mock.patch.object(push, "is_ready", return_value=True), mock.patch.object(push, "_send", fake_send):
+            self.assertEqual(asyncio.run(push.notify_everyone("Prueba\nhola", tag="test")), (3, 1))
+        self.assertIs(seen["query"], query)  # nothing filtered out
+        self.assertEqual(seen["payload"]["tag"], "test")
 
 
 class EnsureKeysTests(unittest.TestCase):
