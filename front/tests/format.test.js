@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { formatClock, formatDate, formatDuration, formatRelative, formatTimestamp, parseDay, toLocalISO } from '../js/lib/format.js';
+import { formatClock, formatDate, formatDuration, formatPlayers, formatRelative, formatTimestamp, parseDay, toLocalISO } from '../js/lib/format.js';
 
 test('formatDuration', () => {
   assert.equal(formatDuration(0), '0 s');
@@ -36,4 +36,12 @@ test('parseDay keeps the calendar day whatever the timezone', () => {
   assert.deepEqual([d.getFullYear(), d.getMonth(), d.getDate()], [2026, 8, 29]);
   assert.equal(formatDate(null), '—');
   assert.match(formatDate('2026-01-01'), /1/);
+});
+
+test('formatPlayers', () => {
+  assert.equal(formatPlayers([]), '');
+  assert.equal(formatPlayers(['Ana']), 'Ana');
+  assert.equal(formatPlayers(['Ana', 'Bob']), 'Ana y Bob');
+  assert.equal(formatPlayers(['Ana', 'Bob', 'Cris']), 'Ana, Bob y Cris');
+  assert.equal(formatPlayers(['Ana', 'Bob', 'Cris', 'Dan', 'Eva']), 'Ana, Bob, Cris y 2 más');
 });

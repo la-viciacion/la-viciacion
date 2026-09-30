@@ -64,3 +64,11 @@ export function toInputValue(value) {
 
 /** "2026-09-29T13:05" (datetime-local input) -> "2026-09-29T13:05:00" (what the API expects). */
 export const fromInputValue = (value) => (value.length === 16 ? `${value}:00` : value);
+
+/** ["Ana", "Bob", "Cris", "Dan", "Eva"] -> "Ana, Bob, Cris y 2 más" (at most three names). */
+export function formatPlayers(names, shown = 3) {
+  if (names.length <= shown) {
+    return names.length > 1 ? `${names.slice(0, -1).join(', ')} y ${names.at(-1)}` : names.join('');
+  }
+  return `${names.slice(0, shown).join(', ')} y ${names.length - shown} más`;
+}

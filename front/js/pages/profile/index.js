@@ -1,7 +1,8 @@
-// Profile page: a header with the season stats and three tabs so nothing needs a
-// long scroll: Resumen (top games, achievements), Mis juegos (see library.js) and
-// Ajustes (personal data, reminders, push notifications, password). The games and the
-// settings load the first time their tab is opened.
+// Profile page: a header with the season stats and four tabs so nothing needs a
+// long scroll: Resumen (top games, achievements), Mis juegos (see library.js),
+// Recomendados (see recommendations.js) and Ajustes (personal data, reminders, push
+// notifications, password). The games, the recommendations and the settings load the
+// first time their tab is opened.
 // All routes are /api/v1/users/{username}/...
 import { api, jsonRequest } from '../../lib/api.js';
 import { formatDate, formatDuration } from '../../lib/format.js';
@@ -10,6 +11,7 @@ import { PASSWORD_HINT, isValidPassword } from '../../lib/password.js';
 import { initLibrary } from './library.js';
 import { initPreferences } from './preferences.js';
 import { initPush } from './push.js';
+import { initRecommendations } from './recommendations.js';
 
 export const active = 'profile';
 export const mainClass = 'profile-main';
@@ -19,6 +21,7 @@ const AVATAR_SIZE = 256;
 const TABS = [
   ['resumen', 'Resumen'],
   ['juegos', 'Mis juegos'],
+  ['recomendados', 'Recomendados'],
   ['ajustes', 'Ajustes'],
 ];
 
@@ -67,6 +70,7 @@ function showTab(id) {
   if (opened.has(id)) return;
   opened.add(id);
   if (id === 'juegos') initLibrary(main.querySelector('#pfLibrary'), { username: user.username, onChange: refreshSummary });
+  if (id === 'recomendados') initRecommendations(main.querySelector('#pfRecommended'), { username: user.username });
   if (id === 'ajustes') {
     initPreferences(main.querySelector('#pfPrefs'), { path: userPath('settings') }).catch(() => {});
     initPush(main.querySelector('#pfPush')).catch(() => {}); // optional: never breaks the page
@@ -177,6 +181,11 @@ function draw(d) {
     <section class="pf-panel" role="tabpanel" id="pfPanel-juegos" aria-labelledby="pfTab-juegos" hidden>
       <div class="pf-sub pf-note">Aquí aparecen los juegos de todas las temporadas; la temporada de cada uno va indicada.</div>
       <div id="pfLibrary"></div>
+    </section>
+
+    <section class="pf-panel" role="tabpanel" id="pfPanel-recomendados" aria-labelledby="pfTab-recomendados" hidden>
+      <div class="pf-sub pf-note">Juegos que tienen los demás y tú nunca has jugado, empezando por los que más gente comparte.</div>
+      <div id="pfRecommended"></div>
     </section>
 
     <section class="pf-panel" role="tabpanel" id="pfPanel-ajustes" aria-labelledby="pfTab-ajustes" hidden>
