@@ -84,6 +84,38 @@ def overview(db: Session = Depends(get_db)):
     }
 
 
+# A timer left running this long is almost surely forgotten (the hourly job only nudges its owner).
+STALE_TIMER_HOURS = 12
+
+
+@router.get("/attention")
+def attention(db: Session = Depends(get_db)):
+    """What the admin may want to look at: forgotten timers, players the bot cannot reach and
+    games without RAWG metadata. Computed on request, like every other figure."""
+    cutoff = datetime.datetime.now() - datetime.timedelta(hours=STALE_TIMER_HOURS)
+    stale = (
+        db.query(models.GameTimer)
+        .filter(models.GameTimer.is_active == True, models.GameTimer.start_time < cutoff)  # noqa: E712
+    )
+    oldest = (
+        stale.join(models.User, models.User.id == models.GameTimer.user_id)
+        .join(models.Game, models.Game.id == models.GameTimer.game_id)
+        .with_entities(models.User.username, models.Game.name, models.GameTimer.start_time)
+        .order_by(models.GameTimer.start_time)
+        .limit(5)
+        .all()
+    )
+    return {
+        "stale_timer_hours": STALE_TIMER_HOURS,
+        "stale_timers": stale.count(),
+        "stale_timers_oldest": [{"user": u, "game": g, "start_time": s.isoformat()} for u, g, s in oldest],
+        "users_without_telegram": db.query(func.count(models.User.id))
+        .filter(models.User.is_active == 1, models.User.telegram_id.is_(None), models.not_god())
+        .scalar(),
+        "games_without_rawg": db.query(func.count(models.Game.id)).filter(models.Game.rawg_id.is_(None)).scalar(),
+    }
+
+
 class CheckAchievementsBody(BaseModel):
     user_id: Optional[int] = None
     silent: bool = True
