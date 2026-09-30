@@ -15,6 +15,8 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
+from sqlalchemy.orm import deferred
+
 from .database import Base
 
 #############################
@@ -33,7 +35,8 @@ class User(Base):
     email = Column(String(255))
     is_admin = Column(Integer)
     is_active = Column(Integer)
-    avatar = Column(LargeBinary)
+    # not loaded with the user: nearly every request loads the user (auth) and none needs the picture
+    avatar = deferred(Column(LargeBinary))
 
     # email is the login identifier, username the (unique) nickname
     __table_args__ = (

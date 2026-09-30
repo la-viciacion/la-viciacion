@@ -35,6 +35,15 @@ router = APIRouter(
 )
 
 
+def _target_user(db: Session, active_user: models.User, username: str) -> models.User:
+    """The user a route is about. Most of the time it is the caller, already loaded by the auth
+    dependency in this same request: an admin asking about somebody else costs the lookup."""
+    user = active_user if active_user.username == username else users.get_user_by_username(db, username)
+    if user is None:
+        raise HTTPException(status_code=404, detail=msg.USER_NOT_EXISTS)
+    return user
+
+
 @router.get("/", response_model=list[schemas.User])
 @version(1)
 def get_users(
@@ -72,9 +81,7 @@ def get_user(
         _type_: _description_
     """
     auth.ensure_self_or_admin(active_user, username=username)
-    user_db = users.get_user_by_username(db, username)
-    if user_db is None:
-        raise HTTPException(status_code=404, detail=msg.USER_NOT_EXISTS)
+    user_db = _target_user(db, active_user, username)
     return user_db
 
 
@@ -87,9 +94,7 @@ def get_profile(
 ):
     """Main stats, in-progress games and personal data of a user"""
     auth.ensure_self_or_admin(active_user, username=username)
-    user = users.get_user_by_username(db, username)
-    if user is None:
-        raise HTTPException(status_code=404, detail=msg.USER_NOT_EXISTS)
+    user = _target_user(db, active_user, username)
     return users.get_profile(db, user)
 
 
@@ -103,9 +108,7 @@ def update_profile(
 ):
     """Edit own name, email and Telegram id"""
     auth.ensure_self_or_admin(active_user, username=username)
-    user = users.get_user_by_username(db, username)
-    if user is None:
-        raise HTTPException(status_code=404, detail=msg.USER_NOT_EXISTS)
+    user = _target_user(db, active_user, username)
     data = body.model_dump(exclude_unset=True)
     if "name" in data:
         # never empty: messages and rankings print it (falls back to the nickname)
@@ -140,9 +143,7 @@ def get_settings(
 ):
     """Personal preferences (None = the default applies) and the defaults"""
     auth.ensure_self_or_admin(active_user, username=username)
-    user = users.get_user_by_username(db, username)
-    if user is None:
-        raise HTTPException(status_code=404, detail=msg.USER_NOT_EXISTS)
+    user = _target_user(db, active_user, username)
     return user_settings.get(db, user.id)
 
 
@@ -156,9 +157,7 @@ def update_settings(
 ):
     """Change personal preferences; null resets one to its default"""
     auth.ensure_self_or_admin(active_user, username=username)
-    user = users.get_user_by_username(db, username)
-    if user is None:
-        raise HTTPException(status_code=404, detail=msg.USER_NOT_EXISTS)
+    user = _target_user(db, active_user, username)
     changes = body.model_dump(exclude_unset=True)
     hours = changes.get("forgotten_timer_hours")
     if hours is not None and not user_settings.valid_forgotten_timer_hours(hours):
@@ -181,9 +180,7 @@ def change_password(
 ):
     """Change own password (the current one is required)"""
     auth.ensure_self(active_user, username)
-    user = users.get_user_by_username(db, username)
-    if user is None:
-        raise HTTPException(status_code=404, detail=msg.USER_NOT_EXISTS)
+    user = _target_user(db, active_user, username)
     if not auth.verify_password(body.current_password, user.password):
         raise HTTPException(status_code=400, detail=msg.PASSWORD_WRONG)
     if not utils.validate_password_requirements(body.new_password):
@@ -203,9 +200,7 @@ def get_library(
 ):
     """Every game of the user (all seasons), most recently played first"""
     auth.ensure_self_or_admin(active_user, username=username)
-    user = users.get_user_by_username(db, username)
-    if user is None:
-        raise HTTPException(status_code=404, detail=msg.USER_NOT_EXISTS)
+    user = _target_user(db, active_user, username)
     return users.get_library(db, user.id, limit, offset)
 
 
@@ -245,9 +240,7 @@ def update_completion(
     - completed=false unmarks it (any season); the entry itself is kept.
     """
     auth.ensure_self_or_admin(active_user, username=username)
-    user = users.get_user_by_username(db, username)
-    if user is None:
-        raise HTTPException(status_code=404, detail=msg.USER_NOT_EXISTS)
+    user = _target_user(db, active_user, username)
     entry = users.get_library_entry(db, user.id, entry_id)
     if entry is None:
         raise HTTPException(status_code=404, detail=msg.ENTRY_NOT_FOUND)
