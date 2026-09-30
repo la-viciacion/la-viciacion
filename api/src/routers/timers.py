@@ -2,7 +2,7 @@ import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
-from sqlalchemy import func, or_
+from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -173,31 +173,52 @@ def get_grouped_timer_history(
         .all()
     )
 
-    groups: List[GameTimerGroup] = []
-    for row in page:
-        game = db.query(Game).filter(Game.id == row.game_id).first()
-        sessions = (
+    game_ids = [row.game_id for row in page]
+    games = {g.id: g for g in db.query(Game).filter(Game.id.in_(game_ids)).all()} if game_ids else {}
+
+    # the newest `sessions_per_game` sessions of every game of the page, in one query
+    rank = func.row_number().over(partition_by=GameTimer.game_id, order_by=GameTimer.start_time.desc())
+    ranked = (
+        select(GameTimer.id.label("id"), rank.label("rank"))
+        .where(*finished, GameTimer.game_id.in_(game_ids))
+        .subquery("ranked")
+    )
+    sessions_by_game: dict[str, list[GameTimer]] = {game_id: [] for game_id in game_ids}
+    if game_ids:
+        newest = (
             db.query(GameTimer)
-            .filter(*finished, GameTimer.game_id == row.game_id)
-            .order_by(GameTimer.start_time.desc())
-            .limit(sessions_per_game)
+            .join(ranked, ranked.c.id == GameTimer.id)
+            .filter(ranked.c.rank <= sessions_per_game)
+            .order_by(GameTimer.game_id, GameTimer.start_time.desc())
             .all()
         )
-        platforms = [
-            r.platform
-            for r in db.query(GameTimer.platform)
-            .filter(*finished, GameTimer.game_id == row.game_id, GameTimer.platform.isnot(None))
-            .group_by(GameTimer.platform)
+        for session in newest:
+            sessions_by_game[session.game_id].append(session)
+
+    # platforms used per game, the most recently used first
+    platforms_by_game: dict[str, list[str]] = {game_id: [] for game_id in game_ids}
+    if game_ids:
+        used = (
+            db.query(GameTimer.game_id, GameTimer.platform)
+            .filter(*finished, GameTimer.game_id.in_(game_ids), GameTimer.platform.isnot(None))
+            .group_by(GameTimer.game_id, GameTimer.platform)
             .order_by(func.max(GameTimer.start_time).desc())
             .all()
-        ]
+        )
+        for game_id, platform in used:
+            platforms_by_game[game_id].append(platform)
+
+    groups: List[GameTimerGroup] = []
+    for row in page:
+        game = games.get(row.game_id)
+        sessions = sessions_by_game[row.game_id]
         groups.append(
             GameTimerGroup(
                 game_id=row.game_id,
                 game_name=game.name if game else None,
                 image_url=game.image_url if game else None,
                 platform=sessions[0].platform if sessions else None,
-                platforms=platforms,
+                platforms=platforms_by_game[row.game_id],
                 last_played=row.last_played,
                 total_seconds=int(row.total_seconds),
                 session_count=row.session_count,
