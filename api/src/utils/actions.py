@@ -87,9 +87,16 @@ async def check_users(
     users_db = users.get_users(db, only_active_users)
     if user_ids is not None:
         users_db = [u for u in users_db if u.id in user_ids]
+    failures: list[str] = []
     try:
         for user in users_db:
-            await check_user(db, user, silent=silent, announce_streak_loss=announce_streak_loss)
+            # one user's failure must not skip the checks of the rest
+            try:
+                await check_user(db, user, silent=silent, announce_streak_loss=announce_streak_loss)
+            except Exception as e:
+                db.rollback()
+                logger.error(f"Error checking achievements of {user.username}: {e}")
+                failures.append(user.username)
         await achievements.teamwork(db, silent)
         elapsed_time = time.time() - start_time
         if elapsed_time > 30:
@@ -97,6 +104,10 @@ async def check_users(
                 db, "❗Ejecución lenta❗\nLa última comprobación ha durado más de 30 segundos"
             )
         logger.info("Elapsed time: " + str(elapsed_time))
+        if failures:
+            await utils.send_message_to_admins(
+                db, "Error checking achievements of: " + ", ".join(failures)
+            )
     except Exception as e:
         logger.error("Error checking achievements: " + str(e))
         await utils.send_message_to_admins(db, "Error checking achievements: " + str(e))

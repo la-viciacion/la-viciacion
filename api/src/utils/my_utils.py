@@ -26,6 +26,11 @@ oai_client = OpenAIClient()
 config = Config()
 
 
+def escape_markdown(text) -> str:
+    """Escape what Telegram's legacy Markdown reads as formatting, for names inside a message."""
+    return re.sub(r"([_*`\[])", r"\\\1", str(text))
+
+
 def validate_password_requirements(password):
     # Length
     if len(password) < 12 or len(password) > 24:
@@ -395,6 +400,35 @@ def convert_blob_to_image(
         raise
 
 
+TELEGRAM_RETRIES = 3
+
+
+async def _telegram_send(bot, chat_id, text: str, image=None) -> bool:
+    """Send one message; True if Telegram took it. Never raises: a notification must not
+    break the operation that triggered it.
+
+    It goes as Markdown; if Telegram cannot parse it (a name with `_` or `*` in it, an
+    unbalanced reply from the model) it is sent again as plain text.
+    """
+    parse_mode = telegram.constants.ParseMode.MARKDOWN
+    for _ in range(TELEGRAM_RETRIES):
+        try:
+            if image is None:
+                await bot.send_message(text=text, chat_id=chat_id, parse_mode=parse_mode)
+            else:
+                await bot.send_photo(chat_id=chat_id, photo=image, caption=text, parse_mode=parse_mode)
+            return True
+        except telegram.error.BadRequest as e:
+            logger.warning("Telegram rejected the message (" + str(e) + ")")
+            if parse_mode is None:
+                return False
+            parse_mode = None
+        except Exception as e:
+            logger.error("Error sending telegram message: " + str(e))
+    logger.error("Max retries reached. Message not sent.")
+    return False
+
+
 async def send_message(
     msg,
     silent: bool,
@@ -435,35 +469,14 @@ async def send_message(
         if not telegram_ready:
             logger.info("Telegram is not configured. Message sent by push only.")
             return
-        bot = telegram.Bot(settings.get("telegram.token"))
-        async with bot:
-            retries = 0
-            max_retries = 3
-            while retries < max_retries:
-                try:
-                    logger.info("Sending message to group...")
-                    if image is None:
-                        await bot.send_message(
-                            text=msg,
-                            chat_id=settings.get("telegram.group_id"),
-                            parse_mode=telegram.constants.ParseMode.MARKDOWN,
-                        )
-                        break
-                    else:
-                        await bot.send_photo(
-                            chat_id=settings.get("telegram.group_id"),
-                            photo=image,
-                            caption=msg,
-                            parse_mode=telegram.constants.ParseMode.MARKDOWN,
-                        )
+        try:
+            bot = telegram.Bot(settings.get("telegram.token"))
+            async with bot:
+                logger.info("Sending message to group...")
+                if await _telegram_send(bot, settings.get("telegram.group_id"), msg, image):
                     logger.info("Message sent successfully!")
-                    break
-                except Exception as e:
-                    logger.error("Error sending telegram message: " + str(e))
-                    retries += 1
-                    if retries >= max_retries:
-                        logger.error("Max retries reached. Message not sent.")
-                        raise
+        except Exception as e:  # e.g. Telegram unreachable when the bot session opens
+            logger.error("Error sending telegram message: " + str(e))
     else:
         logger.info("Silent mode. Message not sent.")
 
@@ -478,26 +491,14 @@ async def send_message_to_user(user_telegram_id, msg, user_id=None):
     if user_telegram_id is None or not settings.get("telegram.token"):
         logger.warning("User without Telegram id or bot not configured. Message not sent.")
         return
-    bot = telegram.Bot(settings.get("telegram.token"))
-    async with bot:
-        retries = 0
-        max_retries = 3
-        while retries < max_retries:
-            try:
-                logger.info("Sending message to user " + str(user_telegram_id) + "...")
-                await bot.send_message(
-                    text=msg,
-                    chat_id=user_telegram_id,
-                    parse_mode=telegram.constants.ParseMode.MARKDOWN,
-                )
-                break
-            except Exception as e:
-                logger.error("Error sending telegram message to user: " + str(e))
-                retries += 1
-                if retries >= max_retries:
-                    logger.error("Max retries reached. Message not sent.")
-                    # raise
-    logger.info("Message sent successfully!")
+    try:
+        bot = telegram.Bot(settings.get("telegram.token"))
+        async with bot:
+            logger.info("Sending message to user " + str(user_telegram_id) + "...")
+            if await _telegram_send(bot, user_telegram_id, msg):
+                logger.info("Message sent successfully!")
+    except Exception as e:
+        logger.error("Error sending telegram message to user: " + str(e))
 
 
 async def send_message_to_admins(db: Session, msg):
@@ -511,12 +512,8 @@ async def send_message_to_admins(db: Session, msg):
             if user.is_admin and user.telegram_id is not None:
                 bot = telegram.Bot(settings.get("telegram.token"))
                 async with bot:
-                    await bot.send_message(
-                        text=msg,
-                        chat_id=user.telegram_id,
-                        parse_mode=telegram.constants.ParseMode.MARKDOWN,
-                    )
-                logger.info("Message sent successfully!")
+                    if await _telegram_send(bot, user.telegram_id, msg):
+                        logger.info("Message sent successfully!")
     except Exception as e:
         logger.info(e)
 

@@ -350,6 +350,35 @@ def get_avatar(db: Session, username: str):
         raise
 
 
+async def _announce_new_game(
+    db: Session, user: models.User, game_db: models.Game, started_date, silent: bool
+) -> None:
+    """Tell the group a user started a game. The entry is already saved: a failure here is only logged."""
+    try:
+        # the season of the new entry, not the running one: a backdated start belongs to its own season
+        played_games = count_played_games(db, user.id, seasons.of(started_date))
+        started_game = utils.escape_markdown(game_db.name)
+        if game_db.slug:
+            started_game = "[" + started_game + "](https://rawg.io/games/" + game_db.slug + ")"
+        msg = (
+            "*"
+            + utils.escape_markdown(user.name)
+            + "* acaba de empezar "
+            + started_game
+            + ", su juego número "
+            + str(played_games)
+            + " de este año."
+        )
+        await utils.send_message(
+            msg,
+            silent,
+            openai=True,
+            system_prompt=prompts.NEW_GAME_PROMPT,
+        )
+    except Exception as e:
+        logger.error("Error announcing new game: " + str(e))
+
+
 async def add_new_game(
     db: Session,
     game: schemas.NewGameUser,
@@ -382,26 +411,7 @@ async def add_new_game(
             if "Duplicate" not in str(e):
                 logger.info("Error adding new user game: " + str(e))
                 raise e
-        # the season of the new entry, not the running one: a backdated start belongs to its own season
-        played_games = count_played_games(db, user.id, seasons.of(started_date))
-        started_game = (
-            "[" + game_db.name + "](https://rawg.io/games/" + game_db.slug + ")"
-        )
-        msg = (
-            "*"
-            + user.name
-            + "* acaba de empezar "
-            + started_game
-            + ", su juego número "
-            + str(played_games)
-            + " de este año."
-        )
-        await utils.send_message(
-            msg,
-            silent,
-            openai=True,
-            system_prompt=prompts.NEW_GAME_PROMPT,
-        )
+        await _announce_new_game(db, user, game_db, started_date, silent)
         logger.info("Game added!")
         return user_game
     except SQLAlchemyError as e:
