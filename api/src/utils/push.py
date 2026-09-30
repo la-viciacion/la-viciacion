@@ -19,6 +19,7 @@ import re
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 from py_vapid import Vapid
 from pywebpush import WebPushException, webpush
+from sqlalchemy import select
 
 from ..config import Config
 from ..database import models
@@ -158,10 +159,16 @@ def _deliver(devices: list[tuple], payload: dict, private_pem: str, subject: str
     return sent, gone, failed
 
 
+def active_users_only(query):
+    """Devices of accounts that are still active: a disabled user gets no notices."""
+    active = select(models.User.id).where(models.User.is_active == 1)
+    return query.filter(models.PushSubscription.user_id.in_(active))
+
+
 async def _send(query_filter, payload: dict) -> tuple[int, int]:
     """Send `payload` to the subscriptions selected by `query_filter(query)`; returns (sent, failed)."""
     with SessionLocal() as db:
-        rows = query_filter(db.query(models.PushSubscription)).all()
+        rows = active_users_only(query_filter(db.query(models.PushSubscription))).all()
         devices = [(r.id, r.endpoint, r.p256dh, r.auth) for r in rows]
     if not devices:
         return 0, 0

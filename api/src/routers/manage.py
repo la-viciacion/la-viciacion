@@ -287,6 +287,7 @@ def delete_user(
     db.query(models.GameTimer).filter_by(user_id=user_id).delete()
     db.query(models.UserGame).filter_by(user_id=user_id).delete()
     db.query(models.UserAchievement).filter_by(user_id=user_id).delete()
+    db.query(models.PushSubscription).filter_by(user_id=user_id).delete()
     db.delete(user)
     db.commit()
     return {"message": "Usuario eliminado"}
