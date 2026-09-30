@@ -1,5 +1,4 @@
 from sqlalchemy import (
-    JSON,
     BigInteger,
     Boolean,
     Column,
@@ -9,7 +8,6 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Integer,
-    Interval,
     LargeBinary,
     SmallInteger,
     String,
@@ -17,8 +15,6 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
-from sqlalchemy.orm import relationship
-
 from .database import Base
 
 #############################

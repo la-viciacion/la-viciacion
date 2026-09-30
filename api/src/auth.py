@@ -49,12 +49,6 @@ def verify_password(plain_password: str, hashed_password: str):
     )
 
 
-def get_password_hash(password: str):
-    salt = bcrypt.gensalt()
-    hashed_password = bcrypt.hashpw(password.encode("utf-8"), salt)
-    return hashed_password
-
-
 def authenticate_user(db, login: str, password: str):
     """`login` is a username or an email."""
     user = users.get_user_by_login(db, login)

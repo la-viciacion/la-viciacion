@@ -86,11 +86,6 @@ def hello_world(request: Request):
 @router.post(
     "/signup",
     response_model=schemas.User,
-    # responses={
-    #     200: {"model": schemas.User},
-    #     400: {"model": schemas.HttpException},
-    #     "default": {"model": schemas.HttpException},
-    # },
 )
 @version(1)
 def signup(request: Request, user: schemas.UserCreate, db: Session = Depends(get_db)):

@@ -183,9 +183,6 @@ async def _send(query_filter, payload: dict) -> tuple[int, int]:
     return sent, failed
 
 
-AUDIENCES = ("me", "user", "group", "all")
-
-
 async def deliver(payload: dict, audience: str, user_id: int | None = None) -> tuple[int, int]:
     """Send a prepared payload to `audience`: one user's devices ("me"/"user" with `user_id`),
     the devices that want group notices ("group") or every device ("all"). Returns (sent, failed)."""

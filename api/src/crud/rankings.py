@@ -181,29 +181,6 @@ def games_last_played(db: Session, limit: int = 10):
         raise e
 
 
-def user_last_played_games(
-    db: Session, limit: int = None, is_active: bool | None = True
-):
-    try:
-        sessions = time_entries.sessions_subquery()
-        stmt = select(
-            sessions.c.game_id,
-            sessions.c.user_id,
-            sessions.c.start,
-            models.User.name,
-        ).join(models.User, models.User.id == sessions.c.user_id)
-
-        if is_active is not None:
-            stmt = stmt.where(models.User.is_active == is_active)
-
-        stmt = stmt.order_by(desc(sessions.c.start)).limit(limit)
-
-        return db.execute(stmt).fetchall()
-    except Exception as e:
-        logger.error("Error getting user last played games: " + str(e))
-        raise e
-
-
 def games_most_played(db: Session, limit: int = 10) -> list[dict]:
     return time_entries.games_played_time(db, limit=limit)
 

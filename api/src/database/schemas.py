@@ -1,5 +1,5 @@
 import datetime
-from typing import Dict, List, Optional, Union
+from typing import List, Optional, Union
 
 from pydantic import BaseModel, Field
 
@@ -150,15 +150,6 @@ class UserAchievement(BaseModel):
 
     class Config:
         from_attributes = True
-
-
-class HttpExceptionDetailModel(BaseModel):
-    message: str
-    code: str
-
-
-class HttpException(BaseModel):
-    detail: HttpExceptionDetailModel
 
 
 # Game Timer Schemas

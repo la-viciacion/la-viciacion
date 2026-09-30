@@ -1,7 +1,5 @@
 USER_NOT_EXISTS = "User not exists"
 USER_ALREADY_EXISTS = "User already exists"
-USER_ALREADY_PLAYING = "User is already playing this game"
-USER_NOT_PLAYING = "User is not playing this game"
 ENTRY_NOT_FOUND = "Entrada de la biblioteca no encontrada"
 COMPLETE_ONLY_CURRENT_SEASON = "Solo se puede completar un juego en la temporada actual"
 ALREADY_COMPLETED_IN_SEASON = "Ya has completado este juego en esta temporada"
@@ -16,7 +14,6 @@ FORGOTTEN_HOURS_INVALID = "Las horas deben ser un número entero entre {min} y {
 USER_NOT_ADMIN ="You are not allowed to do this action"
 INVALID_INVITATION_KEY = "The Invitation Key is not a valid key"
 
-GAME_NOT_FOUND = "Game not found"
 GAME_ALREADY_COMPLETED = "Game is already completed"
 
 FILE_TYPE_NOT_ALLOWED = "File type not supported. Only jpeg, jpg and png are allowed"

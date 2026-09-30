@@ -1,5 +1,5 @@
 import datetime
-from typing import Union, Tuple
+from typing import Union
 
 from sqlalchemy import (
     Integer,

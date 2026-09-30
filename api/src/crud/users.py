@@ -1,6 +1,6 @@
 import datetime
 import json
-from typing import Tuple, Union
+from typing import Union
 import random
 
 import bcrypt

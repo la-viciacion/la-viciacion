@@ -97,9 +97,6 @@ class Achievements:
             db.rollback()
             logger.error("Error adding achievements: " + str(e))
 
-    def get_achievements_list(self, db: Session) -> list[models.Achievement]:
-        return db.query(models.Achievement)
-
     def get_ach_by_key(self, db: Session, key: str):
         return (
             db.query(models.Achievement.id)
