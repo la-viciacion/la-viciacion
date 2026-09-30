@@ -7,6 +7,11 @@ ALLOWED_FORMATS = {"PNG": "image/png", "JPEG": "image/jpeg"}
 MAX_PIXELS = 16_000_000  # refuses decompression bombs before decoding anything
 
 
+def media_type_of(data: bytes) -> str:
+    """Media type of an image that was validated when it was uploaded (only PNG or JPEG get in)."""
+    return "image/png" if data.startswith(b"\x89PNG") else "image/jpeg"
+
+
 def validate_image(data: bytes, max_bytes: int) -> str:
     """Return the media type of `data` or raise ValueError with a user-facing reason.
 

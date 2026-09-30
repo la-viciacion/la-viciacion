@@ -3,7 +3,7 @@ import unittest
 
 from PIL import Image
 
-from src.utils.images import validate_image
+from src.utils.images import media_type_of, validate_image
 
 
 def image_bytes(fmt: str, size=(8, 8)) -> bytes:
@@ -44,3 +44,9 @@ class ValidateImageTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class MediaTypeOfTests(unittest.TestCase):
+    def test_png_and_jpeg_are_told_apart(self):
+        self.assertEqual(media_type_of(b"\x89PNG\r\n\x1a\n...."), "image/png")
+        self.assertEqual(media_type_of(b"\xff\xd8\xff\xe0...."), "image/jpeg")

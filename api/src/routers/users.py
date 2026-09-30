@@ -454,5 +454,4 @@ async def get_avatar(
     if not data or not data[0]:
         raise HTTPException(status_code=404, detail="Avatar not found")
     image = bytes(data[0])
-    media_type = "image/png" if image.startswith(b"\x89PNG") else "image/jpeg"
-    return Response(content=image, media_type=media_type)
+    return Response(content=image, media_type=images.media_type_of(image))
