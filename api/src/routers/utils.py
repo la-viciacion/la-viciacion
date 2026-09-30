@@ -4,10 +4,8 @@ from sqlalchemy.orm import Session
 
 from .. import auth
 from ..auth import get_db
-from ..crud import games, time_entries, users
 from ..crud.achievements import Achievements
-from ..database import models, schemas
-from ..utils import actions as actions
+from ..database import models
 from ..utils import images
 from ..utils import messages as msg
 from ..utils import my_utils as utils
@@ -42,45 +40,6 @@ def platforms(
     for tag in tags:
         response.append({"id": tag[0], "name": tag[1]})
     return response
-
-
-@router.get("/achievements")
-@version(1)
-def achievements_list(
-    db: Session = Depends(get_db),
-    user: models.User = Security(auth.get_current_active_user),
-):
-    """
-    Get achievements list
-    """
-    ach_list = achievements.get_achievements_list(db)
-    response = []
-    for ach in ach_list:
-        response.append(ach.title)
-    return response
-
-
-@router.get("/playing")
-@version(1)
-def get_playing_users(
-    db: Session = Depends(get_db),
-    user_logged: models.User = Security(auth.get_current_active_user),
-):
-    """
-    Get playing users
-    """
-    users_db = users.get_users(db)
-    playing = []
-    for user in users_db:
-        info = {}
-        active_game_timer = time_entries.get_active_game_timer_by_user(db, user.id)
-        if active_game_timer is not None:
-            logger.info(active_game_timer)
-            info["user"] = user.name
-            info["game"] = games.get_game_by_id(db, active_game_timer.game_id).name
-            info["time"] = active_game_timer.start_time
-            playing.append(info)
-    return playing
 
 
 @router.patch("/achievement-image/{achievement}")
@@ -134,9 +93,3 @@ async def get_achievement_image(
     except Exception as e:
         logger.error("Error reading achievement image: " + str(e))
         raise HTTPException(status_code=500, detail=msg.INTERNAL_ERROR)
-
-
-# @router.get("/sentry-debug")
-# @version(1)
-# async def trigger_error():
-#     division_by_zero = 1 / 0

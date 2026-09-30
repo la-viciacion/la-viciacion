@@ -1,25 +1,20 @@
 import datetime
-from enum import Enum
 
 from fastapi import (
     APIRouter,
     Depends,
-    File,
     HTTPException,
     Query,
     Response,
-    Security,
     UploadFile,
 )
 from fastapi_versioning import version
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from .. import auth
 from ..auth import get_db
-from ..crud import games, time_entries, users
+from ..crud import users
 from ..database import models, schemas
-from ..utils import actions as actions
 from ..utils import images
 from ..utils import messages as msg
 from ..utils import my_utils as utils
@@ -37,10 +32,6 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
     dependencies=[Depends(auth.get_current_active_user)],
 )
-
-
-class RankingUsersTypes(str, Enum):
-    games = "games"
 
 
 @router.get("/", response_model=list[schemas.User])
@@ -84,33 +75,6 @@ def get_user(
     if user_db is None:
         raise HTTPException(status_code=404, detail=msg.USER_NOT_EXISTS)
     return user_db
-
-
-@router.get("/{username}/weekly-resume")
-@version(1)
-async def get_weekly_resume(
-    username: str,
-    active_user: models.User = Depends(auth.get_current_active_user),
-    db: Session = Depends(get_db),
-):
-    """_summary_
-
-    Args:
-        username (str): _description_
-        db (Session, optional): _description_. Defaults to Depends(get_db).
-
-    Raises:
-        HTTPException: _description_
-
-    Returns:
-        _type_: _description_
-    """
-    auth.ensure_self_or_admin(active_user, username=username)
-    user_db = users.get_user_by_username(db, username)
-    if user_db is None:
-        raise HTTPException(status_code=404, detail=msg.USER_NOT_EXISTS)
-    resume = await actions.weekly_resume(db, user_db, weeks_ago=0, silent=True)
-    return resume
 
 
 @router.get("/{username}/profile")
@@ -303,110 +267,6 @@ async def update_completion(
         _check_completion_date(entry, body.completed_date)
         users.set_completed_date(db, entry, body.completed_date)
     return users.get_library_item(db, user.id, entry.id)
-
-
-@router.post("/{username}/new_game", response_model=schemas.UserGame)
-@version(1)
-async def add_game_to_user(
-    username: str,
-    game: schemas.NewGameUser,
-    active_user: models.User = Depends(auth.get_current_active_user),
-    db: Session = Depends(get_db),
-):
-    """
-    Add new game to user list
-    """
-    auth.ensure_self_or_admin(active_user, username=username)
-    current_season = seasons.current()
-    user = users.get_user_by_username(db, username)
-    if user is None:
-        raise HTTPException(status_code=404, detail=msg.USER_NOT_EXISTS)
-    already_playing = users.get_game_by_id(db, user.id, game.game_id, current_season)
-    if already_playing:
-        raise HTTPException(status_code=409, detail=msg.USER_ALREADY_PLAYING)
-    if games.get_game_by_id(db, game.game_id) is None:
-        raise HTTPException(status_code=404, detail=msg.GAME_NOT_FOUND)
-    try:
-        return await users.add_new_game(db=db, game=game, user=user)
-    except SQLAlchemyError as e:
-        logger.error("Error adding new game user: " + str(e))
-        raise HTTPException(status_code=500, detail=msg.INTERNAL_ERROR)
-
-
-@router.get(
-    "/{username}/games",
-    response_model=list[schemas.UserGame],
-)
-@version(1)
-def get_games(
-    username: str,
-    limit: int | None = Query(None, ge=1, le=500),
-    completed: bool = None,
-    active_user: models.User = Depends(auth.get_current_active_user),
-    db: Session = Depends(get_db),
-):
-    auth.ensure_self_or_admin(active_user, username=username)
-    user = users.get_user_by_username(db, username=username)
-    if user is None:
-        raise HTTPException(status_code=404, detail=msg.USER_NOT_EXISTS)
-    played_games = users.get_games(db, user.id, limit, completed)
-    return played_games
-
-
-@router.patch("/{username}/complete-game", response_model=schemas.UserGame)
-@version(1)
-async def complete_game(
-    username: str,
-    game_id: str,
-    active_user: models.User = Depends(auth.get_current_active_user),
-    db: Session = Depends(get_db),
-):
-    """
-    Complete game by username
-    """
-    auth.ensure_self_or_admin(active_user, username=username)
-    user = users.get_user_by_username(db, username)
-    if user is None:
-        raise HTTPException(status_code=404, detail=msg.USER_NOT_EXISTS)
-    current_season = seasons.current()
-    user_game = users.get_game_by_id(db, user.id, game_id, current_season)
-    if user_game is None:
-        raise HTTPException(status_code=404, detail=msg.USER_NOT_PLAYING)
-    if user_game.completed == 1:
-        raise HTTPException(status_code=409, detail=msg.GAME_ALREADY_COMPLETED)
-    try:
-        return await users.complete_game(db, user.id, game_id)
-    except SQLAlchemyError as e:
-        logger.error("Error completing game_user: " + str(e))
-        raise HTTPException(status_code=500, detail=msg.INTERNAL_ERROR)
-
-
-@router.patch("/{username}/rate-game")
-@version(1)
-async def rate_game(
-    username: str,
-    game_id: str,
-    score: float = Query(..., ge=0, le=10),
-    active_user: models.User = Depends(auth.get_current_active_user),
-    db: Session = Depends(get_db),
-):
-    """
-    Rate game
-    """
-    auth.ensure_self_or_admin(active_user, username=username)
-    user = users.get_user_by_username(db, username)
-    if user is None:
-        raise HTTPException(status_code=404, detail=msg.USER_NOT_EXISTS)
-    current_season = seasons.current()
-    user_game = users.get_game_by_id(db, user.id, game_id, current_season)
-    if user_game is None:
-        raise HTTPException(status_code=404, detail=msg.USER_NOT_PLAYING)
-    try:
-        return await users.rate_game(db, user.id, game_id, score)
-    except Exception as e:
-        logger.info(e)
-        logger.error("Error rating game: " + str(e))
-        raise HTTPException(status_code=500, detail=msg.INTERNAL_ERROR)
 
 
 @router.patch("/{username}/avatar")

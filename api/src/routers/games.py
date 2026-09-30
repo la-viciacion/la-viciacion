@@ -6,7 +6,6 @@ from .. import auth
 from ..auth import get_db
 from ..crud import games
 from ..database import models, schemas
-from ..utils import actions as actions
 from ..utils import my_utils as utils
 from ..utils.logger import LogManager
 
@@ -75,34 +74,6 @@ async def get_game_by_id(game_id: str, db: Session = Depends(get_db)):
     return game_db
 
 
-# @router.get("/games/name/{name}", tags=["Games"], response_model=schemas.Game)
-# @version(1)
-# async def get_game_by_name(name: str, db: Session = Depends(get_db)):
-#     """
-#     Get game from DB by name
-#     """
-#     game_db = games.get_game_by_name(db, name)
-#     if game_db is None:
-#         raise HTTPException(status_code=404, detail="Game not exists")
-#     return game_db
-
-
-@router.get("/rawg/{name}")
-@version(1)
-async def get_game_rawg_by_name(name: str, db: Session = Depends(get_db)):
-    """_summary_
-
-    Args:
-        name (str): _description_
-        db (Session, optional): _description_. Defaults to Depends(get_db).
-
-    Returns:
-        _type_: _description_
-    """
-    game_info = await utils.get_game_info(name)
-    return game_info
-
-
 @router.post("/", response_model=schemas.Game, status_code=201)
 @version(1)
 async def create_game(game: schemas.NewGame, db: Session = Depends(get_db)):
@@ -148,41 +119,3 @@ async def update_game(
     if game_db is None:
         raise HTTPException(status_code=404, detail="Game not exists")
     return games.update_game(db=db, game_id=game_id, game=game)
-
-
-@router.get("/recommendations/{user_id}")
-@version(1)
-async def get_recommendations(
-    user_id: int,
-    genres: str = None,
-    limit: int = None,
-    active_user: models.User = Depends(auth.get_current_active_user),
-    db: Session = Depends(get_db),
-):
-    """_summary_
-
-    Args:
-        name (str): _description_
-        db (Session, optional): _description_. Defaults to Depends(get_db).
-
-    Returns:
-        _type_: _description_
-    """
-    auth.ensure_self_or_admin(active_user, user_id=user_id)
-    genres_list = []
-    if genres is not None:
-        genres_list = genres.split(",")
-    recommended_games = games.recommended_games(
-        db, user_id, genres=genres_list, limit=limit
-    )
-    games_list = []
-    for rec_game in recommended_games:
-        game = {}
-        game["game_id"] = rec_game[0]
-        game["user_id"] = rec_game[1]
-        game["game_name"] = rec_game[2]
-        game["genres"] = rec_game[3]
-        game["user_name"] = rec_game[4]
-        games_list.append(game)
-
-    return {"num_games": len(games_list), "games": games_list}

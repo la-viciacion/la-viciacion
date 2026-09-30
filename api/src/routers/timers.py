@@ -20,7 +20,6 @@ from ..database.schemas import (
     ManualSessionCreate,
     NewGameUser,
     SessionUpdate,
-    TimerStats,
 )
 from ..utils import actions
 from ..utils import seasons
@@ -210,45 +209,6 @@ def get_grouped_timer_history(
         )
 
     return GameTimerGroupPage(groups=groups, total_games=total_games)
-
-
-def get_timer_stats(db: Session, user_id: int, game_id: Optional[str] = None) -> TimerStats:
-    query = db.query(GameTimer).filter(
-        GameTimer.user_id == user_id,
-        GameTimer.is_active == False
-    )
-    
-    if game_id:
-        query = query.filter(GameTimer.game_id == game_id)
-    
-    timers = query.all()
-    
-    if not timers:
-        return TimerStats(
-            user_id=user_id,
-            game_id=game_id,
-            total_time_seconds=0,
-            total_sessions=0,
-            average_session_duration=0.0,
-            longest_session_seconds=0,
-            shortest_session_seconds=0
-        )
-    
-    total_time = sum(t.duration_seconds or 0 for t in timers)
-    total_sessions = len(timers)
-    avg_duration = total_time / total_sessions if total_sessions > 0 else 0
-    longest = max(t.duration_seconds or 0 for t in timers)
-    shortest = min(t.duration_seconds or 0 for t in timers)
-    
-    return TimerStats(
-        user_id=user_id,
-        game_id=game_id,
-        total_time_seconds=total_time,
-        total_sessions=total_sessions,
-        average_session_duration=avg_duration,
-        longest_session_seconds=longest,
-        shortest_session_seconds=shortest
-    )
 
 
 # ── Manual sessions: enter, correct or remove a finished session ──────────
@@ -568,14 +528,3 @@ def get_game_platforms_endpoint(
     )
     return GamePlatformsResponse(has_history=has_history, platforms=platforms)
 
-
-@router.get("/stats/{user_id}", response_model=TimerStats)
-def get_timer_stats_endpoint(
-    user_id: int, 
-    game_id: Optional[str] = None,
-    current_user: User = Depends(auth.get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """Get timer statistics for a user, optionally filtered by game"""
-    auth.ensure_self_or_admin(current_user, user_id=user_id)
-    return get_timer_stats(db, user_id, game_id)

@@ -52,10 +52,6 @@ class ListLimitTests(unittest.TestCase):
             self.assertEqual(self.client.get("/timers/history/1", params={"limit": "500"}).status_code, 200)
         self.assertEqual(history.call_args.args[3], 500)
 
-    def test_the_games_limit_is_bounded_too(self):
-        for limit in ("0", "-5", "501"):
-            self.assertEqual(self.client.get("/users/ana/games", params={"limit": limit}).status_code, 422, limit)
-
 
 if __name__ == "__main__":
     unittest.main()

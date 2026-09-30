@@ -203,16 +203,6 @@ class GameTimerResponse(GameTimerBase):
         from_attributes = True
 
 
-class TimerStats(BaseModel):
-    user_id: int
-    game_id: str | None = None
-    total_time_seconds: int
-    total_sessions: int
-    average_session_duration: float
-    longest_session_seconds: int
-    shortest_session_seconds: int
-
-
 class GameTimerGroup(BaseModel):
     """All finished sessions of one game, collapsed into a single history row."""
 

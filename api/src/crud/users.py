@@ -746,63 +746,6 @@ async def _after_completion(db: Session, entry: models.UserGame, silent: bool):
     )
 
 
-async def complete_game(
-    db: Session,
-    user_id,
-    game_id,
-    completed_date: str = None,
-    season: int = None,
-    silent: bool = False,
-):
-    """Complete the pending entry of a game in a season (current by default)."""
-    season = seasons.or_current(season)
-    entry = (
-        db.query(models.UserGame)
-        .filter(
-            models.UserGame.user_id == user_id,
-            models.UserGame.game_id == game_id,
-            models.UserGame.season == season,
-            models.UserGame.completed != 1,
-        )
-        .order_by(models.UserGame.id)
-        .first()
-    )
-    if entry is None:
-        return get_game_by_id(db, user_id, game_id, season)
-    parsed = utils.convert_date_from_text(completed_date) if completed_date else None
-    return await complete_entry(db, entry, parsed, silent)
-
-
-async def rate_game(
-    db: Session,
-    user_id,
-    game_id,
-    score,
-    season: int = None,
-) -> models.UserGame:
-    season = seasons.or_current(season)
-    try:
-        stmt = (
-            update(models.UserGame)
-            .where(
-                models.UserGame.game_id == game_id,
-                models.UserGame.user_id == user_id,
-                models.UserGame.season == season,
-            )
-            .values(
-                score=score,
-            )
-        )
-        db.execute(stmt)
-        db.commit()
-        return get_game_by_id(db, user_id, game_id, season)
-
-    except Exception as e:
-        db.rollback()
-        logger.error("Error rating game: " + str(e))
-        raise e
-
-
 def get_streaks(db: Session, username: str):
     """Current and best streak of the running season, computed from the sessions."""
     from . import time_entries as time_entries_crud
