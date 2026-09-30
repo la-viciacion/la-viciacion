@@ -10,7 +10,7 @@ Telegram bot (bot) ── HTTP, superadmin token ────────┘   �
 
 - The **API is the only component that touches the DB** and holds all business rules.
 - The **front** is a static SPA served by nginx; nginx proxies `/api/` to `laviciacion-api:5000` (`front/nginx.conf`), so the browser only talks to one origin.
-- The **bot** is a read-only client: it logs in as the superadmin `admin` (password `GOD_ADMIN_PASS`) and uses generic endpoints (`/manage/...`, `/statistics/...`). It re-logs in on 401 and restarts itself when Telegram settings change in the API.
+- The **bot** is a read-only client (its one write is `/activate`, below): it logs in as the superadmin `admin` (password `GOD_ADMIN_PASS`) and uses generic endpoints (`/manage/...`, `/statistics/...`). It re-logs in on 401 and restarts itself when Telegram settings change in the API.
 - The API sends notifications to Telegram itself (through `utils/my_utils.py`, using the token stored in `app_settings`); the bot handles interactive commands.
 - All services share one `.env` (`env_file`); nothing secret is baked into images.
 
@@ -110,7 +110,9 @@ Page module contract (documented at the top of `main.js`): exports `active`, opt
 
 ## Bot (`bot/src/`)
 
-`app.py` wires handlers; `routes/` holds the conversation flows (`basic_routes`, `my_routes`, `ranking_routes`); `utils/config.py` is a singleton that logs in to the API, fetches Telegram settings (`GET /manage/settings/telegram`) and watches them every 60 s (exits to be restarted by Docker if they change); `utils/my_utils.py` wraps sending messages and API requests; `utils/messages.py` / `read_messages.py` hold texts.
+`app.py` wires handlers; `routes/` holds the conversation flows (`basic_routes`, `my_routes`, `ranking_routes`); `utils/config.py` is a singleton that logs in to the API, fetches Telegram settings (`GET /manage/settings/telegram`) and watches them every 60 s (exits to be restarted by Docker if they change); `utils/my_utils.py` wraps sending messages and API requests; `utils/messages.py` holds the texts.
+
+**Access control** (`utils/access.py` + `MyUtils.gate`, a `TypeHandler` in group -1 that runs before every handler): an update is served only if the chat is private or the group configured in the app (`telegram.group_id`) **and** the sender's Telegram id is the `telegram_id` of an active account (looked up with `GET /users/`). Identity is never the Telegram `@username`. Other groups and channels get no answer at all; handlers read the account from `context.user_data["app_user"]`. `/start` (a welcome that points to `/activate`) and `/activate` are the only commands for people not linked yet, and they work only inside the app's group; `/activate`: it links the sender's Telegram id to the account whose app username equals their Telegram `@username` (case-insensitively; the account must be active and have no id yet, an existing id is never overwritten, so changing one needs an admin) through `PATCH /manage/users/{id}`; afterwards the `@username` no longer matters. It is listed in the command menu only for the group (`set_my_commands` with a chat scope); the gate is what enforces it.
 
 ## External services
 

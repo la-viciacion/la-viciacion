@@ -12,7 +12,7 @@ Four services, one `docker-compose.yml`:
 |---|---|---|---|
 | `laviciacion-api` | `api/` | Python 3.13, FastAPI, SQLAlchemy 2, Alembic, MariaDB | Source of truth: REST API, business logic, in-process scheduler |
 | `laviciacion-front` | `front/` | Vanilla JS (ES modules), no framework, no build step, nginx | PWA; nginx also proxies `/api` to the API |
-| `laviciacion-bot` | `bot/` | Python 3.11, python-telegram-bot | **Read-only** Telegram bot; talks to the API as superadmin |
+| `laviciacion-bot` | `bot/` | Python 3.11, python-telegram-bot | Telegram bot, read-only except `/activate`; talks to the API as superadmin |
 | `laviciacion-db` | `db/` | MariaDB | Data in `db/data/` (gitignored) |
 
 ## Documentation map
@@ -30,7 +30,7 @@ Four services, one `docker-compose.yml`:
 1. **Migrations are the most delicate part of the project; read [docs/migrations.md](docs/migrations.md) before touching anything Alembic-related.** Schema changes go through an Alembic migration (`api/alembic/versions/`), never `create_all` or manual DB edits. Applied migrations are immutable (fix forward), history stays linear with a single head, revision ids are `NNN_name` of at most 32 chars, migrations are idempotent and refuse to run on inconsistent data instead of rewriting it, and no agent applies a migration to real data (`db/data/`, production) without explicit user approval.
 2. **Do not store what can be derived.** Totals, rankings, streaks and the time of a library entry are computed from `game_timers` when requested; never add a table or column that caches them. **`season` is never written.** It is a generated column derived from the row's date. To move a row to another season, change its date. The running season comes only from `api/src/utils/seasons.py`.
 3. **Authorization lives in the API** (`api/tests/test_endpoint_security.py` enforces it: the public endpoints are a fixed list; do not add one without updating it on purpose), never only in the front. Every route needs `get_current_active_user`; admin routes use `require_admin`; per-user data uses `ensure_self_or_admin`.
-4. **The bot is read-only.** It must only call generic endpoints; no write logic, no direct DB access.
+4. **The bot is read-only, with one deliberate exception: `/activate`**, which sets the sender's own `telegram_id` (via `PATCH /manage/users/{id}`, only from the app's group, never overwriting an existing id). Any other write is a design decision. It must only call generic endpoints; no other write logic, no direct DB access.
 5. **Never commit secrets or data**: `.env`, DB dumps, `db/data/`, `db/init/*` (except `.gitkeep`) are gitignored. Only `.env.template` is tracked. Add new env vars to `.env.template` (with a placeholder) and to `api/src/config.py` / `bot/src/utils/config.py`.
 6. **Front output is escaped by construction**: build markup with the `html` tagged template (`front/js/lib/html.js`), never assign strings to `innerHTML`.
 7. **Telegram settings are runtime data** (table `app_settings`, edited from the admin panel), not `.env`. `.env` only seeds them once.

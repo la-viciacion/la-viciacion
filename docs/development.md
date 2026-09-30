@@ -43,7 +43,7 @@ npm run lint      # ESLint
 npm run dev       # static server on :3000 (API must be reachable at /api)
 ```
 
-Run the API tests with the venv, not the global Python: `test_migrations.py` needs `alembic` and the other pinned dependencies. There is no test suite for the bot. API tests cover pure logic (`scheduler`, `settings`, `my_utils`), the static integrity of the Alembic history, and queries against an in-memory SQLite database (`tests/sqlite_db.py`, which registers `YEAR()` for the generated `season` columns); anything MariaDB-specific still needs a real database. Front tests cover `js/lib` and `pages/home/sessions`. Prefer extracting pure functions so new logic can be tested the same way (see [roadmap](roadmap.md) for planned integration tests).
+Run the API tests with the venv, not the global Python: `test_migrations.py` needs `alembic` and the other pinned dependencies. The bot's access rules have unit tests (`cd bot && python -m unittest discover -s tests -t .`); the rest of the bot is untested. API tests cover pure logic (`scheduler`, `settings`, `my_utils`), the static integrity of the Alembic history, and queries against an in-memory SQLite database (`tests/sqlite_db.py`, which registers `YEAR()` for the generated `season` columns); anything MariaDB-specific still needs a real database. Front tests cover `js/lib` and `pages/home/sessions`. Prefer extracting pure functions so new logic can be tested the same way (see [roadmap](roadmap.md) for planned integration tests).
 
 ## Database and migrations
 

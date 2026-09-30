@@ -17,7 +17,7 @@ Until then: work on the current branch, small commits, no tags or releases.
 
 - No DB-backed API tests: add integration tests against a throwaway MariaDB (migrations from empty and from previous revision, timers/manual-session rules, authorization). Today only the static integrity of the Alembic history is tested automatically; the DB-backed steps of the [migrations checklist](migrations.md#verification-checklist-all-mandatory-before-considering-a-migration-done) are manual.
 - **MariaDB version policy:** the compose file does not pin the image (`image: mariadb`), so it drifts to the latest major. 12+ breaks table rebuilds on a Windows bind mount (worked around with `DB_DATA`, see [deployment.md](deployment.md#mariadb-version)). The Linux server runs latest with a bind mount and works (2026-09-30), so the open point is only whether to pin a version to avoid surprise major upgrades of a database that has data.
-- The bot has no tests.
+- The bot only tests its access rules (`bot/tests/test_access.py`); the handlers have no tests.
 - A new deployment ends with empty `_archived_*` tables (migration 005 renames the v1 `*_historical` tables that 000 had to create). Harmless; a migration that drops the archives that are empty would tidy it up.
 - `utils/email.py` is kept for the upcoming e-mail features; nothing calls it yet.
 - `crud/users.py` (~1300 lines) and `utils/actions.py` are large; split by responsibility when touched.

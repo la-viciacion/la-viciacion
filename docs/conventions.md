@@ -34,7 +34,7 @@
 
 ## Bot
 
-Read-only, generic endpoints only. Texts live in `bot/src/utils/messages.py`. Handle the API being down or the token expiring (`Config.request` already retries on 401). Any new write capability is a design decision, not an implementation detail.
+Read-only (except `/activate`, see architecture), generic endpoints only. Texts live in `bot/src/utils/messages.py`. Handle the API being down or the token expiring (`Config.request` already retries on 401). Any new write capability is a design decision, not an implementation detail.
 
 ## Database and migrations
 
