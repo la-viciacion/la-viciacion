@@ -22,6 +22,7 @@ from ..auth import get_db
 from ..crud import users as users_crud
 from ..database import models
 from ..utils import actions, my_utils, push, rawg_sync, seasons, settings
+from ..utils import email as mail
 from ..database.schemas import NOTES_MAX
 from ..utils.logger import LogManager
 from ..utils.my_utils import normalize_email, validate_email_format, validate_password_requirements, validate_username
@@ -926,14 +927,16 @@ def revoke_user_achievement(award_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/settings")
-def get_settings(db: Session = Depends(get_db)):
+def get_settings(admin: models.User = Depends(auth.require_admin), db: Session = Depends(get_db)):
     """Settings for the admin panel (the Telegram token is never returned, only whether it is set)."""
     jobs = {j.job: {"last_run_at": j.last_run_at, "last_status": j.last_status} for j in db.query(models.JobRun).all()}
     push_devices = {
         "devices": db.query(func.count(models.PushSubscription.id)).scalar(),
         "users": db.query(func.count(func.distinct(models.PushSubscription.user_id))).scalar(),
     }
-    return {"values": settings.public_view(db), "jobs": jobs, "push_devices": push_devices}
+    # mail comes from the environment, not from app_settings: shown read-only, with where a test goes
+    mail_info = {**mail.status(), "test_recipient": admin.email}
+    return {"values": settings.public_view(db), "jobs": jobs, "push_devices": push_devices, "mail": mail_info}
 
 
 class SettingsBody(BaseModel):
@@ -1045,3 +1048,20 @@ async def send_test_message(admin: models.User = Depends(auth.require_admin)):
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Telegram no lo ha aceptado: {e}")
     return {"message": "Mensaje enviado"}
+
+
+@router.post("/settings/test-email")
+def send_test_email(admin: models.User = Depends(auth.require_admin)):
+    """Send a diagnostic email to the email of the admin who asks (blocking SMTP: a plain def, so it
+    runs in a worker thread). Tells why when it cannot."""
+    missing = mail.missing_settings()
+    if missing:
+        raise HTTPException(status_code=409, detail="El correo no está configurado: faltan " + ", ".join(missing) + " en el .env")
+    if not admin.email:
+        raise HTTPException(status_code=400, detail="Tu cuenta no tiene email: añádelo en Usuarios → Editar")
+    try:
+        mail.send_test_email(admin.email, admin.username)
+    except Exception as e:
+        logger.error(f"Test email failed: {e}")
+        raise HTTPException(status_code=502, detail=f"El servidor de correo no lo ha aceptado: {e}")
+    return {"message": f"Correo de prueba enviado a {admin.email}"}

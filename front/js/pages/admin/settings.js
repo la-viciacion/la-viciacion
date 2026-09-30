@@ -21,7 +21,12 @@ function lastRun(job) {
   return `Último envío: ${formatDateTime(job.last_run_at)}${job.last_status ? ` (${job.last_status})` : ''}.`;
 }
 
-function view(values, jobs, pushDevices) {
+function mailStatus(mail) {
+  if (!mail.configured) return `Sin configurar: faltan ${mail.missing.join(', ')} en el .env.`;
+  return `Configurado: envía como ${mail.from} por ${mail.host}:${mail.port} (${mail.security}); los enlaces apuntan a ${mail.public_url}.`;
+}
+
+function view(values, jobs, pushDevices, mail) {
   const token = values['telegram.token'];
   const vapid = values['push.vapid_private'];
   return html`
@@ -60,12 +65,20 @@ function view(values, jobs, pushDevices) {
         <h3>Avisos en la app (push)</h3>
         ${check('push.enabled', 'Enviar avisos a la app instalada', 'Función activa para todos por defecto; nadie recibe nada hasta que cada usuario lo active en su perfil («Avisos en la app») y elija en qué dispositivos. Los avisos del grupo llegan a quien los marque y los privados (timer olvidado…) solo a su usuario. Necesita las notificaciones activadas y HTTPS.')}
         <label>Contacto para los servicios push
-          <input class="adm-input" type="text" name="push.contact" placeholder="mailto:tu@correo.com (vacío: usa el correo SMTP)" />
+          <input class="adm-input" type="text" name="push.contact" placeholder="mailto:tu@correo.com (vacío: usa el remitente del correo o la dirección pública)" />
         </label>
         <div class="adm-sub">${vapid.is_set ? 'Las claves del servidor se crearon solas al arrancar; son las mismas para todos los usuarios.' : 'Sin claves (se crean al arrancar la API).'}</div>
         <div class="adm-sub">${pushDevices.devices} dispositivo${pushDevices.devices === 1 ? '' : 's'} suscrito${pushDevices.devices === 1 ? '' : 's'} (${pushDevices.users} usuario${pushDevices.users === 1 ? '' : 's'}).</div>
         <div class="adm-sub">Para redactar y enviar avisos (o probarlos en tus dispositivos) usa la pestaña <strong>Avisos</strong>.</div>
         <div><button type="button" class="adm-btn" data-set-act="push-keys">Regenerar claves…</button></div>
+      </section>
+
+      <section class="adm-set-card">
+        <h3>Correo (recuperar contraseña)</h3>
+        <div class="adm-sub">${mailStatus(mail)}</div>
+        <div class="adm-sub">Se configura en el <code>.env</code> (<code>PUBLIC_URL</code>, <code>SMTP_*</code>) y se aplica al reiniciar la API. El inicio de sesión ofrece «¿Has olvidado tu contraseña?» y este correo es el que lleva el enlace.</div>
+        <div class="adm-sub">${mail.test_recipient ? `La prueba se envía a tu email: ${mail.test_recipient}.` : 'Tu cuenta no tiene email: añádelo en Usuarios → Editar para poder recibir la prueba.'}</div>
+        <div><button type="button" class="adm-btn" data-set-act="test-email" ${mail.configured && mail.test_recipient ? '' : html`disabled`}>Enviar correo de prueba a mi cuenta</button></div>
       </section>
 
       <div class="adm-error" role="alert"></div>
@@ -123,6 +136,17 @@ async function sendTest() {
   }
 }
 
+async function sendTestEmail(mail) {
+  const ok = await confirmDialog('Correo de prueba', html`<p>Se enviará un correo de prueba a <strong>${mail.test_recipient}</strong> desde ${mail.from}.</p>`, { ok: 'Enviar' });
+  if (!ok) return;
+  try {
+    const result = await api('/manage/settings/test-email', { method: 'POST' });
+    toast(result.message);
+  } catch (err) {
+    toast(err.message, 'err');
+  }
+}
+
 async function generateKeys(replace) {
   if (replace) {
     const ok = await confirmDialog('Regenerar claves', html`<p>Todos los dispositivos suscritos dejarán de recibir avisos y cada usuario tendrá que volver a activarlos.</p>`, { danger: true, ok: 'Regenerar' });
@@ -140,16 +164,17 @@ async function generateKeys(replace) {
 export async function render(target) {
   panel = target;
   try {
-    const { values, jobs, push_devices: pushDevices } = await api('/manage/settings');
+    const { values, jobs, push_devices: pushDevices, mail } = await api('/manage/settings');
     loaded = Object.fromEntries(Object.entries(values).filter(([key]) => key !== 'telegram.token' && !key.startsWith('push.vapid')));
     loaded['telegram.token'] = null;
-    mount(panel, view(values, jobs, pushDevices));
+    mount(panel, view(values, jobs, pushDevices, mail));
     const form = panel.querySelector('#admSettings');
     fill(form, values);
     form.addEventListener('submit', (e) => { e.preventDefault(); save(form); });
     form.addEventListener('click', (e) => {
       const act = e.target.closest('[data-set-act]')?.dataset.setAct;
       if (act === 'test') sendTest();
+      else if (act === 'test-email') sendTestEmail(mail);
       else if (act === 'push-keys') generateKeys(values['push.vapid_private'].is_set);
     });
   } catch (err) {
