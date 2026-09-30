@@ -27,7 +27,7 @@ function navbar(user, avatarUrl, active) {
             : html`<div class="navbar-avatar navbar-avatar-placeholder" aria-hidden="true">${initial}</div>`}
           <span class="navbar-username">${user.name || user.username}</span>
         </a>
-        <button class="btn-logout" id="logoutBtn" aria-label="Cerrar sesión">${iconLogout()} Salir</button>
+        <button class="btn-logout" id="logoutBtn" type="button" aria-label="Cerrar sesión" title="Cerrar sesión">${iconLogout()}</button>
       </div>
     </nav>`;
 }

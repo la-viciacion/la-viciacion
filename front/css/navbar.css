@@ -48,30 +48,37 @@
 .navbar-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 6px;
 }
 
+/* icon-only, red: it is the one destructive action of the bar */
 .btn-logout {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
-  color: var(--text-secondary);
-  font-family: var(--font);
-  font-size: 0.85rem;
-  font-weight: 500;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  margin-left: 6px;
+  padding: 0;
+  background: rgba(239,68,68,0.1);
+  border: 1px solid rgba(239,68,68,0.28);
+  border-radius: 50%;
+  color: #f87171;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background 0.2s, border-color 0.2s, color 0.2s, transform 0.2s;
 }
 
 .btn-logout:hover {
-  background: rgba(239,68,68,0.1);
-  border-color: rgba(239,68,68,0.3);
-  color: #f87171;
+  background: rgba(239,68,68,0.22);
+  border-color: rgba(239,68,68,0.55);
+  color: #fca5a5;
 }
+
+.btn-logout:active { transform: scale(0.94); }
+
+.btn-logout:focus-visible { outline: 2px solid #f87171; outline-offset: 2px; }
+
+.btn-logout svg { width: 17px; height: 17px; }
 
 .home-main {
   max-width: 1100px;
@@ -89,23 +96,36 @@
 }
 
 @media (max-width: 640px) {
-  .navbar { padding: 0 16px; }
+  .navbar { padding: 0 12px; }
+  .navbar-actions { gap: 2px; }
+  .navbar-link { padding: 8px 10px; font-size: 0.85rem; }
+  .navbar-username { display: none; } /* the avatar is enough on a phone */
+  .navbar-user { padding: 3px; }
   .home-main { padding: 24px 16px 60px; }
+}
+
+@media (max-width: 400px) {
+  .navbar-brand { font-size: 0; gap: 0; } /* keep only the logo */
 }
 
 .navbar-link {
   color: var(--text-secondary); text-decoration: none; font-weight: 600; font-size: 0.9rem;
-  padding: 6px 12px; border-radius: var(--radius-sm); transition: all 0.2s ease;
+  padding: 8px 14px; border-radius: var(--radius-pill); transition: all 0.2s ease;
 }
 
 .navbar-link:hover { color: var(--text-primary); background: var(--bg-card-hover); }
 
-.navbar-link.active { color: var(--accent-teal); }
+.navbar-link.active { color: var(--accent-teal); background: rgba(61,217,179,0.12); }
 
 .admin-main { max-width: 1200px; }
 
-.navbar-user { text-decoration: none; padding: 4px 8px; border-radius: var(--radius-pill); }
+.navbar-user {
+  text-decoration: none; padding: 4px 12px 4px 5px; border-radius: var(--radius-pill);
+  border: 1px solid var(--border); background: rgba(255,255,255,0.03); transition: all 0.2s ease;
+}
 
 .navbar-user:hover, .navbar-user.active { background: var(--bg-card-hover); color: var(--text-primary); }
+
+.navbar-user.active { border-color: var(--border-accent); }
 
 .profile-main { max-width: 900px; }
