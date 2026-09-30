@@ -386,11 +386,8 @@ class Achievements:
         await self._unlock_reached(db, user, streak, STREAKS, silent, date_for=lambda needed: date)
 
     async def teamwork(self, db: Session, silent: bool):
-        playing: List[models.User] = [
-            user
-            for user in users.get_users(db)
-            if time_entries.get_active_game_timer_by_user(db, user.id) is not None
-        ]
+        active = time_entries.active_timer_user_ids(db)
+        playing: List[models.User] = [user for user in users.get_users(db) if user.id in active]
         if len(playing) < 4:
             return
         logger.info("4 or more users are playing!")

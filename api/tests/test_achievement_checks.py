@@ -123,6 +123,26 @@ class AchievementCheckTests(unittest.IsolatedAsyncioTestCase):
             await self.ach.user_played_games_per_day(self.db, USER)
         self.assertEqual(self.sent.await_count, 2)
 
+    async def test_teamwork_needs_four_players_with_a_running_timer(self):
+        for i in range(2, 6):
+            self.db.add(models.User(id=i, name=f"P{i}", username=f"p{i}", is_active=1))
+            self.db.add(models.GameTimer(user_id=i, game_id="g1", start_time=datetime.datetime(YEAR, 3, 1, 10), is_active=True))
+        self.db.add(models.User(id=1, name="Ana", username="ana", is_active=1))
+        self.db.commit()
+        with mock.patch.object(ach_module.time_entries, "active_timer_user_ids", wraps=ach_module.time_entries.active_timer_user_ids) as ids:
+            await self.ach.teamwork(self.db, silent=False)
+        ids.assert_called_once()  # one query for everybody, not one per user
+        self.assertEqual({k for k in self.awarded()}, {"TEAMWORK"})
+        self.assertIn("P2", self.message())
+
+    async def test_three_players_are_not_a_team(self):
+        for i in range(2, 5):
+            self.db.add(models.User(id=i, name=f"P{i}", username=f"p{i}", is_active=1))
+            self.db.add(models.GameTimer(user_id=i, game_id="g1", start_time=datetime.datetime(YEAR, 3, 1, 10), is_active=True))
+        self.db.commit()
+        await self.ach.teamwork(self.db, silent=False)
+        self.assertEqual(self.awarded(), {})
+
 
 class QueryEconomyTests(unittest.IsolatedAsyncioTestCase):
     async def test_a_check_costs_one_query_per_group_not_one_per_threshold(self):

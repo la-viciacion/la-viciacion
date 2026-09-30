@@ -368,6 +368,12 @@ def get_time_entry_between_hours(
     return entries
 
 
+def active_timer_user_ids(db: Session) -> set[int]:
+    """Ids of the users that have a timer running right now: one query for everybody."""
+    rows = db.query(models.GameTimer.user_id).filter(models.GameTimer.is_active == True).distinct().all()  # noqa: E712
+    return {user_id for (user_id,) in rows}
+
+
 def get_active_game_timer_by_user(db: Session, user_id: int) -> models.GameTimer:
     return (
         db.query(models.GameTimer)

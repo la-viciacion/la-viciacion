@@ -39,7 +39,12 @@ Utils worth knowing: `seasons.py` (single source of the season concept), `action
 
 ### Sync vs async
 
-Routes and helpers are a mix of `def` and `async def`; the DB layer is synchronous SQLAlchemy. Do not introduce async DB drivers. Long/background work uses `BackgroundTasks` (see `manage.py` check-achievements and RAWG sync) or the scheduler thread.
+The DB layer is synchronous SQLAlchemy (do not introduce async DB drivers), so the rule is about where blocking code runs:
+
+- **Routes are plain `def`.** FastAPI runs them in a worker thread (40 by default) and the connection pool covers them (`database.py`: 30 + 30 overflow). Anything that blocks (queries, bcrypt at login, image decoding for avatars) is fine there and nowhere else: a login or an avatar upload on the event loop froze every other request (measured: a `GET /keepalive` took 372 ms, up to 2 s, while six logins ran).
+- **`async def` only when the route awaits the network** (RAWG search, creating a game, Telegram/push from the admin panel). Their database work goes through `run_in_threadpool`. `tests/test_async_discipline.py` fails any router `async def` that never awaits, and pins the list of allowed ones.
+- **Slow follow-ups never run in the request.** Announcements, achievements, the effects of completing a game (HLTB, OpenAI, Telegram) are `BackgroundTasks` entrypoints in `utils/actions.py` (`after_timer_start`, `after_session_change`, `after_completion`): plain `def`s that open their own DB session and run their own event loop, serialized by `_check_lock`. The scheduler is a thread that does the same.
+- Notification helpers (`utils/my_utils.py`, `utils/push.py`) are async, never raise, and offload blocking clients (`asyncio.to_thread`).
 
 ## Data model (`database/models.py`)
 
