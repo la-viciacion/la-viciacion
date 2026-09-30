@@ -16,7 +16,7 @@ export const adminOnly = true;
 
 const PAGE = 25;
 
-const state = Object.fromEntries(TABS.map((t) => [t, { filters: {}, search: '', offset: 0, data: null }]));
+const state = Object.fromEntries(TABS.map((t) => [t, { filters: {}, search: '', offset: 0, data: null, sort: ENTITIES[t].defaultSort ? { ...ENTITIES[t].defaultSort } : null }]));
 let root;
 let current = 'users';
 let searchTimer;
@@ -96,6 +96,11 @@ function queryFor(entity, st) {
   if (entity.filters?.includes('user') && f.user_id) params.set('user_id', f.user_id);
   if (entity.filters?.includes('game') && f.game_id) params.set('game_id', f.game_id);
   if (entity.filters?.includes('active') && f.active) params.set('active', 'true');
+  for (const select of entity.selects || []) if (f[select.key]) params.set(select.key, f[select.key]);
+  if (st.sort) {
+    params.set('sort', st.sort.key);
+    params.set('order', st.sort.dir);
+  }
   return params;
 }
 
@@ -140,6 +145,10 @@ function toolbarView(entity, st) {
           : html`<button class="adm-btn" data-act="filter-game">Filtrar por juego…</button>`)
         : ''}
       ${entity.filters?.includes('active') ? html`<label class="adm-check"><input type="checkbox" id="admFilterActive" ${f.active ? html`checked` : ''} /> Solo en curso</label>` : ''}
+      ${(entity.selects || []).map((s) => html`
+        <select class="adm-input" data-filter="${s.key}" aria-label="${s.label}">
+          ${s.options.map(([value, label]) => html`<option value="${value}" ${(f[s.key] || '') === value ? html`selected` : ''}>${label}</option>`)}
+        </select>`)}
       <span class="adm-spacer"></span>
       ${(entity.toolbarActions || []).map((a) => html`<button class="adm-btn" data-act="${a.act}">${a.label}</button>`)}
       ${entity.createFields ? html`<button class="adm-btn primary" data-act="create">+ ${entity.createLabel}</button>` : ''}
@@ -164,6 +173,14 @@ function rowView(entity, r, i) {
     </tr>`;
 }
 
+function headerView(column, st) {
+  if (!column.sort) return html`<th>${column.label}</th>`;
+  const on = st.sort?.key === column.sort;
+  const arrow = on ? (st.sort.dir === 'asc' ? ' ▲' : ' ▼') : '';
+  const ariaSort = on ? (st.sort.dir === 'asc' ? 'ascending' : 'descending') : 'none';
+  return html`<th aria-sort="${ariaSort}"><button class="adm-sort" data-act="sort" data-key="${column.sort}">${column.label}${arrow}</button></th>`;
+}
+
 function panelView(entity, st, loading) {
   const toolbar = toolbarView(entity, st);
   if (loading || !st.data) return html`${toolbar}<div class="loading-spinner">Cargando...</div>`;
@@ -182,7 +199,7 @@ function panelView(entity, st, loading) {
   return html`${toolbar}
     <div class="adm-table-wrap">
       <table class="adm-table">
-        <thead><tr>${entity.columns.map((c) => html`<th>${c.label}</th>`)}<th></th></tr></thead>
+        <thead><tr>${entity.columns.map((c) => headerView(c, st))}<th></th></tr></thead>
         <tbody>${items.map((r, i) => rowView(entity, r, i))}</tbody>
       </table>
     </div>${pager}`;
@@ -205,6 +222,8 @@ function onChange(e) {
     st.filters.user_id = e.target.value || undefined;
   } else if (e.target.id === 'admFilterActive') {
     st.filters.active = e.target.checked || undefined;
+  } else if (e.target.dataset.filter) {
+    st.filters[e.target.dataset.filter] = e.target.value || undefined;
   } else {
     return;
   }
@@ -223,6 +242,12 @@ async function onClick(e) {
   const row = button.dataset.i != null ? st.data?.items?.[Number(button.dataset.i)] : null;
   try {
     switch (button.dataset.act) {
+      case 'sort': {
+        const key = button.dataset.key;
+        st.sort = { key, dir: st.sort?.key === key && st.sort.dir === 'asc' ? 'desc' : 'asc' };
+        st.offset = 0;
+        return load();
+      }
       case 'prev': st.offset = Math.max(0, st.offset - PAGE); return load();
       case 'next': st.offset += PAGE; return load();
       case 'recompute': return recomputeDialog();

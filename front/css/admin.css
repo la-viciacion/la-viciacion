@@ -27,6 +27,8 @@
 
 .adm-spacer { flex: 1; }
 
+.adm-sort { background: none; border: 0; padding: 0; font: inherit; color: inherit; cursor: pointer; white-space: nowrap; }
+.adm-sort:hover { color: var(--accent-teal); }
 .adm-input {
   background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm);
   color: var(--text-primary); font: inherit; font-size: 0.9rem; padding: 9px 12px; min-width: 0;

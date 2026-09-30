@@ -319,29 +319,48 @@ def _game_out(g: models.Game, sessions: int = 0, players: int = 0) -> dict:
 @router.get("/games")
 def list_games(
     search: Optional[str] = None,
+    rawg: Optional[str] = Query(None, pattern="^(linked|unlinked)$"),
+    image: Optional[str] = Query(None, pattern="^(with|without)$"),
+    usage: Optional[str] = Query(None, pattern="^(used|unused)$"),
+    sort: str = Query("name", pattern="^(name|release_date|sessions|players)$"),
+    order: str = Query("asc", pattern="^(asc|desc)$"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
-    q = db.query(models.Game)
+    """Games with their usage. Filters: linked to RAWG, has a cover, used (has sessions or players)."""
+    session_counts = (
+        db.query(models.GameTimer.game_id.label("gid"), func.count(models.GameTimer.id).label("n"))
+        .group_by(models.GameTimer.game_id)
+        .subquery()
+    )
+    player_counts = (
+        db.query(models.UserGame.game_id.label("gid"), func.count(func.distinct(models.UserGame.user_id)).label("n"))
+        .group_by(models.UserGame.game_id)
+        .subquery()
+    )
+    sessions = func.coalesce(session_counts.c.n, 0)
+    players = func.coalesce(player_counts.c.n, 0)
+    q = (
+        db.query(models.Game, sessions.label("sessions"), players.label("players"))
+        .outerjoin(session_counts, session_counts.c.gid == models.Game.id)
+        .outerjoin(player_counts, player_counts.c.gid == models.Game.id)
+    )
     if search:
         q = q.filter(models.Game.name.like(_like(search)))
+    if rawg:
+        q = q.filter(models.Game.rawg_id.isnot(None) if rawg == "linked" else models.Game.rawg_id.is_(None))
+    if image:
+        has_image = (models.Game.image_url.isnot(None)) & (models.Game.image_url != "")
+        q = q.filter(has_image if image == "with" else ~has_image)
+    if usage:
+        in_use = (sessions > 0) | (players > 0)
+        q = q.filter(in_use if usage == "used" else ~in_use)
     total = q.count()
-    games = q.order_by(models.Game.name).limit(limit).offset(offset).all()
-    ids = [g.id for g in games]
-    sessions = dict(
-        db.query(models.GameTimer.game_id, func.count(models.GameTimer.id))
-        .filter(models.GameTimer.game_id.in_(ids))
-        .group_by(models.GameTimer.game_id)
-        .all()
-    )
-    players = dict(
-        db.query(models.UserGame.game_id, func.count(func.distinct(models.UserGame.user_id)))
-        .filter(models.UserGame.game_id.in_(ids))
-        .group_by(models.UserGame.game_id)
-        .all()
-    )
-    return {"total": total, "items": [_game_out(g, sessions.get(g.id, 0), players.get(g.id, 0)) for g in games]}
+    column = {"name": models.Game.name, "release_date": models.Game.release_date, "sessions": sessions, "players": players}[sort]
+    direction = column.desc() if order == "desc" else column.asc()
+    rows = q.order_by(direction, models.Game.name, models.Game.id).limit(limit).offset(offset).all()
+    return {"total": total, "items": [_game_out(g, s, p) for g, s, p in rows]}
 
 
 @router.patch("/games/{game_id}")

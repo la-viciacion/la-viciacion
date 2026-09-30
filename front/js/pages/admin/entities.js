@@ -2,8 +2,10 @@
 // index.js renders the toolbar, table, pager, forms and delete flow from this.
 //
 // Entity: { label, endpoint, search?, filters?, columns, fields, createFields?,
-//           createLabel?, name(row), actions?, toolbarActions?, canDelete, deleteLabel?, deleteNote? }
-// Column: { label, render(row) -> html``, filter?(row) -> filters to apply on click }
+//           createLabel?, name(row), actions?, toolbarActions?, canDelete, deleteLabel?, deleteNote?,
+//           selects?, defaultSort? }
+// Column: { label, render(row) -> html``, filter?(row) -> filters to apply on click, sort? (API sort key) }
+// Select: { key, label, options: [[value, label], ...] }   sent to the API as ?key=value
 // Action: { label, show?(row), run(row, admin) }   admin = { jumpTo, reload }
 import { formatDuration, formatTimestamp } from '../../lib/format.js';
 import { html } from '../../lib/html.js';
@@ -62,17 +64,25 @@ export const ENTITIES = {
     label: 'Juegos',
     endpoint: '/manage/games',
     search: true,
+    defaultSort: { key: 'name', dir: 'asc' },
+    selects: [
+      { key: 'usage', label: 'Uso', options: [['', 'Uso: todos'], ['used', 'Con sesiones o jugadores'], ['unused', 'Sin uso']] },
+      { key: 'rawg', label: 'RAWG', options: [['', 'RAWG: todos'], ['linked', 'Enlazados a RAWG'], ['unlinked', 'Sin enlazar']] },
+      { key: 'image', label: 'Imagen', options: [['', 'Imagen: todas'], ['with', 'Con imagen'], ['without', 'Sin imagen']] },
+    ],
     columns: [
       {
         label: 'Juego',
+        sort: 'name',
         render: (r) => html`<div class="adm-game">
           ${r.image_url ? html`<img src="${r.image_url}" alt="" loading="lazy" />` : html`<span>🎮</span>`}
           <div><strong>${r.name}</strong><div class="adm-sub">${r.dev || ''}</div></div>
         </div>`,
       },
       { label: 'Géneros', render: (r) => r.genres || '—' },
-      { label: 'Sesiones', render: (r) => r.sessions },
-      { label: 'Jugadores', render: (r) => r.players },
+      { label: 'Lanzamiento', sort: 'release_date', render: (r) => r.release_date || '—' },
+      { label: 'Sesiones', sort: 'sessions', render: (r) => r.sessions },
+      { label: 'Jugadores', sort: 'players', render: (r) => r.players },
     ],
     fields: [
       { key: 'name', label: 'Nombre', type: 'text', required: true },
