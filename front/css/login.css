@@ -199,3 +199,37 @@
 @media (max-width: 640px) {
   .login-card { padding: 36px 24px; }
 }
+
+/* Password recovery */
+.login-link {
+  display: block;
+  margin: 18px auto 0;
+  background: none;
+  border: 0;
+  color: var(--text-secondary);
+  font-family: var(--font);
+  font-size: 0.85rem;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.login-link:hover { color: var(--accent-teal); }
+
+.login-hint {
+  margin: -4px 0 14px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.login-info {
+  display: none;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(61,217,179,0.35);
+  background: rgba(61,217,179,0.08);
+  color: var(--text-primary);
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+.login-info.visible { display: block; animation: fadeIn 0.3s ease; }

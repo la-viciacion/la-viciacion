@@ -8,8 +8,10 @@
 //                                       once the user navigated elsewhere
 //   dispose()   optional cleanup when leaving the page
 import { api, loadAvatarUrl, session, setUnauthorizedHandler } from './lib/api.js';
+import { RESET_ROUTE, isResetRoute, resetTokenFromHash } from './lib/recovery.js';
 import * as home from './pages/home/index.js';
 import { showLogin } from './pages/login.js';
+import { showForgotPassword, showResetPassword } from './pages/recover.js';
 import { renderShell, showLoading } from './ui/layout.js';
 import { inviteToPush } from './ui/push-invite.js';
 
@@ -34,10 +36,24 @@ function logout() {
   showLogin(route);
 }
 
+// The link of the recovery email works with or without a session. The token is read once and taken
+// out of the address bar, so it does not stay in the history.
+function showRecovery() {
+  const token = resetTokenFromHash(location.hash);
+  history.replaceState(null, '', location.pathname + RESET_ROUTE);
+  const leave = () => {
+    history.replaceState(null, '', location.pathname);
+    route();
+  };
+  showResetPassword(token, leave, () => showForgotPassword(leave));
+}
+
 async function route() {
   const id = ++navigation;
   const isCurrent = () => id === navigation;
   leaveCurrentPage();
+
+  if (isResetRoute(location.hash)) return showRecovery();
 
   if (!session.getToken()) return showLogin(route);
   showLoading();
@@ -74,7 +90,7 @@ setUnauthorizedHandler(() => {
 });
 
 window.addEventListener('hashchange', () => {
-  if (session.getToken()) route();
+  if (session.getToken() || isResetRoute(location.hash)) route();
 });
 
 if ('serviceWorker' in navigator) {

@@ -2,6 +2,7 @@
 import { login } from '../lib/api.js';
 import { html, mount } from '../lib/html.js';
 import { iconEye, iconEyeOff, iconLock, iconUser } from '../ui/icons.js';
+import { showForgotPassword } from './recover.js';
 
 /** Render the login form; onSuccess runs once the token is stored. */
 export function showLogin(onSuccess) {
@@ -39,6 +40,7 @@ export function showLogin(onSuccess) {
             <div class="btn-spinner"></div>
           </button>
         </form>
+        <button type="button" class="login-link" id="forgotLink">¿Has olvidado tu contraseña?</button>
       </div>
     </div>`);
 
@@ -51,6 +53,7 @@ export function showLogin(onSuccess) {
   });
 
   document.getElementById('loginForm').addEventListener('submit', (e) => submit(e, onSuccess));
+  document.getElementById('forgotLink').addEventListener('click', () => showForgotPassword(() => showLogin(onSuccess)));
 }
 
 function showError(message) {
