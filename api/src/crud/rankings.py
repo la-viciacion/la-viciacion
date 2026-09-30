@@ -83,7 +83,7 @@ def user_ranking_achievements(
             .filter(models.UserAchievement.season == season)
             .join(models.User, models.User.id == models.UserAchievement.user_id)
             .group_by(models.UserAchievement.user_id, models.User.name)
-            .order_by(func.count(models.UserAchievement.achievement_id).desc())
+            .order_by(func.count(models.UserAchievement.achievement_id).desc(), models.UserAchievement.user_id)
             .limit(limit)
         )
         if is_active is not None:
@@ -117,7 +117,7 @@ def user_played_games(
 
         stmt = (
             stmt.group_by(models.UserGame.user_id, models.User.name)
-            .order_by(func.count(models.UserGame.game_id).desc())
+            .order_by(func.count(models.UserGame.game_id).desc(), models.UserGame.user_id)
             .limit(limit)
         )
 
@@ -154,7 +154,7 @@ def user_completed_games(
             user_data["completed_games"] = completed
             data.append(user_data)
 
-        ordered_data = sorted(data, key=lambda x: x["completed_games"], reverse=True)
+        ordered_data = sorted(data, key=lambda x: (-x["completed_games"], x["user_id"]))
         return ordered_data
     except Exception as e:
         logger.error("Error getting user completed games: " + str(e))
@@ -275,7 +275,7 @@ def user_ratio(db: Session, season: int = None, is_active: bool | None = True):
             user_data["ratio"] = ratio
             data.append(user_data)
 
-        ordered_data = sorted(data, key=lambda x: x["ratio"], reverse=True)
+        ordered_data = sorted(data, key=lambda x: (-x["ratio"], x["user_id"]))
         return ordered_data
     except Exception as e:
         logger.error("Error calculating user ratio: " + str(e))

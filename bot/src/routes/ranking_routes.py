@@ -176,7 +176,7 @@ class RankingRoutes:
             "GET", config.API_URL + "/statistics/rankings?ranking=user_current_streak"
         )
         ranking = utils.load_json_response(ranking[0])
-        msg = "Estas són las rachas de días actuales:\n"
+        msg = "Estas son las rachas de días actuales:\n"
         for i, elem in enumerate(ranking["data"]):
             msg = (
                 msg
@@ -197,7 +197,7 @@ class RankingRoutes:
             "GET", config.API_URL + "/statistics/rankings?ranking=user_ratio"
         )
         ranking = utils.load_json_response(ranking[0])
-        msg = "Estas són las rachas de días actuales:\n"
+        msg = "Así está el ranking de ratio (completados / jugados):\n"
         for i, elem in enumerate(ranking["data"]):
             msg = (
                 msg
