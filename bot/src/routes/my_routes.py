@@ -36,7 +36,7 @@ class MyRoutes:
     async def my_games(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         logger.info("My games")
         query = update.callback_query
-        username = query.from_user.username
+        username = context.user_data["app_user"]["username"]
         ranking = utils.fetch_json(
             "GET",
             config.API_URL + "/statistics/users/" + username + "?ranking=played_games",
@@ -64,7 +64,7 @@ class MyRoutes:
     ) -> int:
         logger.info("My top games")
         query = update.callback_query
-        username = query.from_user.username
+        username = context.user_data["app_user"]["username"]
         ranking = utils.fetch_json(
             "GET",
             config.API_URL + "/statistics/users/" + username + "?ranking=top_games",
@@ -91,7 +91,7 @@ class MyRoutes:
     ) -> None:
         logger.info("My completed games")
         query = update.callback_query
-        username = query.from_user.username
+        username = context.user_data["app_user"]["username"]
         ranking = utils.fetch_json(
             "GET",
             config.API_URL
@@ -111,7 +111,7 @@ class MyRoutes:
     ) -> None:
         logger.info("My achievements")
         query = update.callback_query
-        username = query.from_user.username
+        username = context.user_data["app_user"]["username"]
         ranking = utils.fetch_json(
             "GET",
             config.API_URL + "/statistics/users/" + username + "?ranking=achievements",
@@ -128,7 +128,7 @@ class MyRoutes:
     ) -> None:
         logger.info("My streak")
         query = update.callback_query
-        username = query.from_user.username
+        username = context.user_data["app_user"]["username"]
         ranking = utils.fetch_json(
             "GET",
             config.API_URL + "/statistics/users/" + username + "?ranking=streak",

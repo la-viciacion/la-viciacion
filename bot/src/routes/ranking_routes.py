@@ -24,16 +24,6 @@ config = Config()
 class RankingRoutes:
     async def rankings(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         logger.info("Ranking")
-        # Uncomment the following code at the end of season
-        # Remove 'if' if want to disable for everyone
-        # if not context.user_data["is_admin"]:
-        #     await utils.response_conversation(
-        #         update,
-        #         context,
-        #         "Esta opción está desactivada hasta final de temporada.",
-        #     )
-        #     logger.info("Option deactivated")
-        #     return
         query = update.callback_query
         await query.answer()
         keyboard = kb.RANKING_MENU
@@ -106,24 +96,6 @@ class RankingRoutes:
             )
 
         await utils.response_conversation(update, context, msg)
-
-    # async def ranking_platform(
-    #     self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    # ) -> None:
-    #     logger.info("Ranking platform")
-    #     # db.log(context.user_data["user"], ActionLogs.RANKING_PLATFORM)
-    #     db.cursor.execute(dbq.ranking_platform)
-    #     result = db.cursor.fetchall()
-    #     result = dict(sorted(result, key=lambda x: x[1], reverse=True))
-    #     # logger.info(type(result))
-    #     msg = "Así está el ranking por plataforma:\n"
-    #     i = 0
-    #     for elem in result:
-    #         if i >= 5:
-    #             break
-    #         msg = msg + elem + ": " + str(result[elem]) + " juegos\n"
-    #         i += 1
-    #     await utils.response_conversation(update, context, msg)
 
     async def user_achievements(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
@@ -230,24 +202,6 @@ class RankingRoutes:
                 + "\n"
             )
 
-        await utils.response_conversation(update, context, msg)
-
-    async def debt(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        logger.info("Ranking debt")
-        await utils.response_conversation(update, context, "Deuda técnica: TBI")
-        return
-
-    async def games_last_played(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ) -> None:
-        logger.info("Ranking last played")
-        ranking = utils.fetch_json(
-            "GET", config.API_URL + "/statistics/rankings?ranking=games_last_played"
-        )
-        ranking = utils.load_json_response(ranking[0])
-        msg = "Ranking últimos juegos jugados:\n"
-        for i, elem in enumerate(ranking["data"]):
-            msg = msg + str(i + 1) + ". " + str(elem["name"]) + "\n"
         await utils.response_conversation(update, context, msg)
 
     async def games_most_played(

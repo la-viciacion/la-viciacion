@@ -1,9 +1,8 @@
 import telegram
-import telegram.ext.filters as FILTERS
 from routes.basic_routes import BasicRoutes
 from routes.my_routes import MyRoutes
 from routes.ranking_routes import RankingRoutes
-from telegram import BotCommand, Update
+from telegram import BotCommand, BotCommandScopeChat, Update
 from telegram.ext import (
     Application,
     ApplicationBuilder,
@@ -11,15 +10,12 @@ from telegram.ext import (
     CommandHandler,
     ContextTypes,
     ConversationHandler,
-    MessageHandler,
-    filters,
+    TypeHandler,
 )
 from utils.config import Config
 from utils.my_utils import MyUtils
 from utils.logger import LogManager
-from utils.read_messages import ReadMessages
 
-read_messages = ReadMessages()
 log_manager = LogManager()
 logger = log_manager.get_logger()
 import sentry_sdk
@@ -80,13 +76,19 @@ async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def post_init(application: Application):
-    await application.bot.set_my_commands(
-        [
-            BotCommand("/start", "Iniciar el chat"),
-            BotCommand("/menu", "Menú principal"),
-            BotCommand("/help", "Ayuda"),
-        ]
-    )
+    commands = [
+        BotCommand("/start", "Iniciar el chat"),
+        BotCommand("/menu", "Menú principal"),
+    ]
+    await application.bot.set_my_commands(commands)
+    # /activate is listed only in the app's group (the gate also refuses it anywhere else)
+    try:
+        await application.bot.set_my_commands(
+            commands + [BotCommand("/activate", "Vincular tu cuenta de la app")],
+            scope=BotCommandScopeChat(chat_id=int(config.TELEGRAM_GROUP_ID)),
+        )
+    except Exception as e:  # e.g. the bot is not in the group yet
+        logger.warning(f"Could not list /activate in the group: {e}")
 
 
 def main() -> None:
@@ -152,11 +154,6 @@ def main() -> None:
                     ranking_routes.user_best_streak,
                     pattern="^" + "user_best_streak" + "$",
                 ),
-                CallbackQueryHandler(ranking_routes.debt, pattern="^" + "debt" + "$"),
-                CallbackQueryHandler(
-                    ranking_routes.games_last_played,
-                    pattern="^" + "games_last_played" + "$",
-                ),
                 CallbackQueryHandler(
                     ranking_routes.games_most_played,
                     pattern="^" + "games_most_played" + "$",
@@ -173,12 +170,11 @@ def main() -> None:
         per_user=True,
         conversation_timeout=60,
     )
-    app.add_handler(CommandHandler("info_dev", utils.info_dev))
+    # group -1 runs before everything else; the gate stops what is not the app's group or users
+    app.add_handler(TypeHandler(Update, utils.gate), group=-1)
     app.add_handler(conv_handler)
+    app.add_handler(CommandHandler("activate", utils.activate))
     app.add_handler(CommandHandler("start", utils.start))
-    app.add_handler(CommandHandler("help", utils.help))
-    # app.add_handler(MessageHandler(None, other_routes.random_response))
-    app.add_handler(MessageHandler(None, read_messages.read_message))
     app.run_polling()
 
 
