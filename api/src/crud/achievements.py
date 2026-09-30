@@ -20,14 +20,56 @@ logger = log_manager.get_logger()
 
 config = Config()
 
+E = AchievementsElems
+
+# (achievement, needed): what a total has to reach to unlock each one
+TOTAL_HOURS = (
+    (E.PLAYED_100_HOURS, 100),
+    (E.PLAYED_200_HOURS, 200),
+    (E.PLAYED_500_HOURS, 500),
+    (E.PLAYED_1000_HOURS, 1000),
+)
+HOURS_IN_A_DAY = (
+    (E.PLAYED_4_HOURS_DAY, 4),
+    (E.PLAYED_8_HOURS_DAY, 8),
+    (E.PLAYED_12_HOURS_DAY, 12),
+    (E.PLAYED_16_HOURS_DAY, 16),
+)
+TOTAL_DAYS = (
+    (E.PLAYED_7_DAYS, 7),
+    (E.PLAYED_15_DAYS, 15),
+    (E.PLAYED_30_DAYS, 30),
+    (E.PLAYED_60_DAYS, 60),
+    (E.PLAYED_100_DAYS, 100),
+    (E.PLAYED_200_DAYS, 200),
+    (E.PLAYED_300_DAYS, 300),
+    (E.PLAYED_365_DAYS, 365),
+)
+STREAKS = (
+    (E.STREAK_7_DAYS, 7),
+    (E.STREAK_15_DAYS, 15),
+    (E.STREAK_30_DAYS, 30),
+    (E.STREAK_60_DAYS, 60),
+    (E.STREAK_100_DAYS, 100),
+    (E.STREAK_200_DAYS, 200),
+    (E.STREAK_300_DAYS, 300),
+    (E.STREAK_365_DAYS, 365),
+)
+GAMES_IN_A_DAY = ((E.PLAYED_5_GAMES_DAY, 5), (E.PLAYED_10_GAMES_DAY, 10))
+PLAYED_GAMES = (
+    (E.PLAYED_10_GAMES, 10),
+    (E.PLAYED_42_GAMES, 42),
+    (E.PLAYED_50_GAMES, 50),
+    (E.PLAYED_100_GAMES, 100),
+)
+COMPLETED_GAMES = ((E.COMPLETED_42_GAMES, 42), (E.COMPLETED_100_GAMES, 100))
+
 ######################
 #### ACHIEVEMENTS ####
 ######################
 
 
 class Achievements:
-    from ..utils.achievements import AchievementsElems
-
     def __init__(self, silent: bool = False) -> None:
         self.silent = silent
 
@@ -136,6 +178,52 @@ class Achievements:
     ##### ACH CHECKS #####
     ######################
 
+    async def _award(
+        self,
+        db: Session,
+        user: models.User,
+        ach: AchievementsElems,
+        silent: bool,
+        date: str = None,
+        game_id: str = None,
+    ):
+        """Store an unlocked achievement and announce it. `game_id` also names the game in the message."""
+        logger.info("Set achievement " + ach.name)
+        self.set_user_achievement(db, user.id, ach.name, game_id, date)
+        msg = utils.get_ach_message(ach, user=user.name, db=db, game_id=game_id)
+        await utils.send_message(msg, silent, image=self.get_image(db, ach.name)[0])
+
+    async def _unlock_reached(
+        self,
+        db: Session,
+        user: models.User,
+        value: float,
+        thresholds: tuple,
+        silent: bool,
+        date_for=lambda needed: None,
+    ):
+        """Unlock every achievement of `thresholds` ((achievement, needed) pairs) that `value` reaches.
+
+        `date_for(needed)` gives the date it was earned (default: now)."""
+        for ach, needed in thresholds:
+            if value >= needed and not self.check_already_achieved(db, user.id, ach.name):
+                await self._award(db, user, ach, silent, date=date_for(needed))
+
+    async def _unlock_if_new(
+        self,
+        db: Session,
+        user: models.User,
+        ach: AchievementsElems,
+        silent: bool,
+        date: str = None,
+        game_id: str = None,
+    ) -> bool:
+        """Unlock one achievement unless the user already has it; True if it did."""
+        if self.check_already_achieved(db, user.id, ach.name):
+            return False
+        await self._award(db, user, ach, silent, date=date, game_id=game_id)
+        return True
+
     async def user_played_total_time(
         self,
         db: Session,
@@ -144,69 +232,11 @@ class Achievements:
         date: str = None,
         silent: bool = False,
     ):
-        # logger.debug("Check total played time achievements...")
         if played_time is None:
             return
-        played_time = played_time / 60 / 60
-        # To create messages, use the follow example, and adapt to every message
-        # user = user.name
-        # msg = AchievementsElems.PLAYED_100_HOURS.value["message"].format(name)
-        # 100 h
-        # logger.info("Check total played time achievements")
-        ach = AchievementsElems.PLAYED_100_HOURS
-        if played_time >= 100 and not self.check_already_achieved(
-            db, user.id, ach.name
-        ):
-            logger.info("Set achievement 100h")
-            self.set_user_achievement(db, user.id, ach.name, date)
-            msg = utils.get_ach_message(ach, user=user.name)
-            await utils.send_message(
-                msg,
-                silent,
-                image=self.get_image(db, ach.name)[0],
-            )
-
-        # 200 h
-        ach = AchievementsElems.PLAYED_200_HOURS
-        if played_time >= 200 and not self.check_already_achieved(
-            db, user.id, ach.name
-        ):
-            logger.info("Set achievement 200h")
-            self.set_user_achievement(db, user.id, ach.name, date)
-            msg = utils.get_ach_message(ach, user=user.name)
-            await utils.send_message(
-                msg,
-                silent,
-                image=self.get_image(db, ach.name)[0],
-            )
-
-        # 500 h
-        ach = AchievementsElems.PLAYED_500_HOURS
-        if played_time >= 500 and not self.check_already_achieved(
-            db, user.id, ach.name
-        ):
-            logger.info("Set achievement 500h")
-            self.set_user_achievement(db, user.id, ach.name, date)
-            msg = utils.get_ach_message(ach, user=user.name)
-            await utils.send_message(
-                msg,
-                silent,
-                image=self.get_image(db, ach.name)[0],
-            )
-
-        # 1000 h
-        ach = AchievementsElems.PLAYED_1000_HOURS
-        if played_time >= 1000 and not self.check_already_achieved(
-            db, user.id, ach.name
-        ):
-            logger.info("Set achievement 1000h")
-            self.set_user_achievement(db, user.id, ach.name, date)
-            msg = utils.get_ach_message(ach, user=user.name)
-            await utils.send_message(
-                msg,
-                silent,
-                image=self.get_image(db, ach.name)[0],
-            )
+        await self._unlock_reached(
+            db, user, played_time / 60 / 60, TOTAL_HOURS, silent, date_for=lambda needed: date
+        )
 
     async def user_played_day_time(
         self,
@@ -214,452 +244,78 @@ class Achievements:
         user: models.User,
         silent: bool = False,
     ):
-        # logger.debug("Check played time in one day achievements...")
-        played_days = time_entries.get_played_time_by_day(db, user.id)
-        for played_day in played_days:
-            date = str(played_day[0])
+        for played_day in time_entries.get_played_time_by_day(db, user.id):
             if played_day[1] is None:
                 continue
-            played_time = played_day[1] / 60 / 60
-            # 4 hours
-            ach = AchievementsElems.PLAYED_4_HOURS_DAY
-            if played_time >= 4 and not self.check_already_achieved(
-                db, user.id, ach.name
-            ):
-                logger.info("Set achievement 4 hours day")
-                self.set_user_achievement(db, user.id, ach.name, date=date)
-                msg = utils.get_ach_message(ach, user=user.name)
-                await utils.send_message(
-                    msg,
-                    silent,
-                    image=self.get_image(db, ach.name)[0],
-                )
-
-            # 8 hours
-            ach = AchievementsElems.PLAYED_8_HOURS_DAY
-            if played_time >= 8 and not self.check_already_achieved(
-                db, user.id, ach.name
-            ):
-                logger.info("Set achievement 8 hours day")
-                self.set_user_achievement(db, user.id, ach.name, date=date)
-                msg = utils.get_ach_message(ach, user=user.name)
-                await utils.send_message(
-                    msg,
-                    silent,
-                    image=self.get_image(db, ach.name)[0],
-                )
-
-            # 12 hour
-            ach = AchievementsElems.PLAYED_12_HOURS_DAY
-            if played_time >= 12 and not self.check_already_achieved(
-                db, user.id, ach.name
-            ):
-                logger.info("Set achievement 12 hours day")
-                self.set_user_achievement(db, user.id, ach.name, date=date)
-                msg = utils.get_ach_message(ach, user=user.name)
-                await utils.send_message(
-                    msg,
-                    silent,
-                    image=self.get_image(db, ach.name)[0],
-                )
-
-            # 16 hours
-            ach = AchievementsElems.PLAYED_16_HOURS_DAY
-            if played_time >= 16 and not self.check_already_achieved(
-                db, user.id, ach.name
-            ):
-                logger.info("Set achievement 16 hours day")
-                self.set_user_achievement(db, user.id, ach.name, date=date)
-                msg = utils.get_ach_message(ach, user=user.name)
-                await utils.send_message(
-                    msg,
-                    silent,
-                    image=self.get_image(db, ach.name)[0],
-                )
+            day = str(played_day[0])
+            await self._unlock_reached(
+                db, user, played_day[1] / 60 / 60, HOURS_IN_A_DAY, silent, date_for=lambda needed: day
+            )
 
     async def user_session_time(
         self, db: Session, user: models.User, silent: bool = False
     ):
-        # logger.debug("Check session played time achievements...")
         # -5 min
-        ach = AchievementsElems.PLAYED_LESS_5_MIN_SESSION
-        if not self.check_already_achieved(db, user.id, ach.name):
-            time_entry = time_entries.get_time_entry_by_time(db, user.id, 5 * 60, 2)
-            if time_entry is not None:
-                logger.info("Set achievement less 5 minutes session")
-                self.set_user_achievement(
-                    db,
-                    user.id,
-                    ach.name,
-                    game_id=time_entry.game_id,
-                    date=str(time_entry.start),
+        if not self.check_already_achieved(db, user.id, AchievementsElems.PLAYED_LESS_5_MIN_SESSION.name):
+            entry = time_entries.get_time_entry_by_time(db, user.id, 5 * 60, 2)
+            if entry is not None:
+                await self._award(
+                    db, user, AchievementsElems.PLAYED_LESS_5_MIN_SESSION, silent,
+                    date=str(entry.start), game_id=entry.game_id,
                 )
-                msg = utils.get_ach_message(
-                    ach,
-                    user=user.name,
-                    db=db,
-                    game_id=time_entry.game_id,
-                )
-                await utils.send_message(
-                    msg,
-                    silent,
-                    image=self.get_image(db, ach.name)[0],
-                )
-
-        # +4 hours
-        ach = AchievementsElems.PLAYED_4_HOURS_SESSION
-        if not self.check_already_achieved(db, user.id, ach.name):
-            time_entry = time_entries.get_time_entry_by_time(
-                db, user.id, 4 * 60 * 60, 3
-            )
-            if time_entry is not None:
-                logger.info("Set achievement 4 hours session")
-                self.set_user_achievement(
-                    db,
-                    user.id,
-                    ach.name,
-                    game_id=time_entry.game_id,
-                    date=str(time_entry.start),
-                )
-                msg = utils.get_ach_message(
-                    ach,
-                    user=user.name,
-                    db=db,
-                    game_id=time_entry.game_id,
-                )
-                await utils.send_message(
-                    msg,
-                    silent,
-                    image=self.get_image(db, ach.name)[0],
-                )
-
-        # +8 hours
-        ach = AchievementsElems.PLAYED_8_HOURS_SESSION
-        if not self.check_already_achieved(db, user.id, ach.name):
-            time_entry = time_entries.get_time_entry_by_time(
-                db, user.id, 8 * 60 * 60, 3
-            )
-            if time_entry is not None:
-                logger.info("Set achievement 8 hours session")
-                self.set_user_achievement(
-                    db,
-                    user.id,
-                    ach.name,
-                    game_id=time_entry.game_id,
-                    date=str(time_entry.start),
-                )
-                msg = utils.get_ach_message(
-                    ach,
-                    user=user.name,
-                    db=db,
-                    game_id=time_entry.game_id,
-                )
-                await utils.send_message(
-                    msg,
-                    silent,
-                    image=self.get_image(db, ach.name)[0],
-                )
+        # +4 and +8 hours
+        for ach, hours in (
+            (AchievementsElems.PLAYED_4_HOURS_SESSION, 4),
+            (AchievementsElems.PLAYED_8_HOURS_SESSION, 8),
+        ):
+            if not self.check_already_achieved(db, user.id, ach.name):
+                entry = time_entries.get_time_entry_by_time(db, user.id, hours * 60 * 60, 3)
+                if entry is not None:
+                    await self._award(db, user, ach, silent, date=str(entry.start), game_id=entry.game_id)
 
     async def user_played_total_days(
         self, db: Session, user: models.User, total_days: list, silent: bool = False
     ):
-        # logger.debug(
-        #    "Check total played days achievements (" + str(len(total_days)) + ")..."
-        # )
-        # achieved_date = total_days[1]
-        # 7 days
-        ach = AchievementsElems.PLAYED_7_DAYS
-        if len(total_days) >= 7 and not self.check_already_achieved(
-            db, user.id, ach.name
-        ):
-            logger.info("Set achievement played 7 days")
-            # logger.info(total_days[6])
-            self.set_user_achievement(
-                db,
-                user.id,
-                ach.name,
-                date=str(total_days[6]),
-            )
-            msg = utils.get_ach_message(ach, user=user.name)
-            await utils.send_message(
-                msg,
-                silent,
-                image=self.get_image(db, ach.name)[0],
-            )
-        # 15 days
-        ach = AchievementsElems.PLAYED_15_DAYS
-        if len(total_days) >= 15 and not self.check_already_achieved(
-            db, user.id, ach.name
-        ):
-            logger.info("Set achievement played 15 days")
-            self.set_user_achievement(
-                db,
-                user.id,
-                ach.name,
-                date=str(total_days[14]),
-            )
-            msg = utils.get_ach_message(ach, user=user.name)
-            await utils.send_message(
-                msg,
-                silent,
-                image=self.get_image(db, ach.name)[0],
-            )
-        # 30 days
-        ach = AchievementsElems.PLAYED_30_DAYS
-        if len(total_days) >= 30 and not self.check_already_achieved(
-            db, user.id, ach.name
-        ):
-            logger.info("Set achievement played 30 days")
-            self.set_user_achievement(
-                db,
-                user.id,
-                ach.name,
-                date=str(total_days[29]),
-            )
-            msg = utils.get_ach_message(ach, user=user.name)
-            await utils.send_message(
-                msg,
-                silent,
-                image=self.get_image(db, ach.name)[0],
-            )
-        # 60 days
-        ach = AchievementsElems.PLAYED_60_DAYS
-        if len(total_days) >= 60 and not self.check_already_achieved(
-            db, user.id, ach.name
-        ):
-            logger.info("Set achievement played 60 days")
-            self.set_user_achievement(
-                db,
-                user.id,
-                ach.name,
-                date=str(total_days[59]),
-            )
-            msg = utils.get_ach_message(ach, user=user.name)
-            await utils.send_message(
-                msg,
-                silent,
-                image=self.get_image(db, ach.name)[0],
-            )
-        # 100 days
-        ach = AchievementsElems.PLAYED_100_DAYS
-        if len(total_days) >= 100 and not self.check_already_achieved(
-            db, user.id, ach.name
-        ):
-            logger.info("Set achievement played 100 days")
-            self.set_user_achievement(
-                db,
-                user.id,
-                ach.name,
-                date=str(total_days[99]),
-            )
-            msg = utils.get_ach_message(ach, user=user.name)
-            await utils.send_message(
-                msg,
-                silent,
-                image=self.get_image(db, ach.name)[0],
-            )
-        # 200 days
-        ach = AchievementsElems.PLAYED_200_DAYS
-        if len(total_days) >= 200 and not self.check_already_achieved(
-            db, user.id, ach.name
-        ):
-            logger.info("Set achievement played 200 days")
-            self.set_user_achievement(
-                db,
-                user.id,
-                ach.name,
-                date=str(total_days[199]),
-            )
-            msg = utils.get_ach_message(ach, user=user.name)
-            await utils.send_message(
-                msg,
-                silent,
-                image=self.get_image(db, ach.name)[0],
-            )
-        # 300 days
-        ach = AchievementsElems.PLAYED_300_DAYS
-        if len(total_days) >= 300 and not self.check_already_achieved(
-            db, user.id, ach.name
-        ):
-            logger.info("Set achievement played 300 days")
-            self.set_user_achievement(
-                db,
-                user.id,
-                ach.name,
-                date=str(total_days[299]),
-            )
-            msg = utils.get_ach_message(ach, user=user.name)
-            await utils.send_message(
-                msg,
-                silent,
-                image=self.get_image(db, ach.name)[0],
-            )
-        # 365 days
-        ach = AchievementsElems.PLAYED_365_DAYS
-        if len(total_days) >= 365 and not self.check_already_achieved(
-            db, user.id, ach.name
-        ):
-            logger.info("Set achievement played 365 days")
-            self.set_user_achievement(
-                db,
-                user.id,
-                ach.name,
-                date=str(total_days[364]),
-            )
-            msg = utils.get_ach_message(ach, user=user.name)
-            await utils.send_message(
-                msg,
-                silent,
-                image=self.get_image(db, ach.name)[0],
-            )
+        await self._unlock_reached(
+            db, user, len(total_days), TOTAL_DAYS, silent,
+            date_for=lambda needed: str(total_days[needed - 1]),
+        )
 
     async def user_played_hours_game_day(
         self, db: Session, user: models.User, silent: bool = False
     ):
-        # logger.debug("Check hours played in a single game/day achievement...")
         ach = AchievementsElems.PLAYED_8_HOURS_GAME_DAY
         if self.check_already_achieved(db, user.id, ach.name):
             return
-        rows = time_entries.get_played_time_by_game_and_day(db, user.id)
-        for date, game_id, duration in rows:
+        for date, game_id, duration in time_entries.get_played_time_by_game_and_day(db, user.id):
             if duration is None or game_id is None:
                 continue
             if duration / 60 / 60 >= 8:
-                logger.info("Set achievement 8 hours game/day")
-                self.set_user_achievement(
-                    db, user.id, ach.name, game_id=game_id, date=str(date)
-                )
-                msg = utils.get_ach_message(ach, user=user.name, db=db, game_id=game_id)
-                await utils.send_message(
-                    msg,
-                    silent,
-                    image=self.get_image(db, ach.name)[0],
-                )
+                await self._award(db, user, ach, silent, date=str(date), game_id=game_id)
                 return
 
     async def user_played_games_per_day(
         self, db: Session, user: models.User, silent: bool = False
     ):
-        # logger.debug("Check distinct games played in a single day achievements...")
-        rows = time_entries.get_played_games_count_by_day(db, user.id)
-        for date, distinct_games in rows:
+        for date, distinct_games in time_entries.get_played_games_count_by_day(db, user.id):
             if distinct_games is None:
                 continue
-            ach = AchievementsElems.PLAYED_5_GAMES_DAY
-            if distinct_games >= 5 and not self.check_already_achieved(
-                db, user.id, ach.name
-            ):
-                logger.info("Set achievement 5 games/day")
-                self.set_user_achievement(db, user.id, ach.name, date=str(date))
-                msg = utils.get_ach_message(ach, user=user.name)
-                await utils.send_message(
-                    msg,
-                    silent,
-                    image=self.get_image(db, ach.name)[0],
-                )
-            ach = AchievementsElems.PLAYED_10_GAMES_DAY
-            if distinct_games >= 10 and not self.check_already_achieved(
-                db, user.id, ach.name
-            ):
-                logger.info("Set achievement 10 games/day")
-                self.set_user_achievement(db, user.id, ach.name, date=str(date))
-                msg = utils.get_ach_message(ach, user=user.name)
-                await utils.send_message(
-                    msg,
-                    silent,
-                    image=self.get_image(db, ach.name)[0],
-                )
+            await self._unlock_reached(
+                db, user, distinct_games, GAMES_IN_A_DAY, silent, date_for=lambda needed: str(date)
+            )
 
     async def user_played_total_games(
         self, db: Session, user: models.User, date: str = None, silent: bool = False
     ):
-        # logger.debug("Check total played games achievements...")
         played_games = users.count_played_games(db, user.id)  # distinct games
-        # 10
-        # logger.info("Played games for " + user.name + ": " + str(played_games))
-        ach = AchievementsElems.PLAYED_10_GAMES
-        if played_games >= 10 and not self.check_already_achieved(
-            db, user.id, ach.name
-        ):
-            logger.info("Set achievement played 10 games")
-            self.set_user_achievement(db, user.id, ach.name)
-            msg = utils.get_ach_message(ach, user=user.name)
-            await utils.send_message(
-                msg,
-                silent,
-                image=self.get_image(db, ach.name)[0],
-            )
-        # 42
-        ach = AchievementsElems.PLAYED_42_GAMES
-        if played_games >= 42 and not self.check_already_achieved(
-            db, user.id, ach.name
-        ):
-            logger.info("Set achievement played 42 games")
-            self.set_user_achievement(db, user.id, ach.name)
-            msg = utils.get_ach_message(ach, user=user.name)
-            await utils.send_message(
-                msg,
-                silent,
-                image=self.get_image(db, ach.name)[0],
-            )
-        # 50
-        ach = AchievementsElems.PLAYED_50_GAMES
-        if played_games >= 50 and not self.check_already_achieved(
-            db, user.id, ach.name
-        ):
-            logger.info("Set achievement played 50 games")
-            self.set_user_achievement(db, user.id, ach.name)
-            msg = utils.get_ach_message(ach, user=user.name)
-            await utils.send_message(
-                msg,
-                silent,
-                image=self.get_image(db, ach.name)[0],
-            )
-        # 100
-        ach = AchievementsElems.PLAYED_100_GAMES
-        if played_games >= 100 and not self.check_already_achieved(
-            db, user.id, ach.name
-        ):
-            logger.info("Set achievement played 100 games")
-            self.set_user_achievement(db, user.id, ach.name)
-            msg = utils.get_ach_message(ach, user=user.name)
-            await utils.send_message(
-                msg,
-                silent,
-                image=self.get_image(db, ach.name)[0],
-            )
+        await self._unlock_reached(db, user, played_games, PLAYED_GAMES, silent)
 
     async def user_completed_total_games(
         self, db: Session, user: models.User, silent: bool = False
     ):
-        # logger.debug("Check total completed games achievements...")
-        completed_games = users.count_completed_games(db, user.id)
-        # 42
-        ach = AchievementsElems.COMPLETED_42_GAMES
-        if completed_games >= 42 and not self.check_already_achieved(
-            db, user.id, ach.name
-        ):
-            logger.info("Set achievement completed 42 games")
-            self.set_user_achievement(db, user.id, ach.name)
-            msg = utils.get_ach_message(ach, user=user.name)
-            await utils.send_message(
-                msg,
-                silent,
-                image=self.get_image(db, ach.name)[0],
-            )
-        # 100
-        ach = AchievementsElems.COMPLETED_100_GAMES
-        if completed_games >= 100 and not self.check_already_achieved(
-            db, user.id, ach.name
-        ):
-            logger.info("Set achievement completed 100 games")
-            self.set_user_achievement(db, user.id, ach.name)
-            msg = utils.get_ach_message(ach, user=user.name)
-            await utils.send_message(
-                msg,
-                silent,
-                image=self.get_image(db, ach.name)[0],
-            )
+        await self._unlock_reached(
+            db, user, users.count_completed_games(db, user.id), COMPLETED_GAMES, silent
+        )
 
     async def user_played_hours_game(
         self,
@@ -670,71 +326,11 @@ class Achievements:
         date: str = None,
         silent: bool = False,
     ):
-        played_time = int(played_time / 60 / 60)
-        # 100 h
-        ach = AchievementsElems.PLAYED_100_HOURS_GAME
-        if played_time >= 100 and not self.check_already_achieved(
-            db, user.id, ach.name
-        ):
-            game = games.get_game_by_id(db, game_id)
-            logger.info(
-                "Set achievement played 100 hours game: "
-                + game.name
-                + " ("
-                + str(played_time)
-                + ")"
+        # only 100 h per game is active: the 500 h and 1000 h achievements exist but are not awarded yet
+        if int(played_time / 60 / 60) >= 100:
+            await self._unlock_if_new(
+                db, user, AchievementsElems.PLAYED_100_HOURS_GAME, silent, game_id=game_id
             )
-            self.set_user_achievement(db, user.id, ach.name, game_id)
-            msg = utils.get_ach_message(ach=ach, user=user.name, db=db, game_id=game_id)
-            await utils.send_message(
-                msg,
-                silent,
-                image=self.get_image(db, ach.name)[0],
-            )
-
-        # The following are not activated yet
-        # # 500 h
-        # ach = AchievementsElems.PLAYED_500_HOURS_GAME
-        # if played_time >= 500 and not self.check_already_achieved(
-        #     db, user.id, ach.name
-        # ):
-        #     game = games.get_game_by_id(db, game_id)
-        #     logger.info(
-        #         "Set achievement played 500 hours game: "
-        #         + game.name
-        #         + " ("
-        #         + str(played_time)
-        #         + ")"
-        #     )
-        #     self.set_user_achievement(db, user.id, ach.name, game_id)
-        #     msg = utils.get_ach_message(ach=ach, user=user.name, db=db, game_id=game_id)
-        #     await utils.send_message(
-        #         msg,
-        #         silent,
-        #         image=self.get_image(db, ach.name)[0],
-        #     )
-
-        # # 1000 h
-        # ach = AchievementsElems.PLAYED_1000_HOURS_GAME
-        # if played_time >= 1000 and not self.check_already_achieved(
-        #     db, user.id, ach.name
-        # ):
-        #     game = games.get_game_by_id(db, game_id)
-        #     logger.info(
-        #         "Set achievement played 1000 hours game: "
-        #         + game.name
-        #         + " ("
-        #         + str(played_time)
-        #         + ")"
-        #     )
-        #     self.set_user_achievement(db, user.id, ach.name, game_id)
-        #     msg = utils.get_ach_message(ach=ach, user=user.name, db=db, game_id=game_id)
-        #     await utils.send_message(
-        #         msg,
-        #         silent,
-        #         image=self.get_image(db, ach.name)[0],
-        #     )
-        return
 
     async def happy_new_year(
         self,
@@ -743,26 +339,11 @@ class Achievements:
         silent: bool = False,
         season: int = None,
     ):
-        season = seasons.or_current(season)
-        current_season = str(season)
-        new_year = current_season + "-01-01"
-        time_entry = time_entries.get_time_entry_by_date(db, user.id, new_year, 1)
-        ach = AchievementsElems.HAPPY_NEW_YEAR
-        if len(time_entry) > 0 and not self.check_already_achieved(
-            db, user.id, ach.name
-        ):
-            logger.info("Set achievement happy new year")
-            self.set_user_achievement(
-                db,
-                user.id,
-                ach.name,
-                date=str(time_entry[0].start),
-            )
-            msg = utils.get_ach_message(ach, user=user.name)
-            await utils.send_message(
-                msg,
-                silent,
-                image=self.get_image(db, ach.name)[0],
+        new_year = str(seasons.or_current(season)) + "-01-01"
+        entries = time_entries.get_time_entry_by_date(db, user.id, new_year, 1)
+        if len(entries) > 0:
+            await self._unlock_if_new(
+                db, user, AchievementsElems.HAPPY_NEW_YEAR, silent, date=str(entries[0].start)
             )
 
     async def user_streak(
@@ -773,134 +354,33 @@ class Achievements:
         date: datetime.datetime = None,
         silent: bool = False,
     ):
-        # logger.debug("Check streaks achievements...")
         if date is not None:
             date = date.strftime("%Y-%m-%d %H:%M:%S")
-        # 7 days
-        ach = AchievementsElems.STREAK_7_DAYS
-        if streak >= 7 and not self.check_already_achieved(db, user.id, ach.name):
-            logger.info("Set achievement streak 7 days")
-            self.set_user_achievement(db, user.id, ach.name, date=date)
-            msg = utils.get_ach_message(ach, user=user.name)
-            await utils.send_message(
-                msg,
-                silent,
-                image=self.get_image(db, ach.name)[0],
-            )
-        # 15 days
-        ach = AchievementsElems.STREAK_15_DAYS
-        if streak >= 15 and not self.check_already_achieved(db, user.id, ach.name):
-            logger.info("Set achievement streak 15 days")
-            self.set_user_achievement(db, user.id, ach.name, date=date)
-            msg = utils.get_ach_message(ach, user=user.name)
-            await utils.send_message(
-                msg,
-                silent,
-                image=self.get_image(db, ach.name)[0],
-            )
-        # 30 days
-        ach = AchievementsElems.STREAK_30_DAYS
-        if streak >= 30 and not self.check_already_achieved(db, user.id, ach.name):
-            logger.info("Set achievement streak 30 days")
-            self.set_user_achievement(db, user.id, ach.name, date=date)
-            msg = utils.get_ach_message(ach, user=user.name)
-            await utils.send_message(
-                msg,
-                silent,
-                image=self.get_image(db, ach.name)[0],
-            )
-        # 60 days
-        ach = AchievementsElems.STREAK_60_DAYS
-        if streak >= 60 and not self.check_already_achieved(db, user.id, ach.name):
-            logger.info("Set achievement streak 60 days")
-            self.set_user_achievement(db, user.id, ach.name, date=date)
-            msg = utils.get_ach_message(ach, user=user.name)
-            await utils.send_message(
-                msg,
-                silent,
-                image=self.get_image(db, ach.name)[0],
-            )
-        # 100 days
-        ach = AchievementsElems.STREAK_100_DAYS
-        if streak >= 100 and not self.check_already_achieved(db, user.id, ach.name):
-            logger.info("Set achievement streak 100 days")
-            self.set_user_achievement(db, user.id, ach.name, date=date)
-            msg = utils.get_ach_message(ach, user=user.name)
-            await utils.send_message(
-                msg,
-                silent,
-                image=self.get_image(db, ach.name)[0],
-            )
-        # 200 days
-        ach = AchievementsElems.STREAK_200_DAYS
-        if streak >= 200 and not self.check_already_achieved(db, user.id, ach.name):
-            logger.info("Set achievement streak 200 days")
-            self.set_user_achievement(db, user.id, ach.name, date=date)
-            msg = utils.get_ach_message(ach, user=user.name)
-            await utils.send_message(
-                msg,
-                silent,
-                image=self.get_image(db, ach.name)[0],
-            )
-        # 300 days
-        ach = AchievementsElems.STREAK_300_DAYS
-        if streak >= 300 and not self.check_already_achieved(db, user.id, ach.name):
-            logger.info("Set achievement streak 300 days")
-            self.set_user_achievement(db, user.id, ach.name, date=date)
-            msg = utils.get_ach_message(ach, user=user.name)
-            await utils.send_message(
-                msg,
-                silent,
-                image=self.get_image(db, ach.name)[0],
-            )
-        # 365 days
-        ach = AchievementsElems.STREAK_365_DAYS
-        if streak >= 365 and not self.check_already_achieved(db, user.id, ach.name):
-            logger.info("Set achievement streak 365 days")
-            self.set_user_achievement(db, user.id, ach.name, date=date)
-            msg = utils.get_ach_message(ach, user=user.name)
-            await utils.send_message(
-                msg,
-                silent,
-                image=self.get_image(db, ach.name)[0],
-            )
+        await self._unlock_reached(db, user, streak, STREAKS, silent, date_for=lambda needed: date)
 
     async def teamwork(self, db: Session, silent: bool):
-        # logger.debug("Checking teamwork achievement...")
-        user_list = users.get_users(db)
-        playing: List[models.User] = []
-        for user in user_list:
-            has_active_game_timer = time_entries.get_active_game_timer_by_user(
-                db, user.id
-            )
-            if has_active_game_timer is not None:
-                playing.append(user)
-        # logger.debug(
-        #    "Playing users: " + str(len(playing)) + "/" + str(user_list.count())
-        # )
+        playing: List[models.User] = [
+            user
+            for user in users.get_users(db)
+            if time_entries.get_active_game_timer_by_user(db, user.id) is not None
+        ]
+        if len(playing) < 4:
+            return
+        logger.info("4 or more users are playing!")
         ach = AchievementsElems.TEAMWORK
-        if len(playing) >= 4:  # and notification_sent is None:
-            logger.info("4 or more users are playing!")
-            someone_not_achieved = False
-            players = ""
-            for player in playing:
-                players += player.name + ", "
-                if not self.check_already_achieved(db, player.id, ach.name):
-                    someone_not_achieved = True
-                    logger.info("Set 'Teamwork' achievement for " + player.name)
-                    self.set_user_achievement(db, player.id, ach.name)
-            if someone_not_achieved:
-                players = players[:-2]
-                players = players.rsplit(",", 1)
-                players = " y".join(players)
-                msg = utils.get_ach_message(ach, user=players)
-                await utils.send_message(
-                    msg,
-                    silent,
-                    image=self.get_image(db, ach.name)[0],
-                )
-            else:
-                logger.info("All users unlocked this achievement")
+        someone_not_achieved = False
+        for player in playing:
+            if not self.check_already_achieved(db, player.id, ach.name):
+                someone_not_achieved = True
+                logger.info("Set 'Teamwork' achievement for " + player.name)
+                self.set_user_achievement(db, player.id, ach.name)
+        if not someone_not_achieved:
+            logger.info("All users unlocked this achievement")
+            return
+        # "Ana, Bob y Cris"
+        names = ", ".join(player.name for player in playing).rsplit(",", 1)
+        msg = utils.get_ach_message(ach, user=" y".join(names))
+        await utils.send_message(msg, silent, image=self.get_image(db, ach.name)[0])
 
     async def timer_started(
         self, db: Session, user: models.User, start_time: datetime.datetime, silent: bool = False
@@ -910,79 +390,35 @@ class Achievements:
             (AchievementsElems.EARLY_RISER, 5, 6),
             (AchievementsElems.NOCTURNAL, 2, 5),
         ):
-            if not first_hour <= start_time.hour < last_hour:
-                continue
-            if self.check_already_achieved(db, user.id, ach.name):
-                continue
-            logger.info("Set achievement " + ach.name + " on timer start")
-            self.set_user_achievement(db, user.id, ach.name, date=str(start_time))
-            msg = utils.get_ach_message(ach, user=user.name)
-            await utils.send_message(msg, silent, image=self.get_image(db, ach.name)[0])
+            if first_hour <= start_time.hour < last_hour:
+                await self._unlock_if_new(db, user, ach, silent, date=str(start_time))
 
     async def early_riser(self, db: Session, user: models.User, silent: bool):
-        # logger.debug("Checking early riser achievement...")
-        entries = time_entries.get_time_entry_between_hours(
-            db, user.id, start_hour=5, end_hour=6
-        )
-        ach = AchievementsElems.EARLY_RISER
-        if len(entries) > 0 and not self.check_already_achieved(db, user.id, ach.name):
-            logger.info("Set achievement early riser")
-            self.set_user_achievement(
-                db,
-                user.id,
-                ach.name,
-                date=str(entries[0].start),
-            )
-            msg = utils.get_ach_message(ach, user=user.name)
-            await utils.send_message(
-                msg,
-                silent,
-                image=self.get_image(db, ach.name)[0],
+        entries = time_entries.get_time_entry_between_hours(db, user.id, start_hour=5, end_hour=6)
+        if len(entries) > 0:
+            await self._unlock_if_new(
+                db, user, AchievementsElems.EARLY_RISER, silent, date=str(entries[0].start)
             )
 
     async def nocturnal(self, db: Session, user: models.User, silent: bool):
-        # logger.debug("Checking nocturnal achievement...")
-        entries = time_entries.get_time_entry_between_hours(
-            db, user.id, start_hour=2, end_hour=5
-        )
-        ach = AchievementsElems.NOCTURNAL
-        if len(entries) > 0 and not self.check_already_achieved(db, user.id, ach.name):
-            logger.info("Set achievement nocturnal")
-            self.set_user_achievement(
-                db,
-                user.id,
-                ach.name,
-                date=str(entries[0].start),
-            )
-            msg = utils.get_ach_message(ach, user=user.name)
-            await utils.send_message(
-                msg,
-                silent,
-                image=self.get_image(db, ach.name)[0],
+        entries = time_entries.get_time_entry_between_hours(db, user.id, start_hour=2, end_hour=5)
+        if len(entries) > 0:
+            await self._unlock_if_new(
+                db, user, AchievementsElems.NOCTURNAL, silent, date=str(entries[0].start)
             )
 
     def get_weekly_achievements(
         self, db: Session, user: models.User, weeks_ago: int = 0
     ):
-        """_summary_
-
-        Args:
-            db (Session): _description_
-            user (models.User): _description_
-            mode (int, optional): 0 = last week. 1 = current week. Defaults to 0.
-
-        Returns:
-            _type_: _description_
-        """
+        """Rows with (number of achievements unlocked that week,); 0 = this week, 1 = last week..."""
         first_day, last_day = utils.get_week_range_dates(weeks_ago)
-        weekly_achievements = (
+        return (
             db.query(func.count(models.UserAchievement.id))
             .filter(models.UserAchievement.user_id == user.id)
             .filter(func.DATE(models.UserAchievement.date) >= first_day)
             .filter(func.DATE(models.UserAchievement.date) <= last_day)
             .all()
         )
-        return weekly_achievements
 
     async def just_in_time(
         self,
@@ -994,22 +430,13 @@ class Achievements:
         date: str = None,
         silent: bool = False,
     ):
-        # logger.debug("Check just-in-time completion achievement...")
         if not played_time or not avg_time:
-            return
-        ach = AchievementsElems.JUST_IN_TIME
-        if self.check_already_achieved(db, user.id, ach.name):
             return
         # Both played_time and avg_time (HLTB comp_main) are in seconds;
         # matched at hour granularity since an exact-second match is
         # practically unreachable and everything else in the app buckets
         # played time into hours anyway.
         if round(played_time / 3600) == round(avg_time / 3600):
-            logger.info("Set achievement just in time")
-            self.set_user_achievement(db, user.id, ach.name, game_id, date=date)
-            msg = utils.get_ach_message(ach, user=user.name, db=db, game_id=game_id)
-            await utils.send_message(
-                msg,
-                silent,
-                image=self.get_image(db, ach.name)[0],
+            await self._unlock_if_new(
+                db, user, AchievementsElems.JUST_IN_TIME, silent, date=date, game_id=game_id
             )
