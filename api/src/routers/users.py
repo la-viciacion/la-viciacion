@@ -12,6 +12,7 @@ from fastapi import (
     UploadFile,
 )
 from fastapi_versioning import version
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from .. import auth
@@ -332,16 +333,13 @@ async def add_game_to_user(
     already_playing = users.get_game_by_id(db, user.id, game.game_id, current_season)
     if already_playing:
         raise HTTPException(status_code=409, detail=msg.USER_ALREADY_PLAYING)
+    if games.get_game_by_id(db, game.game_id) is None:
+        raise HTTPException(status_code=404, detail=msg.GAME_NOT_FOUND)
     try:
-        game_db = games.get_game_by_id(db, game.game_id)
-        if game_db is None:
-            raise HTTPException(status_code=404, detail=msg.GAME_NOT_FOUND)
         return await users.add_new_game(db=db, game=game, user=user)
-    except Exception as e:
-        logger.info(e)
-        raise HTTPException(
-            status_code=500, detail="Error adding new game user: " + str(e)
-        )
+    except SQLAlchemyError as e:
+        logger.error("Error adding new game user: " + str(e))
+        raise HTTPException(status_code=500, detail=msg.INTERNAL_ERROR)
 
 
 @router.get(
@@ -377,10 +375,7 @@ async def complete_game(
     """
     auth.ensure_self_or_admin(active_user, username=username)
     user = users.get_user_by_username(db, username)
-    logger.info("USER:")
-    logger.info(user)
     if user is None:
-        logger.info("IS NONE")
         raise HTTPException(status_code=404, detail=msg.USER_NOT_EXISTS)
     current_season = seasons.current()
     user_game = users.get_game_by_id(db, user.id, game_id, current_season)
@@ -390,11 +385,9 @@ async def complete_game(
         raise HTTPException(status_code=409, detail=msg.GAME_ALREADY_COMPLETED)
     try:
         return await users.complete_game(db, user.id, game_id)
-    except Exception as e:
-        logger.info(e)
-        raise HTTPException(
-            status_code=500, detail="Error completing game_user: " + str(e)
-        )
+    except SQLAlchemyError as e:
+        logger.error("Error completing game_user: " + str(e))
+        raise HTTPException(status_code=500, detail=msg.INTERNAL_ERROR)
 
 
 @router.patch("/{username}/rate-game")
@@ -402,7 +395,7 @@ async def complete_game(
 async def rate_game(
     username: str,
     game_id: str,
-    score: float,
+    score: float = Query(..., ge=0, le=10),
     active_user: models.User = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db),
 ):
