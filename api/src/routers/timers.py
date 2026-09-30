@@ -141,7 +141,9 @@ def stop_timer(db: Session, timer_id: int, user_id: int) -> GameTimer:
             detail="Active timer not found"
         )
     
-    timer.end_time = datetime.datetime.now()
+    # a timer may start "ahead" of the clock (after a manual session that ended a minute early):
+    # stopping it right away must not give it a negative duration
+    timer.end_time = max(datetime.datetime.now(), timer.start_time)
     timer.duration_seconds = int((timer.end_time - timer.start_time).total_seconds())
     timer.is_active = False
 
