@@ -1,5 +1,4 @@
 import datetime
-import types
 import unittest
 from unittest import mock
 
@@ -102,9 +101,10 @@ class CompletionNoticeTests(unittest.IsolatedAsyncioTestCase):
         FakeBot.sent = []
         chat = mock.Mock(return_value=completion)
         with mock.patch.object(my_utils.telegram, "Bot", FakeBot), \
-                mock.patch.object(my_utils.settings, "get", side_effect=lambda key: self.values.get(key)), \
-                mock.patch.object(my_utils.oai_client, "chat_completion", chat):
-            await my_utils.send_message("Ana completó Doom", False, openai=True, new_game_recommended=recommended)
+                mock.patch.object(my_utils.settings, "get", side_effect=lambda k: self.values.get(k, my_utils.settings.REGISTRY[k].default)), \
+                mock.patch.object(my_utils.ai, "is_ready", return_value=True), \
+                mock.patch.object(my_utils.ai, "complete", chat):
+            await my_utils.send_message("Ana completó Doom", False, ai_use="completed_game", new_game_recommended=recommended)
         return chat, FakeBot.sent[0]["text"]
 
     async def test_without_ai_the_recommendation_is_a_plain_line(self):
@@ -114,10 +114,9 @@ class CompletionNoticeTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Lo tiene Bob", text)
 
     async def test_the_ai_is_told_about_the_recommendation_and_the_line_is_not_added(self):
-        reply = types.SimpleNamespace(choices=[types.SimpleNamespace(message=types.SimpleNamespace(content="Qué crack, Ana. Prueba Hades"))])
-        chat, text = await self.send({"game": "Hades", "user": "Bob"}, completion=reply)
+        chat, text = await self.send({"game": "Hades", "user": "Bob"}, completion="Qué crack, Ana. Prueba Hades")
         self.assertEqual(text, "Qué crack, Ana. Prueba Hades")
-        prompt = chat.call_args.kwargs["system_prompt"]
+        prompt = chat.call_args.args[0]
         self.assertIn("Juego recomendado: Hades", prompt)
         self.assertIn("Jugado por: Bob", prompt)
 

@@ -43,7 +43,7 @@ Read-only (except `/activate`, see architecture), generic endpoints only. Texts 
 
 ## Tests
 
-- API: `unittest`, files `api/tests/test_*.py`, importing `src.*` (run from `api/`). Mock time by passing `now` explicitly; mock `requests`/Telegram/OpenAI, never call real services.
+- API: `unittest`, files `api/tests/test_*.py`, importing `src.*` (run from `api/`). Mock time by passing `now` explicitly; mock `requests`/Telegram/the AI providers, never call real services.
 - Front: `node --test`, files `front/tests/*.test.js`.
 - A bug fix comes with a test that fails without it whenever the logic is testable.
 

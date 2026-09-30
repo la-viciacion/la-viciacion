@@ -5,7 +5,7 @@
 ```
 Browser (PWA) ──► nginx (front, :3000) ──/api/──► FastAPI (api, :5000) ──► MariaDB (db)
                                                      ▲   │
-Telegram bot (bot) ── HTTP, superadmin token ────────┘   └─► Telegram (notifications), RAWG, OpenAI, SMTP, Sentry
+Telegram bot (bot) ── HTTP, superadmin token ────────┘   └─► Telegram (notifications), RAWG, Gemini/OpenAI, SMTP, Sentry
 ```
 
 - The **API is the only component that touches the DB** and holds all business rules.
@@ -26,7 +26,7 @@ database/          database.py (engine, SessionLocal, Base), models.py (tables),
 routers/           HTTP layer only: validation, auth, calling crud/utils, mapping errors to HTTP
 crud/              DB access and queries (users, games, time_entries, rankings, achievements, ...)
 utils/             domain logic and integrations (see below)
-clients/open_ai.py OpenAI client wrapper
+clients/google_ai.py, open_ai.py  one function per AI provider, each with the provider's official SDK (`google-genai`, `openai`); utils/ai.py picks one from the settings
 ```
 
 Routers: `basic` (login, token, `/auth/active_user`, keepalive), `users` (profile, library, recommendations, avatar, password), `games`, `timers` (start/stop/manual/edit/history), `statistics`, `manage` (**admin panel API**: users, games, platforms (`/manage/platforms`: list with usage, create, rename, delete when unused), timers, library, achievements and awarded achievements (`/manage/user-achievements`: list, change date, revoke), RAWG sync, settings; router-level `require_admin`), `utils` (platforms, achievement images).
@@ -43,7 +43,7 @@ The DB layer is synchronous SQLAlchemy (do not introduce async DB drivers), so t
 
 - **Routes are plain `def`.** FastAPI runs them in a worker thread (40 by default) and the connection pool covers them (`database.py`: 30 + 30 overflow). Anything that blocks (queries, bcrypt at login, image decoding for avatars) is fine there and nowhere else: a login or an avatar upload on the event loop froze every other request (measured: a `GET /keepalive` took 372 ms, up to 2 s, while six logins ran).
 - **`async def` only when the route awaits the network** (RAWG search, creating a game, Telegram/push from the admin panel). Their database work goes through `run_in_threadpool`. `tests/test_async_discipline.py` fails any router `async def` that never awaits, and pins the list of allowed ones.
-- **Slow follow-ups never run in the request.** Announcements, achievements, the effects of completing a game (HLTB, OpenAI, Telegram) are `BackgroundTasks` entrypoints in `utils/actions.py` (`after_timer_start`, `after_session_change`, `after_completion`): plain `def`s that open their own DB session and run their own event loop, serialized by `_check_lock`. The scheduler is a thread that does the same.
+- **Slow follow-ups never run in the request.** Announcements, achievements, the effects of completing a game (HLTB, the AI, Telegram) are `BackgroundTasks` entrypoints in `utils/actions.py` (`after_timer_start`, `after_session_change`, `after_completion`): plain `def`s that open their own DB session and run their own event loop, serialized by `_check_lock`. The scheduler is a thread that does the same.
 - Notification helpers (`utils/my_utils.py`, `utils/push.py`) are async, never raise, and offload blocking clients (`asyncio.to_thread`).
 
 ## Data model (`database/models.py`)
@@ -117,4 +117,4 @@ Page module contract (documented at the top of `main.js`): exports `active`, opt
 
 ## External services
 
-RAWG (game metadata and covers, `RAWG_URL`), SMTP (`utils/email.py`, outgoing mail: only the password recovery link, optional), OpenAI (optional, `OPENAI_API_KEY`, prompts in `utils/ai_prompts.py`), Sentry (optional, separate DSN per service), Telegram Bot API.
+RAWG (game metadata and covers, `RAWG_API_KEY`; the old `RAWG_URL` with `key=` in it still works), SMTP (`utils/email.py`, outgoing mail: only the password recovery link, optional), an AI provider (optional: Google Gemini or OpenAI; provider, key, model and on/off switch are `ai.*` settings edited from the admin panel, seeded once from `AI_*`/`OPENAI_*`; `utils/ai.py`). `utils/ai_prompts.py` is the registry of the places the AI writes (`USES`: id, label, default prompt): from it `settings.py` generates, for each, the setting `ai.prompt.<id>` (default: the code's prompt; `PUT /manage/settings` with `null` deletes the override) and the switch `ai.use.<id>`, and callers ask for a notice with `send_message(..., ai_use=<id>)`. Adding a place that uses the AI means adding an entry to `USES`; ids are stored, so they are never renamed, Sentry (optional, separate DSN per service), Telegram Bot API.

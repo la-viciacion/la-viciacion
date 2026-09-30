@@ -16,7 +16,6 @@ from ..crud.achievements import Achievements
 from ..database import models, schemas
 from . import my_utils as utils
 from . import push
-from ..utils import ai_prompts as prompts
 from ..utils import seasons, streaks, user_settings
 from .logger import LogManager
 
@@ -316,11 +315,11 @@ async def announce_ranking_changes(db: Session, before: dict, silent: bool):
         message = games_ranking_message(before["games"], time_entries.games_played_time(db))
         if message:
             logger.info(message)
-            await utils.send_message(message, silent, openai=True, system_prompt=prompts.RANKING_GAMES_PROMPT)
+            await utils.send_message(message, silent, ai_use="ranking_games")
         message = players_ranking_message(before["players"], rankings.user_hours_players(db))
         if message:
             logger.info(message)
-            await utils.send_message(message, silent, openai=True, system_prompt=prompts.RANKING_USER_PROMPT)
+            await utils.send_message(message, silent, ai_use="ranking_players")
     except Exception as e:
         logger.error("Error announcing ranking changes: " + str(e))
 

@@ -1,7 +1,7 @@
 """Runtime settings edited from the admin panel (table `app_settings`).
 
 Every setting is declared once in REGISTRY (type, default, validation, whether
-it is a secret). The table stores values as text; secrets (the Telegram token)
+it is a secret). The table stores values as text; secrets (the Telegram token, the AI key)
 are encrypted with a key derived from SECRET_KEY and are never returned by the
 API, only a hint of their last characters.
 
@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 from ..config import Config
 from ..database import models
 from ..database.database import SessionLocal
+from .ai_prompts import USES as AI_USES
 from .logger import LogManager
 
 log_manager = LogManager()
@@ -40,6 +41,8 @@ class Spec:
     hint: bool = True  # a secret shows its last characters in the panel unless this is False
     env: str | None = None  # variable that seeds the value the first time
     check: Callable[[Any], str | None] | None = None  # error message or None
+    blank_ok: bool = False  # an empty text is a valid value (it means "the default")
+    resettable: bool = False  # `None` deletes the stored value, so the default applies again
 
 
 def _chat_id(value: str) -> str | None:
@@ -66,6 +69,25 @@ def _vapid_public(value: str) -> str | None:
     return None if re.fullmatch(r"[A-Za-z0-9_-]{80,100}", value) else "Clave pública VAPID no válida"
 
 
+AI_PROVIDERS = ("google", "openai")
+
+
+def _ai_provider(value: str) -> str | None:
+    return None if value in AI_PROVIDERS else "El proveedor debe ser " + " u ".join(AI_PROVIDERS)
+
+
+def _ai_model(value: str) -> str | None:
+    # it goes into the URL of the request, so only what model names are made of
+    return None if not value or re.fullmatch(r"[A-Za-z0-9._-]{1,100}", value) else "Nombre de modelo no válido"
+
+
+PROMPT_MAX = 4000
+
+
+def _prompt(value: str) -> str | None:
+    return None if len(value) <= PROMPT_MAX else f"Como máximo {PROMPT_MAX} caracteres"
+
+
 REGISTRY: dict[str, Spec] = {
     "notifications.enabled": Spec("bool", True),
     "notifications.admin_alerts": Spec("bool", True),
@@ -77,10 +99,21 @@ REGISTRY: dict[str, Spec] = {
     "push.contact": Spec("str", None, check=_contact),
     "push.vapid_public": Spec("str", None, check=_vapid_public),
     "push.vapid_private": Spec("str", None, secret=True, hint=False),
+    # AI text for the notices (utils/ai.py). The key is typed in the panel; AI_* (or the old OPENAI_*) only seed it.
+    "ai.enabled": Spec("bool", True),
+    "ai.provider": Spec("str", "google", env="AI_PROVIDER", check=_ai_provider),
+    "ai.api_key": Spec("str", None, secret=True, env="AI_API_KEY"),
+    "ai.model": Spec("str", None, env="AI_MODEL", check=_ai_model, blank_ok=True),  # empty: the provider's default
     "telegram.token": Spec("str", None, secret=True, env="TELEGRAM_TOKEN", check=_token),
     "telegram.group_id": Spec("str", None, env="TELEGRAM_GROUP_ID", check=_chat_id),
     "telegram.admin_chat_id": Spec("str", None, env="TELEGRAM_ADMIN_CHAT_ID", check=_chat_id),
 }
+
+# One prompt (default: the one in the code) and one switch per place the AI writes (utils/ai_prompts.py).
+for _id, _use in AI_USES.items():
+    REGISTRY[f"ai.prompt.{_id}"] = Spec("str", _use.default.strip(), check=_prompt, resettable=True)
+    if _use.switchable:
+        REGISTRY[f"ai.use.{_id}"] = Spec("bool", True)
 
 
 # ── encoding ────────────────────────────────────────────────
@@ -108,9 +141,9 @@ def coerce(key: str, value: Any) -> Any:
             raise ValueError(f"{key}: debe ser un número entero") from None
     else:
         result = str(value).strip()
-        if not result:
+        if not result and not spec.blank_ok:
             raise ValueError(f"{key}: no puede estar vacío")
-    if spec.check:
+    if spec.check and not (spec.blank_ok and result == ""):
         error = spec.check(result)
         if error:
             raise ValueError(f"{key}: {error}")
@@ -164,6 +197,28 @@ def get_all(db: Session) -> dict[str, Any]:
     return {key: _decode(key, rows.get(key)) for key in REGISTRY}
 
 
+def customized(db: Session) -> set[str]:
+    """Resettable settings the admin has changed (the rest follow the defaults in the code)."""
+    stored = {r.key for r in db.query(models.AppSetting).all()}
+    return {key for key, spec in REGISTRY.items() if spec.resettable and key in stored}
+
+
+def ai_uses(db: Session) -> list[dict]:
+    """Where the AI writes, for the panel: each with the prompt the code brings and whether the admin changed it."""
+    changed = customized(db)
+    return [
+        {
+            "id": use_id,
+            "label": use.label,
+            "help": use.help,
+            "switchable": use.switchable,
+            "default_prompt": REGISTRY[f"ai.prompt.{use_id}"].default,
+            "customized": f"ai.prompt.{use_id}" in changed,
+        }
+        for use_id, use in AI_USES.items()
+    ]
+
+
 def public_view(db: Session) -> dict[str, Any]:
     """Values for the admin panel; a secret is reduced to whether it is set and its last characters."""
     values = get_all(db)
@@ -184,10 +239,21 @@ def set_values(db: Session, values: dict[str, Any], user_id: int | None = None) 
     for key, value in values.items():
         if key not in REGISTRY:
             raise ValueError(f"Ajuste desconocido: {key}")
+        if value is None and REGISTRY[key].resettable:
+            clean[key] = None
+            continue
+        if value is None:
+            raise ValueError(f"{key}: no puede estar vacío")
         clean[key] = coerce(key, value)
     current = get_all(db)
     changed = []
     for key, value in clean.items():
+        if value is None:  # back to the default
+            row = db.get(models.AppSetting, key)
+            if row is not None:
+                db.delete(row)
+                changed.append(key)
+            continue
         if current.get(key) == value:
             continue
         row = db.get(models.AppSetting, key)
@@ -208,7 +274,7 @@ def seed_from_env(db: Session) -> list[str]:
     """Copy the .env values into settings that do not exist yet (first start only)."""
     import os
 
-    seeded = []
+    seeded: list[str] = []
     for key, spec in REGISTRY.items():
         if not spec.env or db.get(models.AppSetting, key) is not None:
             continue
@@ -222,10 +288,36 @@ def seed_from_env(db: Session) -> list[str]:
             continue
         db.add(models.AppSetting(key=key, value=_encode(key, value)))
         seeded.append(key)
+    seeded += _seed_legacy_openai(db, seeded)
     db.commit()
     if seeded:
         logger.info("Settings seeded from environment: " + ", ".join(seeded))
     return seeded
+
+
+def _seed_legacy_openai(db: Session, seeded: list[str]) -> list[str]:
+    """Installations from before the AI settings have OPENAI_API_KEY (and OPENAI_MODEL): they keep
+    working as the "openai" provider unless AI_* says otherwise."""
+    import os
+
+    legacy = {
+        "ai.api_key": os.getenv("OPENAI_API_KEY"),
+        "ai.provider": "openai",
+        "ai.model": os.getenv("OPENAI_MODEL"),
+    }
+    if not legacy["ai.api_key"] or "ai.api_key" in seeded or db.get(models.AppSetting, "ai.api_key") is not None:
+        return []
+    added = []
+    for key, raw in legacy.items():
+        if not raw or key in seeded or db.get(models.AppSetting, key) is not None:
+            continue
+        try:
+            db.add(models.AppSetting(key=key, value=_encode(key, coerce(key, raw))))
+        except ValueError as e:
+            logger.warning(f"Not seeding {key} from the OPENAI_* variables: {e}")
+            continue
+        added.append(key)
+    return added
 
 
 def telegram_version(db: Session) -> str:

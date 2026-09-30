@@ -13,7 +13,8 @@ class Config:
 
         # Telegram token and chats live in the app_settings table (admin panel);
         # TELEGRAM_TOKEN / TELEGRAM_GROUP_ID / TELEGRAM_ADMIN_CHAT_ID in .env only
-        # seed it the first time (see utils/settings.py).
+        # seed it the first time (see utils/settings.py). The same goes for the AI provider,
+        # key and model (AI_PROVIDER / AI_API_KEY / AI_MODEL, or the old OPENAI_API_KEY / OPENAI_MODEL).
         
         # Admin
         self.GOD_ADMIN_PASS = self._get_env("GOD_ADMIN_PASS")
@@ -24,10 +25,9 @@ class Config:
         self.DB_USER = self._get_env("MARIADB_USER")
         self.DB_PASS = self._get_env("MARIADB_PASSWORD")
         
-        # External APIs
-        self.RAWG_URL = self._get_env("RAWG_URL")
-        self.OPENAI_API_KEY = self._get_env("OPENAI_API_KEY")
-        self.OPENAI_MODEL = self._get_env("OPENAI_MODEL")
+        # External APIs. RAWG_API_KEY is the key; RAWG_URL is the old way (a URL with `key=...` in it),
+        # still read so an existing .env keeps working (see the RAWG_API_KEY property).
+        self.RAWG_URL = os.getenv("RAWG_URL", "").strip()
         
         # Security
         self.SECRET_KEY = self._get_env("SECRET_KEY")
@@ -78,7 +78,7 @@ class Config:
 
     @property
     def RAWG_API_KEY(self) -> str:
-        direct_key = os.getenv("RAWG_API_KEY")
+        direct_key = os.getenv("RAWG_API_KEY", "").strip()
         if direct_key:
             return direct_key
         if self.RAWG_URL and "key=" in self.RAWG_URL:

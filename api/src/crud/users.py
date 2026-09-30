@@ -25,7 +25,6 @@ from ..config import Config
 from ..database import models, schemas
 from ..utils import my_utils as utils
 from . import games
-from ..utils import ai_prompts as prompts
 from ..utils.logger import LogManager
 from ..utils import seasons, streaks
 
@@ -361,8 +360,7 @@ async def announce_new_game(
         await utils.send_message(
             msg,
             silent,
-            openai=True,
-            system_prompt=prompts.NEW_GAME_PROMPT,
+            ai_use="new_game",
         )
     except Exception as e:
         logger.error("Error announcing new game: " + str(e))
@@ -728,8 +726,7 @@ async def after_completion(db: Session, entry: models.UserGame, silent: bool):
     await utils.send_message(
         message,
         silent,
-        openai=True,
-        system_prompt=prompts.COMPLETED_GAME_PROMPT,
+        ai_use="completed_game",
         new_game_recommended=new_game_info,
     )
 

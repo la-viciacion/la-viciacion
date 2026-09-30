@@ -67,9 +67,11 @@ From the home page a user can add a finished session by hand (**+ Sesión manual
 
 The **Recomendados** tab of the profile lists games the other players have and you have never had (in any season), the most shared first. The bot shows the first ten from its **Recomendados** button. Nothing is stored: it is computed from the libraries when the tab opens. When somebody completes a game, the group notice also suggests a game with a similar genre that somebody else has (written by the AI if OpenAI is configured, as a plain line if not).
 
-### OpenAI integration
+### AI-written notices
 
-To use the OpenAI integration, set `OPENAI_API_KEY` in `.env`. The prompts for the predefined notifications live in `api/src/utils/ai_prompts.py`; adjust them as you like.
+The AI rewrites some notices of the group (a new game, a completed game, the rankings) in a funnier way; without it they go out as plain text. It is managed from the admin panel (**Notificaciones → Inteligencia artificial**): an on/off switch, the provider (**Google Gemini** or **OpenAI**), the API key and, optionally, the model (empty: `gemini-2.5-flash` for Google, `gpt-4o-mini` for OpenAI). Changes apply at once, without restarting, and **Probar la IA** asks the saved configuration for one sentence and shows the answer or the reason it failed. The key is stored encrypted and never shown again.
+
+`AI_PROVIDER`, `AI_API_KEY` and `AI_MODEL` in `.env` only **seed** these settings the first time the API starts. An installation that still has `OPENAI_API_KEY` / `OPENAI_MODEL` and no `AI_API_KEY` is seeded as an OpenAI setup, so it keeps working. Each notice that can use the AI has its own switch and its own editable instructions (prompt) under **Avisos que usan la IA**: a new game, a completed game (and the suggestion of another game it may carry), a change in the games ranking and a change in the hours ranking. The prompts in `api/src/utils/ai_prompts.py` are only the defaults: nothing is copied to the database until an admin edits one, from then on the edited text wins, and **Restaurar las originales** goes back to following the code (so an improved default reaches everybody who never changed it).
 
 ## Front
 

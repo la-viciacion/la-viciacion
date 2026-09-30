@@ -21,7 +21,7 @@ from .. import auth
 from ..auth import get_db
 from ..crud import users as users_crud
 from ..database import models
-from ..utils import actions, my_utils, push, rawg_sync, seasons, settings
+from ..utils import actions, ai, my_utils, push, rawg_sync, seasons, settings
 from ..utils import email as mail
 from ..database.schemas import NOTES_MAX
 from ..utils.logger import LogManager
@@ -936,7 +936,13 @@ def get_settings(admin: models.User = Depends(auth.require_admin), db: Session =
     }
     # mail comes from the environment, not from app_settings: shown read-only, with where a test goes
     mail_info = {**mail.status(), "test_recipient": admin.email}
-    return {"values": settings.public_view(db), "jobs": jobs, "push_devices": push_devices, "mail": mail_info}
+    return {
+        "values": settings.public_view(db),
+        "jobs": jobs,
+        "push_devices": push_devices,
+        "mail": mail_info,
+        "ai_uses": settings.ai_uses(db),
+    }
 
 
 class SettingsBody(BaseModel):
@@ -1048,6 +1054,23 @@ async def send_test_message(admin: models.User = Depends(auth.require_admin)):
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Telegram no lo ha aceptado: {e}")
     return {"message": "Mensaje enviado"}
+
+
+@router.post("/settings/test-ai")
+def test_ai(admin: models.User = Depends(auth.require_admin)):
+    """Ask the AI for one short sentence with the saved provider, key and model (blocking network call:
+    a plain def, so it runs in a worker thread). Works with the AI switched off, to try a key before using it."""
+    if not settings.get("ai.api_key"):
+        raise HTTPException(status_code=409, detail="No hay ninguna clave de IA guardada")
+    provider, model = ai.current()
+    try:
+        reply = ai.complete(
+            "Responde solo con una frase corta y divertida sobre videojuegos.", "Saluda al grupo.", force=True
+        )
+    except ai.AIError as e:
+        logger.error(f"AI test by {admin.username} failed: {e}")
+        raise HTTPException(status_code=502, detail=f"La IA no ha respondido: {e}")
+    return {"message": "La IA ha respondido", "reply": reply, "provider": provider, "model": model}
 
 
 @router.post("/settings/test-email")

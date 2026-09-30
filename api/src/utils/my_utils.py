@@ -14,16 +14,13 @@ from ..config import Config
 from ..crud import games, time_entries, users
 from ..database import models, schemas
 from .achievements import AchievementsElems
-from ..clients.open_ai import OpenAIClient
-from ..utils import ai_prompts as prompts
-from . import push, settings
+from . import ai, push, settings
 from .redaction import redact_rawg_key
 from ..utils.logger import LogManager
 
 log_manager = LogManager()
 logger = log_manager.get_logger()
 
-oai_client = OpenAIClient()
 config = Config()
 
 
@@ -378,12 +375,12 @@ async def send_message(
     msg,
     silent: bool,
     image=None,
-    openai=False,
-    system_prompt=prompts.DEFAULT_SYSTEM_PROMPT,
+    ai_use: str | None = None,
     new_game_recommended: dict | None = None,
 ):
-    """`new_game_recommended` ({"game", "user"}) is suggested at the end of the notice: by the AI when
-    it rewrites the message, as a plain line when it does not (no key, or it failed)."""
+    """`ai_use` (an id of utils/ai_prompts.USES) lets the AI rewrite the notice when it is on for that use.
+    `new_game_recommended` ({"game", "user"}) is suggested at the end of the notice: by the AI when
+    it rewrites the message, as a plain line when it does not (off, no key, or it failed)."""
     if not silent and not settings.get("notifications.enabled"):
         logger.info("Notifications are disabled. Message not sent.")
         return
@@ -394,19 +391,13 @@ async def send_message(
     if not silent:
         logger.info("Preparing message...")
         rewritten = False
-        if openai:
+        if ai_use and ai.is_ready(ai_use):
             try:
-                if new_game_recommended:
-                    system_prompt += "\n" + prompts.NEW_GAME_RECOMMENDATION + "\n"
-                    system_prompt += "Juego recomendado: " + str(new_game_recommended["game"]) + "\n"
-                    system_prompt += "Jugado por: " + str(new_game_recommended["user"])
-                # the client is synchronous: keep it off the event loop
-                completion = await asyncio.to_thread(
-                    oai_client.chat_completion, user_prompt=msg, system_prompt=system_prompt
-                )
-                if completion is not None:
-                    logger.info(completion.choices[0].message.content)
-                    msg = completion.choices[0].message.content
+                # the clients block on the network: keep them off the event loop
+                text = await asyncio.to_thread(ai.complete, ai.prompt_for(ai_use, new_game_recommended), msg)
+                if text:
+                    logger.info(text)
+                    msg = text
                     rewritten = True
             except Exception as e:
                 logger.info("Error generating completion: " + str(e))

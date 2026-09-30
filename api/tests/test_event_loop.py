@@ -13,19 +13,20 @@ from src.utils import actions, my_utils
 
 
 class OffTheLoopTests(unittest.IsolatedAsyncioTestCase):
-    async def test_the_openai_call_runs_in_a_worker_thread(self):
+    async def test_the_ai_call_runs_in_a_worker_thread(self):
         seen = []
 
-        def completion(**kwargs):
+        def completion(system_prompt, user_prompt):
             seen.append(threading.current_thread())
             return None
 
         values = {"notifications.enabled": True, "telegram.token": None, "telegram.group_id": None}
-        with mock.patch.object(my_utils.oai_client, "chat_completion", completion), \
-                mock.patch.object(my_utils.settings, "get", side_effect=values.get), \
+        with mock.patch.object(my_utils.ai, "complete", completion), \
+                mock.patch.object(my_utils.ai, "is_ready", return_value=True), \
+                mock.patch.object(my_utils.settings, "get", side_effect=lambda k: values.get(k, my_utils.settings.REGISTRY[k].default)), \
                 mock.patch.object(my_utils.push, "is_ready", return_value=True), \
                 mock.patch.object(my_utils.push, "notify_group", new=mock.AsyncMock()):
-            await my_utils.send_message("hola", False, openai=True)
+            await my_utils.send_message("hola", False, ai_use="new_game")
         self.assertEqual(len(seen), 1)
         self.assertIsNot(seen[0], threading.main_thread())
 

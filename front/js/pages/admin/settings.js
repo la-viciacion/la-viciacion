@@ -1,6 +1,7 @@
-// "Notificaciones" tab: general switches, weekly summary schedule and the
-// Telegram bot (token, group, admin chat). Values live in the app_settings
-// table; the API never returns the token, only whether it is set.
+// "Notificaciones" tab: general switches, weekly summary schedule, the Telegram bot
+// (token, group, admin chat) and the AI that writes the notices (provider, key, model).
+// Values live in the app_settings table; the API never returns a secret (the Telegram
+// token, the AI key), only whether it is set.
 import { api, jsonRequest } from '../../lib/api.js';
 import { formatDateTime } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
@@ -8,10 +9,14 @@ import { toast } from '../../ui/toast.js';
 import { errorState } from './components.js';
 import { confirmDialog } from './dialogs.js';
 
+const SECRETS = ['telegram.token', 'ai.api_key']; // never loaded back: sent only when something is typed
+const AI_PROVIDERS = [['google', 'Google (Gemini)'], ['openai', 'OpenAI']];
+
 const WEEKDAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
 let panel;
 let loaded = {}; // values as the server has them
+let aiUses = []; // where the AI writes: label, original prompt and whether it was changed
 
 const check = (name, label, hint) => html`
   <label class="adm-check adm-set-check"><input type="checkbox" name="${name}" /> <span><strong>${label}</strong><span class="adm-sub">${hint}</span></span></label>`;
@@ -26,8 +31,26 @@ function mailStatus(mail) {
   return `Configurado: envía como ${mail.from} por ${mail.host}:${mail.port} (${mail.security}); los enlaces apuntan a ${mail.public_url}.`;
 }
 
-function view(values, jobs, pushDevices, mail) {
+// One notice that can use the AI: its own switch (a fragment has none) and its editable instructions.
+function aiUse(use) {
+  return html`
+    <div class="adm-ai-use">
+      ${use.switchable
+    ? check(`ai.use.${use.id}`, use.label, use.help)
+    : html`<div><strong>${use.label}</strong><span class="adm-sub">${use.help}</span></div>`}
+      <details class="adm-details">
+        <summary>Instrucciones${use.customized ? ' (modificadas)' : ''}</summary>
+        <div>
+          <textarea class="adm-input" name="ai.prompt.${use.id}" rows="9" spellcheck="false"></textarea>
+          <button type="button" class="adm-btn" data-set-act="reset-prompt" data-use="${use.id}">Restaurar las originales</button>
+        </div>
+      </details>
+    </div>`;
+}
+
+function view(values, jobs, pushDevices, mail, aiUses) {
   const token = values['telegram.token'];
+  const aiKey = values['ai.api_key'];
   const vapid = values['push.vapid_private'];
   return html`
     <form class="adm-settings" id="admSettings" novalidate>
@@ -62,6 +85,27 @@ function view(values, jobs, pushDevices, mail) {
       </section>
 
       <section class="adm-set-card">
+        <h3>Inteligencia artificial</h3>
+        ${check('ai.enabled', 'Usar IA en los avisos', 'Apagada, los avisos salen con el texto original. Necesita una clave guardada para funcionar.')}
+        <label>Proveedor
+          <select class="adm-input" name="ai.provider">${AI_PROVIDERS.map(([id, label]) => html`<option value="${id}">${label}</option>`)}</select>
+        </label>
+        <label>Clave de la API
+          <input class="adm-input" type="password" name="ai.api_key" autocomplete="new-password"
+                 placeholder="${aiKey.is_set ? `Configurada (${aiKey.hint}). Escribe una nueva para cambiarla` : 'Sin configurar'}" />
+        </label>
+        <label>Modelo <input class="adm-input" type="text" name="ai.model" placeholder="Vacío: el modelo por defecto del proveedor" /></label>
+        <div class="adm-sub">Se aplica al momento, sin reiniciar. La clave se guarda cifrada y no se vuelve a mostrar. Por defecto: Google <code>gemini-2.5-flash</code>, OpenAI <code>gpt-4o-mini</code>.</div>
+        <div><button type="button" class="adm-btn" data-set-act="test-ai" ${aiKey.is_set ? '' : html`disabled`}>Probar la IA</button></div>
+      </section>
+
+      <section class="adm-set-card">
+        <h3>Avisos que usan la IA</h3>
+        <div class="adm-sub">Cada aviso se puede activar o desactivar por separado (con la IA general apagada no se usa ninguno), y sus instrucciones se pueden cambiar. Mientras no las cambies, siguen las que trae la aplicación; al restaurarlas vuelven a seguirlas.</div>
+        ${aiUses.map((use) => aiUse(use))}
+      </section>
+
+      <section class="adm-set-card">
         <h3>Avisos en la app (push)</h3>
         ${check('push.enabled', 'Enviar avisos a la app instalada', 'Función activa para todos por defecto; nadie recibe nada hasta que cada usuario lo active en su perfil («Avisos en la app») y elija en qué dispositivos. Los avisos del grupo llegan a quien los marque y los privados (timer olvidado…) solo a su usuario. Necesita las notificaciones activadas y HTTPS.')}
         <label>Contacto para los servicios push
@@ -89,7 +133,7 @@ function view(values, jobs, pushDevices, mail) {
 function fill(form, values) {
   for (const [key, value] of Object.entries(values)) {
     const field = form.elements[key];
-    if (!field || key === 'telegram.token') continue;
+    if (!field || SECRETS.includes(key)) continue;
     if (field.type === 'checkbox') field.checked = Boolean(value);
     else field.value = value ?? '';
   }
@@ -100,11 +144,22 @@ function collect(form) {
   for (const [key, before] of Object.entries(loaded)) {
     const field = form.elements[key];
     if (!field) continue;
-    if (key === 'telegram.token') {
+    if (SECRETS.includes(key)) {
       if (field.value.trim()) changes[key] = field.value.trim();
       continue;
     }
-    const now = field.type === 'checkbox' ? field.checked : field.type === 'select-one' ? Number(field.value) : field.value.trim();
+    const isNumber = typeof before === 'number';
+    const now = field.type === 'checkbox' ? field.checked : field.type === 'select-one' && isNumber ? Number(field.value) : field.value.trim();
+    if (key.startsWith('ai.prompt.')) {
+      // the original text (or nothing) is not an override: it goes back to following the application's prompt
+      const use = aiUses.find((u) => `ai.prompt.${u.id}` === key);
+      if (now === '' || now === use.default_prompt.trim()) {
+        if (use.customized) changes[key] = null;
+      } else if (now !== before) {
+        changes[key] = now;
+      }
+      continue;
+    }
     if (now === '' && before == null) continue; // an optional text left empty
     if (now !== before) changes[key] = now;
   }
@@ -147,6 +202,27 @@ async function sendTestEmail(mail) {
   }
 }
 
+// What was typed but not saved yet is not what the test uses: it asks the API, which uses what is stored.
+async function testAi(form) {
+  // the prompts and the per-notice switches are not part of the test
+  if (Object.keys(collect(form)).some((key) => key.startsWith('ai.') && !key.startsWith('ai.prompt.') && !key.startsWith('ai.use.'))) {
+    return toast('Guarda los cambios antes de probar la IA', 'err');
+  }
+  toast('Probando la IA…');
+  try {
+    const result = await api('/manage/settings/test-ai', { method: 'POST' });
+    toast(`${result.provider} (${result.model}) responde: ${result.reply}`);
+  } catch (err) {
+    toast(err.message, 'err');
+  }
+}
+
+// Puts the original instructions back in the box; they take effect when the changes are saved.
+function resetPrompt(form, id) {
+  form.elements[`ai.prompt.${id}`].value = aiUses.find((u) => u.id === id).default_prompt.trim();
+  toast('Instrucciones originales restauradas: guarda los cambios para aplicarlo');
+}
+
 async function generateKeys(replace) {
   if (replace) {
     const ok = await confirmDialog('Regenerar claves', html`<p>Todos los dispositivos suscritos dejarán de recibir avisos y cada usuario tendrá que volver a activarlos.</p>`, { danger: true, ok: 'Regenerar' });
@@ -164,10 +240,11 @@ async function generateKeys(replace) {
 export async function render(target) {
   panel = target;
   try {
-    const { values, jobs, push_devices: pushDevices, mail } = await api('/manage/settings');
-    loaded = Object.fromEntries(Object.entries(values).filter(([key]) => key !== 'telegram.token' && !key.startsWith('push.vapid')));
-    loaded['telegram.token'] = null;
-    mount(panel, view(values, jobs, pushDevices, mail));
+    const { values, jobs, push_devices: pushDevices, mail, ai_uses: uses } = await api('/manage/settings');
+    aiUses = uses;
+    loaded = Object.fromEntries(Object.entries(values).filter(([key]) => !SECRETS.includes(key) && !key.startsWith('push.vapid')));
+    for (const key of SECRETS) loaded[key] = null;
+    mount(panel, view(values, jobs, pushDevices, mail, aiUses));
     const form = panel.querySelector('#admSettings');
     fill(form, values);
     form.addEventListener('submit', (e) => { e.preventDefault(); save(form); });
@@ -175,6 +252,8 @@ export async function render(target) {
       const act = e.target.closest('[data-set-act]')?.dataset.setAct;
       if (act === 'test') sendTest();
       else if (act === 'test-email') sendTestEmail(mail);
+      else if (act === 'test-ai') testAi(form);
+      else if (act === 'reset-prompt') resetPrompt(form, e.target.closest('[data-use]').dataset.use);
       else if (act === 'push-keys') generateKeys(values['push.vapid_private'].is_set);
     });
   } catch (err) {
