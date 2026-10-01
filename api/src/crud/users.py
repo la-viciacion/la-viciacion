@@ -119,18 +119,30 @@ def change_password(db: Session, user: models.User, new_password: str):
         raise
 
 
+def seasons_played(db: Session, user_id: int) -> list[int]:
+    """The seasons the user has something in (plus the running one), newest first."""
+    found = {seasons.current()}
+    for model in (models.UserGame, models.GameTimer, models.UserAchievement):
+        found.update(year for (year,) in db.query(model.season).filter(model.user_id == user_id).distinct() if year)
+    return sorted(found, reverse=True)
+
+
 def get_profile(db: Session, user: models.User, season: int = None) -> dict:
-    """Main stats of a user for the profile page."""
+    """Main stats of a user for the profile page. `season` may be seasons.ALL for the totals."""
     season = seasons.or_current(season)
+    every = season == seasons.ALL
     from . import time_entries as time_entries_crud
 
     played_days = time_entries_crud.get_played_days(db, user.id, season=season)[1]
-    best_date, best_streak, current_streak = streaks.streak_summary(played_days, datetime.date.today(), season)[:3]
+    best_date, best_streak, current_streak = streaks.streak_summary(
+        played_days, datetime.date.today(), seasons.current() if every else season
+    )[:3]
     total = time_entries_crud.get_user_played_time(db, user.id, season)
     played_time = total[1] if total is not None else 0
     achievements = get_achievements(db, user.username, season)
     return {
-        "season": season,
+        "season": "all" if every else season,
+        "seasons": seasons_played(db, user.id),
         "user": {
             "id": user.id,
             "username": user.username,
@@ -409,11 +421,10 @@ def add_new_game(
 def count_played_games(db: Session, user_id: int, season: int = None):
     season = seasons.or_current(season)
     try:
-        return (
-            db.query(func.count(func.distinct(models.UserGame.game_id)))
-            .filter(models.UserGame.user_id == user_id, models.UserGame.season == season)
-            .scalar()
-        )
+        query = db.query(func.count(func.distinct(models.UserGame.game_id))).filter(models.UserGame.user_id == user_id)
+        if season != seasons.ALL:
+            query = query.filter(models.UserGame.season == season)
+        return query.scalar()
     except SQLAlchemyError as e:
         logger.error("Error counting played games: " + str(e))
         raise e
@@ -422,11 +433,10 @@ def count_played_games(db: Session, user_id: int, season: int = None):
 def count_completed_games(db: Session, user_id: int, season: int = None):
     season = seasons.or_current(season)
     try:
-        return (
-            db.query(models.UserGame)
-            .filter_by(user_id=user_id, completed=1, season=season)
-            .count()
-        )
+        query = db.query(models.UserGame).filter_by(user_id=user_id, completed=1)
+        if season != seasons.ALL:
+            query = query.filter_by(season=season)
+        return query.count()
     except SQLAlchemyError as e:
         logger.error("Error counting completed games: " + str(e))
         raise e
@@ -762,6 +772,19 @@ def top_games(db: Session, username: str, limit: int = 10, season: int = None):
     season = seasons.or_current(season)
     try:
         user = get_user_by_username(db, username)
+        if season == seasons.ALL:
+            # across seasons a game is one row: its time in every season added up
+            sessions = time_entries_crud.sessions_subquery()
+            total = func.sum(sessions.c.duration)
+            stmt = (
+                select(sessions.c.game_id, models.Game.name.label("game_name"), total.label("played_time"))
+                .join(models.Game, models.Game.id == sessions.c.game_id)
+                .where(sessions.c.user_id == user.id)
+                .group_by(sessions.c.game_id, models.Game.name)
+                .order_by(desc(total))
+                .limit(limit)
+            )
+            return db.execute(stmt).fetchall()
         entry_time = time_entries_crud.entry_played_time(user.id)
         played = func.coalesce(entry_time.c.played_time, 0)
         stmt = (
@@ -819,7 +842,7 @@ def get_achievements(db: Session, username: str, season: int = None):
             )
             .where(
                 models.UserAchievement.user_id == user.id,
-                models.UserAchievement.season == season,
+                True if season == seasons.ALL else models.UserAchievement.season == season,
             )
             .group_by(
                 models.UserAchievement.user_id,

@@ -89,13 +89,14 @@ def get_user(
 @version(1)
 def get_profile(
     username: str,
+    season: str | None = Query(None, pattern=r"^(all|\d{4})$", description="A year, or 'all' for the totals; default: the running season"),
     active_user: models.User = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db),
 ):
     """Main stats, in-progress games and personal data of a user"""
     auth.ensure_self_or_admin(active_user, username=username)
     user = _target_user(db, active_user, username)
-    return users.get_profile(db, user)
+    return users.get_profile(db, user, seasons.ALL if season == "all" else int(season) if season else None)
 
 
 @router.patch("/{username}/profile")

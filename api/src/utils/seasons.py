@@ -8,6 +8,10 @@ the server (see the TZ variable of the deployment).
 """
 import datetime
 
+# Passed where a season is expected, asks for every season at once (the profile's "Total").
+# There is no year 0, so it can never be a real season.
+ALL = 0
+
 
 def current() -> int:
     """The running season."""

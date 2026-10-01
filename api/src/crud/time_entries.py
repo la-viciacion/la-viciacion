@@ -12,6 +12,7 @@ from sqlalchemy import (
     or_,
     select,
     text,
+    true,
     update,
 )
 from sqlalchemy.orm import Session
@@ -28,6 +29,11 @@ log_manager = LogManager()
 logger = log_manager.get_logger()
 
 config = Config()
+
+
+def _in_season(column, season: int):
+    """`column` is in the season (any season when asked for seasons.ALL)."""
+    return true() if season == seasons.ALL else column == season
 
 
 def sessions_subquery():
@@ -141,7 +147,7 @@ def get_user_played_time(db: Session, user_id: str, season: int = None):
         )
         .where(
             sessions.c.user_id == user_id,
-            sessions.c.season == season,
+            _in_season(sessions.c.season, season),
         )
         .group_by(sessions.c.user_id)
     )
@@ -216,8 +222,7 @@ def get_played_days(
     played_days = []
     real_played_days = []
     if start_date is None:
-        current_date = datetime.datetime.now()
-        start_date = str(current_date.year) + "-01-01"
+        start_date = "1970-01-01" if season == seasons.ALL else f"{season}-01-01"
     if end_date is None:
         end_date = "3000-12-31"
     sessions = sessions_subquery()
@@ -226,7 +231,7 @@ def get_played_days(
         .filter(sessions.c.user_id == user_id)
         .filter(func.DATE(sessions.c.start) >= start_date)
         .filter(func.DATE(sessions.c.start) <= end_date)
-        .filter(sessions.c.season == season)
+        .filter(_in_season(sessions.c.season, season))
         .filter(sessions.c.duration >= 600)
         .distinct()
         .all()
@@ -236,7 +241,7 @@ def get_played_days(
         .filter(sessions.c.user_id == user_id)
         .filter(func.DATE(sessions.c.end) >= start_date)
         .filter(func.DATE(sessions.c.end) <= end_date)
-        .filter(sessions.c.season == season)
+        .filter(_in_season(sessions.c.season, season))
         .filter(sessions.c.duration >= 600)
         .distinct()
         .all()
