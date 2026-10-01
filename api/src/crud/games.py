@@ -1,4 +1,5 @@
 import datetime
+import math
 import uuid
 from typing import Union
 import random
@@ -79,8 +80,8 @@ def recommended_games(
     return unique_recommended_games
 
 
-def recommendations_for(db: Session, user_id: int, limit: int = 12) -> list[dict]:
-    """Games other (active) players have and `user_id` has never had in their library, any season.
+def recommendation_candidates(db: Session, user_id: int) -> list[dict]:
+    """Every game other (active) players have and `user_id` has never had in their library, any season.
 
     The ones more players share come first, then those more of them completed, then by name, so the
     answer is the same until somebody's library changes."""
@@ -113,11 +114,86 @@ def recommendations_for(db: Session, user_id: int, limit: int = 12) -> list[dict
             item["players"].append(owner)
         if completed:
             completed_by.setdefault(game_id, set()).add(owner_id)
+    # what the other players have put into each game: seconds and finished sessions, any season
+    activity = {
+        game_id: (seconds or 0, sessions)
+        for game_id, seconds, sessions in db.query(
+            models.GameTimer.game_id, func.sum(models.GameTimer.duration_seconds), func.count(models.GameTimer.id)
+        )
+        .join(models.User, models.GameTimer.user_id == models.User.id)
+        .filter(
+            models.GameTimer.game_id.in_(list(found)),
+            models.GameTimer.is_active == False,  # noqa: E712
+            models.GameTimer.user_id != user_id,
+            models.User.is_active == 1,
+            models.not_god(),
+        )
+        .group_by(models.GameTimer.game_id)
+    } if found else {}
     for game_id, item in found.items():
         item["players"].sort(key=str.lower)
         item["completed_by"] = len(completed_by.get(game_id, ()))
-    ranked = sorted(found.values(), key=lambda i: (-len(i["players"]), -i["completed_by"], i["game_name"].lower()))
-    return ranked[:limit]
+        item["played_seconds"], item["sessions"] = activity.get(game_id, (0, 0))
+    return sorted(found.values(), key=lambda i: (-len(i["players"]), -i["completed_by"], i["game_name"].lower()))
+
+
+# How much each signal weighs in the chance of a candidate being picked. Hours and sessions go through
+# a logarithm so a game somebody left running for months does not crowd out the rest.
+W_PLAYER = 2.0  # per player that has it
+W_COMPLETED = 3.0  # per player that completed it
+W_HOURS = 1.5  # per ln(1 + hours played by everybody else)
+W_SESSIONS = 1.0  # per ln(1 + sessions of everybody else)
+
+
+def genre_affinity(db: Session, user_id: int) -> dict[str, float]:
+    """The share of the user's playing time that went to each genre (a game with several genres counts
+    for each of them, so the shares can add up to more than 1)."""
+    rows = (
+        db.query(models.Game.genres, func.sum(models.GameTimer.duration_seconds))
+        .join(models.GameTimer, models.GameTimer.game_id == models.Game.id)
+        .filter(models.GameTimer.user_id == user_id, models.GameTimer.is_active == False)  # noqa: E712
+        .group_by(models.Game.id, models.Game.genres)
+        .all()
+    )
+    total = sum(seconds or 0 for _, seconds in rows)
+    shares: dict[str, float] = {}
+    for genres, seconds in rows:
+        for genre in genre_list(genres):
+            shares[genre.lower()] = shares.get(genre.lower(), 0) + (seconds or 0) / total
+    return shares if total else {}
+
+
+def recommendation_weight(item: dict, affinity: dict[str, float]) -> float:
+    """The chance (relative to the others) that a candidate is picked: what the others have put into it
+    (players, completions, hours, sessions) times a boost, up to double, for the genres the user plays most."""
+    base = (
+        1
+        + W_PLAYER * len(item["players"])
+        + W_COMPLETED * item["completed_by"]
+        + W_HOURS * math.log1p(item["played_seconds"] / 3600)
+        + W_SESSIONS * math.log1p(item["sessions"])
+    )
+    liked = min(1.0, sum(affinity.get(genre.lower(), 0) for genre in item["genres"]))
+    return base * (1 + liked)
+
+
+def weighted_sample(weights: list[float], k: int, rng=random) -> list[int]:
+    """Indices of `k` items picked without repeats, each with a chance proportional to its weight
+    (Efraimidis-Spirakis: the k biggest of random() ** (1 / weight))."""
+    keys = sorted(((rng.random() ** (1 / w), i) for i, w in enumerate(weights)), reverse=True)
+    return sorted(i for _, i in keys[:k])
+
+
+def recommendations_for(db: Session, user_id: int, limit: int = 12, rng=random) -> list[dict]:
+    """`limit` games picked at random among the candidates, favouring the ones the others have shared,
+    completed and played most and the genres this user plays most; every visit shows others. The picked
+    ones keep the candidates' order."""
+    candidates = recommendation_candidates(db, user_id)
+    if not candidates:
+        return []
+    affinity = genre_affinity(db, user_id)
+    chosen = weighted_sample([recommendation_weight(c, affinity) for c in candidates], limit, rng)
+    return [candidates[i] for i in chosen]
 
 
 async def new_game(db: Session, game: schemas.NewGame) -> models.Game:

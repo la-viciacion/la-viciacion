@@ -1,4 +1,5 @@
 import datetime
+import random
 import unittest
 from unittest import mock
 
@@ -34,7 +35,7 @@ class RecommendationsForTests(unittest.TestCase):
         self.db.commit()
 
     def names(self, user_id=1, **kwargs):
-        return [g["game_name"] for g in games.recommendations_for(self.db, user_id, **kwargs)]
+        return [g["game_name"] for g in games.recommendation_candidates(self.db, user_id, **kwargs)]
 
     def test_games_the_user_already_has_are_left_out_whatever_the_season(self):
         add_library(self.db, [(1, "doom", 0), (2, "doom", 0), (2, "hades", 0)])
@@ -55,7 +56,7 @@ class RecommendationsForTests(unittest.TestCase):
         add_library(self.db, [(2, "doom", 1), (3, "doom", 0)])
         self.db.add(models.UserGame(user_id=2, game_id="doom", completed=0, started_date=datetime.date(2020, 3, 1), platform="ps"))
         self.db.commit()
-        doom = games.recommendations_for(self.db, 1)[0]
+        doom = games.recommendation_candidates(self.db, 1)[0]
         self.assertEqual(doom["players"], ["Bob", "cris"])  # a nameless account shows its username
         self.assertEqual(doom["completed_by"], 1)
         self.assertEqual(doom["genres"], ["Shooter", "Action"])
@@ -65,13 +66,99 @@ class RecommendationsForTests(unittest.TestCase):
         add_library(self.db, [(4, "doom", 1), (5, "hades", 1)])
         self.assertEqual(self.names(), [])
 
-    def test_limit(self):
-        add_library(self.db, [(2, "doom", 0), (2, "hades", 0), (2, "zelda", 0)])
-        self.assertEqual(len(self.names(limit=2)), 2)
+    def test_limit_picks_that_many_of_the_candidates_keeping_their_order(self):
+        add_library(self.db, [(2, "doom", 0), (3, "doom", 0), (2, "hades", 0), (2, "zelda", 0), (2, "quake", 0)])
+        everything = self.names()
+        for seed in range(20):
+            picked = [g["game_name"] for g in games.recommendations_for(self.db, 1, limit=2, rng=random.Random(seed))]
+            self.assertEqual(len(picked), 2)
+            self.assertEqual(picked, sorted(picked, key=everything.index))
+
+    def test_every_visit_can_show_other_games(self):
+        add_library(self.db, [(2, "doom", 0), (2, "hades", 0), (2, "zelda", 0), (2, "quake", 0), (2, "mine", 0)])
+        seen = {
+            frozenset(g["game_name"] for g in games.recommendations_for(self.db, 1, limit=2, rng=random.Random(seed)))
+            for seed in range(30)
+        }
+        self.assertGreater(len(seen), 1)
+
+    def test_fewer_candidates_than_the_limit_are_all_returned(self):
+        add_library(self.db, [(2, "doom", 0)])
+        self.assertEqual([g["game_name"] for g in games.recommendations_for(self.db, 1, limit=12)], ["Doom"])
 
     def test_a_user_with_no_library_gets_what_everybody_else_has(self):
         add_library(self.db, [(2, "doom", 0)])
         self.assertEqual(self.names(user_id=3), ["Doom"])
+
+
+def add_session(db, user_id, game_id, hours, day=1):
+    start = datetime.datetime(DAY.year, 2, day, 10)
+    db.add(models.GameTimer(
+        user_id=user_id, game_id=game_id, platform="pc", start_time=start,
+        end_time=start + datetime.timedelta(hours=hours), duration_seconds=hours * 3600, is_active=False,
+    ))
+    db.commit()
+
+
+class WeightTests(unittest.TestCase):
+    def setUp(self):
+        self.db = make_session()
+        self.db.add_all([
+            models.User(id=1, name="Ana", username="ana", is_active=1),
+            models.User(id=2, name="Bob", username="bob", is_active=1),
+            models.User(id=3, name="Cris", username="cris", is_active=1),
+            models.User(id=4, name="Gone", username="gone", is_active=0),
+            models.Game(id="doom", name="Doom", genres="Shooter"),
+            models.Game(id="hades", name="Hades", genres="Roguelike"),
+            models.Game(id="zelda", name="Zelda", genres="Adventure"),
+        ])
+        self.db.commit()
+
+    def item(self, **kw):
+        return {"players": ["Bob"], "completed_by": 0, "played_seconds": 0, "sessions": 0, "genres": [], **kw}
+
+    def test_candidates_carry_what_the_others_played_but_not_the_users_nor_inactive_players(self):
+        add_library(self.db, [(2, "doom", 0), (3, "doom", 0), (4, "doom", 0)])
+        add_session(self.db, 2, "doom", 2, day=1)
+        add_session(self.db, 3, "doom", 3, day=2)
+        add_session(self.db, 4, "doom", 50, day=3)  # inactive: not counted
+        add_session(self.db, 1, "doom", 40, day=4)  # the user's own time is not "what the others played"
+        doom = games.recommendation_candidates(self.db, 1)[0]
+        self.assertEqual((doom["played_seconds"], doom["sessions"]), (5 * 3600, 2))
+
+    def test_every_signal_raises_the_weight(self):
+        base = games.recommendation_weight(self.item(), {})
+        for change in ({"players": ["Bob", "Cris"]}, {"completed_by": 1}, {"played_seconds": 3600}, {"sessions": 1}):
+            self.assertGreater(games.recommendation_weight(self.item(**change), {}), base, change)
+
+    def test_hours_and_sessions_are_damped(self):
+        some = games.recommendation_weight(self.item(played_seconds=10 * 3600, sessions=10), {})
+        lots = games.recommendation_weight(self.item(played_seconds=1000 * 3600, sessions=1000), {})
+        self.assertLess(lots, 4 * some)
+
+    def test_the_genres_the_user_plays_most_boost_the_weight_up_to_double(self):
+        add_session(self.db, 1, "doom", 9)
+        add_session(self.db, 1, "hades", 1, day=2)
+        affinity = games.genre_affinity(self.db, 1)
+        self.assertAlmostEqual(affinity["shooter"], 0.9)
+        liked = games.recommendation_weight(self.item(genres=["Shooter"]), affinity)
+        other = games.recommendation_weight(self.item(genres=["Adventure"]), affinity)
+        self.assertGreater(liked, other)
+        self.assertLessEqual(liked, 2 * other)
+
+    def test_a_user_with_no_sessions_has_no_affinity(self):
+        self.assertEqual(games.genre_affinity(self.db, 1), {})
+
+    def test_the_sample_has_no_repeats_and_favours_the_heavy(self):
+        weights = [1, 1, 1, 1, 50]
+        counts = [0] * 5
+        for seed in range(200):
+            picked = games.weighted_sample(weights, 2, random.Random(seed))
+            self.assertEqual(len(set(picked)), 2)
+            for i in picked:
+                counts[i] += 1
+        self.assertGreater(counts[4], 190)
+        self.assertTrue(all(c > 0 for c in counts[:4]))  # the light ones still come out now and then
 
 
 class FakeBot:
