@@ -198,6 +198,7 @@ class GameTimerGroup(BaseModel):
     last_played: datetime.datetime
     total_seconds: int
     session_count: int
+    completed: bool = False  # completed in the running season
     # Most recent sessions first, capped by the endpoint's sessions_per_game.
     sessions: list[GameTimerResponse]
 

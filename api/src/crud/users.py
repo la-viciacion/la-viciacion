@@ -541,7 +541,7 @@ def completed_in_season(db: Session, user_id: int, game_id: str, season: int) ->
     return (game_id, season) in _completed_keys(db, user_id)
 
 
-def _library_query(user_id: int, entry_id: int | None = None):
+def _library_query(user_id: int, entry_id: int | None = None, game_id: str | None = None):
     from . import time_entries as time_entries_crud
 
     last = _last_played_by_year(user_id)
@@ -577,6 +577,8 @@ def _library_query(user_id: int, entry_id: int | None = None):
     )
     if entry_id is not None:
         stmt = stmt.where(models.UserGame.id == entry_id)
+    if game_id is not None:
+        stmt = stmt.where(models.UserGame.game_id == game_id)
     # most recently played first; entries without sessions go last (by start date)
     return stmt.order_by(
         last.c.last_played.is_(None),
@@ -615,10 +617,13 @@ def _library_item(row, completed_keys: set, current_season: int) -> dict:
     }
 
 
-def get_library(db: Session, user_id: int, limit: int = 15, offset: int = 0) -> dict:
+def get_library(db: Session, user_id: int, limit: int = 15, offset: int = 0, game_id: str | None = None) -> dict:
     season = seasons.current()
-    total = db.query(models.UserGame).filter(models.UserGame.user_id == user_id).count()
-    rows = db.execute(_library_query(user_id).limit(limit).offset(offset)).all()
+    count = db.query(models.UserGame).filter(models.UserGame.user_id == user_id)
+    if game_id is not None:
+        count = count.filter(models.UserGame.game_id == game_id)
+    rows = db.execute(_library_query(user_id, game_id=game_id).limit(limit).offset(offset)).all()
+    total = count.count()
     keys = _completed_keys(db, user_id)
     return {
         "season": season,

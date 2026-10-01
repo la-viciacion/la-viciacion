@@ -208,6 +208,16 @@ def get_grouped_timer_history(
         for game_id, platform in used:
             platforms_by_game[game_id].append(platform)
 
+    # games the user has completed in the running season
+    completed = set()
+    if game_ids:
+        completed = {
+            game_id
+            for (game_id,) in db.query(UserGame.game_id)
+            .filter(UserGame.user_id == user_id, UserGame.game_id.in_(game_ids), UserGame.completed == 1, UserGame.season == seasons.current())
+            .distinct()
+        }
+
     groups: List[GameTimerGroup] = []
     for row in page:
         game = games.get(row.game_id)
@@ -222,6 +232,7 @@ def get_grouped_timer_history(
                 last_played=row.last_played,
                 total_seconds=int(row.total_seconds),
                 session_count=row.session_count,
+                completed=row.game_id in completed,
                 sessions=sessions,
             )
         )

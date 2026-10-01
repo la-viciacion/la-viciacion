@@ -195,13 +195,14 @@ def get_library(
     username: str,
     limit: int = Query(15, ge=1, le=100),
     offset: int = Query(0, ge=0),
+    game_id: str | None = Query(None, description="Only the entries of this game"),
     active_user: models.User = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db),
 ):
     """Every game of the user (all seasons), most recently played first"""
     auth.ensure_self_or_admin(active_user, username=username)
     user = _target_user(db, active_user, username)
-    return users.get_library(db, user.id, limit, offset)
+    return users.get_library(db, user.id, limit, offset, game_id)
 
 
 @router.get("/{username}/recommendations")
