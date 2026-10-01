@@ -64,7 +64,30 @@ test('a push without data still shows something', async () => {
   assert.equal(sw.shown[0].title, 'La Viciación');
 });
 
-test('tapping a notification closes it and opens its url', async () => {
+test('tapping a pinned notification opens the app and shows it again', async () => {
+  const sw = load();
+  await sw.run('push', push({ title: 'Hollow Knight', body: '1h 25min', tag: 'timer', quiet: true, pinned: true, button: 'Parar', url: '/' }));
+  const shown = sw.shown.pop();
+  const notification = { title: shown.title, data: shown.data, close() { this.closed = true; } };
+  await sw.run('notificationclick', { action: '', notification });
+  assert.deepEqual(JSON.parse(JSON.stringify(sw.opened)), ['/']);
+  assert.notEqual(notification.closed, true);
+  const [again] = sw.shown;
+  assert.deepEqual(JSON.parse(JSON.stringify({ ...again, data: undefined })), JSON.parse(JSON.stringify({ ...shown, data: undefined })));
+  assert.equal(again.requireInteraction, true);
+  assert.equal(again.silent, true);
+});
+
+test('tapping the button of a pinned notification keeps it too', async () => {
+  const sw = load();
+  const data = { url: '/', body: '5 min', tag: 'timer', quiet: true, pinned: true, button: 'Parar' };
+  await sw.run('notificationclick', { action: 'open', notification: { title: 'Hollow Knight', data, close() {} } });
+  assert.equal(sw.shown.length, 1);
+  assert.equal(sw.shown[0].title, 'Hollow Knight');
+  assert.equal(sw.shown[0].body, '5 min');
+});
+
+test('tapping an ordinary notification closes it and opens its url', async () => {
   const sw = load();
   const notification = { data: { url: '#/profile' }, close() { this.closed = true; } };
   await sw.run('notificationclick', { notification });
@@ -76,5 +99,6 @@ test('tapping the button opens the app like tapping the notification', async () 
   const sw = load();
   const notification = { data: { url: '/' }, close() {} };
   await sw.run('notificationclick', { action: 'open', notification });
+  assert.equal(sw.shown.length, 0);
   assert.deepEqual(JSON.parse(JSON.stringify(sw.opened)), ['/']);
 });
