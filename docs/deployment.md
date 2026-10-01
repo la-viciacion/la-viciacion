@@ -63,7 +63,7 @@ Rules of thumb:
 
 ## TLS and exposure
 
-The compose file publishes the front on `:3000` (plain HTTP) and the API/DB only on localhost. TLS termination and the public domain are expected to be handled by a reverse proxy in front of the front container (not part of this repo). Do not publish the DB or the API directly.
+The compose file publishes the front on `:3000` (plain HTTP, every interface) and the API/DB only on localhost. The host side of each port is set in `.env`: `FRONT_HOST_IP` / `FRONT_HOST_PORT`, `API_HOST_IP` / `API_HOST_PORT`, `DB_HOST_IP` / `DB_HOST_PORT` (the containers keep 3000, 5000 and 3306), e.g. `FRONT_HOST_IP=10.0.0.2` to expose the front only on the server's internal address. TLS termination and the public domain are expected to be handled by a reverse proxy in front of the front container (not part of this repo). Do not publish the DB or the API directly.
 
 ## Deploying a change
 

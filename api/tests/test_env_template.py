@@ -19,6 +19,7 @@ EXTERNAL = {
     "LAVI_VERSION",  # docker-compose.yml (image tag)
     "API_UPSTREAM",  # docker-compose.yml, rendered into the front's nginx config
     "DNS_RESOLVER",  # same
+    "FRONT_HOST_IP", "FRONT_HOST_PORT", "API_HOST_IP", "API_HOST_PORT", "DB_HOST_IP", "DB_HOST_PORT",  # docker-compose.yml (published ports)
 }
 # Only read to seed the settings the first time, or kept so an old .env keeps working.
 LEGACY = {"OPENAI_API_KEY", "OPENAI_MODEL", "RAWG_URL"}
