@@ -49,11 +49,23 @@
   .adm-shell { grid-template-columns: minmax(0, 1fr); gap: 16px; }
   .adm-side { position: static; }
   .adm-side-toggle {
-    display: flex; justify-content: space-between; align-items: center; gap: 12px; width: 100%;
-    background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-secondary);
-    font: inherit; font-weight: 600; padding: 12px 14px; cursor: pointer;
+    display: flex; align-items: center; gap: 14px; width: 100%; text-align: left;
+    background: var(--bg-card); border: 1px solid var(--border-accent); border-radius: var(--radius-md); color: var(--text-primary);
+    font: inherit; padding: 10px 14px; cursor: pointer;
   }
-  .adm-side-toggle span:last-child { color: var(--accent-teal); }
+  .adm-side-toggle:active { background: var(--bg-card-hover); }
+  .adm-side-burger {
+    flex-shrink: 0; width: 18px; height: 2px; background: var(--accent-teal); border-radius: 2px;
+    box-shadow: 0 -6px 0 var(--accent-teal), 0 6px 0 var(--accent-teal);
+  }
+  .adm-side-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .adm-side-text small { color: var(--text-muted); font-size: 0.72rem; }
+  .adm-side-text strong { font-size: 1rem; }
+  .adm-side-caret {
+    flex-shrink: 0; width: 9px; height: 9px; margin: 0 4px 3px 0; border: solid var(--accent-teal); border-width: 0 2px 2px 0;
+    transform: rotate(45deg); transition: transform 0.2s ease;
+  }
+  .adm-side-toggle[aria-expanded="true"] .adm-side-caret { transform: rotate(-135deg); margin: 3px 4px 0 0; }
   .adm-nav { display: none; margin-top: 8px; padding: 12px 6px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); }
   .adm-side.open .adm-nav { display: flex; }
 }

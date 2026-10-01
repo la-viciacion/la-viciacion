@@ -89,7 +89,9 @@ function drawLayout() {
     <div class="adm-shell">
       <aside class="adm-side">
         <button class="adm-side-toggle" data-act="toggle-nav" aria-expanded="false">
-          <span>Panel de administración</span><span id="admNavCurrent"></span>
+          <span class="adm-side-burger" aria-hidden="true"></span>
+          <span class="adm-side-text"><small>Sección (toca para cambiar)</small><strong id="admNavCurrent"></strong></span>
+          <span class="adm-side-caret" aria-hidden="true"></span>
         </button>
         <nav class="adm-nav" aria-label="Secciones del panel">${navView()}</nav>
       </aside>
