@@ -8,7 +8,8 @@ what nothing else can trigger remains here:
 
   weekly_summary    once a week at the configured day/time (admin panel)
   timer_notices     every minute, refreshes the pinned push notification of the running
-                    timers that are due (each user chooses the interval, 10 minutes or more)
+                    timers that are due (each user chooses the interval, 10 minutes or more).
+                    Switched off by TIMER_NOTICE_REFRESH: only the first notification is sent
   forgotten_timers  every hour, reminds who has a timer running for too long
   daily_streaks     every day at 05:00, checks achievements + announces lost streaks
 
@@ -41,6 +42,9 @@ WEEKLY_GRACE = datetime.timedelta(hours=6)
 HOURLY_GRACE = datetime.timedelta(minutes=10)
 DAILY_GRACE = datetime.timedelta(hours=3)
 DAILY_STREAKS_HOUR = 5
+# Off: the notification is shown once, when the timer starts. The job, the per-user interval
+# (user_settings.timer_notice_minutes) and its column stay, so turning this on brings the refresh back.
+TIMER_NOTICE_REFRESH = False
 TIMER_NOTICE_GRACE = datetime.timedelta(minutes=2)  # a late refresh is useless: the next one is due soon
 
 
@@ -155,7 +159,7 @@ def tick(now: datetime.datetime | None = None) -> None:
             if is_due(now, slot, _last_run(db, "weekly_summary"), WEEKLY_GRACE) and _claim(db, "weekly_summary", slot, now):
                 _run(db, "weekly_summary", lambda: _weekly_summary(db))
 
-        if notifications and push.is_ready():
+        if TIMER_NOTICE_REFRESH and notifications and push.is_ready():
             slot = minute_slot(now)
             if is_due(now, slot, _last_run(db, "timer_notices"), TIMER_NOTICE_GRACE) and _claim(db, "timer_notices", slot, now):
                 _run(db, "timer_notices", lambda: _timer_notices(db, slot))
