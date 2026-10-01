@@ -378,16 +378,30 @@ async def send_timer_notice(db: Session, timer: models.GameTimer | None):
     await push.notify_timer(timer.user_id, game.name if game else "", timer.start_time)
 
 
-async def refresh_timer_notices(db: Session, min_age: datetime.timedelta) -> str:
-    """Refresh the pinned notification of every timer running for at least `min_age`: a younger one
-    was announced when it started a moment ago. Called every 10 minutes by the scheduler."""
+def timer_notice_due(slot: datetime.datetime, start_time: datetime.datetime, every_minutes: int) -> bool:
+    """Is the notification of a timer started at `start_time` due for the minute `slot`?
+
+    It is, once per `every_minutes` of play (never at minute 0: it was shown when the timer started).
+    Whole minutes between the minute of the start and the minute of the slot, so it does not depend
+    on the second the scheduler happens to run at and nothing has to be remembered between runs.
+    """
+    played = int((slot - start_time.replace(second=0, microsecond=0)).total_seconds() // 60)
+    return played >= every_minutes and played % every_minutes == 0
+
+
+async def refresh_timer_notices(db: Session, slot: datetime.datetime) -> str:
+    """Refresh the pinned notification of the running timers that are due at `slot`, each one
+    at its user's own interval (user_settings.timer_notice_minutes). Called every minute by the scheduler."""
     if not push.is_ready():
         return ""
-    cutoff = datetime.datetime.now() - min_age
-    running = time_entries.get_running_game_timers(db, cutoff)
-    for timer in running:
+    due = [
+        timer
+        for timer in time_entries.get_running_game_timers(db)
+        if timer_notice_due(slot, timer.start_time, user_settings.timer_notice_minutes(db, timer.user_id))
+    ]
+    for timer in due:
         await send_timer_notice(db, timer)
-    return f"{len(running)} timers"
+    return f"{len(due)} timers"
 
 
 def signed_difference(difference: int, render=str) -> str:

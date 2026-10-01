@@ -44,7 +44,7 @@ TTL_SECONDS = 3600  # a notice that could not be delivered within the hour is st
 MAX_DEVICES_PER_USER = 10
 
 TIMER_TAG = "timer"
-TIMER_TTL_SECONDS = 600  # a refresh that arrives late is worse than none: the next one is due within 10 minutes
+TIMER_TTL_SECONDS = 600  # a refresh that arrives late is worse than none: the next one is due in 10 minutes or more
 
 
 # ── payload ─────────────────────────────────────────────────

@@ -11,6 +11,7 @@ EMAIL_REQUIRED = "El email es obligatorio"
 TELEGRAM_ID_IN_USE = "Ese ID de Telegram ya está en uso por otra cuenta"
 EMAIL_IN_USE = "Ese email ya está en uso por otra cuenta"
 FORGOTTEN_HOURS_INVALID = "Las horas deben ser un número entero entre {min} y {max}"
+TIMER_NOTICE_MINUTES_INVALID = "Los minutos deben ser un número entero entre {min} y {max}"
 USER_NOT_ADMIN ="You are not allowed to do this action"
 
 GAME_ALREADY_COMPLETED = "Game is already completed"

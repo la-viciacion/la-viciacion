@@ -168,6 +168,14 @@ def update_settings(
                 min=user_settings.MIN_FORGOTTEN_TIMER_HOURS, max=user_settings.MAX_FORGOTTEN_TIMER_HOURS
             ),
         )
+    minutes = changes.get("timer_notice_minutes")
+    if minutes is not None and not user_settings.valid_timer_notice_minutes(minutes):
+        raise HTTPException(
+            status_code=400,
+            detail=msg.TIMER_NOTICE_MINUTES_INVALID.format(
+                min=user_settings.MIN_TIMER_NOTICE_MINUTES, max=user_settings.MAX_TIMER_NOTICE_MINUTES
+            ),
+        )
     return user_settings.update(db, user.id, changes)
 
 

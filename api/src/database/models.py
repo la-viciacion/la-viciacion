@@ -67,6 +67,8 @@ class UserSettings(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     # hours a timer may run before the user is reminded about it
     forgotten_timer_hours = Column(SmallInteger, nullable=True)
+    # minutes between refreshes of the running-timer push notification (10-120)
+    timer_notice_minutes = Column(SmallInteger, nullable=True)
     updated_at = Column(DateTime, server_default=text("CURRENT_TIMESTAMP"), onupdate=text("CURRENT_TIMESTAMP"))
 
 

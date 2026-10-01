@@ -31,6 +31,8 @@ class UserProfileUpdate(BaseModel):
 class UserSettingsUpdate(BaseModel):
     # whole hours; None goes back to the default (the range is checked in the route)
     forgotten_timer_hours: int | None = None
+    # whole minutes, 10-120 (checked in the route)
+    timer_notice_minutes: int | None = None
 
 
 class CompletionUpdate(BaseModel):

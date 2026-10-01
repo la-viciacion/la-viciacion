@@ -25,11 +25,9 @@ class SlotTests(unittest.TestCase):
         self.assertEqual(scheduler.daily_slot(D(2026, 9, 29, 5, 0), 5), D(2026, 9, 29, 5, 0))
         self.assertEqual(scheduler.hourly_slot(D(2026, 9, 29, 13, 47, 12)), D(2026, 9, 29, 13, 0))
 
-    def test_timer_notice_slot(self):
-        self.assertEqual(scheduler.timer_notice_slot(D(2026, 9, 29, 13, 47, 12)), D(2026, 9, 29, 13, 40))
-        self.assertEqual(scheduler.timer_notice_slot(D(2026, 9, 29, 13, 10, 0)), D(2026, 9, 29, 13, 10))
-        self.assertEqual(scheduler.timer_notice_slot(D(2026, 9, 29, 13, 59, 59)), D(2026, 9, 29, 13, 50))
-
+    def test_minute_slot(self):
+        self.assertEqual(scheduler.minute_slot(D(2026, 9, 29, 13, 47, 12, 345)), D(2026, 9, 29, 13, 47))
+        self.assertEqual(scheduler.minute_slot(D(2026, 9, 29, 13, 59, 59)), D(2026, 9, 29, 13, 59))
 
 class DueTests(unittest.TestCase):
     slot = D(2026, 9, 28, 9, 0)
