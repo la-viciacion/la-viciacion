@@ -10,7 +10,7 @@ ROUTERS = Path(__file__).resolve().parent.parent / "src" / "routers"
 # to the thread pool (run_in_threadpool) or do none
 ALLOWED_ASYNC_ROUTES = {
     "games.py": {"search_rawg", "create_game"},
-    "manage.py": {"send_announcement", "send_test_message"},
+    "manage.py": {"send_announcement", "send_telegram_announcement", "send_test_message"},
 }
 
 

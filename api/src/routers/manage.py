@@ -1032,10 +1032,12 @@ class AnnouncementBody(BaseModel):
 
 @router.get("/push/audience")
 def push_audience(db: Session = Depends(get_db)):
-    """How many devices/users can receive a notice, by audience (for the composer)."""
+    """Who can receive a notice, by channel (for the composer): the devices of the app by audience, and
+    whether Telegram has a bot and a group."""
     q = db.query(models.PushSubscription)
     return {
         "ready": push.is_ready(),
+        "telegram": {"ready": bool(settings.get("telegram.token")), "group": bool(settings.get("telegram.group_id"))},
         "all": {"devices": q.count(), "users": q.with_entities(func.count(func.distinct(models.PushSubscription.user_id))).scalar()},
         "group": {
             "devices": q.filter(models.PushSubscription.receive_group == True).count(),  # noqa: E712
@@ -1076,6 +1078,42 @@ async def send_announcement(
         detail = "Ningún dispositivo lo ha aceptado" if failed else "No hay ningún dispositivo suscrito en ese destino"
         raise HTTPException(status_code=404, detail=detail)
     return {"sent": sent, "failed": failed}
+
+
+class TelegramAnnouncementBody(BaseModel):
+    title: str = Field(min_length=1, max_length=push.TITLE_MAX)
+    body: Optional[str] = Field(None, max_length=push.ANNOUNCEMENT_BODY_MAX)
+    audience: str = Field("me", pattern="^(me|user|group)$")
+    user_id: Optional[int] = None
+
+
+@router.post("/telegram/announce")
+async def send_telegram_announcement(
+    body: TelegramAnnouncementBody,
+    admin: models.User = Depends(auth.require_admin),
+    db: Session = Depends(get_db),
+):
+    """Send a notice written by an admin by Telegram only: to their own private chat ("me"), one user's or the
+    group's. The app's devices get nothing (see /push/announce for those)."""
+    if not settings.get("telegram.token"):
+        raise HTTPException(status_code=409, detail="Telegram no está configurado: falta el token del bot")
+    if body.audience == "group":
+        chat_id, who = settings.get("telegram.group_id"), "el grupo"
+        if not chat_id:
+            raise HTTPException(status_code=409, detail="Falta el ID del grupo de Telegram")
+    else:
+        target = admin
+        if body.audience == "user":
+            if body.user_id is None:
+                raise HTTPException(status_code=400, detail="Falta elegir el usuario")
+            target = _get_or_404(db, models.User, body.user_id, "Usuario")
+        chat_id, who = target.telegram_id, target.username
+        if chat_id is None:
+            raise HTTPException(status_code=409, detail=f"{target.username} no tiene Telegram ID")
+    if not await my_utils.send_announcement_to_chat(chat_id, body.title, body.body):
+        raise HTTPException(status_code=502, detail="Telegram no ha aceptado el mensaje")
+    logger.info(f"Telegram announcement by {admin.username} to {body.audience}")
+    return {"message": f"Enviado a {who}"}
 
 
 @router.post("/settings/test-message")

@@ -442,6 +442,22 @@ async def send_message_to_user(user_telegram_id, msg, user_id=None):
         logger.error("Error sending telegram message to user: " + str(e))
 
 
+def announcement_text(title: str, body: str | None = None) -> str:
+    """A notice written by an admin as a Telegram message: the title in bold, then the message. Plain
+    text in, so whatever they type is escaped and cannot break the Markdown."""
+    title, body = (title or "").strip(), (body or "").strip()
+    text = f"*{escape_markdown(title)}*"
+    return text + "\n\n" + escape_markdown(body) if body else text
+
+
+async def send_announcement_to_chat(chat_id, title: str, body: str | None = None) -> bool:
+    """Send an admin's notice to one Telegram chat (the group or a private chat); True if Telegram took it.
+    Only Telegram: nothing goes to the app's devices. Ignores the general notifications switch, like the test message."""
+    bot = telegram.Bot(settings.get("telegram.token"))
+    async with bot:
+        return await _telegram_send(bot, chat_id, announcement_text(title, body))
+
+
 async def send_message_to_admins(db: Session, msg):
     if not settings.get("notifications.admin_alerts") or not settings.get("telegram.token"):
         logger.info("Admin alerts are disabled or the bot is not configured. Message not sent.")
