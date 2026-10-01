@@ -9,7 +9,7 @@ import { platformList } from '../../lib/platforms.js';
 import * as seasons from '../../lib/seasons.js';
 import { modalHeader, openModal } from '../../ui/modal.js';
 import { toast } from '../../ui/toast.js';
-import { NOTES_MAX, openGamePicker } from './game-picker.js';
+import { openGamePicker } from './game-picker.js';
 
 const MAX_MS = 24 * 3600 * 1000;
 const CONFIRM_MS = 4000;
@@ -64,7 +64,6 @@ export async function openSessionForm({ game, session = null }) {
       </label>
       <label>Inicio <input class="sess-input" type="datetime-local" name="start" step="60" max="${now}" value="${session ? toInputValue(session.start_time) : ''}" required /></label>
       <label>Fin <input class="sess-input" type="datetime-local" name="end" step="60" max="${now}" value="${session ? toInputValue(session.end_time) : ''}" required /></label>
-      <label>Nota (opcional) <textarea class="sess-input" name="notes" rows="2" maxlength="${NOTES_MAX}">${session?.notes || ''}</textarea></label>
       <div class="sess-hint">Solo sesiones de esta temporada (${seasons.current()}), de menos de 24 horas y que no se solapen con otras tuyas.</div>
       <div class="sess-error" role="alert"></div>
       <div class="sess-actions">
@@ -89,7 +88,6 @@ export async function openSessionForm({ game, session = null }) {
       platform: form.platform.value,
       start_time: fromInputValue(form.start.value),
       end_time: fromInputValue(form.end.value),
-      notes: form.notes.value.trim() || null,
     };
     try {
       if (session) await api(`/timers/${session.id}`, jsonRequest('PATCH', body));

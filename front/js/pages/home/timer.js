@@ -82,13 +82,12 @@ export async function loadTimerCard() {
   document.getElementById('chooseGameBtn').addEventListener('click', () => onChoose());
 }
 
-export async function startTimer(gameId, platform = null, notes = null) {
+export async function startTimer(gameId, platform = null) {
   try {
     const started = await api('/timers/start', jsonRequest('POST', {
       user_id: userId,
       game_id: gameId,
       platform,
-      notes,
     }));
     if (started) await onChange();
   } catch (err) {

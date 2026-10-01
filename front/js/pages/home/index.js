@@ -43,7 +43,7 @@ export async function render({ user, main, isCurrent }) {
   initSessions({ userId: user.id, onChange: refresh });
   initHistory({
     userId: user.id,
-    onContinue: (group) => startTimer(group.game_id, group.platform, group.sessions[0]?.notes ?? null),
+    onContinue: (group) => startTimer(group.game_id, group.platform),
     onComplete: (group) => openCompletion({ username: user.username, game: { id: group.game_id, name: group.game_name || group.game_id }, onChange: refresh }),
     onEditSession: (group, session) => openSessionForm({ game: { id: group.game_id, name: group.game_name || group.game_id }, session }),
   });
