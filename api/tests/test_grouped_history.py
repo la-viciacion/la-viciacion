@@ -54,6 +54,16 @@ class GroupedHistoryTests(unittest.TestCase):
         self.assertEqual(g1.platforms, ["ps", "pc"])
         self.assertEqual(g1.platform, "ps")
 
+    def test_only_a_completion_of_the_running_season_is_flagged(self):
+        self.db.add_all([
+            models.UserGame(user_id=1, game_id="g2", platform="pc", started_date=datetime.date(YEAR - 1, 2, 1), completed=1),
+            models.UserGame(user_id=1, game_id="g1", platform="pc", started_date=datetime.date(YEAR, 2, 1), completed=0),
+            models.UserGame(user_id=2, game_id="g3", platform="pc", started_date=datetime.date(YEAR, 2, 1), completed=1),
+        ])
+        self.db.add(models.UserGame(user_id=1, game_id="g1", platform="ps", started_date=datetime.date(YEAR, 3, 1), completed=1))
+        self.db.commit()
+        self.assertEqual({g.game_id: g.completed for g in self.page().groups}, {"g1": True, "g2": False, "g3": False})
+
     def test_pagination(self):
         self.assertEqual([g.game_id for g in self.page(limit=1, offset=1).groups], ["g2"])
 
@@ -61,8 +71,8 @@ class GroupedHistoryTests(unittest.TestCase):
         queries = []
         event.listen(self.db.get_bind(), "before_cursor_execute", lambda *a: queries.append(a[2]))
         self.page()
-        # count, page, games, newest sessions, platforms
-        self.assertEqual(len(queries), 5)
+        # count, page, games, newest sessions, platforms, completions
+        self.assertEqual(len(queries), 6)
 
     def test_an_empty_history_needs_no_extra_queries(self):
         queries = []

@@ -4,8 +4,8 @@ import { loadPlatforms } from '../../lib/platforms.js';
 import { closeAllModals } from '../../ui/modal.js';
 import { openCompletion } from './completion.js';
 import { initGamePicker, startTimerFlow } from './game-picker.js';
-import { initHistory, loadHistory, onHistoryClick } from './history.js';
-import { initSessions, openManualSession } from './sessions.js';
+import { initHistory, loadHistory, onHistoryClick, onHistoryKey } from './history.js';
+import { initSessions, openManualSession, openSessionForm } from './sessions.js';
 import { initTimer, loadTimerCard, startTimer, stopClock } from './timer.js';
 
 export const active = 'home';
@@ -44,10 +44,12 @@ export async function render({ user, main, isCurrent }) {
   initHistory({
     userId: user.id,
     onContinue: (group) => startTimer(group.game_id, group.platform),
-    onOpen: (group) => openCompletion({ username: user.username, game: { id: group.game_id, name: group.game_name || group.game_id } }),
+    onComplete: (group) => openCompletion({ username: user.username, game: { id: group.game_id, name: group.game_name || group.game_id }, onChange: refresh }),
+    onEditSession: (group, session) => openSessionForm({ game: { id: group.game_id, name: group.game_name || group.game_id }, session }),
   });
   main.querySelector('#manualSessionBtn').addEventListener('click', openManualSession);
   main.querySelector('#historyList').addEventListener('click', onHistoryClick);
+  main.querySelector('#historyList').addEventListener('keydown', onHistoryKey);
   main.querySelector('#historyMore').addEventListener('click', onHistoryClick);
 
   // Active timer first: it decides whether "Seguir" buttons are enabled.
