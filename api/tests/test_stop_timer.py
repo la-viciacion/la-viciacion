@@ -3,6 +3,8 @@ import types
 import unittest
 from unittest import mock
 
+from fastapi import HTTPException
+
 from src.routers import timers
 
 
@@ -30,6 +32,25 @@ class StopTimerTests(unittest.TestCase):
         timers.stop_timer(db_with(timer), 1, 1)
         self.assertEqual(timer.duration_seconds, 0)
         self.assertEqual(timer.end_time, start)
+
+
+class CancelTimerTests(unittest.TestCase):
+    def test_cancelling_deletes_the_timer_and_drops_its_empty_library_entry(self):
+        timer = types.SimpleNamespace(
+            start_time=datetime.datetime.now(), platform="pc", game_id="g1", is_active=True
+        )
+        db = db_with(timer)
+        with mock.patch.object(timers.users_crud, "drop_empty_entry") as drop:
+            timers.cancel_timer(db, 1, 7)
+        db.delete.assert_called_once_with(timer)
+        drop.assert_called_once()
+        self.assertEqual(drop.call_args.args[1:4], (7, "g1", "pc"))
+        db.commit.assert_called_once()
+
+    def test_cancelling_a_timer_that_is_not_running_is_a_404(self):
+        with self.assertRaises(HTTPException) as ctx:
+            timers.cancel_timer(db_with(None), 1, 1)
+        self.assertEqual(ctx.exception.status_code, 404)
 
 
 if __name__ == "__main__":

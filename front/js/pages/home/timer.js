@@ -42,7 +42,10 @@ const activeCard = (timer, game) => html`
       <div class="timer-game">${game?.name || timer.game_id}</div>
       <div class="timer-duration" id="timerDuration">00:00:00</div>
     </div>
-    <button class="btn-stop-timer" id="stopTimerBtn" data-timer-id="${timer.id}">${iconStop()} Detener</button>
+    <div class="timer-actions">
+      <button class="btn-cancel-timer" id="cancelTimerBtn" data-timer-id="${timer.id}">Cancelar</button>
+      <button class="btn-stop-timer" id="stopTimerBtn" data-timer-id="${timer.id}">${iconStop()} Detener</button>
+    </div>
   </div>`;
 
 const idleCard = () => html`
@@ -67,6 +70,7 @@ export async function loadTimerCard() {
       if (!section.isConnected) return; // page was re-rendered meanwhile
       mount(section, activeCard(active.timer, game));
       document.getElementById('stopTimerBtn').addEventListener('click', (e) => stopTimer(e.currentTarget.dataset.timerId));
+      document.getElementById('cancelTimerBtn').addEventListener('click', (e) => cancelTimer(e.currentTarget.dataset.timerId));
       startClock(active.timer.start_time);
       return;
     }
@@ -89,6 +93,29 @@ export async function startTimer(gameId, platform = null) {
   } catch (err) {
     console.error('Error starting timer:', err);
     toast(`Error al iniciar el timer: ${err.message}`, 'err');
+  }
+}
+
+// Cancelling deletes the timer for good: the first click asks, the second (within 4 s) confirms.
+async function cancelTimer(timerId) {
+  const button = document.getElementById('cancelTimerBtn');
+  if (!button.dataset.armed) {
+    button.dataset.armed = '1';
+    button.textContent = '¿Seguro? Pulsa otra vez';
+    setTimeout(() => {
+      if (button.isConnected) { delete button.dataset.armed; button.textContent = 'Cancelar'; }
+    }, 4000);
+    return;
+  }
+  try {
+    const cancelled = await api(`/timers/cancel/${timerId}?user_id=${userId}`, { method: 'DELETE' });
+    if (cancelled) {
+      toast('Timer cancelado');
+      await onChange();
+    }
+  } catch (err) {
+    console.error('Error cancelling timer:', err);
+    toast(`Error al cancelar el timer: ${err.message}`, 'err');
   }
 }
 

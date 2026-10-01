@@ -139,6 +139,30 @@ def stop_timer(db: Session, timer_id: int, user_id: int) -> GameTimer:
     return timer
 
 
+def cancel_timer(db: Session, timer_id: int, user_id: int) -> GameTimer:
+    """Discard a running timer as if it had never started (nothing is recorded)."""
+    timer = db.query(GameTimer).filter(
+        GameTimer.id == timer_id,
+        GameTimer.user_id == user_id,
+        GameTimer.is_active == True
+    ).first()
+
+    if not timer:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Active timer not found"
+        )
+
+    # starting it created the library entry of that game/platform/season: do not leave it
+    # empty behind unless the user has other sessions, a completion or a score there
+    entry = (timer.platform, seasons.of(timer.start_time))
+    db.delete(timer)
+    db.flush()
+    users_crud.drop_empty_entry(db, user_id, timer.game_id, *entry)
+    db.commit()
+    return timer
+
+
 def get_timer_history(db: Session, user_id: int, game_id: Optional[str] = None, limit: int = 100) -> List[GameTimer]:
     query = db.query(GameTimer).filter(GameTimer.user_id == user_id)
     
@@ -472,6 +496,21 @@ def stop_timer_endpoint(
     background_tasks.add_task(actions.after_session_change, user_id, False, ranking_before)
     background_tasks.add_task(actions.after_timer_stop, user_id, timer.game_id, timer.duration_seconds)
     return timer
+
+
+@router.delete("/cancel/{timer_id}")
+def cancel_timer_endpoint(
+    timer_id: int,
+    user_id: int,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Cancel an active timer: it is deleted, not recorded"""
+    auth.ensure_self_or_admin(current_user, user_id=user_id)
+    timer = cancel_timer(db, timer_id, user_id)
+    background_tasks.add_task(actions.after_timer_stop, user_id, timer.game_id, None)
+    return {"message": "Timer cancelado"}
 
 
 @router.get("/history/{user_id}", response_model=List[GameTimerResponse])

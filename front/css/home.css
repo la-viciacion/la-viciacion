@@ -63,6 +63,29 @@
   transform: translateY(0);
 }
 
+.timer-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.btn-cancel-timer {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-accent);
+  padding: 14px 20px;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-cancel-timer:hover {
+  color: var(--text-primary);
+  border-color: #ef4444;
+}
+
 .timer-idle {
   background: var(--gradient-card);
   border: 1px solid var(--border-accent);
@@ -230,6 +253,7 @@
 @media (max-width: 640px) {
   .timer-idle, .timer-active { flex-direction: column; align-items: stretch; text-align: center; }
   .btn-start-timer, .btn-stop-timer { justify-content: center; }
+  .timer-actions { flex-direction: column-reverse; align-items: stretch; }
   
   .btn-continue span, .navbar-username { display: none; }
 }
