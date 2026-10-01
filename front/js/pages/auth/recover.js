@@ -1,15 +1,15 @@
 // Password recovery (public pages, like the login): ask for the link by email, and choose the new
 // password with it. The flow is in the API (routers/basic.py); the link is `#/reset-password?token=`.
-import { api, jsonRequest } from '../lib/api.js';
-import { html, mount } from '../lib/html.js';
-import { PASSWORD_HINT, isValidPassword } from '../lib/password.js';
-import { iconLock, iconUser } from '../ui/icons.js';
+import { api, jsonRequest } from '../../lib/api.js';
+import { html, mount } from '../../lib/html.js';
+import { PASSWORD_HINT, isValidPassword } from '../../lib/password.js';
+import { iconLock, iconUser } from '../../ui/icons.js';
 
 const card = (subtitle, body) => html`
   <div class="login-page">
     <div class="login-card">
       <div class="login-brand">
-        <img src="icon-192.png" alt="La Viciación logo" class="login-logo" />
+        <img src="assets/icons/icon-192.png" alt="La Viciación logo" class="login-logo" />
         <h1>La Viciación</h1>
         <p>${subtitle}</p>
       </div>

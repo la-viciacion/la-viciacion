@@ -10,8 +10,8 @@
 import { api, loadAvatarUrl, session, setUnauthorizedHandler } from './lib/api.js';
 import { RESET_ROUTE, isResetRoute, resetTokenFromHash } from './lib/recovery.js';
 import * as home from './pages/home/index.js';
-import { showLogin } from './pages/login.js';
-import { showForgotPassword, showResetPassword } from './pages/recover.js';
+import { showLogin } from './pages/auth/login.js';
+import { showForgotPassword, showResetPassword } from './pages/auth/recover.js';
 import { renderShell, showLoading } from './ui/layout.js';
 import { inviteToPush } from './ui/push-invite.js';
 

@@ -82,10 +82,11 @@ Plain HTML/CSS/JS (no framework, no build step) served by nginx. Layout of `fron
 ```
 index.html          shell: CSS links + js/main.js
 css/                one stylesheet per area (base, login, navbar, home, modal, admin, profile)
+assets/icons/       PWA icons (favicon, manifest, push notification icon and badge)
 js/main.js          hash router + session handling
 js/lib/             html (escaping template tag), api, format, password, platforms
 js/ui/              layout (navbar shell), modal, toast, icons
-js/pages/           login, profile, home/ (timer, history, completion, game picker), admin/ (entities, form, dialogs, rawg-sync)
+js/pages/           auth/ (login, recover), profile, home/ (timer, history, completion, game picker), admin/ (entities, form, dialogs, rawg-sync)
 sw.js               pass-through service worker (caches nothing; keeps the app installable)
 tests/              node:test unit tests for js/lib
 ```

@@ -27,8 +27,8 @@ self.addEventListener('push', (event) => {
   event.waitUntil(
     self.registration.showNotification(data.title || 'La Viciación', {
       body: data.body || '',
-      icon: 'icon-192.png',
-      badge: 'badge-96.png',
+      icon: 'assets/icons/icon-192.png',
+      badge: 'assets/icons/badge-96.png',
       image: data.image || undefined, // large picture: Android and desktop only
       tag: data.tag || undefined,
       renotify: Boolean(data.tag), // a newer notice with the same tag replaces the old one but still alerts

@@ -1,7 +1,7 @@
 // Login page (the only page that does not need a session).
-import { login } from '../lib/api.js';
-import { html, mount } from '../lib/html.js';
-import { iconEye, iconEyeOff, iconLock, iconUser } from '../ui/icons.js';
+import { login } from '../../lib/api.js';
+import { html, mount } from '../../lib/html.js';
+import { iconEye, iconEyeOff, iconLock, iconUser } from '../../ui/icons.js';
 import { showForgotPassword } from './recover.js';
 
 /** Render the login form; onSuccess runs once the token is stored. */
@@ -10,7 +10,7 @@ export function showLogin(onSuccess) {
     <div class="login-page">
       <div class="login-card">
         <div class="login-brand">
-          <img src="icon-192.png" alt="La Viciación logo" class="login-logo" />
+          <img src="assets/icons/icon-192.png" alt="La Viciación logo" class="login-logo" />
           <h1>La Viciación</h1>
         </div>
 

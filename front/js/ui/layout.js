@@ -15,7 +15,7 @@ function navbar(user, avatarUrl, active) {
   return html`
     <nav class="navbar" role="navigation" aria-label="Navegación principal">
       <a href="#" class="navbar-brand" aria-label="La Viciación inicio">
-        <img src="icon-64.png" alt="" class="navbar-logo" aria-hidden="true" />
+        <img src="assets/icons/icon-64.png" alt="" class="navbar-logo" aria-hidden="true" />
         La Viciación
       </a>
       <div class="navbar-actions">

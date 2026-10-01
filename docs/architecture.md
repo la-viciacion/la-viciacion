@@ -102,8 +102,9 @@ No framework/build step. ES modules loaded by `index.html` → `js/main.js`.
 js/main.js        hash router (#/, #/profile, #/admin), session handling, page lifecycle
 js/lib/           api (fetch wrapper + session), html (escaping template tag), format, password, platforms, seasons
 js/ui/            layout (navbar shell), modal, toast, icons
-js/pages/         login, home/ (timer, history, completion, sessions, game-picker), profile/, admin/ (entities, form, dialogs, rawg-sync, settings)
+js/pages/         auth/ (login, recover), home/ (timer, history, completion, sessions, game-picker), profile/, admin/ (entities, form, dialogs, rawg-sync, settings)
 css/              one stylesheet per area
+assets/icons/     PWA icons (favicon, manifest, push notification icon and badge)
 sw.js             pass-through service worker (caches nothing; keeps the app installable)
 ```
 
