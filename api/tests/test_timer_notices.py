@@ -4,11 +4,11 @@ import unittest
 from unittest import mock
 
 from src.database import models
-from src.utils import actions
+from src.utils import actions, scheduler
 from tests.sqlite_db import make_session
 
 NOW = datetime.datetime.now()
-FIVE = datetime.timedelta(minutes=5)
+MIN_AGE = scheduler.TIMER_NOTICE_MIN_AGE
 
 
 def add_running(db, user_id, minutes_ago, game_id="g", active=True):
@@ -26,10 +26,10 @@ class RefreshTimerNoticesTests(unittest.TestCase):
 
     def refresh(self, ready=True):
         with mock.patch.object(actions.push, "is_ready", return_value=ready), mock.patch.object(actions.push, "notify_timer", new=mock.AsyncMock()) as notify:
-            result = asyncio.run(actions.refresh_timer_notices(self.db, FIVE))
+            result = asyncio.run(actions.refresh_timer_notices(self.db, MIN_AGE))
         return result, notify
 
-    def test_every_timer_running_for_five_minutes_is_refreshed(self):
+    def test_every_running_timer_is_refreshed(self):
         old = add_running(self.db, 1, 12)
         add_running(self.db, 2, 90)
         result, notify = self.refresh()
@@ -37,11 +37,19 @@ class RefreshTimerNoticesTests(unittest.TestCase):
         self.assertEqual(notify.await_count, 2)
         notify.assert_any_await(1, "Hollow Knight", old.start_time)
 
-    def test_a_timer_younger_than_the_period_was_announced_when_it_started(self):
-        add_running(self.db, 1, 2)
+    def test_a_timer_that_has_just_started_was_announced_a_moment_ago(self):
+        add_running(self.db, 1, 0.3)
         result, notify = self.refresh()
         self.assertEqual(result, "0 timers")
         notify.assert_not_awaited()
+
+    def test_a_timer_that_is_a_minute_old_is_refreshed(self):
+        # the minimum age is short on purpose: at 5 minutes a timer started just before a slot would wait a whole extra period
+        add_running(self.db, 1, 1.5)
+        self.assertEqual(self.refresh()[0], "1 timers")
+
+    def test_the_minimum_age_never_skips_a_whole_period(self):
+        self.assertLess(MIN_AGE, datetime.timedelta(minutes=scheduler.TIMER_NOTICE_EVERY))
 
     def test_finished_timers_are_ignored(self):
         add_running(self.db, 1, 60, active=False)

@@ -10,10 +10,14 @@ function load() {
   const handlers = {};
   const shown = [];
   const opened = [];
+  const on = { screen: [] }; // notifications the fake browser is showing
   const scope = {
     addEventListener: (type, fn) => (handlers[type] = fn),
     skipWaiting: () => {},
-    registration: { showNotification: async (title, options) => shown.push({ title, ...options }) },
+    registration: {
+      showNotification: async (title, options) => shown.push({ title, ...options }),
+      getNotifications: async ({ tag }) => on.screen.filter((n) => n.tag === tag),
+    },
     clients: { claim: async () => {}, matchAll: async () => [], openWindow: async (url) => opened.push(url) },
     caches: { keys: async () => [], delete: async () => true },
   };
@@ -24,7 +28,7 @@ function load() {
     await handlers[type]({ ...event, waitUntil: (p) => (pending = p) });
     await pending;
   };
-  return { shown, opened, run };
+  return { shown, opened, run, on };
 }
 
 const push = (payload) => ({ data: { json: () => payload } });
@@ -48,6 +52,25 @@ test('the "stopped" notice that replaces it is quiet but no longer pinned', asyn
   assert.equal(sw.shown[0].silent, true);
   assert.equal(sw.shown[0].requireInteraction, false);
   assert.equal(sw.shown[0].actions, undefined);
+});
+
+test('a quiet refresh closes the notification it replaces (iOS piles them up otherwise)', async () => {
+  const sw = load();
+  const old = { tag: 'timer', close() { this.closed = true; } };
+  const other = { tag: 'group', close() { this.closed = true; } };
+  sw.on.screen.push(old, other);
+  await sw.run('push', push({ title: 'Hollow Knight', body: '9 min', tag: 'timer', quiet: true, pinned: true }));
+  assert.equal(old.closed, true);
+  assert.equal(other.closed, undefined);
+  assert.equal(sw.shown.length, 1);
+});
+
+test('a normal notice does not close anything', async () => {
+  const sw = load();
+  const old = { tag: 'group', close() { this.closed = true; } };
+  sw.on.screen.push(old);
+  await sw.run('push', push({ title: 'T', body: 'b', tag: 'group' }));
+  assert.equal(old.closed, undefined);
 });
 
 test('a normal push with a tag still alerts again', async () => {

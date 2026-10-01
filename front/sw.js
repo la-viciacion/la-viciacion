@@ -17,7 +17,7 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', () => {});
 
 // Web Push (server: api/src/utils/push.py). The payload is {title, body, url, tag, image?, quiet?, pinned?, button?}.
-// `quiet` notices (the running-timer one, refreshed every 5 minutes under the same tag) must not
+// `quiet` notices (the running-timer one, refreshed every 10 minutes under the same tag) must not
 // alert; `pinned` ones stay on screen, also after being tapped (see notificationclick); `button`
 // adds one action button (every tap, on it or on the notification, just opens `url`: the app does the work).
 const ICONS = { icon: 'assets/icons/icon-192.png', badge: 'assets/icons/badge-96.png' };
@@ -44,7 +44,15 @@ self.addEventListener('push', (event) => {
   } catch {
     data = { body: event.data ? event.data.text() : '' };
   }
-  event.waitUntil(self.registration.showNotification(data.title || 'La Viciación', noticeOptions(data)));
+  event.waitUntil(
+    (async () => {
+      if (data.quiet && data.tag) {
+        // a quiet notice is a refresh of the previous one: iOS does not replace by tag, it piles them up
+        for (const previous of await self.registration.getNotifications({ tag: data.tag })) previous.close();
+      }
+      await self.registration.showNotification(data.title || 'La Viciación', noticeOptions(data));
+    })(),
+  );
 });
 
 self.addEventListener('notificationclick', (event) => {

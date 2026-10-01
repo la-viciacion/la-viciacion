@@ -7,7 +7,7 @@ sessions when asked for, so nothing has to be reset when the season changes. Onl
 what nothing else can trigger remains here:
 
   weekly_summary    once a week at the configured day/time (admin panel)
-  timer_notices     every 5 minutes, refreshes the pinned push notification of running timers
+  timer_notices     every 10 minutes, refreshes the pinned push notification of running timers
   forgotten_timers  every hour, reminds who has a timer running for too long
   daily_streaks     every day at 05:00, checks achievements + announces lost streaks
 
@@ -40,7 +40,8 @@ WEEKLY_GRACE = datetime.timedelta(hours=6)
 HOURLY_GRACE = datetime.timedelta(minutes=10)
 DAILY_GRACE = datetime.timedelta(hours=3)
 DAILY_STREAKS_HOUR = 5
-TIMER_NOTICE_EVERY = 5  # minutes
+TIMER_NOTICE_EVERY = 10  # minutes
+TIMER_NOTICE_MIN_AGE = datetime.timedelta(minutes=1)  # younger than this it was just announced; a longer wait would skip a whole period
 TIMER_NOTICE_GRACE = datetime.timedelta(minutes=2)  # a late refresh is useless: the next one is due soon
 
 
@@ -64,7 +65,7 @@ def hourly_slot(now: datetime.datetime) -> datetime.datetime:
     return now.replace(minute=0, second=0, microsecond=0)
 
 
-def five_minute_slot(now: datetime.datetime) -> datetime.datetime:
+def timer_notice_slot(now: datetime.datetime) -> datetime.datetime:
     return now.replace(minute=now.minute - now.minute % TIMER_NOTICE_EVERY, second=0, microsecond=0)
 
 
@@ -129,8 +130,7 @@ async def _weekly_summary(db: Session) -> str:
 
 
 async def _timer_notices(db: Session) -> str:
-    # a timer younger than one period was announced when it started
-    return await actions.refresh_timer_notices(db, datetime.timedelta(minutes=TIMER_NOTICE_EVERY))
+    return await actions.refresh_timer_notices(db, TIMER_NOTICE_MIN_AGE)
 
 
 async def _forgotten_timers(db: Session) -> str:
@@ -157,7 +157,7 @@ def tick(now: datetime.datetime | None = None) -> None:
                 _run(db, "weekly_summary", lambda: _weekly_summary(db))
 
         if notifications and push.is_ready():
-            slot = five_minute_slot(now)
+            slot = timer_notice_slot(now)
             if is_due(now, slot, _last_run(db, "timer_notices"), TIMER_NOTICE_GRACE) and _claim(db, "timer_notices", slot, now):
                 _run(db, "timer_notices", lambda: _timer_notices(db))
 

@@ -380,7 +380,7 @@ async def send_timer_notice(db: Session, timer: models.GameTimer | None):
 
 async def refresh_timer_notices(db: Session, min_age: datetime.timedelta) -> str:
     """Refresh the pinned notification of every timer running for at least `min_age`: a younger one
-    was announced when it started. Called every 5 minutes by the scheduler."""
+    was announced when it started a moment ago. Called every 10 minutes by the scheduler."""
     if not push.is_ready():
         return ""
     cutoff = datetime.datetime.now() - min_age
