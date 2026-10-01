@@ -1,10 +1,20 @@
+# Production pulls the images the release workflow publishes (set LAVI_VERSION in .env to pin
+# one, e.g. 2.0.0): `docker compose pull && docker compose up -d`. For development
+# `docker compose up -d --build` builds them from the Dockerfiles and tags them with the same names.
+# The images hold no configuration: it all arrives at run time (env_file / environment).
+
 services:
 
   laviciacion-front:
     build: ./front
-    image: laviciacion-front
+    image: ghcr.io/la-viciacion/laviciacion-front:${LAVI_VERSION:-latest}
     container_name: laviciacion-front
     restart: unless-stopped
+    # Where /api is proxied to: the one thing the front needs to know. The image does not get
+    # the whole .env (it holds secrets the front must not see), only these.
+    environment:
+      API_UPSTREAM: ${API_UPSTREAM:-http://laviciacion-api:5000}
+      DNS_RESOLVER: ${DNS_RESOLVER:-127.0.0.11}
     networks:
       - la-viciacion
     ports:
@@ -12,7 +22,7 @@ services:
 
   laviciacion-bot:
     build: ./bot
-    image: laviciacion-bot
+    image: ghcr.io/la-viciacion/laviciacion-bot:${LAVI_VERSION:-latest}
     container_name: laviciacion-bot
     env_file: .env
     restart: unless-stopped
@@ -25,7 +35,7 @@ services:
 
   laviciacion-api:
     build: ./api
-    image: laviciacion-api
+    image: ghcr.io/la-viciacion/laviciacion-api:${LAVI_VERSION:-latest}
     container_name: laviciacion-api
     env_file: .env
     restart: unless-stopped

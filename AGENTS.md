@@ -35,6 +35,7 @@ Four services, one `docker-compose.yml`:
 6. **Front output is escaped by construction**: build markup with the `html` tagged template (`front/js/lib/html.js`), never assign strings to `innerHTML`.
 7. **Telegram settings are runtime data** (table `app_settings`, edited from the admin panel), not `.env`. `.env` only seeds them once.
 8. Do not add a build step, framework or bundler to the front without an explicit decision.
+9. **Images hold no secrets and no environment-specific configuration** (CI publishes them to GHCR on every `v*` tag and the server runs them as they are). Anything that varies per deployment arrives at run time (`env_file` / `environment:`); the front's nginx takes its upstream from a template (`front/nginx.conf.template`). See [docs/deployment.md](docs/deployment.md#images).
 
 ## Quick commands
 

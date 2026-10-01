@@ -16,6 +16,9 @@ EXTERNAL = {
     "TZ",  # the containers' time zone
     "FORWARDED_ALLOW_IPS",  # uvicorn
     "DB_DATA",  # docker-compose.yml
+    "LAVI_VERSION",  # docker-compose.yml (image tag)
+    "API_UPSTREAM",  # docker-compose.yml, rendered into the front's nginx config
+    "DNS_RESOLVER",  # same
 }
 # Only read to seed the settings the first time, or kept so an old .env keeps working.
 LEGACY = {"OPENAI_API_KEY", "OPENAI_MODEL", "RAWG_URL"}

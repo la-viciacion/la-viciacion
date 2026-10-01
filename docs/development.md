@@ -14,7 +14,7 @@ When running the API outside Docker, `MARIADB_HOST` must point to a reachable DB
 
 
 ```bash
-docker compose up -d --build           # everything
+docker compose up -d --build           # everything, building the images from the Dockerfiles (production pulls the published ones instead)
 docker compose up -d --build laviciacion-api   # rebuild one service
 docker compose logs -f laviciacion-api
 docker compose down                    # keeps db/data

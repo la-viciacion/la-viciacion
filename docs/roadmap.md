@@ -7,7 +7,7 @@ These are deliberately **undefined for now**. Do not invent or enforce them; whe
 - **Branch workflow**: branch naming, which branch is the integration branch (`main`, `develop` and `2.0` exist today), PR/merge policy, protected branches.
 - **Versioning and releases**: the app version is **2.0.0** (set in `front/package.json` and its lockfile). A dedicated `VERSION` file may become the single source of truth when GitHub CI creates releases; until then the API version in `main.py` (`0.1.0`, shown in the OpenAPI docs) is still a placeholder to align with it. Tags, changelog format and release notes are still open.
 - **Commit conventions enforcement**: Conventional Commits are used informally; no tooling enforces them.
-- **CI/CD**: no pipeline yet (tests, lint, image build, deployment).
+- **CI/CD**: only the release workflow exists (tests, image build and publish to GHCR when a `v*` tag is pushed; see [deployment.md](deployment.md#cicd)). Open: tests on every push/PR, automatic deployment, `arm64` images.
 
 Until then: work on the current branch, small commits, no tags or releases.
 

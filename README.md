@@ -6,7 +6,7 @@
 
 Copy `.env.template` to `.env` and fill in your values. That single file is read by every service (`api`, `bot` and `db`) through `env_file` in `docker-compose.yml`; when running the api or bot outside Docker they fall back to that same `.env`. Variables already present in the environment always win over the file.
 
-`docker-compose.yml` and the `Dockerfile`s are ready to use as they are; they contain no secrets.
+`docker-compose.yml` and the `Dockerfile`s are ready to use as they are; they contain no secrets. The images hold no configuration either: everything arrives at run time through `.env` (see [Deployment](#deployment-docker-compose)).
 
 ### Users and login
 
@@ -108,11 +108,16 @@ npm run dev     # static server on :3000 (the API must be reachable at /api)
 
 The stack is four services orchestrated by `docker-compose.yml`: `laviciacion-db` (MariaDB), `laviciacion-api` (FastAPI), `laviciacion-bot` (the Telegram bot) and `laviciacion-front` (the PWA). The API's container runs `alembic upgrade head` automatically on every start (see `api/entrypoint.sh`) before serving requests, so schema migrations are never a manual step — and `laviciacion-api` won't even start until `laviciacion-db` reports healthy (`depends_on` + a MariaDB healthcheck), so a slow first boot doesn't race the migration.
 
+The images are published to GHCR (`ghcr.io/la-viciacion/laviciacion-api`, `-front` and `-bot`) every time a `vX.Y.Z` tag is created, so a server does not need to build anything: `docker compose pull && docker compose up -d` is the whole deploy. `LAVI_VERSION` in `.env` pins a release (e.g. `2.0.0`; default `latest`). Nothing sensitive or environment-specific is inside them: the API and the bot read `.env` through `env_file`, and the front's nginx receives only `API_UPSTREAM` (default `http://laviciacion-api:5000`) and `DNS_RESOLVER` (default `127.0.0.11`), both optional. `docker compose up -d --build` builds the same images from the `Dockerfile`s instead, which is what development uses.
+
 ### Fresh install (no existing data)
 
 ```bash
-docker compose up -d --build
+docker compose pull && docker compose up -d     # the published images
+# or, to build from this checkout:  docker compose up -d --build
 ```
+
+> If `pull` answers `denied`, the package is still private: on GitHub, *Packages* → the package → *Package settings* → *Change visibility* → Public (once per image; the repository is public).
 
 > **Windows (Docker Desktop):** add `DB_DATA=laviciacion_db_data` to `.env` before the first start (see `.env.template`), so the database lives in a Docker volume instead of `./db/data`. On that folder MariaDB 12+ cannot rebuild tables and the migrations fail. On Linux leave it unset. Details and tested versions: [docs/deployment.md](docs/deployment.md#database-storage-linux-vs-windows).
 
@@ -126,7 +131,7 @@ Deploying v2 to a *new* environment from a backup taken on the old (Clockify-bas
 2. Make sure `db/data/` is empty/does not exist yet — MariaDB's official image only runs the scripts in `db/init/` **the first time it initializes a data directory**. If `db/data/` already has data (e.g. you're re-running this on an environment that already started once), the import is silently skipped; remove/rename `db/data/` first if you need a clean re-import.
 3. Bring the stack up:
    ```bash
-   docker compose up -d --build
+   docker compose pull && docker compose up -d
    ```
    On first boot MariaDB imports the backup file(s) from `db/init/`, then (once healthy) `laviciacion-api` starts and runs `alembic upgrade head`, bringing that imported v1 schema up to the current one — including the one-off data cleanup migration that backfills missing `games_statistics` rows and patches any orphaned Clockify project references found in *that specific backup*.
 4. Check it went well:

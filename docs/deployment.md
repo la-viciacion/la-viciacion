@@ -8,12 +8,18 @@ Docker Compose, four containers on the `la-viciacion` network:
 
 | Container | Image / build | Ports | Notes |
 |---|---|---|---|
-| `laviciacion-front` | `front/Dockerfile` (`nginx:alpine`, static files copied in) | `3000` | Proxies `/api/` to the API; `no-cache` on html/js/css; SPA fallback to `index.html` |
-| `laviciacion-api` | `api/Dockerfile` (`python:3.13-slim-bookworm`) | `127.0.0.1:5000` | `entrypoint.sh`: wait for DB → `alembic upgrade head` → `uvicorn` (`--proxy-headers`) |
-| `laviciacion-bot` | `bot/Dockerfile` (`python:3.11-slim-bookworm`) | none | Depends on the API; restarts itself when Telegram settings change |
+| `laviciacion-front` | `ghcr.io/la-viciacion/laviciacion-front` (built from `front/Dockerfile`: `nginx:alpine`, static files copied in) | `3000` | Proxies `/api/` to `API_UPSTREAM`; `no-cache` on html/js/css; SPA fallback to `index.html` |
+| `laviciacion-api` | `ghcr.io/la-viciacion/laviciacion-api` (`api/Dockerfile`: `python:3.13-slim-bookworm`) | `127.0.0.1:5000` | `entrypoint.sh`: wait for DB → `alembic upgrade head` → `uvicorn` (`--proxy-headers`) |
+| `laviciacion-bot` | `ghcr.io/la-viciacion/laviciacion-bot` (`bot/Dockerfile`: `python:3.11-slim-bookworm`) | none | Depends on the API; restarts itself when Telegram settings change |
 | `laviciacion-db` | `mariadb` (official) | `127.0.0.1:3307` | Healthcheck gates the API start; data in `./db/data` (or a named volume, see [Database storage](#database-storage-linux-vs-windows)) |
 
-All use `restart: unless-stopped` and read `.env` through `env_file` (front excepted). Logs of api/bot are bind-mounted to `./api/logs` and `./bot/logs`.
+All use `restart: unless-stopped`. API, bot and db read `.env` through `env_file`; the front gets only `API_UPSTREAM` and `DNS_RESOLVER` through `environment:` (it must not see the secrets in `.env`). Logs of api/bot are bind-mounted to `./api/logs` and `./bot/logs`.
+
+## Images
+
+The compose file names the three images (`image: ghcr.io/la-viciacion/laviciacion-<service>:${LAVI_VERSION:-latest}`) and also has their `build:` context, so one file serves both uses: `docker compose pull && docker compose up -d` runs the published images (production), `docker compose up -d --build` builds them from the Dockerfiles and tags them with the same names (development). The database uses the official `mariadb` image.
+
+**An image contains no configuration and no secrets, and must keep it that way** (the release workflow fails otherwise): everything that differs between environments is a run-time variable. The front's nginx config is a template (`front/nginx.conf.template`) that the nginx image renders at start (`envsubst`) with `API_UPSTREAM` and `DNS_RESOLVER`; only those two are substituted (`NGINX_ENVSUBST_FILTER`), the rest of nginx's own `$variables` are untouched. Adding another deploy-time value to the front means: a variable in the template, a default `ENV` in `front/Dockerfile`, the entry in `docker-compose.yml` and `.env.template` (and in `EXTERNAL` of `api/tests/test_env_template.py`).
 
 ## Configuration
 
@@ -62,8 +68,9 @@ The compose file publishes the front on `:3000` (plain HTTP) and the API/DB only
 ## Deploying a change
 
 ```bash
-git pull
-docker compose up -d --build            # rebuilds changed images, recreates containers
+git pull                                 # the compose file and docs; the code comes in the images
+docker compose pull                      # the release set in LAVI_VERSION (default: latest)
+docker compose up -d                     # recreates the containers whose image changed
 docker compose logs --tail=100 laviciacion-api   # look for "Running upgrade ..." and no errors
 ```
 
@@ -96,7 +103,7 @@ Backups (`*.sql`, `*.sql.gz`, `*.dump`) are gitignored; store them outside the r
 
 ## Rollback
 
-Code rollback: check out the previous revision and `docker compose up -d --build` (the previous code works on the schema after `015`/`016`; what it did that the keys forbid, such as storing a session of a game that does not exist, would now fail instead of being stored). If a migration was applied, either restore the pre-deploy backup or run `alembic downgrade` only when that migration defines a real downgrade. Prefer restore from backup for anything destructive.
+Code rollback: set `LAVI_VERSION` in `.env` to the previous release (e.g. `2.0.0`), then `docker compose pull && docker compose up -d` (the previous code works on the schema after `015`/`016`; what it did that the keys forbid, such as storing a session of a game that does not exist, would now fail instead of being stored). If a migration was applied, either restore the pre-deploy backup or run `alembic downgrade` only when that migration defines a real downgrade. Prefer restore from backup for anything destructive.
 
 ## Health
 
@@ -104,4 +111,10 @@ Code rollback: check out the previous revision and `docker compose up -d --build
 
 ## CI/CD
 
-None yet. See [roadmap.md](roadmap.md).
+`.github/workflows/release.yml` runs when a tag `vX.Y.Z` is pushed (or by hand from the Actions tab, which does everything but publish):
+
+1. **tests**: API (Python 3.13), bot (3.11), front tests and lint. The API tests need only dummy values for the variables of `config.py` (set in the workflow's `env`; when you add a required variable to `config.py`, add it there too) and the `.env.template` at the repo root.
+2. **build**: builds the three images and looks inside each one: no `.env*`, `*.sql`, `*.dump` under `/app` or the web root, and no credential-looking variable baked in (`PASS`, `SECRET`, `TOKEN`, `KEY`).
+3. **publish** (tags only): pushes `ghcr.io/la-viciacion/laviciacion-{api,front,bot}` tagged `X.Y.Z`, `X.Y` and `latest` (prereleases get no `latest`), using the workflow's own `GITHUB_TOKEN`; no secret has to be configured.
+
+Cut a release with `git tag v2.0.0 && git push origin v2.0.0` (see [roadmap](roadmap.md): tags are not created until 2.0.0 ships). The first time, set each package public (README, Deployment); the repository is public, so nothing needs a login afterwards. There is no automatic deploy: the server pulls when you decide. The images are `linux/amd64` only.

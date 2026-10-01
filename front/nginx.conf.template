@@ -1,3 +1,5 @@
+# Rendered at container start by the nginx image (envsubst): only API_UPSTREAM and DNS_RESOLVER
+# are substituted (NGINX_ENVSUBST_FILTER in the Dockerfile); every other $variable is nginx's own.
 server {
     listen 3000;
     server_name _;
@@ -11,8 +13,8 @@ server {
     }
 
     location /api/ {
-        resolver 127.0.0.11 valid=10s;
-        set $api_upstream http://laviciacion-api:5000;
+        resolver ${DNS_RESOLVER} valid=10s;
+        set $api_upstream ${API_UPSTREAM};
         proxy_pass $api_upstream$request_uri;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
