@@ -20,6 +20,16 @@ docker compose logs -f laviciacion-api
 docker compose down                    # keeps db/data
 ```
 
+**Development stack (`*-dev` names):** `docker-compose.dev.yml` is an override of the main file that builds from the checkout and names images and containers `laviciacion-<service>-dev` (the database keeps the `mariadb` image, container `laviciacion-db-dev`). Always use it together with the main file:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+docker compose -f docker-compose.yml -f docker-compose.dev.yml logs -f laviciacion-api
+docker compose -f docker-compose.yml -f docker-compose.dev.yml down
+```
+
+It is an alternative to the main stack, not a second one next to it: same project, same service names (so `.env` hostnames such as `laviciacion-db` keep working), same ports (`FRONT_HOST_PORT`...) and the same database volume, so switching between the two recreates the containers and keeps the data. To avoid retyping the two files, set `COMPOSE_FILE=docker-compose.yml;docker-compose.dev.yml` in your shell (`:` instead of `;` on Linux/macOS); then plain `docker compose up -d --build` is the dev stack.
+
 - Front: http://localhost:3000 (API proxied at `/api/`)
 - API: http://127.0.0.1:5000 (interactive docs at `/api/v1/docs` only with `API_DOCS_ENABLED=true` in `.env`)
 - DB: `127.0.0.1:3307`

@@ -1,0 +1,26 @@
+# Development stack: the same services as docker-compose.yml, but built from this checkout
+# and named *-dev (images and containers). It is an override, so it is always used together
+# with the main file:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+#
+# Ports, healthchecks, volumes and environment all come from the main file (and the same .env),
+# so the host ports are still FRONT_/API_/DB_HOST_IP and _HOST_PORT. Service names stay the
+# same, which is what keeps the hostnames of .env (laviciacion-db, laviciacion-api) working.
+
+services:
+
+  laviciacion-front:
+    image: laviciacion-front-dev
+    container_name: laviciacion-front-dev
+
+  laviciacion-bot:
+    image: laviciacion-bot-dev
+    container_name: laviciacion-bot-dev
+
+  laviciacion-api:
+    image: laviciacion-api-dev
+    container_name: laviciacion-api-dev
+
+  laviciacion-db:
+    container_name: laviciacion-db-dev

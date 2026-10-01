@@ -41,7 +41,8 @@ Four services, one `docker-compose.yml`:
 
 ```bash
 # Stack
-docker compose up -d --build
+docker compose up -d --build           # build from the checkout
+# dev names (*-dev): docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
 docker compose logs -f laviciacion-api
 
 # API tests (from api/, needs the root .env or equivalent env vars)
