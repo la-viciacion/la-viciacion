@@ -12,7 +12,6 @@ export function showLogin(onSuccess) {
         <div class="login-brand">
           <img src="icon-192.png" alt="La Viciación logo" class="login-logo" />
           <h1>La Viciación</h1>
-          <p>Accede a tu cuenta de gamer</p>
         </div>
 
         <form id="loginForm" novalidate>
