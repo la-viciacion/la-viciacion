@@ -95,29 +95,52 @@ async function searchRawg(modal, query, onPick) {
     const candidates = await api(`/games/search-rawg?query=${encodeURIComponent(query)}`);
     if (!results.isConnected) return;
     if (!candidates?.length) return mount(results, hint('Sin resultados'));
-    mount(results, html`${candidates.map((c, i) => html`
-      <button class="modal-result-row" data-index="${i}">
-        ${thumb(c.image_url)}
-        <span class="modal-result-name">
-          ${c.name}${c.released ? html` <span class="modal-result-year">(${c.released.slice(0, 4)})</span>` : ''}
-          ${c.exists_in_db ? html`<span class="modal-result-badge">Ya en tu catálogo</span>` : ''}
-        </span>
-      </button>`)}`);
-    results.onclick = (e) => {
-      const row = e.target.closest('.modal-result-row');
-      if (row) pickRawgCandidate(results, candidates[Number(row.dataset.index)], onPick);
+    const showList = () => {
+      mount(results, html`${candidates.map((c, i) => html`
+        <button class="modal-result-row" data-index="${i}">
+          ${thumb(c.image_url)}
+          <span class="modal-result-name">
+            ${c.name}${c.released ? html` <span class="modal-result-year">(${c.released.slice(0, 4)})</span>` : ''}
+            ${c.exists_in_db ? html`<span class="modal-result-badge">Ya en tu catálogo</span>` : ''}
+          </span>
+        </button>`)}`);
+      results.onclick = (e) => {
+        const row = e.target.closest('.modal-result-row');
+        if (row) pickRawgCandidate(results, candidates[Number(row.dataset.index)], onPick, showList);
+      };
     };
+    showList();
   } catch (err) {
     if (results.isConnected) mount(results, hint(`Error buscando: ${err.message}`));
   }
 }
 
-async function pickRawgCandidate(results, candidate, onPick) {
+// A game that is already in the catalogue is used at once; a fresh one from RAWG is only created after a confirmation.
+async function pickRawgCandidate(results, candidate, onPick, back) {
+  if (candidate.exists_in_db && candidate.db_game_id) {
+    closeAllModals();
+    return onPick(candidate.db_game_id, candidate.name);
+  }
+  mount(results, html`
+    <div class="modal-confirm">
+      ${thumb(candidate.image_url)}
+      <div class="modal-confirm-text">
+        <strong>${candidate.name}${candidate.released ? ` (${candidate.released.slice(0, 4)})` : ''}</strong>
+        <span>Este juego no está en tu catálogo. ¿Añadirlo? Quedará disponible para todos.</span>
+      </div>
+      <div class="sess-actions">
+        <button type="button" class="sess-btn" data-back>Volver</button>
+        <button type="button" class="sess-btn primary" data-confirm>Añadir juego</button>
+      </div>
+    </div>`);
+  results.onclick = (e) => {
+    if (e.target.closest('[data-back]')) back();
+    else if (e.target.closest('[data-confirm]')) addRawgGame(results, candidate, onPick);
+  };
+}
+
+async function addRawgGame(results, candidate, onPick) {
   try {
-    if (candidate.exists_in_db && candidate.db_game_id) {
-      closeAllModals();
-      return onPick(candidate.db_game_id, candidate.name);
-    }
     mount(results, hint('Añadiendo juego...'));
     const game = await api('/games/', jsonRequest('POST', {
       name: candidate.name,
