@@ -23,7 +23,7 @@ Single `.env` (template: `.env.template`). Production checklist:
 - `CORS_ORIGINS` is a JSON list with the real public origin(s).
 - `TZ` set (drives the current season and the scheduled job times).
 - `ENVIRONMENT=production`; Sentry DSNs if wanted.
-- Password recovery (optional) needs `PUBLIC_URL` (the public address of the app, e.g. `https://lavi.example.com`) and an SMTP server: `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURITY`, `SMTP_EMAIL` (From), `SMTP_USER`/`SMTP_PASS`. Without them the feature answers "not configured". Migration `017_password_resets` adds its table. Try it once after deploying: the **Correo** section of the admin panel (Sistema) shows the state and sends a test email to your own account (your admin user needs an email); then ask for a link from the login page. Check the spam folder of a new sender.
+- Password recovery (optional) needs `PUBLIC_URL` (the public address of the app, e.g. `https://lavi.example.com`) and an SMTP server: `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURITY`, `SMTP_EMAIL` (From), `SMTP_USER`/`SMTP_PASS`. Without them the feature answers "not configured". Migration `017_password_resets` adds its table. Try it once after deploying: the **Correo** card of the admin panel (Sistema) shows the state and sends a test email to your own account (your admin user needs an email); then ask for a link from the login page. Check the spam folder of a new sender.
 - Push notifications (optional) need HTTPS in front of the app; their VAPID keys are generated from the panel, not set in `.env`.
 - `SECRET_KEY` also derives the key that encrypts the Telegram token: rotate it only if you can re-enter the token from the panel (it invalidates all sessions too).
 

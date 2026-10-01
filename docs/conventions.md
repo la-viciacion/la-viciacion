@@ -68,7 +68,7 @@ Read-only (except `/activate`, see architecture), generic endpoints only. Texts 
 
 ### Add an admin panel section
 
-Backend under `routers/manage.py` (already admin-only). Front: the panel is a sidebar of sections (`front/js/pages/admin/nav.js`: groups and ids; the address of a section is `#/admin/<id>`). A table section is only a declarative entry in `entities.js` (columns, fields, filters, row actions), rendered by the generic controller in `index.js`; anything else is a *custom* entry (`custom: '<module>'`) whose module in the same folder exports `render(panel, { entity, admin })` (`home.js`, `announce.js`, `settings.js`). Add the id to a group in `nav.js` (and to its test). Reuse `components.js`, `form.js`, `dialogs.js`; styles in `css/admin.css`.
+Backend under `routers/manage.py` (already admin-only). Front: the panel is a sidebar of sections (`front/js/pages/admin/nav.js`: Inicio, Gestión de datos, Notificaciones, Sistema), each with one or more tabs; the address of a tab is `#/admin/<id>`. A table section is only a declarative entry in `entities.js` (columns, fields, filters, row actions), rendered by the generic controller in `index.js`; anything else is a *custom* entry (`custom: '<module>'`) whose module in the same folder exports `render(panel, { entity, admin })` (`home.js`, `announce.js`, `settings.js`). Add its id to a section's `tabs` in `nav.js`. Reuse `components.js`, `form.js`, `dialogs.js`; styles in `css/admin.css`.
 
 ### Add a page to the front
 
@@ -80,7 +80,7 @@ Write the async job in `utils/scheduler.py`, expose a pure slot function and add
 
 ### Add a runtime setting
 
-Define it in `utils/settings.py` (key, default, coercion/validation, secret or not), expose it via `GET/PUT /manage/settings`, add the field in a card of `front/js/pages/admin/settings.js` (each settings page lists the cards it shows in `sections`, in `entities.js`), and cover `coerce` with a test. Secrets must be encrypted and write-only from the panel.
+Define it in `utils/settings.py` (key, default, coercion/validation, secret or not), expose it via `GET/PUT /manage/settings`, add the field in a card of `front/js/pages/admin/settings.js` (the settings entries in `entities.js`, `notifications` and `system`, list the cards they show in `sections`), and cover `coerce` with a test. Secrets must be encrypted and write-only from the panel.
 
 ### Add an environment variable
 
