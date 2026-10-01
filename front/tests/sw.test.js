@@ -31,7 +31,7 @@ const push = (payload) => ({ data: { json: () => payload } });
 
 test('the running-timer notification is pinned and silent, and replaces the previous one', async () => {
   const sw = load();
-  await sw.run('push', push({ title: 'Hollow Knight', body: '1h 25min', tag: 'timer', quiet: true, pinned: true, url: '/' }));
+  await sw.run('push', push({ title: 'Hollow Knight', body: '1h 25min', tag: 'timer', quiet: true, pinned: true, button: 'Parar', url: '/' }));
   const [n] = sw.shown;
   assert.equal(n.title, 'Hollow Knight');
   assert.equal(n.body, '1h 25min');
@@ -39,7 +39,7 @@ test('the running-timer notification is pinned and silent, and replaces the prev
   assert.equal(n.silent, true);
   assert.equal(n.renotify, false); // Chrome rejects renotify together with silent
   assert.equal(n.requireInteraction, true);
-  assert.equal(n.actions, undefined);
+  assert.deepEqual(JSON.parse(JSON.stringify(n.actions)), [{ action: 'open', title: 'Parar' }]);
 });
 
 test('the "stopped" notice that replaces it is quiet but no longer pinned', async () => {
@@ -47,6 +47,7 @@ test('the "stopped" notice that replaces it is quiet but no longer pinned', asyn
   await sw.run('push', push({ title: 'Hollow Knight', body: 'Timer parado · 1h 25min', tag: 'timer', quiet: true }));
   assert.equal(sw.shown[0].silent, true);
   assert.equal(sw.shown[0].requireInteraction, false);
+  assert.equal(sw.shown[0].actions, undefined);
 });
 
 test('a normal push with a tag still alerts again', async () => {
@@ -69,4 +70,11 @@ test('tapping a notification closes it and opens its url', async () => {
   await sw.run('notificationclick', { notification });
   assert.equal(notification.closed, true);
   assert.deepEqual(JSON.parse(JSON.stringify(sw.opened)), ['#/profile']);
+});
+
+test('tapping the button opens the app like tapping the notification', async () => {
+  const sw = load();
+  const notification = { data: { url: '/' }, close() {} };
+  await sw.run('notificationclick', { action: 'open', notification });
+  assert.deepEqual(JSON.parse(JSON.stringify(sw.opened)), ['/']);
 });

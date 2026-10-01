@@ -109,7 +109,7 @@ def elapsed_text(seconds: float) -> str:
 
 
 def build_timer_payload(game_name: str, start_time: datetime.datetime, now: datetime.datetime) -> dict:
-    """The pinned notification of a running timer: tapping it opens the app, where the timer is stopped."""
+    """The pinned notification of a running timer. Both tapping it and its "Parar" button open the app, where the timer is stopped."""
     return {
         "title": _shorten(game_name, TITLE_MAX),
         "body": elapsed_text((now - start_time).total_seconds()),
@@ -117,6 +117,7 @@ def build_timer_payload(game_name: str, start_time: datetime.datetime, now: date
         "tag": TIMER_TAG,
         "quiet": True,
         "pinned": True,
+        "button": "Parar",
     }
 
 

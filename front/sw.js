@@ -16,9 +16,10 @@ self.addEventListener('activate', (e) => {
 
 self.addEventListener('fetch', () => {});
 
-// Web Push (server: api/src/utils/push.py). The payload is {title, body, url, tag, image?, quiet?, pinned?}.
+// Web Push (server: api/src/utils/push.py). The payload is {title, body, url, tag, image?, quiet?, pinned?, button?}.
 // `quiet` notices (the running-timer one, refreshed every 5 minutes under the same tag) must not
-// alert; `pinned` ones stay on screen until tapped or replaced.
+// alert; `pinned` ones stay on screen until tapped or replaced; `button` adds one action button
+// (every tap, on it or on the notification, just opens `url`: the app does the work).
 self.addEventListener('push', (event) => {
   let data = {};
   try {
@@ -36,6 +37,7 @@ self.addEventListener('push', (event) => {
       silent: Boolean(data.quiet),
       renotify: Boolean(data.tag) && !data.quiet, // a newer notice with the same tag replaces the old one but still alerts (Chrome rejects renotify together with silent)
       requireInteraction: Boolean(data.pinned),
+      actions: data.button ? [{ action: 'open', title: String(data.button) }] : undefined,
       data: { url: data.url || '/' },
     }),
   );

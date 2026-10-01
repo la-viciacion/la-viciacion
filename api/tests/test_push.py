@@ -194,11 +194,13 @@ class TimerNoticeTests(unittest.TestCase):
         payload = push.build_timer_payload("Hollow Knight", self.start, self.start + datetime.timedelta(minutes=85))
         self.assertEqual((payload["title"], payload["body"]), ("Hollow Knight", "1h 25min"))
         self.assertEqual((payload["tag"], payload["quiet"], payload["pinned"], payload["url"]), (push.TIMER_TAG, True, True, "/"))
+        self.assertEqual(payload["button"], "Parar")
 
     def test_the_stopped_payload_keeps_the_tag_and_says_how_long_it_was(self):
         payload = push.build_timer_stopped_payload("Hollow Knight", 5100)
         self.assertEqual((payload["tag"], payload["body"]), (push.TIMER_TAG, "Timer parado · 1h 25min"))
         self.assertNotIn("pinned", payload)
+        self.assertNotIn("button", payload)
         self.assertEqual(push.build_timer_stopped_payload("x", None)["body"], "Timer parado")
 
     def test_a_long_game_name_is_shortened(self):
