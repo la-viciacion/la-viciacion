@@ -5,11 +5,14 @@
 // notifications, password). The games, the recommendations and the settings load the
 // first time their tab is opened.
 // All routes are /api/v1/users/{username}/...
-import { api, jsonRequest } from '../../lib/api.js';
+import { api } from '../../lib/api.js';
 import { formatDate, formatDuration } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
-import { PASSWORD_HINT, isValidPassword } from '../../lib/password.js';
+import { PASSWORD_HINT } from '../../lib/password.js';
 import * as seasons from '../../lib/seasons.js';
+import { initAccount } from './account.js';
+import { initAvatar } from './avatar.js';
+import { flash } from './flash.js';
 import { initLibrary } from './library.js';
 import { initPreferences } from './preferences.js';
 import { initPush } from './push.js';
@@ -17,8 +20,6 @@ import { initRecommendations } from './recommendations.js';
 
 export const active = 'profile';
 export const mainClass = 'profile-main';
-
-const AVATAR_SIZE = 256;
 
 const TABS = [
   ['resumen', 'Resumen'],
@@ -34,11 +35,6 @@ let opened; // tabs already initialised
 let shown; // season on screen: a year, or seasons.ALL; null = the running one
 
 const userPath = (suffix) => `/users/${encodeURIComponent(user.username)}/${suffix}`;
-
-function flash(el, message, ok = false) {
-  el.textContent = message;
-  el.className = `pf-msg ${message ? (ok ? 'ok' : 'err') : ''}`;
-}
 
 export async function render(ctx) {
   main = ctx.main;
@@ -257,99 +253,6 @@ function draw(d) {
   });
   main.querySelector('.pf-tabs').addEventListener('keydown', onTabKey);
   main.querySelector('#pfSeasons').addEventListener('click', onSeason);
-  main.querySelector('#pfAvatarInput').addEventListener('change', changeAvatar);
-  main.querySelector('#pfData').addEventListener('submit', saveData);
-  main.querySelector('#pfPass').addEventListener('submit', changePassword);
-}
-
-// ── Avatar ──────────────────────────────────────────────────
-// Center-crop to a square and shrink, so the stored avatar stays small.
-function resizeImage(file) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    const src = URL.createObjectURL(file);
-    img.onload = () => {
-      const side = Math.min(img.width, img.height);
-      const canvas = document.createElement('canvas');
-      canvas.width = canvas.height = AVATAR_SIZE;
-      canvas.getContext('2d').drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, AVATAR_SIZE, AVATAR_SIZE);
-      URL.revokeObjectURL(src);
-      canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('No se pudo procesar la imagen'))), 'image/jpeg', 0.9);
-    };
-    img.onerror = () => { URL.revokeObjectURL(src); reject(new Error('El archivo no es una imagen válida')); };
-    img.src = src;
-  });
-}
-
-// Swap a placeholder (or old image) for the new picture, keeping its classes.
-function showAvatar(el) {
-  if (!el) return;
-  const img = document.createElement('img');
-  img.src = avatarUrl;
-  img.alt = '';
-  img.className = el.className.replace(/\s*(navbar|pf)-avatar-placeholder/, '').trim();
-  if (el.id) img.id = el.id;
-  el.replaceWith(img);
-}
-
-async function changeAvatar(e) {
-  const file = e.target.files[0];
-  e.target.value = '';
-  if (!file) return;
-  const msg = main.querySelector('#pfAvatarMsg');
-  if (!['image/jpeg', 'image/png'].includes(file.type)) return flash(msg, 'Solo se admiten imágenes JPG o PNG');
-  flash(msg, 'Subiendo…', true);
-  try {
-    const small = await resizeImage(file);
-    const form = new FormData();
-    form.append('file', small, 'avatar.jpg');
-    await api(userPath('avatar'), { method: 'PATCH', body: form });
-    avatarUrl = URL.createObjectURL(small);
-    showAvatar(main.querySelector('#pfAvatar'));
-    showAvatar(document.querySelector('.navbar-avatar'));
-    flash(msg, 'Foto actualizada', true);
-  } catch (err) {
-    flash(msg, err.message);
-  }
-}
-
-// ── Personal data & password ────────────────────────────────
-async function saveData(e) {
-  e.preventDefault();
-  const form = e.currentTarget;
-  const msg = main.querySelector('#pfDataMsg');
-  // The email identifies the account, so it is only sent when filled in.
-  const telegram = form.telegram_id.value.trim();
-  const changes = { name: form.name.value, telegram_id: telegram === '' ? null : Number(telegram) };
-  if (form.email.value.trim()) changes.email = form.email.value;
-  try {
-    const updated = await api(userPath('profile'), jsonRequest('PATCH', changes));
-    Object.assign(user, { name: updated.name, email: updated.email, telegram_id: updated.telegram_id });
-    const shown = updated.name || updated.username;
-    main.querySelector('.pf-title').textContent = shown;
-    const navName = document.querySelector('.navbar-username');
-    if (navName) navName.textContent = shown;
-    flash(msg, 'Datos guardados', true);
-  } catch (err) {
-    flash(msg, err.message);
-  }
-}
-
-async function changePassword(e) {
-  e.preventDefault();
-  const form = e.currentTarget;
-  const msg = main.querySelector('#pfPassMsg');
-  if (!form.current.value) return flash(msg, 'Introduce tu contraseña actual');
-  if (!isValidPassword(form.next.value)) return flash(msg, `La contraseña debe tener ${PASSWORD_HINT.toLowerCase()}`);
-  if (form.next.value !== form.again.value) return flash(msg, 'Las contraseñas nuevas no coinciden');
-  try {
-    await api(userPath('password'), jsonRequest('POST', {
-      current_password: form.current.value,
-      new_password: form.next.value,
-    }));
-    form.reset();
-    flash(msg, 'Contraseña actualizada', true);
-  } catch (err) {
-    flash(msg, err.message);
-  }
+  initAvatar(main, { path: userPath('avatar') });
+  initAccount(main, { user, userPath });
 }
