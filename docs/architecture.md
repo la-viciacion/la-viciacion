@@ -29,7 +29,7 @@ utils/             domain logic and integrations (see below)
 clients/google_ai.py, open_ai.py  one function per AI provider, each with the provider's official SDK (`google-genai`, `openai`); utils/ai.py picks one from the settings
 ```
 
-Routers: `basic` (login, token, `/auth/active_user`, keepalive), `users` (profile, library, recommendations, avatar, password), `games`, `timers` (start/stop/manual/edit/history), `statistics`, `manage` (**admin panel API**: `/manage/overview` and `/manage/attention` for the panel's home (forgotten timers, players without Telegram ID, games without RAWG: computed on request), users, games, platforms (`/manage/platforms`: list with usage, create, rename, delete when unused), timers, library, achievements and awarded achievements (`/manage/user-achievements`: list, change date, revoke), RAWG sync, settings; router-level `require_admin`), `utils` (platforms, achievement images).
+Routers: `basic` (login, token, `/auth/active_user`, keepalive), `users` (profile, library (optionally `?game_id=` for the entries of one game), recommendations, avatar, password), `games`, `timers` (start/stop/manual/edit/history), `statistics`, `manage` (**admin panel API**: `/manage/overview` and `/manage/attention` for the panel's home (forgotten timers, players without Telegram ID, games without RAWG: computed on request), users, games, platforms (`/manage/platforms`: list with usage, create, rename, delete when unused), timers, library, achievements and awarded achievements (`/manage/user-achievements`: list, change date, revoke), RAWG sync, settings; router-level `require_admin`), `utils` (platforms, achievement images).
 
 Utils worth knowing: `seasons.py` (single source of the season concept), `actions.py` (achievement checks, ranking/streak announcements, weekly resume), `streaks.py` (pure streak maths), `rate_limit.py`, `password_reset.py` + `email.py` (password recovery), `images.py`, `scheduler.py`, `settings.py` (runtime settings), `achievements.py`, `rawg_sync.py`, `messages.py` (Spanish user-facing error strings), `custom_exceptions.py`, `logger.py`.
 
@@ -102,7 +102,7 @@ No framework/build step. ES modules loaded by `index.html` → `js/main.js`.
 js/main.js        hash router (#/, #/profile, #/admin), session handling, page lifecycle
 js/lib/           api (fetch wrapper + session), html (escaping template tag), format, password, platforms, seasons
 js/ui/            layout (navbar shell), modal, toast, icons
-js/pages/         login, home/ (timer, history, sessions, game-picker), profile/, admin/ (entities, form, dialogs, rawg-sync, settings)
+js/pages/         login, home/ (timer, history, completion, sessions, game-picker), profile/, admin/ (entities, form, dialogs, rawg-sync, settings)
 css/              one stylesheet per area
 sw.js             pass-through service worker (caches nothing; keeps the app installable)
 ```

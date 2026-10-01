@@ -61,7 +61,7 @@ In the admin panel, **Logros → Concedidos** lists what each player has unlocke
 
 ### Manual sessions
 
-From the home page a user can add a finished session by hand (**+ Sesión manual**: game, platform, start, end) and correct or delete one of their own from the expanded history of a game (**Editar**; **Ver todas** loads older ones). The API (`POST /timers/manual`, `PATCH`/`DELETE /timers/{id}`) enforces: the end after the start and not in the future, at most 24 h, **current season only** (closed seasons are frozen; admins can still edit them), and no overlap with any other session of that user, running timer included. The game cannot be changed on an existing session: delete it and add it again. Manual changes check the user's achievements silently (nothing is announced to the group), and creating one also creates the library entry for that game/platform/season if it is missing.
+From the home page a user can add a finished session by hand (**+ Sesión manual**: game, platform, start, end) and correct or delete one of their own from **Perfil → Mis juegos → Sesiones** (the sessions of that game and season; **Editar**, only for the current season). In the home list of latest games, pressing a game's name opens a window to mark it as completed (once per game and season, announced to the group after a confirmation) and **Seguir** starts a new timer. The API (`POST /timers/manual`, `PATCH`/`DELETE /timers/{id}`) enforces: the end after the start and not in the future, at most 24 h, **current season only** (closed seasons are frozen; admins can still edit them), and no overlap with any other session of that user, running timer included. The game cannot be changed on an existing session: delete it and add it again. Manual changes check the user's achievements silently (nothing is announced to the group), and creating one also creates the library entry for that game/platform/season if it is missing.
 
 ### Recommendations
 
@@ -83,7 +83,7 @@ css/                one stylesheet per area (base, login, navbar, home, modal, a
 js/main.js          hash router + session handling
 js/lib/             html (escaping template tag), api, format, password, platforms
 js/ui/              layout (navbar shell), modal, toast, icons
-js/pages/           login, profile, home/ (timer, history, game picker), admin/ (entities, form, dialogs, rawg-sync)
+js/pages/           login, profile, home/ (timer, history, completion, game picker), admin/ (entities, form, dialogs, rawg-sync)
 sw.js               pass-through service worker (caches nothing; keeps the app installable)
 tests/              node:test unit tests for js/lib
 ```
