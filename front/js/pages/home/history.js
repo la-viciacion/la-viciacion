@@ -92,7 +92,7 @@ function groupRow(g) {
         <ul class="history-sessions">
           ${g.sessions.map((s) => html`
             <li>
-              <span>${formatDateTime(s.start_time)}${s.platform ? ` · ${platformName(s.platform)}` : ''}</span>
+              <span class="session-info">${formatDateTime(s.start_time)}${s.platform ? ` · ${platformName(s.platform)}` : ''}${s.notes ? html`<span class="session-note">${s.notes}</span>` : ''}</span>
               <span class="session-end">
                 <span class="session-duration">${formatDuration(s.duration_seconds || 0)}</span>
                 <button class="btn-session" data-action="edit-session" data-game-id="${g.game_id}" data-timer-id="${s.id}" aria-label="Editar sesión">Editar</button>

@@ -14,6 +14,8 @@ let searchTimer = null;
 
 export const initGamePicker = (id) => { userId = id; };
 
+export const NOTES_MAX = 500; // width of game_timers.notes
+
 const hint = (text) => html`<div class="modal-hint">${text}</div>`;
 const thumb = (url) => (url
   ? html`<img src="${url}" alt="" class="modal-result-thumb" />`
@@ -151,6 +153,8 @@ function platformRow(id, badge) {
     </button>`;
 }
 
+const notesField = () => html`<input type="text" id="timerNotes" class="modal-search-input" maxlength="${NOTES_MAX}" placeholder="Nota de la sesión (opcional)" autocomplete="off" />`;
+
 function openPlatformStep(gameId, gameName, used, forceAll = false, hasHistory = used.length > 0) {
   const showAll = forceAll || used.length === 0; // no known platform to offer as "same"
   let content;
@@ -162,10 +166,11 @@ function openPlatformStep(gameId, gameName, used, forceAll = false, hasHistory =
         ? 'Ya has jugado a este juego, pero no consta la plataforma. ¿En cuál juegas?'
         : 'Este juego es nuevo para ti. ¿En qué plataforma juegas?';
     const rows = platformList().map((p) => platformRow(p.id, used.includes(p.id) ? 'Ya usada' : ''));
-    content = html`${hint(message)}<div class="modal-results-list">${rows.length ? rows : hint('No hay plataformas disponibles')}</div>`;
+    content = html`${hint(message)}${notesField()}<div class="modal-results-list">${rows.length ? rows : hint('No hay plataformas disponibles')}</div>`;
   } else {
     content = html`
       ${hint('Ya has jugado a este juego. ¿En qué plataforma?')}
+      ${notesField()}
       <div class="modal-results-list">${used.map((id, i) => platformRow(id, i === 0 ? 'Misma que la última vez' : ''))}</div>
       <div class="modal-footer">
         <button class="btn-modal-secondary" id="otherPlatformBtn">${iconPlus()} Otra plataforma</button>
@@ -174,8 +179,9 @@ function openPlatformStep(gameId, gameName, used, forceAll = false, hasHistory =
 
   const modal = openStep(html`${modalHeader(gameName || 'Plataforma')}${content}`);
   modal.el.querySelectorAll('[data-platform]').forEach((btn) => btn.addEventListener('click', () => {
+    const notes = modal.el.querySelector('#timerNotes').value.trim() || null;
     closeAllModals();
-    startTimer(gameId, btn.dataset.platform);
+    startTimer(gameId, btn.dataset.platform, notes);
   }));
   modal.el.querySelector('#otherPlatformBtn')?.addEventListener('click', () => openPlatformStep(gameId, gameName, used, true, hasHistory));
 }

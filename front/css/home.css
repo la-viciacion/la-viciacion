@@ -231,6 +231,10 @@
 
 .history-sessions .session-more { color: var(--text-muted); font-style: italic; justify-content: center; }
 
+.session-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+
+.session-note { color: var(--text-muted); font-style: italic; overflow-wrap: anywhere; }
+
 .session-duration { color: var(--text-primary); font-weight: 600; }
 
 .history-more { display: flex; justify-content: center; margin-top: 16px; }
@@ -266,6 +270,7 @@
   background: var(--bg-base); border: 1px solid var(--border); border-radius: var(--radius-sm);
   color: var(--text-primary); font: inherit; font-size: 0.9rem; padding: 9px 12px; min-width: 0;
 }
+textarea.sess-input { resize: vertical; min-height: 56px; }
 .sess-input:focus { outline: none; border-color: var(--accent-teal); }
 .sess-hint { font-size: 0.78rem; color: var(--text-muted); }
 .sess-error { min-height: 1.2em; font-size: 0.85rem; color: var(--accent-pink); }
