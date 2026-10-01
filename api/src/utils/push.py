@@ -7,15 +7,19 @@ swallows its errors and only logs them.
 - notify_group: a copy of what goes to the Telegram group, for every device that
   wants group notices.
 - notify_user: a private notice for one user, on all of their devices.
+- notify_timer / notify_timer_stopped: the pinned "timer running" notification of a user's
+  devices, refreshed every few minutes by the scheduler (same tag, so each one replaces the last).
 
 Payloads are short plain text (title, body, url, tag): how long messages and images
 fit into a push is still to be designed, see docs/roadmap.md.
 """
 import asyncio
 import base64
+import datetime
 import json
 import re
 
+import jwt
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 from py_vapid import Vapid
 from pywebpush import WebPushException, webpush
@@ -39,6 +43,11 @@ ANNOUNCEMENT_BODY_MAX = 240
 PAYLOAD_MAX_BYTES = 3500  # the Web Push limit is 4096 bytes once encrypted
 TTL_SECONDS = 3600  # a notice that could not be delivered within the hour is stale
 MAX_DEVICES_PER_USER = 10
+
+TIMER_TAG = "timer"
+TIMER_TTL_SECONDS = 600  # a refresh that arrives late is worse than none: the next one is due in 5 minutes
+STOP_TOKEN_MINUTES = 15  # renewed by every refresh; only valid for the "Parar" button of one timer
+STOP_TOKEN_TYPE = "timer-stop"
 
 
 # ── payload ─────────────────────────────────────────────────
@@ -92,6 +101,57 @@ def build_announcement(title: str, body: str | None = None, url: str | None = No
     return payload
 
 
+# ── running-timer notification ──────────────────────────────
+def elapsed_text(seconds: float) -> str:
+    """"Timer iniciado" under a minute, then "5 min" or "1h 05min". Mirrored by sw.js (formatElapsed)."""
+    minutes = max(0, int(seconds)) // 60
+    if minutes < 1:
+        return "Timer iniciado"
+    hours, minutes = divmod(minutes, 60)
+    return f"{hours}h {minutes:02d}min" if hours else f"{minutes} min"
+
+
+def make_stop_token(user_id: int, timer_id: int) -> str:
+    """Lets the "Parar" button of a notification stop exactly this timer without a login: the
+    service worker cannot read the session token. Not accepted as a session (no `username` claim)."""
+    expires = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=STOP_TOKEN_MINUTES)
+    claims = {"typ": STOP_TOKEN_TYPE, "uid": user_id, "tid": timer_id, "exp": expires}
+    return jwt.encode(claims, config.SECRET_KEY, algorithm="HS256")
+
+
+def read_stop_token(token: str) -> tuple[int, int]:
+    """(user id, timer id) of a valid stop token. Raises ValueError when it is forged, expired or another kind of token."""
+    try:
+        claims = jwt.decode(token, config.SECRET_KEY, algorithms=["HS256"])
+        if claims.get("typ") != STOP_TOKEN_TYPE:
+            raise ValueError("wrong token type")
+        return int(claims["uid"]), int(claims["tid"])
+    except (jwt.PyJWTError, KeyError, TypeError, ValueError) as e:
+        raise ValueError("Invalid stop token") from e
+
+
+def build_timer_payload(game_name: str, start_time: datetime.datetime, user_id: int, timer_id: int, now: datetime.datetime) -> dict:
+    """The pinned notification of a running timer. `start` (epoch ms) lets the service worker
+    recompute the elapsed time by itself when it has to redraw the notification."""
+    return {
+        "title": _shorten(game_name, TITLE_MAX),
+        "body": elapsed_text((now - start_time).total_seconds()),
+        "url": "/",
+        "tag": TIMER_TAG,
+        "kind": "timer",
+        "quiet": True,
+        "start": int(start_time.timestamp() * 1000),
+        "token": make_stop_token(user_id, timer_id),
+    }
+
+
+def build_timer_stopped_payload(game_name: str, duration_seconds: int | None) -> dict:
+    """Replaces the pinned notification once the timer is over (no longer pinned, no sound)."""
+    elapsed = elapsed_text(duration_seconds or 0)
+    body = "Timer parado" if elapsed == "Timer iniciado" else f"Timer parado · {elapsed}"
+    return {"title": _shorten(game_name, TITLE_MAX), "body": body, "url": "/", "tag": TIMER_TAG, "kind": "timer-stopped", "quiet": True}
+
+
 # ── keys and settings ───────────────────────────────────────
 def generate_vapid_keys() -> tuple[str, str]:
     """(public key as base64url for the browser, private key as PEM)."""
@@ -136,7 +196,7 @@ def ensure_vapid_keys(db) -> bool:
 
 
 # ── delivery ────────────────────────────────────────────────
-def _deliver(devices: list[tuple], payload: dict, private_pem: str, subject: str) -> tuple[int, list[int], int]:
+def _deliver(devices: list[tuple], payload: dict, private_pem: str, subject: str, ttl: int = TTL_SECONDS) -> tuple[int, list[int], int]:
     """Blocking. Returns (sent, ids of subscriptions that no longer exist, failures)."""
     vapid = Vapid.from_pem(private_pem.encode())
     data = json.dumps(payload)
@@ -148,7 +208,7 @@ def _deliver(devices: list[tuple], payload: dict, private_pem: str, subject: str
                 data=data,
                 vapid_private_key=vapid,
                 vapid_claims={"sub": subject},
-                ttl=TTL_SECONDS,
+                ttl=ttl,
                 timeout=10,
             )
             sent += 1
@@ -171,7 +231,7 @@ def active_users_only(query):
     return query.filter(models.PushSubscription.user_id.in_(active))
 
 
-async def _send(query_filter, payload: dict) -> tuple[int, int]:
+async def _send(query_filter, payload: dict, ttl: int = TTL_SECONDS) -> tuple[int, int]:
     """Send `payload` to the subscriptions selected by `query_filter(query)`; returns (sent, failed)."""
     with SessionLocal() as db:
         rows = active_users_only(query_filter(db.query(models.PushSubscription))).all()
@@ -179,7 +239,7 @@ async def _send(query_filter, payload: dict) -> tuple[int, int]:
     if not devices:
         return 0, 0
     sent, gone, failed = await asyncio.to_thread(
-        _deliver, devices, payload, settings.get("push.vapid_private"), contact()
+        _deliver, devices, payload, settings.get("push.vapid_private"), contact(), ttl
     )
     if gone:
         with SessionLocal() as db:
@@ -239,3 +299,25 @@ async def notify_user(user_id: int, message: str, tag: str | None = None) -> tup
     except Exception as e:
         logger.error(f"Push to user {user_id} failed: {e}")
         return 0, 0
+
+
+async def notify_timer(user_id: int, game_name: str, start_time: datetime.datetime, timer_id: int) -> None:
+    """Show or refresh the pinned notification of a running timer on all of the user's devices."""
+    if not is_ready():
+        return
+    try:
+        payload = build_timer_payload(game_name, start_time, user_id, timer_id, datetime.datetime.now())
+        await _send(lambda q: q.filter(models.PushSubscription.user_id == user_id), payload, TIMER_TTL_SECONDS)
+    except Exception as e:
+        logger.error(f"Timer push to user {user_id} failed: {e}")
+
+
+async def notify_timer_stopped(user_id: int, game_name: str, duration_seconds: int | None) -> None:
+    """Unpin the notification of a timer that is over, on all of the user's devices."""
+    if not is_ready():
+        return
+    try:
+        payload = build_timer_stopped_payload(game_name, duration_seconds)
+        await _send(lambda q: q.filter(models.PushSubscription.user_id == user_id), payload)
+    except Exception as e:
+        logger.error(f"Timer-stopped push to user {user_id} failed: {e}")

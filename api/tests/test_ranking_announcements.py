@@ -75,12 +75,17 @@ class StoppingATimerTests(unittest.TestCase):
 
     def test_stopping_schedules_the_checks_with_the_ranking_from_before(self):
         background = self.stop()
-        self.assertEqual(len(background.tasks), 1)
+        self.assertEqual(len(background.tasks), 2)
         task = background.tasks[0]
         self.assertIs(task.func, actions.after_session_change)
         user_id, silent, before = task.args
         self.assertEqual((user_id, silent), (2, False))
         self.assertEqual(before, {"players": [1, 2], "games": ["g1", "g2"]})  # a running timer counts for nothing yet
+
+    def test_stopping_also_unpins_the_timer_notification(self):
+        task = self.stop().tasks[1]
+        self.assertIs(task.func, actions.after_timer_stop)
+        self.assertEqual(task.args[0], 2)
 
     def test_an_overtaking_is_announced_to_the_group_with_the_new_totals(self):
         sent, _, checks = self.run_background(self.stop())

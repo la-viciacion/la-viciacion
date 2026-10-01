@@ -166,6 +166,7 @@ def after_timer_start(user_id: int, start_time: datetime.datetime, new_game_id: 
         try:
             user = users.get_user_by_id(db, user_id)
             if user is not None:
+                await send_timer_notice(db, time_entries.get_active_game_timer_by_user(db, user_id))
                 if new_game_id is not None:
                     game = games.get_game_by_id(db, new_game_id)
                     if game is not None:
@@ -181,6 +182,22 @@ def after_timer_start(user_id: int, start_time: datetime.datetime, new_game_id: 
             asyncio.run(_run())
         except Exception as e:
             logger.error("Error checking after a timer start: " + str(e))
+
+
+def after_timer_stop(user_id: int, game_id: str, duration_seconds: int | None):
+    """Background-task entrypoint for a timer that has just stopped: unpins its notification on the
+    user's devices. Apart from after_session_change (which is slow and serialized) so it arrives at once."""
+    from ..database.database import SessionLocal
+
+    async def _run():
+        with SessionLocal() as db:
+            game = games.get_game_by_id(db, game_id)
+            await push.notify_timer_stopped(user_id, game.name if game else "", duration_seconds)
+
+    try:
+        asyncio.run(_run())
+    except Exception as e:
+        logger.error("Error unpinning the timer notification: " + str(e))
 
 
 def after_completion(entry_id: int, silent: bool = False):
@@ -351,6 +368,26 @@ async def check_forgotten_timer(db: Session, user: models.User):
             + " párala y edita la sesión con el tiempo correcto."
         )
         await utils.send_message_to_user(user.telegram_id, msg, user_id=user.id)
+
+
+async def send_timer_notice(db: Session, timer: models.GameTimer | None):
+    """Show or refresh the pinned push notification of one running timer."""
+    if timer is None:
+        return
+    game = games.get_game_by_id(db, timer.game_id)
+    await push.notify_timer(timer.user_id, game.name if game else "", timer.start_time, timer.id)
+
+
+async def refresh_timer_notices(db: Session, min_age: datetime.timedelta) -> str:
+    """Refresh the pinned notification of every timer running for at least `min_age`: a younger one
+    was announced when it started. Called every 5 minutes by the scheduler."""
+    if not push.is_ready():
+        return ""
+    cutoff = datetime.datetime.now() - min_age
+    running = time_entries.get_running_game_timers(db, cutoff)
+    for timer in running:
+        await send_timer_notice(db, timer)
+    return f"{len(running)} timers"
 
 
 def signed_difference(difference: int, render=str) -> str:

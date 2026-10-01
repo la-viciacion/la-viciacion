@@ -25,6 +25,11 @@ class SlotTests(unittest.TestCase):
         self.assertEqual(scheduler.daily_slot(D(2026, 9, 29, 5, 0), 5), D(2026, 9, 29, 5, 0))
         self.assertEqual(scheduler.hourly_slot(D(2026, 9, 29, 13, 47, 12)), D(2026, 9, 29, 13, 0))
 
+    def test_five_minute_slot(self):
+        self.assertEqual(scheduler.five_minute_slot(D(2026, 9, 29, 13, 47, 12)), D(2026, 9, 29, 13, 45))
+        self.assertEqual(scheduler.five_minute_slot(D(2026, 9, 29, 13, 5, 0)), D(2026, 9, 29, 13, 5))
+        self.assertEqual(scheduler.five_minute_slot(D(2026, 9, 29, 13, 59, 59)), D(2026, 9, 29, 13, 55))
+
 
 class DueTests(unittest.TestCase):
     slot = D(2026, 9, 28, 9, 0)

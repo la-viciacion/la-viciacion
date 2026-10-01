@@ -87,8 +87,10 @@ class StartTimerTests(unittest.TestCase):
 class AfterTimerStartTests(unittest.TestCase):
     def run_after(self, new_game_id):
         announce = mock.AsyncMock()
+        self.notice = mock.AsyncMock()
         db = mock.MagicMock()
         patches = [
+            mock.patch.object(actions, "send_timer_notice", self.notice),
             mock.patch("src.database.database.SessionLocal", return_value=db),
             mock.patch.object(actions.achievements, "populate_achievements"),
             mock.patch.object(actions.achievements, "timer_started", new=mock.AsyncMock()),
@@ -109,6 +111,10 @@ class AfterTimerStartTests(unittest.TestCase):
 
     def test_nothing_is_announced_otherwise(self):
         self.assertEqual(self.run_after(None).await_count, 0)
+
+    def test_the_pinned_timer_notification_is_shown_right_away(self):
+        self.run_after(None)
+        self.notice.assert_awaited_once()
 
 
 class AfterCompletionTests(unittest.TestCase):

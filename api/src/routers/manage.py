@@ -582,6 +582,8 @@ def create_timer(body: TimerCreate, db: Session = Depends(get_db)):
     db.add(timer)
     users_crud.ensure_library_entry(db, body.user_id, body.game_id, body.platform, body.start_time)
     _commit(db, "Sesión")
+    if was_running and not timer.is_active:
+        background_tasks.add_task(actions.after_timer_stop, timer.user_id, timer.game_id, timer.duration_seconds)
     return _timer_out(timer, None, None)
 
 
@@ -593,9 +595,10 @@ class TimerPatch(BaseModel):
 
 
 @router.patch("/timers/{timer_id}")
-def patch_timer(timer_id: int, body: TimerPatch, db: Session = Depends(get_db)):
+def patch_timer(timer_id: int, body: TimerPatch, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """Edit a session. Setting an end time finishes an active one (stuck timer)."""
     timer = _get_or_404(db, models.GameTimer, timer_id, "Sesión")
+    was_running = bool(timer.is_active)
     data = body.model_dump(exclude_unset=True)
     for k, v in data.items():
         setattr(timer, k, v)
@@ -608,8 +611,10 @@ def patch_timer(timer_id: int, body: TimerPatch, db: Session = Depends(get_db)):
 
 
 @router.delete("/timers/{timer_id}")
-def delete_timer(timer_id: int, db: Session = Depends(get_db)):
+def delete_timer(timer_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     timer = _get_or_404(db, models.GameTimer, timer_id, "Sesión")
+    if timer.is_active:
+        background_tasks.add_task(actions.after_timer_stop, timer.user_id, timer.game_id, None)
     db.delete(timer)
     db.commit()
     return {"message": "Sesión eliminada"}

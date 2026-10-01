@@ -392,6 +392,15 @@ def get_active_game_timer_by_user(db: Session, user_id: int) -> models.GameTimer
     )
 
 
+def get_running_game_timers(db: Session, started_before: datetime.datetime) -> list[models.GameTimer]:
+    """Every running timer that started before `started_before`."""
+    return (
+        db.query(models.GameTimer)
+        .filter(models.GameTimer.is_active == True, models.GameTimer.start_time <= started_before)  # noqa: E712
+        .all()
+    )
+
+
 def get_forgotten_game_timers(
     db: Session,
     user_id: int = None,
