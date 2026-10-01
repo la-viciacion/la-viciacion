@@ -1,19 +1,19 @@
 """Push subscriptions of the installed PWA (see utils/push.py)."""
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi_versioning import version
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from .. import auth
 from ..auth import get_db
-from ..crud import users as users_crud
 from ..database import models
-from ..utils import actions, push, settings
-from . import timers
+from ..utils import push, settings
 
-# No router-wide login: /stop-timer is the one route here that authenticates with its own token.
-# Every other route asks for the session explicitly (test_endpoint_security.py checks it).
-router = APIRouter(prefix="/push", tags=["Push"])
+router = APIRouter(
+    prefix="/push",
+    tags=["Push"],
+    dependencies=[Depends(auth.get_current_active_user)],
+)
 
 
 class Keys(BaseModel):
@@ -119,34 +119,3 @@ def set_preference(
     row.receive_group = body.receive_group
     db.commit()
     return {"receive_group": bool(row.receive_group)}
-
-
-class StopTimerBody(BaseModel):
-    token: str = Field(min_length=1, max_length=1000)
-
-
-@router.post("/stop-timer")
-@version(1)
-def stop_timer_from_notification(
-    body: StopTimerBody,
-    background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db),
-):
-    """The "Parar" button of the running-timer notification. Open to anyone holding the signed token
-    the notification carries (the service worker has no session): it only stops that one timer, for
-    15 minutes at most. Stopping an already stopped timer is not an error."""
-    try:
-        user_id, timer_id = push.read_stop_token(body.token)
-    except ValueError:
-        raise HTTPException(status_code=401, detail="El botón de la notificación ha caducado, abre la app para parar el timer")
-    user = users_crud.get_user_by_id(db, user_id)
-    if user is None or not user.is_active:
-        raise HTTPException(status_code=401, detail="El botón de la notificación ha caducado, abre la app para parar el timer")
-    ranking_before = actions.ranking_snapshot(db)
-    try:
-        timer = timers.stop_timer(db, timer_id, user_id)
-    except HTTPException:
-        return {"stopped": False}
-    background_tasks.add_task(actions.after_session_change, user_id, False, ranking_before)
-    background_tasks.add_task(actions.after_timer_stop, user_id, timer.game_id, timer.duration_seconds)
-    return {"stopped": True}

@@ -375,7 +375,7 @@ async def send_timer_notice(db: Session, timer: models.GameTimer | None):
     if timer is None:
         return
     game = games.get_game_by_id(db, timer.game_id)
-    await push.notify_timer(timer.user_id, game.name if game else "", timer.start_time, timer.id)
+    await push.notify_timer(timer.user_id, game.name if game else "", timer.start_time)
 
 
 async def refresh_timer_notices(db: Session, min_age: datetime.timedelta) -> str:

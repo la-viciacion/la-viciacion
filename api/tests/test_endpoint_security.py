@@ -22,7 +22,6 @@ PUBLIC = {
     ("POST", "/auth/forgot-password"),  # same answer for any account; throttled; needs mail configured
     ("POST", "/auth/reset-password"),  # needs the emailed one-time token; throttled
     ("GET", "/utils/achievement-image/{achievement}"),  # loaded by <img>, which cannot send a token
-    ("POST", "/push/stop-timer"),  # the notification's "Parar" button: the service worker has no session, it sends a signed 15-minute token that only stops that timer
 }
 
 # Path parameters that identify whose data is touched, plus the routes that carry the owner in the body

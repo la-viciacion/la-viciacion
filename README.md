@@ -50,7 +50,7 @@ A second channel next to Telegram, **on by default**, with nothing to set up: th
 
 - What goes to the Telegram group is also pushed to every device that has group notices on (a per-device switch); private notices (a forgotten timer, the weekly summary) go only to that user's devices.
 - **Notificaciones → Redactar aviso** in the admin panel is a composer: title (80 characters) and message (240), with a live preview. Each notice goes through **one channel at a time**, chosen in the composer: the **app** (push: where a tap opens, an optional https image, to your own devices to try it, to one user, to the devices that want group notices or to every subscribed device) or **Telegram** (`POST /manage/telegram/announce`: to your own private chat, to one user's, or to the group; the title in bold, no link or image). Sending to a group or to everybody asks for confirmation. Plain text only; the image shows on Android and desktop, not on iPhone/iPad. These manual notices ignore the general notifications switch, like the test message. The **Avisos en la app** card of **Notificaciones → Ajustes** shows how many devices and users are subscribed.
-- **Timer notification**: while you have a timer running, every subscribed device of yours shows a pinned, silent notification with the game and the time played, refreshed every 5 minutes. **Parar** asks for confirmation (**Sí, parar** / **Cancelar**) and then stops the timer without opening the app; if that fails (expired button, no connection) the app opens instead. When the timer stops, from wherever, the notification turns into "Timer parado · 1h 25min". Android and desktop only: iPhone/iPad show and refresh it, but it is not pinned and has no buttons. It follows the general notifications switch and, for now, there is no per-device switch for it.
+- **Timer notification**: while you have a timer running, every subscribed device of yours shows a pinned, silent notification with the game and the time played, refreshed every 5 minutes. Tapping it opens the app, where you stop the timer. When the timer stops, from wherever, the notification turns into "Timer parado · 1h 25min". On iPhone/iPad it is refreshed but not pinned. It follows the general notifications switch and, for now, there is no per-device switch for it.
 - Expired devices are removed automatically. Regenerating the keys unsubscribes every device.
 - The pushed text is the same message as Telegram's without Markdown, cut to a title and a short body; how long messages and images fit is pending (see `docs/roadmap.md`).
 
@@ -88,7 +88,7 @@ js/main.js          hash router + session handling
 js/lib/             html (escaping template tag), api, format, password, platforms
 js/ui/              layout (navbar shell), modal, toast, icons
 js/pages/           auth/ (login, recover), profile, home/ (timer, history, completion, game picker), admin/ (entities, form, dialogs, rawg-sync)
-sw.js               service worker: caches nothing (keeps the app installable), shows push notifications and handles the running-timer notification's buttons
+sw.js               service worker: caches nothing (keeps the app installable) and shows push notifications
 tests/              node:test unit tests for js/lib
 ```
 

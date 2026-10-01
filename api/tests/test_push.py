@@ -3,10 +3,8 @@ import datetime
 import unittest
 from unittest import mock
 
-import jwt
 from pywebpush import WebPushException
 
-from src import auth
 from src.utils import push
 
 
@@ -193,58 +191,23 @@ class TimerNoticeTests(unittest.TestCase):
         self.assertEqual(push.elapsed_text(-30), "Timer iniciado")
 
     def test_the_payload_replaces_the_previous_one_and_makes_no_noise(self):
-        payload = push.build_timer_payload("Hollow Knight", self.start, 7, 42, self.start + datetime.timedelta(minutes=85))
+        payload = push.build_timer_payload("Hollow Knight", self.start, self.start + datetime.timedelta(minutes=85))
         self.assertEqual((payload["title"], payload["body"]), ("Hollow Knight", "1h 25min"))
-        self.assertEqual((payload["tag"], payload["kind"], payload["quiet"]), (push.TIMER_TAG, "timer", True))
-        self.assertEqual(payload["start"], int(self.start.timestamp() * 1000))
+        self.assertEqual((payload["tag"], payload["quiet"], payload["pinned"], payload["url"]), (push.TIMER_TAG, True, True, "/"))
 
     def test_the_stopped_payload_keeps_the_tag_and_says_how_long_it_was(self):
         payload = push.build_timer_stopped_payload("Hollow Knight", 5100)
-        self.assertEqual((payload["tag"], payload["kind"], payload["body"]), (push.TIMER_TAG, "timer-stopped", "Timer parado · 1h 25min"))
-        self.assertNotIn("token", payload)
+        self.assertEqual((payload["tag"], payload["body"]), (push.TIMER_TAG, "Timer parado · 1h 25min"))
+        self.assertNotIn("pinned", payload)
         self.assertEqual(push.build_timer_stopped_payload("x", None)["body"], "Timer parado")
 
     def test_a_long_game_name_is_shortened(self):
-        payload = push.build_timer_payload("T" * 300, self.start, 1, 1, self.start)
+        payload = push.build_timer_payload("T" * 300, self.start, self.start)
         self.assertLessEqual(len(payload["title"]), push.TITLE_MAX)
 
     def test_the_payload_is_far_below_the_web_push_limit(self):
-        payload = push.build_timer_payload("T" * push.TITLE_MAX, self.start, 1, 1, self.start)
+        payload = push.build_timer_payload("T" * push.TITLE_MAX, self.start, self.start)
         self.assertLess(len(__import__("json").dumps(payload).encode()), push.PAYLOAD_MAX_BYTES)
-
-
-class StopTokenTests(unittest.TestCase):
-    def test_round_trip(self):
-        self.assertEqual(push.read_stop_token(push.make_stop_token(7, 42)), (7, 42))
-
-    def test_garbage_is_rejected(self):
-        for token in ("", "abc", "a.b.c"):
-            with self.assertRaises(ValueError):
-                push.read_stop_token(token)
-
-    def test_an_expired_token_is_rejected(self):
-        claims = {"typ": push.STOP_TOKEN_TYPE, "uid": 1, "tid": 1, "exp": datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(seconds=5)}
-        with self.assertRaises(ValueError):
-            push.read_stop_token(jwt.encode(claims, push.config.SECRET_KEY, algorithm="HS256"))
-
-    def test_a_token_signed_with_another_key_is_rejected(self):
-        claims = {"typ": push.STOP_TOKEN_TYPE, "uid": 1, "tid": 1}
-        with self.assertRaises(ValueError):
-            push.read_stop_token(jwt.encode(claims, "not-the-secret-key-not-the-secret-key", algorithm="HS256"))
-
-    def test_a_session_token_cannot_stop_a_timer(self):
-        session = auth.create_access_token({"username": "ana", "pwv": "x"})
-        with self.assertRaises(ValueError):
-            push.read_stop_token(session)
-
-    def test_a_stop_token_is_not_a_session(self):
-        claims = jwt.decode(push.make_stop_token(7, 42), push.config.SECRET_KEY, algorithms=["HS256"])
-        self.assertIsNone(claims.get("username"))  # get_current_user needs it
-
-    def test_it_expires_soon(self):
-        claims = jwt.decode(push.make_stop_token(7, 42), push.config.SECRET_KEY, algorithms=["HS256"])
-        left = claims["exp"] - datetime.datetime.now(datetime.timezone.utc).timestamp()
-        self.assertLessEqual(left, push.STOP_TOKEN_MINUTES * 60)
 
 
 if __name__ == "__main__":

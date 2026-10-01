@@ -35,7 +35,7 @@ class RefreshTimerNoticesTests(unittest.TestCase):
         result, notify = self.refresh()
         self.assertEqual(result, "2 timers")
         self.assertEqual(notify.await_count, 2)
-        notify.assert_any_await(1, "Hollow Knight", old.start_time, old.id)
+        notify.assert_any_await(1, "Hollow Knight", old.start_time)
 
     def test_a_timer_younger_than_the_period_was_announced_when_it_started(self):
         add_running(self.db, 1, 2)
