@@ -1,22 +1,24 @@
-// Sidebar structure and addresses of the admin panel. Pure: no DOM, so it can be tested.
-// Every id is a key of ENTITIES (entities.js); the address of a section is #/admin/<id>.
+// Structure and addresses of the admin panel. Pure: no DOM, so it can be tested.
+// The sidebar lists SECTIONS; a section with several tabs shows them under its title.
+// Every tab id is a key of ENTITIES (entities.js) and its address is #/admin/<id>.
 
 export const HOME = 'home';
 
-export const GROUPS = [
-  { label: null, items: [HOME] },
-  { label: 'Personas', items: ['users'] },
-  { label: 'Contenido', items: ['games', 'platforms'] },
-  { label: 'Actividad', items: ['timers', 'library'] },
-  { label: 'Logros', items: ['achievements', 'awards'] },
-  { label: 'Comunicación', items: ['announce', 'telegram', 'push'] },
-  { label: 'Sistema', items: ['ai', 'mail'] },
+export const SECTIONS = [
+  { label: 'Inicio', tabs: [HOME] },
+  { label: 'Gestión de datos', tabs: ['users', 'games', 'platforms', 'timers', 'library', 'achievements', 'awards'] },
+  { label: 'Notificaciones', tabs: ['notifications', 'announce'] },
+  { label: 'Sistema', tabs: ['system'] },
 ];
+
+export const TAB_IDS = SECTIONS.flatMap((section) => section.tabs);
+
+export const sectionOf = (tab) => SECTIONS.find((section) => section.tabs.includes(tab));
 
 export const hashFor = (tab) => (tab === HOME ? '#/admin' : `#/admin/${tab}`);
 
-/** The section an address points at; anything unknown (or no section) is the home page. */
-export function tabFromHash(hash, valid) {
+/** The tab an address points at; anything unknown (or no tab) is the home page. */
+export function tabFromHash(hash, valid = TAB_IDS) {
   const match = /^#\/admin\/([a-z]+)\/?$/.exec(hash);
   return match && valid.includes(match[1]) ? match[1] : HOME;
 }

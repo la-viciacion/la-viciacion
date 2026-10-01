@@ -10,7 +10,7 @@ import { errorState, store } from './components.js';
 import { checkAchievementsDialog, deleteRow, pickGame } from './dialogs.js';
 import { ENTITIES, TABS } from './entities.js';
 import { openForm } from './form.js';
-import { GROUPS, hashFor, tabFromHash } from './nav.js';
+import { SECTIONS, hashFor, sectionOf, tabFromHash } from './nav.js';
 
 export const active = 'admin';
 export const mainClass = 'admin-main';
@@ -21,6 +21,7 @@ const PAGE = 25;
 const state = Object.fromEntries(TABS.map((t) => [t, { filters: {}, search: '', offset: 0, data: null, sort: ENTITIES[t].defaultSort ? { ...ENTITIES[t].defaultSort } : null }]));
 let root;
 let current = 'home';
+const lastTab = new Map(); // section -> the tab it was left on
 let searchTimer;
 
 // What entities/dialogs may call back into.
@@ -61,7 +62,7 @@ export async function render({ main, user }) {
     await loadPlatforms();
     const [users, achievements] = await Promise.all([api('/manage/users?limit=200'), api('/manage/achievements')]);
     store.achievements = (achievements || []).map((a) => ({ id: a.id, title: a.title }));
-    store.users = (users?.items || []).map((u) => ({ id: u.id, username: u.username, name: u.name }));
+    store.users = (users?.items || []).map((u) => ({ id: u.id, username: u.username, name: u.name, telegram_id: u.telegram_id }));
   } catch (err) {
     mount(root, errorState(err.message));
     return;
@@ -77,12 +78,10 @@ export async function render({ main, user }) {
 }
 
 // ── Layout ──────────────────────────────────────────────────
+const tabLabel = (tab) => ENTITIES[tab].nav || ENTITIES[tab].label;
+
 function navView() {
-  return GROUPS.map((group) => html`
-    <div class="adm-nav-group">
-      ${group.label ? html`<div class="adm-nav-label">${group.label}</div>` : ''}
-      ${group.items.map((t) => html`<button class="adm-nav-item ${t === current ? 'active' : ''}" data-tab="${t}" ${t === current ? html`aria-current="page"` : ''}>${ENTITIES[t].nav || ENTITIES[t].label}</button>`)}
-    </div>`);
+  return SECTIONS.map((section, i) => html`<button class="adm-nav-item" data-section="${i}">${section.label}</button>`);
 }
 
 function drawLayout() {
@@ -99,6 +98,7 @@ function drawLayout() {
           <h1 class="adm-title" id="admTitle"></h1>
           <p class="adm-desc" id="admDesc"></p>
         </header>
+        <div class="adm-tabs" id="admTabs" role="tablist"></div>
         <div id="admPanel"></div>
       </section>
     </div>`);
@@ -106,12 +106,15 @@ function drawLayout() {
 }
 
 function drawHeading() {
-  const entity = ENTITIES[current];
-  document.getElementById('admTitle').textContent = entity.label;
-  document.getElementById('admDesc').textContent = entity.description || '';
-  document.getElementById('admNavCurrent').textContent = entity.nav || entity.label;
+  const section = sectionOf(current);
+  document.getElementById('admTitle').textContent = section.label;
+  document.getElementById('admDesc').textContent = ENTITIES[current].description || '';
+  document.getElementById('admNavCurrent').textContent = section.label;
+  const tabs = document.getElementById('admTabs');
+  tabs.hidden = section.tabs.length < 2;
+  mount(tabs, html`${section.tabs.map((t) => html`<button class="adm-tab ${t === current ? 'active' : ''}" role="tab" aria-selected="${String(t === current)}" data-tab="${t}">${tabLabel(t)}</button>`)}`);
   root.querySelectorAll('.adm-nav-item').forEach((b) => {
-    const on = b.dataset.tab === current;
+    const on = SECTIONS[Number(b.dataset.section)] === section;
     b.classList.toggle('active', on);
     if (on) b.setAttribute('aria-current', 'page');
     else b.removeAttribute('aria-current');
@@ -121,6 +124,7 @@ function drawHeading() {
 // Moving inside the panel adds a history entry without a hashchange, so the page is not rebuilt.
 function setTab(tab) {
   current = tab;
+  lastTab.set(sectionOf(tab), tab);
   if (location.hash !== hashFor(tab)) history.pushState(null, '', hashFor(tab));
   drawHeading();
   closeNav();
@@ -310,6 +314,11 @@ async function onClick(e) {
   closeMenus();
   const tabButton = e.target.closest('[data-tab]');
   if (tabButton) return setTab(tabButton.dataset.tab);
+  const sectionButton = e.target.closest('[data-section]');
+  if (sectionButton) {
+    const section = SECTIONS[Number(sectionButton.dataset.section)];
+    return setTab(lastTab.get(section) || section.tabs[0]);
+  }
   const button = e.target.closest('[data-act]');
   if (!button) return;
 

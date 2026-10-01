@@ -1,21 +1,26 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { GROUPS, HOME, hashFor, tabFromHash } from '../js/pages/admin/nav.js';
+import { HOME, SECTIONS, TAB_IDS, hashFor, sectionOf, tabFromHash } from '../js/pages/admin/nav.js';
 
-const valid = GROUPS.flatMap((g) => g.items);
-
-test('every section has exactly one place in the sidebar', () => {
-  assert.equal(new Set(valid).size, valid.length);
-  assert.ok(valid.includes(HOME));
+test('every tab belongs to exactly one section', () => {
+  assert.equal(new Set(TAB_IDS).size, TAB_IDS.length);
+  assert.ok(TAB_IDS.includes(HOME));
+  for (const tab of TAB_IDS) assert.equal(SECTIONS.filter((s) => s.tabs.includes(tab)).length, 1);
 });
 
-test('a section address goes there and back', () => {
-  for (const tab of valid) assert.equal(tabFromHash(hashFor(tab), valid), tab);
+test('the section of a tab is the one that lists it', () => {
+  assert.equal(sectionOf('users').label, 'Gestión de datos');
+  assert.equal(sectionOf('announce').label, 'Notificaciones');
+  assert.equal(sectionOf('nothing'), undefined);
 });
 
-test('the bare panel address and unknown sections are the home page', () => {
-  assert.equal(tabFromHash('#/admin', valid), HOME);
-  assert.equal(tabFromHash('#/admin/', valid), HOME);
-  assert.equal(tabFromHash('#/admin/nothing', valid), HOME);
-  assert.equal(tabFromHash('#/admin/users/extra', valid), HOME);
+test('a tab address goes there and back', () => {
+  for (const tab of TAB_IDS) assert.equal(tabFromHash(hashFor(tab)), tab);
+});
+
+test('the bare panel address and unknown tabs are the home page', () => {
+  assert.equal(tabFromHash('#/admin'), HOME);
+  assert.equal(tabFromHash('#/admin/'), HOME);
+  assert.equal(tabFromHash('#/admin/nothing'), HOME);
+  assert.equal(tabFromHash('#/admin/users/extra'), HOME);
 });

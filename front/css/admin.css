@@ -15,11 +15,7 @@
 
 .adm-side-toggle { display: none; }
 
-.adm-nav { display: flex; flex-direction: column; gap: 18px; }
-
-.adm-nav-group { display: flex; flex-direction: column; gap: 2px; }
-
-.adm-nav-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); padding: 0 12px 4px; }
+.adm-nav { display: flex; flex-direction: column; gap: 2px; }
 
 .adm-nav-item {
   background: none; border: none; border-left: 3px solid transparent; border-radius: var(--radius-sm); color: var(--text-secondary);
@@ -30,7 +26,20 @@
 
 .adm-nav-item.active { color: var(--accent-teal); background: rgba(61,217,179,0.1); border-left-color: var(--accent-teal); }
 
-.adm-page-head { margin-bottom: 18px; }
+.adm-page-head { margin-bottom: 14px; }
+
+.adm-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 16px; overflow-x: auto; }
+
+.adm-tabs[hidden] { display: none; }
+
+.adm-tab {
+  background: none; border: none; color: var(--text-secondary); font: inherit; font-weight: 600;
+  padding: 10px 16px; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap;
+}
+
+.adm-tab:hover { color: var(--text-primary); }
+
+.adm-tab.active { color: var(--accent-teal); border-bottom-color: var(--accent-teal); }
 
 .adm-desc { color: var(--text-secondary); font-size: 0.92rem; margin-top: 4px; }
 

@@ -49,10 +49,10 @@ function integrations(cfg) {
     ? ['green', 'Activos', `${plural(cfg.push_devices.devices, 'dispositivo suscrito', 'dispositivos suscritos')}`] : ['gray', 'Apagados', 'Nadie recibe avisos en la app'];
   const mail = cfg.mail.configured ? ['green', 'Configurado', `Envía como ${cfg.mail.from}`] : ['gray', 'Sin configurar', 'Nadie puede recuperar su contraseña por correo'];
   return [
-    { name: 'Telegram', tab: 'telegram', state: telegram },
-    { name: 'Inteligencia artificial', tab: 'ai', state: ai },
-    { name: 'Avisos en la app', tab: 'push', state: push },
-    { name: 'Correo', tab: 'mail', state: mail },
+    { name: 'Telegram', tab: 'notifications', state: telegram },
+    { name: 'Inteligencia artificial', tab: 'system', state: ai },
+    { name: 'Avisos en la app', tab: 'notifications', state: push },
+    { name: 'Correo', tab: 'system', state: mail },
   ];
 }
 

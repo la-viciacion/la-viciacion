@@ -1,7 +1,7 @@
 // Declarative description of every admin section (its place in the sidebar is in nav.js). The generic controller in
 // index.js renders the toolbar, table, pager, forms and delete flow from this.
 //
-// Entity: { label, nav? (shorter name for the sidebar), description? (line under the title), endpoint, search?, filters?, columns, fields, createFields?,
+// Entity: { label, nav? (shorter name for its tab), description? (line under the title), endpoint, search?, filters?, columns, fields, createFields?,
 //           createLabel?, name(row), actions?, toolbarActions?, canDelete, deleteLabel?, deleteNote?,
 //           selects?, defaultSort? }
 //         or a custom page: { label, custom (module in this folder exporting render(panel, { entity, admin })) }
@@ -264,32 +264,18 @@ ENTITIES.awards = {
 
 // Not tables: custom pages, each one a module exporting render(panel, { entity, admin }).
 ENTITIES.home = { label: 'Inicio', description: 'Resumen de la aplicación y lo que necesita atención.', custom: 'home' };
-ENTITIES.announce = { label: 'Avisos push', nav: 'Redactar aviso', description: 'Escribe un aviso y envíalo a los dispositivos de la app.', custom: 'announce' };
-ENTITIES.telegram = {
-  label: 'Telegram y resumen semanal',
-  nav: 'Telegram',
-  description: 'Bot de Telegram, interruptor general de notificaciones y resumen semanal.',
+ENTITIES.announce = { label: 'Redactar aviso', description: 'Escribe un aviso y envíalo a los dispositivos de la app.', custom: 'announce' };
+ENTITIES.notifications = {
+  label: 'Ajustes',
+  description: 'Interruptor general de notificaciones, resumen semanal, bot de Telegram y avisos en la app.',
   custom: 'settings',
-  sections: ['notifications', 'weekly', 'telegram'],
+  sections: ['notifications', 'weekly', 'telegram', 'push'],
 };
-ENTITIES.push = {
-  label: 'Avisos en la app',
-  description: 'Configuración de los avisos push y dispositivos suscritos.',
+ENTITIES.system = {
+  label: 'Sistema',
+  description: 'Inteligencia artificial que redacta algunos avisos y correo para recuperar la contraseña.',
   custom: 'settings',
-  sections: ['push'],
-};
-ENTITIES.ai = {
-  label: 'Inteligencia artificial',
-  nav: 'IA',
-  description: 'Proveedor, clave y modelo de la IA que redacta algunos avisos, y las instrucciones de cada uno.',
-  custom: 'settings',
-  sections: ['ai', 'aiuses'],
-};
-ENTITIES.mail = {
-  label: 'Correo',
-  description: 'Estado del correo con el que se recupera la contraseña.',
-  custom: 'settings',
-  sections: ['mail'],
+  sections: ['ai', 'aiuses', 'mail'],
 };
 
 export const TABS = Object.keys(ENTITIES);
