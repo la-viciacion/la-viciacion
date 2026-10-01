@@ -71,7 +71,6 @@ function groupRow(g) {
             <span>${formatRelative(g.last_played)}</span>
             <span class="dot">·</span>
             <span>${formatDuration(g.total_seconds)}${g.session_count > 1 ? ' en total' : ''}</span>
-            ${g.completed ? html`<span class="completed-pill">Completado</span>` : ''}
             ${g.session_count > 1 ? html`<span class="session-pill">${g.session_count} sesiones</span>` : ''}
             ${g.platforms.map((p) => html`<span class="platform-pill">${platformName(p)}</span>`)}
           </div>

@@ -160,11 +160,6 @@
   border-radius: 999px; padding: 1px 8px; font-size: 0.75rem; font-weight: 600;
 }
 
-.completed-pill {
-  background: rgba(245, 197, 66, 0.15); color: var(--accent-gold);
-  border-radius: 999px; padding: 1px 8px; font-size: 0.75rem; font-weight: 600;
-}
-
 .platform-pill {
   background: rgba(61, 217, 179, 0.12); color: var(--accent-teal);
   border-radius: 999px; padding: 1px 8px; font-size: 0.75rem; font-weight: 600;

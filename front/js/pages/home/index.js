@@ -44,7 +44,7 @@ export async function render({ user, main, isCurrent }) {
   initHistory({
     userId: user.id,
     onContinue: (group) => startTimer(group.game_id, group.platform),
-    onOpen: (group) => openCompletion({ username: user.username, game: { id: group.game_id, name: group.game_name || group.game_id }, onChange: refresh }),
+    onOpen: (group) => openCompletion({ username: user.username, game: { id: group.game_id, name: group.game_name || group.game_id } }),
   });
   main.querySelector('#manualSessionBtn').addEventListener('click', openManualSession);
   main.querySelector('#historyList').addEventListener('click', onHistoryClick);

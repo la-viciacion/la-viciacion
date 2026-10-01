@@ -10,8 +10,8 @@ import { toast } from '../../ui/toast.js';
 
 const CONFIRM_MS = 4000;
 
-/** Opens the modal of `game` ({ id, name }) for the user `username`; onChange runs after a completion. */
-export async function openCompletion({ username, game, onChange }) {
+/** Opens the modal of `game` ({ id, name }) for the user `username`. */
+export async function openCompletion({ username, game }) {
   const path = `/users/${encodeURIComponent(username)}/library`;
   const modal = openModal(html`${modalHeader(game.name)}<div class="comp-body" id="compBody"><div class="loading-spinner">Cargando...</div></div>`);
   const body = modal.el.querySelector('#compBody');
@@ -76,7 +76,6 @@ export async function openCompletion({ username, game, onChange }) {
       await api(`${path}/${button.dataset.complete}/completion`, jsonRequest('PATCH', { completed: true }));
       toast(`«${game.name}» marcado como completado`);
       message = '';
-      await onChange();
     } catch (err) {
       message = err.message;
     }
