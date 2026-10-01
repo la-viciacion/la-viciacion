@@ -127,13 +127,9 @@
   transition: border-color 0.2s ease;
 }
 
-.history-group.open { border-color: var(--border-accent); }
+.history-row { display: flex; align-items: center; gap: 14px; padding: 12px 14px; cursor: pointer; }
 
-.history-row { display: flex; align-items: center; gap: 14px; padding: 12px 14px; }
-
-.history-row.expandable { cursor: pointer; }
-
-.history-row.expandable:hover { background: var(--bg-card-hover); }
+.history-row:hover { background: var(--bg-card-hover); }
 
 .history-thumb {
   width: 48px; height: 48px; border-radius: var(--radius-sm);
@@ -145,9 +141,12 @@
 .history-main { flex: 1; min-width: 0; }
 
 .history-title {
+  display: block; max-width: 100%; background: none; border: none; padding: 0; font: inherit; text-align: left; cursor: pointer;
   font-weight: 600; color: var(--text-primary);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+
+.history-row:hover .history-title { color: var(--accent-teal); }
 
 .history-meta {
   display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
@@ -158,6 +157,11 @@
 
 .session-pill {
   background: rgba(167, 139, 250, 0.15); color: var(--accent-purple);
+  border-radius: 999px; padding: 1px 8px; font-size: 0.75rem; font-weight: 600;
+}
+
+.completed-pill {
+  background: rgba(245, 197, 66, 0.15); color: var(--accent-gold);
   border-radius: 999px; padding: 1px 8px; font-size: 0.75rem; font-weight: 600;
 }
 
@@ -180,26 +184,7 @@
 
 .btn-continue:disabled { opacity: 0.35; cursor: not-allowed; }
 
-.history-chevron { color: var(--text-muted); display: flex; transition: transform 0.2s ease; }
-
-.history-group.open .history-chevron { transform: rotate(180deg); }
-
-.history-sessions {
-  list-style: none; margin: 0; padding: 4px 14px 12px 76px;
-  border-top: 1px solid var(--border); animation: fadeIn 0.2s ease;
-}
-
-.history-sessions li {
-  display: flex; justify-content: space-between; gap: 12px;
-  padding: 7px 0; font-size: 0.85rem; color: var(--text-secondary);
-  border-bottom: 1px dashed var(--border);
-}
-
-.history-sessions li:last-child { border-bottom: none; }
-
 .session-duration { color: var(--text-primary); font-weight: 600; }
-
-.history-sessions .session-more { color: var(--text-muted); font-style: italic; justify-content: center; }
 
 .history-more { display: flex; justify-content: center; margin-top: 16px; }
 
@@ -227,7 +212,6 @@
   border-radius: var(--radius-sm); padding: 2px 10px; font: inherit; font-size: 0.75rem; cursor: pointer;
 }
 .btn-session:hover { border-color: var(--accent-teal); color: var(--text-primary); }
-.history-sessions .session-more { align-items: center; gap: 10px; }
 
 .sess-form { display: flex; flex-direction: column; gap: 12px; padding: 16px 20px 20px; }
 .sess-form label { display: flex; flex-direction: column; gap: 6px; font-size: 0.85rem; color: var(--text-secondary); font-weight: 600; }
@@ -251,6 +235,11 @@
 @media (max-width: 640px) {
   .timer-idle, .timer-active { flex-direction: column; align-items: stretch; text-align: center; }
   .btn-start-timer, .btn-stop-timer { justify-content: center; }
-  .history-sessions { padding-left: 14px; }
+  
   .btn-continue span, .navbar-username { display: none; }
 }
+
+/* Completion modal (click on a game of the history) */
+.comp-body { padding: 8px 20px 20px; display: flex; flex-direction: column; gap: 12px; }
+.comp-list { display: flex; flex-direction: column; gap: 10px; }
+.comp-entry { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 10px 12px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm); }

@@ -2,11 +2,16 @@
 // first, with its completion state.
 //   - a pending game of the current season can be marked as completed
 //   - a completed game lets you change the completion date or unmark it
+//   - "Sesiones" lists the sessions of the entry (game and season); those of the current season
+//     can be corrected or deleted there
 // The API enforces the rules (once per game and season, current season only,
 // date inside the entry's season); the UI only offers what is allowed.
 import { api, jsonRequest } from '../../lib/api.js';
-import { formatDate, formatDuration, formatRelative } from '../../lib/format.js';
+import { blockedReason } from '../../lib/completion.js';
+import { formatDate, formatDateTime, formatDuration, formatRelative } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
+import { platformName } from '../../lib/platforms.js';
+import { initSessions, openSessionForm } from '../home/sessions.js';
 
 const PAGE = 15;
 const MAX = 100; // API limit per request
@@ -14,11 +19,13 @@ const CONFIRM_MS = 4000;
 
 let el;
 let username;
+let userId;
 let onChange;
 let season = new Date().getFullYear();
 let items = [];
 let total = 0;
 let editing = null; // id of the entry whose date is being edited
+let sessions = new Map(); // entry id -> its sessions, for the entries that are expanded
 
 const path = (suffix = '') => `/users/${encodeURIComponent(username)}/library${suffix}`;
 
@@ -29,14 +36,17 @@ function flash(message, ok = false) {
   msg.className = `pf-msg ${message ? (ok ? 'ok' : 'err') : ''}`;
 }
 
-/** onChange runs after a completion changed (the page refreshes its stats). */
+/** onChange runs after a completion or a session changed (the page refreshes its stats). */
 export async function initLibrary(container, options) {
   el = container;
   username = options.username;
+  userId = options.userId;
   onChange = options.onChange;
   items = [];
   total = 0;
   editing = null;
+  sessions = new Map();
+  initSessions({ userId, onChange: afterSessionChange });
   el.addEventListener('click', onClick);
   el.addEventListener('submit', onSubmit);
   await load(PAGE);
@@ -77,18 +87,6 @@ function status(g) {
     : html`<span class="pf-tag">En curso</span>`;
 }
 
-// Why the "complete" action is not available (the API decides, we only word it).
-function blockedReason(g) {
-  switch (g.complete_blocked) {
-    case 'closed_season':
-      return `Temporada ${g.season} cerrada: solo se pueden completar juegos de la temporada actual (${season}).`;
-    case 'completed_in_season':
-      return 'Ya lo has completado esta temporada en otra plataforma.';
-    default:
-      return '';
-  }
-}
-
 // Latest day a completion may be dated: today, or the end of a past season.
 const maxDate = (g) => {
   const today = new Date().toLocaleDateString('sv-SE');
@@ -106,15 +104,35 @@ function dateForm(g) {
 }
 
 function actions(g) {
+  const sessionsButton = html`<button class="pf-btn" data-action="sessions" data-id="${g.id}" aria-expanded="${String(sessions.has(g.id))}">Sesiones</button>`;
   if (g.can_complete) {
-    return html`<button class="pf-btn primary" data-action="complete" data-id="${g.id}" data-label="Marcar completado">Marcar completado</button>`;
+    return html`${sessionsButton}<button class="pf-btn primary" data-action="complete" data-id="${g.id}" data-label="Marcar completado">Marcar completado</button>`;
   }
   if (!g.completed) {
-    return html`<button class="pf-btn" disabled title="${blockedReason(g)}">Marcar completado</button>`;
+    return html`${sessionsButton}<button class="pf-btn" disabled title="${blockedReason(g, season)}">Marcar completado</button>`;
   }
   return html`
+    ${sessionsButton}
     <button class="pf-btn" data-action="edit-date" data-id="${g.id}">Cambiar fecha</button>
     <button class="pf-btn" data-action="uncomplete" data-id="${g.id}" data-label="Desmarcar">Desmarcar</button>`;
+}
+
+// The sessions of an entry; the API only lets you change those of the running season.
+function sessionList(g) {
+  const list = sessions.get(g.id);
+  if (!list) return '';
+  if (!list.length) return html`<div class="pf-sub">Sin sesiones registradas.</div>`;
+  return html`
+    <ul class="pf-sessions">
+      ${list.map((s) => html`
+        <li>
+          <span>${formatDateTime(s.start_time)}${s.platform ? ` · ${platformName(s.platform)}` : ''}</span>
+          <span class="session-end">
+            <span class="session-duration">${formatDuration(s.duration_seconds || 0)}</span>
+            ${g.season === season ? html`<button class="btn-session" data-action="edit-session" data-id="${g.id}" data-timer-id="${s.id}" aria-label="Editar sesión">Editar</button>` : ''}
+          </span>
+        </li>`)}
+    </ul>`;
 }
 
 function row(g) {
@@ -127,10 +145,11 @@ function row(g) {
           ${g.platform_name || 'Sin plataforma'} · Temporada ${g.season} · ${formatDuration(g.played_time)}
           ${g.last_played ? ` · Última sesión: ${formatRelative(g.last_played)}` : ''}
         </div>
-        ${g.complete_blocked ? html`<div class="pf-lock">🔒 ${blockedReason(g)}</div>` : ''}
+        ${g.complete_blocked ? html`<div class="pf-lock">🔒 ${blockedReason(g, season)}</div>` : ''}
         ${editing === g.id ? dateForm(g) : ''}
       </div>
       <div class="pf-game-actions">${editing === g.id ? '' : actions(g)}</div>
+      ${sessionList(g)}
     </div>`;
 }
 
@@ -173,6 +192,24 @@ function armed(button, label) {
   return false;
 }
 
+async function loadSessions(entry) {
+  const all = await api(`/timers/history/${userId}?game_id=${encodeURIComponent(entry.game_id)}&limit=500`);
+  sessions.set(entry.id, (all || []).filter((s) => !s.is_active && s.season === entry.season));
+}
+
+// A session was edited, added or deleted: reload the open lists and the numbers of the entries.
+async function afterSessionChange() {
+  await Promise.all([...sessions.keys()].map((id) => loadSessions(items.find((g) => g.id === id))));
+  await load();
+  await onChange();
+}
+
+async function toggleSessions(entry) {
+  if (sessions.has(entry.id)) sessions.delete(entry.id);
+  else await loadSessions(entry);
+  draw();
+}
+
 async function onClick(e) {
   const button = e.target.closest('[data-action]');
   if (!button) return;
@@ -191,6 +228,14 @@ async function onClick(e) {
       if (!armed(button, button.dataset.label)) return;
       button.disabled = true;
       return setCompletion(id, { completed: false }, 'Marcado como no completado');
+    case 'sessions':
+      return toggleSessions(items.find((g) => g.id === id)).catch((err) => flash(err.message));
+    case 'edit-session': {
+      const entry = items.find((g) => g.id === id);
+      const session = sessions.get(id)?.find((s) => String(s.id) === button.dataset.timerId);
+      if (entry && session) openSessionForm({ game: { id: entry.game_id, name: entry.game_name }, session });
+      return;
+    }
     case 'edit-date':
       editing = id;
       return draw();

@@ -1,25 +1,25 @@
-// Session history grouped by game, with expandable sessions and "Seguir".
+// Latest games played: one row per game. The whole row opens the completion modal (the name is its keyboard target), "Seguir" starts a timer.
+// The sessions themselves (and editing them) are in the profile.
 import { api } from '../../lib/api.js';
-import { formatDateTime, formatDuration, formatRelative } from '../../lib/format.js';
+import { formatDuration, formatRelative } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
 import { platformName } from '../../lib/platforms.js';
-import { iconChevron, iconPlay } from '../../ui/icons.js';
+import { iconPlay } from '../../ui/icons.js';
 import { hasActive } from './timer.js';
 
 const PAGE_SIZE = 8; // games per page
 
-const state = { userId: null, groups: [], total: 0, expanded: new Set() };
+const state = { userId: null, groups: [], total: 0 };
 let onContinue = () => {};
-let onEditSession = () => {};
+let onOpen = () => {};
 
-/** onContinue(group): "Seguir" on a game. onEditSession(group, session): "Editar" on a session. */
+/** onContinue(group): "Seguir" on a game. onOpen(group): its name was pressed. */
 export function initHistory(options) {
   state.userId = options.userId;
   onContinue = options.onContinue;
-  onEditSession = options.onEditSession;
+  onOpen = options.onOpen;
   state.groups = [];
   state.total = 0;
-  state.expanded = new Set();
 }
 
 export async function loadHistory(reset) {
@@ -30,7 +30,7 @@ export async function loadHistory(reset) {
 
   try {
     const offset = reset ? 0 : state.groups.length;
-    const page = await api(`/timers/history/${state.userId}/grouped?limit=${PAGE_SIZE}&offset=${offset}`);
+    const page = await api(`/timers/history/${state.userId}/grouped?limit=${PAGE_SIZE}&offset=${offset}&sessions_per_game=1`);
     if (!page) return;
     state.total = page.total_games;
     state.groups = reset ? page.groups : state.groups.concat(page.groups);
@@ -59,23 +59,20 @@ function renderHistory() {
 
 function groupRow(g) {
   const name = g.game_name || g.game_id;
-  const multi = g.session_count > 1;
-  const open = state.expanded.has(g.game_id);
-  const hidden = g.session_count - g.sessions.length;
-
   return html`
-    <article class="history-group ${open ? 'open' : ''}" data-game-id="${g.game_id}">
-      <div class="history-row ${multi ? 'expandable' : ''}" ${multi ? html`data-action="toggle" role="button" tabindex="0" aria-expanded="${String(open)}"` : ''}>
+    <article class="history-group" data-game-id="${g.game_id}">
+      <div class="history-row" data-action="complete" data-game-id="${g.game_id}">
         ${g.image_url
           ? html`<img src="${g.image_url}" alt="" class="history-thumb" loading="lazy" />`
           : html`<div class="history-thumb history-thumb-placeholder" aria-hidden="true">🎮</div>`}
         <div class="history-main">
-          <div class="history-title" title="${name}">${name}</div>
+          <button class="history-title" title="Marcar ${name} como completado">${name}</button>
           <div class="history-meta">
             <span>${formatRelative(g.last_played)}</span>
             <span class="dot">·</span>
-            <span>${formatDuration(g.total_seconds)}${multi ? ' en total' : ''}</span>
-            ${multi ? html`<span class="session-pill">${g.session_count} sesiones</span>` : ''}
+            <span>${formatDuration(g.total_seconds)}${g.session_count > 1 ? ' en total' : ''}</span>
+            ${g.completed ? html`<span class="completed-pill">Completado</span>` : ''}
+            ${g.session_count > 1 ? html`<span class="session-pill">${g.session_count} sesiones</span>` : ''}
             ${g.platforms.map((p) => html`<span class="platform-pill">${platformName(p)}</span>`)}
           </div>
         </div>
@@ -83,33 +80,8 @@ function groupRow(g) {
                 ${hasActive ? html`disabled title="Ya tienes un timer activo"` : ''} aria-label="Seguir jugando a ${name}">
           ${iconPlay()} <span>Seguir</span>
         </button>
-        ${multi ? html`<span class="history-chevron" aria-hidden="true">${iconChevron()}</span>` : ''}
       </div>
-      ${multi && open ? html`
-        <ul class="history-sessions">
-          ${g.sessions.map((s) => html`
-            <li>
-              <span>${formatDateTime(s.start_time)}${s.platform ? ` · ${platformName(s.platform)}` : ''}</span>
-              <span class="session-end">
-                <span class="session-duration">${formatDuration(s.duration_seconds || 0)}</span>
-                <button class="btn-session" data-action="edit-session" data-game-id="${g.game_id}" data-timer-id="${s.id}" aria-label="Editar sesión">Editar</button>
-              </span>
-            </li>`)}
-          ${hidden > 0 ? html`<li class="session-more">… y ${hidden} sesiones anteriores
-            <button class="btn-session" data-action="all-sessions" data-game-id="${g.game_id}">Ver todas</button></li>` : ''}
-        </ul>` : ''}
     </article>`;
-}
-
-// The history keeps the latest sessions per game; "Ver todas" loads the rest.
-async function loadAllSessions(gameId) {
-  const group = state.groups.find((x) => x.game_id === gameId);
-  if (!group) return;
-  const all = await api(`/timers/history/${state.userId}?game_id=${encodeURIComponent(gameId)}&limit=500`);
-  if (all) {
-    group.sessions = all.filter((s) => !s.is_active);
-    renderHistory();
-  }
 }
 
 /** Delegated click handler for #historyList and #historyMore. */
@@ -124,23 +96,9 @@ export function onHistoryClick(e) {
     if (group) onContinue(group);
     return;
   }
-  const edit = e.target.closest('[data-action="edit-session"]');
-  if (edit) {
-    const group = state.groups.find((x) => x.game_id === edit.dataset.gameId);
-    const session = group?.sessions.find((s) => String(s.id) === edit.dataset.timerId);
-    if (group && session) {
-      onEditSession(group, session);
-    }
-    return;
-  }
-  const all = e.target.closest('[data-action="all-sessions"]');
-  if (all) return loadAllSessions(all.dataset.gameId);
-
-  const row = e.target.closest('[data-action="toggle"]');
-  if (row) {
-    const id = row.closest('.history-group').dataset.gameId;
-    if (state.expanded.has(id)) state.expanded.delete(id);
-    else state.expanded.add(id);
-    renderHistory();
+  const complete = e.target.closest('[data-action="complete"]');
+  if (complete) {
+    const group = state.groups.find((x) => x.game_id === complete.dataset.gameId);
+    if (group) onOpen(group);
   }
 }

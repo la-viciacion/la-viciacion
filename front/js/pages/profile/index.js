@@ -69,7 +69,7 @@ function showTab(id) {
   history.replaceState(null, '', `#/profile/${id}`);
   if (opened.has(id)) return;
   opened.add(id);
-  if (id === 'juegos') initLibrary(main.querySelector('#pfLibrary'), { username: user.username, onChange: refreshSummary });
+  if (id === 'juegos') initLibrary(main.querySelector('#pfLibrary'), { username: user.username, userId: user.id, onChange: refreshSummary });
   if (id === 'recomendados') initRecommendations(main.querySelector('#pfRecommended'), { username: user.username });
   if (id === 'ajustes') {
     initPreferences(main.querySelector('#pfPrefs'), { path: userPath('settings') }).catch(() => {});

@@ -14,5 +14,4 @@ export const iconEyeOff = () =>
 export const iconLogout = () => svg(15, '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>');
 export const iconPlay = () => svg(16, '<polygon points="5 3 19 12 5 21 5 3"/>');
 export const iconStop = () => svg(16, '<rect x="6" y="6" width="12" height="12"/>');
-export const iconChevron = () => svg(16, '<polyline points="6 9 12 15 18 9"/>');
 export const iconPlus = () => svg(16, '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>');
