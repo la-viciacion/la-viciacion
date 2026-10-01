@@ -116,7 +116,7 @@ def recommendation_candidates(db: Session, user_id: int) -> list[dict]:
             completed_by.setdefault(game_id, set()).add(owner_id)
     # what the other players have put into each game: seconds and finished sessions, any season
     activity = {
-        game_id: (seconds or 0, sessions)
+        game_id: (float(seconds or 0), sessions)  # MariaDB returns SUM() as Decimal
         for game_id, seconds, sessions in db.query(
             models.GameTimer.game_id, func.sum(models.GameTimer.duration_seconds), func.count(models.GameTimer.id)
         )
@@ -155,11 +155,11 @@ def genre_affinity(db: Session, user_id: int) -> dict[str, float]:
         .group_by(models.Game.id, models.Game.genres)
         .all()
     )
-    total = sum(seconds or 0 for _, seconds in rows)
+    total = sum(float(seconds or 0) for _, seconds in rows)  # MariaDB returns SUM() as Decimal
     shares: dict[str, float] = {}
     for genres, seconds in rows:
         for genre in genre_list(genres):
-            shares[genre.lower()] = shares.get(genre.lower(), 0) + (seconds or 0) / total
+            shares[genre.lower()] = shares.get(genre.lower(), 0) + float(seconds or 0) / total
     return shares if total else {}
 
 

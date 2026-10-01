@@ -1,4 +1,5 @@
 import datetime
+from decimal import Decimal
 import random
 import unittest
 from unittest import mock
@@ -125,6 +126,18 @@ class WeightTests(unittest.TestCase):
         add_session(self.db, 1, "doom", 40, day=4)  # the user's own time is not "what the others played"
         doom = games.recommendation_candidates(self.db, 1)[0]
         self.assertEqual((doom["played_seconds"], doom["sessions"]), (5 * 3600, 2))
+
+    def test_affinity_and_weight_work_with_decimal_sums_like_mariadb_returns(self):
+        # SQLite sums to int, MariaDB to Decimal: mixing Decimal with float used to raise a TypeError
+        query = mock.MagicMock()
+        query.join.return_value.filter.return_value.group_by.return_value.all.return_value = [
+            ("Shooter", Decimal("3600")), ("Adventure", Decimal("1200")),
+        ]
+        db = mock.MagicMock()
+        db.query.return_value = query
+        affinity = games.genre_affinity(db, 1)
+        self.assertEqual(affinity, {"shooter": 0.75, "adventure": 0.25})
+        self.assertIsInstance(games.recommendation_weight(self.item(genres=["Shooter"]), affinity), float)
 
     def test_every_signal_raises_the_weight(self):
         base = games.recommendation_weight(self.item(), {})
