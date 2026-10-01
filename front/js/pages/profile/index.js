@@ -1,4 +1,5 @@
-// Profile page: a header with the season stats and four tabs so nothing needs a
+// Profile page: a header with the stats of a season (the running one, another one or the total of
+// all, chosen with the pills) and four tabs so nothing needs a
 // long scroll: Resumen (top games, achievements), Mis juegos (see library.js),
 // Recomendados (see recommendations.js) and Ajustes (personal data, reminders, push
 // notifications, password). The games, the recommendations and the settings load the
@@ -8,6 +9,7 @@ import { api, jsonRequest } from '../../lib/api.js';
 import { formatDate, formatDuration } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
 import { PASSWORD_HINT, isValidPassword } from '../../lib/password.js';
+import * as seasons from '../../lib/seasons.js';
 import { initLibrary } from './library.js';
 import { initPreferences } from './preferences.js';
 import { initPush } from './push.js';
@@ -29,6 +31,7 @@ let main;
 let user;
 let avatarUrl;
 let opened; // tabs already initialised
+let shown; // season on screen: a year, or seasons.ALL; null = the running one
 
 const userPath = (suffix) => `/users/${encodeURIComponent(user.username)}/${suffix}`;
 
@@ -47,6 +50,7 @@ export async function render(ctx) {
 async function load() {
   const data = await api(userPath('profile'));
   if (!data) return;
+  shown = null;
   draw(data);
   opened = new Set();
   showTab(tabFromHash());
@@ -86,13 +90,30 @@ function onTabKey(e) {
   next.focus();
 }
 
-// A completion changed: refresh the numbers without redrawing the whole page.
-async function refreshSummary() {
-  const data = await api(userPath('profile'));
+// Show another season (or the total) or, with no argument, refresh the one on screen after a change:
+// only the numbers are redrawn, not the whole page.
+async function refreshSummary(season = shown) {
+  const data = await api(`${userPath('profile')}${season == null ? '' : `?season=${season}`}`);
   if (!data) return;
+  shown = season;
+  mount(main.querySelector('#pfSeasons'), seasonPills(data));
+  main.querySelector('#pfStats').setAttribute('aria-label', `Estadísticas: ${seasonName(data)}`);
   mount(main.querySelector('#pfStats'), statsView(data));
+  mount(main.querySelector('#pfTopTitle'), titleView(`Más jugados ${seasonSuffix(data)}`));
   mount(main.querySelector('#pfTop'), topView(data));
+  mount(main.querySelector('#pfAchTitle'), titleView(`Logros ${seasonSuffix(data)}`));
   mount(main.querySelector('#pfAchievements'), achievementsView(data));
+}
+
+async function onSeason(e) {
+  const pill = e.target.closest('[data-season]');
+  if (!pill || pill.getAttribute('aria-pressed') === 'true') return;
+  const value = pill.dataset.season === seasons.ALL ? seasons.ALL : Number(pill.dataset.season);
+  try {
+    await refreshSummary(value);
+  } catch (err) {
+    flash(main.querySelector('#pfAvatarMsg'), err.message);
+  }
 }
 
 // ── Templates ───────────────────────────────────────────────
@@ -106,16 +127,27 @@ function avatar(d) {
     : html`<div class="pf-avatar pf-avatar-placeholder" id="pfAvatar" aria-hidden="true">${initial}</div>`;
 }
 
-const sectionTitle = (title) => html`<div class="section-header"><h2 class="section-title">${title}</h2><div class="section-line"></div></div>`;
+const titleView = (title) => html`<h2 class="section-title">${title}</h2><div class="section-line"></div>`;
+const sectionTitle = (title, id) => html`<div class="section-header" ${id ? html`id="${id}"` : ''}>${titleView(title)}</div>`;
+
+const seasonName = (d) => (d.season === seasons.ALL ? 'todas las temporadas' : `temporada ${d.season}`);
+const seasonSuffix = (d) => (d.season === seasons.ALL ? '(total)' : `en ${d.season}`);
+
+function seasonPills(d) {
+  return html`${seasons.choices(d.seasons).map(({ value, label }) => html`
+    <button type="button" class="pf-season-badge" data-season="${value}" aria-pressed="${String(value === d.season)}">${value === seasons.ALL ? label : `Temporada ${label}`}</button>`)}`;
+}
 
 function statsView(d) {
   const s = d.stats;
+  // a streak that is still running only makes sense for the running season or the total
+  const running = d.season === seasons.ALL || d.season === d.seasons[0];
   return html`
     ${statTile('Tiempo jugado', formatDuration(s.played_time))}
     ${statTile('Días jugados', s.played_days)}
     ${statTile('Juegos jugados', s.played_games)}
     ${statTile('Completados', s.completed_games)}
-    ${statTile('Racha actual', `${s.current_streak} d`)}
+    ${running ? statTile('Racha actual', `${s.current_streak} d`) : ''}
     ${statTile('Mejor racha', `${s.best_streak} d`)}
     ${statTile('Logros', s.achievements)}`;
 }
@@ -156,10 +188,8 @@ function draw(d) {
       </div>
     </div>
 
-    <div class="pf-season">
-      <span class="pf-season-badge">Temporada ${d.season}</span>
-    </div>
-    <section class="pf-stats" id="pfStats" aria-label="Estadísticas de la temporada ${d.season}">${statsView(d)}</section>
+    <div class="pf-season" id="pfSeasons" role="group" aria-label="Temporada">${seasonPills(d)}</div>
+    <section class="pf-stats" id="pfStats" aria-label="Estadísticas: ${seasonName(d)}">${statsView(d)}</section>
 
     <nav class="pf-tabs" role="tablist" aria-label="Secciones del perfil">
       ${TABS.map(([id, label]) => html`<button class="pf-tab" role="tab" type="button" id="pfTab-${id}" aria-controls="pfPanel-${id}" data-tab="${id}">${label}</button>`)}
@@ -168,11 +198,11 @@ function draw(d) {
     <section class="pf-panel" role="tabpanel" id="pfPanel-resumen" aria-labelledby="pfTab-resumen">
       <div class="pf-cols">
         <div>
-          ${sectionTitle(`Más jugados en ${d.season}`)}
+          ${sectionTitle(`Más jugados ${seasonSuffix(d)}`, 'pfTopTitle')}
           <div class="pf-card" id="pfTop">${topView(d)}</div>
         </div>
         <div>
-          ${sectionTitle(`Logros de ${d.season}`)}
+          ${sectionTitle(`Logros ${seasonSuffix(d)}`, 'pfAchTitle')}
           <div class="pf-card" id="pfAchievements">${achievementsView(d)}</div>
         </div>
       </div>
@@ -226,6 +256,7 @@ function draw(d) {
     if (tab) showTab(tab.dataset.tab);
   });
   main.querySelector('.pf-tabs').addEventListener('keydown', onTabKey);
+  main.querySelector('#pfSeasons').addEventListener('click', onSeason);
   main.querySelector('#pfAvatarInput').addEventListener('change', changeAvatar);
   main.querySelector('#pfData').addEventListener('submit', saveData);
   main.querySelector('#pfPass').addEventListener('submit', changePassword);

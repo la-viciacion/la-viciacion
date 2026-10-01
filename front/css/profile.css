@@ -9,9 +9,15 @@
 .pf-season { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 4px 0 10px; }
 
 .pf-season-badge {
-  background: rgba(61,217,179,0.12); border: 1px solid var(--border-accent); color: var(--accent-teal);
+  background: transparent; border: 1px solid var(--border); color: var(--text-secondary); font: inherit; cursor: pointer;
   font-size: 0.8rem; font-weight: 700; padding: 4px 12px; border-radius: var(--radius-pill); white-space: nowrap;
 }
+
+.pf-season-badge:hover { border-color: var(--border-accent); color: var(--text-primary); }
+
+.pf-season-badge[aria-pressed="true"] { background: rgba(61,217,179,0.12); border-color: var(--border-accent); color: var(--accent-teal); cursor: default; }
+
+.pf-season-badge:focus-visible { outline: 2px solid var(--accent-teal); outline-offset: 2px; }
 
 .pf-note { margin: 4px 0 10px; }
 

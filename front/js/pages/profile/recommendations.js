@@ -1,7 +1,7 @@
-// "Recomendados": games other players have and this user has never had, the ones most
-// players share first. The API decides what is recommended; this only shows it.
+// "Recomendados": a weighted random pick of the games other players have and this user has never had.
+// The API decides what is recommended; this only shows it, and asks again for other ones.
 import { api } from '../../lib/api.js';
-import { formatPlayers } from '../../lib/format.js';
+import { formatDuration, formatPlayers } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
 
 const MAX_GENRES = 3;
@@ -14,7 +14,8 @@ function detail(g) {
   const completed = g.completed_by
     ? ` · ${g.completed_by === 1 ? 'Lo ha completado 1' : `Lo han completado ${g.completed_by}`}`
     : '';
-  return `Lo ${g.players.length === 1 ? 'tiene' : 'tienen'} ${formatPlayers(g.players)}${completed}`;
+  const played = g.played_seconds ? ` · ${formatDuration(g.played_seconds)} jugadas entre todos` : '';
+  return `Lo ${g.players.length === 1 ? 'tiene' : 'tienen'} ${formatPlayers(g.players)}${completed}${played}`;
 }
 
 const row = (g) => html`
@@ -30,16 +31,27 @@ const row = (g) => html`
   </div>`;
 
 export async function initRecommendations(container, { username }) {
-  try {
-    const items = await api(`/users/${encodeURIComponent(username)}/recommendations`);
-    if (!items) return;
-    mount(container, html`
-      <div class="pf-card">
-        ${items.length
+  async function load() {
+    try {
+      const items = await api(`/users/${encodeURIComponent(username)}/recommendations`);
+      if (!items) return;
+      mount(container, html`
+        <div class="pf-card">
+          ${items.length
     ? items.map(row)
     : html`<div class="pf-empty">No hay nada que recomendarte: ya has probado todo lo que tienen los demás.</div>`}
-      </div>`);
-  } catch (err) {
-    mount(container, html`<div class="pf-empty">Error cargando las recomendaciones: ${err.message}</div>`);
+          ${items.length ? html`<div><button class="pf-btn" data-more>🎲 Otras recomendaciones</button></div>` : ''}
+        </div>`);
+    } catch (err) {
+      mount(container, html`<div class="pf-empty">Error cargando las recomendaciones: ${err.message}</div>`);
+    }
   }
+
+  container.addEventListener('click', (e) => {
+    const more = e.target.closest('[data-more]');
+    if (!more) return;
+    more.disabled = true;
+    load();
+  });
+  await load();
 }
