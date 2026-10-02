@@ -1,0 +1,47 @@
+name: CI
+
+# Runs on every pull request to main and again on main after a merge. Branch protection requires
+# the `CI` job below, so a PR can only be merged with all the checks green.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Pull requests are squash-merged, so the title becomes the commit message on main.
+  pr-title:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Title follows Conventional Commits
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          if ! printf '%s' "$TITLE" | grep -E -q '^(feat|fix|refactor|docs|style|test|chore|perf|build|ci|revert)(\([a-z0-9._-]+\))?!?: .+'; then
+            echo "::error::The PR title must look like 'feat(front): add X' (types: feat, fix, refactor, docs, style, test, chore, perf, build, ci, revert)"
+            exit 1
+          fi
+
+  checks:
+    uses: ./.github/workflows/checks.yml
+
+  # The single status that branch protection requires, whatever jobs are added above.
+  ci:
+    name: CI
+    if: always()
+    needs: [pr-title, checks]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Every job passed (a skipped pr-title on push to main is fine)
+        run: |
+          if [ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" = "true" ]; then
+            echo "::error::A required job did not pass"; exit 1
+          fi

@@ -1,7 +1,7 @@
 name: Release images
 
-# Creating a tag `vX.Y.Z` tests the code, builds the api, front and bot images and publishes
-# them to GHCR (ghcr.io/<owner>/laviciacion-<service>:X.Y.Z, X.Y and latest). Run by hand
+# Creating a tag `vX.Y.Z` runs the same checks as every PR, then publishes the api, front and bot
+# images to GHCR (ghcr.io/<owner>/laviciacion-<service>:X.Y.Z, X.Y and latest). Run by hand
 # ("Run workflow") it does everything except publish, to try the build without a tag.
 on:
   push:
@@ -15,105 +15,14 @@ concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
-env:
-  # What the API tests need to import the code; they never connect to anything.
-  GOD_ADMIN_PASS: ci
-  MARIADB_HOST: localhost
-  MARIADB_DATABASE: ci
-  MARIADB_USER: ci
-  MARIADB_PASSWORD: ci
-  SECRET_KEY: ci-secret
-  ACCESS_TOKEN_EXPIRE_MINUTES: "60"
-  CORS_ORIGINS: "[]"
-  SENTRY_URL_API: ""
-  ENVIRONMENT: test
-  API_LOG_LEVEL: INFO
-
 jobs:
-  tests:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-          cache: pip
-          cache-dependency-path: api/requirements.txt
-      - name: API tests
-        working-directory: api
-        run: |
-          pip install -r requirements.txt
-          python -m unittest discover -s tests -t .
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: pip
-          cache-dependency-path: bot/requirements.txt
-      - name: Bot tests
-        working-directory: bot
-        run: |
-          pip install -r requirements.txt
-          python -m unittest discover -s tests -t .
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: front/package-lock.json
-      - name: Front tests and lint
-        working-directory: front
-        run: |
-          npm ci
-          npm test
-          npm run lint
-
-  # Build every image and look inside it before anything is published.
-  build:
-    needs: tests
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: true
-      matrix:
-        service: [api, front, bot]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-
-      - name: Build ${{ matrix.service }}
-        uses: docker/build-push-action@v6
-        with:
-          context: ${{ matrix.service }}
-          load: true
-          tags: check/${{ matrix.service }}
-          cache-from: type=gha,scope=${{ matrix.service }}
-          cache-to: type=gha,scope=${{ matrix.service }},mode=max
-
-      - name: The image holds no secrets, data or configuration files
-        run: |
-          image=check/${{ matrix.service }}
-
-          # files that must never end up in an image
-          found=$(docker run --rm --entrypoint sh "$image" -c \
-            'find /app /usr/share/nginx/html \( -name ".env" -o -name ".env.*" -o -name "*.sql" -o -name "*.sql.gz" -o -name "*.dump" \) 2>/dev/null')
-          if [ -n "$found" ]; then
-            echo "::error::sensitive files inside the image:"; echo "$found"; exit 1
-          fi
-
-          # variables baked in with ENV/ARG: nothing that looks like a credential (GPG_KEY is the
-          # public key id of the official python image)
-          baked=$(docker image inspect "$image" --format '{{range .Config.Env}}{{println .}}{{end}}' \
-            | cut -d= -f1 | grep -i -E 'PASS|SECRET|TOKEN|KEY' | grep -v -x GPG_KEY || true)
-          if [ -n "$baked" ]; then
-            echo "::error::credential-looking variables baked into the image:"; echo "$baked"; exit 1
-          fi
-          echo "clean"
+  checks:
+    uses: ./.github/workflows/checks.yml
 
   publish:
     # Only for a real tag, never for a manual try-out.
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: build
+    needs: checks
     runs-on: ubuntu-latest
     permissions:
       contents: read
