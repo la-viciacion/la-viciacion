@@ -24,6 +24,10 @@ Simplified trunk-based development for a team of 2-3. `main` is the trunk: alway
 
 Run the same locally before pushing: see [development.md](development.md#tests-and-lint).
 
+## Dependency updates
+
+`.github/dependabot.yml` opens one grouped PR per week and ecosystem (pip for `api/` and `bot/`, npm, GitHub Actions, base images). They are ordinary PRs: CI must be green and a teammate reviews them. Majors of Python packages and npm libraries arrive as separate PRs on purpose; the Python version of the images is not bumped automatically (it must match the CI jobs). The MariaDB image is not tracked: its major version is a data decision (see [deployment.md](deployment.md#mariadb-version)).
+
 ## One-time repository setup (GitHub settings)
 
 Settings → Rules → Rulesets (or Branches → Branch protection rule) for `main`:
