@@ -25,7 +25,7 @@ from src import auth
 from src.crud.achievements import Achievements
 from src.database import database, models
 from src.routers import basic
-from src.utils import actions
+from src.utils import actions, my_utils, settings
 from tests import mariadb_db
 from tests.app_routes import BASE, ROUTERS
 from tests.mariadb_db import MariaDBTestCase
@@ -105,12 +105,33 @@ class ApiTestCase(MariaDBTestCase):
             basic.RECOVERY_BY_CLIENT, basic.RESET_LINK_FAILS,
         ):
             limiter._failures.clear()
+        settings._cache.clear()  # settings are cached for a few seconds in the process
         self.background = {}
         for name in BACKGROUND:
             patcher = mock.patch.object(actions, name)
             self.background[name] = patcher.start()
             self.addCleanup(patcher.stop)
+        self._forbid_the_network()
         self.client = TestClient(self.app)
+
+    def _forbid_the_network(self):
+        """A test never talks to RAWG or HowLongToBeat, whatever the developer's .env says (Config reads it:
+        a real RAWG key there would turn a test into a real request). A test that wants them replaces these."""
+
+        async def no_network(url, params, timeout):
+            raise AssertionError(f"a test tried to reach {url}")
+
+        class NoHowLongToBeat:
+            async def async_search(self, name):
+                return []
+
+        for patcher in (
+            mock.patch.object(type(my_utils.config), "RAWG_API_KEY", new_callable=mock.PropertyMock, return_value=""),
+            mock.patch.object(my_utils, "_http_get", new=no_network),
+            mock.patch.object(my_utils, "HowLongToBeat", new=NoHowLongToBeat),
+        ):
+            patcher.start()
+            self.addCleanup(patcher.stop)
 
     # --- requests
 
