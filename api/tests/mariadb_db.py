@@ -10,6 +10,7 @@ Never point it at a server that holds real data: every test creates its own data
 (`lavi_test_<random>`) and drops it at the end, but it is still the server's admin account.
 """
 import os
+import re
 import subprocess
 import sys
 import unittest
@@ -83,3 +84,26 @@ class MariaDBTestCase(unittest.TestCase):
     def current_revision(cls) -> str | None:
         with cls.engine.connect() as conn:
             return conn.execute(text("SELECT version_num FROM alembic_version")).scalar()
+
+    @classmethod
+    def schema_snapshot(cls) -> dict[str, str]:
+        """table -> its CREATE TABLE, without the AUTO_INCREMENT counter (which only says how many rows existed)."""
+        with cls.engine.connect() as conn:
+            tables = [t for (t,) in conn.execute(text("SHOW TABLES")) if t != "alembic_version"]
+            return {
+                t: re.sub(r" AUTO_INCREMENT=\d+", "", conn.execute(text(f"SHOW CREATE TABLE `{t}`")).all()[0][1])
+                for t in tables
+            }
+
+    @classmethod
+    def data_snapshot(cls) -> dict[str, tuple]:
+        """table -> (row count, checksum): equal snapshots mean a migration left the data as it was."""
+        with cls.engine.connect() as conn:
+            tables = [t for (t,) in conn.execute(text("SHOW TABLES")) if t != "alembic_version"]
+            return {
+                t: (
+                    conn.execute(text(f"SELECT COUNT(*) FROM `{t}`")).scalar(),
+                    conn.execute(text(f"CHECKSUM TABLE `{t}`")).all()[0][1],
+                )
+                for t in tables
+            }
