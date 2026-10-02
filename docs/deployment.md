@@ -1,6 +1,45 @@
 # Deployment and operations
 
-The operator-facing procedure (fresh install and importing a pre-v2 backup) is in the [README](../README.md#deployment-docker-compose). This page adds what an agent or maintainer needs to know when changing the stack.
+How to install, configure, deploy and operate the stack. The settings that go in `.env` are described in [configuration.md](configuration.md); what the application does at run time is in [features.md](features.md). This page also covers what a maintainer needs to know when changing the stack.
+
+## Installing
+
+The stack is four services orchestrated by `docker-compose.yml`: `laviciacion-db` (MariaDB), `laviciacion-api` (FastAPI), `laviciacion-bot` (the Telegram bot) and `laviciacion-front` (the PWA). The API's container runs `alembic upgrade head` automatically on every start (see `api/entrypoint.sh`) before serving requests, so schema migrations are never a manual step — and `laviciacion-api` won't even start until `laviciacion-db` reports healthy (`depends_on` + a MariaDB healthcheck), so a slow first boot doesn't race the migration.
+
+The images are published to GHCR (`ghcr.io/la-viciacion/laviciacion-api`, `-front` and `-bot`) every time a `vX.Y.Z` tag is created, so a server does not need to build anything: `docker compose pull && docker compose up -d` is the whole deploy. `LAVI_VERSION` in `.env` pins a release (e.g. `2.0.0`; default `latest`). Nothing sensitive or environment-specific is inside them: the API and the bot read `.env` through `env_file`, and the front's nginx receives only `API_UPSTREAM` (default `http://laviciacion-api:5000`) and `DNS_RESOLVER` (default `127.0.0.11`), both optional. `docker compose up -d --build` builds the same images from the `Dockerfile`s instead, which is what development uses (see [Images](#images)).
+
+### Fresh install (no existing data)
+
+```bash
+docker compose pull && docker compose up -d     # the published images
+# or, to build from this checkout:  docker compose up -d --build
+```
+
+> If `pull` answers `denied`, the package is still private: on GitHub, *Packages* → the package → *Package settings* → *Change visibility* → Public (once per image; the repository is public).
+
+> **Windows (Docker Desktop):** add `DB_DATA=laviciacion_db_data` to `.env` before the first start (see `.env.template`), so the database lives in a Docker volume instead of `./db/data`. On that folder MariaDB 12+ cannot rebuild tables and the migrations fail. On Linux leave it unset. Details and tested versions: [Database storage](#database-storage-linux-vs-windows).
+
+MariaDB starts with an empty database and the API's `alembic upgrade head` builds the whole schema from scratch (migration `000_baseline_v1` creates the starting tables, the rest run in order, and `015_seed_platforms` adds a default list of platforms). On start the API also creates the `admin` user from `GOD_ADMIN_PASS`, the achievements and the push keys. Nothing else to do: fill in `.env` and run it.
+
+### Importing a pre-v2 database into a new environment
+
+Deploying v2 to a *new* environment from a backup taken on the old (Clockify-based, "v1") schema — for example right before cutting over in production — needs the database to be seeded with that backup **before** the API applies its migrations, so the historical data survives the migration instead of starting from an empty schema:
+
+1. Put your pre-migration `mysqldump` file in `db/init/` (e.g. `db/init/laviciacion-backup.sql`). Anything ending in `.sql`, `.sql.gz` or `.sh` placed there is picked up.
+2. Make sure `db/data/` is empty/does not exist yet — MariaDB's official image only runs the scripts in `db/init/` **the first time it initializes a data directory**. If `db/data/` already has data (e.g. you're re-running this on an environment that already started once), the import is silently skipped; remove/rename `db/data/` first if you need a clean re-import.
+3. Bring the stack up:
+   ```bash
+   docker compose pull && docker compose up -d
+   ```
+   On first boot MariaDB imports the backup file(s) from `db/init/`, then (once healthy) `laviciacion-api` starts and runs `alembic upgrade head`, bringing that imported v1 schema up to the current one — including the one-off data cleanup migration that backfills missing `games_statistics` rows and patches any orphaned Clockify project references found in *that specific backup*.
+4. Check it went well:
+   ```bash
+   docker compose logs laviciacion-db   # look for the SQL import log lines
+   docker compose logs laviciacion-api  # look for "Running upgrade ..." lines from alembic, no errors
+   ```
+5. Nothing to recompute: totals, rankings and streaks are computed from the sessions whenever they are requested. (Optional) Use **Comprobar logros** in the admin panel so achievements earned by the imported history are registered right away instead of at the next 05:00 check.
+
+`db/init/` itself is tracked (so it always exists on a fresh clone), but the SQL/backup files you drop into it are gitignored — never commit a real database dump.
 
 ## Stack
 
@@ -23,7 +62,7 @@ The compose file names the three images (`image: ghcr.io/la-viciacion/laviciacio
 
 ## Configuration
 
-Single `.env` (template: `.env.template`). Production checklist:
+Single `.env` (template: `.env.template`; every variable and what it does: [configuration.md](configuration.md)). Production checklist:
 
 - Strong unique values for `GOD_ADMIN_PASS`, `SECRET_KEY`, `MARIADB_*`.
 - `CORS_ORIGINS` is a JSON list with the real public origin(s).
@@ -107,7 +146,7 @@ After `016` the database rejects what used to be kept by hand: deleting a user o
 docker compose exec laviciacion-db sh -c 'mariadb-dump -u root -p"$MARIADB_ROOT_PASSWORD" --single-transaction --routines "$MARIADB_DATABASE"' > backup-$(date +%F).sql
 ```
 
-Backups (`*.sql`, `*.sql.gz`, `*.dump`) are gitignored; store them outside the repo. To restore into a fresh environment, put the dump in `db/init/` with an empty `db/data/` (README explains the first-boot import), or import it into a running DB with a normal `mariadb` client.
+Backups (`*.sql`, `*.sql.gz`, `*.dump`) are gitignored; store them outside the repo. To restore into a fresh environment, put the dump in `db/init/` with an empty `db/data/` ([Importing a pre-v2 database](#importing-a-pre-v2-database-into-a-new-environment) explains the first-boot import), or import it into a running DB with a normal `mariadb` client.
 
 ## Rollback
 
@@ -125,4 +164,4 @@ Code rollback: set `LAVI_VERSION` in `.env` to the previous release (e.g. `2.0.0
    **build**: builds the three images and looks inside each one: no `.env*`, `*.sql`, `*.dump` under `/app` or the web root, and no credential-looking variable baked in (`PASS`, `SECRET`, `TOKEN`, `KEY`).
 2. **publish** (tags only): pushes `ghcr.io/la-viciacion/laviciacion-{api,front,bot}` tagged `X.Y.Z`, `X.Y` and `latest` (prereleases get no `latest`), using the workflow's own `GITHUB_TOKEN`; no secret has to be configured.
 
-Cut a release with `git tag v2.0.0 && git push origin v2.0.0` (see [roadmap](roadmap.md): tags are not created until 2.0.0 ships). The first time, set each package public (README, Deployment); the repository is public, so nothing needs a login afterwards. There is no automatic deploy: the server pulls when you decide. The images are `linux/amd64` only.
+Cut a release with `git tag v2.0.0 && git push origin v2.0.0` (see [roadmap](roadmap.md): tags are not created until 2.0.0 ships). The first time, set each package public (see [Installing](#installing)); the repository is public, so nothing needs a login afterwards. There is no automatic deploy: the server pulls when you decide. The images are `linux/amd64` only.

@@ -1,0 +1,1 @@
+Read [AGENTS.md](../AGENTS.md) at the repository root before changing anything: it holds the rules that must never be broken, the documentation map and the working agreements. The details are in `docs/`.
