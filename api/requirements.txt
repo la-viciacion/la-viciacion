@@ -1,4 +1,4 @@
-fastapi==0.136.0
+fastapi==0.141.1
 fastapi-login==1.10.3
 fastapi-versioning==0.10.0
 python-dotenv==1.2.3
@@ -15,7 +15,7 @@ pymysql==1.2.3
 sqlalchemy==2.1.1
 alembic==1.20.0
 requests==2.34.2
-howlongtobeatpy==1.0.23
+howlongtobeatpy==1.0.24
 rawg==1.2.0
 python_telegram_bot==22.8
 pywebpush==2.5.0
