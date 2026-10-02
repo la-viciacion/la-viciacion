@@ -32,10 +32,11 @@ from tests.mariadb_db import MariaDBTestCase
 
 PASSWORD = "Sup3r-secret!pw"  # meets the password rules (12-24 characters, upper, lower, digit, symbol)
 
-# what every test starts without: the rows tests create. platform_tags (seeded by migration 015) and the
-# achievements catalogue (seeded once below) stay, as they do in a real database.
+# what every test starts without: the rows tests create. platform_tags (seeded by migration 015) stays, as in a real
+# database; the achievements catalogue is rebuilt from the code for every test, because tests may edit a title or
+# upload an image and the next one must not see it.
 DATA_TABLES = (
-    "game_timers", "users_achievements", "users_games", "push_subscriptions", "password_resets",
+    "game_timers", "users_achievements", "achievements", "users_games", "push_subscriptions", "password_resets",
     "user_settings", "app_settings", "job_runs", "games", "users",
 )
 
@@ -74,8 +75,6 @@ class ApiTestCase(MariaDBTestCase):
             cls.migrate()
             _shared.update(engine=cls.engine, admin=cls._admin, name=cls.db_name, bind=database.SessionLocal.kw["bind"])
             database.SessionLocal.configure(bind=cls.engine)
-            with database.SessionLocal() as db:
-                Achievements().populate_achievements(db)
             atexit.register(_drop_shared_database)
         else:
             cls.engine, cls._admin, cls.db_name = _shared["engine"], _shared["admin"], _shared["name"]
@@ -100,6 +99,8 @@ class ApiTestCase(MariaDBTestCase):
             for table in DATA_TABLES:
                 conn.execute(text(f"DELETE FROM `{table}`"))
             conn.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
+        with database.SessionLocal() as db:
+            Achievements().populate_achievements(db)
         for limiter in (
             basic.LOGIN_BY_ACCOUNT, basic.LOGIN_BY_CLIENT, basic.RECOVERY_BY_ACCOUNT,
             basic.RECOVERY_BY_CLIENT, basic.RESET_LINK_FAILS,
