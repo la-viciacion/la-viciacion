@@ -36,7 +36,7 @@ updates:
       actions:
         update-types: [minor, patch]
 
-  # Base images. The Python major/minor (3.13 api, 3.11 bot) is a deliberate decision that must
+  # Base images. The Python major/minor (3.13 for api and bot) is a deliberate decision that must
   # match the CI jobs, so only patch-level changes arrive on their own.
   - package-ecosystem: docker
     directory: /api

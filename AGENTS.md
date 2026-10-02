@@ -12,7 +12,7 @@ Four services, one `docker-compose.yml`:
 |---|---|---|---|
 | `laviciacion-api` | `api/` | Python 3.13, FastAPI, SQLAlchemy 2, Alembic, MariaDB | Source of truth: REST API, business logic, in-process scheduler |
 | `laviciacion-front` | `front/` | Vanilla JS (ES modules), no framework, no build step, nginx | PWA; nginx also proxies `/api` to the API |
-| `laviciacion-bot` | `bot/` | Python 3.11, python-telegram-bot | Telegram bot, read-only except `/activate`; talks to the API as superadmin |
+| `laviciacion-bot` | `bot/` | Python 3.13, python-telegram-bot | Telegram bot, read-only except `/activate`; talks to the API as superadmin |
 | `laviciacion-db` | `db/` | MariaDB | Data in `db/data/` (gitignored) |
 
 ## Documentation map

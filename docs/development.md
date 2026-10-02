@@ -3,7 +3,7 @@
 ## Prerequisites
 
 - Docker + Docker Compose (the reference way to run everything)
-- Python 3.13 (API) / 3.11 (bot) and Node 20+ (front) if you run services outside Docker
+- Python 3.13 (API and bot) and Node 20+ (front) if you run services outside Docker
 - A `.env` at the repo root: `cp .env.template .env` and fill it in. API and bot fall back to this file when not in Docker (`find_dotenv`); real environment variables always win.
 
 When running the API outside Docker, `MARIADB_HOST` must point to a reachable DB (e.g. `127.0.0.1` with the compose DB published on `127.0.0.1:3307`; adapt the port in the URL/host as needed) instead of the container name `laviciacion-db`.

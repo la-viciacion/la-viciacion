@@ -18,7 +18,7 @@ Simplified trunk-based development for a team of 2-3. `main` is the trunk: alway
 
 - API tests (Python 3.13), including the Alembic history guards, the endpoint security list and the `.env.template` check.
 - Migrations and schema rules on a real MariaDB (empty database to head, an older revision with data to head, re-run, downgrade, generated `season` columns, constraints), on the `lts` and `latest` images.
-- Bot tests (Python 3.11).
+- Bot tests (Python 3.13).
 - Front tests and ESLint.
 - The three Docker images build and contain no secrets, data or baked-in credentials.
 - The PR title follows Conventional Commits.
