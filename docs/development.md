@@ -61,7 +61,7 @@ TEST_MARIADB_URL=mysql+pymysql://root:testpw@127.0.0.1:3399 venv/Scripts/python.
 docker rm -f lavi-test-db
 ```
 
-Use the version `docker-compose.yml` pins. CI runs them on every PR against exactly that version (it reads the tag from the compose file) with `REQUIRE_MARIADB_TESTS=1`, so a missing server there fails instead of skipping, and weekly against `lts` and `latest` as an early warning. Front tests cover `js/lib` and `pages/home/sessions`. Prefer extracting pure functions so new logic can be tested the same way (see [roadmap](roadmap.md) for planned integration tests).
+Use the version `docker-compose.yml` pins. CI runs them on every PR against exactly that version (it reads the tag from the compose file) with `REQUIRE_MARIADB_TESTS=1`, so a missing server there fails instead of skipping, and weekly against `lts` and `latest` as an early warning. Front tests (`node --test`, no DOM and no extra dependency) cover `js/lib` (formatting, the API client with a stubbed `fetch` and `localStorage`, the platform catalogue, the push flow with a stubbed browser and fake timers, and the pure rules) and the pure rules of the pages. What needs a DOM (rendering and event wiring of the pages) is not covered: see [roadmap](roadmap.md). Prefer extracting pure functions so new logic can be tested the same way. `api/tests/test_front_api_paths.py` reads the front's source and checks that every `api(...)` call it makes has a route behind it, with that method, so a renamed route fails a test instead of a browser.
 
 ## Database and migrations
 
