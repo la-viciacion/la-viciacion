@@ -21,10 +21,13 @@ Four services, one `docker-compose.yml`:
 - [docs/development.md](docs/development.md): local setup, commands, tests, debugging.
 - [docs/conventions.md](docs/conventions.md): code conventions, best practices, step-by-step recipes for common changes.
 - [docs/migrations.md](docs/migrations.md): **Alembic rules, conventions and verification checklist (mandatory for any schema change).**
-- [docs/deployment.md](docs/deployment.md): deployment stack, migrations, operations, rollback.
+- [docs/deployment.md](docs/deployment.md): installing, deployment stack, migrations, operations, rollback.
+- [docs/configuration.md](docs/configuration.md): `.env`, accounts and login, password recovery, API docs.
+- [docs/features.md](docs/features.md): how the app behaves (seasons, notifications and jobs, push, sessions, achievements, recommendations, AI notices). The product rules live here; read it before changing behaviour.
 - [docs/workflow.md](docs/workflow.md): git workflow (trunk-based, PRs, required CI checks).
 - [docs/roadmap.md](docs/roadmap.md): pending decisions (branching, versioning, CI) and known debt.
-- [README.md](README.md): user/operator-facing documentation (config, seasons, notifications, manual sessions, deployment).
+- [README.md](README.md): project presentation only (what it is, quick start, links). Documentation goes in `docs/`, not in the README.
+- [CONTRIBUTING.md](CONTRIBUTING.md): short human-facing contribution guide.
 
 ## Rules that must never be broken
 
@@ -37,6 +40,26 @@ Four services, one `docker-compose.yml`:
 7. **Telegram settings are runtime data** (table `app_settings`, edited from the admin panel), not `.env`. `.env` only seeds them once.
 8. Do not add a build step, framework or bundler to the front without an explicit decision.
 9. **Images hold no secrets and no environment-specific configuration** (CI publishes them to GHCR on every `v*` tag and the server runs them as they are). Anything that varies per deployment arrives at run time (`env_file` / `environment:`); the front's nginx takes its upstream from a template (`front/nginx.conf.template`). See [docs/deployment.md](docs/deployment.md#images).
+
+## Where to start, by task
+
+| You are asked to... | Read first |
+|---|---|
+| Change how something behaves (a rule, a notification, a season) | [docs/features.md](docs/features.md), then [docs/architecture.md](docs/architecture.md) |
+| Add an endpoint, page, job, setting, env var or dependency | the matching recipe in [docs/conventions.md](docs/conventions.md) |
+| Touch the database schema | [docs/migrations.md](docs/migrations.md), before anything else |
+| Run or debug locally | [docs/development.md](docs/development.md) |
+| Change deploy, images, CI or MariaDB | [docs/deployment.md](docs/deployment.md) |
+| Add a variable or explain a setting | [docs/configuration.md](docs/configuration.md) and `.env.template` |
+| Commit, branch or open a PR | [docs/workflow.md](docs/workflow.md) |
+
+## How to help the developer
+
+- Read the code and the relevant doc before proposing a change; the docs describe rules that are easy to break by accident (derived data, authorization, migrations, escaping).
+- When a request conflicts with a rule above, say so and propose the compliant way instead of silently bending the rule.
+- Verify, do not assume: run the tests that cover what you changed and report the real result, including failures and what you could not run.
+- Never touch real data (`db/data/`, dumps, production) and never print or commit secrets; use a throwaway database for experiments.
+- Prefer the smallest change that solves the problem, and say what you left out on purpose.
 
 ## Quick commands
 
@@ -61,7 +84,7 @@ Full details in [docs/development.md](docs/development.md).
 - **Database storage / MariaDB:** on Windows/Docker Desktop set `DB_DATA=laviciacion_db_data` in `.env` (a named volume); the default `./db/data` bind mount breaks table-rebuilding migrations on MariaDB 12+. Never change the MariaDB major version of a database that has data by editing the image. Details: [docs/deployment.md](docs/deployment.md#database-storage-linux-vs-windows).
 - Match the surrounding code style; comments explain *why*, not *what*. No dead code, no commented-out blocks.
 - Keep changes focused; do not refactor unrelated code in the same change.
-- Before finishing a change: run the API and front tests, lint the front, and if you touched behaviour described in `README.md` or `docs/`, update those docs in the same change.
+- Before finishing a change: run the API and front tests, lint the front, and if you touched behaviour described in `docs/`, update those docs in the same change.
 - Add or update tests for any pure/business logic you touch (see existing examples in `api/tests/` and `front/tests/`).
 - Ask before anything destructive or hard to reverse (dropping data, touching applied migrations, running migrations against real data, force-pushing).
 - **Git workflow** ([docs/workflow.md](docs/workflow.md)): trunk-based. Never commit to `main`; work on a short-lived branch `<type>/<description>` and open a PR (squash-merged, title in Conventional Commits style: `feat:`, `fix:`, `refactor:`, `docs:`, `style:`, `test:`, `chore:`). The `CI` check must be green. Do not create tags or releases (versioning is still open, see [docs/roadmap.md](docs/roadmap.md)).

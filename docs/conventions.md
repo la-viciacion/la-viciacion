@@ -55,7 +55,7 @@ Read-only (except `/activate`, see architecture), generic endpoints only. Texts 
 2. DB access in `crud/<area>.py`, rules in `utils/` if cross-entity.
 3. Route in `routers/<area>.py` with auth dependency, `response_model`, status code, Spanish error messages from `utils/messages.py`.
 4. If the router is new: add `include_router` in `main.py`.
-5. Tests for the pure part; update `README.md`/`docs/architecture.md` if the behaviour is a documented rule.
+5. Tests for the pure part; update `docs/features.md`/`docs/architecture.md` if the behaviour is a documented rule.
 6. Use it from the front via `api()` (and from the bot only if it is read-only).
 
 ### Add or change a column / table
@@ -84,7 +84,7 @@ Define it in `utils/settings.py` (key, default, coercion/validation, secret or n
 
 ### Add an environment variable
 
-Read it in `api/src/config.py` (or `bot/src/utils/config.py`), add a placeholder to `.env.template` with a comment, mention it in `README.md` if operators must know, and never give it a real default that is a secret.
+Read it in `api/src/config.py` (or `bot/src/utils/config.py`), add a placeholder to `.env.template` with a comment, mention it in `docs/configuration.md` if operators must know, and never give it a real default that is a secret.
 
 ### Add a notification / announcement
 
@@ -98,5 +98,5 @@ Pin the exact version, justify it in the commit message, and check it supports P
 
 - Tests pass (`api` unittest, `front` `npm test`), front lint clean.
 - Stack builds and starts (`docker compose up -d --build`); if a migration is involved, its full checklist in [migrations.md](migrations.md) is done.
-- Docs updated (`README.md`, `docs/`, `.env.template`) when behaviour, config or architecture changed.
+- Docs updated (`docs/`, `.env.template`) when behaviour, config or architecture changed.
 - No secrets, dumps or generated files committed.

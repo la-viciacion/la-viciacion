@@ -63,7 +63,7 @@ Use a throwaway database (a scratch compose stack or a separate MariaDB), **neve
 6. **Downgrade** (if defined): `alembic downgrade -1` then `upgrade head` again.
 7. **Model parity**: `ModelParityTests` does it (`alembic check` in code); by hand, run `alembic check` on the scratch DB. The pre-existing noise (the `_archived_*` tables, `ix_game_timers_*` indexes, `LONGBLOB` vs `LargeBinary`, the `is_active` default) is filtered in the test, so what matters is that your migration adds **no new** differences.
 8. The API starts and the affected flows work against the migrated DB.
-9. Docs updated: README/`docs/architecture.md` if the data model or a domain rule changed.
+9. Docs updated: `docs/architecture.md`/`docs/features.md` if the data model or a domain rule changed.
 
 ## Operating migrations
 
