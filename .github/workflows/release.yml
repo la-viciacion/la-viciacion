@@ -23,7 +23,7 @@ jobs:
     # Only for a real tag, never for a manual try-out.
     if: startsWith(github.ref, 'refs/tags/v')
     needs: checks
-    runs-on: ubuntu-26.04
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
