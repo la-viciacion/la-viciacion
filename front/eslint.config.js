@@ -17,5 +17,10 @@ export default [
     files: ['tests/**/*.js', 'eslint.config.js'],
     languageOptions: { ecmaVersion: 2022, sourceType: 'module', globals: globals.node },
   },
+  {
+    // the page tests run against jsdom, which installs `document` and `window` as globals (tests/dom.js)
+    files: ['tests/dom.js', 'tests/**/*.dom.test.js'],
+    languageOptions: { globals: { ...globals.node, ...globals.browser } },
+  },
   { ignores: ['node_modules/'] },
 ];
