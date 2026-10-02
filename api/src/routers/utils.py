@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Depends, HTTPException, Response, Security, UploadFile
-from fastapi_versioning import version
 from sqlalchemy.orm import Session
 
 from .. import auth
@@ -27,7 +26,6 @@ router = APIRouter(
 
 
 @router.get("/platforms")
-@version(1)
 def platforms(
     db: Session = Depends(get_db),
     user: models.User = Security(auth.get_current_active_user),
@@ -43,7 +41,6 @@ def platforms(
 
 
 @router.patch("/achievement-image/{achievement}")
-@version(1)
 def upload_achievement_image(
     achievement: str,
     # file: Annotated[UploadFile, File(description="A file read as UploadFile")],
@@ -74,7 +71,6 @@ def upload_achievement_image(
 
 
 @router.get("/achievement-image/{achievement}")
-@version(1)
 def get_achievement_image(
     achievement: str,
     db: Session = Depends(get_db),

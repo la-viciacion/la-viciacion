@@ -52,11 +52,9 @@ class MariaDBTestCase(unittest.TestCase):
             cls._admin.dispose()
 
     @classmethod
-    def alembic(cls, *args: str) -> subprocess.CompletedProcess:
-        """Runs the alembic CLI against this class's database, as entrypoint.sh does in production.
-
-        env.py builds the URL from the app's own variables, so those are what point it here.
-        """
+    def app_env(cls) -> dict[str, str]:
+        """The environment of the API (and of alembic, whose env.py builds its URL from the same variables)
+        pointing at this class's database. The other settings are dummies: nothing reaches out to a service."""
         url = make_url(ADMIN_URL)
         env = {
             **os.environ,
@@ -64,10 +62,27 @@ class MariaDBTestCase(unittest.TestCase):
             "MARIADB_DATABASE": cls.db_name,
             "MARIADB_USER": url.username,
             "MARIADB_PASSWORD": url.password or "",
+            "GOD_ADMIN_PASS": "ci",
+            "SECRET_KEY": "ci-secret",
+            "ACCESS_TOKEN_EXPIRE_MINUTES": "60",
+            "CORS_ORIGINS": "[]",
+            "SENTRY_URL_API": "",
+            "ENVIRONMENT": "test",
+            "API_LOG_LEVEL": "INFO",
         }
+        env.pop("API_DOCS_ENABLED", None)  # the default (hidden docs) is what production runs
+        return env
+
+    @classmethod
+    def alembic(cls, *args: str) -> subprocess.CompletedProcess:
+        """Runs the alembic CLI against this class's database, as entrypoint.sh does in production."""
+        return cls.python("-m", "alembic", *args)
+
+    @classmethod
+    def python(cls, *args: str) -> subprocess.CompletedProcess:
         return subprocess.run(
-            [sys.executable, "-m", "alembic", *args],
-            cwd=API_DIR, env=env, capture_output=True, text=True, timeout=300,
+            [sys.executable, *args],
+            cwd=API_DIR, env={**cls.app_env(), "PYTHONPATH": str(API_DIR)}, capture_output=True, text=True, timeout=300,
         )
 
     @classmethod

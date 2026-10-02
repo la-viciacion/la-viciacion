@@ -1,12 +1,14 @@
 version: 2
 
-# Weekly, grouped so a week of updates is one PR per ecosystem instead of a dozen. Every PR goes
+# Weekly, grouped so a week of updates is one PR per ecosystem instead of a dozen, and each ecosystem on
+# its own weekday so the PRs rarely coexist (main requires branches to be up to date: a PR that is
+# still open when another one merges has to be rebased, see docs/workflow.md). Every PR goes
 # through the same CI as any other change. Titles use the Conventional Commits prefix the PR title
 # check requires.
 updates:
   - package-ecosystem: pip
     directory: /api
-    schedule: { interval: weekly }
+    schedule: { interval: weekly, day: monday, time: "07:00", timezone: Europe/Madrid }
     commit-message: { prefix: "chore(api)" }
     groups:
       api-dependencies:
@@ -14,7 +16,7 @@ updates:
 
   - package-ecosystem: pip
     directory: /bot
-    schedule: { interval: weekly }
+    schedule: { interval: weekly, day: tuesday, time: "07:00", timezone: Europe/Madrid }
     commit-message: { prefix: "chore(bot)" }
     groups:
       bot-dependencies:
@@ -22,7 +24,7 @@ updates:
 
   - package-ecosystem: npm
     directory: /front
-    schedule: { interval: weekly }
+    schedule: { interval: weekly, day: wednesday, time: "07:00", timezone: Europe/Madrid }
     commit-message: { prefix: "chore(front)" }
     groups:
       front-dependencies:
@@ -30,7 +32,7 @@ updates:
 
   - package-ecosystem: github-actions
     directory: /
-    schedule: { interval: weekly }
+    schedule: { interval: weekly, day: thursday, time: "07:00", timezone: Europe/Madrid }
     commit-message: { prefix: "ci" }
     groups:
       actions:
@@ -40,7 +42,7 @@ updates:
   # match the CI jobs, so only patch-level changes arrive on their own.
   - package-ecosystem: docker
     directory: /api
-    schedule: { interval: weekly }
+    schedule: { interval: weekly, day: friday, time: "07:00", timezone: Europe/Madrid }
     commit-message: { prefix: "chore(api)" }
     ignore:
       - dependency-name: python
@@ -48,7 +50,7 @@ updates:
 
   - package-ecosystem: docker
     directory: /bot
-    schedule: { interval: weekly }
+    schedule: { interval: weekly, day: friday, time: "07:00", timezone: Europe/Madrid }
     commit-message: { prefix: "chore(bot)" }
     ignore:
       - dependency-name: python
@@ -56,5 +58,5 @@ updates:
 
   - package-ecosystem: docker
     directory: /front
-    schedule: { interval: weekly }
+    schedule: { interval: weekly, day: friday, time: "07:00", timezone: Europe/Madrid }
     commit-message: { prefix: "chore(front)" }

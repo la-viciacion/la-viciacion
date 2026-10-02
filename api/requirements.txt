@@ -1,6 +1,5 @@
 fastapi==0.136.0
 fastapi-login==1.10.3
-fastapi-versioning==0.10.0
 python-dotenv==1.2.3
 cryptography==50.0.1
 uvicorn[standard]==0.54.0

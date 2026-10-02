@@ -2,9 +2,8 @@ import logging
 
 import sentry_sdk
 
-from fastapi import FastAPI
+from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi_versioning import VersionedFastAPI
 
 from .config import Config
 from .database.database import SessionLocal
@@ -47,9 +46,9 @@ class EndpointFilter(logging.Filter):
 
 
 # Exclude specific paths from logging configuration
-base_path = "/api/v1"
+API_PREFIX = "/api/v1"
 excluded_paths = ["/keepalive"]
-full_excluded_paths = [f"{base_path}{path}" for path in excluded_paths]
+full_excluded_paths = [f"{API_PREFIX}{path}" for path in excluded_paths]
 uvicorn_logger = logging.getLogger("uvicorn.access")
 uvicorn_logger.addFilter(EndpointFilter(excluded_paths))
 
@@ -59,36 +58,22 @@ with SessionLocal() as db:
     push_utils.ensure_vapid_keys(db)  # the routers' `push` module has the same name
     Achievements().populate_achievements(db)
 
-app = FastAPI(title="LaViciacion API", version="0.1.0")
-
-app.include_router(basic.router)
-app.include_router(users.router)
-app.include_router(games.router)
-app.include_router(statistics.router)
-app.include_router(timers.router)
-app.include_router(manage.router)
-app.include_router(push.router)
-app.include_router(utils.router)
-
-app = VersionedFastAPI(app, version_format="{major}", prefix_format="/api/v{major}")
-
 # Swagger/ReDoc/openapi.json list every endpoint: only served when API_DOCS_ENABLED=true
-DOCS_PATHS = ("/docs", "/redoc", "/openapi.json", "/docs/oauth2-redirect")
+docs = config.API_DOCS_ENABLED
+app = FastAPI(
+    title="LaViciacion API",
+    version="0.1.0",
+    docs_url=f"{API_PREFIX}/docs" if docs else None,
+    redoc_url=f"{API_PREFIX}/redoc" if docs else None,
+    openapi_url=f"{API_PREFIX}/openapi.json" if docs else None,
+    swagger_ui_oauth2_redirect_url=f"{API_PREFIX}/docs/oauth2-redirect",
+)
 
-
-def remove_docs(application: FastAPI) -> None:
-    application.router.routes[:] = [
-        r
-        for r in application.router.routes
-        if not getattr(r, "path", "").endswith(DOCS_PATHS)
-    ]
-    for route in application.router.routes:
-        if isinstance(getattr(route, "app", None), FastAPI):
-            remove_docs(route.app)
-
-
-if not config.API_DOCS_ENABLED:
-    remove_docs(app)
+# A new incompatible version (/api/v2) is one more router with its own prefix, built the same way
+api_v1 = APIRouter(prefix=API_PREFIX)
+for router in (basic, users, games, statistics, timers, manage, push, utils):
+    api_v1.include_router(router.router)
+app.include_router(api_v1)
 
 
 @app.on_event("startup")
