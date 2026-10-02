@@ -17,7 +17,7 @@ Simplified trunk-based development for a team of 2-3. `main` is the trunk: alway
 `.github/workflows/ci.yml` runs on every PR and again on `main` after the merge. The required status is the single job **`CI`**, which passes only if all of these pass (they live in `checks.yml`, the same ones that gate a release):
 
 - API tests (Python 3.14), including the Alembic history guards, the endpoint security list and the `.env.template` check.
-- Migrations and schema rules on a real MariaDB (empty database to head, an older revision with data to head, re-run, downgrade, generated `season` columns, constraints), on the `lts` and `latest` images.
+- Migrations and schema rules on a real MariaDB (empty database to head, an older revision with data to head, re-run, downgrade, generated `season` columns, constraints), on the exact image `docker-compose.yml` pins (CI reads the tag from there and a test checks the server really is that version). A weekly run (`mariadb-versions.yml`) tries the moving tags `lts` and `latest` as an early warning; it never blocks a PR.
 - The API boots on a freshly migrated MariaDB (`test_mariadb_app_boot.py`): every route the routers declare is published under `/api/v1` and answers 401 without a token (except the reviewed public ones), the docs are hidden, and startup seeds the database.
 - Bot tests (Python 3.14).
 - Front tests and ESLint.
@@ -28,7 +28,7 @@ Run the same locally before pushing: see [development.md](development.md#tests-a
 
 ## Dependency updates
 
-`.github/dependabot.yml` opens one grouped PR per week and ecosystem, each on its own weekday (Monday api, Tuesday bot, Wednesday front, Thursday Actions, Friday base images) so they rarely coexist. Majors of Python packages and npm libraries arrive as separate PRs on purpose; the Python version of the images is not bumped automatically (it must match the CI jobs). The MariaDB image is not tracked: its major version is a data decision (see [deployment.md](deployment.md#mariadb-version)).
+`.github/dependabot.yml` opens one grouped PR per week and ecosystem, each on its own weekday (Monday api, Tuesday bot, Wednesday front, Thursday Actions, Friday base images) so they rarely coexist. Majors of Python packages and npm libraries arrive as separate PRs on purpose; the Python version of the images is not bumped automatically (it must match the CI jobs). The MariaDB image in `docker-compose.yml` only receives patch releases of the pinned series (Fridays); changing the series is a data decision (see [deployment.md](deployment.md#mariadb-version)).
 
 - **A green Dependabot PR is not a reviewed one.** Read what it bumps. CI only proves what the tests exercise: FastAPI 0.141 passed every test and still could not start the API, until a test that boots the application was added. When a bump slips past CI, add the test that would have caught it.
 - **Never auto-merge them.** One person reads the changelog of what changes (especially 0.x libraries such as FastAPI, whose minors can break) and merges.

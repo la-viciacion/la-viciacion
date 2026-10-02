@@ -11,7 +11,7 @@ Docker Compose, four containers on the `la-viciacion` network:
 | `laviciacion-front` | `ghcr.io/la-viciacion/laviciacion-front` (built from `front/Dockerfile`: `nginx:1.31-alpine`, static files copied in) | `3000` | Proxies `/api/` to `API_UPSTREAM`; `no-cache` on html/js/css; SPA fallback to `index.html` |
 | `laviciacion-api` | `ghcr.io/la-viciacion/laviciacion-api` (`api/Dockerfile`: `python:3.14-slim-trixie`) | `127.0.0.1:5000` | `entrypoint.sh`: wait for DB → `alembic upgrade head` → `uvicorn` (`--proxy-headers`) |
 | `laviciacion-bot` | `ghcr.io/la-viciacion/laviciacion-bot` (`bot/Dockerfile`: `python:3.14-slim-trixie`) | none | Depends on the API; restarts itself when Telegram settings change |
-| `laviciacion-db` | `mariadb` (official) | `127.0.0.1:3307` | Healthcheck gates the API start; data in `./db/data` (or a named volume, see [Database storage](#database-storage-linux-vs-windows)) |
+| `laviciacion-db` | `mariadb:12.3.3` (official, pinned) | `127.0.0.1:3307` | Healthcheck gates the API start; data in `./db/data` (or a named volume, see [Database storage](#database-storage-linux-vs-windows)) |
 
 All use `restart: unless-stopped`. API, bot and db read `.env` through `env_file`; the front gets only `API_UPSTREAM` and `DNS_RESOLVER` through `environment:` (it must not see the secrets in `.env`). Logs of api/bot are bind-mounted to `./api/logs` and `./bot/logs`.
 
@@ -44,22 +44,30 @@ With a named volume the data is not in the repo folder: take backups with `maria
 
 ### MariaDB version
 
-`docker-compose.yml` uses `image: mariadb` without a tag, so a rebuild or a pull moves to whatever the latest release is (13.0 at the time of writing). What was tested (2026-09-30, a v1 backup migrated from scratch to `016_foreign_keys`, then the API started):
+`docker-compose.yml` pins **`mariadb:12.3.3`**, the LTS series (supported until June 2029). It used to be `image: mariadb`, which follows whatever is newest at pull time: today that is 13.0, a *rolling* release with a short life, and a server that has pulled once keeps its image until the next `docker compose pull`, so two environments could silently run different versions. The tag is exact on purpose; patch releases of 12.3 arrive as Dependabot pull requests (the compose ecosystem is limited to patches), tested before they are merged.
+
+How the pin is enforced:
+
+- **CI tests the pinned version.** `checks.yml` reads the tag from `docker-compose.yml` and runs the MariaDB tests on that image, and `test_mariadb_pinned_version.py` fails if the server that answered is not that version. What is tested and what is deployed cannot drift apart.
+- **A weekly run (`mariadb-versions.yml`, Mondays) tests the moving tags `lts` and `latest`.** It is an early warning, not a gate: if MariaDB releases something that breaks a migration, you know before having to move to it, and pull requests never turn red because of an upstream release.
+- `test_deployment_pins.py` fails if the compose file loses its tag or a Dockerfile starts from an untagged image.
+
+What was tested (a v1 backup migrated from scratch to the head, then the API started):
 
 | MariaDB | Data on `./db/data` (bind mount) | Data on a named volume |
 |---|---|---|
 | 11.8.9 | works (Windows/Docker Desktop) | not tested |
-| 12.3.3 | **fails at migration 012** (Windows/Docker Desktop) | not tested |
+| **12.3.3 (pinned)** | **fails at migration 012** (Windows/Docker Desktop); Linux VPS: expected to work, as in CI | works (migrations, v1 upgrade and boot test, 2026-10-02) |
 | 13.0.2 | **fails at migration 012** (Windows/Docker Desktop) | works |
-| latest, untagged (Linux VPS) | works (production, 2026-09-30) | not needed |
+| `latest`, untagged (Linux VPS, 2026-09-30) | works | not needed |
 
-**Linux server (the production VPS), `image: mariadb` without a tag (the latest release at deploy time), data on the `./db/data` bind mount: works.** The code-review release (migrations `015` and `016` included) was deployed there on 2026-09-30 and came up without problems. So the failure below is specific to Docker Desktop on Windows, not to MariaDB 12+ in general. The symptom of the Windows problem is the API looping with `OperationalError: (1025, "Error on rename of './<db>/users_games' to './<db>/#sql-backup-...' (errno: 194 "Tablespace is missing for a table")` while the db log says `InnoDB: Cannot rename ... because the source file does not exist`. It is not a data or migration bug: the fix is `DB_DATA` (above) on Windows.
+The Windows failure is specific to Docker Desktop's `9p/drvfs` share, not to MariaDB 12+ in general: the Linux VPS deployed on 2026-09-30 came up without problems. Its symptom is the API looping with `OperationalError: (1025, "Error on rename of './<db>/users_games' to './<db>/#sql-backup-...' (errno: 194 "Tablespace is missing for a table")` while the db log says `InnoDB: Cannot rename ... because the source file does not exist`. It is not a data or migration bug: the fix is `DB_DATA` (above) on Windows.
 
 Rules of thumb:
 
-- **Do not change the major version of a database that already has data by editing the image.** MariaDB does not support downgrading a data directory: going from 13 back to 11.8 (or the other way after a rollback) may refuse to start. Move between versions with a `mariadb-dump` and an empty data directory.
-- Tables created by migrations 002, 009, 013 and 014 take the server's default collation, which differs between MariaDB versions (it was `utf8mb4_uca1400_ai_ci` on 13.0); the v1 tables and `game_timers.game_id` are `utf8mb4_general_ci`. A foreign key needs both columns to have the same collation, so `016` converts `game_timers.platform` to match `platform_tags.id`; keep it in mind before comparing string columns of different tables.
-- To pin a version, set `image: mariadb:11.8` (LTS) in the compose file. Decide it once for all environments; see [roadmap](roadmap.md).
+- **Never change the version of a database that already has data by editing the image.** MariaDB does not support downgrading a data directory: **a directory created by 13.0 cannot be opened by 12.3** (the container refuses to start), and the other way round after a rollback is not safe either. Move between versions with a `mariadb-dump` and an empty data directory: `docker compose down`, remove the volume (or empty `./db/data`), put the dump in `db/init/` and start. A dump taken on 13.0.2 loaded into 12.3.3 without errors (tested 2026-10-02 with the synthetic v1 database migrated to the head: same tables, rows and collations, and `alembic upgrade head` was a no-op); older-into-newer is the supported direction, so try a restore before relying on the opposite one.
+- **Changing the series is a decision, not an update.** To move to another LTS: change the tag in `docker-compose.yml`, let CI run (it tests exactly that), and migrate the data with a dump as above. Dependabot never proposes a series change.
+- Tables created by migrations 002, 009, 013 and 014 take the server's default collation, which differs between MariaDB versions (it was `utf8mb4_uca1400_ai_ci` on 13.0); the v1 tables and `game_timers.game_id` are `utf8mb4_general_ci`. A foreign key needs both columns to have the same collation, so `016` converts `game_timers.platform` to match `platform_tags.id`; keep it in mind before comparing schemas of different servers.
 
 ## TLS and exposure
 
@@ -113,7 +121,7 @@ Code rollback: set `LAVI_VERSION` in `.env` to the previous release (e.g. `2.0.0
 
 `.github/workflows/ci.yml` runs the checks on every PR to `main` and after each merge (see [workflow.md](workflow.md)). The checks live in `checks.yml`, which `release.yml` reuses, so a release is gated by exactly what gates a PR. `release.yml` runs when a tag `vX.Y.Z` is pushed (or by hand from the Actions tab, which does everything but publish):
 
-1. **checks** (`checks.yml`): **tests**: API and bot (Python 3.14), front tests and lint. The API tests need only dummy values for the variables of `config.py` (set in the workflow's `env`; when you add a required variable to `config.py`, add it there too) and the `.env.template` at the repo root.
+1. **checks** (`checks.yml`): **tests**: API and bot (Python 3.14), front tests and lint. The API tests need only dummy values for the variables of `config.py` (set in the `env` of `checks.yml` and of `mariadb-tests.yml`, which does not inherit it; when you add a required variable to `config.py`, add it to both) and the `.env.template` at the repo root.
    **build**: builds the three images and looks inside each one: no `.env*`, `*.sql`, `*.dump` under `/app` or the web root, and no credential-looking variable baked in (`PASS`, `SECRET`, `TOKEN`, `KEY`).
 2. **publish** (tags only): pushes `ghcr.io/la-viciacion/laviciacion-{api,front,bot}` tagged `X.Y.Z`, `X.Y` and `latest` (prereleases get no `latest`), using the workflow's own `GITHUB_TOKEN`; no secret has to be configured.
 

@@ -60,3 +60,15 @@ updates:
     directory: /front
     schedule: { interval: weekly, day: friday, time: "07:00", timezone: Europe/Madrid }
     commit-message: { prefix: "chore(front)" }
+
+  # The MariaDB image in docker-compose.yml: only patch releases of the pinned series arrive on their own.
+  # Moving to another series is a data decision (docs/deployment.md#mariadb-version).
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule: { interval: weekly, day: friday, time: "07:00", timezone: Europe/Madrid }
+    commit-message: { prefix: "chore(db)" }
+    allow:
+      - dependency-name: mariadb
+    ignore:
+      - dependency-name: mariadb
+        update-types: [version-update:semver-major, version-update:semver-minor]
