@@ -1,42 +1,108 @@
-import json
 import logging
 import os
+import threading
+import time
 
-from dotenv import dotenv_values
+import requests
+from dotenv import find_dotenv, load_dotenv
+
+logger = logging.getLogger("bot.config")
+
+WATCH_SECONDS = 60
 
 
 class Config:
-    def __init__(self):
-        try:
-            # Load .env
-            config = dotenv_values(".env")
-            self.ADMIN_USERS = json.loads(config["ADMIN_USERS"])
-            self.TELEGRAM_TOKEN = config["TELEGRAM_TOKEN"]
-            self.TELEGRAM_GROUP_ID = config["TELEGRAM_GROUP_ID"]
-            self.TELEGRAM_ADMIN_CHAT_ID = config["TELEGRAM_ADMIN_CHAT_ID"]
-            self.CLOCKIFY_BASEURL = config["CLOCKIFY_BASEURL"]
-            self.CLOCKIFY_WORKSPACE = config["CLOCKIFY_WORKSPACE"]
-            self.CLOCKIFY_ADMIN_API_KEY = config["CLOCKIFY_ADMIN_API_KEY"]
-            self.API_URL = config["API_URL"] + "/bot"
-            self.API_KEY = config["API_KEY"]
-            self.SECRET_KEY = config["SECRET_KEY"]
-            self.ACCESS_TOKEN_EXPIRE_MINUTES = config["ACCESS_TOKEN_EXPIRE_MINUTES"]
-            self.SENTRY_URL = config["SENTRY_URL_BOT"]
-            self.ENVIRONMENT = config["ENVIRONMENT"]
-            self.OPENAI_API_KEY = config["OPENAI_API_KEY"]
+    """Bot configuration (a singleton: every module asks for it).
 
-        except Exception:
-            self.TELEGRAM_GROUP_ID = os.environ["TELEGRAM_GROUP_ID"]
-            self.ADMIN_USERS = json.loads(os.environ["ADMIN_USERS"])
-            self.TELEGRAM_TOKEN = os.environ["TELEGRAM_TOKEN"]
-            self.TELEGRAM_ADMIN_CHAT_ID = os.environ["TELEGRAM_ADMIN_CHAT_ID"]
-            self.CLOCKIFY_BASEURL = os.environ["CLOCKIFY_BASEURL"]
-            self.CLOCKIFY_WORKSPACE = os.environ["CLOCKIFY_WORKSPACE"]
-            self.CLOCKIFY_ADMIN_API_KEY = os.environ["CLOCKIFY_ADMIN_API_KEY"]
-            self.API_URL = os.environ["API_URL"] + "/bot"
-            self.API_KEY = os.environ["API_KEY"]
-            self.SECRET_KEY = os.environ["SECRET_KEY"]
-            self.ACCESS_TOKEN_EXPIRE_MINUTES = os.environ["ACCESS_TOKEN_EXPIRE_MINUTES"]
+    The bot is read-only: it logs into the API as the superadmin ("admin" with
+    GOD_ADMIN_PASS) and only uses the generic endpoints. The Telegram token and
+    chats are edited from the admin panel and served by the API
+    (GET /manage/settings/telegram); the bot restarts itself when they change so
+    it picks them up (Docker's restart policy brings it back). The TELEGRAM_*
+    variables of .env are only a fallback if the API has nothing yet.
+    """
+
+    _instance = None
+    _lock = threading.Lock()
+
+    def __new__(cls):
+        with cls._lock:
+            if cls._instance is None:
+                cls._instance = super().__new__(cls)
+                cls._instance._ready = False
+            return cls._instance
+
+    def __init__(self):
+        with self._lock:
+            if self._ready:
+                return
+            # In Docker the variables come from env_file. For local development,
+            # fall back to the shared .env at the repo root (never overrides os.environ).
+            load_dotenv(find_dotenv(usecwd=True))
+
+            self.API_URL = os.environ["API_URL"]
+            self.API_USER = "admin"
+            self.API_PASSWORD = os.environ["GOD_ADMIN_PASS"]
             self.SENTRY_URL = os.environ["SENTRY_URL_BOT"]
             self.ENVIRONMENT = os.environ["ENVIRONMENT"]
-            self.OPENAI_API_KEY = os.environ["OPENAI_API_KEY"]
+
+            self._load_telegram()
+            self._ready = True
+            threading.Thread(target=self._watch, name="settings-watch", daemon=True).start()
+
+    def login(self) -> None:
+        """Get a fresh superadmin token from the API."""
+        response = requests.post(
+            f"{self.API_URL}/token",
+            data={"username": self.API_USER, "password": self.API_PASSWORD},
+            timeout=10,
+        )
+        response.raise_for_status()
+        self._token = response.json()["access_token"]
+
+    def request(self, method: str, url: str, **kwargs) -> requests.Response:
+        """Authenticated request; logs in on first use and again if the token expired."""
+        kwargs.setdefault("timeout", 10)
+        for attempt in (1, 2):
+            if not getattr(self, "_token", None):
+                self.login()
+            headers = {"Authorization": f"Bearer {self._token}"}
+            response = requests.request(method, url, headers=headers, **kwargs)
+            if response.status_code != 401 or attempt == 2:
+                return response
+            self._token = None
+
+    def _fetch(self) -> dict:
+        response = self.request("GET", f"{self.API_URL}/manage/settings/telegram")
+        response.raise_for_status()
+        return response.json()
+
+    def _load_telegram(self) -> None:
+        """Block until the API gives (or the environment has) a token and a group."""
+        while True:
+            values = {}
+            try:
+                values = self._fetch()
+            except Exception as e:
+                logger.warning("API settings not available yet: %s", e)
+            token = values.get("token") or os.getenv("TELEGRAM_TOKEN")
+            group = values.get("group_id") or os.getenv("TELEGRAM_GROUP_ID")
+            if token and group:
+                self.TELEGRAM_TOKEN = token
+                self.TELEGRAM_GROUP_ID = group
+                self.TELEGRAM_ADMIN_CHAT_ID = values.get("admin_chat_id") or os.getenv("TELEGRAM_ADMIN_CHAT_ID")
+                self._version = values.get("version")
+                return
+            logger.warning("Telegram token/group not configured yet; retrying in 15s")
+            time.sleep(15)
+
+    def _watch(self) -> None:
+        while True:
+            time.sleep(WATCH_SECONDS)
+            try:
+                version = self._fetch().get("version")
+            except Exception:
+                continue  # the API may be restarting
+            if version != self._version:
+                logger.warning("Telegram settings changed: restarting to apply them")
+                os._exit(0)

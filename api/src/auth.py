@@ -1,8 +1,10 @@
+import hashlib
+import hmac
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
-from fastapi import Depends, Header, HTTPException, Security, status
-from fastapi.security import APIKeyHeader, APIKeyQuery, OAuth2PasswordBearer
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
 
 import jwt
 
@@ -14,6 +16,7 @@ from .config import Config
 from .crud import users
 from .database import models
 from .database.database import SessionLocal
+from .utils import messages
 
 config = Config()
 ALGORITHM = "HS256"
@@ -40,28 +43,29 @@ class TokenData(BaseModel):
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
-api_key_header = APIKeyHeader(name="x-api-key", auto_error=False)
-
-
 def verify_password(plain_password: str, hashed_password: str):
     return bcrypt.checkpw(
         plain_password.encode("utf-8"), hashed_password.encode("utf-8")
     )
 
 
-def get_password_hash(password: str):
-    salt = bcrypt.gensalt()
-    hashed_password = bcrypt.hashpw(password.encode("utf-8"), salt)
-    return hashed_password
-
-
-def authenticate_user(db, username: str, password: str):
-    user = users.get_user_by_username(db, username)
+def authenticate_user(db, login: str, password: str):
+    """`login` is a username or an email."""
+    user = users.get_user_by_login(db, login)
     if not user:
         return False
     if not verify_password(password, user.password):
         return False
     return user
+
+
+def password_fingerprint(user) -> str:
+    """Short keyed digest of the stored password hash.
+
+    It travels inside the token (claim `pwv`), so changing or resetting the
+    password invalidates every session issued before, without extra storage.
+    """
+    return hmac.new(config.SECRET_KEY.encode(), str(user.password).encode(), hashlib.sha256).hexdigest()[:16]
 
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None):
@@ -75,7 +79,8 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     return encoded_jwt
 
 
-async def get_current_user(
+# A plain `def`: it queries the database, so FastAPI runs it in a worker thread instead of on the event loop
+def get_current_user(
     token: Annotated[str, Depends(oauth2_scheme)], db: Session = Depends(get_db)
 ):
     credentials_exception = HTTPException(
@@ -94,6 +99,8 @@ async def get_current_user(
     user = users.get_user_by_username(db, username=token_data.username)
     if user is None:
         raise credentials_exception
+    if not hmac.compare_digest(str(payload.get("pwv", "")), password_fingerprint(user)):
+        raise credentials_exception  # issued before the last password change
     return user
 
 
@@ -105,12 +112,35 @@ async def get_current_active_user(
     return current_user
 
 
-def get_api_key(
-    api_key_header: str = Security(api_key_header),
-) -> str:
-    if api_key_header == config.API_KEY:
-        return api_key_header
+def require_admin(
+    current_user: Annotated[models.User, Depends(get_current_active_user)]
+):
+    """Dependency: only admins get through."""
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail=messages.USER_NOT_ADMIN
+        )
+    return current_user
+
+
+def ensure_self(current_user: models.User, username: str):
+    """Only the account owner, admins included: for actions that need the owner's own consent."""
+    if current_user.username != username:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail=messages.USER_NOT_ADMIN
+        )
+
+
+def ensure_self_or_admin(
+    current_user: models.User, user_id: int | None = None, username: str | None = None
+):
+    """Only the owner of the data (by id or username) or an admin may touch it."""
+    if current_user.is_admin:
+        return
+    if (user_id is not None and current_user.id == user_id) or (
+        username is not None and current_user.username == username
+    ):
+        return
     raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Invalid or missing API Key",
+        status_code=status.HTTP_403_FORBIDDEN, detail=messages.USER_NOT_ADMIN
     )

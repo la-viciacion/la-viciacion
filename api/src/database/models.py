@@ -1,20 +1,21 @@
 from sqlalchemy import (
-    JSON,
     BigInteger,
     Boolean,
     Column,
+    Computed,
     Date,
     DateTime,
     Float,
     ForeignKey,
     Integer,
-    Interval,
     LargeBinary,
+    SmallInteger,
     String,
+    Text,
     UniqueConstraint,
     text,
 )
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import deferred
 
 from .database import Base
 
@@ -31,52 +32,44 @@ class User(Base):
     username = Column(String(255))
     password = Column(String(255))
     telegram_id = Column(BigInteger)
-    clockify_id = Column(String(255))
-    clockify_key = Column(String(255))
     email = Column(String(255))
     is_admin = Column(Integer)
     is_active = Column(Integer)
-    avatar = Column(LargeBinary)
+    # not loaded with the user: nearly every request loads the user (auth) and none needs the picture
+    avatar = deferred(Column(LargeBinary))
 
-    __table_args__ = (UniqueConstraint("username"),)
-
-
-class UserStatistics(Base):
-    __tablename__ = "users_statistics"
-
-    user_id = Column(Integer, primary_key=True)
-    played_time = Column(Integer)
-    current_ranking_hours = Column(Integer)
-    current_streak = Column(Integer)
-    best_streak = Column(Integer)
-    best_streak_date = Column(Date)
-    played_days = Column(Integer)
-    best_unplayed_streak = Column(Integer)
-    current_unplayed_streak = Column(Integer)
-    best_unplayed_streak_date = Column(Date)
-    played_games = Column(Integer)
-    completed_games = Column(Integer)
-
-    __table_args__ = (UniqueConstraint("user_id"),)
+    # email is the login identifier, username the (unique) nickname
+    __table_args__ = (
+        UniqueConstraint("username"),
+        UniqueConstraint("email", name="uq_users_email"),
+        # the bot recognizes people by it; NULL (not set) may repeat
+        UniqueConstraint("telegram_id", name="uq_users_telegram_id"),
+    )
 
 
-class UserStatisticsHistorical(Base):
-    __tablename__ = "users_statistics_historical"
+GOD_USERNAME = "admin"
 
-    user_id = Column(Integer, primary_key=True)
-    played_time = Column(Integer)
-    current_ranking_hours = Column(Integer)
-    current_streak = Column(Integer)
-    best_streak = Column(Integer)
-    best_streak_date = Column(Date)
-    played_days = Column(Integer)
-    best_unplayed_streak = Column(Integer)
-    current_unplayed_streak = Column(Integer)
-    best_unplayed_streak_date = Column(Date)
-    played_games = Column(Integer)
-    completed_games = Column(Integer)
 
-    __table_args__ = (UniqueConstraint("user_id"),)
+def not_god():
+    """Condition that leaves out the emergency account: it is a door, not a player, so it never
+    appears in rankings, statistics, notices or the lists of people (only the admin panel lists it)."""
+    return User.username != GOD_USERNAME
+
+
+class UserSettings(Base):
+    """Personal preferences, one row per user (see utils/user_settings.py).
+
+    Every column is NULL until the user sets it, and NULL means "use the default".
+    """
+
+    __tablename__ = "user_settings"
+
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    # hours a timer may run before the user is reminded about it
+    forgotten_timer_hours = Column(SmallInteger, nullable=True)
+    # minutes between refreshes of the running-timer push notification (10-120)
+    timer_notice_minutes = Column(SmallInteger, nullable=True)
+    updated_at = Column(DateTime, server_default=text("CURRENT_TIMESTAMP"), onupdate=text("CURRENT_TIMESTAMP"))
 
 
 class Game(Base):
@@ -91,67 +84,30 @@ class Game(Base):
     genres = Column(String(255))
     avg_time = Column(Integer)
     slug = Column(String(255))
+    rawg_id = Column(Integer, nullable=True, index=True)
 
     __table_args__ = (UniqueConstraint("name"),)
-
-
-class GameStatistics(Base):
-    __tablename__ = "games_statistics"
-
-    game_id = Column(String(255), primary_key=True)
-    played_time = Column(Integer)
-    avg_time = Column(Integer)
-    current_ranking = Column(Integer)
-
-    __table_args__ = (UniqueConstraint("game_id"),)
-
-
-class GameStatisticsHistorical(Base):
-    __tablename__ = "games_statistics_historical"
-
-    game_id = Column(String(255), primary_key=True)
-    played_time = Column(Integer)
-    avg_time = Column(Integer)
-    current_ranking = Column(Integer)
-
-    __table_args__ = (UniqueConstraint("game_id"),)
 
 
 class UserGame(Base):
     __tablename__ = "users_games"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer)
-    game_id = Column(String(255))
-    started_date = Column(Date)
-    season = Column(Integer)
-    platform = Column(String(255))
+    user_id = Column(Integer, ForeignKey("users.id", name="fk_users_games_user"))
+    game_id = Column(String(255), ForeignKey("games.id", name="fk_users_games_game"))
+    started_date = Column(Date, nullable=False)
+    # derived by the database from started_date: never written by the app
+    season = Column(Integer, Computed("YEAR(started_date)", persisted=False))
+    platform = Column(String(255), ForeignKey("platform_tags.id", name="fk_users_games_platform"))
     completed = Column(Integer)
     completed_date = Column(Date)
     score = Column(Float)
-    played_time = Column(Integer)
+    # time played is not stored: it is the sum of the sessions (crud/time_entries.entry_played_time)
     completion_time = Column(Integer)
 
     __table_args__ = (
-        UniqueConstraint("user_id", "game_id", "platform", "season"),
+        UniqueConstraint("user_id", "game_id", "platform", "season", name="uq_users_games_entry"),
     )
-
-
-class UserGameHistorical(Base):
-    __tablename__ = "users_games_historical"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer)
-    game_id = Column(String(255))
-    started_date = Column(Date)
-    platform = Column(String(255))
-    completed = Column(Integer)
-    completed_date = Column(Date)
-    score = Column(Float)
-    played_time = Column(Integer)
-    completion_time = Column(Integer)
-
-    __table_args__ = (UniqueConstraint("user_id", "game_id", "platform"),)
 
 
 class Achievement(Base):
@@ -169,55 +125,14 @@ class UserAchievement(Base):
     __tablename__ = "users_achievements"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer)
-    achievement_id = Column(Integer)
-    date = Column(Date)
-    season = Column(Integer)
-    game_id = Column(String(255))
-    __table_args__ = (
-        UniqueConstraint("user_id", "achievement_id", "date"),
-        UniqueConstraint("user_id", "achievement_id", "season"),
-    )
-
-
-class UserAchievementHistorical(Base):
-    __tablename__ = "users_achievements_historical"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer)
-    achievement_id = Column(Integer)
-    date = Column(Date)
-    game_id = Column(String(255))
-    __table_args__ = (UniqueConstraint("user_id", "achievement_id", "date"),)
-
-
-class TimeEntry(Base):
-    __tablename__ = "time_entries"
-
-    id = Column(String(255), primary_key=True)
-    user_id = Column(Integer)
-    user_clockify_id = Column(String(255))
-    project_clockify_id = Column(String(255))
-    start = Column(DateTime)
-    end = Column(DateTime)
-    duration = Column(Integer)
-    tags = Column(String(255))
-
-    __table_args__ = (UniqueConstraint("id"),)
-
-
-class TimeEntryHistorical(Base):
-    __tablename__ = "time_entries_historical"
-
-    id = Column(String(255), primary_key=True)
-    user_id = Column(Integer)
-    user_clockify_id = Column(String(255))
-    project_clockify_id = Column(String(255))
-    start = Column(DateTime)
-    end = Column(DateTime)
-    duration = Column(Integer)
-
-    __table_args__ = (UniqueConstraint("id"),)
+    user_id = Column(Integer, ForeignKey("users.id", name="fk_users_achievements_user"))
+    achievement_id = Column(Integer, ForeignKey("achievements.id", name="fk_users_achievements_ach"))
+    date = Column(Date, nullable=False)
+    # derived by the database from date: never written by the app
+    season = Column(Integer, Computed("YEAR(`date`)", persisted=False))
+    game_id = Column(String(255), ForeignKey("games.id", name="fk_users_achievements_game"))
+    # an achievement is earned once per user and season
+    __table_args__ = (UniqueConstraint("user_id", "achievement_id", "season", name="uq_users_achievements_season"),)
 
 
 class PlatformTag(Base):
@@ -228,32 +143,81 @@ class PlatformTag(Base):
     __table_args__ = (UniqueConstraint("id"),)
 
 
-class OtherTag(Base):
-    __tablename__ = "other_tags"
-
-    id = Column(String(255), primary_key=True)
-    name = Column(String(255))
-    __table_args__ = (UniqueConstraint("id"),)
-
-
-class Log(Base):
-    __tablename__ = "logs"
+class GameTimer(Base):
+    __tablename__ = "game_timers"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    player = Column(String(255))
-    action = Column(String(255))
-    date = Column(DateTime)
+    user_id = Column(Integer, ForeignKey("users.id", name="fk_game_timers_user"), nullable=False)
+    game_id = Column(String(255), ForeignKey("games.id", name="fk_game_timers_game"), nullable=False)
+    start_time = Column(DateTime, nullable=False)
+    end_time = Column(DateTime, nullable=True)
+    duration_seconds = Column(Integer, nullable=True)
+    platform = Column(String(255), ForeignKey("platform_tags.id", name="fk_game_timers_platform"), nullable=True)
+    # derived by the database from start_time: never written by the app
+    season = Column(Integer, Computed("YEAR(start_time)", persisted=False))
+    is_active = Column(Boolean, default=True)
+    notes = Column(String(500), nullable=True)
+
+    __table_args__ = (UniqueConstraint("user_id", "game_id", "start_time"),)
 
 
-class CoreNotification(Base):
-    __tablename__ = "core_notifications"
+class PasswordReset(Base):
+    """A one-time password recovery link (see utils/password_reset.py). Only the hash of the
+    token is stored: a copy of the database cannot be used to reset anybody's password."""
 
-    notification = Column(String(255), primary_key=True)
-    __table_args__ = (UniqueConstraint("notification"),)
-
-
-class RequestSync(Base):
-    __tablename__ = "request_sync"
+    __tablename__ = "password_resets"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    request_id = Column(String(255), primary_key=True)
+    user_id = Column(
+        Integer, ForeignKey("users.id", name="fk_password_resets_user", ondelete="CASCADE"), nullable=False, index=True
+    )
+    token_hash = Column(String(64), nullable=False)
+    created_at = Column(DateTime, nullable=False)  # UTC
+    expires_at = Column(DateTime, nullable=False)  # UTC
+    used_at = Column(DateTime, nullable=True)  # UTC
+
+    __table_args__ = (UniqueConstraint("token_hash", name="uq_password_resets_token"),)
+
+
+class AppSetting(Base):
+    """Settings edited from the admin panel (see utils/settings.py)."""
+
+    __tablename__ = "app_settings"
+
+    key = Column(String(100), primary_key=True)
+    value = Column(Text, nullable=False)
+    updated_at = Column(DateTime, server_default=text("CURRENT_TIMESTAMP"), onupdate=text("CURRENT_TIMESTAMP"))
+    # who edited it; ON DELETE SET NULL
+    updated_by = Column(
+        Integer, ForeignKey("users.id", name="fk_app_settings_updated_by", ondelete="SET NULL"), nullable=True
+    )
+
+
+class JobRun(Base):
+    """Last run of each scheduled job (see utils/scheduler.py)."""
+
+    __tablename__ = "job_runs"
+
+    job = Column(String(100), primary_key=True)
+    last_run_at = Column(DateTime, nullable=False)
+    last_status = Column(String(255), nullable=True)
+
+
+class PushSubscription(Base):
+    """A device that receives Web Push notifications (see utils/push.py)."""
+
+    __tablename__ = "push_subscriptions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(
+        Integer, ForeignKey("users.id", name="fk_push_subscriptions_user", ondelete="CASCADE"), nullable=False, index=True
+    )
+    endpoint = Column(String(700), nullable=False)
+    p256dh = Column(String(255), nullable=False)
+    auth = Column(String(255), nullable=False)
+    # also receive what goes to the Telegram group (private notices always arrive)
+    receive_group = Column(Boolean, nullable=False, server_default=text("1"))
+    user_agent = Column(String(255), nullable=True)
+    created_at = Column(DateTime, server_default=text("CURRENT_TIMESTAMP"))
+
+    __table_args__ = (UniqueConstraint("endpoint", name="uq_push_subscriptions_endpoint"),)

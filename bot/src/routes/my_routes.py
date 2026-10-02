@@ -10,11 +10,14 @@ from telegram import (
 )
 from telegram.ext import ContextTypes, ConversationHandler
 from utils.config import Config
+from utils.duration import format_duration, format_players
 from utils.my_utils import MyUtils
 from utils.logger import LogManager
 
 log_manager = LogManager()
 logger = log_manager.get_logger()
+
+RECOMMENDATIONS = 10
 
 utils = MyUtils()
 config = Config()
@@ -36,11 +39,11 @@ class MyRoutes:
     async def my_games(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         logger.info("My games")
         query = update.callback_query
-        username = query.from_user.username
-        ranking = utils.make_request(
+        username = context.user_data["app_user"]["username"]
+        ranking = utils.fetch_json(
             "GET",
             config.API_URL + "/statistics/users/" + username + "?ranking=played_games",
-        ).json()
+        )
         ranking = utils.load_json_response(ranking[0])
         num_games = len(ranking["data"])
         msg = f"Has jugado a {num_games} juegos. Estos son los 10 últimos:\n"
@@ -51,7 +54,7 @@ class MyRoutes:
                 + ". "
                 + str(elem["game_name"])
                 + " ("
-                + str(utils.convert_time_to_hours(elem["played_time"]))
+                + str(format_duration(elem["played_time"]))
                 + ")"
                 + "\n"
             )
@@ -64,15 +67,15 @@ class MyRoutes:
     ) -> int:
         logger.info("My top games")
         query = update.callback_query
-        username = query.from_user.username
-        ranking = utils.make_request(
+        username = context.user_data["app_user"]["username"]
+        ranking = utils.fetch_json(
             "GET",
             config.API_URL + "/statistics/users/" + username + "?ranking=top_games",
-        ).json()
+        )
         ranking = utils.load_json_response(ranking[0])
         msg = "Este es tu top de juegos:\n"
         for i, elem in enumerate(ranking["data"]):
-            played_time = utils.convert_time_to_hours(elem["played_time"])
+            played_time = format_duration(elem["played_time"])
             msg = (
                 msg
                 + str(i + 1)
@@ -91,14 +94,14 @@ class MyRoutes:
     ) -> None:
         logger.info("My completed games")
         query = update.callback_query
-        username = query.from_user.username
-        ranking = utils.make_request(
+        username = context.user_data["app_user"]["username"]
+        ranking = utils.fetch_json(
             "GET",
             config.API_URL
             + "/statistics/users/"
             + username
             + "?ranking=completed_games",
-        ).json()
+        )
         ranking = utils.load_json_response(ranking[0])
         msg = "Estos son tus últimos juegos completados:\n"
         for i, elem in enumerate(ranking["data"]):
@@ -111,11 +114,11 @@ class MyRoutes:
     ) -> None:
         logger.info("My achievements")
         query = update.callback_query
-        username = query.from_user.username
-        ranking = utils.make_request(
+        username = context.user_data["app_user"]["username"]
+        ranking = utils.fetch_json(
             "GET",
             config.API_URL + "/statistics/users/" + username + "?ranking=achievements",
-        ).json()
+        )
         ranking = utils.load_json_response(ranking[0])
         msg = "Estos son tus logros:\n"
         for i, elem in enumerate(ranking["data"]):
@@ -128,11 +131,11 @@ class MyRoutes:
     ) -> None:
         logger.info("My streak")
         query = update.callback_query
-        username = query.from_user.username
-        ranking = utils.make_request(
+        username = context.user_data["app_user"]["username"]
+        ranking = utils.fetch_json(
             "GET",
             config.API_URL + "/statistics/users/" + username + "?ranking=streak",
-        ).json()
+        )
         ranking = utils.load_json_response(ranking[0])
         msg = "Estos son tus rachas:\n"
         data = ranking["data"]
@@ -140,4 +143,21 @@ class MyRoutes:
         msg = msg + "Mejor racha: " + str(data["best_streak"]) + "\n"
         msg = msg + "Fin mejor racha: " + str(data["best_streak_date"])
 
+        await utils.response_conversation(update, context, msg)
+
+    async def recommendations(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ) -> None:
+        logger.info("Recommendations")
+        username = context.user_data["app_user"]["username"]
+        games = utils.fetch_json(
+            "GET",
+            config.API_URL + "/users/" + username + "/recommendations?limit=" + str(RECOMMENDATIONS),
+        )
+        if not games:
+            msg = "No hay nada que recomendarte: ya has probado todo lo que tienen los demás."
+        else:
+            msg = "Juegos que tienen los demás y tú no has jugado:\n"
+            for i, elem in enumerate(games):
+                msg += f"{i + 1}. {elem['game_name']} ({format_players(elem['players'])})\n"
         await utils.response_conversation(update, context, msg)

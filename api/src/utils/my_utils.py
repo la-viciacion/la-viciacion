@@ -1,41 +1,32 @@
+import asyncio
 import datetime
 import json
 import re
-from io import BytesIO
-from zoneinfo import ZoneInfo
-import time
 
 import requests
+from starlette.concurrency import run_in_threadpool
 import telegram
-from dateutil.parser import isoparse
 from howlongtobeatpy import HowLongToBeat
-from PIL import Image
-from sqlalchemy import asc, create_engine, desc, func, select, text, update
+from sqlalchemy import asc, create_engine, desc, func, or_, select, text, update
 from sqlalchemy.orm import Session
 
 from ..config import Config
 from ..crud import games, time_entries, users
 from ..database import models, schemas
 from .achievements import AchievementsElems
-from .clockify_api import ClockifyApi
-from ..clients.open_ai import OpenAIClient
-from ..utils import ai_prompts as prompts
+from . import ai, push, settings
+from .redaction import redact_rawg_key
 from ..utils.logger import LogManager
 
 log_manager = LogManager()
 logger = log_manager.get_logger()
 
-oai_client = OpenAIClient()
-clockify_api = ClockifyApi()
 config = Config()
 
 
-def check_hex(s):
-    try:
-        int(s, 16)
-        return True
-    except ValueError:
-        return False
+def escape_markdown(text) -> str:
+    """Escape what Telegram's legacy Markdown reads as formatting, for names inside a message."""
+    return re.sub(r"([_*`\[])", r"\\\1", str(text))
 
 
 def validate_password_requirements(password):
@@ -70,19 +61,29 @@ def validate_email_format(email):
         return False
 
 
-def convert_time_to_hours(seconds) -> str:
+def normalize_email(email) -> str | None:
+    """Trim and lower-case an email; blank becomes None."""
+    return (email or "").strip().lower() or None
+
+
+def validate_username(username) -> str | None:
+    """Error message for an invalid nickname, or None when it is fine.
+    No "@" so a nickname can never be mistaken for somebody's email at login."""
+    if not (username or "").strip():
+        return "El usuario no puede estar vacío"
+    if "@" in username:
+        return 'El usuario no puede contener "@" (el email es el identificador de inicio de sesión)'
+    if any(c.isspace() for c in username):
+        return "El usuario no puede contener espacios"
+    return None
+
+
+def format_duration(seconds) -> str:
+    """3725 -> '01h02m'. Units are spelled out so nobody reads it as minutes and seconds."""
     if seconds is None:
-        return "0h0m"
-    hours = seconds // 3600
-    minutes = (seconds % 3600) // 60
-    remaining_seconds = seconds % 60
-    return f"{hours}h{minutes}m{remaining_seconds}s"
-
-
-def convert_hours_minutes_to_seconds(time) -> int:
-    if time is None:
-        return 0
-    return time * 3600
+        return "00h00m"
+    seconds = int(seconds)  # SQL sums come back as Decimal
+    return f"{seconds // 3600:02d}h{seconds % 3600 // 60:02d}m"
 
 
 def convert_date_from_text(date: str):
@@ -92,30 +93,6 @@ def convert_date_from_text(date: str):
     if ":" not in date:
         return datetime.datetime.strptime(date, "%Y-%m-%d")
     return datetime.datetime.strptime(date, "%Y-%m-%d %H:%M:%S")
-
-
-def change_timezone_clockify(time) -> str:
-    date_time = isoparse(time)
-    spain_timezone = ZoneInfo("Europe/Madrid")  # pytz.timezone("Europe/Madrid")
-    return str(date_time.astimezone(spain_timezone).strftime("%Y-%m-%d %H:%M:%S"))
-
-
-def convert_clockify_duration(duration):
-    match = re.match(r"PT(\d+H)?(\d+M)?(\d+S)?", duration)
-    if match:
-        hours_str = match.group(1)
-        mins_str = match.group(2)
-        secs_str = match.group(3)
-
-        hours = int(hours_str[:-1]) if hours_str else 0
-        mins = int(mins_str[:-1]) if mins_str else 0
-        secs = int(secs_str[:-1]) if secs_str else 0
-
-        total_secs = hours * 3600 + mins * 60 + secs
-
-        return total_secs
-    else:
-        return 0
 
 
 def get_week_range_dates(weeks_diff: int = 0):
@@ -132,267 +109,384 @@ def get_week_range_dates(weeks_diff: int = 0):
     return first_day_n_weeks_ago.date(), last_day_n_weeks_ago.date()
 
 
-def get_last_week_range_dates():
-    current_date = datetime.datetime.now()
-    first_day_current_week = current_date - datetime.timedelta(
-        days=current_date.weekday()
-    )
-    first_day_last_week = first_day_current_week - datetime.timedelta(days=7)
-    last_day_last_week = first_day_current_week - datetime.timedelta(days=1)
-    return first_day_last_week.date(), last_day_last_week.date()
+async def _http_get(url: str, params: dict, timeout: int):
+    """`requests` blocks: run it in a thread so the event loop keeps serving everybody else."""
+    return await asyncio.to_thread(requests.get, url, params=params, timeout=timeout)
 
 
-def get_current_week_range_dates():
-    current_date = datetime.datetime.now()
-    first_day_current_week = current_date - datetime.timedelta(
-        days=current_date.weekday()
-    )
-    last_day_current_week = first_day_current_week + datetime.timedelta(days=6)
-    return first_day_current_week.date(), last_day_current_week.date()
+async def search_rawg_games(query: str, db: Session = None) -> list[schemas.RawgGameCandidate]:
+    """Search games in RAWG.io and return candidates, checking if they exist in the DB."""
+    api_key = config.RAWG_API_KEY
+    if not api_key:
+        logger.warning("No RAWG API key configured")
+        return []
+
+    url = "https://api.rawg.io/api/games"
+    params = {"key": api_key, "search": query, "page": 1, "page_size": 10}
+    try:
+        resp = await _http_get(url, params, timeout=10)
+        if not resp.ok:
+            logger.error(f"RAWG search error {resp.status_code}: {redact_rawg_key(resp.content)}")
+            return []
+        data = resp.json()
+        results = data.get("results", [])
+    except Exception as e:
+        logger.error(f"Error searching RAWG for '{query}': {redact_rawg_key(e)}")
+        return []
+
+    candidates = []
+    for item in results:
+        candidates.append(
+            schemas.RawgGameCandidate(
+                rawg_id=item.get("id"),
+                name=item.get("name", ""),
+                slug=item.get("slug", ""),
+                released=item.get("released"),
+                image_url=item.get("background_image"),
+                genres=[g["name"] for g in item.get("genres", []) if "name" in g],
+                platforms=[
+                    p.get("platform", {}).get("name")
+                    for p in item.get("platforms", [])
+                    if p.get("platform", {}).get("name")
+                ],
+                rating=item.get("rating"),
+                metacritic=item.get("metacritic"),
+            )
+        )
+    if db is not None and candidates:
+        await run_in_threadpool(mark_existing_games, db, candidates)
+    return candidates
 
 
-def day_of_the_year(date):
-    date = datetime.datetime.strptime(date, "%Y-%m-%d %H:%M:%S")
-    return date.timetuple().tm_yday
+def mark_existing_games(db: Session, candidates: list[schemas.RawgGameCandidate]) -> None:
+    """Flag the candidates that are already in the games table (same RAWG id, slug or name): one query."""
+    rawg_ids = {c.rawg_id for c in candidates if c.rawg_id}
+    slugs = {c.slug for c in candidates if c.slug}
+    names = {c.name for c in candidates if c.name}
+    filters = []
+    if rawg_ids:
+        filters.append(models.Game.rawg_id.in_(rawg_ids))
+    if slugs:
+        filters.append(models.Game.slug.in_(slugs))
+    if names:
+        filters.append(models.Game.name.in_(names))
+    if not filters:
+        return
+    games_db = db.query(models.Game.id, models.Game.rawg_id, models.Game.slug, models.Game.name).filter(or_(*filters)).all()
+    for candidate in candidates:
+        for game in games_db:
+            if (
+                (candidate.rawg_id and game.rawg_id == candidate.rawg_id)
+                or (candidate.slug and game.slug == candidate.slug)
+                or (candidate.name and game.name == candidate.name)
+            ):
+                candidate.exists_in_db = True
+                candidate.db_game_id = game.id
+                break
 
 
-def date_from_day_of_the_year(day):
-    current_date = datetime.datetime.now()
-    start_date_base = datetime.datetime.strptime(
-        str(current_date.year) + "-01-01", "YYYY-MM-DD"
-    )
-    start_date = datetime.datetime(
-        start_date_base.year, start_date_base.month, start_date_base.day
-    )
-    current_date = start_date + datetime.timedelta(days=day - 1)
-    return current_date.strftime("%Y-%m-%d")
+async def get_game_details_by_rawg_id(rawg_id: int) -> dict | None:
+    """Fetch complete game details from RAWG.io by rawg_id, including developers and Steam ID."""
+    api_key = config.RAWG_API_KEY
+    if not api_key:
+        return None
 
+    url = f"https://api.rawg.io/api/games/{rawg_id}"
+    params = {"key": api_key}
+    try:
+        resp = await _http_get(url, params, timeout=10)
+        if not resp.ok:
+            logger.error(f"RAWG details error {resp.status_code}: {redact_rawg_key(resp.content)}")
+            return None
+        data = resp.json()
+    except Exception as e:
+        logger.error(f"Error fetching RAWG details for id {rawg_id}: {redact_rawg_key(e)}")
+        return None
 
-def date_from_datetime(datetime: str):
-    return datetime.split(" ")[0]
+    name = data.get("name", "")
+    slug = data.get("slug", "")
+    released = data.get("released")
+    image_url = data.get("background_image")
+    genres = ",".join([g["name"] for g in data.get("genres", []) if "name" in g])
+
+    # Developers and publishers from RAWG
+    dev_list = [d["name"] for d in data.get("developers", []) if "name" in d]
+    if not dev_list:
+        dev_list = [p["name"] for p in data.get("publishers", []) if "name" in p]
+    dev = ", ".join(dev_list) if dev_list else "-"
+
+    # Steam ID from stores endpoint
+    steam_id = ""
+    try:
+        stores_resp = await _http_get(
+            f"https://api.rawg.io/api/games/{rawg_id}/stores", params, timeout=6
+        )
+        if stores_resp.ok:
+            stores_data = stores_resp.json().get("results", [])
+            for s in stores_data:
+                u = s.get("url", "")
+                if "steampowered.com/app/" in u:
+                    match = re.search(r"app/(\d+)", u)
+                    if match:
+                        steam_id = match.group(1)
+                        break
+    except Exception as e:
+        logger.warning(f"Error fetching stores for RAWG game {rawg_id}: {redact_rawg_key(e)}")
+
+    # HLTB for estimated playtime (and fallback for dev/steam_id)
+    avg_time = 0
+    clean_name = re.sub(r"[:/]", "", name)
+    try:
+        hltb_results = await HowLongToBeat().async_search(clean_name)
+        if hltb_results and len(hltb_results) > 0:
+            best_hltb = max(hltb_results, key=lambda x: x.similarity)
+            avg_time = getattr(best_hltb, "gameplay_main", 0) or 0
+            if dev == "-" and hasattr(best_hltb, "profile_dev") and best_hltb.profile_dev:
+                dev = best_hltb.profile_dev
+            if not steam_id and hasattr(best_hltb, "profile_steam") and best_hltb.profile_steam:
+                steam_id = str(best_hltb.profile_steam)
+    except Exception as e:
+        logger.warning(f"HLTB search failed for '{clean_name}': {e}")
+
+    release_date = None
+    if released:
+        try:
+            release_date = datetime.datetime.strptime(released, "%Y-%m-%d").date()
+        except Exception:
+            release_date = None
+
+    return {
+        "rawg_id": rawg_id,
+        "name": name,
+        "slug": slug,
+        "dev": dev,
+        "release_date": release_date,
+        "steam_id": str(steam_id) if steam_id else "",
+        "image_url": image_url,
+        "genres": genres,
+        "avg_time": int(avg_time) if avg_time else 0,
+    }
 
 
 async def get_game_info(game: str):
-    # Rawg
-    game_request = requests.get(config.RAWG_URL + game)
-    # logger.debug("RAWG:")
-    # logger.debug(json.loads(game_request.content)["results"][0])
-    try:
-        rawg_content = json.loads(game_request.content)["results"][0]
-    except Exception:
-        rawg_content = None
+    """Retrieve rawg and hltb info for backward compatibility."""
+    api_key = config.RAWG_API_KEY
+    rawg_content = None
+    if api_key:
+        try:
+            url = "https://api.rawg.io/api/games"
+            params = {"key": api_key, "search": game, "page": 1, "page_size": 1}
+            game_request = await _http_get(url, params, timeout=10)
+            if game_request.ok:
+                results = game_request.json().get("results", [])
+                if results:
+                    rawg_content = results[0]
+        except Exception as e:
+            logger.warning(f"Error fetching RAWG for {game}: {redact_rawg_key(e)}")
+
     # HLTB
-    game = game.replace(":", "")
-    game = game.replace("/", "")
+    clean_game = re.sub(r"[:/]", "", game)
+    hltb_content = None
     try:
-        results_list = await HowLongToBeat().async_search(game)
-        if results_list is not None and len(results_list) > 0:
+        results_list = await HowLongToBeat().async_search(clean_game)
+        if results_list and len(results_list) > 0:
             best_element = max(results_list, key=lambda element: element.similarity)
             hltb_content = best_element.json_content
-        else:
-            hltb_content = None
     except Exception:
         hltb_content = None
+
     return {"rawg": rawg_content, "hltb": hltb_content}
 
 
 async def get_new_game_info(game) -> schemas.NewGame:
-    # logger.debug("Get new game info from rawg and hltb...")
-    game_name = game["name"]
-    project_id = game["id"]
-    released = ""
-    genres = ""
-    steam_id = ""
-    dev = ""
-    avg_time = 0
-    game_info = await get_game_info(game_name)
-    # logger.debug("Game info: " + str(game_info))
-    rawg_info = game_info["rawg"]
-    hltb_info = game_info["hltb"]
-    game_name = rawg_info["name"]
-    released = rawg_info["released"]
-    try:
-        if hltb_info is None:
-            steam_id = 0
-            dev = "-"
-            avg_time = 0
-        else:
-            steam_id = hltb_info["profile_steam"]
-            dev = hltb_info["profile_dev"]
-            avg_time = hltb_info["comp_main"]
-    except Exception:
-        steam_id = 0
-        dev = "-"
-        avg_time = 0
-    if steam_id == 0:
-        steam_id = ""
-    if released is not None:
-        release_date = datetime.datetime.strptime(released, "%Y-%m-%d")
-    else:
-        release_date = None
-    genres = ""
-    for genre in rawg_info["genres"]:
-        genres += genre["name"] + ","
-    genres = genres[:-1]
-    image_url = rawg_info["background_image"]
-    new_game = schemas.NewGame(
-        name=game_name,
-        dev=dev,
-        release_date=release_date,
-        steam_id=str(steam_id),
-        image_url=image_url,
-        genres=genres,
-        avg_time=avg_time,
-        clockify_id=project_id,
-        slug=rawg_info["slug"],
-    )
-    return new_game
+    """Resolve and build schemas.NewGame using rawg_id if provided, or by searching RAWG."""
+    game_data = game if isinstance(game, dict) else (game.dict() if hasattr(game, "dict") else vars(game))
+    game_name = game_data.get("name", "")
+    rawg_id = game_data.get("rawg_id")
 
+    details = None
+    if rawg_id:
+        details = await get_game_details_by_rawg_id(rawg_id)
 
-async def sync_clockify_entries(
-    db: Session,
-    user: models.User,
-    date: str = None,
-    only_time_entries: bool = False,
-    silent: bool = False,
-):
-    try:
-        start_time = time.time()
-        total_entries = 0
-        entries = clockify_api.get_time_entries(user.clockify_id, date)
-        total_entries = len(entries)
-        logger.info("Sync " + str(total_entries) + " entries for " + str(user.name))
-        if total_entries == 0:
-            return 0
-        await time_entries.sync_clockify_entries_db(
-            db, user, entries, only_time_entries, silent
+    if not details and game_name:
+        candidates = await search_rawg_games(game_name)
+        if candidates:
+            top_candidate = candidates[0]
+            details = await get_game_details_by_rawg_id(top_candidate.rawg_id)
+
+    if details:
+        return schemas.NewGame(
+            name=details["name"],
+            dev=details["dev"],
+            release_date=details["release_date"],
+            steam_id=details["steam_id"],
+            image_url=details["image_url"],
+            genres=details["genres"],
+            avg_time=details["avg_time"],
+            slug=details["slug"],
+            rawg_id=details["rawg_id"],
         )
-        end_time = time.time()
-        elapsed_time = end_time - start_time
-        logger.debug("Elapsed time for sync time entries: " + str(elapsed_time))
-        return total_entries
-    except Exception as e:
-        logger.error("Error syncing clockify entries: " + str(e))
+
+    # Safe fallback if RAWG finds nothing
+    logger.warning(f"No RAWG details found for game: {game_name}. Using fallback.")
+    return schemas.NewGame(
+        name=game_name,
+        dev="-",
+        release_date=None,
+        steam_id="",
+        image_url="",
+        genres="",
+        avg_time=0,
+        slug="",
+        rawg_id=None,
+    )
 
 
-def convert_blob_to_image(
-    blob_data,
-    output_format: str,
-):
-    try:
-        image = Image.open(BytesIO(blob_data))
-        converted_image = BytesIO()
-        image.save(converted_image, format=output_format)
-        converted_data = converted_image.getvalue()
+TELEGRAM_RETRIES = 3
 
-        return converted_data
-    except Exception as e:
-        print(f"Error converting image: {e}")
-        raise
+
+async def _telegram_send(bot, chat_id, text: str, image=None) -> bool:
+    """Send one message; True if Telegram took it. Never raises: a notification must not
+    break the operation that triggered it.
+
+    It goes as Markdown; if Telegram cannot parse it (a name with `_` or `*` in it, an
+    unbalanced reply from the model) it is sent again as plain text.
+    """
+    parse_mode = telegram.constants.ParseMode.MARKDOWN
+    for _ in range(TELEGRAM_RETRIES):
+        try:
+            if image is None:
+                await bot.send_message(text=text, chat_id=chat_id, parse_mode=parse_mode)
+            else:
+                await bot.send_photo(chat_id=chat_id, photo=image, caption=text, parse_mode=parse_mode)
+            return True
+        except telegram.error.BadRequest as e:
+            logger.warning("Telegram rejected the message (" + str(e) + ")")
+            if parse_mode is None:
+                return False
+            parse_mode = None
+        except Exception as e:
+            logger.error("Error sending telegram message: " + str(e))
+    logger.error("Max retries reached. Message not sent.")
+    return False
 
 
 async def send_message(
     msg,
     silent: bool,
     image=None,
-    openai=False,
-    system_prompt=prompts.DEFAULT_SYSTEM_PROMPT,
-    new_game_recommended=None,
+    ai_use: str | None = None,
+    new_game_recommended: dict | None = None,
 ):
+    """`ai_use` (an id of utils/ai_prompts.USES) lets the AI rewrite the notice when it is on for that use.
+    `new_game_recommended` ({"game", "user"}) is suggested at the end of the notice: by the AI when
+    it rewrites the message, as a plain line when it does not (off, no key, or it failed)."""
+    if not silent and not settings.get("notifications.enabled"):
+        logger.info("Notifications are disabled. Message not sent.")
+        return
+    telegram_ready = bool(settings.get("telegram.token") and settings.get("telegram.group_id"))
+    if not silent and not (telegram_ready or push.is_ready()):
+        logger.warning("Neither Telegram nor push are configured. Message not sent.")
+        return
     if not silent:
         logger.info("Preparing message...")
-        if openai:
+        rewritten = False
+        if ai_use and ai.is_ready(ai_use):
             try:
-                # logger.debug("Original message: " + msg)
-                # logger.debug("System prompt: " + system_prompt)
-                if new_game_recommended is not None:
-                    system_prompt += "\n" + prompts.NEW_GAME_RECOMENDATION + "\n"
-                    system_prompt += (
-                        "Juego recomendado: " + str(new_game_recommended["game"]) + "\n"
-                    )
-                    system_prompt += "Jugado por: " + str(new_game_recommended["user"])
-                    # logger.info(system_prompt)
-                completion = oai_client.chat_completion(
-                    user_prompt=msg, system_prompt=system_prompt
-                )
-                if completion is not None:
-                    logger.info(completion.choices[0].message.content)
-                    msg = completion.choices[0].message.content
+                # the clients block on the network: keep them off the event loop
+                text = await asyncio.to_thread(ai.complete, ai.prompt_for(ai_use, new_game_recommended), msg)
+                if text:
+                    logger.info(text)
+                    msg = text
+                    rewritten = True
             except Exception as e:
                 logger.info("Error generating completion: " + str(e))
-        bot = telegram.Bot(config.TELEGRAM_TOKEN)
-        async with bot:
-            retries = 0
-            max_retries = 3
-            while retries < max_retries:
-                try:
-                    logger.info("Sending message to group...")
-                    if image is None:
-                        await bot.send_message(
-                            text=msg,
-                            chat_id=config.TELEGRAM_GROUP_ID,
-                            parse_mode=telegram.constants.ParseMode.MARKDOWN,
-                        )
-                        break
-                    else:
-                        await bot.send_photo(
-                            chat_id=config.TELEGRAM_GROUP_ID,
-                            photo=image,
-                            caption=msg,
-                            parse_mode=telegram.constants.ParseMode.MARKDOWN,
-                        )
+        if new_game_recommended and not rewritten:
+            msg += (
+                f"\n\n🎮 ¿Te apetece probar *{escape_markdown(new_game_recommended['game'])}*? "
+                f"Lo tiene {escape_markdown(new_game_recommended['user'])}."
+            )
+        await push.notify_group(msg)  # never raises: it must not affect Telegram
+        if not telegram_ready:
+            logger.info("Telegram is not configured. Message sent by push only.")
+            return
+        try:
+            bot = telegram.Bot(settings.get("telegram.token"))
+            async with bot:
+                logger.info("Sending message to group...")
+                if await _telegram_send(bot, settings.get("telegram.group_id"), msg, image):
                     logger.info("Message sent successfully!")
-                    break
-                except Exception as e:
-                    logger.error("Error sending telegram message: " + str(e))
-                    retries += 1
-                    if retries >= max_retries:
-                        logger.error("Max retries reached. Message not sent.")
-                        raise
+        except Exception as e:  # e.g. Telegram unreachable when the bot session opens
+            logger.error("Error sending telegram message: " + str(e))
     else:
         logger.info("Silent mode. Message not sent.")
 
 
-async def send_message_to_user(user_telegram_id, msg):
-    # logger.info("Sending message to user " + str(user_telegram_id) + "...")
-    bot = telegram.Bot(config.TELEGRAM_TOKEN)
+async def send_message_to_user(user_telegram_id, msg, user_id=None):
+    """Private notice: Telegram (if the user has an id) and, given `user_id`, their pushed devices."""
+    if not settings.get("notifications.enabled"):
+        logger.info("Notifications are disabled. Message to user not sent.")
+        return
+    if user_id is not None:
+        await push.notify_user(user_id, msg, tag="private")
+    if user_telegram_id is None or not settings.get("telegram.token"):
+        logger.warning("User without Telegram id or bot not configured. Message not sent.")
+        return
+    try:
+        bot = telegram.Bot(settings.get("telegram.token"))
+        async with bot:
+            logger.info("Sending message to user " + str(user_telegram_id) + "...")
+            if await _telegram_send(bot, user_telegram_id, msg):
+                logger.info("Message sent successfully!")
+    except Exception as e:
+        logger.error("Error sending telegram message to user: " + str(e))
+
+
+def announcement_text(title: str, body: str | None = None) -> str:
+    """A notice written by an admin as a Telegram message: the title in bold, then the message. Plain
+    text in, so whatever they type is escaped and cannot break the Markdown."""
+    title, body = (title or "").strip(), (body or "").strip()
+    text = f"*{escape_markdown(title)}*"
+    return text + "\n\n" + escape_markdown(body) if body else text
+
+
+async def send_announcement_to_chat(chat_id, title: str, body: str | None = None) -> bool:
+    """Send an admin's notice to one Telegram chat (the group or a private chat); True if Telegram took it.
+    Only Telegram: nothing goes to the app's devices. Ignores the general notifications switch, like the test message."""
+    bot = telegram.Bot(settings.get("telegram.token"))
     async with bot:
-        retries = 0
-        max_retries = 3
-        while retries < max_retries:
-            try:
-                logger.info("Sending message to user " + str(user_telegram_id) + "...")
-                await bot.send_message(
-                    text=msg,
-                    chat_id=user_telegram_id,
-                    parse_mode=telegram.constants.ParseMode.MARKDOWN,
-                )
-                break
-            except Exception as e:
-                logger.error("Error sending telegram message to user: " + str(e))
-                retries += 1
-                if retries >= max_retries:
-                    logger.error("Max retries reached. Message not sent.")
-                    # raise
-    logger.info("Message sent successfully!")
+        return await _telegram_send(bot, chat_id, announcement_text(title, body))
 
 
 async def send_message_to_admins(db: Session, msg):
+    if not settings.get("notifications.admin_alerts") or not settings.get("telegram.token"):
+        logger.info("Admin alerts are disabled or the bot is not configured. Message not sent.")
+        return
     logger.info("Sending message to admins...")
     users_db = users.get_users(db)
     try:
         for user in users_db:
-            if user.is_admin:
-                bot = telegram.Bot(config.TELEGRAM_TOKEN)
+            if user.is_admin and user.telegram_id is not None:
+                bot = telegram.Bot(settings.get("telegram.token"))
                 async with bot:
-                    await bot.send_message(
-                        text=msg,
-                        chat_id=user.telegram_id,
-                        parse_mode=telegram.constants.ParseMode.MARKDOWN,
-                    )
-                logger.info("Message sent successfully!")
+                    if await _telegram_send(bot, user.telegram_id, msg):
+                        logger.info("Message sent successfully!")
     except Exception as e:
         logger.info(e)
+
+
+async def send_test_message(sent_by: str) -> None:
+    """Diagnostic message to the configured group (ignores the notification switch).
+    Raises if Telegram refuses it, so the admin sees why."""
+    token, group = settings.get("telegram.token"), settings.get("telegram.group_id")
+    if not token or not group:
+        raise ValueError("Falta el token del bot o el ID del grupo")
+    bot = telegram.Bot(token)
+    async with bot:
+        await bot.send_message(
+            chat_id=group,
+            text="✅ Mensaje de prueba de La Viciación (enviado por " + sent_by + ")",
+        )
 
 
 def get_ach_message(
@@ -414,17 +508,6 @@ def get_platforms(db: Session):
             models.PlatformTag.name,
         )
         return db.execute(stmt).fetchall()
-    except Exception as e:
-        logger.info(e)
-        raise e
-
-
-def get_completed_tag(db: Session):
-    try:
-        stmt = select(
-            models.OtherTag.id,
-        ).where(models.OtherTag.name == "Completed")
-        return db.execute(stmt).fetchone()
     except Exception as e:
         logger.info(e)
         raise e

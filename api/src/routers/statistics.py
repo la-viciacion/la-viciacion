@@ -1,20 +1,19 @@
 from enum import Enum
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi_versioning import version
+from sqlalchemy import Row
 from sqlalchemy.orm import Session
 
 from .. import auth
+from ..auth import get_db
 from ..crud import rankings, users
 from ..database import models, schemas
-from ..database.database import SessionLocal, engine
 from ..utils import actions as actions
 from ..utils.logger import LogManager
 
 log_manager = LogManager()
 logger = log_manager.get_logger()
-
-models.Base.metadata.create_all(bind=engine)
 
 router = APIRouter(
     prefix="/statistics",
@@ -24,13 +23,34 @@ router = APIRouter(
 )
 
 
-# Dependency
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+def plain(data):
+    """Query rows as JSON-friendly dicts (FastAPI cannot serialize SQLAlchemy `Row`s)."""
+    if isinstance(data, Row):
+        return dict(data._mapping)
+    if isinstance(data, (list, tuple)):
+        return [plain(item) for item in data]
+    return data
+
+
+class _SharedRankingData:
+    """What several rankings need, computed the first time and reused within one request."""
+
+    def __init__(self, db: Session):
+        self._db = db
+        self._players = None
+        self._counts = None
+
+    @property
+    def players(self):  # days played by every player: days, best and current streak
+        if self._players is None:
+            self._players = rankings.players_with_dates(self._db)
+        return self._players
+
+    @property
+    def counts(self):  # library entries and completions per player: completed games, ratio
+        if self._counts is None:
+            self._counts = rankings.library_counts(self._db)
+        return self._counts
 
 
 class RankingStatisticsTypes(str, Enum):
@@ -68,25 +88,26 @@ def get_ranking_statistics(
         rankings_list = ranking.split(",")
     else:
         rankings_list = [elem.value for elem in RankingStatisticsTypes]
+    shared = _SharedRankingData(db)
     response = []
     for ranking_type in rankings_list:
         content = {}
         if ranking_type == RankingStatisticsTypes.user_hours:
             data = rankings.user_hours_players(db)
         elif ranking_type == RankingStatisticsTypes.user_days:
-            data = rankings.user_days_played(db)
+            data = rankings.user_days_played(db, players=shared.players)
         elif ranking_type == RankingStatisticsTypes.user_played_games:
             data = rankings.user_played_games(db)
         elif ranking_type == RankingStatisticsTypes.user_completed_games:
-            data = rankings.user_completed_games(db)
+            data = rankings.user_completed_games(db, counts=shared.counts)
         elif ranking_type == RankingStatisticsTypes.achievements:
             data = rankings.user_ranking_achievements(db)
         elif ranking_type == RankingStatisticsTypes.user_ratio:
-            data = rankings.user_ratio(db)
+            data = rankings.user_ratio(db, counts=shared.counts)
         elif ranking_type == RankingStatisticsTypes.user_current_streak:
-            data = rankings.user_current_streak(db)
+            data = rankings.user_current_streak(db, players=shared.players)
         elif ranking_type == RankingStatisticsTypes.user_best_streak:
-            data = rankings.user_best_streak(db)
+            data = rankings.user_best_streak(db, players=shared.players)
         elif ranking_type == RankingStatisticsTypes.games_most_played:
             data = rankings.games_most_played(db)
         elif ranking_type == RankingStatisticsTypes.platform_played:
@@ -98,7 +119,7 @@ def get_ranking_statistics(
         else:
             data = {"message": "More rankings are coming"}
         content["type"] = ranking_type
-        content["data"] = data
+        content["data"] = plain(data)
         response.append(content)
     return response
 
@@ -116,6 +137,7 @@ class UserStatisticsTypes(str, Enum):
 def get_user_statistics(
     username: str,
     ranking: str = None,
+    active_user: models.User = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db),
 ):
     """_summary_
@@ -128,19 +150,22 @@ def get_user_statistics(
     Returns:
         _type_: _description_
     """
+    auth.ensure_self_or_admin(active_user, username=username)
     if ranking is not None:
         rankings_list = ranking.split(",")
     else:
         rankings_list = [elem.value for elem in UserStatisticsTypes]
+
+    user = users.get_user_by_username(db, username)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
     response = []
     for ranking_type in rankings_list:
         content = {}
         if ranking_type == UserStatisticsTypes.played_games:
-            user = users.get_user_by_username(db, username)
             data = users.get_games(db, user.id)
-            # data = users.played_games(db=db, username=username)
         elif ranking_type == UserStatisticsTypes.completed_games:
-            user = users.get_user_by_username(db, username)
             data = users.get_games(db=db, user_id=user.id, completed=True)
         elif ranking_type == UserStatisticsTypes.top_games:
             data = users.top_games(db, username)
@@ -152,6 +177,6 @@ def get_user_statistics(
             data = {"message": ranking_type + " is not a valid ranking"}
         content["type"] = ranking_type
         content["len_data"] = len(data)
-        content["data"] = data
+        content["data"] = plain(data)
         response.append(content)
     return response

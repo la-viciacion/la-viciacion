@@ -158,8 +158,8 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+/lib/
+/lib64/
 parts/
 sdist/
 var/
@@ -357,12 +357,19 @@ yarn-error.log*
 # Custom files
 logs.log
 *.crt
-# .gitlab-ci.yml
-db/data/
-docker-compose.yml
-Dockerfile
 assets/*
 .vscode
-webhooks.py
-ai_prompts.py
-read_messages.py
+
+# Secrets: any env variant except the template
+.env.*
+!.env.template
+*.pem
+*.key
+
+# Database: data dirs (db/data, db/data_, backups...) and dumps
+db/data*/
+db/init/*
+!db/init/.gitkeep
+*.sql
+*.sql.gz
+*.dump
