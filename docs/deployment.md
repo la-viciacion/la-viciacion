@@ -10,7 +10,7 @@ Docker Compose, four containers on the `la-viciacion` network:
 |---|---|---|---|
 | `laviciacion-front` | `ghcr.io/la-viciacion/laviciacion-front` (built from `front/Dockerfile`: `nginx:alpine`, static files copied in) | `3000` | Proxies `/api/` to `API_UPSTREAM`; `no-cache` on html/js/css; SPA fallback to `index.html` |
 | `laviciacion-api` | `ghcr.io/la-viciacion/laviciacion-api` (`api/Dockerfile`: `python:3.13-slim-bookworm`) | `127.0.0.1:5000` | `entrypoint.sh`: wait for DB → `alembic upgrade head` → `uvicorn` (`--proxy-headers`) |
-| `laviciacion-bot` | `ghcr.io/la-viciacion/laviciacion-bot` (`bot/Dockerfile`: `python:3.11-slim-bookworm`) | none | Depends on the API; restarts itself when Telegram settings change |
+| `laviciacion-bot` | `ghcr.io/la-viciacion/laviciacion-bot` (`bot/Dockerfile`: `python:3.13-slim-bookworm`) | none | Depends on the API; restarts itself when Telegram settings change |
 | `laviciacion-db` | `mariadb` (official) | `127.0.0.1:3307` | Healthcheck gates the API start; data in `./db/data` (or a named volume, see [Database storage](#database-storage-linux-vs-windows)) |
 
 All use `restart: unless-stopped`. API, bot and db read `.env` through `env_file`; the front gets only `API_UPSTREAM` and `DNS_RESOLVER` through `environment:` (it must not see the secrets in `.env`). Logs of api/bot are bind-mounted to `./api/logs` and `./bot/logs`.
@@ -111,10 +111,10 @@ Code rollback: set `LAVI_VERSION` in `.env` to the previous release (e.g. `2.0.0
 
 ## CI/CD
 
-`.github/workflows/release.yml` runs when a tag `vX.Y.Z` is pushed (or by hand from the Actions tab, which does everything but publish):
+`.github/workflows/ci.yml` runs the checks on every PR to `main` and after each merge (see [workflow.md](workflow.md)). The checks live in `checks.yml`, which `release.yml` reuses, so a release is gated by exactly what gates a PR. `release.yml` runs when a tag `vX.Y.Z` is pushed (or by hand from the Actions tab, which does everything but publish):
 
-1. **tests**: API (Python 3.13), bot (3.11), front tests and lint. The API tests need only dummy values for the variables of `config.py` (set in the workflow's `env`; when you add a required variable to `config.py`, add it there too) and the `.env.template` at the repo root.
-2. **build**: builds the three images and looks inside each one: no `.env*`, `*.sql`, `*.dump` under `/app` or the web root, and no credential-looking variable baked in (`PASS`, `SECRET`, `TOKEN`, `KEY`).
-3. **publish** (tags only): pushes `ghcr.io/la-viciacion/laviciacion-{api,front,bot}` tagged `X.Y.Z`, `X.Y` and `latest` (prereleases get no `latest`), using the workflow's own `GITHUB_TOKEN`; no secret has to be configured.
+1. **checks** (`checks.yml`): **tests**: API and bot (Python 3.13), front tests and lint. The API tests need only dummy values for the variables of `config.py` (set in the workflow's `env`; when you add a required variable to `config.py`, add it there too) and the `.env.template` at the repo root.
+   **build**: builds the three images and looks inside each one: no `.env*`, `*.sql`, `*.dump` under `/app` or the web root, and no credential-looking variable baked in (`PASS`, `SECRET`, `TOKEN`, `KEY`).
+2. **publish** (tags only): pushes `ghcr.io/la-viciacion/laviciacion-{api,front,bot}` tagged `X.Y.Z`, `X.Y` and `latest` (prereleases get no `latest`), using the workflow's own `GITHUB_TOKEN`; no secret has to be configured.
 
 Cut a release with `git tag v2.0.0 && git push origin v2.0.0` (see [roadmap](roadmap.md): tags are not created until 2.0.0 ships). The first time, set each package public (README, Deployment); the repository is public, so nothing needs a login afterwards. There is no automatic deploy: the server pulls when you decide. The images are `linux/amd64` only.

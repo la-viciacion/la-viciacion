@@ -94,7 +94,7 @@ tests/              node:test unit tests for js/lib
 
 All markup is built with the ``html`` tagged template (`js/lib/html.js`), which escapes every interpolated value by default; write ``mount(el, html`...`)`` instead of assigning strings to `innerHTML`.
 
-Development (needs Node 20+):
+Development (needs Node 20.19+ or 22.13+):
 
 ```bash
 cd front

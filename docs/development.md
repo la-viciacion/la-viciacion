@@ -3,7 +3,7 @@
 ## Prerequisites
 
 - Docker + Docker Compose (the reference way to run everything)
-- Python 3.13 (API) / 3.11 (bot) and Node 20+ (front) if you run services outside Docker
+- Python 3.13 (API and bot) and Node 20.19+ / 22.13+ (front, ESLint 10) if you run services outside Docker
 - A `.env` at the repo root: `cp .env.template .env` and fill it in. API and bot fall back to this file when not in Docker (`find_dotenv`); real environment variables always win.
 
 When running the API outside Docker, `MARIADB_HOST` must point to a reachable DB (e.g. `127.0.0.1` with the compose DB published on `127.0.0.1:3307`; adapt the port in the URL/host as needed) instead of the container name `laviciacion-db`.
@@ -53,7 +53,15 @@ npm run lint      # ESLint
 npm run dev       # static server on :3000 (API must be reachable at /api)
 ```
 
-Run the API tests with the venv, not the global Python: `test_migrations.py` needs `alembic` and the other pinned dependencies. The bot's access rules have unit tests (`cd bot && python -m unittest discover -s tests -t .`); the rest of the bot is untested. API tests cover pure logic (`scheduler`, `settings`, `my_utils`), the static integrity of the Alembic history, and queries against an in-memory SQLite database (`tests/sqlite_db.py`, which registers `YEAR()` for the generated `season` columns); anything MariaDB-specific still needs a real database. Front tests cover `js/lib` and `pages/home/sessions`. Prefer extracting pure functions so new logic can be tested the same way (see [roadmap](roadmap.md) for planned integration tests).
+Run the API tests with the venv, not the global Python: `test_migrations.py` needs `alembic` and the other pinned dependencies. The bot's access rules have unit tests (`cd bot && python -m unittest discover -s tests -t .`); the rest of the bot is untested. API tests cover pure logic (`scheduler`, `settings`, `my_utils`), the static integrity of the Alembic history, and queries against an in-memory SQLite database (`tests/sqlite_db.py`, which registers `YEAR()` for the generated `season` columns); anything MariaDB-specific still needs a real database. Tests whose file is named `test_mariadb_*.py` run on a **real MariaDB** and skip themselves without one. To run them locally start a throwaway server and point `TEST_MARIADB_URL` at it (each test class creates and drops its own `lavi_test_*` database; never use a server with real data):
+
+```bash
+docker run -d --name lavi-test-db -e MARIADB_ROOT_PASSWORD=testpw -p 127.0.0.1:3399:3306 mariadb
+TEST_MARIADB_URL=mysql+pymysql://root:testpw@127.0.0.1:3399 venv/Scripts/python.exe -m unittest discover -s tests -t . -p "test_mariadb_*.py"
+docker rm -f lavi-test-db
+```
+
+CI runs them on every PR against MariaDB `lts` and `latest` with `REQUIRE_MARIADB_TESTS=1`, so a missing server there fails instead of skipping. Front tests cover `js/lib` and `pages/home/sessions`. Prefer extracting pure functions so new logic can be tested the same way (see [roadmap](roadmap.md) for planned integration tests).
 
 ## Database and migrations
 

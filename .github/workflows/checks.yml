@@ -1,0 +1,143 @@
+name: Checks
+
+# Everything a change must pass before it can reach main (called by ci.yml on every PR) and
+# before an image is published (called by release.yml).
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+env:
+  # What the API tests need to import the code; they never connect to anything.
+  GOD_ADMIN_PASS: ci
+  MARIADB_HOST: localhost
+  MARIADB_DATABASE: ci
+  MARIADB_USER: ci
+  MARIADB_PASSWORD: ci
+  SECRET_KEY: ci-secret
+  ACCESS_TOKEN_EXPIRE_MINUTES: "60"
+  CORS_ORIGINS: "[]"
+  SENTRY_URL_API: ""
+  ENVIRONMENT: test
+  API_LOG_LEVEL: INFO
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: api/requirements.txt
+      - name: API tests
+        working-directory: api
+        run: |
+          pip install -r requirements.txt
+          python -m unittest discover -s tests -t .
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: bot/requirements.txt
+      - name: Bot tests
+        working-directory: bot
+        run: |
+          pip install -r requirements.txt
+          python -m unittest discover -s tests -t .
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: front/package-lock.json
+      - name: Front tests and lint
+        working-directory: front
+        run: |
+          npm ci
+          npm test
+          npm run lint
+
+  # Migrations and schema rules on a real MariaDB (api/tests/test_mariadb_*.py; without a server
+  # those tests skip, which is why the job above does not run them). `lts` is the conservative
+  # line, `latest` is what docker-compose.yml runs in production (it does not pin the image).
+  api-mariadb:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        mariadb: [lts, latest]
+    services:
+      mariadb:
+        image: mariadb:${{ matrix.mariadb }}
+        env:
+          MARIADB_ROOT_PASSWORD: ci
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+    env:
+      TEST_MARIADB_URL: mysql+pymysql://root:ci@127.0.0.1:3306
+      REQUIRE_MARIADB_TESTS: "1"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: api/requirements.txt
+      - name: API tests on MariaDB ${{ matrix.mariadb }}
+        working-directory: api
+        run: |
+          pip install -r requirements.txt
+          python -m unittest discover -s tests -t . -p "test_mariadb_*.py"
+
+  # Build every image and look inside it before anything is published.
+  build:
+    needs: tests
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        service: [api, front, bot]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Build ${{ matrix.service }}
+        uses: docker/build-push-action@v7
+        with:
+          context: ${{ matrix.service }}
+          load: true
+          tags: check/${{ matrix.service }}
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,scope=${{ matrix.service }},mode=max
+
+      - name: The image holds no secrets, data or configuration files
+        run: |
+          image=check/${{ matrix.service }}
+
+          # files that must never end up in an image. Only the directories that exist in that image
+          # are searched (the api and bot have /app, the front has the web root): find exits 1 for a
+          # missing path, which under `bash -e` would end this step silently.
+          found=$(docker run --rm --entrypoint sh "$image" -c \
+            'for dir in /app /usr/share/nginx/html; do
+               [ -d "$dir" ] && find "$dir" \( -name ".env" -o -name ".env.*" -o -name "*.sql" -o -name "*.sql.gz" -o -name "*.dump" \)
+             done; true')
+          if [ -n "$found" ]; then
+            echo "::error::sensitive files inside the image:"; echo "$found"; exit 1
+          fi
+
+          # variables baked in with ENV/ARG: nothing that looks like a credential (GPG_KEY is the
+          # public key id of the official python image)
+          baked=$(docker image inspect "$image" --format '{{range .Config.Env}}{{println .}}{{end}}' \
+            | cut -d= -f1 | grep -i -E 'PASS|SECRET|TOKEN|KEY' | grep -v -x GPG_KEY || true)
+          if [ -n "$baked" ]; then
+            echo "::error::credential-looking variables baked into the image:"; echo "$baked"; exit 1
+          fi
+          echo "clean"
