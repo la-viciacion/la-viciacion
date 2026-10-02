@@ -74,6 +74,10 @@ def get_game_by_id(game_id: str, db: Session = Depends(get_db)):
 @router.post("/", response_model=schemas.Game, status_code=201)
 async def create_game(game: schemas.NewGame, db: Session = Depends(get_db)):
     """Add a new game to DB, resolving details via RAWG."""
+    # the duplicate check and the stored name must see the same text: " Celeste" is "Celeste"
+    game.name = game.name.strip()
+    if not game.name:
+        raise HTTPException(status_code=400, detail="The name cannot be empty")
     await run_in_threadpool(_refuse_duplicates, db, game)
     return await games.new_game(db=db, game=game)
 

@@ -61,7 +61,9 @@ TEST_MARIADB_URL=mysql+pymysql://root:testpw@127.0.0.1:3399 venv/Scripts/python.
 docker rm -f lavi-test-db
 ```
 
-Use the version `docker-compose.yml` pins. CI runs them on every PR against exactly that version (it reads the tag from the compose file) with `REQUIRE_MARIADB_TESTS=1`, so a missing server there fails instead of skipping, and weekly against `lts` and `latest` as an early warning. Front tests cover `js/lib` and `pages/home/sessions`. Prefer extracting pure functions so new logic can be tested the same way (see [roadmap](roadmap.md) for planned integration tests).
+Use the version `docker-compose.yml` pins. The HTTP-level tests (`test_mariadb_api_*.py`) make real requests to the routers on a migrated database: `tests/api_support.py` mounts them as `main.py` does, points `get_db` at the test database (migrated once per run, emptied before each test), builds users, games and tokens the way the application does (`self.user("ana")`, `self.api("GET", "/users/ana", as_user="ana")`) and replaces what the application does after answering (`actions.after_*`, announcements) with recorders in `self.background`. RAWG and HowLongToBeat are faked in every test, and a test that reaches the network fails: the developer's `.env` (which `Config` reads) may hold a real RAWG key. A new route or business rule gets its test there, written as the request a client makes.
+
+CI runs them on every PR against exactly that version (it reads the tag from the compose file) with `REQUIRE_MARIADB_TESTS=1`, so a missing server there fails instead of skipping, and weekly against `lts` and `latest` as an early warning. Front tests cover `js/lib` and `pages/home/sessions`. Prefer extracting pure functions so new logic can be tested the same way (see [roadmap](roadmap.md) for planned integration tests).
 
 ## Database and migrations
 
