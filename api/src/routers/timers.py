@@ -73,7 +73,15 @@ def create_timer(db: Session, timer: GameTimerCreate) -> tuple[GameTimer, bool]:
         is_active=True
     )
     db.add(db_timer)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # the same game started twice within one second (a retried request): the table keeps seconds
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Ya tienes un timer de ese juego que empieza a esa hora",
+        )
     db.refresh(db_timer)
 
     # Make sure the user has a UserGame entry for this game/season.
