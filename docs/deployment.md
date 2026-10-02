@@ -121,7 +121,7 @@ Code rollback: set `LAVI_VERSION` in `.env` to the previous release (e.g. `2.0.0
 
 `.github/workflows/ci.yml` runs the checks on every PR to `main` and after each merge (see [workflow.md](workflow.md)). The checks live in `checks.yml`, which `release.yml` reuses, so a release is gated by exactly what gates a PR. `release.yml` runs when a tag `vX.Y.Z` is pushed (or by hand from the Actions tab, which does everything but publish):
 
-1. **checks** (`checks.yml`): **tests**: API and bot (Python 3.14), front tests and lint. The API tests need only dummy values for the variables of `config.py` (set in the workflow's `env`; when you add a required variable to `config.py`, add it there too) and the `.env.template` at the repo root.
+1. **checks** (`checks.yml`): **tests**: API and bot (Python 3.14), front tests and lint. The API tests need only dummy values for the variables of `config.py` (set in the `env` of `checks.yml` and of `mariadb-tests.yml`, which does not inherit it; when you add a required variable to `config.py`, add it to both) and the `.env.template` at the repo root.
    **build**: builds the three images and looks inside each one: no `.env*`, `*.sql`, `*.dump` under `/app` or the web root, and no credential-looking variable baked in (`PASS`, `SECRET`, `TOKEN`, `KEY`).
 2. **publish** (tags only): pushes `ghcr.io/la-viciacion/laviciacion-{api,front,bot}` tagged `X.Y.Z`, `X.Y` and `latest` (prereleases get no `latest`), using the workflow's own `GITHUB_TOKEN`; no secret has to be configured.
 

@@ -19,6 +19,21 @@ on:
 permissions:
   contents: read
 
+env:
+  # What the API tests need to import the code (a called workflow does not inherit the caller's env, so
+  # this is the same block as in checks.yml). The tests that need a database use TEST_MARIADB_URL below.
+  GOD_ADMIN_PASS: ci
+  MARIADB_HOST: localhost
+  MARIADB_DATABASE: ci
+  MARIADB_USER: ci
+  MARIADB_PASSWORD: ci
+  SECRET_KEY: ci-secret
+  ACCESS_TOKEN_EXPIRE_MINUTES: "60"
+  CORS_ORIGINS: "[]"
+  SENTRY_URL_API: ""
+  ENVIRONMENT: test
+  API_LOG_LEVEL: INFO
+
 jobs:
   tests:
     name: ${{ inputs.image }}
