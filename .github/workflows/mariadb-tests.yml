@@ -1,0 +1,62 @@
+name: MariaDB tests
+
+# Migrations and schema rules on a real MariaDB (api/tests/test_mariadb_*.py; without a server those tests
+# skip, which is why the plain API job does not run them). Called by checks.yml with the image that
+# docker-compose.yml pins, and by mariadb-versions.yml with the moving tags.
+on:
+  workflow_call:
+    inputs:
+      image:
+        description: The MariaDB image to test against, with its tag (mariadb:12.3.3)
+        required: true
+        type: string
+      expect-pin:
+        description: Fail unless the server is the version docker-compose.yml pins
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: ${{ inputs.image }}
+    runs-on: ubuntu-latest
+    services:
+      mariadb:
+        image: ${{ inputs.image }}
+        env:
+          MARIADB_ROOT_PASSWORD: ci
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+    env:
+      TEST_MARIADB_URL: mysql+pymysql://root:ci@127.0.0.1:3306
+      REQUIRE_MARIADB_TESTS: "1"
+      EXPECT_MARIADB_PIN: ${{ inputs.expect-pin && '1' || '' }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: api/requirements.txt
+      - name: Install
+        working-directory: api
+        run: pip install -r requirements.txt
+      - name: Server under test
+        working-directory: api
+        run: |
+          python - <<'PY'
+          import os
+          from sqlalchemy import create_engine, text
+          with create_engine(os.environ["TEST_MARIADB_URL"]).connect() as conn:
+              print("image:  ${{ inputs.image }}")
+              print("server:", conn.execute(text("SELECT VERSION()")).scalar())
+          PY
+      - name: API tests on ${{ inputs.image }}
+        working-directory: api
+        run: python -m unittest discover -s tests -t . -p "test_mariadb_*.py"

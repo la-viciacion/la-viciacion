@@ -1,0 +1,26 @@
+name: MariaDB versions
+
+# Early warning, not a gate: once a week (and on demand) the MariaDB tests run against the moving tags,
+# `lts` (the series docker-compose.yml pins, at its newest patch) and `latest` (the next release). If
+# one fails, a release of MariaDB changed something we depend on, and it is known before anyone has to
+# move to it. Pull requests are only gated by the pinned version (checks.yml), so a MariaDB release
+# never turns an unrelated PR red.
+#
+# GitHub disables scheduled workflows after 60 days without repository activity.
+on:
+  schedule:
+    - cron: "0 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mariadb:
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ["mariadb:lts", "mariadb:latest"]
+    uses: ./.github/workflows/mariadb-tests.yml
+    with:
+      image: ${{ matrix.image }}
