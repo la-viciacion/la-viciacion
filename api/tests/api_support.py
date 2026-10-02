@@ -13,6 +13,8 @@
 """
 import atexit
 import datetime
+import inspect
+import unittest
 from datetime import timedelta
 from unittest import mock
 
@@ -94,6 +96,10 @@ class ApiTestCase(MariaDBTestCase):
             db.close()
 
     def setUp(self):
+        test = getattr(self, self._testMethodName)
+        if inspect.iscoroutinefunction(test) and not isinstance(self, unittest.IsolatedAsyncioTestCase):
+            # a plain TestCase "passes" an async test without ever running it
+            self.fail(f"{self._testMethodName} is async: derive from unittest.IsolatedAsyncioTestCase as well")
         with self.engine.begin() as conn:
             conn.execute(text("SET FOREIGN_KEY_CHECKS = 0"))
             for table in DATA_TABLES:
