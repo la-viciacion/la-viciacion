@@ -22,6 +22,7 @@ Four services, one `docker-compose.yml`:
 - [docs/conventions.md](docs/conventions.md): code conventions, best practices, step-by-step recipes for common changes.
 - [docs/migrations.md](docs/migrations.md): **Alembic rules, conventions and verification checklist (mandatory for any schema change).**
 - [docs/deployment.md](docs/deployment.md): deployment stack, migrations, operations, rollback.
+- [docs/workflow.md](docs/workflow.md): git workflow (trunk-based, PRs, required CI checks).
 - [docs/roadmap.md](docs/roadmap.md): pending decisions (branching, versioning, CI) and known debt.
 - [README.md](README.md): user/operator-facing documentation (config, seasons, notifications, manual sessions, deployment).
 
@@ -63,4 +64,4 @@ Full details in [docs/development.md](docs/development.md).
 - Before finishing a change: run the API and front tests, lint the front, and if you touched behaviour described in `README.md` or `docs/`, update those docs in the same change.
 - Add or update tests for any pure/business logic you touch (see existing examples in `api/tests/` and `front/tests/`).
 - Ask before anything destructive or hard to reverse (dropping data, touching applied migrations, running migrations against real data, force-pushing).
-- **Git workflow (branches, versioning, releases) is intentionally undefined until 2.0.0 ships**; see [docs/roadmap.md](docs/roadmap.md). Until then: work on the current branch, small commits in Conventional Commits style (`feat:`, `fix:`, `refactor:`, `docs:`, `style:`, `test:`, `chore:`), and do not create tags or releases.
+- **Git workflow** ([docs/workflow.md](docs/workflow.md)): trunk-based. Never commit to `main`; work on a short-lived branch `<type>/<description>` and open a PR (squash-merged, title in Conventional Commits style: `feat:`, `fix:`, `refactor:`, `docs:`, `style:`, `test:`, `chore:`). The `CI` check must be green. Do not create tags or releases (versioning is still open, see [docs/roadmap.md](docs/roadmap.md)).
