@@ -582,8 +582,6 @@ def create_timer(body: TimerCreate, db: Session = Depends(get_db)):
     db.add(timer)
     users_crud.ensure_library_entry(db, body.user_id, body.game_id, body.platform, body.start_time)
     _commit(db, "Sesión")
-    if was_running and not timer.is_active:
-        background_tasks.add_task(actions.after_timer_stop, timer.user_id, timer.game_id, timer.duration_seconds)
     return _timer_out(timer, None, None)
 
 
@@ -607,6 +605,9 @@ def patch_timer(timer_id: int, body: TimerPatch, background_tasks: BackgroundTas
         timer.duration_seconds = int((timer.end_time - timer.start_time).total_seconds())
         timer.is_active = False
     _commit(db, "Sesión")
+    if was_running and not timer.is_active:
+        # a stuck timer was finished by hand: its pinned notification has to go
+        background_tasks.add_task(actions.after_timer_stop, timer.user_id, timer.game_id, timer.duration_seconds)
     return _timer_out(timer, None, None)
 
 
