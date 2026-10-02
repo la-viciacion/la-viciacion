@@ -21,3 +21,4 @@ Until then: no tags or releases.
 - `utils/email.py` is kept for the upcoming e-mail features; nothing calls it yet.
 - `crud/users.py` (~1300 lines) and `utils/actions.py` are large; split by responsibility when touched.
 - Sentry `traces_sample_rate`/`profiles_sample_rate` are 1.0; tune for production.
+- **Front pages without DOM tests:** the pure logic and the libraries are tested, but the rendering and the event wiring of the pages (about 3,500 lines under `front/js/pages` and `front/js/ui`) need a DOM. Decide whether to add `jsdom` as a dev dependency (it is not a build step or a framework, but it is a dependency) or keep extracting pure functions; the paths the pages call are already checked against the API (`api/tests/test_front_api_paths.py`).
