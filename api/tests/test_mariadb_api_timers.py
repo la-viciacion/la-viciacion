@@ -79,6 +79,17 @@ class StartTimerTests(TimerTestCase):
         self.assertEqual(again.status_code, 400)
         self.assertEqual(self.scalar("SELECT COUNT(*) FROM game_timers"), 1)
 
+    def test_the_same_game_started_twice_in_the_same_second_is_a_conflict_not_a_crash(self):
+        """A timer never starts before the user's last session ended, so one that ends ahead of the clock
+        decides the second the next timer starts in. A session of that game that starts at that very second
+        (what a retried start request leaves behind) must give a 409, not a 500."""
+        ahead = datetime.datetime.now().replace(microsecond=0) + timedelta(seconds=40)
+        self.session(self.ana, "celeste", ahead, 0)
+        clash = self.start()
+        self.assertEqual((clash.status_code, clash.json()["detail"]), (409, "Ya tienes un timer de ese juego que empieza a esa hora"))
+        self.assertEqual(self.scalar("SELECT COUNT(*) FROM game_timers"), 1)
+        self.assertEqual(self.start(game="hades").status_code, 200)  # another game starts at that second without trouble
+
     def test_a_timer_never_starts_before_the_last_session_ended(self):
         end = datetime.datetime.now().replace(microsecond=0) + timedelta(seconds=40)
         self.assertEqual(self.manual(start=end - timedelta(hours=1), end=end).status_code, 201)
