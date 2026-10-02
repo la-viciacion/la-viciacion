@@ -108,6 +108,7 @@ class ApiTestCase(MariaDBTestCase):
             limiter._failures.clear()
         settings._cache.clear()  # settings are cached for a few seconds in the process
         self.background = {}
+        self.real_actions = {name: getattr(actions, name) for name in BACKGROUND}  # for tests of the work itself
         for name in BACKGROUND:
             patcher = mock.patch.object(actions, name)
             self.background[name] = patcher.start()
@@ -189,6 +190,12 @@ class ApiTestCase(MariaDBTestCase):
             db.add(row)
             db.commit()
             return row.id
+
+    def set_settings(self, **values) -> None:
+        """Stores admin settings (`self.set_settings(**{"telegram.token": "..."})`) and drops the in-process cache."""
+        with database.SessionLocal() as db:
+            settings.set_values(db, values)
+        settings._cache.clear()
 
     def rows(self, sql: str, **params) -> list:
         with self.engine.connect() as conn:
