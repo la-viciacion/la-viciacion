@@ -56,12 +56,12 @@ npm run dev       # static server on :3000 (API must be reachable at /api)
 Run the API tests with the venv, not the global Python: `test_migrations.py` needs `alembic` and the other pinned dependencies. The bot's access rules have unit tests (`cd bot && python -m unittest discover -s tests -t .`); the rest of the bot is untested. API tests cover pure logic (`scheduler`, `settings`, `my_utils`), the static integrity of the Alembic history, and queries against an in-memory SQLite database (`tests/sqlite_db.py`, which registers `YEAR()` for the generated `season` columns); anything MariaDB-specific still needs a real database. Tests whose file is named `test_mariadb_*.py` run on a **real MariaDB** and skip themselves without one. To run them locally start a throwaway server and point `TEST_MARIADB_URL` at it (each test class creates and drops its own `lavi_test_*` database; never use a server with real data):
 
 ```bash
-docker run -d --name lavi-test-db -e MARIADB_ROOT_PASSWORD=testpw -p 127.0.0.1:3399:3306 mariadb
+docker run -d --name lavi-test-db -e MARIADB_ROOT_PASSWORD=testpw -p 127.0.0.1:3399:3306 mariadb:12.3.3
 TEST_MARIADB_URL=mysql+pymysql://root:testpw@127.0.0.1:3399 venv/Scripts/python.exe -m unittest discover -s tests -t . -p "test_mariadb_*.py"
 docker rm -f lavi-test-db
 ```
 
-CI runs them on every PR against MariaDB `lts` and `latest` with `REQUIRE_MARIADB_TESTS=1`, so a missing server there fails instead of skipping. Front tests cover `js/lib` and `pages/home/sessions`. Prefer extracting pure functions so new logic can be tested the same way (see [roadmap](roadmap.md) for planned integration tests).
+Use the version `docker-compose.yml` pins. CI runs them on every PR against exactly that version (it reads the tag from the compose file) with `REQUIRE_MARIADB_TESTS=1`, so a missing server there fails instead of skipping, and weekly against `lts` and `latest` as an early warning. Front tests cover `js/lib` and `pages/home/sessions`. Prefer extracting pure functions so new logic can be tested the same way (see [roadmap](roadmap.md) for planned integration tests).
 
 ## Database and migrations
 
