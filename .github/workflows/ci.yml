@@ -19,7 +19,7 @@ jobs:
   # Pull requests are squash-merged, so the title becomes the commit message on main.
   pr-title:
     if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - name: Title follows Conventional Commits
         env:
@@ -38,7 +38,7 @@ jobs:
     name: CI
     if: always()
     needs: [pr-title, checks]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - name: Every job passed (a skipped pr-title on push to main is fine)
         run: |
