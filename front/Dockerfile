@@ -1,4 +1,4 @@
-FROM nginx:alpine
+FROM nginx:1.31-alpine
 
 # Nothing environment-specific is baked in: the nginx image renders the template below
 # at start with these variables. The defaults match docker-compose.yml; override them
