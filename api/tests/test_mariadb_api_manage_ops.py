@@ -31,11 +31,6 @@ class OpsTestCase(ApiTestCase):
     def admin(self, method, path, **kwargs):
         return self.api(method, f"/manage{path}", as_user="root", **kwargs)
 
-    def set_settings(self, **values):
-        with database.SessionLocal() as db:
-            settings.set_values(db, values)
-        settings._cache.clear()
-
 
 class EveryRouteIsAdminOnlyTests(OpsTestCase):
     """Runs every route of the panel without a token and as a player: the router-level dependency must hold."""
