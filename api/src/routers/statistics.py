@@ -1,7 +1,6 @@
 from enum import Enum
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi_versioning import version
 from sqlalchemy import Row
 from sqlalchemy.orm import Session
 
@@ -72,7 +71,6 @@ class RankingStatisticsTypes(str, Enum):
     "/rankings",
     response_description="Return a list of rankings",
 )
-@version(1)
 def get_ranking_statistics(
     ranking: str = None,
     db: Session = Depends(get_db),
@@ -133,7 +131,6 @@ class UserStatisticsTypes(str, Enum):
 
 
 @router.get("/users/{username}")
-@version(1)
 def get_user_statistics(
     username: str,
     ranking: str = None,

@@ -4,7 +4,6 @@ from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Security, status
 from fastapi.security import OAuth2PasswordRequestForm
-from fastapi_versioning import version
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -70,7 +69,6 @@ router = APIRouter(
 
 
 @router.get("/")
-@version(1)
 def hello_world(request: Request):
     """
     Test endpoint
@@ -79,7 +77,6 @@ def hello_world(request: Request):
 
 
 @router.get("/keepalive")
-@version(1)
 def keepalive(request: Request):
     """
     Keepalive endpoint
@@ -88,7 +85,6 @@ def keepalive(request: Request):
 
 
 @router.post("/token", response_model=auth.Token)
-@version(1)
 def login_for_access_token(
     request: Request,
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
@@ -143,7 +139,6 @@ def login_for_access_token(
 
 
 @router.get("/auth/active_user", response_model=schemas.User)
-@version(1)
 def active_user(user: models.User = Security(auth.get_current_active_user)):
     """
     Get active user info
@@ -166,7 +161,6 @@ class ResetPasswordBody(BaseModel):
 
 
 @router.post("/auth/forgot-password", status_code=202)
-@version(1)
 def forgot_password(
     request: Request,
     body: ForgotPasswordBody,
@@ -192,7 +186,6 @@ def forgot_password(
 
 
 @router.post("/auth/reset-password")
-@version(1)
 def reset_password(request: Request, body: ResetPasswordBody, db: Session = Depends(get_db)):
     """Choose a new password with the link sent by email. It also signs out every session."""
     client = _client(request)

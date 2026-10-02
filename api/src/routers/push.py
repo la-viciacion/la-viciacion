@@ -1,6 +1,5 @@
 """Push subscriptions of the installed PWA (see utils/push.py)."""
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi_versioning import version
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -37,7 +36,6 @@ class PreferenceBody(EndpointBody):
 
 
 @router.get("/config")
-@version(1)
 def get_config(
     current_user: models.User = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db),
@@ -61,7 +59,6 @@ def get_config(
 
 
 @router.post("/subscribe")
-@version(1)
 def subscribe(
     body: SubscribeBody,
     current_user: models.User = Depends(auth.get_current_active_user),
@@ -94,7 +91,6 @@ def subscribe(
 
 
 @router.post("/unsubscribe")
-@version(1)
 def unsubscribe(
     body: EndpointBody,
     current_user: models.User = Depends(auth.get_current_active_user),
@@ -106,7 +102,6 @@ def unsubscribe(
 
 
 @router.patch("/subscription")
-@version(1)
 def set_preference(
     body: PreferenceBody,
     current_user: models.User = Depends(auth.get_current_active_user),

@@ -9,7 +9,6 @@ from fastapi import (
     Response,
     UploadFile,
 )
-from fastapi_versioning import version
 from sqlalchemy.orm import Session
 
 from .. import auth
@@ -45,7 +44,6 @@ def _target_user(db: Session, active_user: models.User, username: str) -> models
 
 
 @router.get("/", response_model=list[schemas.User])
-@version(1)
 def get_users(
     admin: models.User = Depends(auth.require_admin), db: Session = Depends(get_db)
 ):
@@ -62,7 +60,6 @@ def get_users(
 
 
 @router.get("/{username}", response_model=schemas.User)
-@version(1)
 def get_user(
     username: str,
     active_user: models.User = Depends(auth.get_current_active_user),
@@ -86,7 +83,6 @@ def get_user(
 
 
 @router.get("/{username}/profile")
-@version(1)
 def get_profile(
     username: str,
     season: str | None = Query(None, pattern=r"^(all|\d{4})$", description="A year, or 'all' for the totals; default: the running season"),
@@ -100,7 +96,6 @@ def get_profile(
 
 
 @router.patch("/{username}/profile")
-@version(1)
 def update_profile(
     username: str,
     body: schemas.UserProfileUpdate,
@@ -136,7 +131,6 @@ def update_profile(
 
 
 @router.get("/{username}/settings")
-@version(1)
 def get_settings(
     username: str,
     active_user: models.User = Depends(auth.get_current_active_user),
@@ -149,7 +143,6 @@ def get_settings(
 
 
 @router.patch("/{username}/settings")
-@version(1)
 def update_settings(
     username: str,
     body: schemas.UserSettingsUpdate,
@@ -180,7 +173,6 @@ def update_settings(
 
 
 @router.post("/{username}/password")
-@version(1)
 def change_password(
     username: str,
     body: schemas.PasswordChange,
@@ -199,7 +191,6 @@ def change_password(
 
 
 @router.get("/{username}/library")
-@version(1)
 def get_library(
     username: str,
     limit: int = Query(15, ge=1, le=100),
@@ -215,7 +206,6 @@ def get_library(
 
 
 @router.get("/{username}/recommendations")
-@version(1)
 def get_recommendations(
     username: str,
     limit: int = Query(12, ge=1, le=50),
@@ -244,7 +234,6 @@ def _check_completion_date(entry: models.UserGame, date: datetime.date):
 
 
 @router.patch("/{username}/library/{entry_id}/completion")
-@version(1)
 def update_completion(
     username: str,
     entry_id: int,
@@ -291,7 +280,6 @@ def update_completion(
 
 
 @router.patch("/{username}/avatar")
-@version(1)
 def upload_avatar(
     username: str,
     # file: Annotated[UploadFile, File(description="A file read as UploadFile")],
@@ -317,7 +305,6 @@ def upload_avatar(
 
 
 @router.get("/{username}/avatar")
-@version(1)
 def get_avatar(
     username: str,
     active_user: models.User = Depends(auth.get_current_active_user),
