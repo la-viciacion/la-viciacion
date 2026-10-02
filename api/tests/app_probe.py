@@ -3,9 +3,11 @@ subprocess, against a migrated database: importing src.main seeds the admin user
 achievements, exactly as `uvicorn src.main:app` does when the API container starts.
 
 Prints one line, `PROBE:` followed by JSON: the status every declared route answers to a request with
-no credentials, the status of the places the interactive docs would be, and the paths of the schema.
+no credentials, the status of the places the interactive docs would be, the paths of the schema and how
+many times the startup event starts the scheduler.
 """
 import json
+from unittest import mock
 
 from fastapi.testclient import TestClient
 
@@ -16,4 +18,8 @@ client = TestClient(main.app, raise_server_exceptions=False)
 status = {f"{method} {path}": client.request(method, requestable(path)).status_code for method, path in declared_routes()}
 docs = {path: client.get(path).status_code for path in (f"{BASE}/docs", f"{BASE}/redoc", f"{BASE}/openapi.json", "/docs", "/redoc", "/openapi.json")}
 schema = sorted(f"{method.upper()} {path}" for path, item in main.app.openapi()["paths"].items() for method in item)
-print("PROBE:" + json.dumps({"status": status, "docs": docs, "schema": schema}))
+# entering the client runs the application's startup and shutdown; the scheduler must not really start here
+with mock.patch.object(main.scheduler, "start") as start:
+    with TestClient(main.app):
+        pass
+print("PROBE:" + json.dumps({"status": status, "docs": docs, "schema": schema, "scheduler_starts": start.call_count}))

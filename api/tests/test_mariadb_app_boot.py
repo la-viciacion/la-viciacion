@@ -50,6 +50,9 @@ class AppBootTests(MariaDBTestCase):
     def test_the_interactive_docs_are_hidden_by_default(self):
         self.assertEqual(self.probe["docs"], {path: 404 for path in self.probe["docs"]})
 
+    def test_the_startup_event_starts_the_scheduler_once(self):
+        self.assertEqual(self.probe["scheduler_starts"], 1)
+
     def test_startup_seeded_the_database(self):
         with self.engine.connect() as conn:
             self.assertEqual(conn.execute(text("SELECT COUNT(*) FROM users WHERE username = 'admin'")).scalar(), 1)

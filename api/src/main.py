@@ -1,4 +1,5 @@
 import logging
+from contextlib import asynccontextmanager
 
 import sentry_sdk
 
@@ -58,11 +59,18 @@ with SessionLocal() as db:
     push_utils.ensure_vapid_keys(db)  # the routers' `push` module has the same name
     Achievements().populate_achievements(db)
 
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    scheduler.start()
+    yield
+
+
 # Swagger/ReDoc/openapi.json list every endpoint: only served when API_DOCS_ENABLED=true
 docs = config.API_DOCS_ENABLED
 app = FastAPI(
     title="LaViciacion API",
     version="0.1.0",
+    lifespan=lifespan,
     docs_url=f"{API_PREFIX}/docs" if docs else None,
     redoc_url=f"{API_PREFIX}/redoc" if docs else None,
     openapi_url=f"{API_PREFIX}/openapi.json" if docs else None,
@@ -74,11 +82,6 @@ api_v1 = APIRouter(prefix=API_PREFIX)
 for router in (basic, users, games, statistics, timers, manage, push, utils):
     api_v1.include_router(router.router)
 app.include_router(api_v1)
-
-
-@app.on_event("startup")
-def start_scheduler():
-    scheduler.start()
 
 
 app.add_middleware(
