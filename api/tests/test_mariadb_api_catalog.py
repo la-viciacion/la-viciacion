@@ -204,6 +204,21 @@ class CreateGameTests(CatalogTestCase):
         self.assertEqual((duplicate.status_code, duplicate.json()["detail"]), (400, "Game already in DB"))
         self.assertEqual(self.scalar("SELECT COUNT(*) FROM games"), 1)
 
+    def test_a_typed_name_is_trimmed_before_it_is_compared_and_stored(self):
+        self.game("celeste", "Celeste")
+        for typed in (" Celeste", "Celeste ", "  CELESTE  ", "	celeste"):
+            with self.subTest(typed=typed):
+                self.assertEqual(self.create(name=typed).status_code, 400)
+        self.assertEqual(self.scalar("SELECT COUNT(*) FROM games"), 1)
+        stored = self.create(name="  Brand New  ").json()
+        self.assertEqual(stored["name"], "Brand New")
+
+    def test_an_empty_name_is_refused(self):
+        for typed in ("", "   "):
+            with self.subTest(typed=typed):
+                self.assertEqual(self.create(name=typed).status_code, 400)
+        self.assertEqual(self.scalar("SELECT COUNT(*) FROM games"), 0)
+
     def test_rawg_resolving_to_a_game_already_here_returns_that_game(self):
         self.game("celeste", "Celeste")
         self.with_rawg(Rawg(search=[CELESTE], details={101: CELESTE}))
