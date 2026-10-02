@@ -15,7 +15,7 @@ ADMIN = types.SimpleNamespace(id=1, username="boss", telegram_id=111)
 
 class TextTests(unittest.TestCase):
     def test_title_in_bold_then_the_message_with_markdown_escaped(self):
-        self.assertEqual(my_utils.announcement_text("Hola_mundo", "un *aviso*"), "*Hola\_mundo*\n\nun \*aviso\*")
+        self.assertEqual(my_utils.announcement_text("Hola_mundo", "un *aviso*"), "*Hola\\_mundo*\n\nun \\*aviso\\*")
 
     def test_without_a_message_it_is_only_the_title(self):
         self.assertEqual(my_utils.announcement_text("Hola", None), "*Hola*")

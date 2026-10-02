@@ -1,7 +1,7 @@
 import datetime
 from typing import List, Optional, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 NOTES_MAX = 500  # width of game_timers.notes
 
@@ -18,8 +18,7 @@ class User(UserBase):
     email: str | None = None
     is_active: int | None = 0
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class UserProfileUpdate(BaseModel):
@@ -57,8 +56,7 @@ class Game(BaseModel):
     slug: str | None = None
     rawg_id: int | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class NewGame(BaseModel):
@@ -107,8 +105,7 @@ class NewGameUser(BaseModel):
 class UsersGamesBase(BaseModel):
     id: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class UserGame(UsersGamesBase):
@@ -132,8 +129,7 @@ class Achievement(BaseModel):
     title: str | None = None
     message: str | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class UserAchievement(BaseModel):
@@ -143,8 +139,7 @@ class UserAchievement(BaseModel):
     date: datetime.date | None = None
     game_id: str | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Game Timer Schemas
@@ -185,8 +180,7 @@ class GameTimerResponse(GameTimerBase):
     duration_seconds: int | None = None
     is_active: bool = True
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class GameTimerGroup(BaseModel):

@@ -210,7 +210,7 @@ class CompletionNoticeTests(unittest.IsolatedAsyncioTestCase):
     async def test_without_ai_the_recommendation_is_a_plain_line(self):
         _, text = await self.send({"game": "Half_Life", "user": "Bob"}, completion=None)
         self.assertTrue(text.startswith("Ana completó Doom"))
-        self.assertIn("Half\_Life", text)  # escaped: a name must not break the Markdown
+        self.assertIn("Half\\_Life", text)  # escaped: a name must not break the Markdown
         self.assertIn("Lo tiene Bob", text)
 
     async def test_the_ai_is_told_about_the_recommendation_and_the_line_is_not_added(self):

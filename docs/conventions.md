@@ -92,7 +92,7 @@ Event-driven: hook it in `utils/actions.py` where the event happens, respecting 
 
 ### Add a dependency
 
-Pin the exact version, justify it in the commit message, and check it supports Python 3.13 (api and bot) or Node 20.19+. Prefer the standard library. Rebuild the image to verify.
+Pin the exact version, justify it in the commit message, and check it supports Python 3.14 (api and bot) or Node 20.19+. Prefer the standard library. Rebuild the image to verify.
 
 ## Definition of done
 

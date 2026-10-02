@@ -16,10 +16,10 @@ Simplified trunk-based development for a team of 2-3. `main` is the trunk: alway
 
 `.github/workflows/ci.yml` runs on every PR and again on `main` after the merge. The required status is the single job **`CI`**, which passes only if all of these pass (they live in `checks.yml`, the same ones that gate a release):
 
-- API tests (Python 3.13), including the Alembic history guards, the endpoint security list and the `.env.template` check.
+- API tests (Python 3.14), including the Alembic history guards, the endpoint security list and the `.env.template` check.
 - Migrations and schema rules on a real MariaDB (empty database to head, an older revision with data to head, re-run, downgrade, generated `season` columns, constraints), on the `lts` and `latest` images.
 - The API boots on a freshly migrated MariaDB (`test_mariadb_app_boot.py`): every route the routers declare is published under `/api/v1` and answers 401 without a token (except the reviewed public ones), the docs are hidden, and startup seeds the database.
-- Bot tests (Python 3.13).
+- Bot tests (Python 3.14).
 - Front tests and ESLint.
 - The three Docker images build and contain no secrets, data or baked-in credentials.
 - The PR title follows Conventional Commits.
