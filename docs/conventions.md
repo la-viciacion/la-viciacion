@@ -44,7 +44,7 @@ Read-only (except `/activate`, see architecture), generic endpoints only. Texts 
 ## Tests
 
 - API: `unittest`, files `api/tests/test_*.py`, importing `src.*` (run from `api/`). Mock time by passing `now` explicitly; mock `requests`/Telegram/the AI providers, never call real services.
-- Front: `node --test`, files `front/tests/*.test.js`.
+- Front: `node --test`, files `front/tests/*.test.js`; a page or a UI component is tested against jsdom in `front/tests/*.dom.test.js` with the helpers of `tests/dom.js` (see [development.md](development.md#tests-and-lint)).
 - A bug fix comes with a test that fails without it whenever the logic is testable.
 
 ## Recipes
