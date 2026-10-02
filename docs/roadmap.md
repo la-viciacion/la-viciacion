@@ -17,7 +17,6 @@ Until then: no tags or releases.
 - MariaDB-backed tests cover the migrations step by step, a synthetic v1 database, the schema rules and model parity (`api/tests/test_mariadb_*.py`, about 3.5 minutes because every alembic call boots the app). Still missing: API-level tests on MariaDB (timers/manual-session rules, authorization through real requests) and more refusal cases (008, 011, 016).
 - The downgrade of `008_season_generated` fails on MariaDB (`MODIFY` on a generated column, error 1907) and migrations 001-005 cannot be re-run. Both are applied and immutable (listed in `test_mariadb_migration_chain.py`); the way back in production is the pre-deploy backup.
 - **Next MariaDB LTS:** the image is pinned to 12.3.3 (LTS, supported until June 2029; see [deployment.md](deployment.md#mariadb-version)). Plan the move to the following LTS before then, with a dump and an empty data directory, and let the weekly `mariadb-versions.yml` run tell whether `latest` already passes. Dev databases created with the old untagged image (13.0) must be recreated from a dump.
-- The bot only tests its access rules (`bot/tests/test_access.py`); the handlers have no tests.
 - A new deployment ends with empty `_archived_*` tables (migration 005 renames the v1 `*_historical` tables that 000 had to create). Harmless; a migration that drops the archives that are empty would tidy it up.
 - `utils/email.py` is kept for the upcoming e-mail features; nothing calls it yet.
 - `crud/users.py` (~1300 lines) and `utils/actions.py` are large; split by responsibility when touched.
