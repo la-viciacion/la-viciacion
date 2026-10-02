@@ -1,0 +1,85 @@
+"""A throwaway database on a real MariaDB server, for the tests that SQLite cannot stand in for
+(migrations, generated columns, CHECK/UNIQUE/foreign-key rules).
+
+The server comes from TEST_MARIADB_URL, a SQLAlchemy URL of an account that may create databases,
+e.g. `mysql+pymysql://root:testpw@127.0.0.1:3399` (see docs/development.md). Without it the tests
+are skipped, so `unittest discover` keeps working with no Docker around; CI sets
+REQUIRE_MARIADB_TESTS=1 so a missing server there is a failure, never a silent skip.
+
+Never point it at a server that holds real data: every test creates its own database
+(`lavi_test_<random>`) and drops it at the end, but it is still the server's admin account.
+"""
+import os
+import subprocess
+import sys
+import unittest
+import uuid
+from pathlib import Path
+
+from sqlalchemy import create_engine, text
+from sqlalchemy.engine import make_url
+from sqlalchemy.orm import sessionmaker
+
+API_DIR = Path(__file__).resolve().parent.parent
+ADMIN_URL = os.environ.get("TEST_MARIADB_URL", "").strip()
+
+
+class MariaDBTestCase(unittest.TestCase):
+    """Skips (or fails in CI) without a server; otherwise gives the class its own empty database."""
+
+    db_name: str
+    engine = None
+
+    @classmethod
+    def setUpClass(cls):
+        if not ADMIN_URL:
+            if os.environ.get("REQUIRE_MARIADB_TESTS"):
+                raise AssertionError("REQUIRE_MARIADB_TESTS is set but TEST_MARIADB_URL is not")
+            raise unittest.SkipTest("TEST_MARIADB_URL is not set (no MariaDB to test against)")
+        cls.db_name = f"lavi_test_{uuid.uuid4().hex[:12]}"
+        cls._admin = create_engine(ADMIN_URL, isolation_level="AUTOCOMMIT")
+        with cls._admin.connect() as conn:
+            conn.execute(text(f"CREATE DATABASE `{cls.db_name}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"))
+        cls.engine = create_engine(make_url(ADMIN_URL).set(database=cls.db_name))
+
+    @classmethod
+    def tearDownClass(cls):
+        if cls.engine is not None:
+            cls.engine.dispose()
+            with cls._admin.connect() as conn:
+                conn.execute(text(f"DROP DATABASE IF EXISTS `{cls.db_name}`"))
+            cls._admin.dispose()
+
+    @classmethod
+    def alembic(cls, *args: str) -> subprocess.CompletedProcess:
+        """Runs the alembic CLI against this class's database, as entrypoint.sh does in production.
+
+        env.py builds the URL from the app's own variables, so those are what point it here.
+        """
+        url = make_url(ADMIN_URL)
+        env = {
+            **os.environ,
+            "MARIADB_HOST": f"{url.host}:{url.port}" if url.port else url.host,
+            "MARIADB_DATABASE": cls.db_name,
+            "MARIADB_USER": url.username,
+            "MARIADB_PASSWORD": url.password or "",
+        }
+        return subprocess.run(
+            [sys.executable, "-m", "alembic", *args],
+            cwd=API_DIR, env=env, capture_output=True, text=True, timeout=300,
+        )
+
+    @classmethod
+    def migrate(cls, target: str = "head") -> None:
+        result = cls.alembic("upgrade", target)
+        if result.returncode != 0:
+            raise AssertionError(f"alembic upgrade {target} failed:\n{result.stdout}\n{result.stderr}")
+
+    @classmethod
+    def session(cls):
+        return sessionmaker(bind=cls.engine, autoflush=False)()
+
+    @classmethod
+    def current_revision(cls) -> str | None:
+        with cls.engine.connect() as conn:
+            return conn.execute(text("SELECT version_num FROM alembic_version")).scalar()
