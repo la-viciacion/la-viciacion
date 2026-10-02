@@ -122,9 +122,13 @@ jobs:
         run: |
           image=check/${{ matrix.service }}
 
-          # files that must never end up in an image
+          # files that must never end up in an image. Only the directories that exist in that image
+          # are searched (the api and bot have /app, the front has the web root): find exits 1 for a
+          # missing path, which under `bash -e` would end this step silently.
           found=$(docker run --rm --entrypoint sh "$image" -c \
-            'find /app /usr/share/nginx/html \( -name ".env" -o -name ".env.*" -o -name "*.sql" -o -name "*.sql.gz" -o -name "*.dump" \) 2>/dev/null')
+            'for dir in /app /usr/share/nginx/html; do
+               [ -d "$dir" ] && find "$dir" \( -name ".env" -o -name ".env.*" -o -name "*.sql" -o -name "*.sql.gz" -o -name "*.dump" \)
+             done; true')
           if [ -n "$found" ]; then
             echo "::error::sensitive files inside the image:"; echo "$found"; exit 1
           fi
