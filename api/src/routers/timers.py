@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from .. import auth
 from ..auth import get_db
+from ..crud import scores as scores_crud
 from ..crud import users as users_crud
 from ..database.models import Game, GameTimer, PlatformTag, User, UserGame
 from ..database.schemas import (
@@ -250,6 +251,7 @@ def get_grouped_timer_history(
             .distinct()
         }
 
+    ratings = scores_crud.user_scores(db, user_id) if game_ids else {}
     groups: List[GameTimerGroup] = []
     for row in page:
         game = games.get(row.game_id)
@@ -265,6 +267,7 @@ def get_grouped_timer_history(
                 total_seconds=int(row.total_seconds),
                 session_count=row.session_count,
                 completed=row.game_id in completed,
+                score=ratings.get(row.game_id),
                 sessions=sessions,
             )
         )
@@ -491,7 +494,8 @@ def get_active_timer_endpoint(
     if active_timer:
         return ActiveTimerResponse(
             is_active=True,
-            timer=active_timer
+            timer=active_timer,
+            score=scores_crud.user_scores(db, user_id).get(active_timer.game_id),
         )
     else:
         return ActiveTimerResponse(

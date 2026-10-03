@@ -44,7 +44,7 @@ export async function render({ user, main, isCurrent }) {
   initHistory({
     userId: user.id,
     onContinue: (group) => startTimer(group.game_id, group.platform),
-    onComplete: (group) => openCompletion({ username: user.username, game: { id: group.game_id, name: group.game_name || group.game_id }, onChange: refresh }),
+    onComplete: (group) => openCompletion({ username: user.username, game: { id: group.game_id, name: group.game_name || group.game_id, score: group.score }, onChange: refresh }),
     onEditSession: (group, session) => openSessionForm({ game: { id: group.game_id, name: group.game_name || group.game_id }, session }),
   });
   main.querySelector('#manualSessionBtn').addEventListener('click', openManualSession);

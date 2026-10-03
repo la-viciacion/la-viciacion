@@ -140,6 +140,7 @@ def get_profile(db: Session, user: models.User, season: int = None) -> dict:
     total = time_entries_crud.get_user_played_time(db, user.id, season)
     played_time = total[1] if total is not None else 0
     achievements = get_achievements(db, user.username, season)
+    ratings = scores.user_scores(db, user.id)
     return {
         "season": "all" if every else season,
         "seasons": seasons_played(db, user.id),
@@ -160,7 +161,7 @@ def get_profile(db: Session, user: models.User, season: int = None) -> dict:
             "achievements": len(achievements),
         },
         "top_games": [
-            {"game_id": r.game_id, "game_name": r.game_name, "played_time": r.played_time or 0}
+            {"game_id": r.game_id, "game_name": r.game_name, "played_time": r.played_time or 0, "score": ratings.get(r.game_id)}
             for r in top_games(db, user.username, limit=5, season=season)
         ],
         "achievements": [

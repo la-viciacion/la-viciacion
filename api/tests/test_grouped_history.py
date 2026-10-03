@@ -71,8 +71,8 @@ class GroupedHistoryTests(unittest.TestCase):
         queries = []
         event.listen(self.db.get_bind(), "before_cursor_execute", lambda *a: queries.append(a[2]))
         self.page()
-        # count, page, games, newest sessions, platforms, completions
-        self.assertEqual(len(queries), 6)
+        # count, page, games, newest sessions, platforms, completions, ratings
+        self.assertEqual(len(queries), 7)
 
     def test_an_empty_history_needs_no_extra_queries(self):
         queries = []

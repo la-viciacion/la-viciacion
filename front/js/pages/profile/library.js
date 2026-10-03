@@ -16,6 +16,7 @@ import { html, mount } from '../../lib/html.js';
 import { platformName } from '../../lib/platforms.js';
 import { SCORE_HINT, SCORE_MAX, SCORE_MIN, parseScore, saveScore } from '../../lib/score.js';
 import * as seasons from '../../lib/seasons.js';
+import { scoreBadge } from '../../ui/score-badge.js';
 import { initSessions, openSessionForm } from '../home/sessions.js';
 
 const PAGE = 15;
@@ -108,8 +109,6 @@ function status(g) {
     : html`<span class="pf-tag">En curso</span>`;
 }
 
-const scoreTag = (g) => (g.score == null ? '' : html`<span class="pf-tag score" title="Tu nota">Nota ${g.score}</span>`);
-
 // Latest day a completion may be dated: today, or the end of a past season.
 const maxDate = (g) => {
   const today = new Date().toLocaleDateString('sv-SE');
@@ -175,7 +174,7 @@ function row(g) {
     <div class="pf-game ${g.complete_blocked ? 'locked' : ''}" data-id="${g.id}">
       ${thumb(g)}
       <div class="pf-row-main">
-        <div class="pf-game-title"><strong>${g.game_name}</strong> ${status(g)} ${scoreTag(g)}</div>
+        <div class="pf-game-title"><strong>${g.game_name}</strong> ${scoreBadge(g.score)} ${status(g)}</div>
         <div class="pf-sub">
           ${g.platform_name || 'Sin plataforma'} · Temporada ${g.season} · ${formatDuration(g.played_time)}
           ${g.last_played ? ` · Última sesión: ${formatRelative(g.last_played)}` : ''}

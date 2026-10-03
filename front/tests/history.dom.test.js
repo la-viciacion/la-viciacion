@@ -8,7 +8,7 @@ const { initHistory, loadHistory, onHistoryClick, onHistoryKey } = await import(
 
 const GROUPS = [
   { game_id: 'celeste', game_name: 'Celeste', image_url: null, platform: 'pc', platforms: ['pc', 'switch'], last_played: '2026-03-01T20:00:00',
-    total_seconds: 7200, session_count: 3, completed: true,
+    total_seconds: 7200, session_count: 3, completed: true, score: 87,
     sessions: [{ id: 11, start_time: '2026-03-01T20:00:00', duration_seconds: 3600, platform: 'pc', is_active: false },
                { id: 10, start_time: '2026-02-28T20:00:00', duration_seconds: 3600, platform: 'switch', is_active: false }] },
   { game_id: 'hades', game_name: 'Hades <b>', image_url: 'https://img/h.jpg', platform: 'pc', platforms: ['pc'], last_played: '2026-02-20T20:00:00',
@@ -44,8 +44,8 @@ const click = (selector) => document.querySelector(selector).click();
 
 test('one row per game, with the markup of a name shown as text and the "show more" counter', () => {
   assert.equal(calls[0].path, '/timers/history/7/grouped?limit=8&offset=0');
-  assert.deepEqual(text('.history-title'), ['Celeste', 'Hades <b>']);
-  assert.equal(document.querySelectorAll('.history-title b').length, 0);
+  assert.deepEqual(text('.history-name'), ['Celeste', 'Hades <b>']);
+  assert.equal(document.querySelectorAll('.history-name b').length, 0);
   assert.equal(text('#historyMoreBtn')[0], 'Mostrar más (9)');
   assert.ok(document.querySelector('[data-game-id="celeste"] .btn-continue.done'));
   assert.equal(document.querySelector('[data-game-id="hades"] .btn-continue.done'), null);
@@ -112,4 +112,10 @@ test('an API failure is shown in the list instead of leaving it empty', async ()
   installApi({ 'GET /timers/history/7/grouped': json({ detail: 'Se rompió' }, 500) });
   await loadHistory(true);
   assert.match(text('#historyList')[0], /Error cargando el historial: Se rompió/);
+});
+
+test('a rated game shows its rating next to the name, an unrated one shows none', () => {
+  assert.deepEqual(text('[data-game-id="celeste"] .history-title .score-badge'), ['87']);
+  assert.equal(document.querySelector('[data-game-id="celeste"] .score-badge').style.getPropertyValue('--h'), '109');
+  assert.equal(document.querySelector('[data-game-id="hades"] .score-badge'), null);
 });

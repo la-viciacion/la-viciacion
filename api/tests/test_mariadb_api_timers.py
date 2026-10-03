@@ -118,7 +118,7 @@ class StartTimerTests(TimerTestCase):
 class ActiveStopCancelTests(TimerTestCase):
     def test_no_timer_running_is_reported_as_such(self):
         body = self.api("GET", f"/timers/active/{self.ana}", as_user="ana").json()
-        self.assertEqual(body, {"is_active": False, "timer": None})
+        self.assertEqual(body, {"is_active": False, "timer": None, "score": None})
 
     def test_the_running_timer_is_reported(self):
         timer_id = self.start().json()["id"]

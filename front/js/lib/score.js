@@ -13,6 +13,12 @@ export function parseScore(text) {
   return number >= SCORE_MIN && number <= SCORE_MAX ? number : NaN;
 }
 
+/**
+ * Hue (HSL degrees) that tells how good a rating is at a glance: 1 is red, 50 amber-yellow, 100 green.
+ * The badge keeps saturation and lightness low so the scale is felt more than shouted.
+ */
+export const scoreHue = (score) => Math.round(((Math.min(SCORE_MAX, Math.max(SCORE_MIN, score)) - SCORE_MIN) / (SCORE_MAX - SCORE_MIN)) * 125);
+
 export const SCORE_HINT = `Un número entero de ${SCORE_MIN} a ${SCORE_MAX}`;
 
 /** Rate a game, or remove the rating when `score` is null. */

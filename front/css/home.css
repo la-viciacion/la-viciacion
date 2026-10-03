@@ -29,6 +29,7 @@
   color: var(--text-primary);
   margin-bottom: 12px;
 }
+.timer-game .score-badge { font-size: 0.78rem; margin-left: 4px; }
 
 .timer-duration {
   font-size: 2rem;
@@ -164,9 +165,10 @@
 .history-main { flex: 1; min-width: 0; }
 
 .history-title {
+  display: flex; align-items: center; gap: 8px;
   font-weight: 600; color: var(--text-primary);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+.history-name { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .history-row:hover .history-title { color: var(--accent-teal); }
 

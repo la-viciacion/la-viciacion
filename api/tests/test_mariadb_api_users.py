@@ -352,6 +352,18 @@ class ScoreTests(UsersTestCase):
         self.rate(20, as_user="bea", username="bea")
         self.assertEqual(sorted(self.stored()), sorted([(self.ana, "celeste", 70), (self.bea, "celeste", 20)]))
 
+    def test_the_rating_comes_with_the_games_the_pages_show(self):
+        self.session(self.ana, "celeste", ago(hours=3), 30)
+        self.session(self.ana, "hades", ago(hours=1), 30)
+        self.library_entry(self.ana, "hades", TODAY(), "pc")
+        self.rate(64)
+        profile = self.api("GET", "/users/ana/profile", as_user="ana").json()
+        self.assertEqual({g["game_id"]: g["score"] for g in profile["top_games"]}, {"celeste": 64, "hades": None})
+        history = self.api("GET", f"/timers/history/{self.ana}/grouped", as_user="ana").json()
+        self.assertEqual({g["game_id"]: g["score"] for g in history["groups"]}, {"celeste": 64, "hades": None})
+        self.api("POST", "/timers/start", as_user="ana", json={"user_id": self.ana, "game_id": "celeste", "platform": "pc"})
+        self.assertEqual(self.api("GET", f"/timers/active/{self.ana}", as_user="ana").json()["score"], 64)
+
     def test_only_the_owner_or_an_admin_rates(self):
         self.assertEqual(self.rate(50, as_user="bea").status_code, 403)
         self.assertEqual(self.api("DELETE", "/users/ana/games/celeste/score", as_user="bea").status_code, 403)

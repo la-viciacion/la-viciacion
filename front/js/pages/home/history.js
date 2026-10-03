@@ -5,6 +5,7 @@ import { formatDateTime, formatDuration, formatRelative } from '../../lib/format
 import { html, mount } from '../../lib/html.js';
 import { platformName } from '../../lib/platforms.js';
 import { iconCheck, iconChevron, iconPlay } from '../../ui/icons.js';
+import { scoreBadge } from '../../ui/score-badge.js';
 import { hasActive } from './timer.js';
 
 const PAGE_SIZE = 8; // games per page
@@ -73,7 +74,7 @@ function groupRow(g) {
           ? html`<img src="${g.image_url}" alt="" class="history-thumb" loading="lazy" />`
           : html`<div class="history-thumb history-thumb-placeholder" aria-hidden="true">🎮</div>`}
         <div class="history-main">
-          <div class="history-title" title="${name}">${name}</div>
+          <div class="history-title" title="${name}"><span class="history-name">${name}</span>${scoreBadge(g.score)}</div>
           <div class="history-meta">
             <span>${formatRelative(g.last_played)}</span>
             <span class="dot">·</span>

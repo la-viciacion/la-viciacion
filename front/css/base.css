@@ -144,3 +144,13 @@ body {
 
 /* the hidden attribute must win over any display rule */
 [hidden] { display: none !important; }
+
+/* A rating (1-100) next to a game's name: a ring whose hue goes from red to green with the score */
+.score-badge {
+  --h: 60;
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  min-width: 1.9em; height: 1.9em; padding: 0 0.4em; box-sizing: border-box; vertical-align: middle;
+  border-radius: var(--radius-pill); border: 1.5px solid hsl(var(--h) 50% 55% / 0.75);
+  background: hsl(var(--h) 50% 55% / 0.12); color: hsl(var(--h) 55% 72%);
+  font-size: 0.72rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums;
+}

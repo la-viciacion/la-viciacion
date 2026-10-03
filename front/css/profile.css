@@ -70,6 +70,7 @@
 }
 
 .pf-bar-label { display: flex; justify-content: space-between; gap: 10px; font-size: 0.85rem; }
+.pf-bar-label .score-badge { font-size: 0.68rem; margin-left: 4px; }
 
 .pf-bar { height: 6px; background: var(--border); border-radius: var(--radius-pill); overflow: hidden; margin-top: 4px; }
 
@@ -111,7 +112,6 @@
 .pf-game-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; }
 .pf-tag { font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: var(--radius-pill); background: var(--bg-card-hover); color: var(--text-secondary); }
 .pf-tag.done { background: rgba(61, 217, 179, 0.15); color: var(--accent-teal); }
-.pf-tag.score { background: rgba(255, 196, 61, 0.15); color: var(--accent-gold, #f5c542); }
 .pf-score-input { width: 90px; }
 .pf-date-form { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
 @media (max-width: 700px) { .pf-game-actions { margin-left: 0; width: 100%; } }

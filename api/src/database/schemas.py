@@ -198,6 +198,7 @@ class GameTimerGroup(BaseModel):
     total_seconds: int
     session_count: int
     completed: bool = False  # completed in the running season
+    score: int | None = None  # the user's rating of the game, 1-100
     # Most recent sessions first, capped by the endpoint's sessions_per_game.
     sessions: list[GameTimerResponse]
 
@@ -215,3 +216,4 @@ class GameTimerGroupPage(BaseModel):
 class ActiveTimerResponse(BaseModel):
     is_active: bool
     timer: GameTimerResponse | None = None
+    score: int | None = None  # the user's rating of the running game, 1-100
