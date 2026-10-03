@@ -1,19 +1,22 @@
 // "Marcar completado" from the history: a modal with the library entries of one game (one per
 // platform and season). The API decides what can be completed; this only offers it. Dates,
 // unmarking and the sessions of a game are in the profile (the games list of the profile summary).
+// Once a game is completed, a second modal (rating.js) offers to rate it.
 import { api, jsonRequest } from '../../lib/api.js';
 import { blockedReason } from '../../lib/completion.js';
 import { formatDate, formatDuration } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
 import { modalHeader, openModal } from '../../ui/modal.js';
 import { toast } from '../../ui/toast.js';
+import { scoreBadge } from '../../ui/score-badge.js';
+import { openRating } from './rating.js';
 
 const CONFIRM_MS = 4000;
 
 /** Opens the modal of `game` ({ id, name }) for the user `username`; onChange runs after a completion. */
 export async function openCompletion({ username, game, onChange }) {
   const path = `/users/${encodeURIComponent(username)}/library`;
-  const modal = openModal(html`${modalHeader(game.name)}<div class="comp-body" id="compBody"><div class="loading-spinner">Cargando...</div></div>`);
+  const modal = openModal(html`${modalHeader(html`${game.name} ${scoreBadge(game.score)}`)}<div class="comp-body" id="compBody"><div class="loading-spinner">Cargando...</div></div>`);
   const body = modal.el.querySelector('#compBody');
   let season = new Date().getFullYear();
   let items = [];
@@ -76,6 +79,8 @@ export async function openCompletion({ username, game, onChange }) {
       await api(`${path}/${button.dataset.complete}/completion`, jsonRequest('PATCH', { completed: true }));
       toast(`«${game.name}» marcado como completado`);
       message = '';
+      const current = items.find((g) => g.score != null)?.score ?? null; // the same on every entry of the game
+      openRating({ username, game, current });
       await onChange();
     } catch (err) {
       message = err.message;

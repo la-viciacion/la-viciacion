@@ -138,6 +138,20 @@ class SchemaRulesTests(MariaDBTestCase):
         with self.assertRaises(DBAPIError):
             self.execute("UPDATE user_settings SET timer_notice_minutes = 121 WHERE user_id = 50")
 
+    def test_a_score_is_one_to_a_hundred_once_per_user_and_game(self):
+        self.execute("INSERT INTO users (id, username, email) VALUES (60, 'dai', 'dai@example.com')")
+        self.execute("INSERT INTO games (id, name) VALUES ('gs1', 'Score Game')")
+        self.execute("INSERT INTO game_scores (user_id, game_id, score) VALUES (60, 'gs1', 100)")
+        for sql in (
+            "INSERT INTO game_scores (user_id, game_id, score) VALUES (60, 'gs1', 50)",  # once per user and game
+            "UPDATE game_scores SET score = 0 WHERE user_id = 60",
+            "UPDATE game_scores SET score = 101 WHERE user_id = 60",
+            "INSERT INTO game_scores (user_id, game_id, score) VALUES (999, 'gs1', 5)",  # unknown user
+            "INSERT INTO game_scores (user_id, game_id, score) VALUES (60, 'nope', 5)",  # unknown game
+        ):
+            with self.subTest(sql), self.assertRaises((IntegrityError, DBAPIError)):
+                self.execute(sql)
+
     def test_deleting_a_user_removes_their_settings(self):
         self.execute("INSERT INTO users (id, username, email) VALUES (51, 'cai', 'cai@example.com')")
         self.execute("INSERT INTO user_settings (user_id) VALUES (51)")
@@ -187,7 +201,7 @@ class UpgradeFromAnOlderRevisionTests(MariaDBTestCase):
 
     def test_values_survive(self):
         self.assertEqual(self.scalar("SELECT telegram_id FROM users WHERE username = 'ana'"), 111)
-        self.assertEqual(self.scalar("SELECT score FROM users_games WHERE user_id = 1 AND season = 2025"), 8.5)
+        self.assertEqual(self.scalar("SELECT completed FROM users_games WHERE user_id = 1 AND season = 2025"), 1)
         self.assertEqual(self.scalar("SELECT duration_seconds FROM game_timers WHERE user_id = 1"), 7200)
         self.assertEqual(self.scalar("SELECT is_active FROM game_timers WHERE user_id = 2"), 1)
 

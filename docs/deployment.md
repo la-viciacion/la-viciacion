@@ -137,6 +137,10 @@ The first deploy of the code-review release (2026-09-30) runs `015_seed_platform
 5. Healthy signs: `Running upgrade 014_user_settings -> 015_seed_platforms`, `... -> 016_foreign_keys`, then `Scheduler started` and `GET /api/v1/` answering.
 
 After `016` the database rejects what used to be kept by hand: deleting a user or a game that still has sessions, library entries or achievements fails (the admin panel already asks for confirmation and removes them first).
+### Migration 019 (game ratings) drops a column
+
+`019_game_scores` creates `game_scores` and **drops `users_games.score` without copying it** (a decision of the data's owner: ratings start from zero; the old column was only ever written by the admin panel and the app never read it). Back up first; the downgrade brings the column back empty.
+
 - Front and API are deployed together; keep API changes backwards compatible with the previously cached front where feasible (the front is revalidated on every load, so mismatch windows are short).
 
 ## Backups and restore

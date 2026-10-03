@@ -4,6 +4,7 @@ import { api, jsonRequest } from '../../lib/api.js';
 import { formatClock } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
 import { iconPlay, iconStop } from '../../ui/icons.js';
+import { scoreBadge } from '../../ui/score-badge.js';
 import { toast } from '../../ui/toast.js';
 
 let userId = null;
@@ -35,11 +36,11 @@ function startClock(startTime) {
   clock = setInterval(tick, 1000);
 }
 
-const activeCard = (timer, game) => html`
+const activeCard = (timer, game, score) => html`
   <div class="timer-active">
     <div class="timer-info">
       <div class="timer-label"><span class="live-dot"></span> Jugando ahora</div>
-      <div class="timer-game">${game?.name || timer.game_id}</div>
+      <div class="timer-game">${game?.name || timer.game_id} ${scoreBadge(score)}</div>
       <div class="timer-duration" id="timerDuration">00:00:00</div>
     </div>
     <div class="timer-actions">
@@ -68,7 +69,7 @@ export async function loadTimerCard() {
       hasActive = true;
       const game = await api(`/games/${encodeURIComponent(active.timer.game_id)}`).catch(() => null);
       if (!section.isConnected) return; // page was re-rendered meanwhile
-      mount(section, activeCard(active.timer, game));
+      mount(section, activeCard(active.timer, game, active.score));
       document.getElementById('stopTimerBtn').addEventListener('click', (e) => stopTimer(e.currentTarget.dataset.timerId));
       document.getElementById('cancelTimerBtn').addEventListener('click', (e) => cancelTimer(e.currentTarget.dataset.timerId));
       startClock(active.timer.start_time);

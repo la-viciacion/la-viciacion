@@ -79,6 +79,9 @@ class V1BackupToHeadTests(MariaDBTestCase):
         library_columns = {c["name"] for c in inspector.get_columns("users_games")}
         self.assertNotIn("played_time", library_columns)
         self.assertIn("completion_time", library_columns)
+        # migration 019: ratings start from zero, per user and game
+        self.assertNotIn("score", library_columns)
+        self.assertEqual(self.scalar("SELECT COUNT(*) FROM game_scores"), 0)
 
     def test_what_held_data_is_archived_not_dropped(self):
         tables = set(inspect(self.engine).get_table_names())
@@ -101,10 +104,10 @@ class V1BackupToHeadTests(MariaDBTestCase):
 
     def test_library_facts_are_copied_verbatim(self):
         row = self.rows(
-            "SELECT completed, completed_date, score, completion_time FROM users_games "
+            "SELECT completed, completed_date, completion_time FROM users_games "
             "WHERE user_id = 1 AND game_id = :g AND season = 2025", g=fx.HOLLOW,
         )[0]
-        self.assertEqual((row[0], str(row[1]), row[2], row[3]), (1, "2025-03-01", 9.0, 36000))
+        self.assertEqual((row[0], str(row[1]), row[2]), (1, "2025-03-01", 36000))
         undated = self.rows("SELECT completed, completed_date FROM users_games WHERE user_id = 2 AND season = 2024")[0]
         self.assertEqual((undated[0], undated[1]), (1, None))
 

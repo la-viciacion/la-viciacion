@@ -265,6 +265,14 @@ class LibraryTests(UsersTestCase):
         self.assertEqual((past["total"], [i["game_id"] for i in past["items"]], past["season"]), (1, ["tetris"], seasons.current()))
         self.assertEqual(self.get(season=1999)["total"], 0)
 
+    def test_every_entry_of_a_game_carries_the_rating_of_the_game(self):
+        again = self.library_entry(self.ana, "celeste", datetime.date(seasons.current() - 1, 2, 1), "switch")
+        self.assertTrue(again)
+        self.api("PUT", "/users/ana/games/celeste/score", as_user="ana", json={"score": 77})
+        items = self.get()["items"]
+        self.assertEqual({i["id"]: i["score"] for i in items if i["game_id"] == "celeste"}, {self.celeste: 77, again: 77})
+        self.assertIsNone(next(i for i in items if i["game_id"] == "hades")["score"])
+
     def test_the_bounds(self):
         for params in ({"limit": 0}, {"limit": 101}, {"offset": -1}):
             self.assertEqual(self.api("GET", "/users/ana/library", as_user="ana", params=params).status_code, 422, params)
@@ -296,6 +304,70 @@ class RecommendationsTests(UsersTestCase):
 
     def test_it_is_private(self):
         self.assertEqual(self.api("GET", "/users/ana/recommendations", as_user="bea").status_code, 403)
+
+
+class ScoreTests(UsersTestCase):
+    def setUp(self):
+        super().setUp()
+        self.library_entry(self.ana, "celeste", TODAY(), "pc")
+        # the same game in another season and platform: still one rating
+        self.library_entry(self.ana, "celeste", datetime.date(seasons.current() - 1, 5, 1), "switch")
+
+    def rate(self, score, as_user="ana", username="ana", game="celeste"):
+        return self.api("PUT", f"/users/{username}/games/{game}/score", as_user=as_user, json={"score": score})
+
+    def stored(self):
+        return [tuple(r) for r in self.rows("SELECT user_id, game_id, score FROM game_scores")]
+
+    def test_a_game_is_rated_and_the_rating_changed(self):
+        self.assertEqual(self.rate(80).json(), {"game_id": "celeste", "score": 80})
+        self.assertEqual(self.rate(95).status_code, 200)
+        self.assertEqual(self.stored(), [(self.ana, "celeste", 95)])
+
+    def test_the_rating_is_removed(self):
+        self.rate(80)
+        response = self.api("DELETE", "/users/ana/games/celeste/score", as_user="ana")
+        self.assertEqual((response.status_code, response.json()["score"]), (200, None))
+        self.assertEqual(self.stored(), [])
+        self.assertEqual(self.api("DELETE", "/users/ana/games/celeste/score", as_user="ana").status_code, 200)  # harmless
+
+    def test_the_range_is_one_to_a_hundred_in_whole_numbers(self):
+        for score in (0, 101, -1, 7.5, "x", None):
+            with self.subTest(score):
+                self.assertEqual(self.rate(score).status_code, 422)
+        for score in (1, 100):
+            self.assertEqual(self.rate(score).status_code, 200)
+
+    def test_only_a_game_of_the_library_can_be_rated(self):
+        response = self.rate(50, game="hades")
+        self.assertEqual((response.status_code, response.json()["detail"]), (404, messages.GAME_NOT_IN_LIBRARY))
+        self.assertEqual(self.stored(), [])
+
+    def test_a_rating_does_not_depend_on_the_completion(self):
+        self.assertEqual(self.rate(60).status_code, 200)  # not completed, and the other entry is of a closed season
+
+    def test_each_player_has_their_own(self):
+        self.library_entry(self.bea, "celeste", TODAY(), "pc")
+        self.rate(70)
+        self.rate(20, as_user="bea", username="bea")
+        self.assertEqual(sorted(self.stored()), sorted([(self.ana, "celeste", 70), (self.bea, "celeste", 20)]))
+
+    def test_the_rating_comes_with_the_games_the_pages_show(self):
+        self.session(self.ana, "celeste", ago(hours=3), 30)
+        self.session(self.ana, "hades", ago(hours=1), 30)
+        self.library_entry(self.ana, "hades", TODAY(), "pc")
+        self.rate(64)
+        profile = self.api("GET", "/users/ana/profile", as_user="ana").json()
+        self.assertEqual({g["game_id"]: g["score"] for g in profile["top_games"]}, {"celeste": 64, "hades": None})
+        history = self.api("GET", f"/timers/history/{self.ana}/grouped", as_user="ana").json()
+        self.assertEqual({g["game_id"]: g["score"] for g in history["groups"]}, {"celeste": 64, "hades": None})
+        self.api("POST", "/timers/start", as_user="ana", json={"user_id": self.ana, "game_id": "celeste", "platform": "pc"})
+        self.assertEqual(self.api("GET", f"/timers/active/{self.ana}", as_user="ana").json()["score"], 64)
+
+    def test_only_the_owner_or_an_admin_rates(self):
+        self.assertEqual(self.rate(50, as_user="bea").status_code, 403)
+        self.assertEqual(self.api("DELETE", "/users/ana/games/celeste/score", as_user="bea").status_code, 403)
+        self.assertEqual(self.rate(50, as_user="root").status_code, 200)
 
 
 class CompletionTests(UsersTestCase):

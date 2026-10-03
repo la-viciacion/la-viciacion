@@ -177,7 +177,7 @@ export const ENTITIES = {
 
   library: {
     label: 'Biblioteca',
-    description: 'Juegos de la biblioteca de cada jugador por temporada, con su estado y nota.',
+    description: 'Juegos de la biblioteca de cada jugador por temporada, con su estado.',
     endpoint: '/manage/library',
     filters: ['user', 'game'],
     selects: [
@@ -193,14 +193,12 @@ export const ENTITIES = {
       { label: 'Temp.', sort: 'season', render: (r) => r.season ?? '—' },
       { label: 'Inicio', sort: 'started', render: (r) => r.started_date || '—' },
       { label: 'Completado', sort: 'completed', render: (r) => (r.completed ? badge(`Sí ${r.completed_date || ''}`, 'green') : badge('No', 'gray')) },
-      { label: 'Nota', sort: 'score', render: (r) => (r.score != null ? r.score : '—') },
     ],
     fields: [
       platformField,
       { key: 'started_date', label: 'Fecha de inicio (su año es la temporada)', type: 'date', required: true },
       { key: 'completed', label: 'Completado', type: 'checkbox' },
       { key: 'completed_date', label: 'Fecha de completado', type: 'date' },
-      { key: 'score', label: 'Nota (0-10)', type: 'number', step: '0.1' },
     ],
     createFields: [
       { key: 'user_id', label: 'Usuario', type: 'user', required: true },
@@ -209,6 +207,29 @@ export const ENTITIES = {
       { key: 'started_date', label: 'Fecha de inicio (vacío = hoy; su año es la temporada)', type: 'date' },
     ],
     createLabel: 'Nueva entrada',
+    name: (r) => `${r.user} · ${r.game}`,
+    canDelete: true,
+  },
+
+  scores: {
+    label: 'Puntuaciones',
+    description: 'La nota (1-100) que cada jugador ha dado a un juego: una por jugador y juego, sea cual sea la temporada.',
+    endpoint: '/manage/scores',
+    filters: ['user', 'game'],
+    defaultSort: { key: 'updated', dir: 'desc' },
+    columns: [
+      userColumn,
+      gameColumn,
+      { label: 'Nota', sort: 'score', render: (r) => r.score },
+      { label: 'Cambiada', sort: 'updated', render: (r) => formatTimestamp(r.updated_at) },
+    ],
+    fields: [{ key: 'score', label: 'Nota (1-100)', type: 'number', required: true }],
+    createFields: [
+      { key: 'user_id', label: 'Usuario', type: 'user', required: true },
+      { key: 'game_id', label: 'Juego', type: 'game', required: true },
+      { key: 'score', label: 'Nota (1-100)', type: 'number', required: true },
+    ],
+    createLabel: 'Nueva puntuación',
     name: (r) => `${r.user} · ${r.game}`,
     canDelete: true,
   },

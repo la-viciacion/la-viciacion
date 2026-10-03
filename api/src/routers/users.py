@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from .. import auth
 from ..auth import get_db
-from ..crud import games, users
+from ..crud import games, scores, users
 from ..database import models, schemas
 from ..utils import actions, images
 from ..utils import messages as msg
@@ -281,6 +281,44 @@ def update_completion(
         _check_completion_date(entry, body.completed_date)
         users.set_completed_date(db, entry, body.completed_date)
     return users.get_library_item(db, user.id, entry.id)
+
+
+def _rated_game(db: Session, user: models.User, game_id: str) -> None:
+    """Only a game of the user's library (any season) can be rated."""
+    if not db.query(models.UserGame.id).filter_by(user_id=user.id, game_id=game_id).first():
+        raise HTTPException(status_code=404, detail=msg.GAME_NOT_IN_LIBRARY)
+
+
+@router.put("/{username}/games/{game_id}/score")
+def rate_game(
+    username: str,
+    game_id: str,
+    body: schemas.ScoreUpdate,
+    active_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Rate a game from 1 to 100 (or change the rating): one per game, whatever the season or platform."""
+    auth.ensure_self_or_admin(active_user, username=username)
+    user = _target_user(db, active_user, username)
+    _rated_game(db, user, game_id)
+    scores.set_score(db, user.id, game_id, body.score)
+    db.commit()
+    return {"game_id": game_id, "score": body.score}
+
+
+@router.delete("/{username}/games/{game_id}/score")
+def remove_game_score(
+    username: str,
+    game_id: str,
+    active_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Remove the rating of a game (nothing happens if it had none)."""
+    auth.ensure_self_or_admin(active_user, username=username)
+    user = _target_user(db, active_user, username)
+    scores.clear_score(db, user.id, game_id)
+    db.commit()
+    return {"game_id": game_id, "score": None}
 
 
 @router.patch("/{username}/avatar")

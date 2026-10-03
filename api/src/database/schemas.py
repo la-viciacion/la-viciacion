@@ -39,6 +39,10 @@ class CompletionUpdate(BaseModel):
     completed_date: datetime.date | None = None
 
 
+class ScoreUpdate(BaseModel):
+    score: int = Field(ge=1, le=100)
+
+
 class PasswordChange(BaseModel):
     current_password: str
     new_password: str
@@ -118,7 +122,6 @@ class UserGame(UsersGamesBase):
     platform_name: str | None = None
     completed: int | None = None
     completed_date: datetime.date | None = None
-    score: float | None = None
     played_time: int | None = None
     completion_time: int | None = None
 
@@ -195,6 +198,7 @@ class GameTimerGroup(BaseModel):
     total_seconds: int
     session_count: int
     completed: bool = False  # completed in the running season
+    score: int | None = None  # the user's rating of the game, 1-100
     # Most recent sessions first, capped by the endpoint's sessions_per_game.
     sessions: list[GameTimerResponse]
 
@@ -212,3 +216,4 @@ class GameTimerGroupPage(BaseModel):
 class ActiveTimerResponse(BaseModel):
     is_active: bool
     timer: GameTimerResponse | None = None
+    score: int | None = None  # the user's rating of the running game, 1-100

@@ -50,12 +50,6 @@ class UpdateSessionTests(unittest.TestCase):
         self.change_platform()
         self.assertEqual(self.entries(), ["pc", "ps"])
 
-    def test_a_rated_entry_stays(self):
-        self.db.query(models.UserGame).update({"score": 8.0})
-        self.db.commit()
-        self.change_platform()
-        self.assertEqual(self.entries(), ["pc", "ps"])
-
     def test_editing_only_the_notes_touches_no_entry(self):
         timers.update_session(self.db, ADMIN, self.timer.id, SessionUpdate(notes="ok"))
         self.assertEqual(self.entries(), ["pc"])
