@@ -417,3 +417,55 @@ class DeleteSessionTests(TimerTestCase):
         old = self.session(self.ana, "hades", datetime.datetime(seasons.current() - 1, 3, 1, 20, 0), 60)
         self.assertEqual(self.api("DELETE", f"/timers/{old}", as_user="ana").status_code, 400)
         self.assertEqual(self.api("DELETE", f"/timers/{old}", as_user="root").status_code, 200)
+
+
+class NowPlayingTests(TimerTestCase):
+    def playing(self, as_user="bea"):
+        return self.api("GET", "/timers/now-playing", as_user=as_user)
+
+    def rewind(self, hours, user_id):
+        with self.engine.begin() as conn:
+            conn.execute(text("UPDATE game_timers SET start_time = start_time - INTERVAL :h HOUR WHERE user_id = :u AND is_active = 1"),
+                         {"h": hours, "u": user_id})
+
+    def test_nobody_playing_is_an_empty_list(self):
+        response = self.playing()
+        self.assertEqual((response.status_code, response.json()), (200, []))
+
+    def test_it_lists_who_is_playing_what_for_every_logged_in_player(self):
+        self.start(user="ana", game="celeste", platform="pc")
+        body = self.playing().json()
+        self.assertEqual(len(body), 1)
+        self.assertEqual((body[0]["user_id"], body[0]["name"], body[0]["game_name"], body[0]["platform"], body[0]["stale"]),
+                         (self.ana, "Ana", "Celeste", "pc", False))
+        self.assertIn("start_time", body[0])
+        self.assertEqual(self.api("GET", "/timers/now-playing").status_code, 401)
+
+    def test_finished_timers_inactive_players_and_the_emergency_account_are_left_out(self):
+        timer = self.start(user="ana").json()["id"]
+        self.api("POST", f"/timers/stop/{timer}", as_user="ana", params={"user_id": self.ana})
+        self.start(user="bea", game="hades")
+        with self.engine.begin() as conn:
+            conn.execute(text("UPDATE users SET is_active = 0 WHERE id = :i"), {"i": self.bea})
+        self.assertEqual(self.playing(as_user="root").json(), [])
+
+    def test_after_six_hours_a_timer_is_stale_and_comes_last(self):
+        self.start(user="ana", game="celeste")
+        self.rewind(7, self.ana)
+        self.start(user="bea", game="hades")
+        body = self.playing(as_user="root").json()
+        self.assertEqual([(p["name"], p["stale"]) for p in body], [("Bea", False), ("Ana", True)])
+
+    def test_the_latest_started_comes_first(self):
+        self.start(user="ana", game="celeste")
+        self.rewind(2, self.ana)
+        self.start(user="bea", game="hades")
+        self.assertEqual([p["name"] for p in self.playing(as_user="root").json()], ["Bea", "Ana"])
+
+    def test_a_player_can_hide_from_the_others_but_not_from_themselves(self):
+        self.start(user="ana", game="celeste")
+        self.api("PATCH", "/users/ana/settings", as_user="ana", json={"show_playing": False})
+        self.assertEqual(self.playing(as_user="bea").json(), [])
+        self.assertEqual([p["name"] for p in self.playing(as_user="ana").json()], ["Ana"])
+        self.api("PATCH", "/users/ana/settings", as_user="ana", json={"show_playing": True})
+        self.assertEqual(len(self.playing(as_user="bea").json()), 1)

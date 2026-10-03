@@ -4,14 +4,15 @@
 //   active      navbar item to highlight ('home' | 'profile' | 'admin')
 //   mainClass   optional class for <main>
 //   adminOnly   optional; non-admins are sent home
-//   render({ user, main, avatarUrl, isCurrent })   fills <main>; isCurrent() turns false
-//                                       once the user navigated elsewhere
+//   render({ user, main, avatarUrl, isCurrent, onLogout })   fills <main>; isCurrent() turns false
+//                                       once the user navigated elsewhere; onLogout ends the session
 //   dispose()   optional cleanup when leaving the page
 import { api, loadAvatarUrl, session, setUnauthorizedHandler } from './lib/api.js';
 import { RESET_ROUTE, isResetRoute, resetTokenFromHash } from './lib/recovery.js';
 import * as home from './pages/home/index.js';
 import { showLogin } from './pages/auth/login.js';
 import { showForgotPassword, showResetPassword } from './pages/auth/recover.js';
+import { stopPresence } from './lib/presence.js';
 import { renderShell, showLoading } from './ui/layout.js';
 import { inviteToPush } from './ui/push-invite.js';
 
@@ -32,6 +33,7 @@ function leaveCurrentPage() {
 
 function logout() {
   session.clear();
+  stopPresence();
   leaveCurrentPage();
   showLogin(route);
 }
@@ -72,9 +74,9 @@ async function route() {
     const avatarUrl = await loadAvatarUrl(user.username);
     if (!isCurrent()) return;
 
-    const main = renderShell({ user, avatarUrl, active: page.active, mainClass: page.mainClass, onLogout: logout });
+    const main = renderShell({ user, avatarUrl, active: page.active, mainClass: page.mainClass });
     currentPage = page;
-    await page.render({ user, main, avatarUrl, isCurrent });
+    await page.render({ user, main, avatarUrl, isCurrent, onLogout: logout });
     inviteToPush().catch(() => {}); // optional: never blocks or breaks a page
   } catch (err) {
     console.error(err);
@@ -85,6 +87,7 @@ async function route() {
 }
 
 setUnauthorizedHandler(() => {
+  stopPresence();
   leaveCurrentPage();
   showLogin(route);
 });

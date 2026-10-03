@@ -1,4 +1,5 @@
 import datetime
+import hashlib
 
 from fastapi import (
     APIRouter,
@@ -6,6 +7,7 @@ from fastapi import (
     Depends,
     HTTPException,
     Query,
+    Request,
     Response,
     UploadFile,
 )
@@ -344,6 +346,30 @@ def upload_avatar(
     except Exception as e:
         logger.error("Error saving avatar: " + str(e))
         raise HTTPException(status_code=500, detail=msg.INTERNAL_ERROR)
+
+
+@router.get("/photo/{player_id}")
+def get_player_photo(
+    player_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """The photo of an active player, for every logged-in user: the group sees each other (the chip of who is
+    playing now). Unlike /{username}/avatar it is not limited to the owner on purpose; it only ever returns an
+    image, and nothing for inactive accounts or the emergency account."""
+    row = (
+        db.query(models.User.avatar)
+        .filter(models.User.id == player_id, models.User.is_active == 1, models.not_god())
+        .first()
+    )
+    if not row or not row[0]:
+        raise HTTPException(status_code=404, detail="Avatar not found")
+    image = bytes(row[0])
+    etag = '"' + hashlib.sha1(image).hexdigest() + '"'
+    headers = {"ETag": etag, "Cache-Control": "private, max-age=300"}
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers=headers)
+    return Response(content=image, media_type=images.media_type_of(image), headers=headers)
 
 
 @router.get("/{username}/avatar")

@@ -11,13 +11,13 @@ export const modalHeader = (title) => html`
   </div>`;
 
 /**
- * Open a modal with the given html`` content.
+ * Open a modal with the given html`` content. `sheet` makes it a bottom sheet on a phone.
  * Returns { el, close }; onClose runs however the modal is dismissed
  * (close button, click outside, Escape or close()).
  */
-export function openModal(content, { wide = false, onClose } = {}) {
+export function openModal(content, { wide = false, sheet = false, onClose } = {}) {
   const overlay = document.createElement('div');
-  overlay.className = 'modal-overlay';
+  overlay.className = `modal-overlay ${sheet ? 'modal-sheet' : ''}`;
   mount(overlay, html`<div class="modal-content ${wide ? 'modal-wide' : ''}">${content}</div>`);
 
   const onKey = (e) => { if (e.key === 'Escape') close(); };

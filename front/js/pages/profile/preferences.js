@@ -1,6 +1,7 @@
 // Personal preferences of the profile (PATCH /users/{username}/settings). An empty field means
 // the default; the API says which one it is.
 //  - "Avisos de timer olvidado": how many hours a timer may run before the reminder.
+//  - "Jugando ahora": whether the others see you in the navbar chip while your timer runs.
 import { api, jsonRequest } from '../../lib/api.js';
 import { HOURS_HINT, MAX_HOURS, MIN_HOURS, parseHours } from '../../lib/hours.js';
 import { html, mount } from '../../lib/html.js';
@@ -42,6 +43,13 @@ export async function initPreferences(el, { path }) {
       <div class="pf-sub">${HOURS_HINT} Si lo dejas vacío, te avisamos a las ${hoursDefault} horas. El aviso se comprueba cada hora, así que puede llegar hasta una hora después.</div>
       <div class="pf-msg" role="status"></div>
       <div><button class="pf-btn primary" type="submit">Guardar</button></div>
+    </form>
+
+    ${heading('Jugando ahora')}
+    <form class="pf-card pf-form" id="pfPlaying" novalidate>
+      <label class="adm-check"><input type="checkbox" name="show" ${(settings.show_playing ?? settings.defaults.show_playing) ? 'checked' : ''} /> Mostrar a los demás cuándo estoy jugando</label>
+      <div class="pf-sub">Si lo desactivas, el resto del grupo no te verá en «Jugando ahora» (tú sí verás el halo verde en tu avatar). Los avisos al grupo que ya existen no cambian.</div>
+      <div class="pf-msg" role="status"></div>
     </form>`);
 
   bindForm(
@@ -55,4 +63,18 @@ export async function initPreferences(el, { path }) {
     },
     path,
   );
+
+  const playing = el.querySelector('#pfPlaying');
+  const say = playing.querySelector('.pf-msg');
+  playing.show.addEventListener('change', async () => {
+    try {
+      await api(path, jsonRequest('PATCH', { show_playing: playing.show.checked }));
+      say.textContent = playing.show.checked ? 'Guardado: los demás te verán cuando juegues' : 'Guardado: los demás no te verán cuando juegues';
+      say.className = 'pf-msg ok';
+    } catch (err) {
+      playing.show.checked = !playing.show.checked;
+      say.textContent = err.message;
+      say.className = 'pf-msg err';
+    }
+  });
 }

@@ -198,3 +198,12 @@
 .modal-confirm { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 16px; text-align: center; }
 .modal-confirm-text { display: flex; flex-direction: column; gap: 6px; font-size: 0.9rem; color: var(--text-secondary); }
 .modal-confirm-text strong { color: var(--text-primary); font-size: 1rem; }
+
+/* A bottom sheet on a phone (openModal(..., { sheet: true })); a normal modal on a wide screen */
+@media (max-width: 640px) {
+  .modal-sheet { align-items: flex-end; padding: 0; }
+  .modal-sheet .modal-content {
+    margin-top: 0; max-width: none; max-height: 75vh; border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}

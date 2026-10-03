@@ -32,6 +32,8 @@ class UserSettingsUpdate(BaseModel):
     forgotten_timer_hours: int | None = None
     # whole minutes, 10-120 (checked in the route)
     timer_notice_minutes: int | None = None
+    # whether the others see the user in "playing now"; None goes back to the default (shown)
+    show_playing: bool | None = None
 
 
 class CompletionUpdate(BaseModel):

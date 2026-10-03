@@ -168,13 +168,21 @@ class SettingsTests(UsersTestCase):
     def test_without_choices_every_value_is_the_default(self):
         body = self.api("GET", "/users/ana/settings", as_user="ana").json()
         self.assertEqual((body["forgotten_timer_hours"], body["timer_notice_minutes"]), (None, None))
-        self.assertEqual(body["defaults"], {"forgotten_timer_hours": 4, "timer_notice_minutes": 10})
+        self.assertEqual(body["defaults"], {"forgotten_timer_hours": 4, "timer_notice_minutes": 10, "show_playing": True})
+        self.assertIsNone(body["show_playing"])
 
     def test_a_value_can_be_set_and_reset_with_null(self):
         self.assertEqual(self.patch(forgotten_timer_hours=6, timer_notice_minutes=30).json()["forgotten_timer_hours"], 6)
         self.assertEqual(self.api("GET", "/users/ana/settings", as_user="ana").json()["timer_notice_minutes"], 30)
         reset = self.patch(forgotten_timer_hours=None).json()
         self.assertEqual((reset["forgotten_timer_hours"], reset["timer_notice_minutes"]), (None, 30))
+
+    def test_showing_that_one_is_playing_can_be_switched_off_and_reset(self):
+        self.assertIs(self.patch(show_playing=False).json()["show_playing"], False)
+        self.assertIs(self.api("GET", "/users/ana/settings", as_user="ana").json()["show_playing"], False)
+        self.assertIs(self.patch(show_playing=True).json()["show_playing"], True)
+        self.assertIsNone(self.patch(show_playing=None).json()["show_playing"])
+        self.assertEqual(self.patch(show_playing="maybe").status_code, 422)
 
     def test_the_limits(self):
         for hours in (0, 25, -1):
@@ -499,3 +507,35 @@ class AvatarTests(UsersTestCase):
         self.assertEqual(self.api("GET", "/users/ana/avatar", as_user="bea").status_code, 403)
         self.assertEqual(self.api("GET", "/users/ana/avatar", as_user="root").status_code, 200)
         self.assertEqual(self.upload(png(), as_user="root", username="nobody").status_code, 404)
+
+
+class PlayerPhotoTests(UsersTestCase):
+    def photo(self, player_id, as_user="bea", **headers):
+        return self.api("GET", f"/users/photo/{player_id}", as_user=as_user, headers=headers)
+
+    def upload(self, username="ana", data=None):
+        self.assertEqual(self.api("PATCH", f"/users/{username}/avatar", as_user=username,
+                                  files={"file": ("a.png", data or png(), "image/png")}).status_code, 200)
+
+    def test_any_logged_in_player_sees_the_photo_of_an_active_player(self):
+        image = png()
+        self.upload(data=image)
+        served = self.photo(self.ana)
+        self.assertEqual((served.status_code, served.headers["content-type"], served.content), (200, "image/png", image))
+
+    def test_it_can_be_revalidated_with_its_etag(self):
+        self.upload()
+        etag = self.photo(self.ana).headers["etag"]
+        self.assertEqual(self.photo(self.ana, **{"If-None-Match": etag}).status_code, 304)
+
+    def test_nothing_for_a_player_without_photo_an_unknown_one_or_an_inactive_one(self):
+        self.assertEqual(self.photo(self.ana).status_code, 404)
+        self.assertEqual(self.photo(999999).status_code, 404)
+        gone = self.user("gone", active=False)
+        with self.engine.begin() as conn:
+            conn.execute(text("UPDATE users SET avatar = :a WHERE id = :i"), {"a": png(), "i": gone})
+        self.assertEqual(self.photo(gone).status_code, 404)
+
+    def test_it_needs_a_login(self):
+        self.upload()
+        self.assertEqual(self.api("GET", f"/users/photo/{self.ana}").status_code, 401)

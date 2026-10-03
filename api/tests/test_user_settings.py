@@ -30,9 +30,11 @@ class ForgottenTimerHoursTests(unittest.TestCase):
             {
                 "forgotten_timer_hours": None,
                 "timer_notice_minutes": None,
+                "show_playing": None,
                 "defaults": {
                     "forgotten_timer_hours": us.DEFAULT_FORGOTTEN_TIMER_HOURS,
                     "timer_notice_minutes": us.DEFAULT_TIMER_NOTICE_MINUTES,
+                    "show_playing": us.DEFAULT_SHOW_PLAYING,
                 },
             },
         )
@@ -66,7 +68,7 @@ class TimerNoticeMinutesTests(unittest.TestCase):
             self.assertFalse(us.valid_timer_notice_minutes(bad), repr(bad))
 
     def test_update_sets_and_resets_it_without_touching_the_other_setting(self):
-        row = SimpleNamespace(user_id=7, forgotten_timer_hours=6, timer_notice_minutes=None)
+        row = SimpleNamespace(user_id=7, forgotten_timer_hours=6, timer_notice_minutes=None, show_playing=None)
         db = db_with(row)
         us.update(db, 7, {"timer_notice_minutes": 30})
         self.assertEqual((row.forgotten_timer_hours, row.timer_notice_minutes), (6, 30))
@@ -109,6 +111,22 @@ class RouteTests(unittest.TestCase):
         self.assertEqual(update.call_args.args[2], {"timer_notice_minutes": None})
 
 
+class ShowPlayingTests(unittest.TestCase):
+    def test_shown_unless_the_user_chose_otherwise(self):
+        self.assertTrue(us.show_playing(db_with(None), 1))
+        self.assertTrue(us.show_playing(db_with(SimpleNamespace(show_playing=None)), 1))
+        self.assertTrue(us.show_playing(db_with(SimpleNamespace(show_playing=True)), 1))
+        self.assertFalse(us.show_playing(db_with(SimpleNamespace(show_playing=False)), 1))
+
+    def test_it_is_set_and_reset_without_touching_the_others(self):
+        row = SimpleNamespace(user_id=7, forgotten_timer_hours=6, timer_notice_minutes=None, show_playing=None)
+        db = db_with(row)
+        us.update(db, 7, {"show_playing": False})
+        self.assertEqual((row.forgotten_timer_hours, row.show_playing), (6, False))
+        us.update(db, 7, {"show_playing": None})
+        self.assertIsNone(row.show_playing)
+
+
 class UpdateTests(unittest.TestCase):
     def test_creates_the_row_the_first_time(self):
         db = db_with(None)
@@ -118,7 +136,7 @@ class UpdateTests(unittest.TestCase):
         db.commit.assert_called_once()
 
     def test_none_resets_to_the_default_and_absent_keys_are_untouched(self):
-        row = SimpleNamespace(user_id=7, forgotten_timer_hours=6, timer_notice_minutes=None)
+        row = SimpleNamespace(user_id=7, forgotten_timer_hours=6, timer_notice_minutes=None, show_playing=None)
         db = db_with(row)
         us.update(db, 7, {})
         self.assertEqual(row.forgotten_timer_hours, 6)
