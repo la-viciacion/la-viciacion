@@ -14,6 +14,7 @@ import { showLogin } from './pages/auth/login.js';
 import { showForgotPassword, showResetPassword } from './pages/auth/recover.js';
 import { stopPresence } from './lib/presence.js';
 import { renderShell, showLoading } from './ui/layout.js';
+import { closeMenu } from './ui/menu.js';
 import { openPlayingSheet } from './ui/playing.js';
 import { inviteToPush } from './ui/push-invite.js';
 
@@ -22,6 +23,7 @@ const ROUTES = [
   { prefix: '#/profile', load: () => import('./pages/profile/index.js') },
   { prefix: '#/game/', load: () => import('./pages/game/index.js') },
   { prefix: '#/group', load: () => import('./pages/group/index.js') },
+  { prefix: '#/stats', load: () => import('./pages/stats/index.js') },
 ];
 
 let navigation = 0; // only the most recent navigation may touch the DOM
@@ -30,6 +32,7 @@ let currentPage = null;
 const loadPage = (hash) => ROUTES.find((r) => hash.startsWith(r.prefix))?.load() ?? Promise.resolve(home);
 
 function leaveCurrentPage() {
+  closeMenu();
   currentPage?.dispose?.();
   currentPage = null;
 }
@@ -77,7 +80,7 @@ async function route() {
     const avatarUrl = await loadAvatarUrl(user.username);
     if (!isCurrent()) return;
 
-    const main = renderShell({ user, avatarUrl, active: page.active, mainClass: page.mainClass });
+    const main = renderShell({ user, avatarUrl, active: page.active, mainClass: page.mainClass, onLogout: logout });
     currentPage = page;
     await page.render({ user, main, avatarUrl, isCurrent, onLogout: logout });
     if (location.hash === '#/playing' && isCurrent()) {

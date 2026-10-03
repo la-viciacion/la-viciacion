@@ -150,3 +150,7 @@
 .ac-event .pl-avatar { width: 36px; height: 36px; border-color: var(--bg-card); }
 .ac-text { min-width: 0; color: var(--text-secondary); overflow-wrap: anywhere; }
 .ac-text strong { color: var(--text-primary); }
+
+/* Statistics placeholder */
+.wip-card { align-items: flex-start; }
+.wip-card .menu-wip { margin-left: 0; }
