@@ -18,15 +18,29 @@ export function subscribe(fn) {
   return () => listeners.delete(fn);
 }
 
-/** Splits the list for one viewer: the others still playing, the others whose timer is stale (dimmed), and
- * whether the viewer's own timer is running. */
+/** Splits the list for one viewer: the others still playing, the others whose timer is stale (dimmed), the
+ * viewer's own running timer (null if none or stale) and whether there is one. */
 export function summarize(list, myId) {
   const others = list.filter((p) => p.user_id !== myId);
+  const mine = list.find((p) => p.user_id === myId && !p.stale) ?? null;
   return {
     fresh: others.filter((p) => !p.stale),
     stale: others.filter((p) => p.stale),
-    meActive: list.some((p) => p.user_id === myId && !p.stale),
+    mine,
+    meActive: mine !== null,
   };
+}
+
+/** The players with a running timer on the same game, whatever the platform (that says nothing about playing
+ * together: each one may be at home with a single player game). Groups come in the order their game first
+ * appears; `shared` is true when there is more than one player in it. */
+export function groupByGame(players) {
+  const groups = new Map();
+  for (const p of players) {
+    if (!groups.has(p.game_id)) groups.set(p.game_id, { game_id: p.game_id, game_name: p.game_name, players: [] });
+    groups.get(p.game_id).players.push(p);
+  }
+  return [...groups.values()].map((g) => ({ ...g, shared: g.players.length > 1 }));
 }
 
 export async function refresh() {

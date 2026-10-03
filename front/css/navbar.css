@@ -144,3 +144,6 @@
   .navbar-link { padding: 0; width: 42px; height: 42px; justify-content: center; }
   .navbar-link-text { display: none; }
 }
+.pl-row.shared .pl-stack { flex: none; }
+.pl-row.shared .pl-avatar { width: 34px; height: 34px; border-color: var(--bg-surface); }
+.pl-row.shared .pl-stack .pl-avatar + .pl-avatar { margin-left: -12px; }

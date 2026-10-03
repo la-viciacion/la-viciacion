@@ -14,6 +14,7 @@ import { showLogin } from './pages/auth/login.js';
 import { showForgotPassword, showResetPassword } from './pages/auth/recover.js';
 import { stopPresence } from './lib/presence.js';
 import { renderShell, showLoading } from './ui/layout.js';
+import { openPlayingSheet } from './ui/playing.js';
 import { inviteToPush } from './ui/push-invite.js';
 
 const ROUTES = [
@@ -78,6 +79,11 @@ async function route() {
     const main = renderShell({ user, avatarUrl, active: page.active, mainClass: page.mainClass });
     currentPage = page;
     await page.render({ user, main, avatarUrl, isCurrent, onLogout: logout });
+    if (location.hash === '#/playing' && isCurrent()) {
+      // the shortcut of the installed app: the home page with the sheet open
+      history.replaceState(null, '', location.pathname);
+      openPlayingSheet(user.id);
+    }
     inviteToPush().catch(() => {}); // optional: never blocks or breaks a page
   } catch (err) {
     console.error(err);

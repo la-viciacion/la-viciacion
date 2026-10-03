@@ -4,7 +4,7 @@ import { installApi, installDom, installStorage } from './dom.js';
 
 installStorage();
 installDom();
-const { current, refresh, startPresence, stopPresence, subscribe, summarize } = await import('../js/lib/presence.js');
+const { current, groupByGame, refresh, startPresence, stopPresence, subscribe, summarize } = await import('../js/lib/presence.js');
 
 const P = (id, extra = {}) => ({ user_id: id, name: `P${id}`, stale: false, ...extra });
 
@@ -51,4 +51,25 @@ test('starting asks at once and stopping forgets the list', async () => {
   assert.equal(current().length, 1);
   stopPresence();
   assert.equal(current().length, 0);
+});
+
+test('your own running timer comes apart from the others', () => {
+  const s = summarize([P(1, { game_id: 'hades' }), P(2, { game_id: 'hades' })], 1);
+  assert.equal(s.mine.user_id, 1);
+  assert.deepEqual(s.fresh.map((p) => p.user_id), [2]);
+  assert.equal(summarize([P(2)], 1).mine, null);
+  assert.equal(summarize([P(1, { stale: true })], 1).mine, null);
+});
+
+test('players on the same game are grouped whatever the platform, the others are alone', () => {
+  const groups = groupByGame([
+    P(2, { game_id: 'hades', game_name: 'Hades', platform: 'pc' }),
+    P(3, { game_id: 'celeste', game_name: 'Celeste' }),
+    P(4, { game_id: 'hades', game_name: 'Hades', platform: 'switch' }),
+  ]);
+  assert.deepEqual(groups.map((g) => [g.game_id, g.players.map((p) => p.user_id), g.shared]), [
+    ['hades', [2, 4], true],
+    ['celeste', [3], false],
+  ]);
+  assert.deepEqual(groupByGame([]), []);
 });
