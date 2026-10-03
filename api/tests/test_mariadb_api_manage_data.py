@@ -260,8 +260,10 @@ class SessionsAdminTests(ManageTestCase):
         self.assertEqual(self.admin("GET", "/timers", params={"sort": "dev"}).status_code, 422)
 
     def test_editing_changes_the_times_and_recomputes_the_duration(self):
-        timer_id = self.admin("POST", "/timers", json=self.body()).json()["id"]
-        end = ago(hours=3)
+        body = self.body()
+        timer_id = self.admin("POST", "/timers", json=body).json()["id"]
+        # Derived from the start, not from a second reading of the clock: two readings can straddle a second
+        end = datetime.datetime.fromisoformat(body["start_time"]) + timedelta(hours=2)
         done = self.admin("PATCH", f"/timers/{timer_id}", json={"end_time": end.isoformat(), "platform": "switch", "notes": "fixed"}).json()
         self.assertEqual((done["duration_seconds"], done["platform"], done["notes"]), (2 * 3600, "switch", "fixed"))
         self.assertEqual(self.admin("PATCH", f"/timers/{timer_id}", json={"end_time": ago(hours=6).isoformat()}).status_code, 400)
