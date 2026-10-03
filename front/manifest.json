@@ -21,5 +21,10 @@
       "purpose": "any"
     }
   ],
+  "shortcuts": [
+    { "name": "Nuevo timer", "short_name": "Timer", "description": "Empezar a jugar", "url": "/#/new" },
+    { "name": "Jugando ahora", "short_name": "Jugando", "description": "Quién está jugando", "url": "/#/playing" },
+    { "name": "Mi perfil", "short_name": "Perfil", "url": "/#/profile" }
+  ],
   "categories": ["games", "entertainment"]
 }

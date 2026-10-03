@@ -6,7 +6,7 @@ import { openCompletion } from './completion.js';
 import { initGamePicker, startTimerFlow } from './game-picker.js';
 import { initHistory, loadHistory, onHistoryClick, onHistoryKey } from './history.js';
 import { initSessions, openManualSession, openSessionForm } from './sessions.js';
-import { initTimer, loadTimerCard, startTimer, stopClock } from './timer.js';
+import { hasActive, initTimer, loadTimerCard, startTimer, stopClock } from './timer.js';
 
 export const active = 'home';
 
@@ -56,6 +56,12 @@ export async function render({ user, main, isCurrent }) {
   await loadTimerCard();
   if (!isCurrent()) return;
   await loadHistory(true);
+
+  if (location.hash === '#/new') {
+    // the shortcut of the installed app: pick a game, unless a timer is already running
+    history.replaceState(null, '', location.pathname);
+    if (!hasActive && isCurrent()) startTimerFlow();
+  }
 }
 
 export function dispose() {
