@@ -6,7 +6,7 @@ export function menuSections(user) {
   return [
     { label: 'Principal', items: [
       { id: 'home', label: 'Inicio', href: '#', icon: 'iconHome' },
-      { id: 'group', label: 'Grupo', href: '#/group', icon: 'iconUsers' },
+      { id: 'activity', label: 'Actividad', href: '#/activity', icon: 'iconActivity' },
     ] },
     { label: 'Explorar', items: [
       { id: 'games', label: 'Juegos', href: '#/games', icon: 'iconGamepad' },
@@ -16,7 +16,6 @@ export function menuSections(user) {
     ] },
     { label: 'Tú', items: [
       { id: 'profile', label: 'Mi perfil', href: '#/profile/resumen', icon: 'iconProfile' },
-      { id: 'recommended', label: 'Recomendados', href: '#/profile/recomendados', icon: 'iconStar' },
       { id: 'settings', label: 'Ajustes', href: '#/profile/ajustes', icon: 'iconSettings' },
     ] },
     { label: 'Administración', items: user?.is_admin ? [
@@ -27,11 +26,10 @@ export function menuSections(user) {
 
 // The item a page address belongs to, longest prefix first so '#/profile/ajustes' is not just 'profile'.
 const PAGES = [
-  ['#/profile/recomendados', 'recommended'],
   ['#/profile/ajustes', 'settings'],
   ['#/profile', 'profile'],
   ['#/admin', 'admin'],
-  ['#/group', 'group'],
+  ['#/activity', 'activity'],
   ['#/stats', 'stats'],
   ['#/games', 'games'],
   ['#/achievements', 'achievements'],
