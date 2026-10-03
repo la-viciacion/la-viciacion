@@ -56,7 +56,7 @@ class ScopeTests(unittest.TestCase):
 
     def test_output_format(self):
         self.assertEqual(ci_scope.render({"front-tests"}, {"front"}), 'scope=front-tests\nbuild_services=["front"]\n')
-        self.assertEqual(ci_scope.render(set(), set()), "scope=\nbuild_services=[]\n")
+        self.assertEqual(ci_scope.render(set(), set()), "scope=none\nbuild_services=[]\n")
         self.assertEqual(ci_scope.render(set(ci_scope.ALL_CHECKS), set(ci_scope.ALL_SERVICES)), 'scope=all\nbuild_services=["api", "front", "bot"]\n')
 
 

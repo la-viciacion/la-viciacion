@@ -7,7 +7,7 @@ on:
   workflow_call:
     inputs:
       scope:
-        description: "The checks to run: all, or a comma-separated subset of api-tests, bot-tests, front-tests, mariadb (empty: none)"
+        description: "The checks to run: all, or a comma-separated subset of api-tests, bot-tests, front-tests, mariadb, or none"
         type: string
         default: all
       build-services:

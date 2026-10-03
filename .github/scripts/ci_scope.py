@@ -2,7 +2,7 @@
 
 Reads the changed paths (one per line) on stdin and prints two lines for GITHUB_OUTPUT:
 
-    scope=api-tests,mariadb,...     the checks to run, or `all`
+    scope=api-tests,mariadb,...     the checks to run, `all`, or `none` (an empty value could be read as unset)
     build_services=["api","bot"]    the images to build and inspect
 
 The rule that keeps this safe: a path nobody classified runs everything. Only the paths listed in INERT run
@@ -63,7 +63,7 @@ def scope(paths):
 def render(checks, services):
     everything = checks == set(ALL_CHECKS) and services == set(ALL_SERVICES)
     return (
-        f"scope={'all' if everything else ','.join(c for c in ALL_CHECKS if c in checks)}\n"
+        f"scope={'all' if everything else ','.join(c for c in ALL_CHECKS if c in checks) or 'none'}\n"
         f"build_services={json.dumps([s for s in ALL_SERVICES if s in services])}\n"
     )
 
