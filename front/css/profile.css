@@ -127,3 +127,18 @@
 
 .pf-btn.danger { background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.35); color: #fca5a5; }
 .pf-btn.danger:hover:not(:disabled) { border-color: rgba(239, 68, 68, 0.7); background: rgba(239, 68, 68, 0.2); }
+
+/* Game page */
+.gm-back { margin-bottom: 14px; }
+.gm-head { display: flex; gap: 16px; align-items: center; margin-bottom: 16px; }
+.gm-cover { width: 96px; height: 96px; border-radius: var(--radius-md); object-fit: cover; flex: none; }
+.gm-cover-placeholder { display: flex; align-items: center; justify-content: center; background: var(--bg-card); font-size: 2rem; }
+.gm-genres { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0; }
+.gm-mine { flex-direction: row; align-items: center; justify-content: space-between; margin: 12px 0 8px; }
+.gm-players { list-style: none; margin: 0; gap: 14px; }
+.gm-player { display: flex; align-items: center; gap: 12px; }
+.gm-player .pl-avatar { width: 40px; height: 40px; font-size: 1rem; border-color: var(--bg-card); }
+.gm-player-main { flex: 1; min-width: 0; }
+.gm-player-name { font-weight: 700; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pf-tag.live { background: rgba(74, 222, 128, 0.15); color: var(--live-green); }
+@media (max-width: 640px) { .gm-cover { width: 72px; height: 72px; } }

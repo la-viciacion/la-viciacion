@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from .. import auth
 from ..auth import get_db
-from ..crud import games
+from ..crud import game_overview, games
 from ..database import models, schemas
 from ..utils import my_utils as utils
 from ..utils.logger import LogManager
@@ -48,6 +48,19 @@ async def search_rawg(query: str, db: Session = Depends(get_db)):
             status_code=400, detail="Query must be at least 2 characters long"
         )
     return await utils.search_rawg_games(query.strip(), db=db)
+
+
+@router.get("/{game_id}/overview")
+def get_game_overview(
+    game_id: str,
+    current_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """The game page: who of the group has it, their hours, completions and ratings (derived, nothing stored)"""
+    found = game_overview.overview(db, game_id, current_user.id)
+    if found is None:
+        raise HTTPException(status_code=404, detail="Game not exists")
+    return found
 
 
 @router.get("/{game_id}", response_model=schemas.Game)

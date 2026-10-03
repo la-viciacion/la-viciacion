@@ -54,7 +54,7 @@ test('one row per game, with the markup of a name shown as text and the "show mo
 
 test('pressing a row unfolds its sessions and pressing it again folds them', () => {
   click('[data-game-id="celeste"] [data-action="toggle"]');
-  assert.equal(document.querySelectorAll('[data-game-id="celeste"] .history-sessions li').length, 3); // two sessions and the line of the older one
+  assert.equal(document.querySelectorAll('[data-game-id="celeste"] .history-sessions li').length, 4); // two sessions, the line of the older one and the link to the game page
   assert.equal(document.querySelector('[data-game-id="celeste"] [data-action="toggle"]').getAttribute('aria-expanded'), 'true');
   click('[data-game-id="celeste"] [data-action="toggle"]');
   assert.equal(document.querySelectorAll('[data-game-id="celeste"] .history-sessions').length, 0);
@@ -91,7 +91,7 @@ test('"Ver todas" loads every session of the game and drops the one still runnin
   click('[data-game-id="celeste"] [data-action="all-sessions"]');
   await settle();
   assert.equal(calls.at(-1).path, '/timers/history/7?game_id=celeste&limit=500');
-  assert.equal(document.querySelectorAll('[data-game-id="celeste"] .history-sessions li').length, 3); // the three finished ones
+  assert.equal(document.querySelectorAll('[data-game-id="celeste"] .history-sessions li').length, 4); // the three finished ones and the link to the game page
   assert.equal(document.querySelector('[data-game-id="celeste"] [data-action="all-sessions"]'), null);
 });
 

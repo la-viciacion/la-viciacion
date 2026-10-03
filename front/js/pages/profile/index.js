@@ -8,6 +8,7 @@
 import { api } from '../../lib/api.js';
 import { formatDate, formatDuration } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
+import { gameHref } from '../../lib/links.js';
 import { PASSWORD_HINT } from '../../lib/password.js';
 import * as seasons from '../../lib/seasons.js';
 import { scoreBadge } from '../../ui/score-badge.js';
@@ -173,7 +174,7 @@ function topGameRow(g, max) {
   const width = Math.max(3, Math.round((g.played_time / max) * 100));
   return html`
     <div class="pf-bar-row">
-      <div class="pf-bar-label"><span>${g.game_name} ${scoreBadge(g.score)}</span><span>${formatDuration(g.played_time)}</span></div>
+      <div class="pf-bar-label"><span><a class="game-link" href="${gameHref(g.game_id)}">${g.game_name}</a> ${scoreBadge(g.score)}</span><span>${formatDuration(g.played_time)}</span></div>
       <div class="pf-bar"><div style="width:${width}%"></div></div>
     </div>`;
 }
