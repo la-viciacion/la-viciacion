@@ -12,7 +12,6 @@ const BODY_MAX = 240;
 const LINKS = [
   ['/', 'Inicio'],
   ['#/profile', 'Mi perfil'],
-  ['#/profile/juegos', 'Mis juegos'],
 ];
 const CHANNELS = [
   ['push', 'Aviso en la app (PWA)'],

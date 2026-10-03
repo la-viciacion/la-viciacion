@@ -1,6 +1,6 @@
 // "Marcar completado" from the history: a modal with the library entries of one game (one per
 // platform and season). The API decides what can be completed; this only offers it. Dates,
-// unmarking and the sessions of a game are in the profile (Mis juegos).
+// unmarking and the sessions of a game are in the profile (the games list of the profile summary).
 import { api, jsonRequest } from '../../lib/api.js';
 import { blockedReason } from '../../lib/completion.js';
 import { formatDate, formatDuration } from '../../lib/format.js';
@@ -43,7 +43,7 @@ export async function openCompletion({ username, game, onChange }) {
     </div>
     <div class="sess-error" role="alert">${message}</div>
     <div class="sess-actions">
-      <a class="pf-sub" href="#/profile/juegos" data-close>Ver mis juegos y sesiones</a>
+      <a class="pf-sub" href="#/profile/resumen" data-close>Ver mis juegos y sesiones</a>
       <span class="sess-spacer"></span>
       <button type="button" class="sess-btn" data-close>Cerrar</button>
     </div>`);
