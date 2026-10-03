@@ -10,9 +10,9 @@ import unittest
 
 from fastapi.routing import APIRoute
 
-from src.routers import activity, basic, games, manage, push, statistics, timers, users, utils
+from src.routers import activity, basic, games, group, manage, push, statistics, timers, users, utils
 
-ROUTER_MODULES = (activity, basic, games, manage, push, statistics, timers, users, utils)
+ROUTER_MODULES = (activity, basic, games, group, manage, push, statistics, timers, users, utils)
 
 # (method, path relative to the router): reachable without a token
 PUBLIC = {
