@@ -1,11 +1,11 @@
 from sqlalchemy import (
     BigInteger,
     Boolean,
+    CheckConstraint,
     Column,
     Computed,
     Date,
     DateTime,
-    Float,
     ForeignKey,
     Integer,
     LargeBinary,
@@ -101,12 +101,28 @@ class UserGame(Base):
     platform = Column(String(255), ForeignKey("platform_tags.id", name="fk_users_games_platform"))
     completed = Column(Integer)
     completed_date = Column(Date)
-    score = Column(Float)
     # time played is not stored: it is the sum of the sessions (crud/time_entries.entry_played_time)
     completion_time = Column(Integer)
 
     __table_args__ = (
         UniqueConstraint("user_id", "game_id", "platform", "season", name="uq_users_games_entry"),
+    )
+
+
+class GameScore(Base):
+    """A player's rating of a game, 1-100: one per user and game, whatever the seasons or platforms."""
+
+    __tablename__ = "game_scores"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id", name="fk_game_scores_user"), nullable=False)
+    game_id = Column(String(255), ForeignKey("games.id", name="fk_game_scores_game"), nullable=False)
+    score = Column(SmallInteger, nullable=False)
+    updated_at = Column(DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP"), onupdate=text("CURRENT_TIMESTAMP"))
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "game_id", name="uq_game_scores_user_game"),
+        CheckConstraint("score BETWEEN 1 AND 100", name="ck_game_scores_range"),
     )
 
 

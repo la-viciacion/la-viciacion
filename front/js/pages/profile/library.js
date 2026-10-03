@@ -1,6 +1,8 @@
 // The games of the profile's summary: those of the season on screen (every season for the total),
 // most recently played first, with their completion state.
 //   - a pending game of the current season can be marked as completed
+//   - any game can be rated (1-100, one rating per game, shown on every entry of it), also right
+//     after completing it
 //   - a completed game of the current season lets you change the completion date or unmark it;
 //     once its season is closed the completion is frozen
 //   - "Sesiones" lists the sessions of the entry (game and season); those of the current season
@@ -12,6 +14,7 @@ import { blockedReason } from '../../lib/completion.js';
 import { formatDate, formatDateTime, formatDuration, formatRelative } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
 import { platformName } from '../../lib/platforms.js';
+import { SCORE_HINT, SCORE_MAX, SCORE_MIN, parseScore, saveScore } from '../../lib/score.js';
 import * as seasons from '../../lib/seasons.js';
 import { initSessions, openSessionForm } from '../home/sessions.js';
 
@@ -28,6 +31,7 @@ let shown = season; // the one on screen: a year, or seasons.ALL
 let items = [];
 let total = 0;
 let editing = null; // id of the entry whose date is being edited
+let rating = null; // id of the entry whose rating is being edited
 let sessions = new Map(); // entry id -> its sessions, for the entries that are expanded
 
 const path = (suffix = '') => `/users/${encodeURIComponent(username)}/library${suffix}`;
@@ -50,6 +54,7 @@ export async function initLibrary(container, options) {
   items = [];
   total = 0;
   editing = null;
+  rating = null;
   sessions = new Map();
   initSessions({ userId, onChange: afterSessionChange });
   el.addEventListener('click', onClick);
@@ -63,6 +68,7 @@ export async function showSeason(value) {
   items = [];
   total = 0;
   editing = null;
+  rating = null;
   sessions = new Map();
   await load(PAGE);
 }
@@ -102,6 +108,8 @@ function status(g) {
     : html`<span class="pf-tag">En curso</span>`;
 }
 
+const scoreTag = (g) => (g.score == null ? '' : html`<span class="pf-tag score" title="Tu nota">Nota ${g.score}</span>`);
+
 // Latest day a completion may be dated: today, or the end of a past season.
 const maxDate = (g) => {
   const today = new Date().toLocaleDateString('sv-SE');
@@ -118,8 +126,19 @@ function dateForm(g) {
     </form>`;
 }
 
+function scoreForm(g) {
+  return html`
+    <form class="pf-date-form" data-score-form data-id="${g.id}">
+      <input class="adm-input pf-score-input" type="number" name="score" value="${g.score ?? ''}" min="${SCORE_MIN}" max="${SCORE_MAX}" step="1" placeholder="1-${SCORE_MAX}" aria-label="Nota de ${g.game_name}" title="${SCORE_HINT}" />
+      <button class="pf-btn primary" type="submit">Guardar nota</button>
+      ${g.score == null ? '' : html`<button class="pf-btn" type="button" data-action="clear-score" data-id="${g.id}">Quitar nota</button>`}
+      <button class="pf-btn" type="button" data-action="cancel-rate">Ahora no</button>
+    </form>`;
+}
+
 function actions(g) {
-  const sessionsButton = html`<button class="pf-btn" data-action="sessions" data-id="${g.id}" aria-expanded="${String(sessions.has(g.id))}">Sesiones</button>`;
+  const sessionsButton = html`<button class="pf-btn" data-action="sessions" data-id="${g.id}" aria-expanded="${String(sessions.has(g.id))}">Sesiones</button>
+    <button class="pf-btn" data-action="rate" data-id="${g.id}">${g.score == null ? 'Puntuar' : 'Cambiar nota'}</button>`;
   if (g.can_complete) {
     return html`${sessionsButton}<button class="pf-btn primary" data-action="complete" data-id="${g.id}" data-label="Marcar completado">Marcar completado</button>`;
   }
@@ -156,15 +175,16 @@ function row(g) {
     <div class="pf-game ${g.complete_blocked ? 'locked' : ''}" data-id="${g.id}">
       ${thumb(g)}
       <div class="pf-row-main">
-        <div class="pf-game-title"><strong>${g.game_name}</strong> ${status(g)}</div>
+        <div class="pf-game-title"><strong>${g.game_name}</strong> ${status(g)} ${scoreTag(g)}</div>
         <div class="pf-sub">
           ${g.platform_name || 'Sin plataforma'} · Temporada ${g.season} · ${formatDuration(g.played_time)}
           ${g.last_played ? ` · Última sesión: ${formatRelative(g.last_played)}` : ''}
         </div>
         ${g.complete_blocked ? html`<div class="pf-lock">🔒 ${blockedReason(g, season)}</div>` : ''}
         ${editing === g.id ? dateForm(g) : ''}
+        ${rating === g.id ? scoreForm(g) : ''}
       </div>
-      <div class="pf-game-actions">${editing === g.id ? '' : actions(g)}</div>
+      <div class="pf-game-actions">${editing === g.id || rating === g.id ? '' : actions(g)}</div>
       ${sessionList(g)}
     </div>`;
 }
@@ -180,11 +200,13 @@ function draw() {
 }
 
 // ── Actions ─────────────────────────────────────────────────
-async function setCompletion(id, body, doneMessage) {
+// `askRating`: a game just completed offers to rate it (the form opens on its row).
+async function setCompletion(id, body, doneMessage, askRating = false) {
   flash('');
   try {
     await api(`${path(`/${id}/completion`)}`, jsonRequest('PATCH', body));
     editing = null;
+    rating = askRating ? id : null;
     await load();
     flash(doneMessage, true);
     await onChange();
@@ -239,7 +261,7 @@ async function onClick(e) {
       if (!armed(button, button.dataset.label)) return;
       button.disabled = true;
       button.textContent = 'Completando…';
-      return setCompletion(id, { completed: true }, `«${items.find((g) => g.id === id)?.game_name}» marcado como completado`);
+      return setCompletion(id, { completed: true }, `«${items.find((g) => g.id === id)?.game_name}» marcado como completado`, true);
     case 'uncomplete':
       if (!armed(button, button.dataset.label)) return;
       button.disabled = true;
@@ -254,10 +276,33 @@ async function onClick(e) {
     }
     case 'edit-date':
       editing = id;
+      rating = null;
       return draw();
     case 'cancel-date':
       editing = null;
       return draw();
+    case 'rate':
+      rating = id;
+      editing = null;
+      return draw();
+    case 'cancel-rate':
+      rating = null;
+      return draw();
+    case 'clear-score':
+      return rate(id, null);
+  }
+}
+
+async function rate(id, score) {
+  flash('');
+  const entry = items.find((g) => g.id === id);
+  try {
+    await saveScore(username, entry.game_id, score);
+    rating = null;
+    await load();
+    flash(score == null ? 'Nota quitada' : `Nota guardada: ${score}`, true);
+  } catch (err) {
+    flash(err.message);
   }
 }
 
@@ -265,6 +310,11 @@ function onSubmit(e) {
   const form = e.target.closest('.pf-date-form');
   if (!form) return;
   e.preventDefault();
+  if (form.dataset.scoreForm !== undefined) {
+    const score = parseScore(form.score.value);
+    if (score == null || Number.isNaN(score)) return flash(SCORE_HINT);
+    return rate(Number(form.dataset.id), score);
+  }
   const date = form.date.value;
   if (!date) return flash('Elige una fecha');
   return setCompletion(Number(form.dataset.id), { completed: true, completed_date: date }, 'Fecha actualizada');

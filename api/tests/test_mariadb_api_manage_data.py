@@ -295,7 +295,7 @@ class LibraryAdminTests(ManageTestCase):
     def setUp(self):
         super().setUp()
         today = datetime.date.today()
-        self.first = self.library_entry(self.ana, "celeste", today, "pc", completed=1, completed_date=today, score=9.0)
+        self.first = self.library_entry(self.ana, "celeste", today, "pc", completed=1, completed_date=today)
         self.second = self.library_entry(self.bea, "hades", today, "switch")
         self.old = self.library_entry(self.ana, "hades", datetime.date(seasons.current() - 1, 3, 1), "pc")
 
@@ -329,17 +329,71 @@ class LibraryAdminTests(ManageTestCase):
         self.assertEqual(self.admin("POST", "/library", json={**body, "game_id": "nope"}).status_code, 404)
 
     def test_editing_an_entry(self):
-        done = self.admin("PATCH", f"/library/{self.second}", json={"completed": True, "completed_date": "2026-01-02", "score": 8.5}).json()
-        self.assertEqual((done["completed"], done["completed_date"], done["score"]), (True, "2026-01-02", 8.5))
+        done = self.admin("PATCH", f"/library/{self.second}", json={"completed": True, "completed_date": "2026-01-02"}).json()
+        self.assertEqual((done["completed"], done["completed_date"]), (True, "2026-01-02"))
         self.assertFalse(self.admin("PATCH", f"/library/{self.second}", json={"completed": False}).json()["completed"])
-        for score in (-1, 10.5):
-            self.assertEqual(self.admin("PATCH", f"/library/{self.second}", json={"score": score}).status_code, 400)
-        self.assertEqual(self.admin("PATCH", "/library/9999", json={"score": 1}).status_code, 404)
+        self.assertEqual(self.admin("PATCH", "/library/9999", json={"completed": True}).status_code, 404)
 
     def test_deleting_an_entry(self):
         self.assertEqual(self.admin("DELETE", f"/library/{self.second}").status_code, 200)
         self.assertEqual(self.admin("DELETE", f"/library/{self.second}").status_code, 404)
         self.assertEqual(self.entries()["total"], 2)
+
+
+class ScoresAdminTests(ManageTestCase):
+    def setUp(self):
+        super().setUp()
+        today = datetime.date.today()
+        self.library_entry(self.ana, "celeste", today, "pc")
+        self.library_entry(self.bea, "hades", today, "switch")
+
+    def scores(self, **params):
+        return self.admin("GET", "/scores", params=params).json()
+
+    def create(self, user, game, score):
+        return self.admin("POST", "/scores", json={"user_id": user, "game_id": game, "score": score})
+
+    def test_a_score_is_created_listed_filtered_and_sorted(self):
+        first = self.create(self.ana, "celeste", 90)
+        self.assertEqual(first.status_code, 201)
+        self.assertEqual((first.json()["score"], first.json()["game_id"]), (90, "celeste"))
+        self.create(self.bea, "hades", 40)
+        body = self.scores(sort="score", order="asc")
+        self.assertEqual((body["total"], [i["score"] for i in body["items"]], [i["user"] for i in body["items"]]), (2, [40, 90], ["bea", "ana"]))
+        self.assertEqual([i["game"] for i in self.scores(user_id=self.ana)["items"]], ["Celeste"])
+        self.assertEqual([i["user"] for i in self.scores(game_id="hades")["items"]], ["bea"])
+        self.assertEqual(self.admin("GET", "/scores", params={"sort": "x"}).status_code, 422)
+
+    def test_a_user_rates_a_game_once(self):
+        self.create(self.ana, "celeste", 90)
+        self.assertEqual(self.create(self.ana, "celeste", 10).status_code, 409)
+        self.assertEqual(self.scalar("SELECT COUNT(*) FROM game_scores"), 1)
+
+    def test_the_rules_of_a_score(self):
+        for score in (0, 101, -3):
+            self.assertEqual(self.create(self.ana, "celeste", score).status_code, 422, score)
+        self.assertEqual(self.admin("POST", "/scores", json={"user_id": self.ana, "game_id": "celeste", "score": 7.5}).status_code, 422)
+        self.assertEqual(self.create(9999, "celeste", 50).status_code, 404)
+        self.assertEqual(self.create(self.ana, "nope", 50).status_code, 404)
+
+    def test_it_is_edited_and_deleted(self):
+        row = self.create(self.ana, "celeste", 90).json()["id"]
+        self.assertEqual(self.admin("PATCH", f"/scores/{row}", json={"score": 55}).json()["score"], 55)
+        self.assertEqual(self.admin("PATCH", f"/scores/{row}", json={"score": 101}).status_code, 422)
+        self.assertEqual(self.admin("PATCH", "/scores/9999", json={"score": 5}).status_code, 404)
+        self.assertEqual(self.admin("DELETE", f"/scores/{row}").status_code, 200)
+        self.assertEqual(self.admin("DELETE", f"/scores/{row}").status_code, 404)
+
+    def test_deleting_a_user_or_a_game_takes_its_scores_after_the_confirmation(self):
+        self.create(self.ana, "celeste", 90)
+        refused = self.admin("DELETE", f"/games/celeste")
+        self.assertEqual(refused.status_code, 409)
+        self.assertEqual(refused.json()["detail"]["counts"]["puntuaciones"], 1)
+        self.assertEqual(self.admin("DELETE", "/games/celeste", params={"force": True}).status_code, 200)
+        self.assertEqual(self.scalar("SELECT COUNT(*) FROM game_scores"), 0)
+        self.create(self.bea, "hades", 40)
+        self.assertEqual(self.admin("DELETE", f"/users/{self.bea}", params={"force": True}).status_code, 200)
+        self.assertEqual(self.scalar("SELECT COUNT(*) FROM game_scores"), 0)
 
 
 class PlatformsAdminTests(ManageTestCase):

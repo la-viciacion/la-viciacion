@@ -308,10 +308,12 @@ def delete_user(
         "sesiones": db.query(models.GameTimer).filter_by(user_id=user_id).count(),
         "biblioteca": db.query(models.UserGame).filter_by(user_id=user_id).count(),
         "logros": db.query(models.UserAchievement).filter_by(user_id=user_id).count(),
+        "puntuaciones": db.query(models.GameScore).filter_by(user_id=user_id).count(),
     }
     _confirm_or_409(counts, force)
     db.query(models.GameTimer).filter_by(user_id=user_id).delete()
     db.query(models.UserGame).filter_by(user_id=user_id).delete()
+    db.query(models.GameScore).filter_by(user_id=user_id).delete()
     db.query(models.UserAchievement).filter_by(user_id=user_id).delete()
     db.query(models.PushSubscription).filter_by(user_id=user_id).delete()
     db.delete(user)
@@ -411,6 +413,7 @@ def _game_counts(db: Session, game_id: str) -> dict:
         "sesiones": db.query(models.GameTimer).filter_by(game_id=game_id).count(),
         "biblioteca": db.query(models.UserGame).filter_by(game_id=game_id).count(),
         "logros": db.query(models.UserAchievement).filter_by(game_id=game_id).count(),
+        "puntuaciones": db.query(models.GameScore).filter_by(game_id=game_id).count(),
     }
 
 
@@ -420,6 +423,7 @@ def delete_game(game_id: str, force: bool = False, db: Session = Depends(get_db)
     _confirm_or_409(_game_counts(db, game_id), force)
     db.query(models.GameTimer).filter_by(game_id=game_id).delete()
     db.query(models.UserGame).filter_by(game_id=game_id).delete()
+    db.query(models.GameScore).filter_by(game_id=game_id).delete()
     db.query(models.UserAchievement).filter_by(game_id=game_id).delete()
     db.delete(game)
     db.commit()
@@ -636,7 +640,6 @@ def _library_out(u: models.UserGame, user_name: Optional[str], game_name: Option
         "started_date": u.started_date,
         "completed": bool(u.completed),
         "completed_date": u.completed_date,
-        "score": u.score,
     }
 
 
@@ -647,7 +650,7 @@ def list_library(
     season: Optional[int] = None,
     platform: Optional[str] = None,
     completed: Optional[str] = Query(None, pattern="^(yes|no)$"),
-    sort: str = Query("season", pattern="^(user|game|platform|season|started|completed|score)$"),
+    sort: str = Query("season", pattern="^(user|game|platform|season|started|completed)$"),
     order: str = Query("desc", pattern="^(asc|desc)$"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
@@ -676,7 +679,6 @@ def list_library(
         "season": models.UserGame.season,
         "started": models.UserGame.started_date,
         "completed": models.UserGame.completed_date,
-        "score": models.UserGame.score,
     }
     rows = _sorted(q, columns[sort], order, models.UserGame.id).limit(limit).offset(offset).all()
     return {"total": total, "items": [_library_out(u, un, gn) for u, un, gn in rows]}
@@ -710,15 +712,12 @@ class LibraryPatch(BaseModel):
     started_date: Optional[datetime.date] = None
     completed: Optional[bool] = None
     completed_date: Optional[datetime.date] = None
-    score: Optional[float] = None
 
 
 @router.patch("/library/{row_id}")
 def patch_library(row_id: int, body: LibraryPatch, db: Session = Depends(get_db)):
     row = _get_or_404(db, models.UserGame, row_id, "Entrada de biblioteca")
     data = body.model_dump(exclude_unset=True)
-    if data.get("score") is not None and not (0 <= data["score"] <= 10):
-        raise HTTPException(status_code=400, detail="La nota debe estar entre 0 y 10")
     if "completed" in data and data["completed"] is not None:
         data["completed"] = int(data["completed"])
     for k, v in data.items():
@@ -733,6 +732,90 @@ def delete_library(row_id: int, db: Session = Depends(get_db)):
     db.delete(row)
     db.commit()
     return {"message": "Entrada eliminada"}
+
+
+# ── Ratings (game_scores) ───────────────────────────────────────
+
+
+def _score_out(s: models.GameScore, user_name: Optional[str], game_name: Optional[str]) -> dict:
+    return {
+        "id": s.id,
+        "user_id": s.user_id,
+        "user": user_name,
+        "game_id": s.game_id,
+        "game": game_name,
+        "score": s.score,
+        "updated_at": s.updated_at,
+    }
+
+
+@router.get("/scores")
+def list_scores(
+    user_id: Optional[int] = None,
+    game_id: Optional[str] = None,
+    sort: str = Query("updated", pattern="^(user|game|score|updated)$"),
+    order: str = Query("desc", pattern="^(asc|desc)$"),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+):
+    q = (
+        db.query(models.GameScore, models.User.username, models.Game.name)
+        .outerjoin(models.User, models.User.id == models.GameScore.user_id)
+        .outerjoin(models.Game, models.Game.id == models.GameScore.game_id)
+    )
+    if user_id is not None:
+        q = q.filter(models.GameScore.user_id == user_id)
+    if game_id:
+        q = q.filter(models.GameScore.game_id == game_id)
+    total = q.count()
+    columns = {
+        "user": models.User.username,
+        "game": models.Game.name,
+        "score": models.GameScore.score,
+        "updated": models.GameScore.updated_at,
+    }
+    rows = _sorted(q, columns[sort], order, models.GameScore.id).limit(limit).offset(offset).all()
+    return {"total": total, "items": [_score_out(s, un, gn) for s, un, gn in rows]}
+
+
+class ScoreCreate(BaseModel):
+    user_id: int
+    game_id: str
+    score: int = Field(ge=1, le=100)
+
+
+@router.post("/scores", status_code=201)
+def create_score(body: ScoreCreate, db: Session = Depends(get_db)):
+    """Rate a game on behalf of a player (a user rates a game once)."""
+    _get_or_404(db, models.User, body.user_id, "Usuario")
+    _get_or_404(db, models.Game, body.game_id, "Juego")
+    row = models.GameScore(user_id=body.user_id, game_id=body.game_id, score=body.score)
+    db.add(row)
+    _commit(db, "Puntuación")
+    db.refresh(row)
+    return _score_out(row, None, None)
+
+
+class ScorePatch(BaseModel):
+    score: int = Field(ge=1, le=100)
+
+
+@router.patch("/scores/{row_id}")
+def patch_score(row_id: int, body: ScorePatch, db: Session = Depends(get_db)):
+    row = _get_or_404(db, models.GameScore, row_id, "Puntuación")
+    row.score = body.score
+    _commit(db, "Puntuación")
+    db.refresh(row)
+    return _score_out(row, None, None)
+
+
+@router.delete("/scores/{row_id}")
+def delete_score(row_id: int, db: Session = Depends(get_db)):
+    row = _get_or_404(db, models.GameScore, row_id, "Puntuación")
+    db.delete(row)
+    db.commit()
+    return {"message": "Puntuación eliminada"}
 
 
 # ── Platforms (platform_tags) ───────────────────────────────────

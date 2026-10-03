@@ -111,6 +111,8 @@
 .pf-game-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; }
 .pf-tag { font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: var(--radius-pill); background: var(--bg-card-hover); color: var(--text-secondary); }
 .pf-tag.done { background: rgba(61, 217, 179, 0.15); color: var(--accent-teal); }
+.pf-tag.score { background: rgba(255, 196, 61, 0.15); color: var(--accent-gold, #f5c542); }
+.pf-score-input { width: 90px; }
 .pf-date-form { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
 @media (max-width: 700px) { .pf-game-actions { margin-left: 0; width: 100%; } }
 .pf-game.locked .pf-thumb { filter: grayscale(1); opacity: 0.55; }

@@ -289,5 +289,8 @@
 
 /* Completion modal (check button of a game of the history) */
 .comp-body { padding: 8px 20px 20px; display: flex; flex-direction: column; gap: 12px; }
+.comp-score { display: flex; gap: 8px; flex-wrap: wrap; align-items: end; }
+.comp-score label { display: flex; flex-direction: column; gap: 4px; font-size: 0.8rem; color: var(--text-secondary); }
+.comp-score .adm-input { width: 90px; }
 .comp-list { display: flex; flex-direction: column; gap: 10px; }
 .comp-entry { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 10px 12px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm); }

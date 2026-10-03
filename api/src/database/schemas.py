@@ -39,6 +39,10 @@ class CompletionUpdate(BaseModel):
     completed_date: datetime.date | None = None
 
 
+class ScoreUpdate(BaseModel):
+    score: int = Field(ge=1, le=100)
+
+
 class PasswordChange(BaseModel):
     current_password: str
     new_password: str
@@ -118,7 +122,6 @@ class UserGame(UsersGamesBase):
     platform_name: str | None = None
     completed: int | None = None
     completed_date: datetime.date | None = None
-    score: float | None = None
     played_time: int | None = None
     completion_time: int | None = None
 

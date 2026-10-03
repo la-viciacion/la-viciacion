@@ -1,6 +1,7 @@
 USER_NOT_EXISTS = "User not exists"
 USER_ALREADY_EXISTS = "User already exists"
 ENTRY_NOT_FOUND = "Entrada de la biblioteca no encontrada"
+GAME_NOT_IN_LIBRARY = "Este juego no está en tu biblioteca"
 COMPLETE_ONLY_CURRENT_SEASON = "Solo se puede completar un juego en la temporada actual"
 COMPLETION_SEASON_CLOSED = "La temporada de este juego está cerrada: su completado ya no se puede cambiar"
 ALREADY_COMPLETED_IN_SEASON = "Ya has completado este juego en esta temporada"

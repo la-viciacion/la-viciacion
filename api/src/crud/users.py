@@ -24,7 +24,7 @@ from sqlalchemy.orm import Session
 from ..config import Config
 from ..database import models, schemas
 from ..utils import my_utils as utils
-from . import games
+from . import games, scores
 from ..utils.logger import LogManager
 from ..utils import seasons, streaks
 
@@ -253,13 +253,13 @@ def ensure_library_entry(
 
 def drop_empty_entry(db: Session, user_id: int, game_id: str, platform: str | None, season: int) -> bool:
     """Delete the library entry (game, platform, season) if nothing is left in it: no session
-    (the caller flushed its change first), no completion and no score. Not committed."""
+    (the caller flushed its change first) and no completion. Not committed."""
     entry = (
         db.query(models.UserGame)
         .filter_by(user_id=user_id, game_id=game_id, platform=platform, season=season)
         .first()
     )
-    if entry is None or entry.completed or entry.score is not None:
+    if entry is None or entry.completed:
         return False
     has_sessions = (
         db.query(models.GameTimer.id)
@@ -598,7 +598,7 @@ def _library_query(user_id: int, entry_id: int | None = None, game_id: str | Non
     )
 
 
-def _library_item(row, completed_keys: set, current_season: int) -> dict:
+def _library_item(row, completed_keys: set, current_season: int, ratings: dict) -> dict:
     entry = row.UserGame
     done = bool(entry.completed)
     # why the completion of the entry cannot be touched (None when it can): a closed season is
@@ -621,6 +621,7 @@ def _library_item(row, completed_keys: set, current_season: int) -> dict:
         "played_time": row.played_time or 0,
         "completed": done,
         "completed_date": entry.completed_date,
+        "score": ratings.get(entry.game_id),  # 1-100 or None: per game, the same on every entry of it
         # a game can be completed once per season, and only in the running one
         "can_complete": not done and blocked is None,
         "complete_blocked": blocked,  # "closed_season" | "completed_in_season" | None
@@ -642,10 +643,11 @@ def get_library(
     rows = db.execute(query.limit(limit).offset(offset)).all()
     total = count.count()
     keys = _completed_keys(db, user_id)
+    ratings = scores.user_scores(db, user_id)
     return {
         "season": season,
         "total": total,
-        "items": [_library_item(r, keys, season) for r in rows],
+        "items": [_library_item(r, keys, season, ratings) for r in rows],
     }
 
 
@@ -653,7 +655,7 @@ def get_library_item(db: Session, user_id: int, entry_id: int) -> dict | None:
     row = db.execute(_library_query(user_id, entry_id)).first()
     if row is None:
         return None
-    return _library_item(row, _completed_keys(db, user_id), seasons.current())
+    return _library_item(row, _completed_keys(db, user_id), seasons.current(), scores.user_scores(db, user_id))
 
 
 def get_library_entry(db: Session, user_id: int, entry_id: int) -> models.UserGame | None:
