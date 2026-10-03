@@ -19,6 +19,7 @@ import { inviteToPush } from './ui/push-invite.js';
 const ROUTES = [
   { prefix: '#/admin', load: () => import('./pages/admin/index.js') },
   { prefix: '#/profile', load: () => import('./pages/profile/index.js') },
+  { prefix: '#/game/', load: () => import('./pages/game/index.js') },
 ];
 
 let navigation = 0; // only the most recent navigation may touch the DOM

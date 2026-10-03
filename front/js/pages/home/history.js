@@ -3,6 +3,7 @@
 import { api } from '../../lib/api.js';
 import { formatDateTime, formatDuration, formatRelative } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
+import { gameHref } from '../../lib/links.js';
 import { platformName } from '../../lib/platforms.js';
 import { iconCheck, iconChevron, iconPlay } from '../../ui/icons.js';
 import { scoreBadge } from '../../ui/score-badge.js';
@@ -99,6 +100,7 @@ function groupRow(g) {
                 <button class="btn-session" data-action="edit-session" data-game-id="${g.game_id}" data-timer-id="${s.id}" aria-label="Editar sesión">Editar</button>
               </span>
             </li>`)}
+          <li class="session-more"><a class="game-link" href="${gameHref(g.game_id)}">Ver la ficha del juego</a></li>
           ${hidden > 0 ? html`<li class="session-more">… y ${hidden} sesiones anteriores
             <button class="btn-session" data-action="all-sessions" data-game-id="${g.game_id}">Ver todas</button></li>` : ''}
         </ul>` : ''}

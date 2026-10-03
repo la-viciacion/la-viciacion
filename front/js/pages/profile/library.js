@@ -13,6 +13,7 @@ import { api, jsonRequest } from '../../lib/api.js';
 import { blockedReason } from '../../lib/completion.js';
 import { formatDate, formatDateTime, formatDuration, formatRelative } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
+import { gameHref } from '../../lib/links.js';
 import { platformName } from '../../lib/platforms.js';
 import { SCORE_HINT, SCORE_MAX, SCORE_MIN, parseScore, saveScore } from '../../lib/score.js';
 import * as seasons from '../../lib/seasons.js';
@@ -174,7 +175,7 @@ function row(g) {
     <div class="pf-game ${g.complete_blocked ? 'locked' : ''}" data-id="${g.id}">
       ${thumb(g)}
       <div class="pf-row-main">
-        <div class="pf-game-title"><strong>${g.game_name}</strong> ${scoreBadge(g.score)} ${status(g)}</div>
+        <div class="pf-game-title"><strong><a class="game-link" href="${gameHref(g.game_id)}">${g.game_name}</a></strong> ${scoreBadge(g.score)} ${status(g)}</div>
         <div class="pf-sub">
           ${g.platform_name || 'Sin plataforma'} · Temporada ${g.season} · ${formatDuration(g.played_time)}
           ${g.last_played ? ` · Última sesión: ${formatRelative(g.last_played)}` : ''}

@@ -3,6 +3,7 @@
 import { api } from '../../lib/api.js';
 import { formatDuration, formatPlayers } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
+import { gameHref } from '../../lib/links.js';
 
 const MAX_GENRES = 3;
 
@@ -23,7 +24,7 @@ const row = (g) => html`
     ${thumb(g)}
     <div class="pf-row-main">
       <div class="pf-game-title">
-        <strong>${g.game_name}</strong>
+        <strong><a class="game-link" href="${gameHref(g.game_id)}">${g.game_name}</a></strong>
         ${g.genres.slice(0, MAX_GENRES).map((genre) => html`<span class="pf-tag muted">${genre}</span>`)}
       </div>
       <div class="pf-sub">${detail(g)}</div>

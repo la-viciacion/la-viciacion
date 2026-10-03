@@ -155,3 +155,7 @@ body {
   background: hsl(var(--h) 50% 55% / 0.12); color: hsl(var(--h) 55% 72%);
   font-size: 0.72rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums;
 }
+
+/* A game's name that leads to its page: it keeps the look of the text around it */
+.game-link { color: inherit; text-decoration: none; }
+.game-link:hover { color: var(--accent-teal); text-decoration: underline; }
