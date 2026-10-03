@@ -1,10 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from starlette.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
 from .. import auth
 from ..auth import get_db
-from ..crud import game_overview, games
+from ..crud import game_catalog, game_overview, games
 from ..database import models, schemas
 from ..utils import my_utils as utils
 from ..utils.logger import LogManager
@@ -48,6 +48,28 @@ async def search_rawg(query: str, db: Session = Depends(get_db)):
             status_code=400, detail="Query must be at least 2 characters long"
         )
     return await utils.search_rawg_games(query.strip(), db=db)
+
+
+@router.get("/catalog")
+def get_game_catalog(
+    q: str | None = Query(None, description="Part of the name"),
+    genre: str | None = None,
+    library: str | None = Query(None, pattern="^(have|not)$", description="In (have) or not in (not) your library"),
+    completed: bool = Query(False, description="Only the ones you completed"),
+    rated: bool = Query(False, description="Only the ones you rated"),
+    playing: bool = Query(False, description="Only the ones somebody is playing right now"),
+    with_players: bool = Query(False, description="Only the ones somebody has in their library"),
+    sort: str = Query("activity", pattern="^(activity|played|rated|players|release|name)$"),
+    limit: int = Query(30, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    current_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Every game with what the group has done with it (derived), filtered, ordered and paged"""
+    return game_catalog.catalog(
+        db, current_user.id, q=q, genre=genre, library=library, completed=completed, rated=rated,
+        playing=playing, with_players=with_players, sort=sort, limit=limit, offset=offset,
+    )
 
 
 @router.get("/{game_id}/overview")
