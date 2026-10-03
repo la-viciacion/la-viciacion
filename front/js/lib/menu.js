@@ -9,6 +9,7 @@ export function menuSections(user) {
       { id: 'group', label: 'Grupo', href: '#/group', icon: 'iconUsers' },
     ] },
     { label: 'Explorar', items: [
+      { id: 'games', label: 'Juegos', href: '#/games', icon: 'iconGamepad' },
       { id: 'stats', label: 'Estadísticas', href: '#/stats', icon: 'iconChart', wip: true },
     ] },
     { label: 'Tú', items: [
@@ -30,6 +31,8 @@ const PAGES = [
   ['#/admin', 'admin'],
   ['#/group', 'group'],
   ['#/stats', 'stats'],
+  ['#/games', 'games'],
+  ['#/game', 'games'],
 ];
 
 /** The id of the item to highlight for an address (null for the pages that have no item). */

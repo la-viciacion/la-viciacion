@@ -77,7 +77,7 @@ async function searchCatalogue(modal, query, onPick) {
 }
 
 // ── Step 1b: add a game from RAWG ───────────────────────────
-function openAddGame(onPick) {
+export function openAddGame(onPick) {
   const modal = openStep(html`
     ${modalHeader('Añadir juego nuevo')}
     <input type="text" id="addGameSearch" class="modal-search-input" placeholder="Buscar en RAWG..." autocomplete="off" />
