@@ -1,6 +1,8 @@
 // Page shell shared by every logged-in page: navbar + <main>.
 import { html, mount } from '../lib/html.js';
+import { startPresence } from '../lib/presence.js';
 import { iconLogout } from './icons.js';
+import { mountPlaying } from './playing.js';
 
 const app = () => document.getElementById('app');
 
@@ -19,6 +21,7 @@ function navbar(user, avatarUrl, active) {
         La Viciación
       </a>
       <div class="navbar-actions">
+        <div class="playing-slot" id="playingSlot"></div>
         ${link('#', 'home', 'Inicio')}
         ${user.is_admin ? link('#/admin', 'admin', 'Admin') : ''}
         <a href="#/profile" class="navbar-user ${active === 'profile' ? 'active' : ''}" title="Mi perfil (@${user.username})">
@@ -43,5 +46,7 @@ export function renderShell({ user, avatarUrl, active, mainClass = '', onLogout 
       <main class="home-main ${mainClass}"></main>
     </div>`);
   document.getElementById('logoutBtn').addEventListener('click', onLogout);
+  mountPlaying(document.getElementById('playingSlot'), user);
+  startPresence();
   return app().querySelector('main');
 }

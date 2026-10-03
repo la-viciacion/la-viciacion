@@ -392,6 +392,42 @@ def get_active_game_timer_by_user(db: Session, user_id: int) -> models.GameTimer
     )
 
 
+# A timer running for longer than this is more likely forgotten than played: shown dimmed
+NOW_PLAYING_STALE_HOURS = 6
+
+
+def get_now_playing(db: Session, viewer_id: int, now: datetime.datetime | None = None) -> list[dict]:
+    """Who is playing right now: the running timers of the active players (never the emergency account),
+    leaving out those who chose to hide it, except from themselves. The ones that are not stale come
+    first, the latest started first. `stale`: running for more than NOW_PLAYING_STALE_HOURS."""
+    now = now or datetime.datetime.now()
+    rows = (
+        db.query(models.GameTimer, models.User, models.Game, models.UserSettings.show_playing)
+        .join(models.User, models.GameTimer.user_id == models.User.id)
+        .outerjoin(models.Game, models.GameTimer.game_id == models.Game.id)
+        .outerjoin(models.UserSettings, models.UserSettings.user_id == models.User.id)
+        .filter(models.GameTimer.is_active == True, models.User.is_active == 1, models.not_god())  # noqa: E712
+        .all()
+    )
+    limit = datetime.timedelta(hours=NOW_PLAYING_STALE_HOURS)
+    playing = [
+        {
+            "user_id": user.id,
+            "username": user.username,
+            "name": user.name or user.username,
+            "game_id": timer.game_id,
+            "game_name": game.name if game else timer.game_id,
+            "image_url": game.image_url if game else None,
+            "platform": timer.platform,
+            "start_time": timer.start_time,
+            "stale": now - timer.start_time > limit,
+        }
+        for timer, user, game, show in rows
+        if show is None or show or user.id == viewer_id
+    ]
+    return sorted(playing, key=lambda p: (p["stale"], -p["start_time"].timestamp()))
+
+
 def get_running_game_timers(db: Session) -> list[models.GameTimer]:
     """Every running timer."""
     return db.query(models.GameTimer).filter(models.GameTimer.is_active == True).all()  # noqa: E712

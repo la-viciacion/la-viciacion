@@ -69,6 +69,8 @@ class UserSettings(Base):
     forgotten_timer_hours = Column(SmallInteger, nullable=True)
     # minutes between refreshes of the running-timer push notification (10-120)
     timer_notice_minutes = Column(SmallInteger, nullable=True)
+    # whether the others see this player in "playing now" (NULL = the default: shown)
+    show_playing = Column(Boolean, nullable=True)
     updated_at = Column(DateTime, server_default=text("CURRENT_TIMESTAMP"), onupdate=text("CURRENT_TIMESTAMP"))
 
 

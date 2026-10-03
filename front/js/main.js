@@ -12,6 +12,7 @@ import { RESET_ROUTE, isResetRoute, resetTokenFromHash } from './lib/recovery.js
 import * as home from './pages/home/index.js';
 import { showLogin } from './pages/auth/login.js';
 import { showForgotPassword, showResetPassword } from './pages/auth/recover.js';
+import { stopPresence } from './lib/presence.js';
 import { renderShell, showLoading } from './ui/layout.js';
 import { inviteToPush } from './ui/push-invite.js';
 
@@ -32,6 +33,7 @@ function leaveCurrentPage() {
 
 function logout() {
   session.clear();
+  stopPresence();
   leaveCurrentPage();
   showLogin(route);
 }
@@ -85,6 +87,7 @@ async function route() {
 }
 
 setUnauthorizedHandler(() => {
+  stopPresence();
   leaveCurrentPage();
   showLogin(route);
 });

@@ -15,6 +15,7 @@ MAX_FORGOTTEN_TIMER_HOURS = 24
 DEFAULT_TIMER_NOTICE_MINUTES = 10
 MIN_TIMER_NOTICE_MINUTES = 10
 MAX_TIMER_NOTICE_MINUTES = 120
+DEFAULT_SHOW_PLAYING = True
 
 
 def valid_forgotten_timer_hours(hours) -> bool:
@@ -42,15 +43,25 @@ def timer_notice_minutes(db: Session, user_id: int) -> int:
     return row.timer_notice_minutes
 
 
+def show_playing(db: Session, user_id: int) -> bool:
+    """Whether the others see this user in "playing now" (their own choice or the default)."""
+    row = db.get(models.UserSettings, user_id)
+    if row is None or row.show_playing is None:
+        return DEFAULT_SHOW_PLAYING
+    return bool(row.show_playing)
+
+
 def get(db: Session, user_id: int) -> dict:
     """What the profile form shows: the user's own value (None = default) and the default."""
     row = db.get(models.UserSettings, user_id)
     return {
         "forgotten_timer_hours": row.forgotten_timer_hours if row else None,
         "timer_notice_minutes": row.timer_notice_minutes if row else None,
+        "show_playing": None if row is None or row.show_playing is None else bool(row.show_playing),
         "defaults": {
             "forgotten_timer_hours": DEFAULT_FORGOTTEN_TIMER_HOURS,
             "timer_notice_minutes": DEFAULT_TIMER_NOTICE_MINUTES,
+            "show_playing": DEFAULT_SHOW_PLAYING,
         },
     }
 
@@ -65,5 +76,7 @@ def update(db: Session, user_id: int, changes: dict) -> dict:
         row.forgotten_timer_hours = changes["forgotten_timer_hours"]
     if "timer_notice_minutes" in changes:
         row.timer_notice_minutes = changes["timer_notice_minutes"]
+    if "show_playing" in changes:
+        row.show_playing = changes["show_playing"]
     db.commit()
     return get(db, user_id)

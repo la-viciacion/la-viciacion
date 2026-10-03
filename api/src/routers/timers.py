@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from .. import auth
 from ..auth import get_db
 from ..crud import scores as scores_crud
+from ..crud import time_entries
 from ..crud import users as users_crud
 from ..database.models import Game, GameTimer, PlatformTag, User, UserGame
 from ..database.schemas import (
@@ -479,6 +480,15 @@ def delete_session_endpoint(
     delete_session(db, current_user, timer_id)
     background_tasks.add_task(actions.after_session_change, owner, True)
     return {"message": "Sesión eliminada"}
+
+
+@router.get("/now-playing")
+def now_playing(
+    current_user: User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Who is playing right now (visible to every logged-in player; each one can hide themselves)"""
+    return time_entries.get_now_playing(db, current_user.id)
 
 
 @router.get("/active/{user_id}", response_model=ActiveTimerResponse)
