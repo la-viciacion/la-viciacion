@@ -601,13 +601,13 @@ def _library_query(user_id: int, entry_id: int | None = None, game_id: str | Non
 def _library_item(row, completed_keys: set, current_season: int) -> dict:
     entry = row.UserGame
     done = bool(entry.completed)
-    # why a pending entry cannot be completed (None when it can)
+    # why the completion of the entry cannot be touched (None when it can): a closed season is
+    # frozen, completed or not; a pending entry is also blocked by another platform's completion
     blocked = None
-    if not done:
-        if entry.season != current_season:
-            blocked = "closed_season"
-        elif (entry.game_id, entry.season) in completed_keys:
-            blocked = "completed_in_season"
+    if entry.season != current_season:
+        blocked = "closed_season"
+    elif not done and (entry.game_id, entry.season) in completed_keys:
+        blocked = "completed_in_season"
     return {
         "id": entry.id,
         "game_id": entry.game_id,

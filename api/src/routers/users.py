@@ -250,13 +250,16 @@ def update_completion(
       season and once per game and season (announced unless silent=true).
     - completed=true + completed_date on an already completed entry changes
       the date (must fall inside the entry's season).
-    - completed=false unmarks it (any season); the entry itself is kept.
+    - completed=false unmarks it; the entry itself is kept.
+    - the completion of a closed season is frozen: neither unmarked nor re-dated.
     """
     auth.ensure_self_or_admin(active_user, username=username)
     user = _target_user(db, active_user, username)
     entry = users.get_library_entry(db, user.id, entry_id)
     if entry is None:
         raise HTTPException(status_code=404, detail=msg.ENTRY_NOT_FOUND)
+    if entry.completed and entry.season != seasons.current():
+        raise HTTPException(status_code=409, detail=msg.COMPLETION_SEASON_CLOSED)
 
     if not body.completed:
         if entry.completed:

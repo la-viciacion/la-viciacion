@@ -342,6 +342,17 @@ class CompletionTests(UsersTestCase):
         response = self.complete(entry=old)
         self.assertEqual((response.status_code, response.json()["detail"]), (409, messages.COMPLETE_ONLY_CURRENT_SEASON))
 
+    def test_the_completion_of_a_closed_season_is_frozen(self):
+        old = self.library_entry(self.ana, "hades", datetime.date(seasons.current() - 1, 4, 1), "pc",
+                                 completed=1, completed_date=datetime.date(seasons.current() - 1, 6, 27))
+        item = next(i for i in self.api("GET", "/users/ana/library", as_user="ana").json()["items"] if i["id"] == old)
+        self.assertEqual((item["completed"], item["can_complete"], item["complete_blocked"]), (True, False, "closed_season"))
+        for body in ({"completed": False}, {"completed": True, "completed_date": f"{seasons.current() - 1}-07-01"}):
+            with self.subTest(body):
+                response = self.complete(entry=old, **body)
+                self.assertEqual((response.status_code, response.json()["detail"]), (409, messages.COMPLETION_SEASON_CLOSED))
+        self.assertEqual(self.scalar("SELECT completed FROM users_games WHERE id = :i", i=old), 1)
+
     def test_the_date_of_a_completed_entry_can_change_but_not_without_saying_which(self):
         self.complete()
         day = TODAY() - timedelta(days=3)
