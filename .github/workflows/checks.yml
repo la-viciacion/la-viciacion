@@ -1,9 +1,19 @@
 name: Checks
 
 # Everything a change must pass before it can reach main (called by ci.yml on every PR) and
-# before an image is published (called by release.yml).
+# before an image is published (called by release.yml). ci.yml narrows it to what a pull request touches
+# (.github/scripts/ci_scope.py decides); called without inputs, as release.yml does, it runs everything.
 on:
   workflow_call:
+    inputs:
+      scope:
+        description: "The checks to run: all, or a comma-separated subset of api-tests, bot-tests, front-tests, mariadb (empty: none)"
+        type: string
+        default: all
+      build-services:
+        description: JSON list of the images to build and inspect
+        type: string
+        default: '["api","front","bot"]'
 
 permissions:
   contents: read
@@ -23,11 +33,11 @@ env:
   API_LOG_LEVEL: INFO
 
 jobs:
-  tests:
+  api-tests:
+    if: inputs.scope == 'all' || contains(format(',{0},', inputs.scope), ',api-tests,')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-
       - uses: actions/setup-python@v7
         with:
           python-version: "3.14"
@@ -39,6 +49,11 @@ jobs:
           pip install -r requirements.txt
           python -m unittest discover -s tests -t .
 
+  bot-tests:
+    if: inputs.scope == 'all' || contains(format(',{0},', inputs.scope), ',bot-tests,')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
           python-version: "3.14"
@@ -50,6 +65,11 @@ jobs:
           pip install -r requirements.txt
           python -m unittest discover -s tests -t .
 
+  front-tests:
+    if: inputs.scope == 'all' || contains(format(',{0},', inputs.scope), ',front-tests,')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
           node-version: 24
@@ -65,6 +85,7 @@ jobs:
   # The MariaDB that docker-compose.yml pins is the one the tests run on: it is read from there, so what is
   # tested and what is deployed cannot drift apart.
   mariadb-image:
+    if: inputs.scope == 'all' || contains(format(',{0},', inputs.scope), ',mariadb,')
     runs-on: ubuntu-latest
     outputs:
       image: ${{ steps.pin.outputs.image }}
@@ -87,12 +108,12 @@ jobs:
 
   # Build every image and look inside it before anything is published.
   build:
-    needs: tests
+    if: inputs.build-services != '[]'
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
-        service: [api, front, bot]
+        service: ${{ fromJSON(inputs.build-services) }}
     steps:
       - uses: actions/checkout@v7
       - uses: docker/setup-buildx-action@v4

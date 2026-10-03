@@ -30,14 +30,57 @@ jobs:
             exit 1
           fi
 
+  # What the pull request touches decides which checks run; main, tags and anything unclassified run them all
+  # (the rules and the reasons are in .github/scripts/ci_scope.py, pinned by api/tests/test_ci_scope.py).
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      scope: ${{ steps.scope.outputs.scope }}
+      build_services: ${{ steps.scope.outputs.build_services }}
+    steps:
+      # The script comes from the base branch, so a pull request cannot change the rules that judge it
+      # (a change to the script is itself unclassified, which runs everything).
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.sha }}
+          sparse-checkout: .github/scripts
+      - id: scope
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          everything() {
+            echo 'scope=all'
+            echo 'build_services=["api","front","bot"]'
+          }
+          if [ "$EVENT" != "pull_request" ]; then
+            everything >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          # a renamed file counts at both ends; if the list cannot be read, run everything
+          if files=$(gh api "repos/$REPO/pulls/$PR/files" --paginate --jq '.[] | .filename, (.previous_filename // empty)'); then
+            echo "$files" | python3 .github/scripts/ci_scope.py | tee -a "$GITHUB_OUTPUT"
+          else
+            echo "::warning::could not list the changed files; running every check"
+            everything >> "$GITHUB_OUTPUT"
+          fi
+
   checks:
+    needs: changes
     uses: ./.github/workflows/checks.yml
+    with:
+      scope: ${{ needs.changes.outputs.scope }}
+      build-services: ${{ needs.changes.outputs.build_services }}
 
   # The single status that branch protection requires, whatever jobs are added above.
   ci:
     name: CI
     if: always()
-    needs: [pr-title, checks]
+    needs: [pr-title, changes, checks]
     runs-on: ubuntu-latest
     steps:
       - name: Every job passed (a skipped pr-title on push to main is fine)
