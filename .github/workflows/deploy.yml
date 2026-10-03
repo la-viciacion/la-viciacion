@@ -1,0 +1,45 @@
+name: Deploy
+
+# Deploys main to the server over SSH once CI has passed on a push to main. The server holds the whole
+# procedure (deploy.sh: pull, rebuild, recreate); the key below can run that script and nothing else
+# (`command=` in its authorized_keys entry), so this job only has to connect.
+on:
+  workflow_run:
+    workflows: [CI]
+    branches: [main]
+    types: [completed]
+  # Re-run a deploy by hand without a new commit.
+  workflow_dispatch:
+
+permissions: {}
+
+# Never two deploys at once; a second one waits for the first instead of cancelling it half-way.
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    # A CI run on a pull request also ends in workflow_run; only a green run on a push to main deploys.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    environment: laviciacion
+    timeout-minutes: 20
+    steps:
+      - name: Run the deploy script on the server
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          SSH_USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          # No command is passed: the server runs deploy.sh whatever the client asks for.
+          ssh -T -i ~/.ssh/deploy_key \
+            -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            "$SSH_USER@$HOST"

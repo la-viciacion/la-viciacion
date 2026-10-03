@@ -164,4 +164,13 @@ Code rollback: set `LAVI_VERSION` in `.env` to the previous release (e.g. `2.0.0
    **build**: builds the three images and looks inside each one: no `.env*`, `*.sql`, `*.dump` under `/app` or the web root, and no credential-looking variable baked in (`PASS`, `SECRET`, `TOKEN`, `KEY`).
 2. **publish** (tags only): pushes `ghcr.io/la-viciacion/laviciacion-{api,front,bot}` tagged `X.Y.Z`, `X.Y` and `latest` (prereleases get no `latest`), using the workflow's own `GITHUB_TOKEN`; no secret has to be configured.
 
-Cut a release with `git tag v2.0.0 && git push origin v2.0.0` (see [roadmap](roadmap.md): tags are not created until 2.0.0 ships). The first time, set each package public (see [Installing](#installing)); the repository is public, so nothing needs a login afterwards. There is no automatic deploy: the server pulls when you decide. The images are `linux/amd64` only.
+Cut a release with `git tag v2.0.0 && git push origin v2.0.0` (see [roadmap](roadmap.md): tags are not created until 2.0.0 ships). The first time, set each package public (see [Installing](#installing)); the repository is public, so nothing needs a login afterwards. The images are `linux/amd64` only.
+
+### Automatic deploy of `main`
+
+`.github/workflows/deploy.yml` deploys the server (the one that builds from the checkout with the `*-dev` compose override) after every push to `main` whose `CI` run is green; it can also be run by hand (`workflow_dispatch`). It connects over SSH and the server does the work, so nothing about the server's layout lives in the workflow.
+
+- **Server side**: a user without a password (`laviciacion-deploy`) in the `docker` and project groups, whose `authorized_keys` entry is restricted to the deploy script: `command="/path/to/deploy.sh",no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty ssh-ed25519 AAAA...`. Even if the key leaks it can only run that script. `deploy.sh` does `git pull --ff-only` and `docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build`, with `set -euo pipefail` so a failure turns the job red.
+- **GitHub side**: environment `laviciacion` with the secrets `DEPLOY_SSH_KEY` (private key), `DEPLOY_HOST`, `DEPLOY_USER` and `DEPLOY_KNOWN_HOSTS` (`<host> ssh-ed25519 AAAA...`, the host key read from the server, so the connection cannot be intercepted). Add *Required reviewers* to the environment to approve each deploy by hand.
+- Migrations still run on API start, so **take a backup before merging a PR with a migration** (see [Backups and restore](#backups-and-restore)); the deploy does not take one.
+- Rotate the key by replacing the public key in `authorized_keys` and the `DEPLOY_SSH_KEY` secret.
