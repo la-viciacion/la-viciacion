@@ -1,7 +1,7 @@
 // Page shell shared by every logged-in page: navbar + <main>.
 import { html, mount } from '../lib/html.js';
 import { startPresence } from '../lib/presence.js';
-import { iconHome, iconMenu, iconShield, iconUsers } from './icons.js';
+import { iconHome, iconMenu, iconShield } from './icons.js';
 import { mountMenu } from './menu.js';
 import { mountPlaying } from './playing.js';
 
@@ -28,7 +28,6 @@ function navbar(user, avatarUrl, active) {
       <div class="navbar-actions">
         <div class="playing-slot" id="playingSlot"></div>
         ${link('#', 'home', 'Inicio', iconHome())}
-        ${link('#/group', 'group', 'Grupo', iconUsers())}
         <a href="#/profile" class="navbar-user ${active === 'profile' ? 'active' : ''}" title="Mi perfil (@${user.username})">
           ${avatarUrl
             ? html`<img src="${avatarUrl}" alt="" class="navbar-avatar" />`

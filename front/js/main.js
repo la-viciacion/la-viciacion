@@ -1,7 +1,7 @@
 // Entry point: hash router + session handling.
 //
 // A page module exports:
-//   active      navbar item to highlight ('home' | 'group' | 'profile' | 'admin')
+//   active      navbar item to highlight ('home' | 'profile' | 'admin')
 //   mainClass   optional class for <main>
 //   adminOnly   optional; non-admins are sent home
 //   render({ user, main, avatarUrl, isCurrent, onLogout })   fills <main>; isCurrent() turns false
@@ -22,7 +22,7 @@ const ROUTES = [
   { prefix: '#/admin', load: () => import('./pages/admin/index.js') },
   { prefix: '#/profile', load: () => import('./pages/profile/index.js') },
   { prefix: '#/game/', load: () => import('./pages/game/index.js') },
-  { prefix: '#/group', load: () => import('./pages/group/index.js') },
+  { prefix: '#/activity', load: () => import('./pages/activity/index.js') },
   { prefix: '#/stats', load: () => import('./pages/stats/index.js') },
   { prefix: '#/games', load: () => import('./pages/games/index.js') },
   { prefix: '#/achievements', load: () => import('./pages/achievements/index.js') },

@@ -41,7 +41,7 @@ From the home page a user can add a finished session by hand (**+ Sesión manual
 
 ## Side menu
 
-The button at the left of the top bar opens the menu, a panel that slides in from the left (on a phone and on a wide screen alike; the admin panel keeps its own sidebar). It lists **Principal** (Inicio, Grupo), **Explorar** (Estadísticas, marked WIP: a placeholder until the statistics are ready), **Tú** (Mi perfil, Recomendados, Ajustes: the profile's tabs), **Administración** (admins only) and, at the foot, **Cerrar sesión**. It highlights the page you are on, closes with Escape, a tap outside, the close button or choosing a page, and its structure is in `front/js/lib/menu.js`. The top bar keeps its icons for now.
+The button at the left of the top bar opens the menu, a panel that slides in from the left (on a phone and on a wide screen alike; the admin panel keeps its own sidebar). It lists **Principal** (Inicio, Actividad), **Explorar** (Juegos, Logros, Jugadores and Estadísticas, marked WIP: a placeholder until the statistics are ready), **Tú** (Mi perfil, Ajustes: tabs of the profile; the recommendations are its third tab), **Administración** (admins only) and, at the foot, **Cerrar sesión**. It highlights the page you are on, closes with Escape, a tap outside, the close button or choosing a page, and its structure is in `front/js/lib/menu.js`. The top bar keeps only Inicio, the profile and, for admins, the admin panel.
 
 ## Players pages
 
@@ -61,9 +61,9 @@ The navbar shows who else is playing right now: a chip with up to three avatars 
 
 The installed app offers shortcuts on a long press of its icon (`shortcuts` in `front/manifest.json`): **Nuevo timer** (`#/new`, opens the game picker unless a timer is already running), **Jugando ahora** (`#/playing`, opens the sheet) and **Mi perfil**.
 
-## Group activity
+## Activity page
 
-The **Grupo** page (the people icon of the navbar) lists what everybody has done, newest first and by day (Hoy, Ayer, then the date), 30 at a time with **Mostrar más** (`GET /activity?limit=&offset=`): hours played that day on a game, a game started for the first time, a game completed (with its rating, if any), a rating given and an achievement unlocked (with its game, if it has one). Within a day the most notable come first (completed, achievement, rated, started, played). Each line shows the player's photo and links to the game page. Only active players (never the emergency account); running timers are not events until they stop. Derived from the sessions, library, ratings and achievements; nothing is stored, so changing a rating moves it to its new date.
+The **Actividad** page (menu → Principal, `#/activity`) lists what everybody has done, newest first and by day (Hoy, Ayer, then the date), 30 at a time with **Mostrar más** (`GET /activity?limit=&offset=`): hours played that day on a game, a game started for the first time, a game completed (with its rating, if any), a rating given and an achievement unlocked (with its game, if it has one). Within a day the most notable come first (completed, achievement, rated, started, played). Each line shows the player's photo and links to the game page. Only active players (never the emergency account); running timers are not events until they stop. Derived from the sessions, library, ratings and achievements; nothing is stored, so changing a rating moves it to its new date.
 
 ## Game page
 

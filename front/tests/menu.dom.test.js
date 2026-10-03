@@ -19,14 +19,14 @@ test('the button opens the panel with the sections and tells the state', () => {
   assert.ok(panel());
   assert.equal(button().getAttribute('aria-expanded'), 'true');
   assert.deepEqual([...document.querySelectorAll('.menu-section')].map((e) => e.textContent), ['Principal', 'Explorar', 'Tú', 'Administración']);
-  assert.equal(document.querySelectorAll('a.menu-item').length, 10);
+  assert.equal(document.querySelectorAll('a.menu-item').length, 9);
   assert.equal(document.querySelector('.menu-wip').textContent, 'WIP');
 });
 
 test('it highlights the page it is on and puts the focus there', () => {
-  window.location.hash = '#/group';
+  window.location.hash = '#/activity';
   button().click();
-  assert.equal(document.querySelector('a.menu-item.active').textContent.trim(), 'Grupo');
+  assert.equal(document.querySelector('a.menu-item.active').textContent.trim(), 'Actividad');
   assert.equal(document.querySelector('a.menu-item.active').getAttribute('aria-current'), 'page');
   assert.equal(document.activeElement, document.querySelector('a.menu-item.active'));
 });

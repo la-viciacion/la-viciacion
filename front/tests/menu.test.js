@@ -5,7 +5,7 @@ import { activeItem, menuSections } from '../js/lib/menu.js';
 const ids = (user) => menuSections(user).flatMap((s) => s.items.map((i) => i.id));
 
 test('a player sees every section but the administration', () => {
-  assert.deepEqual(ids({ is_admin: false }), ['home', 'group', 'games', 'achievements', 'players', 'stats', 'profile', 'recommended', 'settings']);
+  assert.deepEqual(ids({ is_admin: false }), ['home', 'activity', 'games', 'achievements', 'players', 'stats', 'profile', 'settings']);
   assert.deepEqual(menuSections({ is_admin: false }).map((s) => s.label), ['Principal', 'Explorar', 'Tú']);
 });
 
@@ -28,11 +28,11 @@ test('every id and address is unique', () => {
 test('an address highlights its item, the most specific one first', () => {
   assert.equal(activeItem(''), 'home');
   assert.equal(activeItem('#'), 'home');
-  assert.equal(activeItem('#/group'), 'group');
+  assert.equal(activeItem('#/activity'), 'activity');
   assert.equal(activeItem('#/stats'), 'stats');
   assert.equal(activeItem('#/profile'), 'profile');
   assert.equal(activeItem('#/profile/resumen'), 'profile');
-  assert.equal(activeItem('#/profile/recomendados'), 'recommended');
+  assert.equal(activeItem('#/profile/recomendados'), 'profile'); // the recommendations are a tab of the profile
   assert.equal(activeItem('#/profile/ajustes'), 'settings');
   assert.equal(activeItem('#/admin/users'), 'admin');
   assert.equal(activeItem('#/games'), 'games');

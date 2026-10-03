@@ -1,4 +1,4 @@
-// Group page (#/group): the latest activity of everybody, newest first and by day. GET /activity (derived from the
+// Activity page (#/activity): the latest activity of everybody, newest first and by day. GET /activity (derived from the
 // sessions, library, ratings and achievements; nothing is stored).
 import { api } from '../../lib/api.js';
 import { dayLabel, groupByDay } from '../../lib/activity.js';
@@ -8,7 +8,7 @@ import { gameHref } from '../../lib/links.js';
 import { hydratePhotos, playerAvatar } from '../../ui/avatar.js';
 import { scoreBadge } from '../../ui/score-badge.js';
 
-export const active = 'group';
+export const active = null; // it belongs to no item of the top bar
 
 const PAGE = 30;
 
@@ -35,7 +35,7 @@ const eventRow = (e) => html`
 
 function draw() {
   mount(main, html`
-    <div class="section-header"><h2 class="section-title">Actividad del grupo</h2><div class="section-line"></div></div>
+    <div class="section-header"><h2 class="section-title">Actividad</h2><div class="section-line"></div></div>
     ${events.length
       ? html`
         ${groupByDay(events).map((g) => html`

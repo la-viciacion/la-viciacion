@@ -4,7 +4,7 @@ import { installApi, installDom, installStorage, json, settle, text } from './do
 
 installStorage();
 installDom('<main id="main"></main>');
-const page = await import('../js/pages/group/index.js');
+const page = await import('../js/pages/activity/index.js');
 
 const today = new Date().toLocaleDateString('sv-SE');
 const ITEMS = [
