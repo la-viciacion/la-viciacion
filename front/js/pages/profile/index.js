@@ -1,9 +1,9 @@
 // Profile page: a header with the stats of a season (the running one, another one or the total of
-// all, chosen with the pills) and four tabs so nothing needs a
-// long scroll: Resumen (top games, achievements), Mis juegos (see library.js),
+// all, chosen with the pills) and three tabs so nothing needs a long scroll: Resumen (top games,
+// achievements and, below them, the games of the selected season: see library.js),
 // Recomendados (see recommendations.js) and Ajustes (personal data, reminders, push
-// notifications, password). The games, the recommendations and the settings load the
-// first time their tab is opened.
+// notifications, password). The recommendations and the settings load the first time their tab
+// is opened.
 // All routes are /api/v1/users/{username}/...
 import { api } from '../../lib/api.js';
 import { formatDate, formatDuration } from '../../lib/format.js';
@@ -13,7 +13,7 @@ import * as seasons from '../../lib/seasons.js';
 import { initAccount } from './account.js';
 import { initAvatar } from './avatar.js';
 import { flash } from './flash.js';
-import { initLibrary } from './library.js';
+import { initLibrary, showSeason } from './library.js';
 import { initPreferences } from './preferences.js';
 import { initPush } from './push.js';
 import { initRecommendations } from './recommendations.js';
@@ -23,7 +23,6 @@ export const mainClass = 'profile-main';
 
 const TABS = [
   ['resumen', 'Resumen'],
-  ['juegos', 'Mis juegos'],
   ['recomendados', 'Recomendados'],
   ['ajustes', 'Ajustes'],
 ];
@@ -32,7 +31,8 @@ let main;
 let user;
 let avatarUrl;
 let opened; // tabs already initialised
-let shown; // season on screen: a year, or seasons.ALL; null = the running one
+let shown; // season asked for: a year, or seasons.ALL; null = the running one
+let onScreen; // season on screen once resolved: a year, or seasons.ALL
 
 const userPath = (suffix) => `/users/${encodeURIComponent(user.username)}/${suffix}`;
 
@@ -47,6 +47,7 @@ async function load() {
   const data = await api(userPath('profile'));
   if (!data) return;
   shown = null;
+  onScreen = data.season;
   draw(data);
   opened = new Set();
   showTab(tabFromHash());
@@ -69,7 +70,7 @@ function showTab(id) {
   history.replaceState(null, '', `#/profile/${id}`);
   if (opened.has(id)) return;
   opened.add(id);
-  if (id === 'juegos') initLibrary(main.querySelector('#pfLibrary'), { username: user.username, userId: user.id, onChange: refreshSummary });
+  if (id === 'resumen') initLibrary(main.querySelector('#pfLibrary'), { username: user.username, userId: user.id, season: onScreen, onChange: refreshSummary });
   if (id === 'recomendados') initRecommendations(main.querySelector('#pfRecommended'), { username: user.username });
   if (id === 'ajustes') {
     initPreferences(main.querySelector('#pfPrefs'), { path: userPath('settings') }).catch(() => {});
@@ -91,7 +92,9 @@ function onTabKey(e) {
 async function refreshSummary(season = shown) {
   const data = await api(`${userPath('profile')}${season == null ? '' : `?season=${season}`}`);
   if (!data) return;
+  const changed = data.season !== onScreen;
   shown = season;
+  onScreen = data.season;
   mount(main.querySelector('#pfSeasons'), seasonPills(data));
   main.querySelector('#pfStats').setAttribute('aria-label', `Estadísticas: ${seasonName(data)}`);
   mount(main.querySelector('#pfStats'), statsView(data));
@@ -99,6 +102,8 @@ async function refreshSummary(season = shown) {
   mount(main.querySelector('#pfTop'), topView(data));
   mount(main.querySelector('#pfAchTitle'), titleView(`Logros ${seasonSuffix(data)}`));
   mount(main.querySelector('#pfAchievements'), achievementsView(data));
+  mount(main.querySelector('#pfGamesTitle'), titleView(`Juegos ${seasonSuffix(data)}`));
+  if (changed && opened.has('resumen')) await showSeason(data.season);
 }
 
 async function onSeason(e) {
@@ -202,10 +207,7 @@ function draw(d) {
           <div class="pf-card" id="pfAchievements">${achievementsView(d)}</div>
         </div>
       </div>
-    </section>
-
-    <section class="pf-panel" role="tabpanel" id="pfPanel-juegos" aria-labelledby="pfTab-juegos" hidden>
-      <div class="pf-sub pf-note">Aquí aparecen los juegos de todas las temporadas; la temporada de cada uno va indicada.</div>
+      ${sectionTitle(`Juegos ${seasonSuffix(d)}`, 'pfGamesTitle')}
       <div id="pfLibrary"></div>
     </section>
 

@@ -627,12 +627,19 @@ def _library_item(row, completed_keys: set, current_season: int) -> dict:
     }
 
 
-def get_library(db: Session, user_id: int, limit: int = 15, offset: int = 0, game_id: str | None = None) -> dict:
+def get_library(
+    db: Session, user_id: int, limit: int = 15, offset: int = 0, game_id: str | None = None, only_season: int | None = None
+) -> dict:
+    """`season` in the answer is the running one (it decides what can be completed), not the filter."""
     season = seasons.current()
     count = db.query(models.UserGame).filter(models.UserGame.user_id == user_id)
     if game_id is not None:
         count = count.filter(models.UserGame.game_id == game_id)
-    rows = db.execute(_library_query(user_id, game_id=game_id).limit(limit).offset(offset)).all()
+    query = _library_query(user_id, game_id=game_id)
+    if only_season is not None:
+        count = count.filter(models.UserGame.season == only_season)
+        query = query.where(models.UserGame.season == only_season)
+    rows = db.execute(query.limit(limit).offset(offset)).all()
     total = count.count()
     keys = _completed_keys(db, user_id)
     return {

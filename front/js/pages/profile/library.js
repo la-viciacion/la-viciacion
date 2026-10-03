@@ -1,5 +1,5 @@
-// "Mis juegos": every game of the user (all seasons), most recently played
-// first, with its completion state.
+// The games of the profile's summary: those of the season on screen (every season for the total),
+// most recently played first, with their completion state.
 //   - a pending game of the current season can be marked as completed
 //   - a completed game of the current season lets you change the completion date or unmark it;
 //     once its season is closed the completion is frozen
@@ -12,6 +12,7 @@ import { blockedReason } from '../../lib/completion.js';
 import { formatDate, formatDateTime, formatDuration, formatRelative } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
 import { platformName } from '../../lib/platforms.js';
+import * as seasons from '../../lib/seasons.js';
 import { initSessions, openSessionForm } from '../home/sessions.js';
 
 const PAGE = 15;
@@ -22,13 +23,15 @@ let el;
 let username;
 let userId;
 let onChange;
-let season = new Date().getFullYear();
+let season = new Date().getFullYear(); // the running one (what can be completed)
+let shown = season; // the one on screen: a year, or seasons.ALL
 let items = [];
 let total = 0;
 let editing = null; // id of the entry whose date is being edited
 let sessions = new Map(); // entry id -> its sessions, for the entries that are expanded
 
 const path = (suffix = '') => `/users/${encodeURIComponent(username)}/library${suffix}`;
+const seasonQuery = () => (shown === seasons.ALL ? '' : `&season=${shown}`);
 
 function flash(message, ok = false) {
   const msg = el.querySelector('.pf-msg');
@@ -40,6 +43,7 @@ function flash(message, ok = false) {
 /** onChange runs after a completion or a session changed (the page refreshes its stats). */
 export async function initLibrary(container, options) {
   el = container;
+  shown = options.season;
   username = options.username;
   userId = options.userId;
   onChange = options.onChange;
@@ -53,10 +57,20 @@ export async function initLibrary(container, options) {
   await load(PAGE);
 }
 
+/** The summary moved to another season (or to the total): list its games. */
+export async function showSeason(value) {
+  shown = value;
+  items = [];
+  total = 0;
+  editing = null;
+  sessions = new Map();
+  await load(PAGE);
+}
+
 // Fetch the first `count` entries again (keeps what was already shown).
 async function load(count = Math.max(PAGE, items.length)) {
   try {
-    const page = await api(`${path()}?limit=${Math.min(count, MAX)}&offset=0`);
+    const page = await api(`${path()}?limit=${Math.min(count, MAX)}&offset=0${seasonQuery()}`);
     if (!page) return;
     ({ season, total, items } = page);
     draw();
@@ -66,7 +80,7 @@ async function load(count = Math.max(PAGE, items.length)) {
 }
 
 async function loadMore() {
-  const page = await api(`${path()}?limit=${PAGE}&offset=${items.length}`);
+  const page = await api(`${path()}?limit=${PAGE}&offset=${items.length}${seasonQuery()}`);
   if (!page) return;
   items = items.concat(page.items);
   total = page.total;
@@ -159,7 +173,7 @@ function draw() {
   const remaining = total - items.length;
   mount(el, html`
     <div class="pf-card">
-      ${items.length ? items.map(row) : html`<div class="pf-empty">Todavía no has jugado a ningún juego.</div>`}
+      ${items.length ? items.map(row) : html`<div class="pf-empty">No hay juegos en esta selección.</div>`}
       ${remaining > 0 ? html`<button class="pf-btn" data-action="more">Mostrar más (${remaining})</button>` : ''}
       <div class="pf-msg" role="status"></div>
     </div>`);

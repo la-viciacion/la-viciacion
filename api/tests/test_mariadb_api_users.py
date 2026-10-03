@@ -258,6 +258,13 @@ class LibraryTests(UsersTestCase):
         only = self.get(game_id="hades")
         self.assertEqual((only["total"], [i["game_id"] for i in only["items"]]), (1, ["hades"]))
 
+    def test_it_can_be_limited_to_one_season(self):
+        current = self.get(season=seasons.current())
+        self.assertEqual((current["total"], sorted(i["game_id"] for i in current["items"])), (2, ["celeste", "hades"]))
+        past = self.get(season=seasons.current() - 1)
+        self.assertEqual((past["total"], [i["game_id"] for i in past["items"]], past["season"]), (1, ["tetris"], seasons.current()))
+        self.assertEqual(self.get(season=1999)["total"], 0)
+
     def test_the_bounds(self):
         for params in ({"limit": 0}, {"limit": 101}, {"offset": -1}):
             self.assertEqual(self.api("GET", "/users/ana/library", as_user="ana", params=params).status_code, 422, params)
