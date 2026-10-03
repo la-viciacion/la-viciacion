@@ -1,11 +1,12 @@
 // "Mis juegos": every game of the user (all seasons), most recently played
 // first, with its completion state.
 //   - a pending game of the current season can be marked as completed
-//   - a completed game lets you change the completion date or unmark it
+//   - a completed game of the current season lets you change the completion date or unmark it;
+//     once its season is closed the completion is frozen
 //   - "Sesiones" lists the sessions of the entry (game and season); those of the current season
 //     can be corrected or deleted there
-// The API enforces the rules (once per game and season, current season only,
-// date inside the entry's season); the UI only offers what is allowed.
+// The API enforces the rules (once per game and season, current season only for completing,
+// re-dating and unmarking, date inside the entry's season); the UI only offers what is allowed.
 import { api, jsonRequest } from '../../lib/api.js';
 import { blockedReason } from '../../lib/completion.js';
 import { formatDate, formatDateTime, formatDuration, formatRelative } from '../../lib/format.js';
@@ -111,6 +112,7 @@ function actions(g) {
   if (!g.completed) {
     return html`${sessionsButton}<button class="pf-btn" disabled title="${blockedReason(g, season)}">Marcar completado</button>`;
   }
+  if (g.complete_blocked === 'closed_season') return sessionsButton;
   return html`
     ${sessionsButton}
     <button class="pf-btn" data-action="edit-date" data-id="${g.id}">Cambiar fecha</button>

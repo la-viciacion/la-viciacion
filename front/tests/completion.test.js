@@ -15,3 +15,9 @@ test('a game already completed this season says so', () => {
 test('nothing blocks an entry that can be completed', () => {
   assert.equal(blockedReason({ complete_blocked: null, season: 2026 }, 2026), '');
 });
+
+test('a completed game of a closed season says its completion is frozen', () => {
+  const text = blockedReason({ complete_blocked: 'closed_season', completed: true, season: 2025 }, 2026);
+  assert.match(text, /2025/);
+  assert.match(text, /ya no se puede cambiar/);
+});
