@@ -142,3 +142,11 @@
 .gm-player-name { font-weight: 700; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .pf-tag.live { background: rgba(74, 222, 128, 0.15); color: var(--live-green); }
 @media (max-width: 640px) { .gm-cover { width: 72px; height: 72px; } }
+
+/* Group page */
+.ac-day { margin: 18px 0 8px; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
+.ac-list { list-style: none; margin: 0; gap: 14px; }
+.ac-event { display: flex; align-items: center; gap: 12px; }
+.ac-event .pl-avatar { width: 36px; height: 36px; border-color: var(--bg-card); }
+.ac-text { min-width: 0; color: var(--text-secondary); overflow-wrap: anywhere; }
+.ac-text strong { color: var(--text-primary); }

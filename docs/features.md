@@ -45,6 +45,10 @@ The navbar shows who else is playing right now: a chip with up to three avatars 
 
 The installed app offers shortcuts on a long press of its icon (`shortcuts` in `front/manifest.json`): **Nuevo timer** (`#/new`, opens the game picker unless a timer is already running), **Jugando ahora** (`#/playing`, opens the sheet) and **Mi perfil**.
 
+## Group activity
+
+The **Grupo** page (the people icon of the navbar) lists what everybody has done, newest first and by day (Hoy, Ayer, then the date), 30 at a time with **Mostrar más** (`GET /activity?limit=&offset=`): hours played that day on a game, a game started for the first time, a game completed (with its rating, if any), a rating given and an achievement unlocked (with its game, if it has one). Within a day the most notable come first (completed, achievement, rated, started, played). Each line shows the player's photo and links to the game page. Only active players (never the emergency account); running timers are not events until they stop. Derived from the sessions, library, ratings and achievements; nothing is stored, so changing a rating moves it to its new date.
+
 ## Game page
 
 Pressing a game's name (the history's unfolded rows, the profile's games list, most played and recommendations, the playing-now sheet) opens its page, `#/game/<id>` (`GET /games/{id}/overview`, any logged-in user): cover, genres, developer, release date and the average time to complete; the group's figures (players, hours, how many completed it, average rating and how many ratings); your own rating, which you can set or change there; and every active player who has it in their library (any season) with their hours, sessions, seasons, completions and rating, the most played first. A player gets the green aura and "Jugando ahora" while their timer runs (unless it is stale or they hide it, as in the chip). Derived from the library, sessions and ratings; nothing is stored.
