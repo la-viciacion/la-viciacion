@@ -124,3 +124,6 @@
 .pf-sessions { list-style: none; margin: 8px 0 0; padding: 0; width: 100%; }
 .pf-sessions li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 7px 0; font-size: 0.85rem; color: var(--text-secondary); border-bottom: 1px dashed var(--border); }
 .pf-sessions li:last-child { border-bottom: none; }
+
+.pf-btn.danger { background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.35); color: #fca5a5; }
+.pf-btn.danger:hover:not(:disabled) { border-color: rgba(239, 68, 68, 0.7); background: rgba(239, 68, 68, 0.2); }

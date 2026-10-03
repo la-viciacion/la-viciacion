@@ -32,6 +32,7 @@ let main;
 let user;
 let avatarUrl;
 let opened; // tabs already initialised
+let onLogout;
 let shown; // season asked for: a year, or seasons.ALL; null = the running one
 let onScreen; // season on screen once resolved: a year, or seasons.ALL
 
@@ -41,6 +42,7 @@ export async function render(ctx) {
   main = ctx.main;
   user = ctx.user;
   avatarUrl = ctx.avatarUrl;
+  onLogout = ctx.onLogout;
   await load();
 }
 
@@ -246,6 +248,12 @@ function draw(d) {
       <div class="pf-msg" id="pfPassMsg" role="status"></div>
       <div><button class="pf-btn primary" type="submit">Cambiar contraseña</button></div>
     </form>
+
+    ${sectionTitle('Sesión')}
+    <div class="pf-card pf-form">
+      <div class="pf-sub">Cierra la sesión en este dispositivo.</div>
+      <div><button class="pf-btn danger" type="button" id="pfLogout">Cerrar sesión</button></div>
+    </div>
     </div>
     </div>
     </section>`);
@@ -256,6 +264,7 @@ function draw(d) {
   });
   main.querySelector('.pf-tabs').addEventListener('keydown', onTabKey);
   main.querySelector('#pfSeasons').addEventListener('click', onSeason);
+  main.querySelector('#pfLogout').addEventListener('click', () => onLogout());
   initAvatar(main, { path: userPath('avatar') });
   initAccount(main, { user, userPath });
 }
