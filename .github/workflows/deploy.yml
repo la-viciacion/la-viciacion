@@ -1,0 +1,74 @@
+name: Deploy
+
+# Deploys on demand (Actions tab -> Deploy -> Run workflow). It connects over SSH and the server holds the
+# whole procedure; each key can run one script and nothing else (`command=` in its authorized_keys entry).
+#   dev   builds main from the checkout of the dev stack (deploy.sh).
+#   prod  pulls the published images of a release tag (`latest` = the newest vX.Y.Z tag, or e.g. 2.0.0).
+# Each target has its own environment, key and secrets (same names in both), so the reviewers required on
+# `production` cannot be bypassed by a workflow that declares the dev environment.
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Where to deploy
+        type: choice
+        options: [dev, prod]
+        default: dev
+      version:
+        description: "prod only: release to deploy, `latest` or X.Y.Z (also how you roll back)"
+        type: string
+        default: latest
+
+permissions: {}
+
+# Never two deploys at once; a second one waits for the first instead of cancelling it half-way.
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy-dev:
+    # The server pulls main whatever branch the run was started from; refuse to start from anything else.
+    if: inputs.target == 'dev' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: develop
+    timeout-minutes: 20
+    steps:
+      - name: Run the dev deploy script on the server
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          SSH_USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          # No command is passed: the server runs deploy.sh whatever the client asks for.
+          ssh -T -i ~/.ssh/deploy_key \
+            -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            "$SSH_USER@$HOST"
+
+  deploy-prod:
+    if: inputs.target == 'prod' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 20
+    steps:
+      - name: Run the prod deploy script on the server
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          SSH_USER: ${{ secrets.DEPLOY_USER }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          # The version is the only thing the client sends; the server checks it against a strict pattern.
+          ssh -T -i ~/.ssh/deploy_key \
+            -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            "$SSH_USER@$HOST" "$VERSION"

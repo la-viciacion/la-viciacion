@@ -164,4 +164,22 @@ Code rollback: set `LAVI_VERSION` in `.env` to the previous release (e.g. `2.0.0
    **build**: builds the three images and looks inside each one: no `.env*`, `*.sql`, `*.dump` under `/app` or the web root, and no credential-looking variable baked in (`PASS`, `SECRET`, `TOKEN`, `KEY`).
 2. **publish** (tags only): pushes `ghcr.io/la-viciacion/laviciacion-{api,front,bot}` tagged `X.Y.Z`, `X.Y` and `latest` (prereleases get no `latest`), using the workflow's own `GITHUB_TOKEN`; no secret has to be configured.
 
-Cut a release with `git tag v2.0.0 && git push origin v2.0.0` (see [roadmap](roadmap.md): tags are not created until 2.0.0 ships). The first time, set each package public (see [Installing](#installing)); the repository is public, so nothing needs a login afterwards. There is no automatic deploy: the server pulls when you decide. The images are `linux/amd64` only.
+Cut a release with `git tag v2.0.0 && git push origin v2.0.0` (see [roadmap](roadmap.md): tags are not created until 2.0.0 ships). The first time, set each package public (see [Installing](#installing)); the repository is public, so nothing needs a login afterwards. The images are `linux/amd64` only.
+
+### Deploying from GitHub
+
+`.github/workflows/deploy.yml` deploys on demand (nothing deploys on merge): Actions tab → *Deploy* → *Run workflow* on `main`, choosing the `target`. It does not wait for CI, so start it once the merge's `CI` run is green. It connects over SSH and the server does the work, so nothing about the server's layout lives in the workflow.
+
+| Target | What the server does | Environment |
+|---|---|---|
+| `dev` | `deploy.sh` in the dev checkout: `git pull --ff-only` and `up -d --build` with the `*-dev` override | `develop` |
+| `prod` | a script outside the repo: checks out the release tag in the prod checkout and runs `docker compose pull && up -d` with `LAVI_VERSION` set to it | `production` (with *Required reviewers*) |
+
+`version` (prod only) is `latest`, meaning the newest stable `vX.Y.Z` tag, or an explicit `X.Y.Z`; deploying an older one is also the rollback. The release workflow must have published that tag's images first, otherwise the `pull` fails and nothing changes.
+
+- **One key per target.** A user without a password (`laviciacion-deploy`) in the `docker` and project groups has two entries in `authorized_keys`, each restricted to one command: `command="/path/to/dev/deploy.sh",no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty ssh-ed25519 AAAA...` and the same with `command="/usr/local/bin/laviciacion-deploy-prod"` for the prod key. Even if a key leaks it can only run its script. The two keys live in different environments on purpose: the required reviewers belong to the environment, so a shared key would let a workflow that names the dev environment deploy prod without approval.
+- **The prod script is owned by root and kept outside the repo**, so neither a `git pull` nor the deploy user can change what the key runs. It reads the version from `SSH_ORIGINAL_COMMAND`, accepts only `latest` or `X.Y.Z`, takes a lock, `git fetch --tags`, checks out `v<version>` detached (the compose file of that release), exports `LAVI_VERSION` and recreates the stack. Every step runs under `set -euo pipefail`, so a failure turns the job red.
+- **Prod is a second checkout** next to the dev one (for example `la-viciacion-prod`) with its own `.env`: different `FRONT_/API_/DB_HOST_PORT`, its own `DB_DATA` volume and its own Telegram bot token (two bots with one token fight over the updates). The container names (`laviciacion-*` against `*-dev`) and the compose project (the directory name) already keep the stacks apart.
+- **GitHub side**: in each environment, the secrets `DEPLOY_SSH_KEY` (that target's private key), `DEPLOY_HOST`, `DEPLOY_USER` and `DEPLOY_KNOWN_HOSTS` (`<host> ssh-ed25519 AAAA...`, the host key read from the server, so the connection cannot be intercepted). `production` has *Required reviewers*; restrict both environments to the `main` branch.
+- Migrations still run on API start, so **take a backup before deploying a change with a migration** (see [Backups and restore](#backups-and-restore)); the deploy does not take one.
+- Rotate a key by replacing its public key in `authorized_keys` and the `DEPLOY_SSH_KEY` secret of its environment.
