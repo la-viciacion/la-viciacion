@@ -14,7 +14,7 @@ Simplified trunk-based development for a team of 2-3. `main` is the trunk: alway
 
 ## What CI checks
 
-`.github/workflows/ci.yml` runs on every PR and again on `main` after the merge. The required status is the single job **`CI`**, which passes only if all of these pass (they live in `checks.yml`, the same ones that gate a release):
+`.github/workflows/ci.yml` runs on every PR and again on `main` after the merge. The required status is the single job **`CI`**, which passes only if every check that applies to the change passes (see [Which checks run for a change](#which-checks-run-for-a-change)). The checks live in `checks.yml`, the same ones that gate a release:
 
 - API tests (Python 3.14), including the Alembic history guards, the endpoint security list and the `.env.template` check.
 - Migrations and schema rules on a real MariaDB (empty database to head, an older revision with data to head, re-run, downgrade, generated `season` columns, constraints), on the exact image `docker-compose.yml` pins (CI reads the tag from there and a test checks the server really is that version). A weekly run (`mariadb-versions.yml`) tries the moving tags `lts` and `latest` as an early warning; it never blocks a PR.
@@ -23,6 +23,25 @@ Simplified trunk-based development for a team of 2-3. `main` is the trunk: alway
 - Front tests and ESLint.
 - The three Docker images build and contain no secrets, data or baked-in credentials.
 - The PR title follows Conventional Commits.
+
+### Which checks run for a change
+
+A pull request only runs the checks its files can affect; `main` after a merge, the release workflow and the weekly runs always run everything. `ci.yml` starts with a `changes` job that lists the PR's files (GitHub API) and hands them to `.github/scripts/ci_scope.py`, which answers with the checks to run (`api-tests`, `bot-tests`, `front-tests`, `mariadb`) and the images to build. The single required job `CI` counts a skipped job as passed, so a PR that touches only docs shows just `pr-title`, `changes` and `CI`.
+
+| The change touches | Runs |
+|---|---|
+| `docs/`, `design/`, `*.md` at the root, `LICENSE`, `.gitignore`, `.gitattributes`, the PR template, `dependabot.yml` | nothing but the PR title |
+| `front/` | front tests and lint, front image; plus the API tests when it is `front/js/` or `front/Dockerfile` (a test reads them) |
+| `api/` | API tests, MariaDB tests, API image |
+| `bot/src/` | bot tests, bot image, API tests and MariaDB tests (the contract test and the `.env.template` check read the bot's code) |
+| `bot/` (tests, requirements...) | bot tests, bot image |
+| `.env.template`, `docker-compose.dev.yml` | API tests |
+| `docker-compose.yml` | API tests and MariaDB tests (it pins the version they run on) |
+| anything else (`.github/workflows/`, `.github/scripts/`, a new top-level path...) | **everything** |
+
+Three safeguards keep this honest. The default is to run everything: only the paths listed as inert run nothing, so a new directory or file is never silently skipped. The script is read from the base branch, so a PR cannot change the rules that judge it (changing the script is itself a change that runs everything). And `api/tests/test_ci_scope.py` pins the table above and fails if an API test starts reading a directory the script does not know about. When you add a test that reads files outside its own directory, add that path to `RULES` in `ci_scope.py` and to the table.
+
+To force the full run on a PR, touch a path that runs everything or run the **Release images** workflow by hand (it does everything but publish).
 
 Run the same locally before pushing: see [development.md](development.md#tests-and-lint).
 

@@ -30,14 +30,66 @@ jobs:
             exit 1
           fi
 
+  # What the pull request touches decides which checks run; main, tags and anything unclassified run them all
+  # (the rules and the reasons are in .github/scripts/ci_scope.py, pinned by api/tests/test_ci_scope.py).
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      scope: ${{ steps.scope.outputs.scope }}
+      build_services: ${{ steps.scope.outputs.build_services }}
+    steps:
+      # The script comes from the base branch, so a pull request cannot change the rules that judge it
+      # (a change to the script is itself unclassified, which runs everything).
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.sha }}
+          sparse-checkout: .github/scripts
+      - id: scope
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          everything() {
+            echo 'scope=all'
+            echo 'build_services=["api","front","bot"]'
+          }
+          if [ "$EVENT" != "pull_request" ]; then
+            everything >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          # Anything that goes wrong in here must end in "run everything", never in "run nothing": a renamed
+          # file counts at both ends, and the answer is only used if it has both lines.
+          scope_of() {
+            files=$(gh api "repos/$REPO/pulls/$PR/files" --paginate --jq '.[] | .filename, (.previous_filename // empty)') || return 1
+            [ -f .github/scripts/ci_scope.py ] || return 1
+            answer=$(echo "$files" | python3 .github/scripts/ci_scope.py) || return 1
+            echo "$answer" | grep -q '^scope=' || return 1
+            echo "$answer" | grep -q '^build_services=' || return 1
+            echo "$answer"
+          }
+          if answer=$(scope_of); then
+            echo "$answer" | tee -a "$GITHUB_OUTPUT"
+          else
+            echo "::warning::could not work out what the PR changes (or the base has no ci_scope.py yet); running every check"
+            everything | tee -a "$GITHUB_OUTPUT"
+          fi
+
   checks:
+    needs: changes
     uses: ./.github/workflows/checks.yml
+    with:
+      scope: ${{ needs.changes.outputs.scope }}
+      build-services: ${{ needs.changes.outputs.build_services }}
 
   # The single status that branch protection requires, whatever jobs are added above.
   ci:
     name: CI
     if: always()
-    needs: [pr-title, checks]
+    needs: [pr-title, changes, checks]
     runs-on: ubuntu-latest
     steps:
       - name: Every job passed (a skipped pr-title on push to main is fine)
