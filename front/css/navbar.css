@@ -147,3 +147,9 @@
 .pl-row.shared .pl-stack { flex: none; }
 .pl-row.shared .pl-avatar { width: 34px; height: 34px; border-color: var(--bg-surface); }
 .pl-row.shared .pl-stack .pl-avatar + .pl-avatar { margin-left: -12px; }
+
+.navbar-left { display: flex; align-items: center; gap: 6px; min-width: 0; }
+@media (max-width: 400px) {
+  .navbar-left { gap: 2px; }
+  .navbar-link { width: 38px; height: 38px; }
+}

@@ -1,7 +1,8 @@
 // Page shell shared by every logged-in page: navbar + <main>.
 import { html, mount } from '../lib/html.js';
 import { startPresence } from '../lib/presence.js';
-import { iconHome, iconShield, iconUsers } from './icons.js';
+import { iconHome, iconMenu, iconShield, iconUsers } from './icons.js';
+import { mountMenu } from './menu.js';
 import { mountPlaying } from './playing.js';
 
 const app = () => document.getElementById('app');
@@ -17,10 +18,13 @@ function navbar(user, avatarUrl, active) {
   const link = (href, id, label, icon) => html`<a href="${href}" class="navbar-link ${active === id ? 'active' : ''}" aria-label="${label}" title="${label}">${icon}<span class="navbar-link-text">${label}</span></a>`;
   return html`
     <nav class="navbar" role="navigation" aria-label="Navegación principal">
-      <a href="#" class="navbar-brand" aria-label="La Viciación inicio">
-        <img src="assets/icons/icon-64.png" alt="" class="navbar-logo" aria-hidden="true" />
-        La Viciación
-      </a>
+      <div class="navbar-left">
+        <button class="menu-btn" id="menuBtn" type="button" aria-label="Abrir el menú" aria-haspopup="dialog" aria-expanded="false" aria-controls="menuPanel">${iconMenu()}</button>
+        <a href="#" class="navbar-brand" aria-label="La Viciación inicio">
+          <img src="assets/icons/icon-64.png" alt="" class="navbar-logo" aria-hidden="true" />
+          La Viciación
+        </a>
+      </div>
       <div class="navbar-actions">
         <div class="playing-slot" id="playingSlot"></div>
         ${link('#', 'home', 'Inicio', iconHome())}
@@ -40,12 +44,13 @@ function navbar(user, avatarUrl, active) {
  * Render navbar + main and return the <main> element.
  * `mainClass` adds a page-specific modifier (e.g. "admin-main").
  */
-export function renderShell({ user, avatarUrl, active, mainClass = '' }) {
+export function renderShell({ user, avatarUrl, active, mainClass = '', onLogout }) {
   mount(app(), html`
     <div class="home-page">
       ${navbar(user, avatarUrl, active)}
       <main class="home-main ${mainClass}"></main>
     </div>`);
+  mountMenu(document.getElementById('menuBtn'), { user, onLogout });
   mountPlaying(document.getElementById('playingSlot'), user);
   startPresence();
   return app().querySelector('main');
