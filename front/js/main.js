@@ -26,6 +26,8 @@ const ROUTES = [
   { prefix: '#/stats', load: () => import('./pages/stats/index.js') },
   { prefix: '#/games', load: () => import('./pages/games/index.js') },
   { prefix: '#/achievements', load: () => import('./pages/achievements/index.js') },
+  { prefix: '#/players', load: () => import('./pages/players/index.js') },
+  { prefix: '#/player/', load: () => import('./pages/player/index.js') },
 ];
 
 let navigation = 0; // only the most recent navigation may touch the DOM

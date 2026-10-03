@@ -184,3 +184,13 @@
 .ach-body { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .ach-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 @media (max-width: 640px) { .ach-grid { grid-template-columns: 1fr; } }
+
+/* Players pages */
+.pl-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+.pl-card { display: flex; align-items: center; gap: 14px; padding: 12px; text-decoration: none; color: inherit; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); }
+.pl-card:hover { border-color: var(--accent-teal); background: var(--bg-card-hover); }
+.pl-card .pl-avatar { width: 52px; height: 52px; font-size: 1.2rem; border-color: var(--bg-card); }
+.pl-card-main { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.pl-card-name { font-weight: 700; }
+.pf-head .pl-avatar { width: 72px; height: 72px; font-size: 1.8rem; border-color: var(--bg-base); }
+@media (max-width: 640px) { .pl-cards { grid-template-columns: 1fr; } }
