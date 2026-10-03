@@ -43,6 +43,10 @@ From the home page a user can add a finished session by hand (**+ Sesión manual
 
 The button at the left of the top bar opens the menu, a panel that slides in from the left (on a phone and on a wide screen alike; the admin panel keeps its own sidebar). It lists **Principal** (Inicio, Grupo), **Explorar** (Estadísticas, marked WIP: a placeholder until the statistics are ready), **Tú** (Mi perfil, Recomendados, Ajustes: the profile's tabs), **Administración** (admins only) and, at the foot, **Cerrar sesión**. It highlights the page you are on, closes with Escape, a tap outside, the close button or choosing a page, and its structure is in `front/js/lib/menu.js`. The top bar keeps its icons for now.
 
+## Players pages
+
+**Jugadores** (menu → Explorar, `#/players`) lists the active players of the group: photo, name, total hours, games, completed, achievements and either what they are playing now (green aura) or when they played last; the ones playing come first, then the latest to play. Pressing one opens **their page**, `#/player/<id>`, with what is public: the figures of a season or of all of them (the same pills as the profile), most played games with their ratings, latest achievements and what they play now. It never shows the email, the Telegram id, the settings or the library detail, and a player who hides "playing now" (Ajustes) still appears, only without the live status. `GET /group/players` and `GET /group/players/{id}?season=`, derived; nothing is stored. Never the emergency account or inactive players.
+
 ## Achievements page
 
 **Logros** (menu → Explorar, `#/achievements`) shows every achievement with its picture, a description (the text it announces with the player and the game made generic) and who of the group has unlocked it, how many times (once per season) and when last; yours are highlighted, with a count at the top. `GET /group/achievements`, derived from the catalog and the unlocked achievements of the active players; nothing is stored.
