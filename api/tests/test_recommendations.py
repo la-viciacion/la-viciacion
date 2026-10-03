@@ -112,6 +112,7 @@ class WeightTests(unittest.TestCase):
             models.Game(id="doom", name="Doom", genres="Shooter"),
             models.Game(id="hades", name="Hades", genres="Roguelike"),
             models.Game(id="zelda", name="Zelda", genres="Adventure"),
+            models.Game(id="mine", name="Minecraft"),
         ])
         self.db.commit()
 
@@ -138,6 +139,49 @@ class WeightTests(unittest.TestCase):
         affinity = games.genre_affinity(db, 1)
         self.assertEqual(affinity, {"shooter": 0.75, "adventure": 0.25})
         self.assertIsInstance(games.recommendation_weight(self.item(genres=["Shooter"]), affinity), float)
+
+    def rate(self, rows):
+        self.db.add_all(models.GameScore(user_id=user_id, game_id=game_id, score=score) for user_id, game_id, score in rows)
+        self.db.commit()
+
+    def test_candidates_carry_the_ratings_of_the_others_but_not_the_users_nor_inactive_players(self):
+        add_library(self.db, [(2, "doom", 0), (3, "doom", 0), (4, "doom", 0), (2, "hades", 0)])
+        self.rate([(2, "doom", 80), (3, "doom", 60), (4, "doom", 1), (1, "doom", 1)])
+        by_name = {g["game_name"]: g for g in games.recommendation_candidates(self.db, 1)}
+        self.assertEqual((by_name["Doom"]["score_count"], by_name["Doom"]["score_mean"]), (2, 70.0))
+        self.assertEqual((by_name["Hades"]["score_count"], by_name["Hades"]["score_mean"]), (0, None))
+
+    def test_no_ratings_leave_the_weight_alone(self):
+        self.assertEqual(games.score_factor(0, None), 1.0)
+        self.assertEqual(games.recommendation_weight(self.item(score_count=0, score_mean=None), {}), games.recommendation_weight(self.item(), {}))
+
+    def test_better_rated_games_weigh_more_and_worse_rated_ones_less(self):
+        plain = games.recommendation_weight(self.item(), {})
+        good = games.recommendation_weight(self.item(score_count=5, score_mean=95), {})
+        bad = games.recommendation_weight(self.item(score_count=5, score_mean=20), {})
+        self.assertGreater(good, plain)
+        self.assertLess(bad, plain)
+        self.assertGreater(bad, 0)  # never impossible
+
+    def test_few_votes_barely_move_the_weight_and_many_move_it_more(self):
+        one = games.score_factor(1, 100)
+        many = games.score_factor(30, 100)
+        self.assertGreater(one, 1)
+        self.assertLess(one - 1, (many - 1) / 2)
+
+    def test_the_factor_stays_within_a_quarter(self):
+        for count in (1, 5, 1000):
+            for mean in (1, 50, 100):
+                self.assertTrue(0.75 <= games.score_factor(count, mean) <= 1.25, (count, mean))
+
+    def test_the_average_rating_is_the_reference_once_there_are_enough_ratings(self):
+        self.assertEqual(games.rating_prior(self.db), games.SCORE_PRIOR)  # none yet
+        self.rate([(2, "doom", 40), (3, "doom", 40)])
+        self.assertEqual(games.rating_prior(self.db), games.SCORE_PRIOR)  # too few to tell
+        self.rate([(2, "hades", 40), (3, "hades", 40), (2, "zelda", 40), (3, "zelda", 40)] + [(1, g, 40) for g in ("doom", "hades", "zelda")] + [(2, "mine", 40), (4, "doom", 100)])
+        self.assertEqual(games.rating_prior(self.db), 40.0)  # 10 ratings by active players; the inactive one is left out
+        # relative to a low average, a 40 is not "bad"
+        self.assertEqual(games.score_factor(5, 40, prior=40.0), 1.0)
 
     def test_every_signal_raises_the_weight(self):
         base = games.recommendation_weight(self.item(), {})

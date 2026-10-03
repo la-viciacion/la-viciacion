@@ -130,10 +130,27 @@ def recommendation_candidates(db: Session, user_id: int) -> list[dict]:
         )
         .group_by(models.GameTimer.game_id)
     } if found else {}
+    # the ratings (1-100) the other players gave each game
+    rated = {
+        game_id: (count, float(mean))  # MariaDB returns AVG() as Decimal
+        for game_id, count, mean in db.query(
+            models.GameScore.game_id, func.count(models.GameScore.id), func.avg(models.GameScore.score)
+        )
+        .join(models.User, models.GameScore.user_id == models.User.id)
+        .filter(
+            models.GameScore.game_id.in_(list(found)),
+            models.GameScore.user_id != user_id,
+            models.User.is_active == 1,
+            models.not_god(),
+        )
+        .group_by(models.GameScore.game_id)
+    } if found else {}
     for game_id, item in found.items():
         item["players"].sort(key=str.lower)
         item["completed_by"] = len(completed_by.get(game_id, ()))
         item["played_seconds"], item["sessions"] = activity.get(game_id, (0, 0))
+        item["score_count"], mean = rated.get(game_id, (0, None))
+        item["score_mean"] = None if mean is None else round(mean, 1)
     return sorted(found.values(), key=lambda i: (-len(i["players"]), -i["completed_by"], i["game_name"].lower()))
 
 
@@ -143,6 +160,16 @@ W_PLAYER = 2.0  # per player that has it
 W_COMPLETED = 3.0  # per player that completed it
 W_HOURS = 1.5  # per ln(1 + hours played by everybody else)
 W_SESSIONS = 1.0  # per ln(1 + sessions of everybody else)
+
+# The ratings of the others move the weight at most +-SCORE_SWING (a quarter), and only as far as they
+# are backed by votes: the mean of a game is pulled towards what players rate on average, as if it
+# had SCORE_DOUBT extra votes at that value. A game nobody rated keeps its weight; a single rating
+# barely changes it; a low rating makes a game less likely, never impossible.
+SCORE_SWING = 0.25
+SCORE_DOUBT = 3
+SCORE_PRIOR = 70.0  # what rating is "average" until enough ratings exist to measure it
+SCORE_PRIOR_MIN = 10  # ratings needed before the players' own average replaces SCORE_PRIOR
+SCORE_RANGE = 100
 
 
 def genre_affinity(db: Session, user_id: int) -> dict[str, float]:
@@ -163,9 +190,30 @@ def genre_affinity(db: Session, user_id: int) -> dict[str, float]:
     return shares if total else {}
 
 
-def recommendation_weight(item: dict, affinity: dict[str, float]) -> float:
+def rating_prior(db: Session) -> float:
+    """The average rating of the active players, or SCORE_PRIOR while there are too few ratings to tell."""
+    count, mean = (
+        db.query(func.count(models.GameScore.id), func.avg(models.GameScore.score))
+        .join(models.User, models.GameScore.user_id == models.User.id)
+        .filter(models.User.is_active == 1, models.not_god())
+        .one()
+    )
+    return float(mean) if count and count >= SCORE_PRIOR_MIN else SCORE_PRIOR
+
+
+def score_factor(count: int, mean: float | None, prior: float = SCORE_PRIOR) -> float:
+    """Multiplier of the weight for the ratings others gave a game: 1 without ratings, within 1 +- SCORE_SWING."""
+    if not count or mean is None:
+        return 1.0
+    smoothed = (count * mean + SCORE_DOUBT * prior) / (count + SCORE_DOUBT)
+    factor = 1 + SCORE_SWING * 2 * (smoothed - prior) / SCORE_RANGE
+    return max(1 - SCORE_SWING, min(1 + SCORE_SWING, factor))
+
+
+def recommendation_weight(item: dict, affinity: dict[str, float], prior: float = SCORE_PRIOR) -> float:
     """The chance (relative to the others) that a candidate is picked: what the others have put into it
-    (players, completions, hours, sessions) times a boost, up to double, for the genres the user plays most."""
+    (players, completions, hours, sessions) times a boost, up to double, for the genres the user plays most,
+    times a factor for how the others rated it (see score_factor)."""
     base = (
         1
         + W_PLAYER * len(item["players"])
@@ -174,7 +222,7 @@ def recommendation_weight(item: dict, affinity: dict[str, float]) -> float:
         + W_SESSIONS * math.log1p(item["sessions"])
     )
     liked = min(1.0, sum(affinity.get(genre.lower(), 0) for genre in item["genres"]))
-    return base * (1 + liked)
+    return base * (1 + liked) * score_factor(item.get("score_count", 0), item.get("score_mean"), prior)
 
 
 def weighted_sample(weights: list[float], k: int, rng=random) -> list[int]:
@@ -192,7 +240,8 @@ def recommendations_for(db: Session, user_id: int, limit: int = 12, rng=random) 
     if not candidates:
         return []
     affinity = genre_affinity(db, user_id)
-    chosen = weighted_sample([recommendation_weight(c, affinity) for c in candidates], limit, rng)
+    prior = rating_prior(db)
+    chosen = weighted_sample([recommendation_weight(c, affinity, prior) for c in candidates], limit, rng)
     return [candidates[i] for i in chosen]
 
 
