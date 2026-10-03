@@ -10,6 +10,7 @@ export function menuSections(user) {
     ] },
     { label: 'Explorar', items: [
       { id: 'games', label: 'Juegos', href: '#/games', icon: 'iconGamepad' },
+      { id: 'achievements', label: 'Logros', href: '#/achievements', icon: 'iconTrophy' },
       { id: 'stats', label: 'Estadísticas', href: '#/stats', icon: 'iconChart', wip: true },
     ] },
     { label: 'Tú', items: [
@@ -32,6 +33,7 @@ const PAGES = [
   ['#/group', 'group'],
   ['#/stats', 'stats'],
   ['#/games', 'games'],
+  ['#/achievements', 'achievements'],
   ['#/game', 'games'],
 ];
 

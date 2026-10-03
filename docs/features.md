@@ -43,6 +43,10 @@ From the home page a user can add a finished session by hand (**+ Sesión manual
 
 The button at the left of the top bar opens the menu, a panel that slides in from the left (on a phone and on a wide screen alike; the admin panel keeps its own sidebar). It lists **Principal** (Inicio, Grupo), **Explorar** (Estadísticas, marked WIP: a placeholder until the statistics are ready), **Tú** (Mi perfil, Recomendados, Ajustes: the profile's tabs), **Administración** (admins only) and, at the foot, **Cerrar sesión**. It highlights the page you are on, closes with Escape, a tap outside, the close button or choosing a page, and its structure is in `front/js/lib/menu.js`. The top bar keeps its icons for now.
 
+## Achievements page
+
+**Logros** (menu → Explorar, `#/achievements`) shows every achievement with its picture, a description (the text it announces with the player and the game made generic) and who of the group has unlocked it, how many times (once per season) and when last; yours are highlighted, with a count at the top. `GET /group/achievements`, derived from the catalog and the unlocked achievements of the active players; nothing is stored.
+
 ## Games page
 
 **Juegos** (menu → Explorar, `#/games`) lists every game of the database as cards (cover, name, genres, "En tu biblioteca", "Jugándose", how many players have it, the group's hours and the average rating), each one leading to the game's page. `GET /games/catalog` does the work on the server, derived and nothing stored: search by name; order by latest activity (default, the games nobody has touched last), most played, best rated, most players, release date or name; filters by genre and by your library (all, the ones you have, the ones you do not), and toggles for what is being played right now, games with players, completed by you and rated by you; 24 at a time with **Mostrar más**. **Añadir juego** opens the RAWG search of the timer picker and, once chosen, goes to the new game's page.

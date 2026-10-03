@@ -5,7 +5,7 @@ import { activeItem, menuSections } from '../js/lib/menu.js';
 const ids = (user) => menuSections(user).flatMap((s) => s.items.map((i) => i.id));
 
 test('a player sees every section but the administration', () => {
-  assert.deepEqual(ids({ is_admin: false }), ['home', 'group', 'games', 'stats', 'profile', 'recommended', 'settings']);
+  assert.deepEqual(ids({ is_admin: false }), ['home', 'group', 'games', 'achievements', 'stats', 'profile', 'recommended', 'settings']);
   assert.deepEqual(menuSections({ is_admin: false }).map((s) => s.label), ['Principal', 'Explorar', 'Tú']);
 });
 
@@ -36,6 +36,7 @@ test('an address highlights its item, the most specific one first', () => {
   assert.equal(activeItem('#/profile/ajustes'), 'settings');
   assert.equal(activeItem('#/admin/users'), 'admin');
   assert.equal(activeItem('#/games'), 'games');
+  assert.equal(activeItem('#/achievements'), 'achievements');
   assert.equal(activeItem('#/game/celeste'), 'games'); // a game's page belongs to the games
 });
 
