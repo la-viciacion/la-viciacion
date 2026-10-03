@@ -61,12 +61,21 @@ jobs:
           if [ "$EVENT" != "pull_request" ]; then
             everything >> "$GITHUB_OUTPUT"; exit 0
           fi
-          # a renamed file counts at both ends; if the list cannot be read, run everything
-          if files=$(gh api "repos/$REPO/pulls/$PR/files" --paginate --jq '.[] | .filename, (.previous_filename // empty)'); then
-            echo "$files" | python3 .github/scripts/ci_scope.py | tee -a "$GITHUB_OUTPUT"
+          # Anything that goes wrong in here must end in "run everything", never in "run nothing": a renamed
+          # file counts at both ends, and the answer is only used if it has both lines.
+          scope_of() {
+            files=$(gh api "repos/$REPO/pulls/$PR/files" --paginate --jq '.[] | .filename, (.previous_filename // empty)') || return 1
+            [ -f .github/scripts/ci_scope.py ] || return 1
+            answer=$(echo "$files" | python3 .github/scripts/ci_scope.py) || return 1
+            echo "$answer" | grep -q '^scope=' || return 1
+            echo "$answer" | grep -q '^build_services=' || return 1
+            echo "$answer"
+          }
+          if answer=$(scope_of); then
+            echo "$answer" | tee -a "$GITHUB_OUTPUT"
           else
-            echo "::warning::could not list the changed files; running every check"
-            everything >> "$GITHUB_OUTPUT"
+            echo "::warning::could not work out what the PR changes (or the base has no ci_scope.py yet); running every check"
+            everything | tee -a "$GITHUB_OUTPUT"
           fi
 
   checks:
