@@ -599,9 +599,18 @@ def _library_query(user_id: int, entry_id: int | None = None, game_id: str | Non
     )
 
 
+def is_abandoned(entry: models.UserGame, last_played: datetime.datetime | None) -> bool:
+    """An entry is abandoned from the moment the player says so until they play it again: a session after
+    that moment resumes it, so adding sessions needs no bookkeeping. A completed entry is never abandoned."""
+    if entry.completed or entry.abandoned_at is None:
+        return False
+    return last_played is None or last_played <= entry.abandoned_at
+
+
 def _library_item(row, completed_keys: set, current_season: int, ratings: dict) -> dict:
     entry = row.UserGame
     done = bool(entry.completed)
+    abandoned = is_abandoned(entry, row.last_played)
     # why the completion of the entry cannot be touched (None when it can): a closed season is
     # frozen, completed or not; a pending entry is also blocked by another platform's completion
     blocked = None
@@ -626,6 +635,10 @@ def _library_item(row, completed_keys: set, current_season: int, ratings: dict) 
         # a game can be completed once per season, and only in the running one
         "can_complete": not done and blocked is None,
         "complete_blocked": blocked,  # "closed_season" | "completed_in_season" | None
+        "abandoned": abandoned,
+        # giving a game up (and taking it back) is, like completing, only for the running season
+        "can_abandon": not done and not abandoned and entry.season == current_season,
+        "can_resume": abandoned and entry.season == current_season,
     }
 
 
@@ -675,6 +688,17 @@ def uncomplete_entry(db: Session, entry: models.UserGame):
         raise
 
 
+def set_abandoned(db: Session, entry: models.UserGame, abandoned: bool, now: datetime.datetime):
+    """Mark the entry as abandoned as of `now`, or take the mark back."""
+    try:
+        entry.abandoned_at = now if abandoned else None
+        db.commit()
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error("Error changing the abandoned mark: " + str(e))
+        raise
+
+
 def set_completed_date(db: Session, entry: models.UserGame, completed_date: datetime.date):
     try:
         entry.completed_date = completed_date
@@ -695,6 +719,7 @@ def complete_entry(
     try:
         entry.completed = 1
         entry.completed_date = completed_date or datetime.date.today()
+        entry.abandoned_at = None  # finished after all
         db.commit()
         logger.info("Game completed")
     except SQLAlchemyError as e:

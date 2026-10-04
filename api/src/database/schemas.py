@@ -41,6 +41,10 @@ class CompletionUpdate(BaseModel):
     completed_date: datetime.date | None = None
 
 
+class AbandonUpdate(BaseModel):
+    abandoned: bool
+
+
 class ScoreUpdate(BaseModel):
     score: int = Field(ge=1, le=100)
 
@@ -250,6 +254,7 @@ class ExportLibraryEntry(BaseModel):
     completed: bool = False
     completed_date: datetime.date | None = None
     completion_time: int | None = None
+    abandoned_at: NaiveDatetime | None = None
 
 
 class ExportSession(BaseModel):

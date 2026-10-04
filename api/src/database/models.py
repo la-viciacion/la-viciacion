@@ -105,6 +105,9 @@ class UserGame(Base):
     completed_date = Column(Date)
     # time played is not stored: it is the sum of the sessions (crud/time_entries.entry_played_time)
     completion_time = Column(Integer)
+    # when the player gave the game up (NULL = not abandoned). Whether it still counts as abandoned is derived:
+    # a session after this moment resumes it (crud/users.is_abandoned)
+    abandoned_at = Column(DateTime, nullable=True)
 
     __table_args__ = (
         UniqueConstraint("user_id", "game_id", "platform", "season", name="uq_users_games_entry"),
