@@ -21,6 +21,8 @@ EXTERNAL = {
     "DNS_RESOLVER",  # same
     "FRONT_HOST_IP", "FRONT_HOST_PORT", "API_HOST_IP", "API_HOST_PORT", "DB_HOST_IP", "DB_HOST_PORT",  # docker-compose.yml (published ports)
 }
+# Set when the image is built (a build arg of release.yml), not by whoever deploys it.
+BAKED = {"APP_VERSION"}
 # Only read to seed the settings the first time, or kept so an old .env keeps working.
 LEGACY = {"OPENAI_API_KEY", "OPENAI_MODEL", "RAWG_URL"}
 
@@ -47,12 +49,23 @@ def variables_read() -> set[str]:
 
 class TemplateAgreesWithTheCodeTests(unittest.TestCase):
     def test_every_variable_the_code_reads_is_in_the_template(self):
-        missing = variables_read() - template_variables() - LEGACY  # the old names are explained in a comment
+        missing = variables_read() - template_variables() - LEGACY - BAKED  # the old names are explained in a comment
         self.assertEqual(missing, set(), "read by the code but missing from .env.template")
 
     def test_nothing_in_the_template_is_left_over(self):
         leftovers = template_variables() - variables_read() - EXTERNAL - LEGACY
         self.assertEqual(leftovers, set(), "in .env.template but nobody reads it")
+
+
+class AppVersionTests(unittest.TestCase):
+    def version(self, **env):
+        with mock.patch.dict(os.environ, env, clear=True):
+            return object.__new__(Config).APP_VERSION
+
+    def test_it_is_dev_unless_the_image_was_built_with_a_release(self):
+        self.assertEqual(self.version(), "dev")
+        self.assertEqual(self.version(APP_VERSION=""), "dev")
+        self.assertEqual(self.version(APP_VERSION="2.1.0"), "2.1.0")
 
 
 class RawgKeyTests(unittest.TestCase):

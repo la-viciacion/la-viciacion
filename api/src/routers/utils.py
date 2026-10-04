@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from .. import auth
 from ..auth import get_db
+from ..config import Config
 from ..crud.achievements import Achievements
 from ..database import models
 from ..utils import images
@@ -14,6 +15,7 @@ log_manager = LogManager()
 logger = log_manager.get_logger()
 
 achievements = Achievements()
+config = Config()
 
 # To add dependency for active user: dependencies=[Depends(auth.get_current_active_user)],
 ACHIEVEMENT_IMAGE_MAX_BYTES = 1024000
@@ -38,6 +40,14 @@ def platforms(
     for tag in tags:
         response.append({"id": tag[0], "name": tag[1]})
     return response
+
+
+@router.get("/version")
+def version(user: models.User = Security(auth.get_current_active_user)):
+    """
+    The release this API runs (`dev` when it was built from a checkout instead of a tag)
+    """
+    return {"version": config.APP_VERSION}
 
 
 @router.patch("/achievement-image/{achievement}")

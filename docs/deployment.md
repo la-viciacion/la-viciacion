@@ -170,6 +170,8 @@ Code rollback: set `LAVI_VERSION` in `.env` to the previous release (e.g. `2.0.0
    **build**: builds the three images and looks inside each one: no `.env*`, `*.sql`, `*.dump` under `/app` or the web root, and no credential-looking variable baked in (`PASS`, `SECRET`, `TOKEN`, `KEY`).
 2. **publish** (tags only): pushes `ghcr.io/la-viciacion/laviciacion-{api,front,bot}` tagged `X.Y.Z`, `X.Y` and `latest` (prereleases get no `latest`), using the workflow's own `GITHUB_TOKEN`; no secret has to be configured.
 
+The tag is also the version the app reports: `release.yml` passes it to the API image as the build arg `APP_VERSION` (`ENV APP_VERSION`), `GET /api/v1/utils/version` returns it to any logged-in user and the side menu shows it, small and centred, under "Cerrar sesión". An image built from a checkout (`docker compose up --build`) reports `dev`. It is not in any file of the repo, so it cannot drift from the tag.
+
 Cut a release with `git tag v2.0.0 && git push origin v2.0.0` (see [roadmap](roadmap.md): tags are not created until 2.0.0 ships). The first time, set each package public (see [Installing](#installing)); the repository is public, so nothing needs a login afterwards. The images are `linux/amd64` only.
 
 ### Deploying from GitHub

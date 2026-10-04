@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { afterEach, test } from 'node:test';
-import { installDom } from './dom.js';
+import { installApi, installDom, installStorage, settle } from './dom.js';
 
 const window = installDom('<button id="menuBtn" aria-expanded="false">menu</button>');
 globalThis.location = window.location;
@@ -59,4 +59,14 @@ test('"Cerrar sesión" closes the menu and ends the session', () => {
   document.getElementById('menuLogout').click();
   assert.equal(panel(), null);
   assert.equal(logouts, 1);
+});
+
+test('the version of the app shows under the logout button once the API has told it', async () => {
+  installStorage();
+  installApi({ 'GET /utils/version': { version: '2.1.0' } });
+  button().click();
+  await settle();
+  const label = document.querySelector('.menu-foot .menu-version');
+  assert.equal(label.textContent, 'v2.1.0');
+  assert.equal(label.hidden, false);
 });

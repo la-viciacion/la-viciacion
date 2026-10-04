@@ -77,6 +77,11 @@ class Config:
         return bool(self.SMTP_HOST and self.SMTP_EMAIL and self.PUBLIC_URL)
 
     @property
+    def APP_VERSION(self) -> str:
+        """The release tag, baked into the image at build time (release.yml); `dev` when built from a checkout."""
+        return os.getenv("APP_VERSION", "").strip() or "dev"
+
+    @property
     def RAWG_API_KEY(self) -> str:
         direct_key = os.getenv("RAWG_API_KEY", "").strip()
         if direct_key:
