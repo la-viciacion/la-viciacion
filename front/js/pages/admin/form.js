@@ -1,6 +1,6 @@
 // Generic create/edit form driven by the entity field definitions.
 //
-// Field: { key, label, type, required?, omitEmpty?, step? }
+// Field: { key, label, type, required?, omitEmpty?, step?, nameKey? (game: the row's key holding the game's name) }
 // Types: text | number | date | datetime | checkbox | platform | user | game | password
 import { api, jsonRequest } from '../../lib/api.js';
 import { html } from '../../lib/html.js';
@@ -13,7 +13,7 @@ import { pickGame } from './dialogs.js';
 
 const inputId = (f) => `f_${f.key}`;
 
-function fieldHtml(f, value) {
+function fieldHtml(f, value, row) {
   const id = inputId(f);
   const v = value ?? f.default ?? '';
   switch (f.type) {
@@ -34,8 +34,8 @@ function fieldHtml(f, value) {
       </select></label>`;
     case 'game':
       return html`<div class="adm-field-game"><span>${f.label}</span>
-        <div><span class="adm-picked" id="${id}_name">Ninguno</span> <button type="button" class="adm-btn sm" data-pickfor="${f.key}">Elegir…</button></div>
-        <input type="hidden" id="${id}" /></div>`;
+        <div><span class="adm-picked" id="${id}_name">${(f.nameKey && row?.[f.nameKey]) || (v ? v : 'Ninguno')}</span> <button type="button" class="adm-btn sm" data-pickfor="${f.key}">${v ? 'Cambiar…' : 'Elegir…'}</button></div>
+        <input type="hidden" id="${id}" value="${v}" /></div>`;
     case 'password':
       return html`<div class="adm-field-pw"><span>${f.label}</span>
         <div>
@@ -104,7 +104,7 @@ export function openForm(entity, row, admin) {
   const modal = openModal(html`
     ${modalHeader(creating ? entity.createLabel : `Editar · ${entity.name(row)}`)}
     <form class="adm-form" novalidate>
-      ${fields.map((f) => fieldHtml(f, row ? row[f.key] : undefined))}
+      ${fields.map((f) => fieldHtml(f, row ? row[f.key] : undefined, row))}
       <div class="adm-error" role="alert"></div>
       <div class="adm-actions">
         <button type="button" class="adm-btn" data-close>Cancelar</button>
