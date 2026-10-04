@@ -116,16 +116,24 @@
 .pf-tag.done { background: rgba(61, 217, 179, 0.15); color: var(--accent-teal); }
 .pf-score-input { width: 90px; }
 .pf-date-form { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
-@media (max-width: 700px) { .pf-game-actions { margin-left: 0; width: 100%; } }
+/* row buttons: icon + label; icon only on a phone */
+.pf-game-actions .pf-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.pf-game-actions .pf-btn svg { flex-shrink: 0; }
+.pf-game-actions .pf-btn[data-armed] .pf-label { display: inline; }
+@media (max-width: 700px) {
+  .pf-game-actions { margin-left: 0; width: 100%; }
+  .pf-game-actions .pf-btn { min-width: 44px; min-height: 44px; padding: 8px 12px; }
+  .pf-game-actions .pf-btn:not([data-armed]) .pf-label { display: none; }
+}
 .pf-game.locked .pf-thumb { filter: grayscale(1); opacity: 0.55; }
 .pf-game.locked .pf-game-title strong { color: var(--text-secondary); }
 .pf-tag.abandoned { background: rgba(245, 197, 66, 0.15); color: var(--accent-gold); }
 /* the "⋯" menu of a game: the actions that are rarely used */
 .pf-more { position: relative; }
-.pf-more > summary { list-style: none; }
+.pf-more > summary { display: inline-flex; align-items: center; list-style: none; cursor: pointer; }
 .pf-more > summary::-webkit-details-marker { display: none; }
 .pf-more-list { position: absolute; right: 0; top: calc(100% + 4px); z-index: 5; min-width: 200px; display: flex; flex-direction: column; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35); overflow: hidden; }
-.pf-more-item { background: none; border: none; color: var(--text-primary); font: inherit; font-size: 0.88rem; text-align: left; padding: 10px 14px; cursor: pointer; }
+.pf-more-item { display: flex; align-items: center; gap: 8px; background: none; border: none; color: var(--text-primary); font: inherit; font-size: 0.88rem; text-align: left; padding: 10px 14px; cursor: pointer; }
 .pf-more-item:hover { background: var(--bg-card-hover); }
 .pf-tag.muted { background: transparent; border: 1px solid var(--border); color: var(--text-muted); }
 .pf-lock { margin-top: 4px; font-size: 0.8rem; color: var(--text-secondary); }

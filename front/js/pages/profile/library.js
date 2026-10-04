@@ -14,11 +14,12 @@
 import { api, jsonRequest } from '../../lib/api.js';
 import { blockedReason } from '../../lib/completion.js';
 import { formatDate, formatDateTime, formatDuration, formatRelative } from '../../lib/format.js';
-import { html, mount } from '../../lib/html.js';
+import { html, mount, raw } from '../../lib/html.js';
 import { gameHref } from '../../lib/links.js';
 import { platformName } from '../../lib/platforms.js';
 import { SCORE_HINT, SCORE_MAX, SCORE_MIN, parseScore, saveScore } from '../../lib/score.js';
 import * as seasons from '../../lib/seasons.js';
+import { iconCalendar, iconCheck, iconClock, iconDots, iconFlag, iconStar, iconUndo } from '../../ui/icons.js';
 import { scoreBadge } from '../../ui/score-badge.js';
 import { initSessions, openSessionForm } from '../home/sessions.js';
 
@@ -139,33 +140,35 @@ function scoreForm(g) {
     </form>`;
 }
 
+// A row button: an icon plus its label. On a phone only the icon is shown (the label stays for screen readers and
+// as a tooltip); a button that asks "¿Seguro?" shows its label again (css: [data-armed]).
+function act(action, id, icon, label, { primary = false, title = label, extra = '' } = {}) {
+  return html`<button class="pf-btn ${primary ? 'primary' : ''}" data-action="${action}" data-id="${id}" data-label="${label}" title="${title}" aria-label="${title}" ${raw(extra)}>${icon()}<span class="pf-label">${label}</span></button>`;
+}
+
 // The rare actions live behind "⋯" so the row does not grow another button.
 function moreMenu(g) {
   if (!g.can_abandon && !g.can_resume) return '';
   return html`
     <details class="pf-more">
-      <summary class="pf-btn" aria-label="Más opciones de ${g.game_name}">⋯</summary>
+      <summary class="pf-btn" title="Más opciones" aria-label="Más opciones de ${g.game_name}">${iconDots()}</summary>
       <div class="pf-more-list">
-        ${g.can_abandon ? html`<button class="pf-more-item" data-action="abandon" data-id="${g.id}">Marcar como abandonado</button>` : ''}
-        ${g.can_resume ? html`<button class="pf-more-item" data-action="resume" data-id="${g.id}">Retomar</button>` : ''}
+        ${g.can_abandon ? html`<button class="pf-more-item" data-action="abandon" data-id="${g.id}">${iconFlag()} Marcar como abandonado</button>` : ''}
+        ${g.can_resume ? html`<button class="pf-more-item" data-action="resume" data-id="${g.id}">${iconUndo()} Retomar</button>` : ''}
       </div>
     </details>`;
 }
 
 function actions(g) {
-  const sessionsButton = html`<button class="pf-btn" data-action="sessions" data-id="${g.id}" aria-expanded="${String(sessions.has(g.id))}">Sesiones</button>
-    <button class="pf-btn" data-action="rate" data-id="${g.id}">${g.score == null ? 'Puntuar' : 'Cambiar nota'}</button>`;
+  const sessionsButton = html`${act('sessions', g.id, iconClock, 'Sesiones', { extra: `aria-expanded="${sessions.has(g.id)}"` })}${act('rate', g.id, iconStar, g.score == null ? 'Puntuar' : 'Cambiar nota')}`;
   if (g.can_complete) {
-    return html`${sessionsButton}<button class="pf-btn primary" data-action="complete" data-id="${g.id}" data-label="Marcar completado">Marcar completado</button>${moreMenu(g)}`;
+    return html`${sessionsButton}${act('complete', g.id, iconCheck, 'Marcar completado', { primary: true })}${moreMenu(g)}`;
   }
   if (!g.completed) {
-    return html`${sessionsButton}<button class="pf-btn" disabled title="${blockedReason(g, season)}">Marcar completado</button>${moreMenu(g)}`;
+    return html`${sessionsButton}<button class="pf-btn" disabled title="${blockedReason(g, season)}" aria-label="Marcar completado: ${blockedReason(g, season)}">${iconCheck()}<span class="pf-label">Marcar completado</span></button>${moreMenu(g)}`;
   }
   if (g.complete_blocked === 'closed_season') return sessionsButton;
-  return html`
-    ${sessionsButton}
-    <button class="pf-btn" data-action="edit-date" data-id="${g.id}">Cambiar fecha</button>
-    <button class="pf-btn" data-action="uncomplete" data-id="${g.id}" data-label="Desmarcar">Desmarcar</button>`;
+  return html`${sessionsButton}${act('edit-date', g.id, iconCalendar, 'Cambiar fecha')}${act('uncomplete', g.id, iconUndo, 'Desmarcar')}`;
 }
 
 // The sessions of an entry; the API only lets you change those of the running season.
@@ -233,14 +236,16 @@ async function setCompletion(id, body, doneMessage, askRating = false) {
 }
 
 // Destructive/announcing buttons: first click asks, second (within 4s) confirms.
+const setLabel = (button, text) => { (button.querySelector('.pf-label') || button).textContent = text; };
+
 function armed(button, label) {
   if (button.dataset.armed) return true;
   button.dataset.armed = '1';
-  button.textContent = '¿Seguro? Pulsa otra vez';
+  setLabel(button, '¿Seguro? Pulsa otra vez');
   setTimeout(() => {
     if (button.isConnected && button.dataset.armed) {
       delete button.dataset.armed;
-      button.textContent = label;
+      setLabel(button, label);
     }
   }, CONFIRM_MS);
   return false;
@@ -291,7 +296,7 @@ async function onClick(e) {
     case 'complete':
       if (!armed(button, button.dataset.label)) return;
       button.disabled = true;
-      button.textContent = 'Completando…';
+      setLabel(button, 'Completando…');
       return setCompletion(id, { completed: true }, `«${items.find((g) => g.id === id)?.game_name}» marcado como completado`, true);
     case 'uncomplete':
       if (!armed(button, button.dataset.label)) return;
