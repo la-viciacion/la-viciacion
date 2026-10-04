@@ -5,8 +5,8 @@
 //     after completing it
 //   - a completed game of the current season lets you change the completion date or unmark it;
 //     once its season is closed the completion is frozen
-//   - a pending game of the current season can be given up (and taken back) from the "⋯" menu of its row, kept out
-//     of the buttons on purpose: it is rarely used. Playing it again resumes it by itself
+//   - a pending game of the current season can be given up (and taken back) with the "Abandonar" (and "Retomar") button of
+//     its row. Playing it again resumes it by itself
 //   - "Sesiones" lists the sessions of the entry (game and season); those of the current season
 //     can be corrected or deleted there
 // The API enforces the rules (once per game and season, current season only for completing,
@@ -19,7 +19,7 @@ import { gameHref } from '../../lib/links.js';
 import { platformName } from '../../lib/platforms.js';
 import { SCORE_HINT, SCORE_MAX, SCORE_MIN, parseScore, saveScore } from '../../lib/score.js';
 import * as seasons from '../../lib/seasons.js';
-import { iconCalendar, iconCheck, iconClock, iconDots, iconFlag, iconStar, iconUndo } from '../../ui/icons.js';
+import { iconCalendar, iconCheck, iconClock, iconFlag, iconStar, iconUndo } from '../../ui/icons.js';
 import { scoreBadge } from '../../ui/score-badge.js';
 import { initSessions, openSessionForm } from '../home/sessions.js';
 
@@ -146,26 +146,18 @@ function act(action, id, icon, label, { primary = false, title = label, extra = 
   return html`<button class="pf-btn ${primary ? 'primary' : ''}" data-action="${action}" data-id="${id}" data-label="${label}" title="${title}" aria-label="${title}" ${raw(extra)}>${icon()}<span class="pf-label">${label}</span></button>`;
 }
 
-// The rare actions live behind "⋯" so the row does not grow another button.
-function moreMenu(g) {
-  if (!g.can_abandon && !g.can_resume) return '';
-  return html`
-    <details class="pf-more">
-      <summary class="pf-btn" title="Más opciones" aria-label="Más opciones de ${g.game_name}">${iconDots()}</summary>
-      <div class="pf-more-list">
-        ${g.can_abandon ? html`<button class="pf-more-item" data-action="abandon" data-id="${g.id}">${iconFlag()} Marcar como abandonado</button>` : ''}
-        ${g.can_resume ? html`<button class="pf-more-item" data-action="resume" data-id="${g.id}">${iconUndo()} Retomar</button>` : ''}
-      </div>
-    </details>`;
+// Abandoning a game (or taking it back) is one more button of the row, with the others.
+function abandonButtons(g) {
+  return html`${g.can_abandon ? act('abandon', g.id, iconFlag, 'Abandonar') : ''}${g.can_resume ? act('resume', g.id, iconUndo, 'Retomar') : ''}`;
 }
 
 function actions(g) {
   const sessionsButton = html`${act('sessions', g.id, iconClock, 'Sesiones', { extra: `aria-expanded="${sessions.has(g.id)}"` })}${act('rate', g.id, iconStar, g.score == null ? 'Puntuar' : 'Cambiar nota')}`;
   if (g.can_complete) {
-    return html`${sessionsButton}${act('complete', g.id, iconCheck, 'Marcar completado', { primary: true })}${moreMenu(g)}`;
+    return html`${sessionsButton}${act('complete', g.id, iconCheck, 'Marcar completado', { primary: true })}${abandonButtons(g)}`;
   }
   if (!g.completed) {
-    return html`${sessionsButton}<button class="pf-btn" disabled title="${blockedReason(g, season)}" aria-label="Marcar completado: ${blockedReason(g, season)}">${iconCheck()}<span class="pf-label">Marcar completado</span></button>${moreMenu(g)}`;
+    return html`${sessionsButton}<button class="pf-btn" disabled title="${blockedReason(g, season)}" aria-label="Marcar completado: ${blockedReason(g, season)}">${iconCheck()}<span class="pf-label">Marcar completado</span></button>${abandonButtons(g)}`;
   }
   if (g.complete_blocked === 'closed_season') return sessionsButton;
   return html`${sessionsButton}${act('edit-date', g.id, iconCalendar, 'Cambiar fecha')}${act('uncomplete', g.id, iconUndo, 'Desmarcar')}`;
@@ -283,8 +275,6 @@ async function setAbandoned(id, abandoned) {
 }
 
 async function onClick(e) {
-  // a "⋯" menu closes when something else is pressed
-  el.querySelectorAll('.pf-more[open]').forEach((menu) => { if (!menu.contains(e.target)) menu.open = false; });
   const button = e.target.closest('[data-action]');
   if (!button) return;
   const id = Number(button.dataset.id);
