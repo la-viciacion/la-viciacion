@@ -31,7 +31,11 @@ class ForgottenTimerHoursTests(unittest.TestCase):
                 "forgotten_timer_hours": None,
                 "timer_notice_minutes": None,
                 "show_playing": None,
+                "forgotten_timer_telegram": None,
+                "forgotten_timer_push": None,
                 "defaults": {
+                    "forgotten_timer_telegram": us.DEFAULT_FORGOTTEN_TIMER_CHANNEL,
+                    "forgotten_timer_push": us.DEFAULT_FORGOTTEN_TIMER_CHANNEL,
                     "forgotten_timer_hours": us.DEFAULT_FORGOTTEN_TIMER_HOURS,
                     "timer_notice_minutes": us.DEFAULT_TIMER_NOTICE_MINUTES,
                     "show_playing": us.DEFAULT_SHOW_PLAYING,
@@ -68,7 +72,7 @@ class TimerNoticeMinutesTests(unittest.TestCase):
             self.assertFalse(us.valid_timer_notice_minutes(bad), repr(bad))
 
     def test_update_sets_and_resets_it_without_touching_the_other_setting(self):
-        row = SimpleNamespace(user_id=7, forgotten_timer_hours=6, timer_notice_minutes=None, show_playing=None)
+        row = SimpleNamespace(user_id=7, forgotten_timer_hours=6, timer_notice_minutes=None, show_playing=None, forgotten_timer_telegram=None, forgotten_timer_push=None)
         db = db_with(row)
         us.update(db, 7, {"timer_notice_minutes": 30})
         self.assertEqual((row.forgotten_timer_hours, row.timer_notice_minutes), (6, 30))
@@ -119,12 +123,34 @@ class ShowPlayingTests(unittest.TestCase):
         self.assertFalse(us.show_playing(db_with(SimpleNamespace(show_playing=False)), 1))
 
     def test_it_is_set_and_reset_without_touching_the_others(self):
-        row = SimpleNamespace(user_id=7, forgotten_timer_hours=6, timer_notice_minutes=None, show_playing=None)
+        row = SimpleNamespace(user_id=7, forgotten_timer_hours=6, timer_notice_minutes=None, show_playing=None, forgotten_timer_telegram=None, forgotten_timer_push=None)
         db = db_with(row)
         us.update(db, 7, {"show_playing": False})
         self.assertEqual((row.forgotten_timer_hours, row.show_playing), (6, False))
         us.update(db, 7, {"show_playing": None})
         self.assertIsNone(row.show_playing)
+
+
+class ForgottenTimerChannelsTests(unittest.TestCase):
+    def test_both_channels_are_on_without_a_row_or_a_value(self):
+        self.assertEqual(us.forgotten_timer_channels(db_with(None), 1), (True, True))
+        row = SimpleNamespace(forgotten_timer_telegram=None, forgotten_timer_push=None)
+        self.assertEqual(us.forgotten_timer_channels(db_with(row), 1), (True, True))
+
+    def test_each_channel_follows_the_users_choice(self):
+        row = SimpleNamespace(forgotten_timer_telegram=False, forgotten_timer_push=None)
+        self.assertEqual(us.forgotten_timer_channels(db_with(row), 1), (False, True))
+        row = SimpleNamespace(forgotten_timer_telegram=True, forgotten_timer_push=False)
+        self.assertEqual(us.forgotten_timer_channels(db_with(row), 1), (True, False))
+
+    def test_update_sets_and_resets_the_channels_without_touching_the_others(self):
+        row = SimpleNamespace(user_id=7, forgotten_timer_hours=6, timer_notice_minutes=None, show_playing=None,
+                              forgotten_timer_telegram=None, forgotten_timer_push=None)
+        db = db_with(row)
+        us.update(db, 7, {"forgotten_timer_telegram": False, "forgotten_timer_push": False})
+        self.assertEqual((row.forgotten_timer_hours, row.forgotten_timer_telegram, row.forgotten_timer_push), (6, False, False))
+        us.update(db, 7, {"forgotten_timer_push": None})
+        self.assertEqual((row.forgotten_timer_telegram, row.forgotten_timer_push), (False, None))
 
 
 class UpdateTests(unittest.TestCase):
@@ -136,7 +162,7 @@ class UpdateTests(unittest.TestCase):
         db.commit.assert_called_once()
 
     def test_none_resets_to_the_default_and_absent_keys_are_untouched(self):
-        row = SimpleNamespace(user_id=7, forgotten_timer_hours=6, timer_notice_minutes=None, show_playing=None)
+        row = SimpleNamespace(user_id=7, forgotten_timer_hours=6, timer_notice_minutes=None, show_playing=None, forgotten_timer_telegram=None, forgotten_timer_push=None)
         db = db_with(row)
         us.update(db, 7, {})
         self.assertEqual(row.forgotten_timer_hours, 6)

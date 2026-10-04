@@ -15,6 +15,7 @@ import { initAvatar } from './avatar.js';
 import { initData } from './data.js';
 import { flash } from './flash.js';
 import { initLibrary, showSeason } from './library.js';
+import { initNotifications } from './notifications.js';
 import { initPreferences } from './preferences.js';
 import { initPush } from './push.js';
 import { initRecommendations } from './recommendations.js';
@@ -76,6 +77,7 @@ function showTab(id) {
   if (id === 'resumen') initLibrary(main.querySelector('#pfLibrary'), { username: user.username, userId: user.id, season: onScreen, onChange: refreshSummary });
   if (id === 'recomendados') initRecommendations(main.querySelector('#pfRecommended'), { username: user.username });
   if (id === 'ajustes') {
+    initNotifications(main.querySelector('#pfNotifs'), { path: userPath('settings') }).catch(() => {});
     initPreferences(main.querySelector('#pfPrefs'), { path: userPath('settings') }).catch(() => {});
     initPush(main.querySelector('#pfPush')).catch(() => {}); // optional: never breaks the page
     initData(main.querySelector('#pfDataFiles'), { username: user.username });
@@ -183,6 +185,8 @@ function draw(d) {
       <div class="pf-msg" id="pfDataMsg" role="status"></div>
       <div><button class="pf-btn primary" type="submit">Guardar datos</button></div>
     </form>
+
+    <div id="pfNotifs"></div>
 
     <div id="pfPrefs"></div>
 

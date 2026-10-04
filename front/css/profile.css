@@ -78,6 +78,9 @@
 
 .pf-form { gap: 12px; }
 
+.pf-options { display: flex; flex-direction: column; gap: 12px; }
+.pf-options[hidden] { display: none; }
+
 .pf-form label { display: flex; flex-direction: column; gap: 6px; font-size: 0.85rem; color: var(--text-secondary); font-weight: 600; }
 
 .pf-btn { background: var(--bg-surface); border: 1px solid var(--border); color: var(--text-primary); font: inherit; font-size: 0.9rem; font-weight: 600; padding: 9px 16px; border-radius: var(--radius-sm); cursor: pointer; }
