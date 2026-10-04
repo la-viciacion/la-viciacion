@@ -9,6 +9,10 @@ import { html, mount } from '../../lib/html.js';
 import { sectionTitle } from '../../ui/profile-summary.js';
 import { flash } from './flash.js';
 
+// Importing is switched off for now: only the download is offered. The API route and the flow below stay, so turning
+// it back on is this one constant.
+const IMPORT_ENABLED = false;
+
 const PROBLEMS_SHOWN = 8;
 
 const reviewView = (data, report) => html`
@@ -34,10 +38,10 @@ export async function initData(el, { username }) {
   mount(el, html`
     ${sectionTitle('Tus datos')}
     <div class="pf-card">
-      <div class="pf-sub">Descarga un archivo con tus sesiones, biblioteca, puntuaciones, deseados y logros: una copia tuya para guardar. También puedes importar uno de esos archivos (por ejemplo, el de otra instalación de La Viciación).</div>
+      <div class="pf-sub">Descarga un archivo con tus sesiones, biblioteca, puntuaciones, deseados y logros: una copia tuya para guardar.${IMPORT_ENABLED ? ' También puedes importar uno de esos archivos (por ejemplo, el de otra instalación de La Viciación).' : ''}</div>
       <div><button class="pf-btn" data-act="export">Descargar mis datos</button></div>
-      <div><label class="pf-btn">Importar datos…<input type="file" accept=".json,application/json" hidden /></label></div>
-      <div id="pfImportReview"></div>
+      ${IMPORT_ENABLED ? html`<div><label class="pf-btn">Importar datos…<input type="file" accept=".json,application/json" hidden /></label></div>
+      <div id="pfImportReview"></div>` : ''}
       <div class="pf-msg" role="status"></div>
     </div>`);
   const msg = el.querySelector('.pf-msg');
@@ -84,7 +88,7 @@ export async function initData(el, { username }) {
     }
   }
 
-  input.addEventListener('change', () => {
+  input?.addEventListener('change', () => {
     if (input.files[0]) chooseFile(input.files[0]);
     input.value = ''; // the same file can be chosen again
   });
