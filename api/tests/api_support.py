@@ -39,7 +39,7 @@ PASSWORD = "Sup3r-secret!pw"  # meets the password rules (12-24 characters, uppe
 # upload an image and the next one must not see it.
 DATA_TABLES = (
     "game_timers", "users_achievements", "achievements", "users_games", "game_scores", "users_wishlist", "push_subscriptions", "password_resets",
-    "user_settings", "app_settings", "job_runs", "games", "users",
+    "user_settings", "app_settings", "job_runs", "audit_log", "games", "users",
 )
 
 # the follow-ups the routers schedule with BackgroundTasks, replaced by recorders

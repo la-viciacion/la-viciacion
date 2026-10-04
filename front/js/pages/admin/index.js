@@ -239,7 +239,7 @@ function rowView(entity, r, i) {
     <tr>
       ${cells}
       <td class="adm-row-actions">
-        <button class="adm-btn sm" data-act="edit" data-i="${i}">Editar</button>
+        ${entity.readOnly ? '' : html`<button class="adm-btn sm" data-act="edit" data-i="${i}">Editar</button>`}
         ${extras.some((x) => x !== '') ? html`
           <details class="adm-menu">
             <summary class="adm-btn sm" aria-label="Más acciones">⋯</summary>

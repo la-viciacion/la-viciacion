@@ -155,6 +155,8 @@
 
 .adm-menu-item.danger { color: #f87171; }
 
+.adm-audit summary { cursor: pointer; color: var(--accent-teal); font-size: 0.85rem; }
+.adm-audit pre { margin: 4px 0 8px; padding: 8px 10px; max-width: 420px; max-height: 220px; overflow: auto; background: var(--bg-card-hover); border-radius: var(--radius-sm, 8px); font-size: 0.75rem; white-space: pre-wrap; word-break: break-word; }
 .adm-sub { color: var(--text-muted); font-size: 0.78rem; margin-top: 2px; }
 
 .adm-link { background: none; border: none; color: inherit; font: inherit; text-align: left; cursor: pointer; padding: 0; }

@@ -21,7 +21,7 @@ from .. import auth
 from ..auth import get_db
 from ..crud import users as users_crud
 from ..database import models
-from ..utils import actions, ai, my_utils, push, rawg_sync, seasons, settings
+from ..utils import actions, ai, audit, my_utils, push, rawg_sync, seasons, settings
 from ..utils import email as mail
 from ..database.schemas import NOTES_MAX
 from ..utils.logger import LogManager
@@ -32,7 +32,9 @@ logger = LogManager().get_logger()
 router = APIRouter(
     prefix="/manage",
     tags=["Manage"],
-    dependencies=[Depends(auth.require_admin)],
+    # `remember` and AuditedRoute write every successful change of the panel to the audit log (utils/audit.py)
+    dependencies=[Depends(auth.require_admin), Depends(audit.remember)],
+    route_class=audit.AuditedRoute,
 )
 
 
@@ -126,6 +128,31 @@ def check_achievements(body: CheckAchievementsBody, background_tasks: Background
     """Check the achievements of all users, or one, against their sessions (in background)."""
     background_tasks.add_task(actions.after_session_change, body.user_id, body.silent)
     return {"message": "Comprobación en marcha"}
+
+
+# ── Audit log ───────────────────────────────────────────────────
+
+
+@router.get("/audit")
+def list_audit(
+    user_id: Optional[int] = None,
+    entity: Optional[str] = Query(None, max_length=50),
+    method: Optional[str] = Query(None, pattern="^(POST|PUT|PATCH|DELETE)$"),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+):
+    """What the admins changed, newest first."""
+    q = db.query(models.AuditLog)
+    if user_id is not None:
+        q = q.filter(models.AuditLog.user_id == user_id)
+    if entity:
+        q = q.filter(models.AuditLog.entity == entity)
+    if method:
+        q = q.filter(models.AuditLog.method == method)
+    total = q.count()
+    rows = q.order_by(models.AuditLog.id.desc()).limit(limit).offset(offset).all()
+    return {"total": total, "items": [audit.entry_out(r) for r in rows]}
 
 
 # ── Users ───────────────────────────────────────────────────────
