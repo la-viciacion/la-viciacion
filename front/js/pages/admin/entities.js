@@ -195,12 +195,14 @@ export const ENTITIES = {
       { label: 'Temp.', sort: 'season', render: (r) => r.season ?? '—' },
       { label: 'Inicio', sort: 'started', render: (r) => r.started_date || '—' },
       { label: 'Completado', sort: 'completed', render: (r) => (r.completed ? badge(`Sí ${r.completed_date || ''}`, 'green') : badge('No', 'gray')) },
+      { label: 'Abandonado', render: (r) => (r.abandoned_at ? badge(formatTimestamp(r.abandoned_at), 'orange') : '—') },
     ],
     fields: [
       platformField,
       { key: 'started_date', label: 'Fecha de inicio (su año es la temporada)', type: 'date', required: true },
       { key: 'completed', label: 'Completado', type: 'checkbox' },
       { key: 'completed_date', label: 'Fecha de completado', type: 'date' },
+      { key: 'abandoned_at', label: 'Abandonado el (vacío = no; una sesión posterior lo retoma)', type: 'datetime' },
     ],
     createFields: [
       { key: 'user_id', label: 'Usuario', type: 'user', required: true },

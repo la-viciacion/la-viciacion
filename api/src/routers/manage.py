@@ -704,6 +704,7 @@ def _library_out(u: models.UserGame, user_name: Optional[str], game_name: Option
         "started_date": u.started_date,
         "completed": bool(u.completed),
         "completed_date": u.completed_date,
+        "abandoned_at": u.abandoned_at,
     }
 
 
@@ -776,6 +777,7 @@ class LibraryPatch(BaseModel):
     started_date: Optional[datetime.date] = None
     completed: Optional[bool] = None
     completed_date: Optional[datetime.date] = None
+    abandoned_at: Optional[datetime.datetime] = None
 
 
 @router.patch("/library/{row_id}")

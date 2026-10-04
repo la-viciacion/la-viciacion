@@ -69,6 +69,7 @@ Notes:
 - **Ranking announcements compare before and after**: the stop-timer endpoint takes `actions.ranking_snapshot` before stopping and the background task (`after_session_change`) announces how the players and games rankings moved. No last-announced position is remembered; manual sessions and edits are silent.
 - **A lost streak** (more than 10 days) is announced by the 05:00 check on the one day the last played day is two days ago (`streaks.lost_streak`).
 - **Completion** of a game is only allowed for the current season, once per season, date not in the future.
+- **Abandoned** (`users_games.abandoned_at`, migration 023): only the decision is stored, when it was taken. Whether the entry is still abandoned is derived (`crud.users.is_abandoned`): from that moment until the player plays the game again (a session starting after it), and never once it is completed (completing also clears the mark). Only the running season, like completions (`PATCH /users/{username}/library/{id}/abandoned`, 409 otherwise); a closed season keeps what it had. Nothing else reads it yet: rankings, streaks, achievements and recommendations ignore it.
 
 ## Audit log
 

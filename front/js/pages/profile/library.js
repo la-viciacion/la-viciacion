@@ -5,6 +5,8 @@
 //     after completing it
 //   - a completed game of the current season lets you change the completion date or unmark it;
 //     once its season is closed the completion is frozen
+//   - a pending game of the current season can be given up (and taken back) from the "⋯" menu of its row, kept out
+//     of the buttons on purpose: it is rarely used. Playing it again resumes it by itself
 //   - "Sesiones" lists the sessions of the entry (game and season); those of the current season
 //     can be corrected or deleted there
 // The API enforces the rules (once per game and season, current season only for completing,
@@ -104,6 +106,7 @@ function status(g) {
   if (g.completed) {
     return html`<span class="pf-tag done">Completado${g.completed_date ? ` el ${formatDate(g.completed_date)}` : ''}</span>`;
   }
+  if (g.abandoned) return html`<span class="pf-tag abandoned">Abandonado</span>`;
   // an unfinished game of a closed season is no longer "in progress"
   return g.complete_blocked === 'closed_season'
     ? html`<span class="pf-tag muted">Sin completar</span>`
@@ -136,14 +139,27 @@ function scoreForm(g) {
     </form>`;
 }
 
+// The rare actions live behind "⋯" so the row does not grow another button.
+function moreMenu(g) {
+  if (!g.can_abandon && !g.can_resume) return '';
+  return html`
+    <details class="pf-more">
+      <summary class="pf-btn" aria-label="Más opciones de ${g.game_name}">⋯</summary>
+      <div class="pf-more-list">
+        ${g.can_abandon ? html`<button class="pf-more-item" data-action="abandon" data-id="${g.id}">Marcar como abandonado</button>` : ''}
+        ${g.can_resume ? html`<button class="pf-more-item" data-action="resume" data-id="${g.id}">Retomar</button>` : ''}
+      </div>
+    </details>`;
+}
+
 function actions(g) {
   const sessionsButton = html`<button class="pf-btn" data-action="sessions" data-id="${g.id}" aria-expanded="${String(sessions.has(g.id))}">Sesiones</button>
     <button class="pf-btn" data-action="rate" data-id="${g.id}">${g.score == null ? 'Puntuar' : 'Cambiar nota'}</button>`;
   if (g.can_complete) {
-    return html`${sessionsButton}<button class="pf-btn primary" data-action="complete" data-id="${g.id}" data-label="Marcar completado">Marcar completado</button>`;
+    return html`${sessionsButton}<button class="pf-btn primary" data-action="complete" data-id="${g.id}" data-label="Marcar completado">Marcar completado</button>${moreMenu(g)}`;
   }
   if (!g.completed) {
-    return html`${sessionsButton}<button class="pf-btn" disabled title="${blockedReason(g, season)}">Marcar completado</button>`;
+    return html`${sessionsButton}<button class="pf-btn" disabled title="${blockedReason(g, season)}">Marcar completado</button>${moreMenu(g)}`;
   }
   if (g.complete_blocked === 'closed_season') return sessionsButton;
   return html`
@@ -248,7 +264,22 @@ async function toggleSessions(entry) {
   draw();
 }
 
+async function setAbandoned(id, abandoned) {
+  flash('');
+  const name = items.find((g) => g.id === id)?.game_name;
+  try {
+    await api(path(`/${id}/abandoned`), jsonRequest('PATCH', { abandoned }));
+    await load();
+    flash(abandoned ? `«${name}» marcado como abandonado. Si vuelves a jugarlo, se retoma solo` : `«${name}» retomado`, true);
+  } catch (err) {
+    await load();
+    flash(err.message);
+  }
+}
+
 async function onClick(e) {
+  // a "⋯" menu closes when something else is pressed
+  el.querySelectorAll('.pf-more[open]').forEach((menu) => { if (!menu.contains(e.target)) menu.open = false; });
   const button = e.target.closest('[data-action]');
   if (!button) return;
   const id = Number(button.dataset.id);
@@ -266,6 +297,10 @@ async function onClick(e) {
       if (!armed(button, button.dataset.label)) return;
       button.disabled = true;
       return setCompletion(id, { completed: false }, 'Marcado como no completado');
+    case 'abandon':
+      return setAbandoned(id, true);
+    case 'resume':
+      return setAbandoned(id, false);
     case 'sessions':
       return toggleSessions(items.find((g) => g.id === id)).catch((err) => flash(err.message));
     case 'edit-session': {

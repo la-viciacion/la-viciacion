@@ -289,6 +289,34 @@ def update_completion(
     return users.get_library_item(db, user.id, entry.id)
 
 
+@router.patch("/{username}/library/{entry_id}/abandoned")
+def update_abandoned(
+    username: str,
+    entry_id: int,
+    body: schemas.AbandonUpdate,
+    active_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Mark a library entry as abandoned, or take the mark back.
+
+    - only the running season: a closed one is frozen, as its completion is.
+    - a completed entry cannot be abandoned (it was finished).
+    - playing the game again resumes it by itself (see crud.users.is_abandoned).
+    """
+    auth.ensure_self_or_admin(active_user, username=username)
+    user = _target_user(db, active_user, username)
+    entry = users.get_library_entry(db, user.id, entry_id)
+    if entry is None:
+        raise HTTPException(status_code=404, detail=msg.ENTRY_NOT_FOUND)
+    if entry.season != seasons.current():
+        raise HTTPException(status_code=409, detail=msg.ABANDON_ONLY_CURRENT_SEASON)
+    if body.abandoned and entry.completed:
+        raise HTTPException(status_code=409, detail=msg.ABANDON_COMPLETED)
+    users.set_abandoned(db, entry, body.abandoned, datetime.datetime.now())
+    return users.get_library_item(db, user.id, entry.id)
+
+
 def _rated_game(db: Session, user: models.User, game_id: str) -> None:
     """Only a game of the user's library (any season) can be rated."""
     if not db.query(models.UserGame.id).filter_by(user_id=user.id, game_id=game_id).first():

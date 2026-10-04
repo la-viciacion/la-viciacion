@@ -53,6 +53,7 @@ class ExportTests(DataTestCase):
             models.GameTimer(user_id=1, game_id="doom", platform="pc", start_time=at(3, 10), is_active=True),  # running: not exported
             models.GameTimer(user_id=2, game_id="hades", platform="pc", start_time=at(2, 10), end_time=at(2, 11), duration_seconds=3600, is_active=False),
             models.UserGame(user_id=1, game_id="doom", platform="pc", started_date=at(2, 10).date(), completed=1, completed_date=at(5, 1).date()),
+            models.UserGame(user_id=1, game_id="hades", platform="pc", started_date=at(2, 10).date(), completed=0, abandoned_at=at(9, 12)),
             models.GameScore(user_id=1, game_id="doom", score=90),
             models.UserWishlist(user_id=1, game_id="hades"),
             models.Achievement(id=1, key="first", title="First"),
@@ -71,6 +72,7 @@ class ExportTests(DataTestCase):
         self.assertEqual([s["game_id"] for s in out["sessions"]], ["doom"])  # finished ones only, and only ana's
         self.assertEqual(out["sessions"][0]["notes"], "n")
         self.assertEqual(out["scores"], [{"game_id": "doom", "score": 90}])
+        self.assertEqual({e["game_id"]: e["abandoned_at"] for e in out["library"]}, {"doom": None, "hades": f"{YEAR}-01-09T12:00:00"})
         self.assertEqual([w["game_id"] for w in out["wishlist"]], ["hades"])
         self.assertEqual(out["achievements"], [{"key": "first", "date": f"{YEAR}-01-02", "game_id": "doom"}])
 
@@ -229,6 +231,15 @@ class ImportLibraryTests(DataTestCase):
         self.run_import(parse(library=[{"game_id": "doom", "platform": "pc", "started_date": f"{YEAR}-01-03", "completed": True, "completed_date": f"{YEAR}-01-20"}]))
         self.assertEqual(self.count(models.UserGame, user_id=1, game_id="doom", completed=1), 1)
         self.assertEqual(self.count(models.UserGame, user_id=1, game_id="doom"), 2)
+
+    def test_the_abandoned_mark_comes_along_unless_the_game_was_completed(self):
+        mark = f"{YEAR}-01-10T12:00:00"
+        self.run_import(parse(library=[
+            {"game_id": "doom", "platform": "pc", "started_date": f"{YEAR}-01-02", "abandoned_at": mark},
+            {"game_id": "hades", "platform": "pc", "started_date": f"{YEAR}-01-02", "completed": True, "completed_date": f"{YEAR}-01-05", "abandoned_at": mark},
+        ]))
+        self.assertEqual(self.db.query(models.UserGame).filter_by(game_id="doom").one().abandoned_at, D(YEAR, 1, 10, 12))
+        self.assertIsNone(self.db.query(models.UserGame).filter_by(game_id="hades").one().abandoned_at)
 
     def test_a_completion_date_outside_the_season_falls_back_to_the_start(self):
         self.run_import(parse(library=[{"game_id": "doom", "platform": "pc", "started_date": f"{YEAR}-01-02", "completed": True, "completed_date": f"{YEAR + 1}-01-01"}]))
