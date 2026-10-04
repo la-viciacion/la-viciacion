@@ -293,6 +293,8 @@ async function onClick(e) {
       button.disabled = true;
       return setCompletion(id, { completed: false }, 'Marcado como no completado');
     case 'abandon':
+      if (!armed(button, button.dataset.label)) return;
+      button.disabled = true;
       return setAbandoned(id, true);
     case 'resume':
       return setAbandoned(id, false);
