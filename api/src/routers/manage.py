@@ -594,24 +594,43 @@ def create_timer(body: TimerCreate, db: Session = Depends(get_db)):
 
 
 class TimerPatch(BaseModel):
+    game_id: Optional[str] = None
     start_time: Optional[datetime.datetime] = None
     end_time: Optional[datetime.datetime] = None
     platform: Optional[str] = None
     notes: Optional[str] = Field(None, max_length=NOTES_MAX)
 
 
+def _follow_library(db: Session, timer: models.GameTimer, old_entry: tuple) -> None:
+    """A session that changed game, platform or season takes its library entry along: the new one is
+    created if missing and the old one goes when nothing is left in it (a completed one is kept)."""
+    new_entry = (timer.game_id, timer.platform, seasons.of(timer.start_time))
+    if new_entry == old_entry:
+        return
+    users_crud.ensure_library_entry(db, timer.user_id, timer.game_id, timer.platform, timer.start_time)
+    db.flush()
+    users_crud.drop_empty_entry(db, timer.user_id, *old_entry)
+
+
 @router.patch("/timers/{timer_id}")
 def patch_timer(timer_id: int, body: TimerPatch, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
-    """Edit a session. Setting an end time finishes an active one (stuck timer)."""
+    """Edit a session. Setting an end time finishes an active one (stuck timer). Changing the game (a
+    session logged on the wrong one) is for admins only: the owner deletes and re-adds."""
     timer = _get_or_404(db, models.GameTimer, timer_id, "Sesión")
     was_running = bool(timer.is_active)
     data = body.model_dump(exclude_unset=True)
+    if data.get("game_id") is None:
+        data.pop("game_id", None)
+    else:
+        _get_or_404(db, models.Game, data["game_id"], "Juego")
+    old_entry = (timer.game_id, timer.platform, seasons.of(timer.start_time))
     for k, v in data.items():
         setattr(timer, k, v)
     _check_range(timer.start_time, timer.end_time)
     if timer.end_time is not None:
         timer.duration_seconds = int((timer.end_time - timer.start_time).total_seconds())
         timer.is_active = False
+    _follow_library(db, timer, old_entry)
     _commit(db, "Sesión")
     if was_running and not timer.is_active:
         # a stuck timer was finished by hand: its pinned notification has to go

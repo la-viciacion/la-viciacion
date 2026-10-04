@@ -154,6 +154,7 @@ export const ENTITIES = {
       { label: 'Temp.', sort: 'season', render: (r) => r.season ?? '—' },
     ],
     fields: [
+      { key: 'game_id', label: 'Juego (cámbialo si se registró en otro por error)', type: 'game', nameKey: 'game' },
       { key: 'start_time', label: 'Inicio', type: 'datetime', required: true },
       { key: 'end_time', label: 'Fin', type: 'datetime', omitEmpty: true },
       platformField,
