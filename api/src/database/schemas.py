@@ -30,6 +30,9 @@ class UserProfileUpdate(BaseModel):
 class UserSettingsUpdate(BaseModel):
     # whole hours; None goes back to the default (the range is checked in the route)
     forgotten_timer_hours: int | None = None
+    # channels of the forgotten-timer notice; None goes back to the default (on)
+    forgotten_timer_telegram: bool | None = None
+    forgotten_timer_push: bool | None = None
     # whole minutes, 10-120 (checked in the route)
     timer_notice_minutes: int | None = None
     # whether the others see the user in "playing now"; None goes back to the default (shown)

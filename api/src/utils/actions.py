@@ -350,9 +350,11 @@ async def check_forgotten_timer(db: Session, user: models.User):
     """Remind a user about a timer running for too long (the scheduler calls this hourly, and each
     timer is reminded about once: in the run that follows it crossing the line).
 
-    "Too long" is the user's own setting, or the default when they never set it.
+    "Too long" is the user's own setting, or the default when they never set it. The notice goes
+    only through the channels they left on (both off: no notice).
     """
-    if user.telegram_id is None and not push_has_devices(user.id):
+    telegram_on, push_on = user_settings.forgotten_timer_channels(db, user.id)
+    if not ((telegram_on and user.telegram_id is not None) or (push_on and push_has_devices(user.id))):
         return
     hours = user_settings.forgotten_timer_hours(db, user.id)
     forgotten_timer = time_entries.get_forgotten_game_timers(
@@ -367,7 +369,7 @@ async def check_forgotten_timer(db: Session, user: models.User):
             + " Si es correcto, sigue disfrutando. Si te has olvidado de pararlo,"
             + " párala y edita la sesión con el tiempo correcto."
         )
-        await utils.send_message_to_user(user.telegram_id, msg, user_id=user.id)
+        await utils.send_message_to_user(user.telegram_id, msg, user_id=user.id, telegram_on=telegram_on, push_on=push_on)
 
 
 def join_names(names: list[str]) -> str:

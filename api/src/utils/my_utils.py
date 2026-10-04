@@ -422,13 +422,16 @@ async def send_message(
         logger.info("Silent mode. Message not sent.")
 
 
-async def send_message_to_user(user_telegram_id, msg, user_id=None):
-    """Private notice: Telegram (if the user has an id) and, given `user_id`, their pushed devices."""
+async def send_message_to_user(user_telegram_id, msg, user_id=None, telegram_on=True, push_on=True):
+    """Private notice: Telegram (if the user has an id) and, given `user_id`, their pushed devices.
+    `telegram_on` / `push_on` carry the user's choice of channel for this kind of notice."""
     if not settings.get("notifications.enabled"):
         logger.info("Notifications are disabled. Message to user not sent.")
         return
-    if user_id is not None:
+    if user_id is not None and push_on:
         await push.notify_user(user_id, msg, tag="private")
+    if not telegram_on:
+        return
     if user_telegram_id is None or not settings.get("telegram.token"):
         logger.warning("User without Telegram id or bot not configured. Message not sent.")
         return

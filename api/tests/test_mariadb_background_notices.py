@@ -242,9 +242,11 @@ class ForgottenTimerTests(MessagingTestCase):
         self.configure_telegram()
         self.game("celeste", "Celeste")
         self.reminders = []
+        self.channels = []
 
-        async def to_user(telegram_id, message, user_id=None):
+        async def to_user(telegram_id, message, user_id=None, telegram_on=True, push_on=True):
             self.reminders.append((telegram_id, message, user_id))
+            self.channels.append((telegram_on, push_on))
 
         patcher = mock.patch.object(my_utils, "send_message_to_user", new=to_user)
         patcher.start()
@@ -301,6 +303,31 @@ class ForgottenTimerTests(MessagingTestCase):
         with mock.patch.object(push, "is_ready", return_value=True):
             self.check("pushy")
         self.assertEqual(len(self.reminders), 1)
+
+
+    def device(self, user_id):
+        with self.engine.begin() as conn:
+            conn.execute(text("INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth) VALUES (:u, 'https://p/y', 'k', 'a')"), {"u": user_id})
+
+    def test_the_notice_goes_only_through_the_channels_the_user_left_on(self):
+        self.device(self.ana)
+        self.api("PATCH", "/users/ana/settings", as_user="ana", json={"forgotten_timer_telegram": False})
+        self.running_timer(hours_ago=user_settings.DEFAULT_FORGOTTEN_TIMER_HOURS + 0.5)
+        with mock.patch.object(push, "is_ready", return_value=True):
+            self.check()
+        self.assertEqual(self.channels, [(False, True)])
+
+    def test_with_both_channels_off_nothing_is_sent(self):
+        self.api("PATCH", "/users/ana/settings", as_user="ana", json={"forgotten_timer_telegram": False, "forgotten_timer_push": False})
+        self.running_timer(hours_ago=user_settings.DEFAULT_FORGOTTEN_TIMER_HOURS + 0.5)
+        self.check()
+        self.assertEqual(self.reminders, [])
+
+    def test_a_channel_the_user_cannot_be_reached_by_does_not_count(self):
+        self.api("PATCH", "/users/ana/settings", as_user="ana", json={"forgotten_timer_telegram": False})  # ana has no push device
+        self.running_timer(hours_ago=user_settings.DEFAULT_FORGOTTEN_TIMER_HOURS + 0.5)
+        self.check()
+        self.assertEqual(self.reminders, [])
 
 
 class TimerNoticeTests(MessagingTestCase):

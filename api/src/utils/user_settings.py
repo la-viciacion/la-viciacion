@@ -16,6 +16,7 @@ DEFAULT_TIMER_NOTICE_MINUTES = 10
 MIN_TIMER_NOTICE_MINUTES = 10
 MAX_TIMER_NOTICE_MINUTES = 120
 DEFAULT_SHOW_PLAYING = True
+DEFAULT_FORGOTTEN_TIMER_CHANNEL = True
 
 
 def valid_forgotten_timer_hours(hours) -> bool:
@@ -33,6 +34,17 @@ def forgotten_timer_hours(db: Session, user_id: int) -> int:
     if row is None or row.forgotten_timer_hours is None:
         return DEFAULT_FORGOTTEN_TIMER_HOURS
     return row.forgotten_timer_hours
+
+
+def forgotten_timer_channels(db: Session, user_id: int) -> tuple[bool, bool]:
+    """(telegram, push): where this user wants the forgotten-timer notice. Both off means no notice."""
+    row = db.get(models.UserSettings, user_id)
+    telegram = row.forgotten_timer_telegram if row else None
+    push = row.forgotten_timer_push if row else None
+    return (
+        DEFAULT_FORGOTTEN_TIMER_CHANNEL if telegram is None else bool(telegram),
+        DEFAULT_FORGOTTEN_TIMER_CHANNEL if push is None else bool(push),
+    )
 
 
 def timer_notice_minutes(db: Session, user_id: int) -> int:
@@ -58,7 +70,11 @@ def get(db: Session, user_id: int) -> dict:
         "forgotten_timer_hours": row.forgotten_timer_hours if row else None,
         "timer_notice_minutes": row.timer_notice_minutes if row else None,
         "show_playing": None if row is None or row.show_playing is None else bool(row.show_playing),
+        "forgotten_timer_telegram": None if row is None or row.forgotten_timer_telegram is None else bool(row.forgotten_timer_telegram),
+        "forgotten_timer_push": None if row is None or row.forgotten_timer_push is None else bool(row.forgotten_timer_push),
         "defaults": {
+            "forgotten_timer_telegram": DEFAULT_FORGOTTEN_TIMER_CHANNEL,
+            "forgotten_timer_push": DEFAULT_FORGOTTEN_TIMER_CHANNEL,
             "forgotten_timer_hours": DEFAULT_FORGOTTEN_TIMER_HOURS,
             "timer_notice_minutes": DEFAULT_TIMER_NOTICE_MINUTES,
             "show_playing": DEFAULT_SHOW_PLAYING,
@@ -78,5 +94,8 @@ def update(db: Session, user_id: int, changes: dict) -> dict:
         row.timer_notice_minutes = changes["timer_notice_minutes"]
     if "show_playing" in changes:
         row.show_playing = changes["show_playing"]
+    for column in ("forgotten_timer_telegram", "forgotten_timer_push"):
+        if column in changes:
+            setattr(row, column, changes[column])
     db.commit()
     return get(db, user_id)
