@@ -37,7 +37,7 @@ const eventRow = (e) => html`
 
 function draw() {
   mount(main, html`
-    <div class="section-header"><h2 class="section-title">Actividad</h2><div class="section-line"></div></div>
+    <h1 class="pf-title pg-title">Actividad</h1>
     ${events.length
       ? html`
         ${groupByDay(events).map((g) => html`

@@ -7,7 +7,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..database import models
-from . import games, time_entries
+from . import games, time_entries, wishlist
 
 SORTS = ("activity", "played", "rated", "players", "release", "name")
 
@@ -67,6 +67,7 @@ def catalog(
         .group_by(models.GameScore.game_id)
     }
     my_scores = dict(db.query(models.GameScore.game_id, models.GameScore.score).filter_by(user_id=viewer_id).all())
+    wished = wishlist.wished_ids(db, viewer_id)
     live = {p["game_id"] for p in time_entries.get_now_playing(db, viewer_id) if not p["stale"]}
 
     wanted = (q or "").strip().lower()
@@ -104,6 +105,7 @@ def catalog(
             "score_count": count,
             "score_mean": None if mean is None else round(mean, 1),
             "have": have,
+            "wished": game.id in wished,
             "my_score": my_scores.get(game.id),
             "my_completed": mine_done,
             "playing_now": game.id in live,

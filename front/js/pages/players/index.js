@@ -21,7 +21,7 @@ const card = (p) => html`
 
 export async function render({ main }) {
   mount(main, html`
-    <div class="section-header"><h2 class="section-title">Jugadores</h2><div class="section-line"></div></div>
+    <h1 class="pf-title pg-title">Jugadores</h1>
     <div id="plList"><div class="loading-spinner">Cargando jugadores...</div></div>`);
   try {
     const list = await api('/group/players');

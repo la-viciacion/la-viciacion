@@ -14,6 +14,8 @@ const OVERVIEW = {
     { user_id: 2, username: 'bea', name: 'Bea', played_seconds: 7200, sessions: 2, last_played: '2026-03-01T20:00:00', seasons: [2026], completed: true, completions: 1, score: 70, playing: true, is_me: false },
     { user_id: 1, username: 'ana', name: 'Ana', played_seconds: 3600, sessions: 1, last_played: null, seasons: [2026, 2025], completed: false, completions: 0, score: null, playing: false, is_me: true },
   ],
+  wished: false,
+  wanted_by: [],
 };
 
 let calls;
@@ -45,6 +47,36 @@ test('the figures of the group and the players, the most played first, with who 
 
 test('your own rating can be set from the page', () => {
   assert.equal(document.querySelector('#gmRate').textContent, 'Puntuar');
+});
+
+test('a game of your library has no wish button', () => {
+  assert.equal(document.querySelector('#gmWish'), null);
+});
+
+test('you can wish a game you do not have, and the others who want it are named', async () => {
+  const notMine = { ...OVERVIEW, players: OVERVIEW.players.filter((p) => !p.is_me), wanted_by: [{ user_id: 3, username: 'cai', name: 'Cai' }] };
+  let overview = notMine;
+  const log = installApi({
+    'GET /games/celeste/overview': () => overview,
+    'PUT /users/ana/wishlist/celeste': () => { overview = { ...notMine, wished: true }; return { game_id: 'celeste', wished: true }; },
+    'DELETE /users/ana/wishlist/celeste': () => { overview = notMine; return { game_id: 'celeste', wished: false }; },
+    'GET /users/photo/': json({ detail: 'no' }, 404),
+  });
+  await page.render({ main: main(), user: { id: 1, username: 'ana' } });
+  await settle();
+  assert.equal(document.querySelector('#gmRate'), null);
+  assert.equal(text('.gm-wanted')[0], 'Lo quiere Cai');
+  assert.equal(document.querySelector('#gmWish').textContent, 'Añadir a mi lista');
+
+  document.querySelector('#gmWish').click();
+  await settle();
+  assert.deepEqual(log.filter((c) => c.method !== 'GET').map((c) => `${c.method} ${c.path}`), ['PUT /users/ana/wishlist/celeste']);
+  assert.equal(document.querySelector('#gmWish').textContent, 'Quitar de mi lista');
+
+  document.querySelector('#gmWish').click();
+  await settle();
+  assert.equal(log.filter((c) => c.method !== 'GET').at(-1).method, 'DELETE');
+  assert.equal(document.querySelector('#gmWish').textContent, 'Añadir a mi lista');
 });
 
 test('an unknown game says so', async () => {

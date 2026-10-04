@@ -133,6 +133,7 @@
 .gm-head { display: flex; gap: 16px; align-items: center; margin-bottom: 16px; }
 .gm-cover { width: 96px; height: 96px; border-radius: var(--radius-md); object-fit: cover; flex: none; }
 .gm-cover-placeholder { display: flex; align-items: center; justify-content: center; background: var(--bg-card); font-size: 2rem; }
+.gm-wanted { margin: 0 0 8px; }
 .gm-genres { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0; }
 .gm-mine { flex-direction: row; align-items: center; justify-content: space-between; margin: 12px 0 8px; }
 .gm-players { list-style: none; margin: 0; gap: 14px; }
@@ -195,3 +196,14 @@
 .pl-card-name { font-weight: 700; }
 .pf-head .pl-avatar { width: 72px; height: 72px; font-size: 1.8rem; border-color: var(--bg-base); }
 @media (max-width: 640px) { .pl-cards { grid-template-columns: 1fr; } }
+
+/* Wishlist page */
+.pf-tag.wish { background: rgba(244, 114, 182, 0.15); color: #f9a8d4; }
+.wl-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+.wl-card { position: relative; }
+.wl-link { display: flex; gap: 12px; flex: 1; min-width: 0; color: inherit; text-decoration: none; }
+.wl-remove { position: absolute; top: 4px; right: 6px; font: inherit; font-size: 1.1rem; line-height: 1; padding: 2px 7px; background: transparent; border: 0; border-radius: var(--radius-sm); color: var(--text-muted); cursor: pointer; }
+.wl-remove:hover { color: #fca5a5; background: rgba(239, 68, 68, 0.15); }
+.wl-card .gc-name { padding-right: 22px; }
+.wl-empty { margin-bottom: 16px; }
+.pg-title { margin-bottom: 18px; }

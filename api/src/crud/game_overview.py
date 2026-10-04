@@ -6,7 +6,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..database import models
-from . import games, time_entries
+from . import games, time_entries, wishlist
 
 
 def overview(db: Session, game_id: str, viewer_id: int) -> dict | None:
@@ -70,6 +70,7 @@ def overview(db: Session, game_id: str, viewer_id: int) -> dict | None:
         })
     rows.sort(key=lambda r: (-r["played_seconds"], r["name"].lower()))
 
+    wished = wishlist.wished_ids(db, viewer_id)
     rated = [r["score"] for r in rows if r["score"] is not None]
     return {
         "game": {
@@ -89,4 +90,6 @@ def overview(db: Session, game_id: str, viewer_id: int) -> dict | None:
             "score_mean": round(sum(rated) / len(rated), 1) if rated else None,
         },
         "players": rows,
+        "wished": game_id in wished,
+        "wanted_by": wishlist.wanters(db, [game_id], exclude_user_id=viewer_id).get(game_id, []),
     }

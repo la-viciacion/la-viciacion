@@ -117,6 +117,13 @@ def _pick_confident(game: models.Game, results: list[dict]) -> dict | None:
     return None
 
 
+def _parse_date(value: str | None) -> datetime.date | None:
+    try:
+        return datetime.datetime.strptime(value, "%Y-%m-%d").date() if value else None
+    except ValueError:
+        return None
+
+
 def _details(client: _Client, rawg_id: int, need_steam: bool) -> dict:
     d = client.get(f"/games/{rawg_id}")
     devs = [x["name"] for x in d.get("developers") or [] if x.get("name")]
@@ -132,12 +139,7 @@ def _details(client: _Client, rawg_id: int, need_steam: bool) -> dict:
                     break
         except ConnectionError:
             pass                              # steam id is best-effort
-    released = None
-    if d.get("released"):
-        try:
-            released = datetime.datetime.strptime(d["released"], "%Y-%m-%d").date()
-        except ValueError:
-            pass
+    released = _parse_date(d.get("released"))
     return {
         "rawg_id": rawg_id,
         "slug": d.get("slug"),
@@ -352,6 +354,31 @@ def _run(max_calls: int, overwrite: bool):
             current=None,
         )
         logger.info(f"RAWG sync ended ({reason}); {client.calls} RAWG calls")
+
+
+def refresh_release_dates(db, games: list[models.Game], max_calls: int = 50) -> list[models.Game]:
+    """Pull the release date of games that are not out yet from RAWG (one call each): announced dates slip.
+    Only a date RAWG actually gives is written (never blanked out). Returns the games whose date changed."""
+    if not config.RAWG_API_KEY or not games:
+        return []
+    client = _Client(max_calls)
+    changed = []
+    try:
+        for game in games:
+            if not client.budget_left():
+                break
+            try:
+                released = _parse_date(client.get(f"/games/{game.rawg_id}").get("released"))
+            except ConnectionError as e:
+                logger.warning(f"RAWG release date of {game.name} not refreshed: {redact_rawg_key(str(e))}")
+                continue
+            if released and released != game.release_date:
+                game.release_date = released
+                changed.append(game)
+    except RawgFatal as e:
+        logger.warning(f"RAWG release dates not refreshed: {e}")
+    db.commit()
+    return changed
 
 
 def apply_one(db, game_id: str, rawg_id: int, overwrite: bool = False) -> dict:

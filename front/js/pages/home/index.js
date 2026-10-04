@@ -26,7 +26,7 @@ export async function render({ user, main, isCurrent }) {
       <div class="loading-spinner">Cargando timer...</div>
     </section>
 
-    <div class="section-header">
+    <div class="section-header sessions-head">
       <h2 class="section-title">Mis sesiones</h2>
       <div class="section-line"></div>
     </div>

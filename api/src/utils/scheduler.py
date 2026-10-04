@@ -12,6 +12,8 @@ what nothing else can trigger remains here:
                     Switched off by TIMER_NOTICE_REFRESH: only the first notification is sent
   forgotten_timers  every hour, reminds who has a timer running for too long
   daily_streaks     every day at 05:00, checks achievements + announces lost streaks
+  daily_wishlist    every day at 09:00, refreshes the release date of the games somebody waits for
+                    and tells who wished a game that comes out today
 
 Every run is recorded in `job_runs`, so a restart never repeats a run and a job
 that was due while the API was down still runs when it comes back, within a
@@ -42,6 +44,7 @@ WEEKLY_GRACE = datetime.timedelta(hours=6)
 HOURLY_GRACE = datetime.timedelta(minutes=10)
 DAILY_GRACE = datetime.timedelta(hours=3)
 DAILY_STREAKS_HOUR = 5
+DAILY_WISHLIST_HOUR = 9
 # Off: the notification is shown once, when the timer starts. The job, the per-user interval
 # (user_settings.timer_notice_minutes) and its column stay, so turning this on brings the refresh back.
 TIMER_NOTICE_REFRESH = False
@@ -147,6 +150,10 @@ async def _daily_streaks(db: Session) -> str:
     return ""
 
 
+async def _daily_wishlist(db: Session) -> str:
+    return await actions.check_wishlist(db, datetime.date.today())
+
+
 # ── the loop ────────────────────────────────────────────────
 def tick(now: datetime.datetime | None = None) -> None:
     """Run whatever is due. Called every TICK_SECONDS by the scheduler thread."""
@@ -172,6 +179,10 @@ def tick(now: datetime.datetime | None = None) -> None:
         slot = daily_slot(now, DAILY_STREAKS_HOUR)
         if is_due(now, slot, _last_run(db, "daily_streaks"), DAILY_GRACE) and _claim(db, "daily_streaks", slot, now):
             _run(db, "daily_streaks", lambda: _daily_streaks(db), use_lock=True)
+
+        slot = daily_slot(now, DAILY_WISHLIST_HOUR)
+        if is_due(now, slot, _last_run(db, "daily_wishlist"), DAILY_GRACE) and _claim(db, "daily_wishlist", slot, now):
+            _run(db, "daily_wishlist", lambda: _daily_wishlist(db))
 
 
 _thread: threading.Thread | None = None

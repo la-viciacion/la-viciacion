@@ -56,6 +56,7 @@ const card = (g) => html`
       <div class="gc-tags">
         ${g.playing_now ? html`<span class="pf-tag live">Jugándose</span>` : ''}
         ${g.have ? html`<span class="pf-tag done">En tu biblioteca</span>` : ''}
+        ${g.wished ? html`<span class="pf-tag wish">En tu lista</span>` : ''}
         ${g.genres.slice(0, 2).map((genre) => html`<span class="pf-tag muted">${genre}</span>`)}
       </div>
       <div class="gc-meta">
@@ -129,7 +130,7 @@ export async function render(ctx) {
   Object.assign(filters, { q: '', genre: '', library: '', sort: 'activity', playing: false, with_players: false, completed: false, rated: false });
 
   mount(main, html`
-    <div class="section-header"><h2 class="section-title">Juegos</h2><div class="section-line"></div></div>
+    <h1 class="pf-title pg-title">Juegos</h1>
     <div class="gc-toolbar">
       <input class="adm-input gc-search" id="gcSearch" type="search" placeholder="Buscar un juego…" autocomplete="off" aria-label="Buscar un juego" />
       <button class="pf-btn primary" type="button" id="gcAdd">${iconPlus()} Añadir juego</button>

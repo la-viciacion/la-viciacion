@@ -25,6 +25,7 @@ const ROUTES = [
   { prefix: '#/activity', load: () => import('./pages/activity/index.js') },
   { prefix: '#/stats', load: () => import('./pages/stats/index.js') },
   { prefix: '#/games', load: () => import('./pages/games/index.js') },
+  { prefix: '#/wishlist', load: () => import('./pages/wishlist/index.js') },
   { prefix: '#/achievements', load: () => import('./pages/achievements/index.js') },
   { prefix: '#/players', load: () => import('./pages/players/index.js') },
   { prefix: '#/player/', load: () => import('./pages/player/index.js') },

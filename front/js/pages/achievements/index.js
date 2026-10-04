@@ -38,7 +38,7 @@ const card = (a) => (a.hidden ? hiddenCard() : html`
 
 export async function render({ main }) {
   mount(main, html`
-    <div class="section-header"><h2 class="section-title">Logros</h2><div class="section-line"></div></div>
+    <h1 class="pf-title pg-title">Logros</h1>
     <div id="achList"><div class="loading-spinner">Cargando logros...</div></div>`);
   try {
     const list = await api('/group/achievements');
