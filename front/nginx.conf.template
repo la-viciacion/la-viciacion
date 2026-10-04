@@ -13,6 +13,8 @@ server {
     }
 
     location /api/ {
+        # the profile's "Importar datos" posts a whole export file (nginx's default is 1 MB)
+        client_max_body_size 8m;
         resolver ${DNS_RESOLVER} valid=10s;
         set $api_upstream ${API_UPSTREAM};
         proxy_pass $api_upstream$request_uri;

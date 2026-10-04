@@ -1,5 +1,6 @@
 import datetime
 import hashlib
+import re
 
 from fastapi import (
     APIRouter,
@@ -11,11 +12,14 @@ from fastapi import (
     Response,
     UploadFile,
 )
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .. import auth
 from ..auth import get_db
-from ..crud import games, scores, users, wishlist
+from ..crud import data_export, games, scores, users, wishlist
 from ..database import models, schemas
 from ..utils import actions, images
 from ..utils import messages as msg
@@ -355,6 +359,48 @@ def unwish_game(
     wishlist.remove(db, user.id, game_id)
     db.commit()
     return {"game_id": game_id, "wished": False}
+
+
+@router.get("/{username}/export")
+def export_data(
+    username: str,
+    active_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Everything that belongs to the user (sessions, library, ratings, wishlist, achievements) as a file to keep"""
+    auth.ensure_self_or_admin(active_user, username=username)
+    user = _target_user(db, active_user, username)
+    now = datetime.datetime.now()
+    name = re.sub(r"[^A-Za-z0-9_-]", "_", user.username)
+    return JSONResponse(
+        content=jsonable_encoder(data_export.export_user(db, user, now)),
+        headers={"Content-Disposition": f'attachment; filename="laviciacion-{name}-{now.date()}.json"'},
+    )
+
+
+@router.post("/{username}/import")
+def import_data(
+    username: str,
+    body: schemas.ExportFile,
+    background_tasks: BackgroundTasks,
+    dry_run: bool = Query(False, description="Only say what would happen: nothing is written"),
+    active_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Merge an export file into the account without overwriting anything (see crud/data_export.py)"""
+    auth.ensure_self_or_admin(active_user, username=username)
+    user = _target_user(db, active_user, username)
+    if not data_export.is_supported(body):
+        raise HTTPException(status_code=400, detail=msg.IMPORT_NOT_A_FILE)
+    try:
+        report = data_export.import_data(db, active_user, user, body, dry_run)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail=msg.IMPORT_CONFLICT)
+    if report["sessions"]["imported"] and not dry_run:
+        # earned, not imported: the achievements the new sessions deserve are awarded without announcing them
+        background_tasks.add_task(actions.after_session_change, user.id, True)
+    return report
 
 
 @router.patch("/{username}/avatar")

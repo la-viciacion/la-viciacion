@@ -324,9 +324,9 @@ ENTITIES.notifications = {
 };
 ENTITIES.system = {
   label: 'Sistema',
-  description: 'Inteligencia artificial que redacta algunos avisos y correo para recuperar la contraseña.',
+  description: 'Inteligencia artificial que redacta algunos avisos, correo para recuperar la contraseña y copia de seguridad.',
   custom: 'settings',
-  sections: ['ai', 'aiuses', 'mail'],
+  sections: ['ai', 'aiuses', 'mail', 'backup'],
 };
 
 export const TABS = Object.keys(ENTITIES);

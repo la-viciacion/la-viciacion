@@ -150,6 +150,8 @@ After `016` the database rejects what used to be kept by hand: deleting a user o
 docker compose exec laviciacion-db sh -c 'mariadb-dump -u root -p"$MARIADB_ROOT_PASSWORD" --single-transaction --routines "$MARIADB_DATABASE"' > backup-$(date +%F).sql
 ```
 
+The admin panel can also take one: **Sistema → Copia de seguridad → Descargar copia (.sql)** (`POST /manage/backup`, admins only, written to the audit log). The API writes it itself (`api/src/utils/sql_dump.py`, no `mariadb-dump` in the image): for each table `DROP TABLE IF EXISTS`, the server's own `SHOW CREATE TABLE` and the rows as `INSERT`s, read in one consistent snapshot, `alembic_version` included. It restores the same way as the dump above (the `mariadb` client into an empty database, or `db/init/`). It is a convenience for a quick copy, not a replacement for the command above before a deploy with a migration: it holds no routines, triggers or events (the schema has none) and it is as sensitive as the database (password hashes, avatars, encrypted tokens), so keep it out of the repo and do not share it.
+
 Backups (`*.sql`, `*.sql.gz`, `*.dump`) are gitignored; store them outside the repo. To restore into a fresh environment, put the dump in `db/init/` with an empty `db/data/` ([Importing a pre-v2 database](#importing-a-pre-v2-database-into-a-new-environment) explains the first-boot import), or import it into a running DB with a normal `mariadb` client.
 
 ## Rollback

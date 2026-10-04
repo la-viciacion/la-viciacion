@@ -1,7 +1,7 @@
 import datetime
 from typing import List, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, NaiveDatetime
 
 NOTES_MAX = 500  # width of game_timers.notes
 
@@ -219,3 +219,62 @@ class ActiveTimerResponse(BaseModel):
     is_active: bool
     timer: GameTimerResponse | None = None
     score: int | None = None  # the user's rating of the running game, 1-100
+
+
+# ── Export file (crud/data_export.py): what "Importar datos" accepts ──
+# Bounded on purpose: the file comes from outside. Datetimes are naive, like the database's (server-local).
+
+
+class ExportGame(BaseModel):
+    id: str = Field(min_length=1, max_length=255)
+    name: str = Field(min_length=1, max_length=255)
+    dev: str | None = Field(default=None, max_length=255)
+    release_date: datetime.date | None = None
+    genres: str | None = Field(default=None, max_length=255)
+    avg_time: int | None = None
+    image_url: str | None = Field(default=None, max_length=255)
+    slug: str | None = Field(default=None, max_length=255)
+    steam_id: str | None = Field(default=None, max_length=255)
+    rawg_id: int | None = None
+
+
+class ExportPlatform(BaseModel):
+    id: str = Field(min_length=1, max_length=255)
+    name: str | None = Field(default=None, max_length=255)
+
+
+class ExportLibraryEntry(BaseModel):
+    game_id: str = Field(min_length=1, max_length=255)
+    platform: str | None = Field(default=None, max_length=255)
+    started_date: datetime.date
+    completed: bool = False
+    completed_date: datetime.date | None = None
+    completion_time: int | None = None
+
+
+class ExportSession(BaseModel):
+    game_id: str = Field(min_length=1, max_length=255)
+    platform: str | None = Field(default=None, max_length=255)
+    start_time: NaiveDatetime
+    end_time: NaiveDatetime
+    notes: str | None = Field(default=None, max_length=NOTES_MAX)
+
+
+class ExportScore(BaseModel):
+    game_id: str = Field(min_length=1, max_length=255)
+    score: int = Field(ge=1, le=100)
+
+
+class ExportWish(BaseModel):
+    game_id: str = Field(min_length=1, max_length=255)
+
+
+class ExportFile(BaseModel):
+    format: str
+    version: int
+    games: list[ExportGame] = Field(default=[], max_length=5000)
+    platforms: list[ExportPlatform] = Field(default=[], max_length=200)
+    library: list[ExportLibraryEntry] = Field(default=[], max_length=10000)
+    sessions: list[ExportSession] = Field(default=[], max_length=50000)
+    scores: list[ExportScore] = Field(default=[], max_length=5000)
+    wishlist: list[ExportWish] = Field(default=[], max_length=5000)

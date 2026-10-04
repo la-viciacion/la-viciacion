@@ -5,6 +5,7 @@
 // Values live in the app_settings table; the API never returns a secret (the Telegram
 // token, the AI key), only whether it is set.
 import { api, jsonRequest } from '../../lib/api.js';
+import { saveFile } from '../../lib/download.js';
 import { formatDateTime } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
 import { toast } from '../../ui/toast.js';
@@ -12,7 +13,7 @@ import { errorState } from './components.js';
 import { confirmDialog } from './dialogs.js';
 
 const SECRETS = ['telegram.token', 'ai.api_key']; // never loaded back: sent only when something is typed
-const READ_ONLY = ['mail']; // cards with nothing to save
+const READ_ONLY = ['mail', 'backup']; // cards with nothing to save
 const AI_PROVIDERS = [['google', 'Google (Gemini)'], ['openai', 'OpenAI']];
 
 const WEEKDAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
@@ -126,6 +127,13 @@ function view(values, jobs, pushDevices, mail, aiUses) {
         <div><button type="button" class="adm-btn" data-set-act="push-keys">Regenerar claves…</button></div>
       </section>`,
 
+    backup: html`
+      <section class="adm-set-card">
+        <h3>Copia de seguridad</h3>
+        <div class="adm-sub">Descarga toda la base de datos en un archivo .sql: usuarios, sesiones, biblioteca, logros, ajustes y fotos. Se restaura en una base vacía con el cliente de MariaDB (mira docs/deployment.md). Contiene las contraseñas cifradas y los ajustes protegidos, así que guárdala como lo que es: fuera del repositorio y sin compartirla.</div>
+        <div><button type="button" class="adm-btn" data-set-act="backup">Descargar copia (.sql)</button></div>
+      </section>`,
+
     mail: html`
       <section class="adm-set-card">
         <h3>Correo (recuperar contraseña)</h3>
@@ -206,6 +214,21 @@ async function sendTest() {
   }
 }
 
+async function downloadBackup(button) {
+  const ok = await confirmDialog('Copia de seguridad', html`<p>Se descargará toda la base de datos, con las contraseñas cifradas de todos los usuarios. Queda anotado en el registro.</p>`, { ok: 'Descargar' });
+  if (!ok) return;
+  button.disabled = true;
+  try {
+    const sql = await api('/manage/backup', { method: 'POST' });
+    saveFile(`laviciacion-backup-${new Date().toLocaleDateString('sv-SE')}.sql`, sql, 'application/sql');
+    toast('Copia descargada');
+  } catch (err) {
+    toast(err.message, 'err');
+  } finally {
+    button.disabled = false;
+  }
+}
+
 async function sendTestEmail(mail) {
   const ok = await confirmDialog('Correo de prueba', html`<p>Se enviará un correo de prueba a <strong>${mail.test_recipient}</strong> desde ${mail.from}.</p>`, { ok: 'Enviar' });
   if (!ok) return;
@@ -267,6 +290,7 @@ export async function render(target, { entity }) {
     form.addEventListener('click', (e) => {
       const act = e.target.closest('[data-set-act]')?.dataset.setAct;
       if (act === 'test') sendTest();
+      else if (act === 'backup') downloadBackup(e.target.closest('[data-set-act]'));
       else if (act === 'test-email') sendTestEmail(mail);
       else if (act === 'test-ai') testAi(form);
       else if (act === 'reset-prompt') resetPrompt(form, e.target.closest('[data-use]').dataset.use);
