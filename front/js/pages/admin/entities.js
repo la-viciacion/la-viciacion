@@ -3,7 +3,7 @@
 //
 // Entity: { label, nav? (shorter name for its tab), description? (line under the title), endpoint, search?, filters?, columns, fields, createFields?,
 //           createLabel?, name(row), actions?, toolbarActions?, canDelete, deleteLabel?, deleteNote?,
-//           selects?, defaultSort? }
+//           selects?, defaultSort?, readOnly? (no edit button) }
 //         or a custom page: { label, custom (module in this folder exporting render(panel, { entity, admin })) }
 // Column: { label, render(row) -> html``, filter?(row) -> filters to apply on click, sort? (API sort key) }
 // Select: { key, label, options: [[value, label], ...] | () => [...] }   sent to the API as ?key=value
@@ -12,6 +12,7 @@ import { formatDuration, formatTimestamp } from '../../lib/format.js';
 import { html } from '../../lib/html.js';
 import { platformList, platformName } from '../../lib/platforms.js';
 import { badge, store } from './components.js';
+import { ENTITY_OPTIONS, describe, detailParts } from './audit-labels.js';
 import { closeTimerNow, uploadAchievementImage } from './dialogs.js';
 
 const platformField = { key: 'platform', label: 'Plataforma', type: 'platform' };
@@ -282,6 +283,34 @@ ENTITIES.awards = {
   canDelete: true,
   deleteLabel: 'Revocar',
   deleteNote: 'El logro se revoca sin avisar por Telegram. Si el jugador sigue cumpliendo la condición, el próximo recálculo (o el de las 05:00) lo volverá a conceder: corrige antes los datos que lo provocaron.',
+};
+
+ENTITIES.audit = {
+  label: 'Registro',
+  description: 'Qué ha cambiado cada administrador desde el panel y cómo estaba antes. Solo se anotan los cambios que salieron bien.',
+  endpoint: '/manage/audit',
+  filters: ['user'],
+  selects: [
+    { key: 'entity', label: 'Sección', options: [['', 'Sección: todas'], ...ENTITY_OPTIONS] },
+    { key: 'method', label: 'Acción', options: [['', 'Acción: todas'], ['POST', 'Creaciones'], ['PATCH', 'Ediciones'], ['PUT', 'Cambios de ajustes'], ['DELETE', 'Borrados']] },
+  ],
+  readOnly: true,
+  columns: [
+    { label: 'Cuándo', render: (r) => formatTimestamp(r.created_at) },
+    { label: 'Admin', render: (r) => r.username },
+    { label: 'Acción', render: (r) => html`<strong>${describe(r)}</strong><div class="adm-sub">${r.method} ${r.path.replace(/^.*?\/manage/, '')}</div>` },
+    {
+      label: 'Detalle',
+      render: (r) => {
+        const parts = detailParts(r);
+        return parts.length
+          ? html`<details class="adm-audit"><summary>Ver</summary>${parts.map(([title, text]) => html`<div class="adm-sub">${title}</div><pre>${text}</pre>`)}</details>`
+          : '—';
+      },
+    },
+  ],
+  name: (r) => describe(r),
+  canDelete: false,
 };
 
 // Not tables: custom pages, each one a module exporting render(panel, { entity, admin }).

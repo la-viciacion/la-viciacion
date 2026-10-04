@@ -254,3 +254,23 @@ class PushSubscription(Base):
     created_at = Column(DateTime, server_default=text("CURRENT_TIMESTAMP"))
 
     __table_args__ = (UniqueConstraint("endpoint", name="uq_push_subscriptions_endpoint"),)
+
+
+class AuditLog(Base):
+    """What an admin changed from the admin panel (see utils/audit.py): one row per successful write."""
+
+    __tablename__ = "audit_log"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    created_at = Column(DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP"), index=True)
+    # the account may be deleted later: the name stays, the key is set to NULL
+    user_id = Column(Integer, ForeignKey("users.id", name="fk_audit_log_user", ondelete="SET NULL"), nullable=True)
+    username = Column(String(255), nullable=False)
+    method = Column(String(10), nullable=False)
+    path = Column(String(255), nullable=False)
+    # first segment under /manage ("timers") and the id of the row it touched
+    entity = Column(String(50), nullable=True, index=True)
+    entity_id = Column(String(255), nullable=True)
+    status = Column(SmallInteger, nullable=False)
+    # JSON: {"before": the row as it was, "body": what was sent (secrets hidden), "query": ...}
+    detail = Column(Text, nullable=True)

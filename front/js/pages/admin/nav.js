@@ -8,7 +8,7 @@ export const SECTIONS = [
   { label: 'Inicio', tabs: [HOME] },
   { label: 'Gestión de datos', tabs: ['users', 'games', 'platforms', 'timers', 'library', 'scores', 'achievements', 'awards'] },
   { label: 'Notificaciones', tabs: ['notifications', 'announce'] },
-  { label: 'Sistema', tabs: ['system'] },
+  { label: 'Sistema', tabs: ['system', 'audit'] },
 ];
 
 export const TAB_IDS = SECTIONS.flatMap((section) => section.tabs);
