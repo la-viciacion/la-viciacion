@@ -49,7 +49,7 @@ The button at the left of the top bar opens the menu, a panel that slides in fro
 
 ## Achievements page
 
-**Logros** (menu → Explorar, `#/achievements`) shows every achievement with its picture, a description (the text it announces with the player and the game made generic) and who of the group has unlocked it, how many times (once per season) and when last; yours are highlighted, with a count at the top. `GET /group/achievements`, derived from the catalog and the unlocked achievements of the active players; nothing is stored.
+**Logros** (menu → Explorar, `#/achievements`) lists every achievement, but only the ones you have unlocked are shown: with its picture, a description (the text it announces with the player and the game made generic) and who of the group has unlocked it, how many times (once per season) and when last. The rest appear as "Logro oculto" (not even the name; the API sends only the id and `hidden: true`), with a count at the top. The same rule applies wherever achievements of other players show up: the public player page and the activity feed say "logro oculto" for what you have not unlocked. The admin panel always shows everything. `GET /group/achievements`, derived from the catalog and the unlocked achievements of the active players; nothing is stored.
 
 ## Games page
 

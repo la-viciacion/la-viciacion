@@ -24,7 +24,9 @@ const SENTENCES = {
   started: (e) => html`empezó ${game(e)}`,
   completed: (e) => html`completó ${game(e)} ${scoreBadge(e.score)}`,
   rated: (e) => html`puntuó ${game(e)} ${scoreBadge(e.score)}`,
-  achievement: (e) => html`desbloqueó el logro «${e.title}»${e.game_id ? html` en ${game(e)}` : ''}`,
+  achievement: (e) => (e.hidden
+    ? html`desbloqueó un logro oculto`
+    : html`desbloqueó el logro «${e.title}»${e.game_id ? html` en ${game(e)}` : ''}`),
 };
 
 const eventRow = (e) => html`

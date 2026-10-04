@@ -9,7 +9,7 @@ const page = await import('../js/pages/achievements/index.js');
 const LIST = [
   { id: 1, key: 'first', title: 'Primero <b>', description: 'Alguien lo hizo.', has_image: true, unlocked_by: 2, unlocked_by_me: true,
     players: [{ user_id: 1, name: 'Ana', times: 2, last: '2026-02-01' }, { user_id: 2, name: 'Bea', times: 1, last: '2025-01-01' }] },
-  { id: 2, key: 'second', title: 'Segundo', description: 'Otro.', has_image: false, unlocked_by: 0, unlocked_by_me: false, players: [] },
+  { id: 2, hidden: true, unlocked_by_me: false },
 ];
 
 const main = () => document.getElementById('main');
@@ -21,18 +21,20 @@ beforeEach(async () => {
   await settle();
 });
 
-test('every achievement is a card, with names as text, and the count of yours', () => {
+test('yours are cards, with names as text, and the rest are listed hidden with the count', () => {
   assert.equal(calls[0].path, '/group/achievements');
-  assert.deepEqual(text('.ach-title strong'), ['Primero <b>', 'Segundo']);
+  assert.deepEqual(text('.ach-title strong'), ['Primero <b>', 'Logro oculto']);
   assert.equal(document.querySelectorAll('.ach-title b').length, 0);
   assert.equal(text('.ach-count')[0], 'Tienes 1 de 2');
+  assert.equal(document.querySelectorAll('.ach-card').length, 2);
   assert.equal(document.querySelectorAll('.ach-card.mine').length, 1);
+  assert.equal(document.querySelectorAll('.ach-card.hidden').length, 1);
   assert.match(text('.ach-card')[0], /Lo tienes/);
+  assert.doesNotMatch(text('.ach-card')[1], /Segundo|Otro/);
 });
 
-test('it says who has it (with the repeats) and that nobody has the other', () => {
+test('it says who has the unlocked ones, with the repeats', () => {
   assert.match(text('.ach-card')[0], /Lo han conseguido 2: Ana \(×2\) y Bea/);
-  assert.match(text('.ach-card')[1], /Nadie lo ha conseguido todavía/);
 });
 
 test('the picture comes from the achievement image route only when there is one', () => {

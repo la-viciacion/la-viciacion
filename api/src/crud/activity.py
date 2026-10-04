@@ -7,6 +7,7 @@ from sqlalchemy import desc, func
 from sqlalchemy.orm import Session
 
 from ..database import models
+from . import group
 
 # Events of the same day come in this order, most notable first
 RANK = {"completed": 0, "achievement": 1, "rated": 2, "started": 3, "played": 4}
@@ -19,10 +20,12 @@ def _day(value) -> datetime.date:
     return value if isinstance(value, datetime.date) else datetime.date.fromisoformat(str(value))
 
 
-def feed(db: Session, limit: int = 30, offset: int = 0) -> dict:
+def feed(db: Session, viewer_id: int, limit: int = 30, offset: int = 0) -> dict:
     """`limit` events from `offset`, and whether there are more. Every source gives its newest
-    `offset + limit + 1` rows, which is enough to know the newest ones of the merge."""
+    `offset + limit + 1` rows, which is enough to know the newest ones of the merge. The achievements the viewer
+    has not unlocked are announced without saying which."""
     n = offset + limit + 1
+    mine = group.unlocked_ids(db, viewer_id)
     players = (models.User.is_active == 1, models.not_god())
     ratings = {(u, g): s for u, g, s in db.query(models.GameScore.user_id, models.GameScore.game_id, models.GameScore.score)}
     events: list[dict] = []
@@ -96,7 +99,10 @@ def feed(db: Session, limit: int = 30, offset: int = 0) -> dict:
         .order_by(desc(models.UserAchievement.date), models.UserAchievement.user_id, models.UserAchievement.achievement_id)
         .limit(n)
     ):
-        add("achievement", award.date, award.user_id, name, username, game_id, game_name, image, title=title)
+        # what the viewer has not unlocked stays hidden: no title, and the game would give it away
+        seen = award.achievement_id in mine
+        add("achievement", award.date, award.user_id, name, username, game_id if seen else None,
+            game_name if seen else None, image if seen else None, title=title if seen else None, hidden=not seen)
 
     events.sort(key=lambda e: (-e["day"].toordinal(), RANK[e["type"]], e["user_id"], e["game_id"] or "", e.get("title") or ""))
     page = events[offset:offset + limit]
