@@ -245,6 +245,10 @@ class PlatformsAndAchievementImagesTests(CatalogTestCase):
         self.assertEqual(platforms["pc"], "PC")
         self.assertIn("switch", platforms)
 
+    def test_the_version_needs_a_login_and_is_dev_without_a_release_build(self):
+        self.assertEqual(self.api("GET", "/utils/version").status_code, 401)
+        self.assertEqual(self.api("GET", "/utils/version", as_user="ana").json(), {"version": "dev"})
+
     def test_an_achievement_image_is_public_once_uploaded(self):
         key = self.key()
         self.assertEqual(self.api("GET", f"/utils/achievement-image/{key}").status_code, 400)  # none yet

@@ -4,7 +4,7 @@
 
 These are deliberately **undefined for now**. Do not invent or enforce them; when 2.0.0 ships, decide and document them here and in `AGENTS.md`. (The branch workflow is decided: see [workflow.md](workflow.md).)
 
-- **Versioning and releases**: the app version is **2.0.0** (set in `front/package.json` and its lockfile). A dedicated `VERSION` file may become the single source of truth when GitHub CI creates releases; until then the API version in `main.py` (`0.1.0`, shown in the OpenAPI docs) is still a placeholder to align with it. Tags, changelog format and release notes are still open.
+- **Versioning and releases**: the version of the app is the `vX.Y.Z` tag, injected into the API image at build time (`APP_VERSION`, see [deployment.md](deployment.md)); no file holds it (`front/package.json` still says `2.0.0` but nothing reads it). Changelog format and release notes are still open.
 - **Commit conventions**: enforced only on the PR title (it becomes the squash commit); no changelog tooling yet.
 - **CI/CD**: checks run on every PR and on `main`, and gate the release workflow (see [deployment.md](deployment.md#cicd)). Open: automatic deployment, `arm64` images.
 

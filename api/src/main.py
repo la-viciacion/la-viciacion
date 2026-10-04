@@ -69,7 +69,7 @@ async def lifespan(_: FastAPI):
 docs = config.API_DOCS_ENABLED
 app = FastAPI(
     title="LaViciacion API",
-    version="0.1.0",
+    version=config.APP_VERSION,
     lifespan=lifespan,
     docs_url=f"{API_PREFIX}/docs" if docs else None,
     redoc_url=f"{API_PREFIX}/redoc" if docs else None,

@@ -2,6 +2,7 @@
 // outside or after choosing a page; the page it is on is highlighted. What is in it: lib/menu.js.
 import { activeItem, menuSections } from '../lib/menu.js';
 import { html, mount } from '../lib/html.js';
+import { loadVersion } from '../lib/version.js';
 import * as icons from './icons.js';
 
 let open = null; // the close function of the menu that is on screen
@@ -26,7 +27,9 @@ function openMenu(button, { user, onLogout }) {
           <div class="menu-section">${section.label}</div>
           ${section.items.map((it) => item(it, current))}`)}
       </nav>
-      <div class="menu-foot"><button class="menu-item menu-logout" type="button" id="menuLogout">${icons.iconLogout()}<span>Cerrar sesión</span></button></div>
+      <div class="menu-foot"><button class="menu-item menu-logout" type="button" id="menuLogout">${icons.iconLogout()}<span>Cerrar sesión</span></button>
+        <small class="menu-version" id="menuVersion" hidden></small>
+      </div>
     </aside>`);
 
   function close() {
@@ -43,6 +46,12 @@ function openMenu(button, { user, onLogout }) {
     if (e.target === overlay || e.target.closest('[data-close]') || e.target.closest('a.menu-item')) close();
   });
   overlay.querySelector('#menuLogout').addEventListener('click', () => { close(); onLogout(); });
+  loadVersion().then((version) => {
+    const label = overlay.querySelector('#menuVersion');
+    if (!version || !label) return;
+    label.textContent = `v${version}`;
+    label.hidden = false;
+  });
   document.addEventListener('keydown', onKey);
   document.body.appendChild(overlay);
   button.setAttribute('aria-expanded', 'true');
