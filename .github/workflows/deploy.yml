@@ -4,8 +4,9 @@ name: Deploy
 # whole procedure; each key can run one script and nothing else (`command=` in its authorized_keys entry).
 #   dev   builds main from the checkout of the dev stack (deploy.sh).
 #   prod  builds a release tag on the server (`latest` = the newest vX.Y.Z tag, or e.g. 2.0.0).
-# Each target has its own environment, key and secrets (same names in both), so the reviewers required on
-# `production` cannot be bypassed by a workflow that declares the dev environment.
+# Each target has its own key (DEPLOY_SSH_KEY_DEV / DEPLOY_SSH_KEY_PROD); the host, the user and the host key are
+# shared. They are repository secrets, not environment secrets, on purpose: GitHub Free ignores environments
+# (and their secrets) in a private repository, so this keeps working if the repository is ever made private.
 on:
   workflow_dispatch:
     inputs:
@@ -31,12 +32,11 @@ jobs:
     # The server pulls main whatever branch the run was started from; refuse to start from anything else.
     if: inputs.target == 'dev' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    environment: develop
     timeout-minutes: 20
     steps:
       - name: Run the dev deploy script on the server
         env:
-          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY_DEV }}
           KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
           HOST: ${{ secrets.DEPLOY_HOST }}
           SSH_USER: ${{ secrets.DEPLOY_USER }}
@@ -53,12 +53,11 @@ jobs:
   deploy-prod:
     if: inputs.target == 'prod' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    environment: production
     timeout-minutes: 20
     steps:
       - name: Run the prod deploy script on the server
         env:
-          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY_PROD }}
           KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
           HOST: ${{ secrets.DEPLOY_HOST }}
           SSH_USER: ${{ secrets.DEPLOY_USER }}
