@@ -1,8 +1,10 @@
 name: Release images
 
-# Creating a tag `vX.Y.Z` runs the same checks as every PR, then publishes the api, front and bot
-# images to GHCR (ghcr.io/<owner>/laviciacion-<service>:X.Y.Z, X.Y and latest). Run by hand
-# ("Run workflow") it does everything except publish, to try the build without a tag.
+# Creating a tag `vX.Y.Z` runs the same checks as every PR. If the repository variable PUBLISH_IMAGES is
+# `true` it then publishes the api, front and bot images to GHCR
+# (ghcr.io/<owner>/laviciacion-<service>:X.Y.Z, X.Y and latest); without it the tag is only checked,
+# because for now the server builds the tag itself (see docs/deployment.md). Run by hand ("Run workflow")
+# it does everything except publish, to try the build without a tag.
 on:
   push:
     tags: ["v*"]
@@ -20,8 +22,8 @@ jobs:
     uses: ./.github/workflows/checks.yml
 
   publish:
-    # Only for a real tag, never for a manual try-out.
-    if: startsWith(github.ref, 'refs/tags/v')
+    # Only for a real tag, never for a manual try-out, and only once publishing has been switched on.
+    if: startsWith(github.ref, 'refs/tags/v') && vars.PUBLISH_IMAGES == 'true'
     needs: checks
     runs-on: ubuntu-latest
     permissions:

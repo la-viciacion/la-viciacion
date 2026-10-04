@@ -3,7 +3,7 @@ name: Deploy
 # Deploys on demand (Actions tab -> Deploy -> Run workflow). It connects over SSH and the server holds the
 # whole procedure; each key can run one script and nothing else (`command=` in its authorized_keys entry).
 #   dev   builds main from the checkout of the dev stack (deploy.sh).
-#   prod  pulls the published images of a release tag (`latest` = the newest vX.Y.Z tag, or e.g. 2.0.0).
+#   prod  builds a release tag on the server (`latest` = the newest vX.Y.Z tag, or e.g. 2.0.0).
 # Each target has its own environment, key and secrets (same names in both), so the reviewers required on
 # `production` cannot be bypassed by a workflow that declares the dev environment.
 on:
