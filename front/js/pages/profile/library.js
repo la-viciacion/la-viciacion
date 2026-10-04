@@ -297,6 +297,8 @@ async function onClick(e) {
       button.disabled = true;
       return setAbandoned(id, true);
     case 'resume':
+      if (!armed(button, button.dataset.label)) return;
+      button.disabled = true;
       return setAbandoned(id, false);
     case 'sessions':
       return toggleSessions(items.find((g) => g.id === id)).catch((err) => flash(err.message));
