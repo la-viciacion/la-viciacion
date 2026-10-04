@@ -31,6 +31,9 @@ log_manager = LogManager()
 logger = log_manager.get_logger()
 
 AVATAR_MAX_BYTES = 2 * 1024 * 1024
+# Importing a player's data is switched off for now (the profile hides it too); the route and crud/data_export.py
+# stay, so turning it back on is this one constant.
+IMPORT_ENABLED = False
 
 router = APIRouter(
     prefix="/users",
@@ -417,6 +420,8 @@ def import_data(
 ):
     """Merge an export file into the account without overwriting anything (see crud/data_export.py)"""
     auth.ensure_self_or_admin(active_user, username=username)
+    if not IMPORT_ENABLED:
+        raise HTTPException(status_code=404, detail=msg.IMPORT_DISABLED)
     user = _target_user(db, active_user, username)
     if not data_export.is_supported(body):
         raise HTTPException(status_code=400, detail=msg.IMPORT_NOT_A_FILE)

@@ -3,9 +3,11 @@
 import datetime
 import re
 from datetime import timedelta
+from unittest import mock
 
 from sqlalchemy import text
 
+from src.routers import users as users_router
 from tests.api_support import ApiTestCase
 
 
@@ -59,7 +61,25 @@ class ExportTests(DataTestCase):
         self.assertEqual(len(self.export().json()["sessions"]), 2)
 
 
+class ImportDisabledTests(DataTestCase):
+    def test_while_it_is_switched_off_the_route_answers_404_and_writes_nothing(self):
+        data = self.export().json()
+        self.wipe(self.ana)
+        response = self.import_file(data)
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(self.scalar("SELECT COUNT(*) FROM game_timers"), 0)
+
+    def test_it_still_needs_the_owner_or_an_admin_first(self):
+        self.assertEqual(self.import_file(self.export().json(), as_user="bea").status_code, 403)
+
+
 class ImportTests(DataTestCase):
+    def setUp(self):
+        super().setUp()
+        patcher = mock.patch.object(users_router, "IMPORT_ENABLED", True)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def test_it_needs_a_login_and_is_only_for_the_owner_or_an_admin(self):
         self.assertEqual(self.api("POST", "/users/ana/import", json={}).status_code, 401)
         data = self.export().json()
