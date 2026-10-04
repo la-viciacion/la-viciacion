@@ -20,8 +20,15 @@ def describe(message: str | None) -> str:
     return text[:1].upper() + text[1:]
 
 
+def unlocked_ids(db: Session, user_id: int) -> set[int]:
+    """The achievements a player has unlocked in any season. Everything about the others stays hidden from them."""
+    return {a for (a,) in db.query(models.UserAchievement.achievement_id).filter(models.UserAchievement.user_id == user_id)}
+
+
 def achievements_catalog(db: Session, viewer_id: int) -> list[dict]:
-    """Every achievement with who has unlocked it (and how many times: once per season) and when last."""
+    """Every achievement with who has unlocked it (and how many times: once per season) and when last. The ones the
+    viewer has not unlocked come hidden: no key, title, description, picture or players, only that they exist."""
+    mine = unlocked_ids(db, viewer_id)
     players = (models.User.is_active == 1, models.not_god())
     unlocked: dict[int, dict[int, dict]] = {}
     for achievement_id, user_id, username, name, date in (
@@ -42,15 +49,19 @@ def achievements_catalog(db: Session, viewer_id: int) -> list[dict]:
         models.Achievement.id, models.Achievement.key, models.Achievement.title, models.Achievement.message,
         models.Achievement.image.isnot(None).label("has_image"),
     ).order_by(models.Achievement.id):
+        if row.id not in mine:
+            catalog.append({"id": row.id, "hidden": True, "unlocked_by_me": False})
+            continue
         who = sorted(unlocked.get(row.id, {}).values(), key=lambda w: (w["last"], w["name"].lower()), reverse=True)
         catalog.append({
             "id": row.id,
+            "hidden": False,
             "key": row.key,
             "title": row.title,
             "description": describe(row.message),
             "has_image": bool(row.has_image),
             "unlocked_by": len(who),
-            "unlocked_by_me": any(w["user_id"] == viewer_id for w in who),
+            "unlocked_by_me": True,
             "players": who,
         })
     return catalog
@@ -113,13 +124,18 @@ def player_profile(db: Session, viewer_id: int, player_id: int, season=None) -> 
     if user is None:
         return None
     data = users.get_profile(db, user, season)
+    mine = unlocked_ids(db, viewer_id)
+    achievements = [
+        {"title": a["title"], "date": a["date"], "hidden": False} if a["id"] in mine else {"hidden": True, "date": a["date"]}
+        for a in data["achievements"]
+    ]
     return {
         "user": {"id": user.id, "username": user.username, "name": user.name or user.username},
         "season": data["season"],
         "seasons": data["seasons"],
         "stats": data["stats"],
         "top_games": data["top_games"],
-        "achievements": data["achievements"],
+        "achievements": achievements,
         "playing": _playing_now(db, viewer_id).get(user.id),
         "is_me": user.id == viewer_id,
     }

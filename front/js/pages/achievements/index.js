@@ -1,5 +1,5 @@
-// Achievements page (#/achievements): every achievement with its picture and description, and who of the group has
-// unlocked it and when. GET /group/achievements (derived, nothing stored).
+// Achievements page (#/achievements): the achievements the viewer has unlocked with their picture and description, and
+// who of the group has unlocked them and when; the rest are listed hidden. GET /group/achievements (derived, nothing stored).
 import { API_BASE, api } from '../../lib/api.js';
 import { formatDate, formatPlayers } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
@@ -16,15 +16,25 @@ const who = (a) => {
   return html`<div class="pf-sub">Lo han conseguido ${a.unlocked_by}: ${formatPlayers(names, 4)}. Último: ${formatDate(a.players[0].last)}</div>`;
 };
 
-const card = (a) => html`
-  <article class="ach-card ${a.unlocked_by_me ? 'mine' : ''}">
+// What the viewer has not unlocked says nothing: not even the name.
+const hiddenCard = () => html`
+  <article class="ach-card hidden">
+    <div class="ach-img ach-img-placeholder" aria-hidden="true">?</div>
+    <div class="ach-body">
+      <div class="ach-title"><strong>Logro oculto</strong></div>
+      <div class="pf-sub">Desbloquéalo para descubrirlo.</div>
+    </div>
+  </article>`;
+
+const card = (a) => (a.hidden ? hiddenCard() : html`
+  <article class="ach-card mine">
     ${picture(a)}
     <div class="ach-body">
-      <div class="ach-title"><strong>${a.title}</strong>${a.unlocked_by_me ? html`<span class="pf-tag done">Lo tienes</span>` : ''}</div>
+      <div class="ach-title"><strong>${a.title}</strong><span class="pf-tag done">Lo tienes</span></div>
       <div class="pf-sub">${a.description}</div>
       ${who(a)}
     </div>
-  </article>`;
+  </article>`);
 
 export async function render({ main }) {
   mount(main, html`

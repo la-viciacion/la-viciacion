@@ -179,6 +179,7 @@
 .ach-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
 .ach-card { display: flex; gap: 12px; padding: 12px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); }
 .ach-card.mine { border-color: var(--border-accent); background: var(--gradient-card); }
+.ach-card.hidden { opacity: 0.6; }
 .ach-img { width: 56px; height: 56px; border-radius: var(--radius-sm); object-fit: cover; flex: none; }
 .ach-img-placeholder { display: flex; align-items: center; justify-content: center; background: var(--bg-surface); font-size: 1.5rem; }
 .ach-body { min-width: 0; display: flex; flex-direction: column; gap: 4px; }

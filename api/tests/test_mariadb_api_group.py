@@ -41,15 +41,19 @@ class AchievementsCatalogTests(ApiTestCase):
     def test_it_needs_a_login(self):
         self.assertEqual(self.api("GET", "/group/achievements").status_code, 401)
 
-    def test_it_lists_every_achievement_even_the_ones_nobody_has(self):
+    def test_it_lists_every_achievement_but_hides_the_ones_the_viewer_lacks(self):
+        self.award(self.bea, self.second, TODAY())
+        self.award(self.ana, self.first, TODAY())
         body = self.catalog()
         self.assertEqual(len(body), self.scalar("SELECT COUNT(*) FROM achievements"))
         self.assertEqual([a["id"] for a in body], sorted(a["id"] for a in body))
-        first = next(a for a in body if a["id"] == self.first)
-        self.assertEqual((first["unlocked_by"], first["unlocked_by_me"], first["players"], first["has_image"]), (0, False, [], False))
         for achievement in body:
-            self.assertNotIn("{}", achievement["description"])
-            self.assertNotIn("*", achievement["description"])
+            if achievement["id"] == self.first:
+                self.assertFalse(achievement["hidden"])
+                self.assertNotIn("{}", achievement["description"])
+                self.assertNotIn("*", achievement["description"])
+            else:  # not even the name: the other player's unlock does not reveal it
+                self.assertEqual(achievement, {"id": achievement["id"], "hidden": True, "unlocked_by_me": False})
 
     def test_who_has_it_how_many_times_and_when_last_the_latest_first(self):
         last = TODAY() - timedelta(days=400)
@@ -68,6 +72,14 @@ class AchievementsCatalogTests(ApiTestCase):
         theirs = {a["id"]: a["unlocked_by_me"] for a in self.catalog(as_user="bea")}
         self.assertFalse(mine[self.second])
         self.assertTrue(theirs[self.second])
+
+    def test_the_page_of_another_player_hides_what_the_viewer_lacks(self):
+        self.award(self.bea, self.first, TODAY())
+        self.award(self.bea, self.second, TODAY())
+        self.award(self.ana, self.first, TODAY())
+        shown = self.api("GET", f"/group/players/{self.bea}", as_user="ana").json()["achievements"]
+        self.assertEqual(sorted(a["hidden"] for a in shown), [False, True])
+        self.assertTrue(all("title" not in a for a in shown if a["hidden"]))
 
 
 class PlayersTests(ApiTestCase):
