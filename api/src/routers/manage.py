@@ -309,11 +309,13 @@ def delete_user(
         "biblioteca": db.query(models.UserGame).filter_by(user_id=user_id).count(),
         "logros": db.query(models.UserAchievement).filter_by(user_id=user_id).count(),
         "puntuaciones": db.query(models.GameScore).filter_by(user_id=user_id).count(),
+        "deseados": db.query(models.UserWishlist).filter_by(user_id=user_id).count(),
     }
     _confirm_or_409(counts, force)
     db.query(models.GameTimer).filter_by(user_id=user_id).delete()
     db.query(models.UserGame).filter_by(user_id=user_id).delete()
     db.query(models.GameScore).filter_by(user_id=user_id).delete()
+    db.query(models.UserWishlist).filter_by(user_id=user_id).delete()
     db.query(models.UserAchievement).filter_by(user_id=user_id).delete()
     db.query(models.PushSubscription).filter_by(user_id=user_id).delete()
     db.delete(user)
@@ -414,6 +416,7 @@ def _game_counts(db: Session, game_id: str) -> dict:
         "biblioteca": db.query(models.UserGame).filter_by(game_id=game_id).count(),
         "logros": db.query(models.UserAchievement).filter_by(game_id=game_id).count(),
         "puntuaciones": db.query(models.GameScore).filter_by(game_id=game_id).count(),
+        "deseados": db.query(models.UserWishlist).filter_by(game_id=game_id).count(),
     }
 
 
@@ -424,6 +427,7 @@ def delete_game(game_id: str, force: bool = False, db: Session = Depends(get_db)
     db.query(models.GameTimer).filter_by(game_id=game_id).delete()
     db.query(models.UserGame).filter_by(game_id=game_id).delete()
     db.query(models.GameScore).filter_by(game_id=game_id).delete()
+    db.query(models.UserWishlist).filter_by(game_id=game_id).delete()
     db.query(models.UserAchievement).filter_by(game_id=game_id).delete()
     db.delete(game)
     db.commit()

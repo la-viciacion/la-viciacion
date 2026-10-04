@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from .. import auth
 from ..auth import get_db
-from ..crud import games, scores, users
+from ..crud import games, scores, users, wishlist
 from ..database import models, schemas
 from ..utils import actions, images
 from ..utils import messages as msg
@@ -321,6 +321,40 @@ def remove_game_score(
     scores.clear_score(db, user.id, game_id)
     db.commit()
     return {"game_id": game_id, "score": None}
+
+
+@router.put("/{username}/wishlist/{game_id}")
+def wish_game(
+    username: str,
+    game_id: str,
+    active_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Add a game to the wishlist (nothing happens if it already is there). A game of your library cannot be wished."""
+    auth.ensure_self_or_admin(active_user, username=username)
+    user = _target_user(db, active_user, username)
+    if games.get_game_by_id(db, game_id) is None:
+        raise HTTPException(status_code=404, detail=msg.GAME_NOT_FOUND)
+    if wishlist.in_library(db, user.id, game_id):
+        raise HTTPException(status_code=409, detail=msg.GAME_ALREADY_IN_LIBRARY)
+    wishlist.add(db, user.id, game_id)
+    db.commit()
+    return {"game_id": game_id, "wished": True}
+
+
+@router.delete("/{username}/wishlist/{game_id}")
+def unwish_game(
+    username: str,
+    game_id: str,
+    active_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Remove a game from the wishlist (nothing happens if it was not there)."""
+    auth.ensure_self_or_admin(active_user, username=username)
+    user = _target_user(db, active_user, username)
+    wishlist.remove(db, user.id, game_id)
+    db.commit()
+    return {"game_id": game_id, "wished": False}
 
 
 @router.patch("/{username}/avatar")

@@ -3,8 +3,10 @@
 import { api } from '../../lib/api.js';
 import { formatDate, formatDuration, formatRelative } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
+import { wantedBy } from '../../lib/wishlist.js';
 import { hydratePhotos, playerAvatar } from '../../ui/avatar.js';
 import { scoreBadge } from '../../ui/score-badge.js';
+import { toast } from '../../ui/toast.js';
 import { openRating } from '../home/rating.js';
 
 export const active = null; // it belongs to no item of the navbar
@@ -62,6 +64,12 @@ function draw(data) {
       ${tile(summary.score_count ? `Nota media (${summary.score_count})` : 'Nota media', summary.score_count ? scoreBadge(Math.round(summary.score_mean)) : '—')}
     </section>
 
+    ${data.wanted_by.length ? html`<div class="pf-sub gm-wanted">${wantedBy(data.wanted_by)}</div>` : ''}
+    ${mine ? '' : html`
+      <div class="pf-card gm-mine">
+        <div>${data.wished ? 'Está en tu lista de deseados.' : html`<span class="pf-sub">No lo tienes en tu biblioteca.</span>`}</div>
+        <button class="pf-btn" type="button" id="gmWish">${data.wished ? 'Quitar de mi lista' : 'Añadir a mi lista'}</button>
+      </div>`}
     ${mine ? html`
       <div class="pf-card gm-mine">
         <div>${mine.score == null ? html`<span class="pf-sub">Todavía no lo has puntuado.</span>` : html`Tu nota ${scoreBadge(mine.score)}`}</div>
@@ -75,9 +83,21 @@ function draw(data) {
 
   hydratePhotos(main);
   main.querySelector('#gmBack').addEventListener('click', back);
+  main.querySelector('#gmWish')?.addEventListener('click', () => toggleWish(game.id, data.wished));
   main.querySelector('#gmRate')?.addEventListener('click', () => openRating({
     username: user.username, game: { id: game.id, name: game.name }, current: mine.score, onSaved: load,
   }));
+}
+
+async function toggleWish(id, wished) {
+  try {
+    const [username, game] = [user.username, id].map(encodeURIComponent);
+    if (wished) await api(`/users/${username}/wishlist/${game}`, { method: 'DELETE' });
+    else await api(`/users/${username}/wishlist/${game}`, { method: 'PUT' });
+    await load();
+  } catch (err) {
+    toast(err.message, 'err');
+  }
 }
 
 async function load() {

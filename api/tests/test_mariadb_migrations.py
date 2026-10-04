@@ -152,6 +152,18 @@ class SchemaRulesTests(MariaDBTestCase):
             with self.subTest(sql), self.assertRaises((IntegrityError, DBAPIError)):
                 self.execute(sql)
 
+    def test_a_wish_is_once_per_user_and_game_and_needs_both(self):
+        self.execute("INSERT INTO users (id, username, email) VALUES (61, 'eli', 'eli@example.com')")
+        self.execute("INSERT INTO games (id, name) VALUES ('wl1', 'Wish Game')")
+        self.execute("INSERT INTO users_wishlist (user_id, game_id) VALUES (61, 'wl1')")
+        for sql in (
+            "INSERT INTO users_wishlist (user_id, game_id) VALUES (61, 'wl1')",  # once per user and game
+            "INSERT INTO users_wishlist (user_id, game_id) VALUES (999, 'wl1')",  # unknown user
+            "INSERT INTO users_wishlist (user_id, game_id) VALUES (61, 'nope')",  # unknown game
+        ):
+            with self.subTest(sql), self.assertRaises(IntegrityError):
+                self.execute(sql)
+
     def test_deleting_a_user_removes_their_settings(self):
         self.execute("INSERT INTO users (id, username, email) VALUES (51, 'cai', 'cai@example.com')")
         self.execute("INSERT INTO user_settings (user_id) VALUES (51)")

@@ -38,7 +38,7 @@ PASSWORD = "Sup3r-secret!pw"  # meets the password rules (12-24 characters, uppe
 # database; the achievements catalogue is rebuilt from the code for every test, because tests may edit a title or
 # upload an image and the next one must not see it.
 DATA_TABLES = (
-    "game_timers", "users_achievements", "achievements", "users_games", "game_scores", "push_subscriptions", "password_resets",
+    "game_timers", "users_achievements", "achievements", "users_games", "game_scores", "users_wishlist", "push_subscriptions", "password_resets",
     "user_settings", "app_settings", "job_runs", "games", "users",
 )
 

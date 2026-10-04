@@ -111,6 +111,21 @@ class UserGame(Base):
     )
 
 
+class UserWishlist(Base):
+    """A game a player wants to play (or is waiting for). Only the wish is stored: whether the game is
+    upcoming, whether the wish is still pending (the game is not in the player's library yet) and who else
+    wants it are derived when asked (crud/wishlist.py)."""
+
+    __tablename__ = "users_wishlist"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id", name="fk_users_wishlist_user"), nullable=False)
+    game_id = Column(String(255), ForeignKey("games.id", name="fk_users_wishlist_game"), nullable=False)
+    added_at = Column(DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP"))
+
+    __table_args__ = (UniqueConstraint("user_id", "game_id", name="uq_users_wishlist_user_game"),)
+
+
 class GameScore(Base):
     """A player's rating of a game, 1-100: one per user and game, whatever the seasons or platforms."""
 

@@ -144,7 +144,7 @@ class ForeignKeyMigrationTests(unittest.TestCase):
             (fk.name, table.name, fk.parent.name, fk.column.table.name, fk.column.name, fk.ondelete)
             for table in models.Base.metadata.tables.values()
             for fk in table.foreign_keys
-            if table.name not in ("user_settings", "password_resets", "game_scores")  # created with their key by 014, 017 and 019
+            if table.name not in ("user_settings", "password_resets", "game_scores", "users_wishlist")  # created with their key by 014, 017, 019 and 021
         }
         self.assertEqual(declared, set(migration.KEYS))
 

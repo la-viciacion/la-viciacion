@@ -5,7 +5,7 @@ export const active = null; // it belongs to no item of the top bar
 
 export function render({ main }) {
   mount(main, html`
-    <div class="section-header"><h2 class="section-title">Estadísticas</h2><div class="section-line"></div></div>
+    <h1 class="pf-title pg-title">Estadísticas</h1>
     <div class="pf-card wip-card">
       <span class="menu-wip">WIP</span>
       <strong>Estamos trabajando en ello</strong>

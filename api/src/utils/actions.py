@@ -11,11 +11,11 @@ from sqlalchemy import asc, create_engine, desc, func, select, text, update
 from sqlalchemy.orm import Session
 
 from ..config import Config
-from ..crud import games, rankings, time_entries, users
+from ..crud import games, rankings, time_entries, users, wishlist
 from ..crud.achievements import Achievements
 from ..database import models, schemas
 from . import my_utils as utils
-from . import push
+from . import push, rawg_sync
 from ..utils import seasons, streaks, user_settings
 from .logger import LogManager
 
@@ -368,6 +368,38 @@ async def check_forgotten_timer(db: Session, user: models.User):
             + " párala y edita la sesión con el tiempo correcto."
         )
         await utils.send_message_to_user(user.telegram_id, msg, user_id=user.id)
+
+
+def join_names(names: list[str]) -> str:
+    """"A", "A y B", "A, B y C"."""
+    return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " y " + names[-1]
+
+
+def wishlist_release_message(releases: list[tuple[str, list[str]]]) -> str:
+    """The notice for a player whose wished games come out today: (game, other players who want it) for each.
+    One block per game; the first line of the first one is what a push shows as its title."""
+    blocks = []
+    for game_name, others in releases:
+        block = f"¡Hoy sale *{utils.escape_markdown(game_name)}*! Estaba en tu lista de deseados."
+        if others:
+            verb = "lo espera" if len(others) == 1 else "lo esperan"
+            block += f"\nTambién {verb} {utils.escape_markdown(join_names(others))}."
+        blocks.append(block)
+    return "\n\n".join(blocks)
+
+
+async def check_wishlist(db: Session, today: datetime.date) -> str:
+    """Daily: refresh the release date of the games somebody is waiting for (they slip), then tell each player
+    which of the games they wished come out today. Nothing is remembered: a game comes out on one day only."""
+    changed = await asyncio.to_thread(rawg_sync.refresh_release_dates, db, wishlist.to_refresh(db, today))
+    per_user: dict[int, tuple[models.User, list]] = {}
+    for user, game, others in wishlist.releases_on(db, today):
+        per_user.setdefault(user.id, (user, []))[1].append((game.name, [w["name"] for w in others]))
+    for user, releases in per_user.values():
+        if user.telegram_id is None and not push_has_devices(user.id):
+            continue
+        await utils.send_message_to_user(user.telegram_id, wishlist_release_message(releases), user_id=user.id)
+    return f"{len(changed)} dates changed, {len(per_user)} users told"
 
 
 async def send_timer_notice(db: Session, timer: models.GameTimer | None):

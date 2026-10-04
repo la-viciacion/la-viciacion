@@ -25,7 +25,7 @@ beforeEach(async () => {
     'GET /games/catalog?limit=24&offset=0&sort=name': { total: 1, items: [GAME('hades', 'Hades')], genres: ['Indie', 'Platformer'] },
     'GET /games/catalog?limit=24&offset=0&sort=activity&q=hades': { total: 1, items: [GAME('hades', 'Hades')], genres: ['Indie'] },
     'GET /games/catalog?limit=24&offset=0&sort=activity&genre=Indie&library=have&playing=true': { total: 0, items: [], genres: [] },
-    'GET /games/catalog?limit=24&offset=0&sort=activity': { total: 30, items: [GAME('celeste', 'Celeste <b>', { have: true, playing_now: true }), GAME('hades', 'Hades', { players: 1, score_mean: null })], genres: ['Indie', 'Platformer'] },
+    'GET /games/catalog?limit=24&offset=0&sort=activity': { total: 30, items: [GAME('celeste', 'Celeste <b>', { have: true, playing_now: true, wished: true }), GAME('hades', 'Hades', { players: 1, score_mean: null })], genres: ['Indie', 'Platformer'] },
   });
   await page.render({ main: main() });
   await settle();
@@ -44,7 +44,7 @@ test('it lists the games as cards linking to their page, with names as text and 
   assert.equal(document.querySelector('.gc-card').getAttribute('href'), '#/game/celeste');
   assert.equal(text('#gcCount')[0], '30 juegos');
   assert.equal(document.querySelectorAll('.gc-card .score-badge').length, 1); // Hades has no ratings
-  assert.deepEqual(text('.gc-card .pf-tag').slice(0, 4), ['Jugándose', 'En tu biblioteca', 'Indie', 'Platformer']); // two genres at most
+  assert.deepEqual(text('.gc-card .pf-tag').slice(0, 5), ['Jugándose', 'En tu biblioteca', 'En tu lista', 'Indie', 'Platformer']); // two genres at most
 });
 
 test('the genres of the answer fill the genre filter', () => {

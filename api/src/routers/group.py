@@ -1,9 +1,11 @@
+import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from .. import auth
 from ..auth import get_db
-from ..crud import group
+from ..crud import group, wishlist
 from ..database import models
 from ..utils import seasons
 
@@ -48,3 +50,13 @@ def get_player(
     if found is None:
         raise HTTPException(status_code=404, detail="Player not found")
     return found
+
+
+@router.get("/wishlist")
+def get_wishlist(
+    current_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Your wishlist: the games not released yet (the nearest first) and the ones you can already play, each with
+    the other players who want it (derived; only the wish is stored)"""
+    return wishlist.wishlist(db, current_user.id, datetime.date.today())
