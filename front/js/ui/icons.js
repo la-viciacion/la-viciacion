@@ -32,6 +32,5 @@ export const iconStar = () => svg(16, '<polygon points="12 2 15.09 8.26 22 9.27 
 export const iconFlag = () => svg(16, '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/>');
 export const iconUndo = () => svg(16, '<polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>');
 export const iconCalendar = () => svg(16, '<rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>');
-export const iconDots = () => svg(16, '<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>');
 export const iconCheck = () => svg(16, '<polyline points="20 6 9 17 4 12"/>');
 export const iconPlus = () => svg(16, '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>');
