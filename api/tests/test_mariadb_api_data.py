@@ -158,11 +158,11 @@ class AuditTests(ApiTestCase):
         self.assertEqual(self.log()["total"], 0)
 
     def test_a_creation_notes_its_id_and_a_delete_what_went(self):
-        created = self.admin("POST", "/platforms", json={"name": "Steam Deck"}).json()
+        created = self.admin("POST", "/platforms", json={"name": "Plataforma de prueba"}).json()
         self.admin("DELETE", f"/platforms/{created['id']}")
         entries = self.log()["items"]  # newest first
         self.assertEqual([(e["method"], e["entity"], e["entity_id"]) for e in entries], [("DELETE", "platforms", created["id"]), ("POST", "platforms", created["id"])])
-        self.assertEqual(entries[0]["detail"]["before"]["name"], "Steam Deck")
+        self.assertEqual(entries[0]["detail"]["before"]["name"], "Plataforma de prueba")
 
     def test_passwords_and_secrets_never_reach_the_log(self):
         self.admin("POST", f"/users/{self.ana}/password", json={"password": "N3w-secret!password"})
@@ -187,7 +187,7 @@ class AuditTests(ApiTestCase):
 
     def test_the_log_filters_by_admin_entity_and_method_and_pages(self):
         self.admin("PATCH", f"/timers/{self.timer}", json={"notes": "a"})
-        self.admin("POST", "/platforms", json={"name": "Steam Deck"})
+        self.admin("POST", "/platforms", json={"name": "Plataforma de prueba"})
         self.assertEqual(self.log(entity="timers")["total"], 1)
         self.assertEqual(self.log(method="POST")["total"], 1)
         self.assertEqual(self.log(user_id=self.root)["total"], 2)

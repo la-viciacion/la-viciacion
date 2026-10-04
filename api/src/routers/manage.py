@@ -22,7 +22,6 @@ from .. import auth
 from ..auth import get_db
 from ..crud import users as users_crud
 from ..database import models
-from ..database.database import engine
 from ..utils import actions, ai, audit, my_utils, push, rawg_sync, seasons, settings, sql_dump
 from ..utils import email as mail
 from ..database.schemas import NOTES_MAX
@@ -136,12 +135,12 @@ def check_achievements(body: CheckAchievementsBody, background_tasks: Background
 
 
 @router.post("/backup")
-def download_backup():
+def download_backup(db: Session = Depends(get_db)):
     """The whole database as a `.sql` file (see utils/sql_dump.py). It is a POST although it only reads, so the
     audit log records who took a copy of everything and a link or a prefetch cannot trigger it."""
     name = f"laviciacion-backup-{datetime.date.today()}.sql"
     return StreamingResponse(
-        sql_dump.dump(engine), media_type="application/sql", headers={"Content-Disposition": f'attachment; filename="{name}"'}
+        sql_dump.dump(db.get_bind()), media_type="application/sql", headers={"Content-Disposition": f'attachment; filename="{name}"'}
     )
 
 
