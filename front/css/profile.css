@@ -88,6 +88,8 @@
 
 .pf-btn.primary { background: var(--gradient-brand); color: #0a0a14; border-color: transparent; }
 
+.pf-import { display: flex; flex-direction: column; gap: 8px; font-size: 0.9rem; }
+.pf-import ul { margin: 0; padding-left: 20px; }
 .pf-msg { min-height: 1.2em; font-size: 0.85rem; }
 
 .pf-msg.ok { color: var(--accent-teal); }

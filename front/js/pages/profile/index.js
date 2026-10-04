@@ -12,6 +12,7 @@ import * as seasons from '../../lib/seasons.js';
 import { achievementsView, sectionTitle, seasonName, seasonPills, seasonSuffix, statsView, titleView, topView } from '../../ui/profile-summary.js';
 import { initAccount } from './account.js';
 import { initAvatar } from './avatar.js';
+import { initData } from './data.js';
 import { flash } from './flash.js';
 import { initLibrary, showSeason } from './library.js';
 import { initPreferences } from './preferences.js';
@@ -77,6 +78,7 @@ function showTab(id) {
   if (id === 'ajustes') {
     initPreferences(main.querySelector('#pfPrefs'), { path: userPath('settings') }).catch(() => {});
     initPush(main.querySelector('#pfPush')).catch(() => {}); // optional: never breaks the page
+    initData(main.querySelector('#pfDataFiles'), { username: user.username });
   }
 }
 
@@ -185,6 +187,8 @@ function draw(d) {
     <div id="pfPrefs"></div>
 
     <div id="pfPush"></div>
+
+    <div id="pfDataFiles"></div>
 
     </div>
     <div>

@@ -12,6 +12,7 @@ from typing import Optional
 
 from bcrypt import gensalt, hashpw
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
@@ -21,7 +22,8 @@ from .. import auth
 from ..auth import get_db
 from ..crud import users as users_crud
 from ..database import models
-from ..utils import actions, ai, audit, my_utils, push, rawg_sync, seasons, settings
+from ..database.database import engine
+from ..utils import actions, ai, audit, my_utils, push, rawg_sync, seasons, settings, sql_dump
 from ..utils import email as mail
 from ..database.schemas import NOTES_MAX
 from ..utils.logger import LogManager
@@ -128,6 +130,19 @@ def check_achievements(body: CheckAchievementsBody, background_tasks: Background
     """Check the achievements of all users, or one, against their sessions (in background)."""
     background_tasks.add_task(actions.after_session_change, body.user_id, body.silent)
     return {"message": "Comprobación en marcha"}
+
+
+# ── Backup ──────────────────────────────────────────────────────
+
+
+@router.post("/backup")
+def download_backup():
+    """The whole database as a `.sql` file (see utils/sql_dump.py). It is a POST although it only reads, so the
+    audit log records who took a copy of everything and a link or a prefetch cannot trigger it."""
+    name = f"laviciacion-backup-{datetime.date.today()}.sql"
+    return StreamingResponse(
+        sql_dump.dump(engine), media_type="application/sql", headers={"Content-Disposition": f'attachment; filename="{name}"'}
+    )
 
 
 # ── Audit log ───────────────────────────────────────────────────
