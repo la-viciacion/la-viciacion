@@ -11,6 +11,20 @@ def days(start: D, count: int, skip=()):
     return [start + datetime.timedelta(days=i) for i in range(count) if i not in skip]
 
 
+class StreakReachDatesTests(unittest.TestCase):
+    def test_each_length_is_dated_the_day_the_first_run_got_to_it(self):
+        played = days(D(2026, 1, 1), 8) + days(D(2026, 3, 1), 20)
+        reached = streaks.streak_reach_dates(played, (7, 15, 30))
+        self.assertEqual(reached, {7: D(2026, 1, 7), 15: D(2026, 3, 15)})
+
+    def test_a_gap_starts_the_count_again(self):
+        played = days(D(2026, 1, 1), 10, skip={5})  # 5 days, a gap, 4 days
+        self.assertEqual(streaks.streak_reach_dates(played, (7,)), {})
+
+    def test_no_days(self):
+        self.assertEqual(streaks.streak_reach_dates([], (7, 15)), {})
+
+
 class StreakSummaryTests(unittest.TestCase):
     def test_no_days_played(self):
         best_date, best, current, _, gap, current_gap = streaks.streak_summary([], TODAY, 2026)

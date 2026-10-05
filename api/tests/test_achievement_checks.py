@@ -77,11 +77,19 @@ class AchievementCheckTests(unittest.IsolatedAsyncioTestCase):
         await self.ach.user_played_total_time(self.db, USER)
         self.assertEqual(self.awarded(), {})
 
-    async def test_streaks_use_the_given_date(self):
-        await self.ach.user_streak(self.db, USER, 16, datetime.datetime(YEAR, 2, 3, 10, 30))
+    async def test_each_streak_is_dated_the_day_a_run_reached_its_length(self):
+        first_run = self.days(8)  # 1 to 8 January: reaches 7 on the 7th
+        second_run = [datetime.date(YEAR, 2, 1) + datetime.timedelta(days=i) for i in range(16)]  # the best one
+        await self.ach.user_streak(self.db, USER, first_run + second_run)
         got = self.awarded()
         self.assertEqual(set(got), {"STREAK_7_DAYS", "STREAK_15_DAYS"})
-        self.assertEqual(got["STREAK_7_DAYS"][0], datetime.date(YEAR, 2, 3))
+        self.assertEqual(got["STREAK_7_DAYS"][0], datetime.date(YEAR, 1, 7))
+        self.assertEqual(got["STREAK_15_DAYS"][0], datetime.date(YEAR, 2, 15))
+
+    async def test_a_streak_already_earned_is_not_awarded_again(self):
+        await self.ach.user_streak(self.db, USER, self.days(7))
+        await self.ach.user_streak(self.db, USER, self.days(7))
+        self.assertEqual(self.sent.await_count, 1)
 
     def library_entry(self, game_id, started, completed=None, platform=None):
         self.db.add(
@@ -261,7 +269,7 @@ class QueryEconomyTests(unittest.IsolatedAsyncioTestCase):
         days = [(datetime.date(YEAR, 1, 1) + datetime.timedelta(days=i), 9 * 3600) for i in range(40)]
         with mock.patch.object(ach_module.utils, "send_message", mock.AsyncMock()),                 mock.patch.object(ach_module.time_entries, "get_played_time_by_day", return_value=days):
             queries.clear()
-            await ach.user_streak(db, USER, 0)  # nothing reached: no query
+            await ach.user_streak(db, USER, [])  # nothing reached: no query
             self.assertEqual(queries, [])
             await ach.user_played_day_time(db, USER)
         selects = [q for q in queries if q.lstrip().upper().startswith("SELECT") and "achievements" in q.lower()]

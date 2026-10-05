@@ -45,20 +45,16 @@ async def check_user(
     announce_streak_loss: bool = False,
 ):
     """Check every achievement of one user against their sessions and library."""
-    current_season = seasons.current()
-    today = datetime.date.today()
-
-    played_days = time_entries.get_played_days(db, user.id)[1]
+    played_days = time_entries.get_played_days(db, user.id)
     await achievements.user_played_total_days(db, user, played_days, silent=silent)
-    best_streak_date, best_streak = streaks.streak_summary(played_days, today, current_season)[:2]
     if announce_streak_loss:
-        await announce_lost_streak(user, played_days, today, silent)
+        await announce_lost_streak(user, played_days, datetime.date.today(), silent)
     await achievements.user_played_hours_game(db, user, silent=silent)
     await achievements.user_played_total_time(db, user, silent=silent)
     await achievements.user_session_time(db, user, silent=silent)
     await achievements.user_played_total_games(db, user, silent=silent)
     await achievements.user_completed_total_games(db, user, silent=silent)
-    await achievements.user_streak(db, user, best_streak, best_streak_date, silent=silent)
+    await achievements.user_streak(db, user, played_days, silent=silent)
     await achievements.user_played_day_time(db, user, silent)
     await achievements.user_played_hours_game_day(db, user, silent=silent)
     await achievements.user_played_games_per_day(db, user, silent=silent)

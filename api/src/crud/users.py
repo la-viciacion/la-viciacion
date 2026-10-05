@@ -133,7 +133,7 @@ def get_profile(db: Session, user: models.User, season: int = None) -> dict:
     every = season == seasons.ALL
     from . import time_entries as time_entries_crud
 
-    played_days = time_entries_crud.get_played_days(db, user.id, season=season)[1]
+    played_days = time_entries_crud.get_played_days(db, user.id, season=season)
     best_date, best_streak, current_streak = streaks.streak_summary(
         played_days, datetime.date.today(), seasons.current() if every else season
     )[:3]
@@ -809,7 +809,7 @@ def get_streaks(db: Session, username: str):
     try:
         user = get_user_by_username(db, username)
         season = seasons.current()
-        days = time_entries_crud.get_played_days(db, user.id, season=season)[1]
+        days = time_entries_crud.get_played_days(db, user.id, season=season)
         best_date, best, current = streaks.streak_summary(days, datetime.date.today(), season)[:3]
         return [{"current_streak": current, "best_streak": best, "best_streak_date": best_date}]
     except Exception as e:

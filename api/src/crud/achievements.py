@@ -13,7 +13,7 @@ from ..utils import actions as actions
 from ..utils import my_utils as utils
 from ..utils.achievements import AchievementsElems
 from ..utils.logger import LogManager
-from ..utils import seasons
+from ..utils import seasons, streaks
 
 log_manager = LogManager()
 logger = log_manager.get_logger()
@@ -385,16 +385,16 @@ class Achievements:
             )
 
     async def user_streak(
-        self,
-        db: Session,
-        user: models.User,
-        streak: int,
-        date: datetime.datetime = None,
-        silent: bool = False,
+        self, db: Session, user: models.User, played_days: list, silent: bool = False
     ):
-        if date is not None:
-            date = date.strftime("%Y-%m-%d %H:%M:%S")
-        await self._unlock_reached(db, user, streak, STREAKS, silent, date_for=lambda needed: date)
+        """`played_days` of the season, oldest first. Each streak is dated the day a run got to its length."""
+        reached = streaks.streak_reach_dates(played_days, [needed for _, needed in STREAKS])
+        if not reached:
+            return  # the common case costs no query at all
+        have = self.achieved_keys(db, user.id, [ach.name for ach, needed in STREAKS if needed in reached])
+        for ach, needed in STREAKS:
+            if needed in reached and ach.name not in have:
+                await self._award(db, user, ach, silent, date=str(reached[needed]))
 
     async def teamwork(self, db: Session, silent: bool):
         active = time_entries.active_timer_user_ids(db)
