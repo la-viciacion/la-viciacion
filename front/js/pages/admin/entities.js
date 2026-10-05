@@ -242,7 +242,7 @@ export const ENTITIES = {
     label: 'Logros',
     nav: 'Catálogo',
     description: 'Logros que se pueden conseguir: su título, mensaje e imagen.',
-    toolbarActions: [{ act: 'check-achievements', label: 'Comprobar logros' }],
+    toolbarActions: [{ act: 'check-achievements', label: 'Comprobar logros' }, { act: 'recalculate-achievements', label: 'Recalcular logros…' }],
     endpoint: '/manage/achievements',
     paged: false,
     columns: [
@@ -265,7 +265,7 @@ ENTITIES.awards = {
   label: 'Logros concedidos',
   nav: 'Concedidos',
   description: 'Qué ha desbloqueado cada jugador y cuándo.',
-  toolbarActions: [{ act: 'check-achievements', label: 'Comprobar logros' }],
+  toolbarActions: [{ act: 'check-achievements', label: 'Comprobar logros' }, { act: 'recalculate-achievements', label: 'Recalcular logros…' }],
   endpoint: '/manage/user-achievements',
   filters: ['user', 'game'],
   selects: [

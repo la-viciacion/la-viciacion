@@ -78,6 +78,7 @@ function view(ov, att, cfg) {
         <h2>Acciones rápidas</h2>
         <div class="adm-quick">
           <button class="adm-btn" data-quick="achievements">Comprobar logros</button>
+          <button class="adm-btn" data-quick="recalculate">Recalcular logros…</button>
           <button class="adm-btn" data-quick="rawg">Sincronizar con RAWG…</button>
           <button class="adm-btn" data-quick="announce">Redactar aviso</button>
           <button class="adm-btn" data-quick="user">Nuevo usuario</button>
@@ -108,6 +109,7 @@ export async function render(panel, { admin }) {
       if (go != null) admin.jumpTo(items[Number(go)].tab, items[Number(go)].filters || {});
       else if (setup != null) admin.open(setups[Number(setup)].tab);
       else if (quick === 'achievements') checkAchievementsDialog();
+      else if (quick === 'recalculate') (await import('./recalculate-achievements.js')).recalculateAchievementsFlow({ onDone: admin.reload });
       else if (quick === 'announce') admin.open('announce');
       else if (quick === 'rawg') (await import('./rawg-sync.js')).rawgSyncFlow({ onDone: admin.reload });
       else if (quick === 'user') admin.create('users');

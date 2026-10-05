@@ -343,6 +343,10 @@ async function onClick(e) {
       case 'prev': st.offset = Math.max(0, st.offset - PAGE); return load();
       case 'next': st.offset += PAGE; return load();
       case 'check-achievements': return checkAchievementsDialog();
+      case 'recalculate-achievements': {
+        const { recalculateAchievementsFlow } = await import('./recalculate-achievements.js');
+        return recalculateAchievementsFlow({ onDone: admin.reload });
+      }
       case 'rawg-sync': {
         const { rawgSyncFlow } = await import('./rawg-sync.js');
         return rawgSyncFlow({ onDone: admin.reload });
