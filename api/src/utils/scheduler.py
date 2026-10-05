@@ -13,7 +13,8 @@ what nothing else can trigger remains here:
   forgotten_timers  every hour, reminds who has a timer running for too long
   daily_streaks     every day at 05:00, checks achievements + announces lost streaks
   daily_wishlist    every day at 09:00, refreshes the release date of the games somebody waits for
-                    and tells who wished a game that comes out today
+                    and, while actions.WISHLIST_PRIVATE_NOTICE is on (off), tells who wished a game that comes out today
+  wishlist_eve      every day at 12:30, tells the group which wished games come out tomorrow
 
 Every run is recorded in `job_runs`, so a restart never repeats a run and a job
 that was due while the API was down still runs when it comes back, within a
@@ -45,6 +46,8 @@ HOURLY_GRACE = datetime.timedelta(minutes=10)
 DAILY_GRACE = datetime.timedelta(hours=3)
 DAILY_STREAKS_HOUR = 5
 DAILY_WISHLIST_HOUR = 9
+# After the 09:00 refresh, so a date that slipped overnight is already corrected when the group is told
+WISHLIST_EVE_TIME = (12, 30)
 # Off: the notification is shown once, when the timer starts. The job, the per-user interval
 # (user_settings.timer_notice_minutes) and its column stay, so turning this on brings the refresh back.
 TIMER_NOTICE_REFRESH = False
@@ -62,8 +65,8 @@ def weekly_slot(now: datetime.datetime, weekday: int, hhmm: str) -> datetime.dat
     return slot
 
 
-def daily_slot(now: datetime.datetime, hour: int) -> datetime.datetime:
-    slot = now.replace(hour=hour, minute=0, second=0, microsecond=0)
+def daily_slot(now: datetime.datetime, hour: int, minute: int = 0) -> datetime.datetime:
+    slot = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
     return slot - datetime.timedelta(days=1) if slot > now else slot
 
 
@@ -154,6 +157,10 @@ async def _daily_wishlist(db: Session) -> str:
     return await actions.check_wishlist(db, datetime.date.today())
 
 
+async def _wishlist_eve(db: Session) -> str:
+    return await actions.announce_wishlist_eve(db, datetime.date.today() + datetime.timedelta(days=1))
+
+
 # ── the loop ────────────────────────────────────────────────
 def tick(now: datetime.datetime | None = None) -> None:
     """Run whatever is due. Called every TICK_SECONDS by the scheduler thread."""
@@ -183,6 +190,11 @@ def tick(now: datetime.datetime | None = None) -> None:
         slot = daily_slot(now, DAILY_WISHLIST_HOUR)
         if is_due(now, slot, _last_run(db, "daily_wishlist"), DAILY_GRACE) and _claim(db, "daily_wishlist", slot, now):
             _run(db, "daily_wishlist", lambda: _daily_wishlist(db))
+
+        if notifications:
+            slot = daily_slot(now, *WISHLIST_EVE_TIME)
+            if is_due(now, slot, _last_run(db, "wishlist_eve"), DAILY_GRACE) and _claim(db, "wishlist_eve", slot, now):
+                _run(db, "wishlist_eve", lambda: _wishlist_eve(db))
 
 
 _thread: threading.Thread | None = None

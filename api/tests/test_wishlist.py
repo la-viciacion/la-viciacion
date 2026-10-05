@@ -119,6 +119,34 @@ class ReleaseNoticeTests(unittest.TestCase):
         self.assertIn("*Snake\\_Pass*", actions.wishlist_release_message([("Snake_Pass", [])]))
 
 
+class EveNoticeTests(unittest.TestCase):
+    def test_the_group_notice_names_each_game_and_who_waits_for_it(self):
+        message = actions.wishlist_eve_message([("Hades II", ["Ana"]), ("Snake_Pass", ["Ana", "Bea", "Cai"])])
+        self.assertEqual(message, (
+            "Mañana sale *Hades II*. Está en la lista de deseados de Ana.\n\n"
+            "Mañana sale *Snake\\_Pass*. Está en la lista de deseados de Ana, Bea y Cai."
+        ))
+
+    def test_the_wished_releases_of_a_day_are_grouped_by_game(self):
+        db = make_session()
+        tomorrow = TODAY + datetime.timedelta(days=1)
+        db.add_all([
+            models.User(id=1, username="ana", name="Ana", is_active=1),
+            models.User(id=2, username="bea", name="Bea", is_active=1),
+            models.User(id=3, username="gone", name="Gone", is_active=0),
+            models.Game(id="b", name="Bravo", release_date=tomorrow, rawg_id=1),
+            models.Game(id="a", name="alpha", release_date=tomorrow, rawg_id=2),
+            models.Game(id="c", name="Charlie", release_date=tomorrow, rawg_id=3),
+            models.Game(id="d", name="Delta", release_date=TODAY, rawg_id=4),
+        ])
+        db.commit()
+        for user_id, game_id in ((1, "b"), (2, "b"), (2, "a"), (3, "c"), (1, "d")):
+            wishlist.add(db, user_id, game_id)
+        db.commit()
+        found = wishlist.wished_releases_on(db, tomorrow)
+        self.assertEqual([(g.id, names) for g, names in found], [("a", ["Bea"]), ("b", ["Ana", "Bea"])])
+
+
 class RefreshReleaseDatesTests(unittest.TestCase):
     def setUp(self):
         self.db = make_session()

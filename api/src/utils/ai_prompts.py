@@ -67,6 +67,20 @@ a continuación debes añadir tu frase, y debes incluir al final del mensaje
 la clasificación original sin modificar en absoluto.
 """
 
+WISHLIST_RELEASE_PROMPT = """
+Tu función es crear una frase divertida, partiendo del mensaje proporcionado.
+Este mensaje avisa al grupo de que mañana sale a la venta un juego (o varios) que alguien tiene en su
+lista de deseados.
+
+No puedes hacer referencia a logros ni a horas jugadas: solo se trata de un estreno.
+
+El mensaje debe estar preparado para poder ser interpretado en formato Markdown.
+Debes incluir siempre el nombre de cada juego, tal como aparece en el mensaje original.
+Debes incluir siempre el nombre de todas las personas que lo esperan, y dejar claro que es mañana cuando sale.
+Si hay varios juegos, menciónalos todos, sin dejarte ninguno.
+Si conoces alguna broma relacionada con alguno de los juegos, puedes incluirla.
+"""
+
 
 @dataclass(frozen=True)
 class Use:
@@ -106,5 +120,10 @@ USES: dict[str, Use] = {
         "Cambio en el ranking de horas",
         "Aviso al grupo cuando cambia el orden de los jugadores por horas.",
         RANKING_USER_PROMPT,
+    ),
+    "wishlist_release": Use(
+        "Sale un juego deseado",
+        "Aviso al grupo, el día antes, cuando sale un juego que alguien tiene en su lista de deseados.",
+        WISHLIST_RELEASE_PROMPT,
     ),
 }
