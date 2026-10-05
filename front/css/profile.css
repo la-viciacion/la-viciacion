@@ -37,7 +37,7 @@
 
 .pf-empty { color: var(--text-muted); font-size: 0.9rem; }
 
-/* On a phone the seven tiles must not push the tabs off the screen */
+/* On a phone the seven tiles must not overflow the screen */
 @media (max-width: 600px) {
   .pf-stats { grid-template-columns: repeat(3, 1fr); gap: 8px; }
   .pf-stat { padding: 10px 12px; }
@@ -45,23 +45,15 @@
   .pf-stat-label { font-size: 0.72rem; }
   .pf-title { font-size: 1.4rem; }
   .pf-avatar { width: 64px; height: 64px; }
-  .pf-tabs { margin-top: 16px; }
-  .pf-tab { padding: 10px 14px; }
 }
 
-/* Tabs */
-.pf-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin: 22px 0 6px; overflow-x: auto; scrollbar-width: none; }
-.pf-tabs::-webkit-scrollbar { display: none; }
-.pf-tab {
-  background: none; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap;
-  color: var(--text-secondary); font: inherit; font-size: 0.95rem; font-weight: 600; padding: 10px 18px; cursor: pointer;
-  transition: color 0.2s ease, border-color 0.2s ease;
-}
-.pf-tab:hover { color: var(--text-primary); }
-.pf-tab.active { color: var(--accent-teal); border-bottom-color: var(--accent-teal); }
-.pf-tab:focus-visible { outline: 2px solid var(--accent-teal); outline-offset: -2px; border-radius: var(--radius-sm); }
+/* Layout: the admin's side menu (css/admin.css), with the profile's sections */
+.pf-shell { margin-top: 22px; }
+
 .pf-panel[hidden] { display: none; }
 .pf-panel { animation: fadeIn 0.25s ease; }
+
+#pfPanel-ajustes { max-width: 640px; }
 
 .pf-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 20px; }
 
@@ -78,8 +70,24 @@
 
 .pf-form { gap: 12px; }
 
-.pf-options { display: flex; flex-direction: column; gap: 12px; }
-.pf-options[hidden] { display: none; }
+#pfPush { margin-top: 12px; }
+
+/* A checkbox goes to the right of the text that says what it does */
+.pf-form label.pf-check { flex-direction: row; align-items: center; justify-content: space-between; gap: 16px; cursor: pointer; }
+
+.pf-check-text { display: flex; flex-direction: column; gap: 4px; color: var(--text-primary); font-size: 0.95rem; }
+
+.pf-check-text .pf-sub { font-weight: 400; }
+
+.pf-check input { flex: none; width: 20px; height: 20px; accent-color: var(--accent-teal); cursor: pointer; }
+
+.pf-notice-head, .pf-notice { display: grid; grid-template-columns: 1fr 64px 64px; align-items: center; gap: 8px; }
+.pf-notice-head { color: var(--text-secondary); font-size: 0.75rem; font-weight: 700; text-transform: uppercase; text-align: center; }
+.pf-notice-name { font-weight: 600; }
+.pf-notice-box { display: flex; justify-content: center; cursor: pointer; }
+.pf-notice-box input { width: 20px; height: 20px; accent-color: var(--accent-teal); cursor: pointer; }
+.pf-notice-options { border-top: 1px solid var(--border); padding-top: 12px; }
+.pf-notice-options[hidden] { display: none; }
 
 .pf-form label { display: flex; flex-direction: column; gap: 6px; font-size: 0.85rem; color: var(--text-secondary); font-weight: 600; }
 

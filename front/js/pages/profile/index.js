@@ -1,9 +1,10 @@
-// Profile page: a header with the stats of a season (the running one, another one or the total of
-// all, chosen with the pills) and three tabs so nothing needs a long scroll: Resumen (top games,
-// achievements and, below them, the games of the selected season: see library.js),
-// Recomendados (see recommendations.js) and Ajustes (personal data, reminders, push
-// notifications, password). The recommendations and the settings load the first time their tab
-// is opened.
+// Profile page: a header (photo and name) and, below it, the layout of the admin panel: a side menu
+// (a collapsible bar on a phone) with three sections so nothing needs a long scroll. Resumen is the
+// default: the stats of a season (the running one, another one or the total of all, chosen with the
+// pills), top games, achievements and, below them, the games of the selected season (see library.js).
+// Recomendados (see recommendations.js) and Ajustes (personal data, password, notifications, session)
+// are the others. The recommendations and the settings load the first time their section is opened.
+// The layout classes (adm-shell, adm-side, adm-nav...) are the admin's, so both look the same.
 // All routes are /api/v1/users/{username}/...
 import { api } from '../../lib/api.js';
 import { html, mount } from '../../lib/html.js';
@@ -22,6 +23,10 @@ import { initRecommendations } from './recommendations.js';
 
 export const active = 'profile';
 export const mainClass = 'profile-main';
+
+// Off: the "Jugando ahora" preference is not offered in the profile. Its form (preferences.js), the API
+// setting and the filter on the navbar chip stay, so turning this on brings the option back.
+const SHOW_PLAYING_OPTION = false;
 
 const TABS = [
   ['resumen', 'Resumen'],
@@ -69,7 +74,9 @@ function showTab(id) {
     tab.classList.toggle('active', on);
     tab.setAttribute('aria-selected', String(on));
     tab.tabIndex = on ? 0 : -1;
+    if (on) main.querySelector('#pfNavCurrent').textContent = tab.textContent;
   });
+  closeNav();
   main.querySelectorAll('.pf-panel').forEach((panel) => { panel.hidden = panel.id !== `pfPanel-${id}`; });
   history.replaceState(null, '', `#/profile/${id}`);
   if (opened.has(id)) return;
@@ -78,15 +85,21 @@ function showTab(id) {
   if (id === 'recomendados') initRecommendations(main.querySelector('#pfRecommended'), { username: user.username });
   if (id === 'ajustes') {
     initNotifications(main.querySelector('#pfNotifs'), { path: userPath('settings') }).catch(() => {});
-    initPreferences(main.querySelector('#pfPrefs'), { path: userPath('settings') }).catch(() => {});
+    if (SHOW_PLAYING_OPTION) initPreferences(main.querySelector('#pfPrefs'), { path: userPath('settings') }).catch(() => {});
     initPush(main.querySelector('#pfPush')).catch(() => {}); // optional: never breaks the page
     initData(main.querySelector('#pfDataFiles'), { username: user.username });
   }
 }
 
+function closeNav() {
+  main.querySelector('.adm-side').classList.remove('open');
+  main.querySelector('#pfSideToggle').setAttribute('aria-expanded', 'false');
+}
+
 function onTabKey(e) {
-  const move = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
+  const move = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[e.key];
   if (!move) return;
+  e.preventDefault();
   const tabs = [...main.querySelectorAll('.pf-tab')];
   const next = tabs[(tabs.indexOf(document.activeElement) + move + tabs.length) % tabs.length];
   showTab(next.dataset.tab);
@@ -145,14 +158,22 @@ function draw(d) {
       </div>
     </div>
 
-    <div class="pf-season" id="pfSeasons" role="group" aria-label="Temporada">${seasonPills(d)}</div>
-    <section class="pf-stats" id="pfStats" aria-label="Estadísticas: ${seasonName(d)}">${statsView(d)}</section>
+    <div class="adm-shell pf-shell">
+    <aside class="adm-side">
+      <button class="adm-side-toggle" type="button" id="pfSideToggle" aria-expanded="false" aria-controls="pfNav">
+        <span class="adm-side-burger" aria-hidden="true"></span>
+        <span class="adm-side-text"><strong id="pfNavCurrent"></strong></span>
+        <span class="adm-side-caret" aria-hidden="true"></span>
+      </button>
+      <nav class="adm-nav pf-tabs" id="pfNav" role="tablist" aria-orientation="vertical" aria-label="Secciones del perfil">
+        ${TABS.map(([id, label]) => html`<button class="adm-nav-item pf-tab" role="tab" type="button" id="pfTab-${id}" aria-controls="pfPanel-${id}" data-tab="${id}">${label}</button>`)}
+      </nav>
+    </aside>
 
-    <nav class="pf-tabs" role="tablist" aria-label="Secciones del perfil">
-      ${TABS.map(([id, label]) => html`<button class="pf-tab" role="tab" type="button" id="pfTab-${id}" aria-controls="pfPanel-${id}" data-tab="${id}">${label}</button>`)}
-    </nav>
-
+    <div class="pf-content">
     <section class="pf-panel" role="tabpanel" id="pfPanel-resumen" aria-labelledby="pfTab-resumen">
+      <div class="pf-season" id="pfSeasons" role="group" aria-label="Temporada">${seasonPills(d)}</div>
+      <section class="pf-stats" id="pfStats" aria-label="Estadísticas: ${seasonName(d)}">${statsView(d)}</section>
       <div class="pf-cols">
         <div>
           ${sectionTitle(`Más jugados ${seasonSuffix(d)}`, 'pfTopTitle')}
@@ -173,8 +194,6 @@ function draw(d) {
     </section>
 
     <section class="pf-panel" role="tabpanel" id="pfPanel-ajustes" aria-labelledby="pfTab-ajustes" hidden>
-    <div class="pf-cols pf-cols-top">
-    <div>
     ${sectionTitle('Mis datos')}
     <form class="pf-card pf-form" id="pfData" novalidate>
       <label>Usuario (apodo)<input class="adm-input" type="text" value="${d.user.username}" disabled /></label>
@@ -186,16 +205,6 @@ function draw(d) {
       <div><button class="pf-btn primary" type="submit">Guardar datos</button></div>
     </form>
 
-    <div id="pfNotifs"></div>
-
-    <div id="pfPrefs"></div>
-
-    <div id="pfPush"></div>
-
-    <div id="pfDataFiles"></div>
-
-    </div>
-    <div>
     ${sectionTitle('Cambiar contraseña')}
     <form class="pf-card pf-form" id="pfPass" novalidate>
       <label>Contraseña actual<input class="adm-input" type="password" name="current" autocomplete="current-password" /></label>
@@ -206,15 +215,27 @@ function draw(d) {
       <div><button class="pf-btn primary" type="submit">Cambiar contraseña</button></div>
     </form>
 
+    <div id="pfNotifs"></div>
+
+    <div id="pfPush"></div>
+
+    <div id="pfPrefs"></div>
+
+    <div id="pfDataFiles"></div>
+
     ${sectionTitle('Sesión')}
     <div class="pf-card pf-form">
       <div class="pf-sub">Cierra la sesión en este dispositivo.</div>
       <div><button class="pf-btn danger" type="button" id="pfLogout">Cerrar sesión</button></div>
     </div>
+    </section>
     </div>
-    </div>
-    </section>`);
+    </div>`);
 
+  main.querySelector('#pfSideToggle').addEventListener('click', (e) => {
+    const open = main.querySelector('.adm-side').classList.toggle('open');
+    e.currentTarget.setAttribute('aria-expanded', String(open));
+  });
   main.querySelector('.pf-tabs').addEventListener('click', (e) => {
     const tab = e.target.closest('.pf-tab');
     if (tab) showTab(tab.dataset.tab);

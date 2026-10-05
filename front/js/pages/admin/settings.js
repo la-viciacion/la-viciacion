@@ -117,7 +117,7 @@ function view(values, jobs, pushDevices, mail, aiUses) {
     push: html`
       <section class="adm-set-card">
         <h3>Avisos en la app (push)</h3>
-        ${check('push.enabled', 'Enviar avisos a la app instalada', 'Función activa para todos por defecto; nadie recibe nada hasta que cada usuario lo active en su perfil («Avisos en la app») y elija en qué dispositivos. Los avisos del grupo llegan a quien los marque y los privados (timer olvidado…) solo a su usuario. Necesita las notificaciones activadas y HTTPS.')}
+        ${check('push.enabled', 'Enviar avisos a la app instalada', 'Función activa para todos por defecto; nadie recibe nada hasta que cada usuario lo active en su perfil (Ajustes → Notificaciones) y elija en qué dispositivos. Los avisos del grupo llegan a quien los marque y los privados (timer olvidado…) solo a su usuario. Necesita las notificaciones activadas y HTTPS.')}
         <label>Contacto para los servicios push
           <input class="adm-input" type="text" name="push.contact" placeholder="mailto:tu@correo.com (vacío: usa el remitente del correo o la dirección pública)" />
         </label>
@@ -130,8 +130,8 @@ function view(values, jobs, pushDevices, mail, aiUses) {
     backup: html`
       <section class="adm-set-card">
         <h3>Copia de seguridad</h3>
-        <div class="adm-sub">Descarga toda la base de datos en un archivo .sql: usuarios, sesiones, biblioteca, logros, ajustes y fotos. Se restaura en una base vacía con el cliente de MariaDB (mira docs/deployment.md). Contiene las contraseñas cifradas y los ajustes protegidos, así que guárdala como lo que es: fuera del repositorio y sin compartirla.</div>
-        <div><button type="button" class="adm-btn" data-set-act="backup">Descargar copia (.sql)</button></div>
+        <div class="adm-sub">Descarga toda la base de datos en un archivo .sql.gz (un .sql comprimido): usuarios, sesiones, biblioteca, logros, ajustes y fotos. Se restaura en una base vacía con el cliente de MariaDB (mira docs/deployment.md). Contiene las contraseñas cifradas y los ajustes protegidos, así que guárdala como lo que es: fuera del repositorio y sin compartirla.</div>
+        <div><button type="button" class="adm-btn" data-set-act="backup">Descargar copia (.sql.gz)</button></div>
       </section>`,
 
     mail: html`
@@ -219,8 +219,8 @@ async function downloadBackup(button) {
   if (!ok) return;
   button.disabled = true;
   try {
-    const sql = await api('/manage/backup', { method: 'POST' });
-    saveFile(`laviciacion-backup-${new Date().toLocaleDateString('sv-SE')}.sql`, sql, 'application/sql');
+    const backup = await api('/manage/backup', { method: 'POST' });
+    saveFile(`laviciacion-backup-${new Date().toLocaleDateString('sv-SE')}.sql.gz`, backup, 'application/gzip');
     toast('Copia descargada');
   } catch (err) {
     toast(err.message, 'err');
