@@ -30,7 +30,6 @@ from ..utils import seasons, user_settings
 log_manager = LogManager()
 logger = log_manager.get_logger()
 
-AVATAR_MAX_BYTES = 2 * 1024 * 1024
 # Importing a player's data is switched off for now (the profile hides it too); the route and crud/data_export.py
 # stay, so turning it back on is this one constant.
 IMPORT_ENABLED = False
@@ -448,11 +447,10 @@ def upload_avatar(
     if not users.get_user_by_username(db, username):
         logger.info(msg.USER_NOT_EXISTS)
         raise HTTPException(status_code=404, detail=msg.USER_NOT_EXISTS)
-    data = file.file.read(AVATAR_MAX_BYTES + 1)
     try:
-        images.validate_image(data, AVATAR_MAX_BYTES)
+        data = images.normalize_image(file.file.read(images.MAX_UPLOAD_BYTES + 1), images.AVATAR_MAX_SIDE)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=msg.FILE_TOO_BIG if str(e) == "too_big" else msg.FILE_TYPE_NOT_ALLOWED)
+        raise HTTPException(status_code=400, detail=images.upload_error(e))
     try:
         users.upload_avatar(db, username, data)
         return "Avatar uploaded"

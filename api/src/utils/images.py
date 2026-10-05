@@ -1,10 +1,20 @@
-"""Validation of uploaded images (avatars, achievement images)."""
+"""Validation and normalisation of uploaded images (avatars, achievement images).
+
+What is stored is never the upload itself: `normalize_image` shrinks it to a maximum side and encodes it again
+without metadata, so the database keeps the least that serves the screen and no EXIF (GPS, camera) survives.
+"""
 import io
 
-from PIL import Image, UnidentifiedImageError
+from PIL import Image, ImageOps, UnidentifiedImageError
+
+from src.utils import messages
 
 ALLOWED_FORMATS = {"PNG": "image/png", "JPEG": "image/jpeg"}
+MAX_UPLOAD_BYTES = 5 * 1024 * 1024  # what may be sent; what is stored is far smaller
 MAX_PIXELS = 16_000_000  # refuses decompression bombs before decoding anything
+AVATAR_MAX_SIDE = 256
+ACHIEVEMENT_MAX_SIDE = 512
+JPEG_QUALITY = 85
 
 
 def media_type_of(data: bytes) -> str:
@@ -34,3 +44,37 @@ def validate_image(data: bytes, max_bytes: int) -> str:
     except (UnidentifiedImageError, OSError, SyntaxError):
         raise ValueError("type")
     return media_type
+
+
+def upload_error(error: ValueError) -> str:
+    """The user-facing message of a `ValueError` raised by `validate_image` / `normalize_image`."""
+    if str(error) == "too_big":
+        return messages.FILE_TOO_BIG.format(mb=MAX_UPLOAD_BYTES // (1024 * 1024), mp=MAX_PIXELS // 1_000_000)
+    return messages.FILE_TYPE_NOT_ALLOWED
+
+
+def _mode_to_keep(image: Image.Image) -> str:
+    """The colour mode to re-encode in: transparency is kept, anything exotic (palette, CMYK, 16 bit) becomes RGB."""
+    if image.mode in ("RGBA", "LA", "PA") or "transparency" in image.info:
+        return "RGBA"
+    return image.mode if image.mode in ("L", "RGB") else "RGB"
+
+
+def normalize_image(data: bytes, max_side: int, max_bytes: int = MAX_UPLOAD_BYTES) -> bytes:
+    """Validate `data` (same errors as `validate_image`) and return it scaled down to fit in `max_side` x `max_side`
+    (never enlarged, proportions kept: the uploader supplies a square one) and encoded again without metadata.
+    The format is kept: PNG stays PNG (with its transparency), JPEG stays JPEG."""
+    media_type = validate_image(data, max_bytes)
+    try:
+        with Image.open(io.BytesIO(data)) as source:
+            image = ImageOps.exif_transpose(source)  # a phone photo's rotation lives in the EXIF that is dropped
+            image = image.convert(_mode_to_keep(image))
+    except (OSError, SyntaxError):  # truncated or corrupt pixel data that `verify` does not see
+        raise ValueError("type")
+    image.thumbnail((max_side, max_side), Image.Resampling.LANCZOS)
+    out = io.BytesIO()
+    if media_type == "image/png":
+        image.save(out, "PNG", optimize=True)
+    else:
+        image.save(out, "JPEG", quality=JPEG_QUALITY, optimize=True)
+    return out.getvalue()
