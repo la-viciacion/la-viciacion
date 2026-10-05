@@ -144,8 +144,8 @@ def after_timer_start(user_id: int, start_time: datetime.datetime, new_game_id: 
     """Background-task entrypoint for a timer that has just started.
 
     Only what a running timer can unlock is checked here (the rest needs a finished
-    session and is checked when it stops): the time of day it started at and
-    teamwork, which counts the timers running right now. `new_game_id` is set when it is the
+    session and is checked when it stops): the time of day and the date it started at
+    (early riser, nocturnal, new year) and teamwork, which counts the timers running right now. `new_game_id` is set when it is the
     first time the user plays that game this season: the group hears about it here, so the
     request that started the timer does not wait for the notification.
     """

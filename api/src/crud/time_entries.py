@@ -78,9 +78,10 @@ def players_played_time(db: Session, season: int = None, is_active: bool | None 
 
 
 # A session shorter than this does not count for the achievements that count things (days, streaks,
-# games in a day, the new year): it keeps someone who just opens a game for a few seconds from earning
-# them. Hours add up whatever the length of each session, "Lo he abierto sin querer" asks for a short one
-# (get_time_entry_by_time) and the ones that fire when a timer starts (early riser, nocturnal) cannot know it.
+# games in a day): it keeps someone who just opens a game for a few seconds from earning them. Hours add
+# up whatever the length of each session, "Lo he abierto sin querer" asks for a short one
+# (get_time_entry_by_time) and the ones that fire when a timer starts (early riser, nocturnal, new year)
+# cannot know it.
 MIN_SESSION_SECONDS = 600
 
 
@@ -192,7 +193,6 @@ def get_first_time_entry_on_day(db: Session, user_id: int, day: datetime.date):
         select(sessions)
         .where(
             sessions.c.user_id == user_id,
-            sessions.c.duration >= MIN_SESSION_SECONDS,
             sessions.c.start < day_start + datetime.timedelta(days=1),
             sessions.c.end >= day_start,
         )

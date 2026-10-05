@@ -278,10 +278,20 @@ class AchievementCheckTests(unittest.IsolatedAsyncioTestCase):
         await self.ach.user_played_games_per_day(self.db, USER)
         self.assertEqual(set(self.awarded()), {"PLAYED_5_GAMES_DAY"})
 
-    async def test_a_session_under_ten_minutes_does_not_start_the_new_year(self):
-        self.session_of(datetime.datetime(YEAR, 1, 1, 0, 30), 9)
+    async def test_the_new_year_does_not_look_at_the_length_of_the_session(self):
+        self.session_of(datetime.datetime(YEAR, 1, 1, 0, 30), 1)
         await self.ach.happy_new_year(self.db, USER)
+        self.assertEqual(set(self.awarded()), {"HAPPY_NEW_YEAR"})
+
+    async def test_starting_a_timer_on_the_first_of_january_earns_the_new_year_at_once(self):
+        await self.ach.timer_started(self.db, USER, datetime.datetime(YEAR, 1, 2, 0, 30))
         self.assertEqual(self.awarded(), {})
+        await self.ach.timer_started(self.db, USER, datetime.datetime(YEAR, 1, 1, 0, 30))
+        await self.ach.timer_started(self.db, USER, datetime.datetime(YEAR, 1, 1, 9, 0))
+        got = self.awarded()
+        self.assertEqual(set(got), {"HAPPY_NEW_YEAR"})
+        self.assertEqual(got["HAPPY_NEW_YEAR"][0], datetime.date(YEAR, 1, 1))
+        self.assertEqual(self.sent.await_count, 1)
 
     async def test_early_riser_does_not_look_at_the_length_because_it_fires_when_the_timer_starts(self):
         self.session_of(datetime.datetime(YEAR, 3, 1, 5, 30), 1)

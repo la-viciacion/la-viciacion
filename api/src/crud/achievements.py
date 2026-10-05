@@ -433,13 +433,15 @@ class Achievements:
     async def timer_started(
         self, db: Session, user: models.User, start_time: datetime.datetime, silent: bool = False
     ):
-        """Achievements decided by the moment a timer starts (early riser, nocturnal)."""
+        """Achievements decided by the moment a timer starts (early riser, nocturnal, new year)."""
         for ach, first_hour, last_hour in (
             (AchievementsElems.EARLY_RISER, 5, 6),
             (AchievementsElems.NOCTURNAL, 2, 5),
         ):
             if first_hour <= start_time.hour < last_hour:
                 await self._unlock_if_new(db, user, ach, silent, date=str(start_time))
+        if (start_time.month, start_time.day) == (1, 1):
+            await self._unlock_if_new(db, user, AchievementsElems.HAPPY_NEW_YEAR, silent, date=str(start_time))
 
     async def early_riser(self, db: Session, user: models.User, silent: bool):
         entry = time_entries.get_first_time_entry_between_hours(db, user.id, start_hour=5, end_hour=6)
