@@ -1,5 +1,6 @@
 import datetime
 import decimal
+import gzip
 import unittest
 
 from src.utils import sql_dump
@@ -42,6 +43,14 @@ class StatementTests(unittest.TestCase):
     def test_rows_go_in_one_insert(self):
         sql = sql_dump.insert_statement("games", ["id", "name", "dev"], [("g1", "Doom", None), ("g2", "Hades", "Supergiant")])
         self.assertEqual(sql, "INSERT INTO `games` (`id`, `name`, `dev`) VALUES\n('g1', 'Doom', NULL),\n('g2', 'Hades', 'Supergiant');\n")
+
+
+class GzipTests(unittest.TestCase):
+    def test_the_stream_is_one_gzip_file_with_the_same_text(self):
+        chunks = ["-- header\n", "INSERT INTO `t` VALUES ('Viciación 🎮');\n", "-- Dump completed\n"]
+        packed = b"".join(sql_dump.gzip_stream(iter(chunks)))
+        self.assertEqual(packed[:2], b"\x1f\x8b")
+        self.assertEqual(gzip.decompress(packed).decode("utf-8"), "".join(chunks))
 
 
 if __name__ == "__main__":

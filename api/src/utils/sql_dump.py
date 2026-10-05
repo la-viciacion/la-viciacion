@@ -9,10 +9,11 @@ database of a new environment (or `db/init/`, see docs/deployment.md), `alembic_
 Everything is read in one transaction with a repeatable-read snapshot, so the tables agree with each other even
 while the app keeps working, and rows are streamed in batches: nothing is built in memory but one batch.
 The file holds password hashes, avatars and encrypted tokens: it is for admins only and is as sensitive as the
-database itself.
+database itself. The endpoint serves it gzipped (`gzip_stream`).
 """
 import datetime
 import decimal
+import zlib
 from typing import Iterator
 
 from sqlalchemy.engine import Engine
@@ -104,3 +105,12 @@ def dump(engine: Engine, now: datetime.datetime | None = None) -> Iterator[str]:
                 yield insert_statement(table, columns, [tuple(row) for row in batch])
             yield "\n"
         yield FOOTER
+
+
+def gzip_stream(chunks: Iterator[str]) -> Iterator[bytes]:
+    """The text chunks as a gzip stream (the images are hex in the dump, which compresses to about half)."""
+    packer = zlib.compressobj(wbits=31)  # 16 + 15: a gzip container, so `gunzip` and `.sql.gz` in db/init/ read it
+    for chunk in chunks:
+        if data := packer.compress(chunk.encode("utf-8")):
+            yield data
+    yield packer.flush()
