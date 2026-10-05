@@ -1,6 +1,7 @@
-// "Avisos en la app": each user chooses here whether this device (and which of
-// their devices) receives push notifications. The admin only turns the feature
-// on for everybody (Notificaciones tab); nobody is subscribed without asking.
+// The devices card of the profile's "Notificaciones" section (under the table of notices, which has the
+// heading): each user chooses here whether this device (and which of their devices) receives push
+// notifications. The admin only turns the feature on for everybody (Notificaciones tab); nobody is
+// subscribed without asking.
 import { api } from '../../lib/api.js';
 import { formatDate } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
@@ -8,9 +9,7 @@ import { currentSubscription, deviceLabel, enablePush, needsInstall, pushSupport
 
 const isStandalone = () => window.matchMedia?.('(display-mode: standalone)').matches || navigator.standalone === true;
 
-const title = html`<div class="section-header"><h2 class="section-title">Avisos en la app</h2><div class="section-line"></div></div>`;
-
-const notice = (text) => html`${title}<div class="pf-card"><div class="pf-sub">${text}</div></div>`;
+const notice = (text) => html`<div class="pf-card"><div class="pf-sub">${text}</div></div>`;
 
 /** Why this device cannot turn notifications on, or null. */
 function blocker(config) {
@@ -39,9 +38,9 @@ export async function initPush(el) {
     if (blocked && !config.devices.length) return mount(el, notice(blocked));
 
     mount(el, html`
-      ${title}
       <div class="pf-card pf-form">
-        <div class="pf-sub">Recibe los avisos de La Viciación como notificaciones, aunque la app esté cerrada. Los avisos privados (por ejemplo, un timer olvidado) llegan siempre a los dispositivos activados; los del grupo, solo a los que lo marquen.</div>
+        <strong>Dispositivos con avisos en la app</strong>
+        <div class="pf-sub">Para recibir los avisos por push hay que activarlos en cada dispositivo: llegan como notificaciones aunque la app esté cerrada. Los avisos de la tabla de arriba llegan a todos los dispositivos activados si tienen marcado Push; los del grupo, solo a los que marquen «Avisos del grupo».</div>
         ${blocked ? html`<div class="pf-msg err">${blocked}</div>` : ''}
         ${config.devices.map((d, i) => html`
           <div class="pf-row">
@@ -49,7 +48,7 @@ export async function initPush(el) {
               <strong>${deviceLabel(d.user_agent)}</strong>${here?.endpoint === d.endpoint ? html` <span class="pf-sub">(este dispositivo)</span>` : ''}
               <div class="pf-sub">Activado el ${formatDate(d.created_at)}</div>
             </div>
-            <label class="adm-check"><input type="checkbox" data-act="group" data-i="${i}" ${d.receive_group ? html`checked` : ''} /> Avisos del grupo</label>
+            <label class="pf-check"><span class="pf-check-text">Avisos del grupo</span><input type="checkbox" data-act="group" data-i="${i}" ${d.receive_group ? html`checked` : ''} /></label>
             <button class="pf-btn" type="button" data-act="remove" data-i="${i}">Quitar</button>
           </div>`)}
         <div class="pf-msg" id="pfPushMsg" role="status"></div>

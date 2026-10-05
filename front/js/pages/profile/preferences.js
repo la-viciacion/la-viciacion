@@ -13,8 +13,12 @@ export async function initPreferences(el, { path }) {
   mount(el, html`
     ${heading('Jugando ahora')}
     <form class="pf-card pf-form" id="pfPlaying" novalidate>
-      <label class="adm-check"><input type="checkbox" name="show" ${(settings.show_playing ?? settings.defaults.show_playing) ? 'checked' : ''} /> Mostrar a los demás cuándo estoy jugando</label>
-      <div class="pf-sub">Si lo desactivas, el resto del grupo no te verá en «Jugando ahora» (tú sí verás el halo verde en tu avatar). Los avisos al grupo que ya existen no cambian.</div>
+      <label class="pf-check">
+        <span class="pf-check-text">Mostrar a los demás cuándo estoy jugando
+          <span class="pf-sub">Si lo desactivas, el resto del grupo no te verá en «Jugando ahora» (tú sí verás el halo verde en tu avatar). Los avisos al grupo que ya existen no cambian.</span>
+        </span>
+        <input type="checkbox" name="show" ${(settings.show_playing ?? settings.defaults.show_playing) ? 'checked' : ''} />
+      </label>
       <div class="pf-msg" role="status"></div>
     </form>`);
 
