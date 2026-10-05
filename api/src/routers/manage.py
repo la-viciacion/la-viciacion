@@ -635,10 +635,14 @@ class TimerCreate(BaseModel):
     notes: Optional[str] = Field(None, max_length=NOTES_MAX)
 
 
-def _recheck_achievements(background_tasks: BackgroundTasks, user_id: int) -> None:
+def _recheck_achievements(background_tasks: BackgroundTasks, user_id: int, recalculate: list[int] | None = None) -> None:
     """An admin's change to the sessions or the library can earn the player an achievement: check it
-    silently, like a manual session of their own (nothing is announced to the group)."""
-    background_tasks.add_task(actions.after_session_change, user_id, True)
+    silently, like a manual session of their own (nothing is announced to the group). A session that was
+    edited or deleted gives the seasons to work out again (`recalculate`): it may no longer earn what it did."""
+    if recalculate:
+        background_tasks.add_task(actions.after_session_change, user_id, True, recalculate=recalculate)
+    else:
+        background_tasks.add_task(actions.after_session_change, user_id, True)
 
 
 def _check_range(start: datetime.datetime, end: Optional[datetime.datetime]):
@@ -711,7 +715,7 @@ def patch_timer(timer_id: int, body: TimerPatch, background_tasks: BackgroundTas
     if was_running and not timer.is_active:
         # a stuck timer was finished by hand: its pinned notification has to go
         background_tasks.add_task(actions.after_timer_stop, timer.user_id, timer.game_id, timer.duration_seconds)
-    _recheck_achievements(background_tasks, timer.user_id)
+    _recheck_achievements(background_tasks, timer.user_id, sorted({old_entry[2], seasons.of(timer.start_time)}))
     return _timer_out(timer, None, None)
 
 
@@ -720,9 +724,10 @@ def delete_timer(timer_id: int, background_tasks: BackgroundTasks, db: Session =
     timer = _get_or_404(db, models.GameTimer, timer_id, "Sesión")
     if timer.is_active:
         background_tasks.add_task(actions.after_timer_stop, timer.user_id, timer.game_id, None)
+    user_id, season = timer.user_id, seasons.of(timer.start_time)
     db.delete(timer)
     db.commit()
-    _recheck_achievements(background_tasks, timer.user_id)
+    _recheck_achievements(background_tasks, user_id, [season])
     return {"message": "Sesión eliminada"}
 
 

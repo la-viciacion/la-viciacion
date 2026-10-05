@@ -390,6 +390,31 @@ class StartAndStopWorkTests(WorkTestCase):
         self.real_actions["after_timer_stop"](self.ana, "no-such-game", None)
 
 
+class EditedSessionTests(WorkTestCase):
+    def test_deleting_a_session_revokes_what_it_earned_without_telling_anybody(self):
+        self.play_days(self.ana, 7)
+        self.check_one()
+        self.assertIn("STREAK_7_DAYS", self.awarded())
+        with self.engine.begin() as conn:
+            conn.execute(text("DELETE FROM game_timers WHERE user_id = :u ORDER BY start_time DESC LIMIT 1"), {"u": self.ana})
+        self.sent.clear()
+        self.real_actions["after_session_change"](self.ana, True, recalculate=[YEAR])
+        got = self.awarded()
+        self.assertNotIn("PLAYED_7_DAYS", got)
+        self.assertNotIn("STREAK_7_DAYS", got)
+        self.assertEqual(self.sent, [])
+
+    def test_only_the_seasons_asked_for_are_worked_out_again(self):
+        key_id = self.scalar("SELECT id FROM achievements WHERE `key` = 'PLAYED_30_DAYS'")
+        with self.engine.begin() as conn:
+            conn.execute(text("INSERT INTO users_achievements (user_id, achievement_id, date) VALUES (:u, :a, :d)"),
+                         {"u": self.ana, "a": key_id, "d": datetime.date(YEAR - 1, 6, 1)})
+        self.real_actions["after_session_change"](self.ana, True, recalculate=[YEAR])
+        self.assertEqual(self.scalar("SELECT COUNT(*) FROM users_achievements WHERE user_id = :u", u=self.ana), 1)
+        self.real_actions["after_session_change"](self.ana, True, recalculate=[YEAR - 1])
+        self.assertEqual(self.scalar("SELECT COUNT(*) FROM users_achievements WHERE user_id = :u", u=self.ana), 0)
+
+
 class RankingAnnouncementTests(WorkTestCase):
     def test_overtaking_somebody_is_announced_after_the_session_that_did_it(self):
         self.session(self.ana, "celeste", at(3, 1), 120)

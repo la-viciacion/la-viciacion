@@ -287,14 +287,24 @@ class SessionsAdminTests(ManageTestCase):
 
     def test_every_change_of_an_admin_checks_the_achievements_of_that_player_silently(self):
         check = self.background["after_session_change"]
-        timer_id = self.admin("POST", "/timers", json=self.body()).json()["id"]
-        check.assert_called_once_with(self.ana, True)
+        created = self.admin("POST", "/timers", json=self.body()).json()
+        timer_id, season = created["id"], seasons.of(datetime.datetime.fromisoformat(created["start_time"]))
+        check.assert_called_once_with(self.ana, True)  # a new session can only earn more
         check.reset_mock()
         self.admin("PATCH", f"/timers/{timer_id}", json={"notes": "fixed"})
-        check.assert_called_once_with(self.ana, True)
+        check.assert_called_once_with(self.ana, True, recalculate=[season])  # an edited or deleted one may no longer earn
         check.reset_mock()
         self.admin("DELETE", f"/timers/{timer_id}")
-        check.assert_called_once_with(self.ana, True)
+        check.assert_called_once_with(self.ana, True, recalculate=[season])
+
+    def test_moving_a_session_to_another_season_works_out_both_again(self):
+        check = self.background["after_session_change"]
+        created = self.admin("POST", "/timers", json=self.body()).json()
+        check.reset_mock()
+        start = datetime.datetime.fromisoformat(created["start_time"])
+        last_year = start.replace(year=start.year - 1)
+        self.admin("PATCH", f"/timers/{created['id']}", json={"start_time": last_year.isoformat(), "end_time": (last_year + timedelta(hours=1)).isoformat()})
+        check.assert_called_once_with(self.ana, True, recalculate=[start.year - 1, start.year])
 
     def test_a_rejected_change_checks_nothing(self):
         self.admin("POST", "/timers", json=self.body(end_time=ago(hours=6).isoformat()))

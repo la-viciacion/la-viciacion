@@ -156,6 +156,18 @@ class RecalculationTests(unittest.TestCase):
         self.assertEqual(got[("add", 1, PAST, "JUST_IN_TIME")].game_after, "g1")
         self.assertEqual(got[("add", 1, PAST, "PLAYED_LESS_5_MIN_SESSION")].date_after, D(PAST, 3, 2))
 
+    def test_a_session_that_was_deleted_takes_what_it_earned_with_it_in_that_season_only(self):
+        import asyncio
+
+        self.play_days(1, PAST, 7)
+        self.award(1, "PLAYED_7_DAYS", D(PAST, 3, 7))
+        self.award(1, "PLAYED_30_DAYS", D(YEAR, 6, 20))  # not earned either, but in another season
+        self.db.query(models.GameTimer).filter(models.GameTimer.start_time == at(PAST, 3, 7)).delete()
+        self.db.commit()
+        asyncio.run(recalc.recalculate_user(self.db, 1, [PAST]))
+        self.assertEqual(self.stored(), [("PLAYED_30_DAYS", D(YEAR, 6, 20), None)])
+        self.sent.assert_not_awaited()
+
     def test_the_date_stays_in_its_season(self):
         collected = []
         checks = Achievements(season=PAST, collected=collected)

@@ -114,7 +114,7 @@ def _diff(user: models.User, season: int, expected: dict[str, Award], stored: li
     return changes
 
 
-async def _plan(db: Session, user_id: int | None) -> list[Change]:
+async def _plan(db: Session, user_id: int | None, only_seasons: set[int] | None = None) -> list[Change]:
     query = db.query(models.User).filter(models.not_god())
     if user_id is not None:
         query = query.filter(models.User.id == user_id)
@@ -122,7 +122,7 @@ async def _plan(db: Session, user_id: int | None) -> list[Change]:
     teamwork: dict[int, dict[int, datetime.date]] = {}  # season -> user -> day
     changes: list[Change] = []
     for user in query.order_by(models.User.id).all():
-        for season in sorted(_seasons_of(db, user.id)):
+        for season in sorted(_seasons_of(db, user.id) if only_seasons is None else _seasons_of(db, user.id) & only_seasons):
             expected = await _expected(db, user, season)
             if season not in teamwork:
                 teamwork[season] = teamwork_dates(db, season)
@@ -142,6 +142,15 @@ async def _plan(db: Session, user_id: int | None) -> list[Change]:
 def plan(db: Session, user_id: int | None = None) -> list[Change]:
     """What a recalculation would change, for everybody or one user. It changes nothing."""
     return asyncio.run(_plan(db, user_id))
+
+
+async def recalculate_user(db: Session, user_id: int, season_list: list[int]) -> list[Change]:
+    """Work out again the achievements of one user in some seasons and apply it, in silence. It is what
+    follows a session that was edited or deleted: what it earned and no longer holds is revoked. The
+    caller is already in an event loop and holds the lock of the checks."""
+    changes = await _plan(db, user_id, set(season_list))
+    apply(db, changes)
+    return changes
 
 
 def preview(db: Session, user_id: int | None = None) -> dict:

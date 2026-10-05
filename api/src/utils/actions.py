@@ -114,6 +114,7 @@ def after_session_change(
     silent: bool = False,
     ranking_before: dict | None = None,
     stopped: tuple | None = None,
+    recalculate: list[int] | None = None,
 ):
     """Background-task entrypoint for routers/timers.py and the admin panel.
 
@@ -127,13 +128,22 @@ def after_session_change(
     given and not silent, the ranking changes it caused are announced. `stopped` is (game_id, start,
     duration in seconds) of the timer that has just been stopped: what only a real timer can earn
     ("Lo he abierto sin querer") is judged from it, never from the sessions in the database.
+
+    `recalculate` is the seasons of a session that was edited or deleted: instead of only adding what
+    the user has earned, their achievements of those seasons are worked out again, so what the session
+    earned and no longer holds is revoked (see crud/achievements_recalc.py). It never notifies.
     """
     from ..database.database import SessionLocal
 
     async def _run():
         db = SessionLocal()
         try:
-            await check_users(db, silent=silent, user_ids=None if user_id is None else [user_id])
+            if recalculate:
+                from ..crud import achievements_recalc  # imports this module too
+
+                await achievements_recalc.recalculate_user(db, user_id, recalculate)
+            else:
+                await check_users(db, silent=silent, user_ids=None if user_id is None else [user_id])
             if stopped is not None:
                 user = users.get_user_by_id(db, user_id)
                 if user is not None:
