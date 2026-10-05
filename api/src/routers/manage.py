@@ -136,11 +136,13 @@ def check_achievements(body: CheckAchievementsBody, background_tasks: Background
 
 @router.post("/backup")
 def download_backup(db: Session = Depends(get_db)):
-    """The whole database as a `.sql` file (see utils/sql_dump.py). It is a POST although it only reads, so the
+    """The whole database as a gzipped `.sql` file (see utils/sql_dump.py). It is a POST although it only reads, so the
     audit log records who took a copy of everything and a link or a prefetch cannot trigger it."""
-    name = f"laviciacion-backup-{datetime.date.today()}.sql"
+    name = f"laviciacion-backup-{datetime.date.today()}.sql.gz"
     return StreamingResponse(
-        sql_dump.dump(db.get_bind()), media_type="application/sql", headers={"Content-Disposition": f'attachment; filename="{name}"'}
+        sql_dump.gzip_stream(sql_dump.dump(db.get_bind())),
+        media_type="application/gzip",
+        headers={"Content-Disposition": f'attachment; filename="{name}"'},
     )
 
 

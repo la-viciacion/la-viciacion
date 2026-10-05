@@ -53,7 +53,7 @@ export async function api(path, options = {}) {
 
   const type = res.headers.get('content-type') || '';
   if (type.includes('application/json')) return res.json();
-  if (type.includes('image/')) return res.blob();
+  if (type.includes('image/') || type.includes('application/gzip')) return res.blob();
   return res.text();
 }
 

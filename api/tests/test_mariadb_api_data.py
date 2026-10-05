@@ -1,6 +1,7 @@
 """Export / import of a player's data, the audit log and the `.sql` backup through real requests
 (MariaDB required, see api_support.py). The merge rules themselves are in test_data_export.py."""
 import datetime
+import gzip
 import re
 from datetime import timedelta
 from unittest import mock
@@ -234,15 +235,18 @@ class BackupTests(ApiTestCase):
         self.assertEqual(self.api("POST", "/manage/backup").status_code, 401)
         self.assertEqual(self.backup(as_user="ana").status_code, 403)
 
-    def test_it_is_an_sql_download(self):
+    def sql(self):
+        return gzip.decompress(self.backup().content).decode("utf-8")
+
+    def test_it_is_a_gzipped_sql_download(self):
         response = self.backup()
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.headers["content-type"], "application/sql")
-        self.assertRegex(response.headers["content-disposition"], r'attachment; filename="laviciacion-backup-\d{4}-\d\d-\d\d\.sql"')
-        self.assertTrue(response.text.startswith("-- La Viciación: database backup"))
+        self.assertEqual(response.headers["content-type"], "application/gzip")
+        self.assertRegex(response.headers["content-disposition"], r'attachment; filename="laviciacion-backup-\d{4}-\d\d-\d\d\.sql\.gz"')
+        self.assertTrue(self.sql().startswith("-- La Viciación: database backup"))
 
     def test_it_has_every_table_with_its_schema_and_rows(self):
-        sql = self.backup().text
+        sql = self.sql()
         tables = [r[0] for r in self.rows("SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE'")]
         for table in tables:
             with self.subTest(table=table):
@@ -253,7 +257,7 @@ class BackupTests(ApiTestCase):
         self.assertIn("INSERT INTO `alembic_version`", sql)  # the revision travels with the data
 
     def test_generated_columns_are_left_out_of_the_inserts(self):
-        sql = self.backup().text
+        sql = self.sql()
         columns = re.search(r"INSERT INTO `game_timers` \(([^)]*)\)", sql).group(1)
         self.assertNotIn("`season`", columns)
         self.assertIn("`start_time`", columns)
