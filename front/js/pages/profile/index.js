@@ -24,6 +24,10 @@ import { initRecommendations } from './recommendations.js';
 export const active = 'profile';
 export const mainClass = 'profile-main';
 
+// Off: the "Jugando ahora" preference is not offered in the profile. Its form (preferences.js), the API
+// setting and the filter on the navbar chip stay, so turning this on brings the option back.
+const SHOW_PLAYING_OPTION = false;
+
 const TABS = [
   ['resumen', 'Resumen'],
   ['recomendados', 'Recomendados'],
@@ -81,7 +85,7 @@ function showTab(id) {
   if (id === 'recomendados') initRecommendations(main.querySelector('#pfRecommended'), { username: user.username });
   if (id === 'ajustes') {
     initNotifications(main.querySelector('#pfNotifs'), { path: userPath('settings') }).catch(() => {});
-    initPreferences(main.querySelector('#pfPrefs'), { path: userPath('settings') }).catch(() => {});
+    if (SHOW_PLAYING_OPTION) initPreferences(main.querySelector('#pfPrefs'), { path: userPath('settings') }).catch(() => {});
     initPush(main.querySelector('#pfPush')).catch(() => {}); // optional: never breaks the page
     initData(main.querySelector('#pfDataFiles'), { username: user.username });
   }
