@@ -207,7 +207,7 @@ def get_user_games_played_time(
         func.sum(sessions.c.duration),
     ).filter(
         sessions.c.user_id == user_id,
-        sessions.c.season == season,
+        _in_season(sessions.c.season, season),
     )
     if game_id is not None:
         query = query.filter(sessions.c.game_id == game_id)

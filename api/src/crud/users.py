@@ -762,9 +762,10 @@ async def after_completion(db: Session, entry: models.UserGame, silent: bool):
         game = games.get_game_by_id(db, entry.game_id)
     from . import time_entries as time_entries_crud
 
+    # the average of HLTB is for the whole game, however many seasons it took
     completion_time = sum(
         seconds or 0
-        for _, seconds in time_entries_crud.get_user_games_played_time(db, entry.user_id, entry.game_id, entry.season)
+        for _, seconds in time_entries_crud.get_user_games_played_time(db, entry.user_id, entry.game_id, seasons.ALL)
     )
 
     # Local import to avoid a circular import (crud.achievements imports crud.users).

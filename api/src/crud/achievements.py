@@ -63,6 +63,13 @@ PLAYED_GAMES = (
     (E.PLAYED_100_GAMES, 100),
 )
 COMPLETED_GAMES = ((E.COMPLETED_42_GAMES, 42), (E.COMPLETED_100_GAMES, 100))
+HOURS_IN_A_GAME = (
+    (E.PLAYED_100_HOURS_GAME, 100),
+    (E.PLAYED_500_HOURS_GAME, 500),
+    (E.PLAYED_1000_HOURS_GAME, 1000),
+)
+# "Justo a tiempo": the time played has to be this close (a fraction of it) to the HLTB average
+JUST_IN_TIME_TOLERANCE = 0.05
 
 ######################
 #### ACHIEVEMENTS ####
@@ -352,23 +359,26 @@ class Achievements:
     async def user_played_hours_game(
         self, db: Session, user: models.User, silent: bool = False
     ):
-        """100 h in one game this season, dated the day it crossed them. With several games over the
-        line, the one that crossed first is the one named."""
-        # only 100 h per game is active: the 500 h and 1000 h achievements exist but are not awarded yet
-        ach = AchievementsElems.PLAYED_100_HOURS_GAME
-        if self.check_already_achieved(db, user.id, ach.name):
+        """100, 500 and 1000 h in one game this season, each dated the day it crossed them. With several
+        games over a line, the one that crossed first is the one named."""
+        have = self.achieved_keys(db, user.id, [ach.name for ach, _ in HOURS_IN_A_GAME])
+        pending = [(ach, hours) for ach, hours in HOURS_IN_A_GAME if ach.name not in have]
+        if not pending:
             return
         totals: dict[str, float] = {}
-        first = None  # (day it crossed, game_id)
+        first: dict[int, tuple] = {}  # hours -> (day it crossed, game_id)
         for day, game_id, seconds in sorted(
             (row for row in time_entries.get_played_time_by_game_and_day(db, user.id) if row[1] is not None),
             key=lambda row: row[0],
         ):
             totals[game_id] = totals.get(game_id, 0) + (seconds or 0)
-            if totals[game_id] / 60 / 60 >= 100 and (first is None or (day, game_id) < first):
-                first = (day, game_id)
-        if first is not None:
-            await self._award(db, user, ach, silent, date=str(first[0]), game_id=first[1])
+            for _, hours in pending:
+                if totals[game_id] / 60 / 60 >= hours and (hours not in first or (day, game_id) < first[hours]):
+                    first[hours] = (day, game_id)
+        for ach, hours in pending:
+            if hours in first:
+                day, game_id = first[hours]
+                await self._award(db, user, ach, silent, date=str(day), game_id=game_id)
 
     async def happy_new_year(
         self,
@@ -470,11 +480,9 @@ class Achievements:
     ):
         if not played_time or not avg_time:
             return
-        # Both played_time and avg_time (HLTB comp_main) are in seconds;
-        # matched at hour granularity since an exact-second match is
-        # practically unreachable and everything else in the app buckets
-        # played time into hours anyway.
-        if round(played_time / 3600) == round(avg_time / 3600):
+        # Both played_time and avg_time (HLTB comp_main) are in seconds. An exact match is
+        # unreachable, so it is enough to be within a few percent of the average.
+        if abs(played_time - avg_time) <= avg_time * JUST_IN_TIME_TOLERANCE:
             await self._unlock_if_new(
                 db, user, AchievementsElems.JUST_IN_TIME, silent, date=date, game_id=game_id
             )

@@ -154,6 +154,21 @@ class AchievementCheckTests(unittest.IsolatedAsyncioTestCase):
             await self.ach.user_played_hours_game(self.db, USER)
         self.assertEqual(self.awarded()["PLAYED_100_HOURS_GAME"], (datetime.date(YEAR, 2, 1), "g2"))
 
+    async def test_500_and_1000_hours_in_a_game_are_earned_each_the_day_it_crossed_them(self):
+        rows = [
+            (datetime.date(YEAR, 1, 10), "g1", 120 * 3600),
+            (datetime.date(YEAR, 3, 1), "g1", 400 * 3600),  # 520 h: the 500
+            (datetime.date(YEAR, 6, 1), "g1", 500 * 3600),  # 1020 h: the 1000
+        ]
+        with mock.patch.object(ach_module.time_entries, "get_played_time_by_game_and_day", return_value=rows):
+            await self.ach.user_played_hours_game(self.db, USER)
+            await self.ach.user_played_hours_game(self.db, USER)
+        got = self.awarded()
+        self.assertEqual(got["PLAYED_100_HOURS_GAME"], (datetime.date(YEAR, 1, 10), "g1"))
+        self.assertEqual(got["PLAYED_500_HOURS_GAME"], (datetime.date(YEAR, 3, 1), "g1"))
+        self.assertEqual(got["PLAYED_1000_HOURS_GAME"], (datetime.date(YEAR, 6, 1), "g1"))
+        self.assertEqual(self.sent.await_count, 3)
+
     async def test_99_hours_in_a_game_is_not_enough(self):
         rows = [(datetime.date(YEAR, 2, 1), "g1", 99 * 3600 + 3000)]
         with mock.patch.object(ach_module.time_entries, "get_played_time_by_game_and_day", return_value=rows):
@@ -214,6 +229,28 @@ class AchievementCheckTests(unittest.IsolatedAsyncioTestCase):
             await self.ach.user_played_hours_game_day(self.db, USER)
         self.assertEqual(self.awarded()["PLAYED_8_HOURS_GAME_DAY"], (datetime.date(YEAR, 2, 2), "g1"))
         self.assertEqual(self.sent.await_count, 1)
+
+    async def test_just_in_time_needs_the_time_within_five_percent_of_the_average(self):
+        hour = 3600
+        for played, avg, expected in (
+            (10 * hour, 10 * hour, True),
+            (int(10.5 * hour), 10 * hour, True),  # +5 %
+            (int(9.5 * hour), 10 * hour, True),  # -5 %
+            (int(10.6 * hour), 10 * hour, False),
+            (int(9.4 * hour), 10 * hour, False),
+            (45 * 60, 3600, False),  # 25 % under: the hour rounding used to let this one in
+            (100 * hour + 30 * 60, 100 * hour, True),  # half an hour is nothing on a long game...
+            (30 * 60, 2 * hour, False),  # ...and everything on a short one
+        ):
+            self.db.query(models.UserAchievement).delete()
+            self.db.commit()
+            await self.ach.just_in_time(self.db, USER, played, avg, "g1")
+            self.assertEqual("JUST_IN_TIME" in self.awarded(), expected, (played, avg))
+
+    async def test_just_in_time_without_a_time_or_an_average_does_nothing(self):
+        await self.ach.just_in_time(self.db, USER, 0, 3600, "g1")
+        await self.ach.just_in_time(self.db, USER, 3600, 0, "g1")
+        self.assertEqual(self.awarded(), {})
 
     async def test_silent_checks_award_but_pass_silent_on(self):
         await self.ach.user_played_total_days(self.db, USER, self.days(7), silent=True)
