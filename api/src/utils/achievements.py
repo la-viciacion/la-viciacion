@@ -45,9 +45,9 @@ class AchievementsElems(Enum):
     PLAYED_8_HOURS_GAME_DAY = {
         "title": "Mi trabajo es jugar",
         "message": "Lo de estar 8 horas trabajando no suele gustar, pero jugando ya es otra cosa. "
-        + ""
+        + "*"
         + "{}"
-        + " acaba de jugar 8 horas (o más) a _"
+        + "* acaba de jugar 8 horas (o más) a _"
         + "{}"
         + "_ en un mismo día.",
     }
@@ -116,8 +116,9 @@ class AchievementsElems(Enum):
     PLAYED_4_HOURS_SESSION = {
         "title": "Sesión de 4 horas",
         "message": "*{}"
-        + "* acaba de jugar 4 horas seguidas (o más)"
-        + " en un mismo día.",
+        + "* acaba de jugar 4 horas seguidas (o más) a _"
+        + "{}"
+        + "_ en una sola sesión.",
     }
     PLAYED_8_HOURS_SESSION = {
         "title": "Mi trabajo es jugar (sin parar)",
@@ -171,7 +172,7 @@ class AchievementsElems(Enum):
     }
     PLAYED_10_GAMES_DAY = {
         "title": "Indecisión x2",
-        "message": "AAAHHHRRRGGG, sigo sin saber a qué jugar."
+        "message": "AAAHHHRRRGGG, sigo sin saber a qué jugar. "
         + "*{}*"
         + " ha acumulado tantos juegos en su biblioteca que salta de uno "
         + "a otro como pollo sin cabeza, y ya ha probado con 10 o más juegos en un solo día.",
@@ -260,7 +261,7 @@ class AchievementsElems(Enum):
         "message": "*{}*"
         + " acaba de terminar "
         + "_{}_"
-        + " exactamente en el tiempo medio según HLTB.",
+        + " en el tiempo medio según HLTB (con un margen del 5 %).",
     }
 
     HAPPY_NEW_YEAR = {
