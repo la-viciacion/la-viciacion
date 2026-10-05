@@ -77,9 +77,10 @@ def players_played_time(db: Session, season: int = None, is_active: bool | None 
     return [dict(row._mapping) for row in rows]
 
 
-# A session shorter than this does not make a day "played": it keeps someone who just opens a game for
-# a few seconds from earning days, streaks and the achievements that follow from them.
-MIN_PLAYED_DAY_SECONDS = 600
+# A session shorter than this counts for no achievement (days, streaks, hours, games of a day, the hour a
+# session started at...): it keeps someone who just opens a game for a few seconds from earning them.
+# The only one that asks for a short session is "Lo he abierto sin querer" (get_time_entry_by_time).
+MIN_SESSION_SECONDS = 600
 
 
 def played_days_by_user(db: Session, season: int, user_ids: list[int] | None = None) -> dict[int, list[datetime.date]]:
@@ -91,7 +92,7 @@ def played_days_by_user(db: Session, season: int, user_ids: list[int] | None = N
     31 December into 1 January gives a day to each year."""
     sessions = sessions_subquery()
     stmt = select(sessions.c.user_id, sessions.c.start, sessions.c.end).where(
-        sessions.c.duration >= MIN_PLAYED_DAY_SECONDS
+        sessions.c.duration >= MIN_SESSION_SECONDS
     )
     if season != seasons.ALL:
         stmt = stmt.where(
@@ -190,6 +191,7 @@ def get_first_time_entry_on_day(db: Session, user_id: int, day: datetime.date):
         select(sessions)
         .where(
             sessions.c.user_id == user_id,
+            sessions.c.duration >= MIN_SESSION_SECONDS,
             sessions.c.start < day_start + datetime.timedelta(days=1),
             sessions.c.end >= day_start,
         )
@@ -265,6 +267,7 @@ def get_played_time_by_day(db: Session, user_id: int, season: int = None):
         .filter(
             sessions.c.user_id == user_id,
             sessions.c.season == season,
+            sessions.c.duration >= MIN_SESSION_SECONDS,
         )
         .group_by(func.DATE(sessions.c.start))
         .all()
@@ -284,6 +287,7 @@ def get_played_time_by_game_and_day(db: Session, user_id: int, season: int = Non
         .filter(
             sessions.c.user_id == user_id,
             sessions.c.season == season,
+            sessions.c.duration >= MIN_SESSION_SECONDS,
         )
         .group_by(func.DATE(sessions.c.start), sessions.c.game_id)
         .all()
@@ -301,6 +305,7 @@ def get_played_games_count_by_day(db: Session, user_id: int, season: int = None)
         .filter(
             sessions.c.user_id == user_id,
             sessions.c.season == season,
+            sessions.c.duration >= MIN_SESSION_SECONDS,
         )
         .group_by(func.DATE(sessions.c.start))
         .all()
@@ -328,6 +333,7 @@ def get_first_time_entry_between_hours(
     return (
         db.query(sessions)
         .filter(sessions.c.user_id == user_id)
+        .filter(sessions.c.duration >= MIN_SESSION_SECONDS)
         .filter(extract("hour", sessions.c.start) >= start_hour)
         .filter(extract("hour", sessions.c.start) < end_hour)
         .filter(sessions.c.season == season)

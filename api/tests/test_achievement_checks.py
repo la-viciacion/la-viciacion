@@ -252,6 +252,48 @@ class AchievementCheckTests(unittest.IsolatedAsyncioTestCase):
         await self.ach.just_in_time(self.db, USER, 3600, 0, "g1")
         self.assertEqual(self.awarded(), {})
 
+    def session_of(self, start, minutes, game="g1"):
+        self.db.add(
+            models.GameTimer(
+                user_id=1, game_id=game, start_time=start, end_time=start + datetime.timedelta(minutes=minutes),
+                duration_seconds=minutes * 60, is_active=False,
+            )
+        )
+        self.db.commit()
+
+    async def test_sessions_under_ten_minutes_count_for_no_time_achievement(self):
+        self.session_of(datetime.datetime(YEAR, 3, 1, 8, 0), 180)
+        for n in range(20):  # three more hours, in sessions that do not count
+            self.session_of(datetime.datetime(YEAR, 3, 1, 12, 0) + datetime.timedelta(minutes=10 * n), 9)
+        await self.ach.user_played_day_time(self.db, USER)
+        await self.ach.user_played_hours_game_day(self.db, USER)
+        await self.ach.user_played_total_time(self.db, USER)
+        self.assertEqual(self.awarded(), {})
+        self.session_of(datetime.datetime(YEAR, 3, 1, 16, 0), 60)  # one that does: 4 h at last
+        await self.ach.user_played_day_time(self.db, USER)
+        self.assertEqual(set(self.awarded()), {"PLAYED_4_HOURS_DAY"})
+
+    async def test_trying_games_for_less_than_ten_minutes_is_not_trying_them(self):
+        for n in range(5):
+            self.session_of(datetime.datetime(YEAR, 3, 1, 8 + n), 3, game=f"g{n}")
+        await self.ach.user_played_games_per_day(self.db, USER)
+        self.assertEqual(self.awarded(), {})
+        for n in range(5):
+            self.session_of(datetime.datetime(YEAR, 3, 2, 8 + n), 10, game=f"g{n}")
+        await self.ach.user_played_games_per_day(self.db, USER)
+        self.assertEqual(set(self.awarded()), {"PLAYED_5_GAMES_DAY"})
+
+    async def test_a_session_under_ten_minutes_starts_neither_the_early_morning_nor_the_new_year(self):
+        self.session_of(datetime.datetime(YEAR, 1, 1, 5, 30), 9)
+        await self.ach.early_riser(self.db, USER, silent=False)
+        await self.ach.happy_new_year(self.db, USER)
+        self.assertEqual(self.awarded(), {})
+
+    async def test_a_very_short_session_is_the_one_that_does_count_for_opened_by_mistake(self):
+        self.session_of(datetime.datetime(YEAR, 3, 1, 8), 3)
+        await self.ach.user_session_time(self.db, USER)
+        self.assertEqual(set(self.awarded()), {"PLAYED_LESS_5_MIN_SESSION"})
+
     async def test_silent_checks_award_but_pass_silent_on(self):
         await self.ach.user_played_total_days(self.db, USER, self.days(7), silent=True)
         self.assertEqual(self.sent.await_args.args[1], True)
