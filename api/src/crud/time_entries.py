@@ -77,9 +77,10 @@ def players_played_time(db: Session, season: int = None, is_active: bool | None 
     return [dict(row._mapping) for row in rows]
 
 
-# A session shorter than this counts for no achievement (days, streaks, hours, games of a day, the hour a
-# session started at...): it keeps someone who just opens a game for a few seconds from earning them.
-# The only one that asks for a short session is "Lo he abierto sin querer" (get_time_entry_by_time).
+# A session shorter than this does not count for the achievements that count things (days, streaks,
+# games in a day, the new year): it keeps someone who just opens a game for a few seconds from earning
+# them. Hours add up whatever the length of each session, "Lo he abierto sin querer" asks for a short one
+# (get_time_entry_by_time) and the ones that fire when a timer starts (early riser, nocturnal) cannot know it.
 MIN_SESSION_SECONDS = 600
 
 
@@ -267,7 +268,6 @@ def get_played_time_by_day(db: Session, user_id: int, season: int = None):
         .filter(
             sessions.c.user_id == user_id,
             sessions.c.season == season,
-            sessions.c.duration >= MIN_SESSION_SECONDS,
         )
         .group_by(func.DATE(sessions.c.start))
         .all()
@@ -287,7 +287,6 @@ def get_played_time_by_game_and_day(db: Session, user_id: int, season: int = Non
         .filter(
             sessions.c.user_id == user_id,
             sessions.c.season == season,
-            sessions.c.duration >= MIN_SESSION_SECONDS,
         )
         .group_by(func.DATE(sessions.c.start), sessions.c.game_id)
         .all()
@@ -333,7 +332,6 @@ def get_first_time_entry_between_hours(
     return (
         db.query(sessions)
         .filter(sessions.c.user_id == user_id)
-        .filter(sessions.c.duration >= MIN_SESSION_SECONDS)
         .filter(extract("hour", sessions.c.start) >= start_hour)
         .filter(extract("hour", sessions.c.start) < end_hour)
         .filter(sessions.c.season == season)

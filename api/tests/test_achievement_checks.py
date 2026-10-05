@@ -261,15 +261,10 @@ class AchievementCheckTests(unittest.IsolatedAsyncioTestCase):
         )
         self.db.commit()
 
-    async def test_sessions_under_ten_minutes_count_for_no_time_achievement(self):
+    async def test_hours_add_up_whatever_the_length_of_each_session(self):
         self.session_of(datetime.datetime(YEAR, 3, 1, 8, 0), 180)
-        for n in range(20):  # three more hours, in sessions that do not count
+        for n in range(20):  # three more hours, in sessions of nine minutes
             self.session_of(datetime.datetime(YEAR, 3, 1, 12, 0) + datetime.timedelta(minutes=10 * n), 9)
-        await self.ach.user_played_day_time(self.db, USER)
-        await self.ach.user_played_hours_game_day(self.db, USER)
-        await self.ach.user_played_total_time(self.db, USER)
-        self.assertEqual(self.awarded(), {})
-        self.session_of(datetime.datetime(YEAR, 3, 1, 16, 0), 60)  # one that does: 4 h at last
         await self.ach.user_played_day_time(self.db, USER)
         self.assertEqual(set(self.awarded()), {"PLAYED_4_HOURS_DAY"})
 
@@ -283,11 +278,15 @@ class AchievementCheckTests(unittest.IsolatedAsyncioTestCase):
         await self.ach.user_played_games_per_day(self.db, USER)
         self.assertEqual(set(self.awarded()), {"PLAYED_5_GAMES_DAY"})
 
-    async def test_a_session_under_ten_minutes_starts_neither_the_early_morning_nor_the_new_year(self):
-        self.session_of(datetime.datetime(YEAR, 1, 1, 5, 30), 9)
-        await self.ach.early_riser(self.db, USER, silent=False)
+    async def test_a_session_under_ten_minutes_does_not_start_the_new_year(self):
+        self.session_of(datetime.datetime(YEAR, 1, 1, 0, 30), 9)
         await self.ach.happy_new_year(self.db, USER)
         self.assertEqual(self.awarded(), {})
+
+    async def test_early_riser_does_not_look_at_the_length_because_it_fires_when_the_timer_starts(self):
+        self.session_of(datetime.datetime(YEAR, 3, 1, 5, 30), 1)
+        await self.ach.early_riser(self.db, USER, silent=False)
+        self.assertEqual(set(self.awarded()), {"EARLY_RISER"})
 
     async def test_a_very_short_session_is_the_one_that_does_count_for_opened_by_mistake(self):
         self.session_of(datetime.datetime(YEAR, 3, 1, 8), 3)
