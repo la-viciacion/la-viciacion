@@ -1,6 +1,6 @@
 import datetime
 import json
-from typing import List, Union
+from typing import List, NamedTuple, Union
 
 from sqlalchemy import asc, create_engine, desc, func, select, text, update
 from sqlalchemy.exc import SQLAlchemyError
@@ -78,9 +78,28 @@ JUST_IN_TIME_TOLERANCE = 0.05
 ######################
 
 
+class Award(NamedTuple):
+    """An achievement a recalculation says a user deserves in a season."""
+
+    user_id: int
+    key: str
+    date: datetime.date
+    game_id: str | None
+
+
 class Achievements:
-    def __init__(self, silent: bool = False) -> None:
+    """The checks of every achievement.
+
+    `season` (default: the running one) is the season they look at. With `collected` (a list) they only
+    work out what a user deserves: each achievement is appended to the list as an `Award`, and nothing is
+    written or announced, whatever `silent` says. That is how a recalculation reuses the very rules of the
+    live checks without being able to notify anybody.
+    """
+
+    def __init__(self, silent: bool = False, season: int | None = None, collected: list | None = None) -> None:
         self.silent = silent
+        self.season = season
+        self.collected = collected
 
     def populate_achievements(self, db: Session):
         """Create the achievements of the code that the table does not have yet.
@@ -143,6 +162,9 @@ class Achievements:
         keys = [str(key) for key in keys]
         if not keys:
             return set()
+        if self.collected is not None:
+            return {award.key for award in self.collected if award.user_id == user_id and award.key in keys}
+        season = season if season is not None else self.season
         rows = (
             db.query(models.Achievement.key)
             .join(models.UserAchievement, models.UserAchievement.achievement_id == models.Achievement.id)
@@ -198,10 +220,23 @@ class Achievements:
         game_id: str = None,
     ):
         """Store an unlocked achievement and announce it. `game_id` also names the game in the message."""
+        if self.collected is not None:
+            self._collect(user.id, ach, date, game_id)
+            return
+        silent = silent or self.silent
         logger.info("Set achievement " + ach.name)
         self.set_user_achievement(db, user.id, ach.name, game_id, date)
         msg = utils.get_ach_message(ach, user=user.name, db=db, game_id=game_id)
         await utils.send_message(msg, silent, image=self.get_image(db, ach.name)[0])
+
+    def _collect(self, user_id: int, ach: AchievementsElems, date: str | None, game_id: str | None):
+        """Note what a user deserves. Its date is the one that sets the season, so it is kept inside the
+        season it is worked out for."""
+        if date is None:
+            raise ValueError("a recalculation needs the date of every achievement: " + ach.name)
+        season = seasons.or_current(self.season)
+        day = min(max(utils.convert_date_from_text(date).date(), datetime.date(season, 1, 1)), datetime.date(season, 12, 31))
+        self.collected.append(Award(user_id, ach.name, day, game_id))
 
     async def _unlock_reached(
         self,
@@ -244,7 +279,7 @@ class Achievements:
         """Dated the day the season's running total of hours crossed each threshold."""
         total = 0
         running = []
-        for day, seconds in time_entries.get_played_time_by_day(db, user.id):
+        for day, seconds in time_entries.get_played_time_by_day(db, user.id, self.season):
             total += seconds or 0
             running.append((day, total / 60 / 60))
         await self._unlock_first_day_reaching(db, user, running, TOTAL_HOURS, silent)
@@ -276,7 +311,7 @@ class Achievements:
     ):
         days = [
             (day, seconds / 60 / 60 if seconds is not None else None)
-            for day, seconds in time_entries.get_played_time_by_day(db, user.id)
+            for day, seconds in time_entries.get_played_time_by_day(db, user.id, self.season)
         ]
         await self._unlock_first_day_reaching(db, user, days, HOURS_IN_A_DAY, silent)
 
@@ -297,7 +332,7 @@ class Achievements:
             (AchievementsElems.PLAYED_8_HOURS_SESSION, 8),
         ):
             if ach.name not in have:
-                entry = time_entries.get_time_entry_by_time(db, user.id, hours * 60 * 60, 3)
+                entry = time_entries.get_time_entry_by_time(db, user.id, hours * 60 * 60, 3, self.season)
                 if entry is not None:
                     await self._award(db, user, ach, silent, date=str(entry.start), game_id=entry.game_id)
 
@@ -318,6 +353,28 @@ class Achievements:
             db, user, AchievementsElems.PLAYED_LESS_5_MIN_SESSION, silent, date=str(start_time), game_id=game_id
         )
 
+    async def opened_by_mistake_from_sessions(self, db: Session, user: models.User, silent: bool = False):
+        """The same achievement worked out from the sessions of the season, for a recalculation: the
+        database cannot tell a timer that was really stopped from a manual session, so any session of 5
+        minutes or less (and more than 0 s) earns it, the earliest one naming its game."""
+        entry = time_entries.get_time_entry_by_time(db, user.id, OPENED_BY_MISTAKE_SECONDS, 2, self.season)
+        if entry is not None:
+            await self._unlock_if_new(
+                db, user, AchievementsElems.PLAYED_LESS_5_MIN_SESSION, silent,
+                date=str(entry.start), game_id=entry.game_id,
+            )
+
+    async def just_in_time_of_the_season(self, db: Session, user: models.User, silent: bool = False):
+        """The games completed in the season, in order, against the average time stored for each game
+        (a recalculation does not ask HLTB again)."""
+        for day, game_id in users.completed_entries(db, user.id, self.season):
+            played = sum(
+                seconds or 0
+                for _, seconds in time_entries.get_user_games_played_time(db, user.id, game_id, self.season)
+            )
+            game = games.get_game_by_id(db, game_id)
+            await self.just_in_time(db, user, played, game.avg_time if game else None, game_id, date=str(day), silent=silent)
+
     async def user_played_total_days(
         self, db: Session, user: models.User, total_days: list, silent: bool = False
     ):
@@ -335,7 +392,7 @@ class Achievements:
         # the first day it happened, whatever order the database returns the days in
         reached = [
             (date, game_id)
-            for date, game_id, duration in time_entries.get_played_time_by_game_and_day(db, user.id)
+            for date, game_id, duration in time_entries.get_played_time_by_game_and_day(db, user.id, self.season)
             if duration is not None and game_id is not None and duration / 60 / 60 >= 8
         ]
         if reached:
@@ -345,14 +402,14 @@ class Achievements:
     async def user_played_games_per_day(
         self, db: Session, user: models.User, silent: bool = False
     ):
-        days = time_entries.get_played_games_count_by_day(db, user.id)
+        days = time_entries.get_played_games_count_by_day(db, user.id, self.season)
         await self._unlock_first_day_reaching(db, user, [tuple(row) for row in days], GAMES_IN_A_DAY, silent)
 
     async def user_played_total_games(
         self, db: Session, user: models.User, silent: bool = False
     ):
         """Distinct games of the season, dated the day the Nth one began."""
-        dates = users.played_game_dates(db, user.id)
+        dates = users.played_game_dates(db, user.id, self.season)
         await self._unlock_reached(
             db, user, len(dates), PLAYED_GAMES, silent, date_for=lambda needed: str(dates[needed - 1])
         )
@@ -361,7 +418,7 @@ class Achievements:
         self, db: Session, user: models.User, silent: bool = False
     ):
         """Dated the day the Nth game was completed."""
-        dates = users.completed_game_dates(db, user.id)
+        dates = users.completed_game_dates(db, user.id, self.season)
         await self._unlock_reached(
             db, user, len(dates), COMPLETED_GAMES, silent, date_for=lambda needed: str(dates[needed - 1])
         )
@@ -378,7 +435,7 @@ class Achievements:
         totals: dict[str, float] = {}
         first: dict[int, tuple] = {}  # hours -> (day it crossed, game_id)
         for day, game_id, seconds in sorted(
-            (row for row in time_entries.get_played_time_by_game_and_day(db, user.id) if row[1] is not None),
+            (row for row in time_entries.get_played_time_by_game_and_day(db, user.id, self.season) if row[1] is not None),
             key=lambda row: row[0],
         ):
             totals[game_id] = totals.get(game_id, 0) + (seconds or 0)
@@ -397,7 +454,7 @@ class Achievements:
         silent: bool = False,
         season: int = None,
     ):
-        new_year = datetime.datetime(seasons.or_current(season), 1, 1)
+        new_year = datetime.datetime(seasons.or_current(season if season is not None else self.season), 1, 1)
         entry = time_entries.get_first_time_entry_on_day(db, user.id, new_year.date())
         if entry is not None:
             # a session that began on 31 December is dated 1 January: the date is what sets the season,
@@ -454,14 +511,14 @@ class Achievements:
             await self._unlock_if_new(db, user, AchievementsElems.HAPPY_NEW_YEAR, silent, date=str(start_time))
 
     async def early_riser(self, db: Session, user: models.User, silent: bool):
-        entry = time_entries.get_first_time_entry_between_hours(db, user.id, start_hour=5, end_hour=6)
+        entry = time_entries.get_first_time_entry_between_hours(db, user.id, 5, 6, self.season)
         if entry is not None:
             await self._unlock_if_new(
                 db, user, AchievementsElems.EARLY_RISER, silent, date=str(entry.start)
             )
 
     async def nocturnal(self, db: Session, user: models.User, silent: bool):
-        entry = time_entries.get_first_time_entry_between_hours(db, user.id, start_hour=2, end_hour=5)
+        entry = time_entries.get_first_time_entry_between_hours(db, user.id, 2, 5, self.season)
         if entry is not None:
             await self._unlock_if_new(
                 db, user, AchievementsElems.NOCTURNAL, silent, date=str(entry.start)

@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 
 from .. import auth
 from ..auth import get_db
+from ..crud import achievements_recalc
 from ..crud import users as users_crud
 from ..database import models
 from ..utils import actions, ai, audit, my_utils, push, rawg_sync, seasons, settings, sql_dump
@@ -129,6 +130,31 @@ def check_achievements(body: CheckAchievementsBody, background_tasks: Background
     """Check the achievements of all users, or one, against their sessions (in background)."""
     background_tasks.add_task(actions.after_session_change, body.user_id, body.silent)
     return {"message": "Comprobación en marcha"}
+
+
+@router.get("/recalculate-achievements/preview")
+def preview_recalculate_achievements(user_id: Optional[int] = None, db: Session = Depends(get_db)):
+    """What recalculating every achievement of every season would change (add, correct, revoke), for all
+    the players or one. It changes nothing."""
+    return achievements_recalc.preview(db, user_id)
+
+
+RECALCULATE_ACHIEVEMENTS_PHRASE = "RECALCULAR"
+
+
+class RecalculateAchievementsBody(BaseModel):
+    user_id: Optional[int] = None
+    confirm: str  # must equal RECALCULATE_ACHIEVEMENTS_PHRASE (the panel shows the preview first and asks for it)
+
+
+@router.post("/recalculate-achievements", status_code=202)
+def recalculate_achievements(body: RecalculateAchievementsBody, background_tasks: BackgroundTasks):
+    """Work out again every achievement of every season and bring what is stored to it (in background).
+    It never notifies anybody. It rewrites dates and revokes, so it has to be confirmed explicitly."""
+    if body.confirm != RECALCULATE_ACHIEVEMENTS_PHRASE:
+        raise HTTPException(status_code=400, detail="Confirmación incorrecta")
+    background_tasks.add_task(achievements_recalc.recalculate, body.user_id)
+    return {"message": "Recálculo en marcha"}
 
 
 # ── Backup ──────────────────────────────────────────────────────

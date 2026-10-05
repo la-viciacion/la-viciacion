@@ -42,22 +42,25 @@ async def check_user(
     db: Session,
     user: models.User,
     silent: bool = False,
+    checks: Achievements | None = None,
 ):
-    """Check every achievement of one user against their sessions and library."""
-    played_days = time_entries.get_played_days(db, user.id)
-    await achievements.user_played_total_days(db, user, played_days, silent=silent)
-    await achievements.user_played_hours_game(db, user, silent=silent)
-    await achievements.user_played_total_time(db, user, silent=silent)
-    await achievements.user_session_time(db, user, silent=silent)
-    await achievements.user_played_total_games(db, user, silent=silent)
-    await achievements.user_completed_total_games(db, user, silent=silent)
-    await achievements.user_streak(db, user, played_days, silent=silent)
-    await achievements.user_played_day_time(db, user, silent)
-    await achievements.user_played_hours_game_day(db, user, silent=silent)
-    await achievements.user_played_games_per_day(db, user, silent=silent)
-    await achievements.happy_new_year(db, user, silent)
-    await achievements.early_riser(db, user, silent)
-    await achievements.nocturnal(db, user, silent)
+    """Check every achievement of one user against their sessions and library. `checks` is the set
+    of checks to run (default: the running season's, storing and announcing what it finds)."""
+    checks = checks or achievements
+    played_days = time_entries.get_played_days(db, user.id, season=checks.season)
+    await checks.user_played_total_days(db, user, played_days, silent=silent)
+    await checks.user_played_hours_game(db, user, silent=silent)
+    await checks.user_played_total_time(db, user, silent=silent)
+    await checks.user_session_time(db, user, silent=silent)
+    await checks.user_played_total_games(db, user, silent=silent)
+    await checks.user_completed_total_games(db, user, silent=silent)
+    await checks.user_streak(db, user, played_days, silent=silent)
+    await checks.user_played_day_time(db, user, silent)
+    await checks.user_played_hours_game_day(db, user, silent=silent)
+    await checks.user_played_games_per_day(db, user, silent=silent)
+    await checks.happy_new_year(db, user, silent)
+    await checks.early_riser(db, user, silent)
+    await checks.nocturnal(db, user, silent)
 
 
 async def check_users(

@@ -453,15 +453,20 @@ def played_game_dates(db: Session, user_id: int, season: int = None) -> list[dat
     return sorted(day for (day,) in query.group_by(models.UserGame.game_id).all())
 
 
-def completed_game_dates(db: Session, user_id: int, season: int = None) -> list[datetime.date]:
-    """The day of each completion of the season, oldest first (one per completed library entry, as
+def completed_entries(db: Session, user_id: int, season: int = None) -> list[tuple[datetime.date, str]]:
+    """(day, game_id) of each completion of the season, oldest first (one per completed library entry, as
     count_completed_games counts them)."""
     season = seasons.or_current(season)
     when = func.coalesce(models.UserGame.completed_date, models.UserGame.started_date)
-    query = db.query(when).filter(models.UserGame.user_id == user_id, models.UserGame.completed == 1)
+    query = db.query(when, models.UserGame.game_id).filter(models.UserGame.user_id == user_id, models.UserGame.completed == 1)
     if season != seasons.ALL:
         query = query.filter(models.UserGame.season == season)
-    return sorted(day for (day,) in query.all())
+    return sorted((day, game_id) for day, game_id in query.all())
+
+
+def completed_game_dates(db: Session, user_id: int, season: int = None) -> list[datetime.date]:
+    """The day of each completion of the season, oldest first."""
+    return [day for day, _ in completed_entries(db, user_id, season)]
 
 
 def first_entry_per_game(rows, limit: int | None = None) -> list:

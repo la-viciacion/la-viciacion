@@ -9,7 +9,7 @@ from sqlalchemy import text
 
 from src.database import database, models
 from src.routers import manage
-from src.utils import ai, email as mail, my_utils, push, rawg_sync, settings
+from src.utils import ai, email as mail, my_utils, push, rawg_sync, seasons, settings
 from tests.api_support import ApiTestCase
 from tests.app_routes import declared_routes, requestable
 
@@ -89,6 +89,24 @@ class OverviewTests(OpsTestCase):
         self.background["after_session_change"].assert_called_with(None, True)
         self.admin("POST", "/check-achievements", json={"user_id": self.ana, "silent": False})
         self.background["after_session_change"].assert_called_with(self.ana, False)
+
+    def test_recalculating_the_achievements_needs_the_phrase_and_runs_in_the_background(self):
+        recalculate = mock.patch.object(manage.achievements_recalc, "recalculate")
+        with recalculate as run:
+            for body in ({}, {"confirm": "si"}, {"confirm": "recalcular"}):
+                self.assertIn(self.admin("POST", "/recalculate-achievements", json=body).status_code, (400, 422))
+            run.assert_not_called()
+            response = self.admin("POST", "/recalculate-achievements", json={"confirm": "RECALCULAR", "user_id": self.ana})
+        self.assertEqual(response.status_code, 202)
+        run.assert_called_once_with(self.ana)
+
+    def test_the_preview_lists_the_changes_and_makes_none(self):
+        for day in range(1, 8):
+            self.session(self.ana, "celeste", datetime.datetime(seasons.current() - 1, 3, day, 10), 60)
+        body = self.admin("GET", "/recalculate-achievements/preview").json()
+        self.assertEqual(body["counts"], {"add": 2, "date": 0, "revoke": 0})
+        self.assertEqual({c["key"] for c in body["changes"]}, {"PLAYED_7_DAYS", "STREAK_7_DAYS"})
+        self.assertEqual(self.scalar("SELECT COUNT(*) FROM users_achievements"), 0)
 
 
 class RawgSyncTests(OpsTestCase):
