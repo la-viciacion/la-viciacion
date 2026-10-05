@@ -366,11 +366,14 @@ class Achievements:
         silent: bool = False,
         season: int = None,
     ):
-        new_year = str(seasons.or_current(season)) + "-01-01"
-        entries = time_entries.get_time_entry_by_date(db, user.id, new_year, 1)
-        if len(entries) > 0:
+        new_year = datetime.datetime(seasons.or_current(season), 1, 1)
+        entry = time_entries.get_first_time_entry_on_day(db, user.id, new_year.date())
+        if entry is not None:
+            # a session that began on 31 December is dated 1 January: the date is what sets the season,
+            # and an achievement of the previous season would never be seen as earned in this one
+            earned = max(entry.start, new_year)
             await self._unlock_if_new(
-                db, user, AchievementsElems.HAPPY_NEW_YEAR, silent, date=str(entries[0].start)
+                db, user, AchievementsElems.HAPPY_NEW_YEAR, silent, date=str(earned)
             )
 
     async def user_streak(

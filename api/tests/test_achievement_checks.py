@@ -123,6 +123,48 @@ class AchievementCheckTests(unittest.IsolatedAsyncioTestCase):
             await self.ach.user_played_games_per_day(self.db, USER)
         self.assertEqual(self.sent.await_count, 2)
 
+    def finished_session(self, start, end):
+        self.db.add(models.User(id=1, name="Ana", username="ana", is_active=1))
+        self.db.add(
+            models.GameTimer(
+                user_id=1, game_id="g1", start_time=start, end_time=end,
+                duration_seconds=int((end - start).total_seconds()), is_active=False,
+            )
+        )
+        self.db.commit()
+
+    async def test_happy_new_year_for_a_session_that_starts_on_the_first(self):
+        self.finished_session(datetime.datetime(YEAR, 1, 1, 0, 30), datetime.datetime(YEAR, 1, 1, 1, 0))
+        await self.ach.happy_new_year(self.db, USER)
+        self.assertEqual(self.awarded()["HAPPY_NEW_YEAR"][0], datetime.date(YEAR, 1, 1))
+
+    async def test_happy_new_year_for_a_session_across_midnight_is_dated_the_first_and_earned_once(self):
+        self.finished_session(datetime.datetime(YEAR - 1, 12, 31, 23, 0), datetime.datetime(YEAR, 1, 1, 1, 0))
+        await self.ach.happy_new_year(self.db, USER)
+        await self.ach.happy_new_year(self.db, USER)
+        rows = self.db.query(models.UserAchievement).all()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0].date, datetime.date(YEAR, 1, 1))
+        self.assertEqual(rows[0].season, YEAR)
+        self.assertEqual(self.sent.await_count, 1)
+
+    async def test_happy_new_year_for_a_session_that_ends_a_day_later(self):
+        self.finished_session(datetime.datetime(YEAR - 1, 12, 31, 23, 0), datetime.datetime(YEAR, 1, 2, 3, 0))
+        await self.ach.happy_new_year(self.db, USER)
+        self.assertEqual(self.awarded()["HAPPY_NEW_YEAR"][0], datetime.date(YEAR, 1, 1))
+
+    async def test_no_happy_new_year_for_sessions_that_do_not_touch_the_first(self):
+        self.finished_session(datetime.datetime(YEAR - 1, 12, 31, 20, 0), datetime.datetime(YEAR - 1, 12, 31, 23, 59))
+        self.db.add(
+            models.GameTimer(
+                user_id=1, game_id="g1", start_time=datetime.datetime(YEAR, 1, 2, 10), end_time=datetime.datetime(YEAR, 1, 2, 11),
+                duration_seconds=3600, is_active=False,
+            )
+        )
+        self.db.commit()
+        await self.ach.happy_new_year(self.db, USER)
+        self.assertEqual(self.awarded(), {})
+
     async def test_teamwork_needs_four_players_with_a_running_timer(self):
         for i in range(2, 6):
             self.db.add(models.User(id=i, name=f"P{i}", username=f"p{i}", is_active=1))

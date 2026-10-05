@@ -9,7 +9,6 @@ from sqlalchemy import (
     desc,
     extract,
     func,
-    or_,
     select,
     text,
     true,
@@ -154,44 +153,26 @@ def get_user_played_time(db: Session, user_id: str, season: int = None):
     return db.execute(stmt).first()
 
 
-def get_time_entry_by_date(db: Session, user_id: int, date: str, mode: int):
-    """_summary_
+def get_first_time_entry_on_day(db: Session, user_id: int, day: datetime.date):
+    """The earliest finished session that was running at some point of `day`, or None.
 
-    Args:
-        db (Session): _description_
-        user_id (int): _description_
-        date (str): _description_
-        mode (int): 1==, 2<=, 3>=
+    It includes the one that started the day before and ended on `day` (or later), which belongs to
+    the previous season by its start: that is why the caller needs the row and not only a yes/no.
 
     Returns:
-        list[Row]: rows with (user_id, game_id, start, end, duration)
+        Row | None: row with (user_id, game_id, season, start, end, duration)
     """
+    day_start = datetime.datetime.combine(day, datetime.time.min)
     sessions = sessions_subquery()
-    base = select(sessions).where(sessions.c.user_id == user_id)
-    if mode == 1:
-        stmt = base.where(
-            or_(
-                func.DATE(sessions.c.start) == date,
-                func.DATE(sessions.c.end) == date,
-            ),
+    return db.execute(
+        select(sessions)
+        .where(
+            sessions.c.user_id == user_id,
+            sessions.c.start < day_start + datetime.timedelta(days=1),
+            sessions.c.end >= day_start,
         )
-    elif mode == 2:
-        stmt = base.where(
-            or_(
-                func.DATE(sessions.c.start) <= date,
-                func.DATE(sessions.c.end) <= date,
-            ),
-        )
-    elif mode == 3:
-        stmt = base.where(
-            or_(
-                func.DATE(sessions.c.start) >= date,
-                func.DATE(sessions.c.end) >= date,
-            ),
-        )
-    else:
-        return []
-    return db.execute(stmt).all()
+        .order_by(sessions.c.start)
+    ).first()
 
 
 def get_user_games_played_time(
