@@ -180,10 +180,10 @@ class UsesRegistryTests(unittest.TestCase):
             if use.switchable:
                 self.assertIs(settings.REGISTRY[f"ai.use.{use_id}"].default, True)  # as before: on
 
-    def test_the_four_places_that_use_the_ai_today(self):
+    def test_the_places_that_use_the_ai_today(self):
         self.assertEqual(
             {i for i, u in ai_prompts.USES.items() if u.switchable},
-            {"new_game", "completed_game", "ranking_games", "ranking_players"},
+            {"new_game", "completed_game", "ranking_games", "ranking_players", "wishlist_release"},
         )
 
 
