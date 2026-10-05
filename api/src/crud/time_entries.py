@@ -307,35 +307,33 @@ def get_played_games_count_by_day(db: Session, user_id: int, season: int = None)
     )
 
 
-def get_time_entry_between_hours(
+def get_first_time_entry_between_hours(
     db: Session,
     user_id: int,
     start_hour: int,
     end_hour: int,
     season: int = None,
 ):
-    """_summary_
+    """The earliest session of the season that began between two hours of the day, or None.
 
     Args:
-        db (Session): _description_
-        user_id (int): _description_
         start_hour (int): Include this hour
         end_hour (int): Exclude this hour (search until 1 minute before)
 
     Returns:
-        list[Row]: rows with (user_id, game_id, start, end, duration)
+        Row | None: row with (user_id, game_id, season, start, end, duration)
     """
     season = seasons.or_current(season)
     sessions = sessions_subquery()
-    entries = (
+    return (
         db.query(sessions)
         .filter(sessions.c.user_id == user_id)
         .filter(extract("hour", sessions.c.start) >= start_hour)
         .filter(extract("hour", sessions.c.start) < end_hour)
         .filter(sessions.c.season == season)
-        .all()
+        .order_by(sessions.c.start)
+        .first()
     )
-    return entries
 
 
 def active_timer_user_ids(db: Session) -> set[int]:

@@ -315,12 +315,15 @@ class Achievements:
         ach = AchievementsElems.PLAYED_8_HOURS_GAME_DAY
         if self.check_already_achieved(db, user.id, ach.name):
             return
-        for date, game_id, duration in time_entries.get_played_time_by_game_and_day(db, user.id):
-            if duration is None or game_id is None:
-                continue
-            if duration / 60 / 60 >= 8:
-                await self._award(db, user, ach, silent, date=str(date), game_id=game_id)
-                return
+        # the first day it happened, whatever order the database returns the days in
+        reached = [
+            (date, game_id)
+            for date, game_id, duration in time_entries.get_played_time_by_game_and_day(db, user.id)
+            if duration is not None and game_id is not None and duration / 60 / 60 >= 8
+        ]
+        if reached:
+            date, game_id = min(reached)
+            await self._award(db, user, ach, silent, date=str(date), game_id=game_id)
 
     async def user_played_games_per_day(
         self, db: Session, user: models.User, silent: bool = False
@@ -429,17 +432,17 @@ class Achievements:
                 await self._unlock_if_new(db, user, ach, silent, date=str(start_time))
 
     async def early_riser(self, db: Session, user: models.User, silent: bool):
-        entries = time_entries.get_time_entry_between_hours(db, user.id, start_hour=5, end_hour=6)
-        if len(entries) > 0:
+        entry = time_entries.get_first_time_entry_between_hours(db, user.id, start_hour=5, end_hour=6)
+        if entry is not None:
             await self._unlock_if_new(
-                db, user, AchievementsElems.EARLY_RISER, silent, date=str(entries[0].start)
+                db, user, AchievementsElems.EARLY_RISER, silent, date=str(entry.start)
             )
 
     async def nocturnal(self, db: Session, user: models.User, silent: bool):
-        entries = time_entries.get_time_entry_between_hours(db, user.id, start_hour=2, end_hour=5)
-        if len(entries) > 0:
+        entry = time_entries.get_first_time_entry_between_hours(db, user.id, start_hour=2, end_hour=5)
+        if entry is not None:
             await self._unlock_if_new(
-                db, user, AchievementsElems.NOCTURNAL, silent, date=str(entries[0].start)
+                db, user, AchievementsElems.NOCTURNAL, silent, date=str(entry.start)
             )
 
     def get_weekly_achievements(

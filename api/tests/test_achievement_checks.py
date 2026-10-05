@@ -174,6 +174,47 @@ class AchievementCheckTests(unittest.IsolatedAsyncioTestCase):
         await self.ach.timer_started(self.db, USER, datetime.datetime(YEAR, 3, 2, 12, 0))
         self.assertEqual(set(self.awarded()), {"EARLY_RISER"})
 
+    def timers_started_at(self, *starts):
+        for start in starts:
+            self.db.add(
+                models.GameTimer(
+                    user_id=1, game_id="g1", start_time=start, end_time=start + datetime.timedelta(hours=1),
+                    duration_seconds=3600, is_active=False,
+                )
+            )
+        self.db.commit()
+
+    async def test_early_riser_and_nocturnal_are_dated_the_earliest_session_in_their_hours(self):
+        # inserted newest first: the database must not be trusted to return the oldest one first
+        self.timers_started_at(
+            datetime.datetime(YEAR, 6, 9, 5, 15), datetime.datetime(YEAR, 4, 2, 5, 45), datetime.datetime(YEAR, 5, 1, 5, 0),
+            datetime.datetime(YEAR, 8, 9, 3, 0), datetime.datetime(YEAR, 2, 3, 2, 30), datetime.datetime(YEAR, 7, 1, 4, 0),
+            datetime.datetime(YEAR, 1, 1, 12, 0),  # neither
+        )
+        await self.ach.early_riser(self.db, USER, silent=False)
+        await self.ach.nocturnal(self.db, USER, silent=False)
+        got = self.awarded()
+        self.assertEqual(got["EARLY_RISER"][0], datetime.date(YEAR, 4, 2))
+        self.assertEqual(got["NOCTURNAL"][0], datetime.date(YEAR, 2, 3))
+
+    async def test_no_session_in_those_hours_awards_nothing(self):
+        self.timers_started_at(datetime.datetime(YEAR, 3, 1, 6, 0), datetime.datetime(YEAR, 3, 2, 1, 59))
+        await self.ach.early_riser(self.db, USER, silent=False)
+        await self.ach.nocturnal(self.db, USER, silent=False)
+        self.assertEqual(self.awarded(), {})
+
+    async def test_eight_hours_in_a_game_in_a_day_is_dated_the_first_day_it_happened(self):
+        rows = [
+            (datetime.date(YEAR, 3, 9), "g1", 9 * 3600),
+            (datetime.date(YEAR, 2, 2), "g1", 8 * 3600),
+            (datetime.date(YEAR, 1, 5), "g1", 7 * 3600 + 3000),  # not enough
+            (datetime.date(YEAR, 1, 6), None, 9 * 3600),
+        ]
+        with mock.patch.object(ach_module.time_entries, "get_played_time_by_game_and_day", return_value=rows):
+            await self.ach.user_played_hours_game_day(self.db, USER)
+        self.assertEqual(self.awarded()["PLAYED_8_HOURS_GAME_DAY"], (datetime.date(YEAR, 2, 2), "g1"))
+        self.assertEqual(self.sent.await_count, 1)
+
     async def test_silent_checks_award_but_pass_silent_on(self):
         await self.ach.user_played_total_days(self.db, USER, self.days(7), silent=True)
         self.assertEqual(self.sent.await_args.args[1], True)
