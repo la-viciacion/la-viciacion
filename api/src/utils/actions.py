@@ -110,6 +110,7 @@ def after_session_change(
     user_id: int | None = None,
     silent: bool = False,
     ranking_before: dict | None = None,
+    stopped: tuple | None = None,
 ):
     """Background-task entrypoint for routers/timers.py and the admin panel.
 
@@ -120,7 +121,9 @@ def after_session_change(
     BackgroundTask runs) and its own event loop.
 
     `ranking_before` is the snapshot taken before the change (see ranking_snapshot); when
-    given and not silent, the ranking changes it caused are announced.
+    given and not silent, the ranking changes it caused are announced. `stopped` is (game_id, start,
+    duration in seconds) of the timer that has just been stopped: what only a real timer can earn
+    ("Lo he abierto sin querer") is judged from it, never from the sessions in the database.
     """
     from ..database.database import SessionLocal
 
@@ -128,6 +131,10 @@ def after_session_change(
         db = SessionLocal()
         try:
             await check_users(db, silent=silent, user_ids=None if user_id is None else [user_id])
+            if stopped is not None:
+                user = users.get_user_by_id(db, user_id)
+                if user is not None:
+                    await achievements.opened_by_mistake(db, user, *stopped, silent=silent)
             if ranking_before is not None:
                 await announce_ranking_changes(db, ranking_before, silent)
         finally:

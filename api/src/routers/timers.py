@@ -526,7 +526,10 @@ def stop_timer_endpoint(
     auth.ensure_self_or_admin(current_user, user_id=user_id)
     ranking_before = actions.ranking_snapshot(db)
     timer = stop_timer(db, timer_id, user_id)
-    background_tasks.add_task(actions.after_session_change, user_id, False, ranking_before)
+    background_tasks.add_task(
+        actions.after_session_change, user_id, False, ranking_before,
+        stopped=(timer.game_id, timer.start_time, timer.duration_seconds),
+    )
     background_tasks.add_task(actions.after_timer_stop, user_id, timer.game_id, timer.duration_seconds)
     return timer
 

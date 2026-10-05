@@ -110,7 +110,6 @@ class DaysAndStreaksTests(WorkTestCase):
         self.check_one()
         got = self.awarded()
         self.assertNotIn("PLAYED_7_DAYS", got)
-        self.assertIn("PLAYED_LESS_5_MIN_SESSION", got)  # but a very short session earns its own
 
     def test_a_gap_breaks_the_streak_not_the_count_of_days(self):
         self.play_days(self.ana, 3)
@@ -170,14 +169,20 @@ class TimeAndSessionTests(WorkTestCase):
         text = next(m["text"] for m in self.sent if E.PLAYED_100_HOURS_GAME.value["title"] in m["text"])
         self.assertIn("Celeste", text)
 
-    def test_a_session_of_five_minutes_or_less(self):
+    def test_a_timer_stopped_within_five_minutes_earns_opened_by_mistake(self):
         self.session(self.ana, "celeste", at(3, 1), 4)
-        self.check_one()
+        self.real_actions["after_session_change"](self.ana, False, None, stopped=("celeste", at(3, 1), 4 * 60))
         self.assertEqual(self.awarded()["PLAYED_LESS_5_MIN_SESSION"], (f"{YEAR}-03-01", "celeste"))
 
-    def test_a_session_of_zero_seconds_never_counts(self):
-        self.session(self.ana, "celeste", at(3, 1), 0)
+    def test_a_manual_or_edited_session_never_earns_it(self):
+        self.session(self.ana, "celeste", at(3, 1), 4)
         self.check_one()
+        self.real_actions["after_session_change"](self.ana, True)
+        self.assertNotIn("PLAYED_LESS_5_MIN_SESSION", self.awarded())
+
+    def test_a_timer_stopped_at_once_or_after_more_than_five_minutes_does_not(self):
+        for seconds in (0, 5 * 60 + 1):
+            self.real_actions["after_session_change"](self.ana, False, None, stopped=("celeste", at(3, 1), seconds))
         self.assertNotIn("PLAYED_LESS_5_MIN_SESSION", self.awarded())
 
     def test_playing_many_different_games_in_one_day(self):
@@ -338,15 +343,15 @@ class CompletionWorkTests(WorkTestCase):
         self.real_actions["after_completion"](entry, False)
         self.assertIn("JUST_IN_TIME", self.awarded())
 
-    def test_the_time_of_every_season_counts_towards_the_average(self):
+    def test_only_the_time_of_the_season_counts_towards_the_average(self):
         with self.engine.begin() as conn:
             conn.execute(text("UPDATE games SET avg_time = 7200 WHERE id = 'celeste'"))
         entry = self.library_entry(self.ana, "celeste", datetime.date(YEAR, 3, 1), completed=1, completed_date=datetime.date(YEAR, 3, 5))
         self.session(self.ana, "celeste", datetime.datetime(YEAR - 1, 11, 1, 20, 0), 60)  # last season's hour
         self.session(self.ana, "celeste", at(3, 1), 60)
         self.real_actions["after_completion"](entry, False)
-        self.assertIn("JUST_IN_TIME", self.awarded())
-        self.assertIn("*Celeste* en 02h00m", self.sent[-1]["text"])
+        self.assertNotIn("JUST_IN_TIME", self.awarded())
+        self.assertIn("*Celeste* en 01h00m", self.sent[-1]["text"])
 
     def test_a_game_far_from_the_average_does_not(self):
         with self.engine.begin() as conn:

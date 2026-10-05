@@ -298,10 +298,21 @@ class AchievementCheckTests(unittest.IsolatedAsyncioTestCase):
         await self.ach.early_riser(self.db, USER, silent=False)
         self.assertEqual(set(self.awarded()), {"EARLY_RISER"})
 
-    async def test_a_very_short_session_is_the_one_that_does_count_for_opened_by_mistake(self):
-        self.session_of(datetime.datetime(YEAR, 3, 1, 8), 3)
+    async def test_opened_by_mistake_comes_from_a_timer_that_stopped_within_five_minutes(self):
+        start = datetime.datetime(YEAR, 3, 1, 8)
+        await self.ach.opened_by_mistake(self.db, USER, "g1", start, 5 * 60)
+        self.assertEqual(self.awarded()["PLAYED_LESS_5_MIN_SESSION"], (datetime.date(YEAR, 3, 1), "g1"))
+        self.assertIn("Doom", self.message())
+
+    async def test_opened_by_mistake_needs_some_time_and_not_too_much(self):
+        for seconds in (None, 0, 5 * 60 + 1):
+            await self.ach.opened_by_mistake(self.db, USER, "g1", datetime.datetime(YEAR, 3, 1, 8), seconds)
+        self.assertEqual(self.awarded(), {})
+
+    async def test_the_sessions_of_the_database_never_earn_it(self):
+        self.session_of(datetime.datetime(YEAR, 3, 1, 8), 3)  # a manual session looks the same as a timer
         await self.ach.user_session_time(self.db, USER)
-        self.assertEqual(set(self.awarded()), {"PLAYED_LESS_5_MIN_SESSION"})
+        self.assertEqual(self.awarded(), {})
 
     async def test_silent_checks_award_but_pass_silent_on(self):
         await self.ach.user_played_total_days(self.db, USER, self.days(7), silent=True)

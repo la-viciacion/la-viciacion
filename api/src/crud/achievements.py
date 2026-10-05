@@ -68,6 +68,8 @@ HOURS_IN_A_GAME = (
     (E.PLAYED_500_HOURS_GAME, 500),
     (E.PLAYED_1000_HOURS_GAME, 1000),
 )
+# "Lo he abierto sin querer": a timer that was stopped within this many seconds
+OPENED_BY_MISTAKE_SECONDS = 5 * 60
 # "Justo a tiempo": the time played has to be this close (a fraction of it) to the HLTB average
 JUST_IN_TIME_TOLERANCE = 0.05
 
@@ -285,19 +287,10 @@ class Achievements:
             db,
             user.id,
             [
-                AchievementsElems.PLAYED_LESS_5_MIN_SESSION.name,
                 AchievementsElems.PLAYED_4_HOURS_SESSION.name,
                 AchievementsElems.PLAYED_8_HOURS_SESSION.name,
             ],
         )
-        # -5 min
-        if AchievementsElems.PLAYED_LESS_5_MIN_SESSION.name not in have:
-            entry = time_entries.get_time_entry_by_time(db, user.id, 5 * 60, 2)
-            if entry is not None:
-                await self._award(
-                    db, user, AchievementsElems.PLAYED_LESS_5_MIN_SESSION, silent,
-                    date=str(entry.start), game_id=entry.game_id,
-                )
         # +4 and +8 hours
         for ach, hours in (
             (AchievementsElems.PLAYED_4_HOURS_SESSION, 4),
@@ -307,6 +300,23 @@ class Achievements:
                 entry = time_entries.get_time_entry_by_time(db, user.id, hours * 60 * 60, 3)
                 if entry is not None:
                     await self._award(db, user, ach, silent, date=str(entry.start), game_id=entry.game_id)
+
+    async def opened_by_mistake(
+        self,
+        db: Session,
+        user: models.User,
+        game_id: str,
+        start_time: datetime.datetime,
+        duration_seconds: int | None,
+        silent: bool = False,
+    ):
+        """A timer that was stopped within 5 minutes. Only a real timer earns it, so it is judged when
+        the timer stops and never in the general check: a manual session or an edit cannot tell."""
+        if duration_seconds is None or not 0 < duration_seconds <= OPENED_BY_MISTAKE_SECONDS:
+            return
+        await self._unlock_if_new(
+            db, user, AchievementsElems.PLAYED_LESS_5_MIN_SESSION, silent, date=str(start_time), game_id=game_id
+        )
 
     async def user_played_total_days(
         self, db: Session, user: models.User, total_days: list, silent: bool = False

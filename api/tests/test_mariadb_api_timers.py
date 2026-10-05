@@ -141,6 +141,8 @@ class ActiveStopCancelTests(TimerTestCase):
         user, silent, ranking_before = self.background["after_session_change"].call_args.args
         self.assertEqual((user, silent), (self.ana, False))
         self.assertIsInstance(ranking_before, dict)
+        game_id, _, duration = self.background["after_session_change"].call_args.kwargs["stopped"]
+        self.assertEqual((game_id, duration), ("celeste", stopped["duration_seconds"]))  # what only a real timer can earn
         self.background["after_timer_stop"].assert_called_once_with(self.ana, "celeste", stopped["duration_seconds"])
 
     def test_a_timer_started_ahead_of_the_clock_stops_with_zero_not_negative_time(self):
