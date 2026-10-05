@@ -18,8 +18,6 @@ achievements = Achievements()
 config = Config()
 
 # To add dependency for active user: dependencies=[Depends(auth.get_current_active_user)],
-ACHIEVEMENT_IMAGE_MAX_BYTES = 1024000
-
 router = APIRouter(
     prefix="/utils",
     tags=["Utils"],
@@ -64,14 +62,10 @@ def upload_achievement_image(
     if not achievements.get_ach_by_key(db, achievement):
         logger.info(msg.ACHIEVEMENT_NOT_EXISTS)
         raise HTTPException(status_code=404, detail=msg.ACHIEVEMENT_NOT_EXISTS)
-    data = file.file.read(ACHIEVEMENT_IMAGE_MAX_BYTES + 1)
     try:
-        images.validate_image(data, ACHIEVEMENT_IMAGE_MAX_BYTES)
+        data = images.normalize_image(file.file.read(images.MAX_UPLOAD_BYTES + 1), images.ACHIEVEMENT_MAX_SIDE)
     except ValueError as e:
-        raise HTTPException(
-            status_code=400,
-            detail=msg.FILE_TOO_BIG_ACHIEVEMENTS if str(e) == "too_big" else msg.FILE_TYPE_NOT_ALLOWED,
-        )
+        raise HTTPException(status_code=400, detail=images.upload_error(e))
     try:
         achievements.upload_image(db, achievement, data)
         return "Image uploaded"

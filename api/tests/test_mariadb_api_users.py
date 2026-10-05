@@ -7,7 +7,7 @@ from datetime import timedelta
 from PIL import Image
 from sqlalchemy import text
 
-from src.utils import messages, seasons
+from src.utils import images, messages, seasons
 from tests.api_support import PASSWORD, ApiTestCase
 
 NEW_PASSWORD = "An0ther-secret!pw"
@@ -18,10 +18,15 @@ def ago(**delta) -> datetime.datetime:
     return datetime.datetime.now().replace(microsecond=0) - timedelta(**delta)
 
 
-def png() -> bytes:
+def png(size=(4, 4)) -> bytes:
     buffer = io.BytesIO()
-    Image.new("RGB", (4, 4), (200, 30, 30)).save(buffer, "PNG")
+    Image.new("RGB", size, (200, 30, 30)).save(buffer, "PNG")
     return buffer.getvalue()
+
+
+def stored_size(data: bytes) -> tuple:
+    with Image.open(io.BytesIO(data)) as image:
+        return image.size
 
 
 def gif() -> bytes:
@@ -475,10 +480,15 @@ class AvatarTests(UsersTestCase):
         return self.api("PATCH", f"/users/{username}/avatar", as_user=as_user, files={"file": (name, data, "image/png")})
 
     def test_a_picture_is_stored_and_served_back(self):
-        image = png()
-        self.assertEqual(self.upload(image).status_code, 200)
+        self.assertEqual(self.upload(png()).status_code, 200)
         served = self.api("GET", "/users/ana/avatar", as_user="ana")
-        self.assertEqual((served.status_code, served.headers["content-type"], served.content), (200, "image/png", image))
+        self.assertEqual((served.status_code, served.headers["content-type"], stored_size(served.content)), (200, "image/png", (4, 4)))
+
+    def test_a_big_picture_is_stored_scaled_down(self):
+        self.assertEqual(self.upload(png((1024, 1024))).status_code, 200)
+        served = self.api("GET", "/users/ana/avatar", as_user="ana")
+        self.assertEqual(stored_size(served.content), (256, 256))
+        self.assertLess(len(served.content), 5_000)
 
     def test_there_is_a_404_until_one_is_uploaded(self):
         self.assertEqual(self.api("GET", "/users/ana/avatar", as_user="ana").status_code, 404)
@@ -490,8 +500,8 @@ class AvatarTests(UsersTestCase):
         self.assertEqual(self.upload(b"").status_code, 400)
 
     def test_the_size_is_limited(self):
-        response = self.upload(b"\x89PNG" + b"0" * (2 * 1024 * 1024 + 10))
-        self.assertEqual((response.status_code, response.json()["detail"]), (400, messages.FILE_TOO_BIG))
+        response = self.upload(b"\x89PNG" + b"0" * (5 * 1024 * 1024 + 10))
+        self.assertEqual((response.status_code, response.json()["detail"]), (400, images.upload_error(ValueError("too_big"))))
 
     def test_a_new_picture_replaces_the_old_one(self):
         self.upload(png())
@@ -499,7 +509,7 @@ class AvatarTests(UsersTestCase):
         Image.new("RGB", (4, 4), (0, 0, 255)).save(jpeg, "JPEG")
         self.upload(jpeg.getvalue(), name="b.jpg")
         served = self.api("GET", "/users/ana/avatar", as_user="ana")
-        self.assertEqual((served.headers["content-type"], served.content), ("image/jpeg", jpeg.getvalue()))
+        self.assertEqual((served.headers["content-type"], stored_size(served.content)), ("image/jpeg", (4, 4)))
 
     def test_avatars_are_private_to_the_owner_and_the_admins(self):
         self.assertEqual(self.upload(png(), as_user="bea").status_code, 403)
@@ -518,10 +528,9 @@ class PlayerPhotoTests(UsersTestCase):
                                   files={"file": ("a.png", data or png(), "image/png")}).status_code, 200)
 
     def test_any_logged_in_player_sees_the_photo_of_an_active_player(self):
-        image = png()
-        self.upload(data=image)
+        self.upload(data=png())
         served = self.photo(self.ana)
-        self.assertEqual((served.status_code, served.headers["content-type"], served.content), (200, "image/png", image))
+        self.assertEqual((served.status_code, served.headers["content-type"], stored_size(served.content)), (200, "image/png", (4, 4)))
 
     def test_it_can_be_revalidated_with_its_etag(self):
         self.upload()

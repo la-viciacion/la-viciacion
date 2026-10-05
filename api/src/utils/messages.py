@@ -22,14 +22,13 @@ USER_NOT_ADMIN ="You are not allowed to do this action"
 
 GAME_ALREADY_COMPLETED = "Game is already completed"
 
-FILE_TYPE_NOT_ALLOWED = "File type not supported. Only jpeg, jpg and png are allowed"
-FILE_TOO_BIG = "File is too big. Max size is 2MB"
+FILE_TYPE_NOT_ALLOWED = "Archivo no admitido. Solo se aceptan imágenes JPG o PNG"
+FILE_TOO_BIG = "La imagen es demasiado grande (máximo {mb} MB y {mp} megapíxeles)"
 
 PASSWORD_REQUIREMENTS = "The password does not meet the requirements"
 EMAIL_VALIDATION = "The email has not a valid email format"
 
 ACHIEVEMENT_NOT_EXISTS = "Achievement not exists"
-FILE_TOO_BIG_ACHIEVEMENTS = "File is too big. Max size is 1MB"
 
 INTERNAL_ERROR = "Error interno. Inténtalo de nuevo más tarde"
 TOO_MANY_ATTEMPTS = "Demasiados intentos fallidos. Vuelve a intentarlo en {minutes} min"

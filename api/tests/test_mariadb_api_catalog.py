@@ -9,7 +9,7 @@ from unittest import mock
 from PIL import Image
 
 from src.database import database
-from src.utils import messages, my_utils, push, seasons, settings
+from src.utils import images, messages, my_utils, push, seasons, settings
 from tests.api_support import ApiTestCase
 
 
@@ -228,9 +228,9 @@ class CreateGameTests(CatalogTestCase):
 
 
 class PlatformsAndAchievementImagesTests(CatalogTestCase):
-    def png(self):
+    def png(self, size=(4, 4)):
         buffer = io.BytesIO()
-        Image.new("RGB", (4, 4), (1, 2, 3)).save(buffer, "PNG")
+        Image.new("RGB", size, (1, 2, 3)).save(buffer, "PNG")
         return buffer.getvalue()
 
     def key(self):
@@ -254,7 +254,14 @@ class PlatformsAndAchievementImagesTests(CatalogTestCase):
         self.assertEqual(self.api("GET", f"/utils/achievement-image/{key}").status_code, 400)  # none yet
         self.assertEqual(self.put(self.png()).status_code, 200)
         served = self.api("GET", f"/utils/achievement-image/{key}")  # no token: an <img> cannot send one
-        self.assertEqual((served.status_code, served.headers["content-type"], served.content), (200, "image/png", self.png()))
+        self.assertEqual((served.status_code, served.headers["content-type"]), (200, "image/png"))
+        self.assertEqual(Image.open(io.BytesIO(served.content)).size, (4, 4))
+
+    def test_a_big_achievement_image_is_stored_scaled_down(self):
+        key = self.key()
+        self.assertEqual(self.put(self.png((1024, 1024))).status_code, 200)
+        served = self.api("GET", f"/utils/achievement-image/{key}")
+        self.assertEqual(Image.open(io.BytesIO(served.content)).size, (512, 512))
 
     def test_an_unknown_achievement_is_a_404(self):
         self.assertEqual(self.api("GET", "/utils/achievement-image/nope").status_code, 404)
@@ -264,8 +271,8 @@ class PlatformsAndAchievementImagesTests(CatalogTestCase):
         self.assertEqual(self.put(self.png(), as_user="ana").status_code, 403)
         refused = self.put(b"GIF89a not an image")
         self.assertEqual((refused.status_code, refused.json()["detail"]), (400, messages.FILE_TYPE_NOT_ALLOWED))
-        big = self.put(b"\x89PNG" + b"0" * 1_100_000)
-        self.assertEqual((big.status_code, big.json()["detail"]), (400, messages.FILE_TOO_BIG_ACHIEVEMENTS))
+        big = self.put(b"\x89PNG" + b"0" * (5 * 1024 * 1024 + 10))
+        self.assertEqual((big.status_code, big.json()["detail"]), (400, images.upload_error(ValueError("too_big"))))
 
 
 class RankingsTests(CatalogTestCase):
