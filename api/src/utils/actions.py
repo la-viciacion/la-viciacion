@@ -53,14 +53,8 @@ async def check_user(
     best_streak_date, best_streak = streaks.streak_summary(played_days, today, current_season)[:2]
     if announce_streak_loss:
         await announce_lost_streak(user, played_days, today, silent)
-    for game_id, played_time in time_entries.get_user_games_played_time(db, user.id):
-        if played_time is not None:
-            await achievements.user_played_hours_game(
-                db=db, user=user, game_id=game_id, played_time=played_time, silent=silent
-            )
-    played_time = time_entries.get_user_played_time(db, user.id)
-    played_time = played_time[1] if played_time is not None else 0
-    await achievements.user_played_total_time(db, user, played_time, silent=silent)
+    await achievements.user_played_hours_game(db, user, silent=silent)
+    await achievements.user_played_total_time(db, user, silent=silent)
     await achievements.user_session_time(db, user, silent=silent)
     await achievements.user_played_total_games(db, user, silent=silent)
     await achievements.user_completed_total_games(db, user, silent=silent)

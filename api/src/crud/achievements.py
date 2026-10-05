@@ -230,18 +230,15 @@ class Achievements:
         return True
 
     async def user_played_total_time(
-        self,
-        db: Session,
-        user: models.User,
-        played_time: int,
-        date: str = None,
-        silent: bool = False,
+        self, db: Session, user: models.User, silent: bool = False
     ):
-        if played_time is None:
-            return
-        await self._unlock_reached(
-            db, user, played_time / 60 / 60, TOTAL_HOURS, silent, date_for=lambda needed: date
-        )
+        """Dated the day the season's running total of hours crossed each threshold."""
+        total = 0
+        running = []
+        for day, seconds in time_entries.get_played_time_by_day(db, user.id):
+            total += seconds or 0
+            running.append((day, total / 60 / 60))
+        await self._unlock_first_day_reaching(db, user, running, TOTAL_HOURS, silent)
 
     async def _unlock_first_day_reaching(
         self,
@@ -332,32 +329,43 @@ class Achievements:
         await self._unlock_first_day_reaching(db, user, [tuple(row) for row in days], GAMES_IN_A_DAY, silent)
 
     async def user_played_total_games(
-        self, db: Session, user: models.User, date: str = None, silent: bool = False
+        self, db: Session, user: models.User, silent: bool = False
     ):
-        played_games = users.count_played_games(db, user.id)  # distinct games
-        await self._unlock_reached(db, user, played_games, PLAYED_GAMES, silent)
+        """Distinct games of the season, dated the day the Nth one began."""
+        dates = users.played_game_dates(db, user.id)
+        await self._unlock_reached(
+            db, user, len(dates), PLAYED_GAMES, silent, date_for=lambda needed: str(dates[needed - 1])
+        )
 
     async def user_completed_total_games(
         self, db: Session, user: models.User, silent: bool = False
     ):
+        """Dated the day the Nth game was completed."""
+        dates = users.completed_game_dates(db, user.id)
         await self._unlock_reached(
-            db, user, users.count_completed_games(db, user.id), COMPLETED_GAMES, silent
+            db, user, len(dates), COMPLETED_GAMES, silent, date_for=lambda needed: str(dates[needed - 1])
         )
 
     async def user_played_hours_game(
-        self,
-        db: Session,
-        user: models.User,
-        game_id: str,
-        played_time: int,
-        date: str = None,
-        silent: bool = False,
+        self, db: Session, user: models.User, silent: bool = False
     ):
+        """100 h in one game this season, dated the day it crossed them. With several games over the
+        line, the one that crossed first is the one named."""
         # only 100 h per game is active: the 500 h and 1000 h achievements exist but are not awarded yet
-        if int(played_time / 60 / 60) >= 100:
-            await self._unlock_if_new(
-                db, user, AchievementsElems.PLAYED_100_HOURS_GAME, silent, game_id=game_id
-            )
+        ach = AchievementsElems.PLAYED_100_HOURS_GAME
+        if self.check_already_achieved(db, user.id, ach.name):
+            return
+        totals: dict[str, float] = {}
+        first = None  # (day it crossed, game_id)
+        for day, game_id, seconds in sorted(
+            (row for row in time_entries.get_played_time_by_game_and_day(db, user.id) if row[1] is not None),
+            key=lambda row: row[0],
+        ):
+            totals[game_id] = totals.get(game_id, 0) + (seconds or 0)
+            if totals[game_id] / 60 / 60 >= 100 and (first is None or (day, game_id) < first):
+                first = (day, game_id)
+        if first is not None:
+            await self._award(db, user, ach, silent, date=str(first[0]), game_id=first[1])
 
     async def happy_new_year(
         self,

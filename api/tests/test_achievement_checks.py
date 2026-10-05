@@ -59,12 +59,22 @@ class AchievementCheckTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.awarded(), {})
         self.sent.assert_not_awaited()
 
-    async def test_total_time_thresholds(self):
-        await self.ach.user_played_total_time(self.db, USER, 250 * 3600)
-        self.assertEqual(set(self.awarded()), {"PLAYED_100_HOURS", "PLAYED_200_HOURS"})
+    async def test_total_time_is_dated_the_day_the_running_total_crossed_each_threshold(self):
+        rows = [
+            (datetime.date(YEAR, 1, 10), 90 * 3600),
+            (datetime.date(YEAR, 2, 1), None),
+            (datetime.date(YEAR, 3, 5), 70 * 3600),
+            (datetime.date(YEAR, 4, 1), 50 * 3600),
+        ]
+        with mock.patch.object(ach_module.time_entries, "get_played_time_by_day", return_value=rows):
+            await self.ach.user_played_total_time(self.db, USER)
+        got = self.awarded()
+        self.assertEqual(set(got), {"PLAYED_100_HOURS", "PLAYED_200_HOURS"})
+        self.assertEqual(got["PLAYED_100_HOURS"][0], datetime.date(YEAR, 3, 5))
+        self.assertEqual(got["PLAYED_200_HOURS"][0], datetime.date(YEAR, 4, 1))
 
     async def test_total_time_without_data_does_nothing(self):
-        await self.ach.user_played_total_time(self.db, USER, None)
+        await self.ach.user_played_total_time(self.db, USER)
         self.assertEqual(self.awarded(), {})
 
     async def test_streaks_use_the_given_date(self):
@@ -73,21 +83,74 @@ class AchievementCheckTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(set(got), {"STREAK_7_DAYS", "STREAK_15_DAYS"})
         self.assertEqual(got["STREAK_7_DAYS"][0], datetime.date(YEAR, 2, 3))
 
-    async def test_games_played_and_completed(self):
-        with mock.patch.object(ach_module.users, "count_played_games", return_value=42), \
-                mock.patch.object(ach_module.users, "count_completed_games", return_value=42):
-            await self.ach.user_played_total_games(self.db, USER)
-            await self.ach.user_completed_total_games(self.db, USER)
-        self.assertEqual(
-            set(self.awarded()),
-            {"PLAYED_10_GAMES", "PLAYED_42_GAMES", "COMPLETED_42_GAMES"},
+    def library_entry(self, game_id, started, completed=None, platform=None):
+        self.db.add(
+            models.UserGame(
+                user_id=1, game_id=game_id, started_date=started, platform=platform,
+                completed=1 if completed else 0, completed_date=completed,
+            )
         )
 
-    async def test_hours_in_a_game_name_the_game(self):
-        await self.ach.user_played_hours_game(self.db, USER, "g1", 101 * 3600)
+    async def test_played_games_are_dated_the_day_the_nth_game_began(self):
+        for n in range(10):
+            self.library_entry(f"g{n}", datetime.date(YEAR, 1, 1) + datetime.timedelta(days=n * 2))
+        # the same game on another platform is not another game
+        self.library_entry("g0", datetime.date(YEAR, 6, 1), platform="switch")
+        self.db.commit()
+        await self.ach.user_played_total_games(self.db, USER)
         got = self.awarded()
-        self.assertEqual(got["PLAYED_100_HOURS_GAME"][1], "g1")
+        self.assertEqual(set(got), {"PLAYED_10_GAMES"})
+        self.assertEqual(got["PLAYED_10_GAMES"][0], datetime.date(YEAR, 1, 19))
+
+    async def test_nine_games_and_a_repeat_are_not_ten(self):
+        for n in range(9):
+            self.library_entry(f"g{n}", datetime.date(YEAR, 1, 1) + datetime.timedelta(days=n))
+        self.library_entry("g0", datetime.date(YEAR, 6, 1), platform="switch")
+        self.db.commit()
+        await self.ach.user_played_total_games(self.db, USER)
+        self.assertEqual(self.awarded(), {})
+
+    async def test_completed_games_are_dated_the_day_the_nth_was_completed(self):
+        for n in range(42):
+            self.library_entry(f"g{n}", datetime.date(YEAR, 1, 1), completed=datetime.date(YEAR, 1, 1) + datetime.timedelta(days=41 - n))
+        self.db.commit()
+        await self.ach.user_completed_total_games(self.db, USER)
+        got = self.awarded()
+        self.assertEqual(set(got), {"COMPLETED_42_GAMES"})
+        self.assertEqual(got["COMPLETED_42_GAMES"][0], datetime.date(YEAR, 1, 1) + datetime.timedelta(days=41))
+
+    async def test_hours_in_a_game_are_dated_the_day_they_crossed_100_and_name_the_game(self):
+        self.db.add(models.Game(id="g2", name="Hades", slug="hades"))
+        self.db.commit()
+        rows = [
+            (datetime.date(YEAR, 3, 1), "g1", 50 * 3600),
+            (datetime.date(YEAR, 2, 1), "g1", 60 * 3600),  # g1 crosses on 1 March
+            (datetime.date(YEAR, 4, 1), "g2", 101 * 3600),  # g2 crosses later: not the one
+            (datetime.date(YEAR, 1, 5), "g3", 40 * 3600),
+        ]
+        with mock.patch.object(ach_module.time_entries, "get_played_time_by_game_and_day", return_value=rows):
+            await self.ach.user_played_hours_game(self.db, USER)
+        got = self.awarded()
+        self.assertEqual(got["PLAYED_100_HOURS_GAME"], (datetime.date(YEAR, 3, 1), "g1"))
         self.assertIn("Doom", self.message())
+        self.assertEqual(self.sent.await_count, 1)
+
+    async def test_the_first_game_to_cross_100_hours_wins_even_when_it_is_not_the_biggest(self):
+        self.db.add(models.Game(id="g2", name="Hades", slug="hades"))
+        self.db.commit()
+        rows = [
+            (datetime.date(YEAR, 2, 1), "g2", 100 * 3600),
+            (datetime.date(YEAR, 3, 1), "g1", 300 * 3600),
+        ]
+        with mock.patch.object(ach_module.time_entries, "get_played_time_by_game_and_day", return_value=rows):
+            await self.ach.user_played_hours_game(self.db, USER)
+        self.assertEqual(self.awarded()["PLAYED_100_HOURS_GAME"], (datetime.date(YEAR, 2, 1), "g2"))
+
+    async def test_99_hours_in_a_game_is_not_enough(self):
+        rows = [(datetime.date(YEAR, 2, 1), "g1", 99 * 3600 + 3000)]
+        with mock.patch.object(ach_module.time_entries, "get_played_time_by_game_and_day", return_value=rows):
+            await self.ach.user_played_hours_game(self.db, USER)
+        self.assertEqual(self.awarded(), {})
 
     async def test_hours_in_one_day_use_that_day(self):
         day = datetime.date(YEAR, 3, 5)

@@ -443,6 +443,27 @@ def count_completed_games(db: Session, user_id: int, season: int = None):
         raise e
 
 
+def played_game_dates(db: Session, user_id: int, season: int = None) -> list[datetime.date]:
+    """The day the user first played each distinct game of the season, oldest first: the Nth one is
+    the day their Nth game began."""
+    season = seasons.or_current(season)
+    query = db.query(func.min(models.UserGame.started_date)).filter(models.UserGame.user_id == user_id)
+    if season != seasons.ALL:
+        query = query.filter(models.UserGame.season == season)
+    return sorted(day for (day,) in query.group_by(models.UserGame.game_id).all())
+
+
+def completed_game_dates(db: Session, user_id: int, season: int = None) -> list[datetime.date]:
+    """The day of each completion of the season, oldest first (one per completed library entry, as
+    count_completed_games counts them)."""
+    season = seasons.or_current(season)
+    when = func.coalesce(models.UserGame.completed_date, models.UserGame.started_date)
+    query = db.query(when).filter(models.UserGame.user_id == user_id, models.UserGame.completed == 1)
+    if season != seasons.ALL:
+        query = query.filter(models.UserGame.season == season)
+    return sorted(day for (day,) in query.all())
+
+
 def first_entry_per_game(rows, limit: int | None = None) -> list:
     """The first row of each game, in the order given, at most `limit` of them."""
     seen, unique = set(), []
