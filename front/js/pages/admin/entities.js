@@ -284,7 +284,7 @@ ENTITIES.awards = {
   name: (r) => `${r.user || r.user_id} · ${r.title || r.key}`,
   canDelete: true,
   deleteLabel: 'Revocar',
-  deleteNote: 'El logro se revoca sin avisar por Telegram. Si el jugador sigue cumpliendo la condición, el próximo recálculo (o el de las 05:00) lo volverá a conceder: corrige antes los datos que lo provocaron.',
+  deleteNote: 'El logro se revoca sin avisar por Telegram. Si el jugador sigue cumpliendo la condición, el próximo recálculo lo volverá a conceder: corrige antes los datos que lo provocaron.',
 };
 
 ENTITIES.audit = {

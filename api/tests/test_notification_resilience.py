@@ -66,7 +66,7 @@ class CheckUsersTests(unittest.IsolatedAsyncioTestCase):
                 mock.patch.object(actions.utils, "send_message_to_admins", new=mock.AsyncMock()) as alert:
             await actions.check_users(db)
         self.assertEqual(checked, [1, 3])
-        teamwork.assert_awaited_once()
+        teamwork.assert_not_awaited()  # only a timer that starts can make it true
         db.rollback.assert_called_once()
         self.assertIn("u2", alert.await_args.args[1])
 

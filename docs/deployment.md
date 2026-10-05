@@ -37,7 +37,7 @@ Deploying v2 to a *new* environment from a backup taken on the old (Clockify-bas
    docker compose logs laviciacion-db   # look for the SQL import log lines
    docker compose logs laviciacion-api  # look for "Running upgrade ..." lines from alembic, no errors
    ```
-5. Nothing to recompute: totals, rankings and streaks are computed from the sessions whenever they are requested. (Optional) Use **Comprobar logros** in the admin panel so achievements earned by the imported history are registered right away instead of at the next 05:00 check.
+5. Nothing to recompute: totals, rankings and streaks are computed from the sessions whenever they are requested. (Optional) Use **Comprobar logros** in the admin panel so achievements earned by the imported history are registered right away: nothing re-checks them by itself, only a stopped timer, a change to sessions or library entries, or this button.
 
 `db/init/` itself is tracked (so it always exists on a fresh clone), but the SQL/backup files you drop into it are gitignored — never commit a real database dump.
 

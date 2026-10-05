@@ -54,11 +54,17 @@ class WorkTestCase(ApiTestCase):
                 await actions.check_users(db, silent=silent, user_ids=user_ids, **kwargs)
         asyncio.run(run())
 
-    def check_one(self, username="ana", silent=False, announce_streak_loss=False):
+    def check_one(self, username="ana", silent=False):
         async def run():
             with database.SessionLocal() as db:
                 user = db.query(models.User).filter_by(username=username).one()
-                await actions.check_user(db, user, silent=silent, announce_streak_loss=announce_streak_loss)
+                await actions.check_user(db, user, silent=silent)
+        asyncio.run(run())
+
+    def announce_lost_streaks(self, today):
+        async def run():
+            with database.SessionLocal() as db:
+                await actions.announce_lost_streaks(db, today)
         asyncio.run(run())
 
     def awarded(self, user_id=None) -> dict:
@@ -134,12 +140,13 @@ class DaysAndStreaksTests(WorkTestCase):
         today = datetime.date.today()
         for back in range(2, 14):  # twelve days, the last one two days ago
             self.session(self.ana, "celeste", datetime.datetime.combine(today - timedelta(days=back), datetime.time(20, 0)), 30)
-        self.check_one(announce_streak_loss=True)
+        self.announce_lost_streaks(today)
         lost = [m["text"] for m in self.sent if "perder la racha" in m["text"]]
         self.assertEqual(len(lost), 1)
         self.assertIn("12 días", lost[0])
         self.sent.clear()
-        self.check_one(announce_streak_loss=False)
+        self.announce_lost_streaks(today + timedelta(days=1))  # the day after: nothing more to say
+        self.check_one()  # and a check of the achievements never announces it
         self.assertFalse([m for m in self.sent if "perder la racha" in m["text"]])
 
 
@@ -235,10 +242,17 @@ class TeamworkTests(WorkTestCase):
                 db.add(models.GameTimer(user_id=user.id, game_id="celeste", start_time=datetime.datetime.now(), is_active=True, platform="pc"))
             db.commit()
 
+    def team_check(self):
+        """What starting a timer runs (after_timer_start): teamwork is not part of the general check."""
+        async def run():
+            with database.SessionLocal() as db:
+                await actions.achievements.teamwork(db, silent=False)
+        asyncio.run(run())
+
     def test_four_players_at_once_unlock_it_for_everybody_with_one_message(self):
         cai, dan = self.user("cai"), self.user("dan")
         self.start_timers("ana", "bea", "cai", "dan")
-        self.check()
+        self.team_check()
         for user_id in (self.ana, self.bea, cai, dan):
             self.assertIn("TEAMWORK", self.awarded(user_id), user_id)
         teamwork = [m["text"] for m in self.sent if E.TEAMWORK.value["title"] in m["text"]]
@@ -248,15 +262,21 @@ class TeamworkTests(WorkTestCase):
     def test_three_are_not_enough_and_a_repeat_stays_quiet(self):
         self.user("cai"), self.user("dan")
         self.start_timers("ana", "bea", "cai")
-        self.check()
+        self.team_check()
         self.assertEqual(self.sent, [])
         self.start_timers("dan")
-        self.check()
-        self.check()
+        self.team_check()
+        self.team_check()
         self.assertEqual(len([m for m in self.sent if E.TEAMWORK.value["title"] in m["text"]]), 1)
 
     def test_a_disabled_player_does_not_count(self):
         self.user("cai"), self.user("dan", active=False)
+        self.start_timers("ana", "bea", "cai", "dan")
+        self.team_check()
+        self.assertFalse([m for m in self.sent if E.TEAMWORK.value["title"] in m["text"]])
+
+    def test_the_general_check_does_not_evaluate_it(self):
+        self.user("cai"), self.user("dan")
         self.start_timers("ana", "bea", "cai", "dan")
         self.check()
         self.assertFalse([m for m in self.sent if E.TEAMWORK.value["title"] in m["text"]])

@@ -42,13 +42,10 @@ async def check_user(
     db: Session,
     user: models.User,
     silent: bool = False,
-    announce_streak_loss: bool = False,
 ):
     """Check every achievement of one user against their sessions and library."""
     played_days = time_entries.get_played_days(db, user.id)
     await achievements.user_played_total_days(db, user, played_days, silent=silent)
-    if announce_streak_loss:
-        await announce_lost_streak(user, played_days, datetime.date.today(), silent)
     await achievements.user_played_hours_game(db, user, silent=silent)
     await achievements.user_played_total_time(db, user, silent=silent)
     await achievements.user_session_time(db, user, silent=silent)
@@ -68,12 +65,12 @@ async def check_users(
     silent: bool = False,
     only_active_users: bool = True,
     user_ids: list[int] | None = None,
-    announce_streak_loss: bool = False,
 ):
     """Check the achievements of every user (or of `user_ids`).
 
-    Event-driven: it runs right after a timer stops (routers/timers.py), from the
-    admin panel, and from the scheduler (utils/scheduler.py) for the daily check.
+    Event-driven: it runs after a timer stops or a session or library entry changes (routers/timers.py,
+    routers/manage.py, the import) and when an admin asks for it. Teamwork is not checked here: only a
+    timer that starts can make it true (after_timer_start).
     """
     start_time = time.time()
     users_db = users.get_users(db, only_active_users)
@@ -84,12 +81,11 @@ async def check_users(
         for user in users_db:
             # one user's failure must not skip the checks of the rest
             try:
-                await check_user(db, user, silent=silent, announce_streak_loss=announce_streak_loss)
+                await check_user(db, user, silent=silent)
             except Exception as e:
                 db.rollback()
                 logger.error(f"Error checking achievements of {user.username}: {e}")
                 failures.append(user.username)
-        await achievements.teamwork(db, silent)
         elapsed_time = time.time() - start_time
         if elapsed_time > 30:
             await utils.send_message_to_admins(
@@ -215,13 +211,16 @@ def after_completion(entry_id: int, silent: bool = False):
             logger.error("Error in post-completion tasks: " + str(e))
 
 
-async def announce_lost_streak(user: models.User, played_dates: list[datetime.date], today: datetime.date, silent: bool):
-    """Announce a streak of more than 10 days on the day it is lost (daily check)."""
-    lost = streaks.lost_streak(played_dates, today)
-    if lost is not None:
-        msg = user.name + " acaba de perder la racha de " + str(lost) + " días."
-        logger.info(msg)
-        await utils.send_message(msg, silent)
+async def announce_lost_streaks(db: Session, today: datetime.date | None = None, silent: bool = False):
+    """Daily: announce the streaks of more than 10 days that were lost. It is the one thing nothing
+    else can trigger: a streak is lost on a day nobody plays."""
+    today = today or datetime.date.today()
+    for user in users.get_users(db):
+        lost = streaks.lost_streak(time_entries.get_played_days(db, user.id), today)
+        if lost is not None:
+            msg = user.name + " acaba de perder la racha de " + str(lost) + " días."
+            logger.info(msg)
+            await utils.send_message(msg, silent)
 
 
 ####################

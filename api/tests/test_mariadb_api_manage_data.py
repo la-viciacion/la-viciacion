@@ -285,6 +285,21 @@ class SessionsAdminTests(ManageTestCase):
         self.background["after_timer_stop"].assert_called_once_with(self.ana, "celeste", None)
         self.assertEqual(self.admin("DELETE", f"/timers/{timer_id}").status_code, 404)
 
+    def test_every_change_of_an_admin_checks_the_achievements_of_that_player_silently(self):
+        check = self.background["after_session_change"]
+        timer_id = self.admin("POST", "/timers", json=self.body()).json()["id"]
+        check.assert_called_once_with(self.ana, True)
+        check.reset_mock()
+        self.admin("PATCH", f"/timers/{timer_id}", json={"notes": "fixed"})
+        check.assert_called_once_with(self.ana, True)
+        check.reset_mock()
+        self.admin("DELETE", f"/timers/{timer_id}")
+        check.assert_called_once_with(self.ana, True)
+
+    def test_a_rejected_change_checks_nothing(self):
+        self.admin("POST", "/timers", json=self.body(end_time=ago(hours=6).isoformat()))
+        self.background["after_session_change"].assert_not_called()
+
     def test_deleting_a_finished_session_schedules_nothing(self):
         timer_id = self.session(self.ana, "celeste", ago(hours=4), 30)
         self.admin("DELETE", f"/timers/{timer_id}")
@@ -338,6 +353,17 @@ class LibraryAdminTests(ManageTestCase):
         self.assertEqual(self.admin("DELETE", f"/library/{self.second}").status_code, 200)
         self.assertEqual(self.admin("DELETE", f"/library/{self.second}").status_code, 404)
         self.assertEqual(self.entries()["total"], 2)
+
+    def test_every_change_of_an_admin_checks_the_achievements_of_that_player_silently(self):
+        check = self.background["after_session_change"]
+        created = self.admin("POST", "/library", json={"user_id": self.bea, "game_id": "celeste", "platform": "pc"}).json()
+        check.assert_called_once_with(self.bea, True)
+        check.reset_mock()
+        self.admin("PATCH", f"/library/{created['id']}", json={"completed": True})
+        check.assert_called_once_with(self.bea, True)
+        check.reset_mock()
+        self.admin("DELETE", f"/library/{created['id']}")
+        check.assert_called_once_with(self.bea, True)
 
 
 class ScoresAdminTests(ManageTestCase):

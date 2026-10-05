@@ -609,13 +609,19 @@ class TimerCreate(BaseModel):
     notes: Optional[str] = Field(None, max_length=NOTES_MAX)
 
 
+def _recheck_achievements(background_tasks: BackgroundTasks, user_id: int) -> None:
+    """An admin's change to the sessions or the library can earn the player an achievement: check it
+    silently, like a manual session of their own (nothing is announced to the group)."""
+    background_tasks.add_task(actions.after_session_change, user_id, True)
+
+
 def _check_range(start: datetime.datetime, end: Optional[datetime.datetime]):
     if end is not None and end <= start:
         raise HTTPException(status_code=400, detail="El fin debe ser posterior al inicio")
 
 
 @router.post("/timers", status_code=201)
-def create_timer(body: TimerCreate, db: Session = Depends(get_db)):
+def create_timer(body: TimerCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """Create a finished session by hand (e.g. a forgotten timer)."""
     _get_or_404(db, models.User, body.user_id, "Usuario")
     _get_or_404(db, models.Game, body.game_id, "Juego")
@@ -633,6 +639,7 @@ def create_timer(body: TimerCreate, db: Session = Depends(get_db)):
     db.add(timer)
     users_crud.ensure_library_entry(db, body.user_id, body.game_id, body.platform, body.start_time)
     _commit(db, "Sesión")
+    _recheck_achievements(background_tasks, body.user_id)
     return _timer_out(timer, None, None)
 
 
@@ -678,6 +685,7 @@ def patch_timer(timer_id: int, body: TimerPatch, background_tasks: BackgroundTas
     if was_running and not timer.is_active:
         # a stuck timer was finished by hand: its pinned notification has to go
         background_tasks.add_task(actions.after_timer_stop, timer.user_id, timer.game_id, timer.duration_seconds)
+    _recheck_achievements(background_tasks, timer.user_id)
     return _timer_out(timer, None, None)
 
 
@@ -688,6 +696,7 @@ def delete_timer(timer_id: int, background_tasks: BackgroundTasks, db: Session =
         background_tasks.add_task(actions.after_timer_stop, timer.user_id, timer.game_id, None)
     db.delete(timer)
     db.commit()
+    _recheck_achievements(background_tasks, timer.user_id)
     return {"message": "Sesión eliminada"}
 
 
@@ -759,7 +768,7 @@ class LibraryCreate(BaseModel):
 
 
 @router.post("/library", status_code=201)
-def create_library(body: LibraryCreate, db: Session = Depends(get_db)):
+def create_library(body: LibraryCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     _get_or_404(db, models.User, body.user_id, "Usuario")
     _get_or_404(db, models.Game, body.game_id, "Juego")
     row = models.UserGame(
@@ -771,6 +780,7 @@ def create_library(body: LibraryCreate, db: Session = Depends(get_db)):
     )
     db.add(row)
     _commit(db, "Biblioteca")
+    _recheck_achievements(background_tasks, body.user_id)
     return _library_out(row, None, None)
 
 
@@ -783,7 +793,7 @@ class LibraryPatch(BaseModel):
 
 
 @router.patch("/library/{row_id}")
-def patch_library(row_id: int, body: LibraryPatch, db: Session = Depends(get_db)):
+def patch_library(row_id: int, body: LibraryPatch, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     row = _get_or_404(db, models.UserGame, row_id, "Entrada de biblioteca")
     data = body.model_dump(exclude_unset=True)
     if "completed" in data and data["completed"] is not None:
@@ -791,14 +801,16 @@ def patch_library(row_id: int, body: LibraryPatch, db: Session = Depends(get_db)
     for k, v in data.items():
         setattr(row, k, v)
     _commit(db, "Biblioteca")
+    _recheck_achievements(background_tasks, row.user_id)
     return _library_out(row, None, None)
 
 
 @router.delete("/library/{row_id}")
-def delete_library(row_id: int, db: Session = Depends(get_db)):
+def delete_library(row_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     row = _get_or_404(db, models.UserGame, row_id, "Entrada de biblioteca")
     db.delete(row)
     db.commit()
+    _recheck_achievements(background_tasks, row.user_id)
     return {"message": "Entrada eliminada"}
 
 
