@@ -1,9 +1,8 @@
 // Profile page: a header (photo and name) and, below it, the layout of the admin panel: a side menu
-// (a collapsible bar on a phone) with three sections so nothing needs a long scroll. Resumen is the
+// (a collapsible bar on a phone) with two sections so nothing needs a long scroll. Resumen is the
 // default: the stats of a season (the running one, another one or the total of all, chosen with the
 // pills), top games, achievements and, below them, the games of the selected season (see library.js).
-// Recomendados (see recommendations.js) and Ajustes (personal data, password, notifications, session)
-// are the others. The recommendations and the settings load the first time their section is opened.
+// Ajustes (personal data, password, notifications, session) is the other; it loads the first time it is opened.
 // The layout classes (adm-shell, adm-side, adm-nav...) are the admin's, so both look the same.
 // All routes are /api/v1/users/{username}/...
 import { api } from '../../lib/api.js';
@@ -19,7 +18,6 @@ import { initLibrary, showSeason } from './library.js';
 import { initNotifications } from './notifications.js';
 import { initPreferences } from './preferences.js';
 import { initPush } from './push.js';
-import { initRecommendations } from './recommendations.js';
 
 export const active = 'profile';
 export const mainClass = 'profile-main';
@@ -30,7 +28,6 @@ const SHOW_PLAYING_OPTION = false;
 
 const TABS = [
   ['resumen', 'Resumen'],
-  ['recomendados', 'Recomendados'],
   ['ajustes', 'Ajustes'],
 ];
 
@@ -82,7 +79,6 @@ function showTab(id) {
   if (opened.has(id)) return;
   opened.add(id);
   if (id === 'resumen') initLibrary(main.querySelector('#pfLibrary'), { username: user.username, userId: user.id, season: onScreen, onChange: refreshSummary });
-  if (id === 'recomendados') initRecommendations(main.querySelector('#pfRecommended'), { username: user.username });
   if (id === 'ajustes') {
     initNotifications(main.querySelector('#pfNotifs'), { path: userPath('settings') }).catch(() => {});
     if (SHOW_PLAYING_OPTION) initPreferences(main.querySelector('#pfPrefs'), { path: userPath('settings') }).catch(() => {});
@@ -186,11 +182,6 @@ function draw(d) {
       </div>
       ${sectionTitle(`Juegos ${seasonSuffix(d)}`, 'pfGamesTitle')}
       <div id="pfLibrary"></div>
-    </section>
-
-    <section class="pf-panel" role="tabpanel" id="pfPanel-recomendados" aria-labelledby="pfTab-recomendados" hidden>
-      <div class="pf-sub pf-note">Juegos que tienen los demás y tú nunca has jugado, empezando por los que más gente comparte.</div>
-      <div id="pfRecommended"></div>
     </section>
 
     <section class="pf-panel" role="tabpanel" id="pfPanel-ajustes" aria-labelledby="pfTab-ajustes" hidden>
