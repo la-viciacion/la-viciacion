@@ -61,6 +61,8 @@ class AchievementsCatalogTests(ApiTestCase):
                 self.assertFalse(achievement["unlocked_by_me"])
                 self.assertTrue(achievement["title"])
                 self.assertIsNone(achievement["description"])  # what it is about is for whoever earns it
+                self.assertIsNone(achievement["key"])  # nor its key, nor its picture: they would say it
+                self.assertFalse(achievement["has_image"])
         self.assertEqual([p["name"] for p in next(a for a in body if a["id"] == self.second)["players"]], ["Bea"])
 
     def test_a_secret_one_is_hidden_from_whoever_lacks_it_and_nothing_else_about_it_is_known(self):

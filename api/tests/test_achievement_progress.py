@@ -62,6 +62,7 @@ class CatalogProgressTests(unittest.TestCase):
             ("PLAYED_8_HOURS_DAY", 0), ("PLAYED_500_HOURS_LIFETIME", 0), ("PLAYED_10_GAMES_DAY", 1),
         ]
         self.db.add_all([models.User(id=1, username="ana", name="Ana", is_active=1, is_admin=0)])
+        self.keys = [key for key, _ in keys]
         for i, (key, secret) in enumerate(keys, start=1):
             self.db.add(models.Achievement(id=i, key=key, title=key, message="x", active=True, secret=bool(secret), special=0, valid_from_season=2023))
         self.db.add_all([models.Game(id="doom", name="Doom"), models.Game(id="hades", name="Hades")])
@@ -77,7 +78,8 @@ class CatalogProgressTests(unittest.TestCase):
         self.db.commit()
 
     def catalog(self):
-        return {a["key"]: a for a in group.achievements_catalog(self.db, 1, TODAY) if not a["hidden"]}
+        names = {i: key for i, key in enumerate(self.keys, start=1)}  # the catalog does not say the key of a locked one
+        return {names[a["id"]]: a for a in group.achievements_catalog(self.db, 1, TODAY) if not a["hidden"]}
 
     def test_each_cumulative_achievement_shows_how_far_the_player_is(self):
         got = self.catalog()
@@ -153,7 +155,8 @@ class SeasonViewTests(unittest.TestCase):
         self.db.commit()
 
     def view(self, season=None, viewer=1):
-        return {a.get("key", a["id"]): a for a in group.achievements_catalog(self.db, viewer, TODAY, season)}
+        names = {1: "PLAYED_100_HOURS", 2: "PLAYED_7_DAYS", 3: "PLAYED_500_HOURS_LIFETIME", 4: "EARLY_RISER"}
+        return {names[a["id"]] if not a["hidden"] else a["id"]: a for a in group.achievements_catalog(self.db, viewer, TODAY, season)}
 
     def test_a_past_season_says_who_had_it_then_and_whether_the_viewer_did(self):
         got = self.view(YEAR - 1)
@@ -197,6 +200,36 @@ class SeasonViewTests(unittest.TestCase):
         with self.assertRaises(HTTPException) as ctx:
             route.get_achievements(YEAR + 1, models.User(id=1), self.db)
         self.assertEqual(ctx.exception.status_code, 400)
+
+
+class WhatALockedOneGivesAwayTests(unittest.TestCase):
+    def setUp(self):
+        self.db = make_session()
+        self.db.add_all([
+            models.User(id=1, username="ana", name="Ana", is_active=1, is_admin=0),
+            models.User(id=2, username="bea", name="Bea", is_active=1, is_admin=0),
+            models.Achievement(id=1, key="PLAYED_100_HOURS", title="Cien", message="*{}* 100 horas", image=b"picture", active=True, secret=False, special=0, valid_from_season=2023),
+        ])
+        self.db.add(models.UserAchievement(user_id=2, achievement_id=1, date=datetime.date(YEAR - 1, 5, 1)))
+        self.db.commit()
+
+    def item(self, viewer):
+        return group.achievements_catalog(self.db, viewer, TODAY)[0]
+
+    def test_whoever_never_unlocked_it_gets_no_key_no_picture_and_no_description(self):
+        got = self.item(1)
+        self.assertEqual((got["key"], got["has_image"], got["description"]), (None, False, None))
+        self.assertEqual(got["title"], "Cien")  # the name is still shown
+
+    def test_whoever_unlocked_it_in_any_season_gets_them(self):
+        got = self.item(2)  # earned last year, not this season
+        self.assertEqual((got["key"], got["has_image"]), ("PLAYED_100_HOURS", True))
+        self.assertIsNotNone(got["description"])
+
+    def test_an_achievement_without_a_picture_has_none_to_show_either_way(self):
+        self.db.query(models.Achievement).update({"image": None})
+        self.db.commit()
+        self.assertFalse(self.item(2)["has_image"])
 
 
 if __name__ == "__main__":

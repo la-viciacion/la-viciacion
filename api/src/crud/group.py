@@ -44,7 +44,8 @@ def achievements_catalog(db: Session, viewer_id: int, today: datetime.date | Non
     about) unless they are secret: those come hidden, with no key, title, description, picture or players, only that
     they exist, whether they are secret and their special level (so that everybody knows there are special ones to
     unlock). Whoever has unlocked an achievement once knows what it is: that is what shows the description and
-    lifts the secrecy, whatever the season on screen.
+    lifts the secrecy, whatever the season on screen. The same goes for its key and its picture, which would
+    give away what it is about: they are only sent for the ones the viewer has unlocked at some point.
 
     `season` (default: the running one) is the season of the season achievements, which are earned once a season:
     only the ones valid in it are listed, and what is said of each (who has it, whether the viewer has it, the
@@ -93,18 +94,21 @@ def achievements_catalog(db: Session, viewer_id: int, today: datetime.date | Non
             })
             continue
         who = sorted(unlocked.get(row.id, {}).values(), key=lambda w: (w["last"], w["name"].lower()), reverse=True)
+        is_known = row.id in known
         catalog.append({
             "id": row.id,
             "hidden": False,
-            "key": row.key,
+            # the key names the achievement and its picture shows what it is about: neither is given to whoever has
+            # never unlocked it (the front shows a placeholder instead)
+            "key": row.key if is_known else None,
             "title": row.title,
-            "description": describe(row.message) if row.id in known else None,  # what it is about is for whoever earns it
+            "description": describe(row.message) if is_known else None,  # what it is about is for whoever earns it
             "secret": bool(row.secret),
             "special": row.special,
             "lifetime": lifetime,  # earned once in a lifetime, not once a season
             "progress": None if mine or (not lifetime and season != seasons.current())
             else progress.of(row.key, row.valid_from_season, lifetime),
-            "has_image": bool(row.has_image),
+            "has_image": bool(row.has_image) and is_known,
             "unlocked_by": len(who),
             "unlocked_by_me": mine,
             "players": who,
