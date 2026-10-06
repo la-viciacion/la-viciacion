@@ -18,8 +18,8 @@ def is_lifetime(key: str) -> bool:
 
 
 # The season an achievement starts to count in when the code creates it: "since", which every definition has (a
-# test fails if one does not). The ones that already existed say 2023, the first season of the app; the new ones
-# say their own (2027 for the ones added in 2026). An admin can change it afterwards: the database is the truth.
+# test fails if one does not). Every one says 2023, the first season of the app: the ones added later are
+# retroactive and count the history since the start. An admin can change it afterwards: the database is the truth.
 def first_season(achievement) -> int:
     return achievement.value["since"]
 
@@ -187,22 +187,22 @@ class AchievementsElems(Enum):
         + " juego cada 3,65 días de media (si dejara de empezar juegos nuevos). Pensemos en ello.",
     }
     COMPLETED_1_GAME = {
-        "since": 2027,
+        "since": 2023,
         "title": "Primer juego completado",
         "message": "*{}* acaba de completar su primer juego del año. Y esto no ha hecho más que empezar.",
     }
     COMPLETED_5_GAMES = {
-        "since": 2027,
+        "since": 2023,
         "title": "5 juegos completados",
         "message": "*{}* acaba de completar su juego número 5. Esto ya va en serio.",
     }
     COMPLETED_10_GAMES = {
-        "since": 2027,
+        "since": 2023,
         "title": "10 juegos completados",
         "message": "*{}* ya lleva 10 juegos completados. Se nota que sabe terminar lo que empieza (a diferencia de otros).",
     }
     COMPLETED_25_GAMES = {
-        "since": 2027,
+        "since": 2023,
         "special": 1,
         "title": "25 juegos completados",
         "message": "*{}* ha completado 25 juegos. A este ritmo, el año se le queda corto.",
@@ -342,39 +342,39 @@ class AchievementsElems(Enum):
 
     # Others
     COMPLETED_IN_A_DAY = {
-        "since": 2027,
+        "since": 2023,
         "title": "Del tirón",
         "message": "*{}* ha empezado y terminado _{}_ en un solo día. Sin dormir, sin pausas y sin remordimientos.",
     }
 
     RELEASE_DAY = {
-        "since": 2027,
+        "since": 2023,
         "special": 1,
         "title": "Lo estaba esperando",
         "message": "*{}* ha jugado a _{}_ el mismo día de su lanzamiento. Ni un minuto de espera.",
     }
 
     ALL_TOGETHER = {
-        "since": 2027,
+        "since": 2023,
         "title": "Todos a una",
         "message": "*{}* están jugando a la vez a _{}_. Como en los viejos tiempos de las LAN party.",
     }
 
     PRODIGAL_SON = {
-        "since": 2027,
+        "since": 2023,
         "title": "El hijo pródigo",
         "message": "*{}* vuelve a jugar tras 30 días (o más) sin tocar un mando. Se le echaba de menos, aunque algunos ni lo habían notado.",
     }
 
     WORK_WEEK = {
-        "since": 2027,
+        "since": 2023,
         "special": 1,
         "title": "Semana laboral",
         "message": "*{}* acaba de completar una semana laboral entera de 40 horas jugando. Sin vacaciones ni convenio.",
     }
 
     SAVED_BY_THE_BELL = {
-        "since": 2027,
+        "since": 2023,
         "special": 1,
         "secret": True,
         "title": "Salvado por la campana",
@@ -383,112 +383,112 @@ class AchievementsElems(Enum):
 
     # No season limit: they count the whole history of a player and are earned once (the key ends in _LIFETIME)
     PLAYED_1000_HOURS_GAME_LIFETIME = {
-        "since": 2027,
+        "since": 2023,
         "special": 1,
         "title": "Una relación seria",
         "message": "*{}* lleva 1000 horas en total jugando a _{}_, sumando todas las temporadas. Esto ya no es un juego, es una relación.",
     }
     PLAYED_100_DAYS_LIFETIME = {
-        "since": 2027,
+        "since": 2023,
         "title": "100 días jugados (en total)",
         "message": "*{}* suma 100 días jugados en total, contando todas las temporadas. La costumbre ya va cogiendo forma.",
     }
     PLAYED_200_DAYS_LIFETIME = {
-        "since": 2027,
+        "since": 2023,
         "title": "200 días jugados (en total)",
         "message": "*{}* suma 200 días jugados en total, contando todas las temporadas. La costumbre ya es ley.",
     }
     PLAYED_500_DAYS_LIFETIME = {
-        "since": 2027,
+        "since": 2023,
         "title": "500 días jugados (en total)",
         "message": "*{}* suma 500 días jugados en total, contando todas las temporadas. Más de un año y pico de partidas.",
     }
     PLAYED_1000_DAYS_LIFETIME = {
-        "since": 2027,
+        "since": 2023,
         "special": 1,
         "title": "1000 días jugados (en total)",
         "message": "*{}* suma 1000 días jugados en total, contando todas las temporadas. Casi tres años de su vida, con el mando en la mano.",
     }
     PLAYED_2000_DAYS_LIFETIME = {
-        "since": 2027,
+        "since": 2023,
         "special": 2,
         "title": "2000 días jugados (en total)",
         "message": "*{}* suma 2000 días jugados en total, contando todas las temporadas. Más de cinco años de partidas. Ya es patrimonio del grupo.",
     }
     PLAYED_5000_DAYS_LIFETIME = {
-        "since": 2027,
+        "since": 2023,
         "special": 3,
         "title": "5000 días jugados (en total)",
         "message": "*{}* suma 5000 días jugados en total, contando todas las temporadas. Casi catorce años jugando. Que alguien le dé las llaves de la ciudad.",
     }
     PLAYED_500_HOURS_LIFETIME = {
-        "since": 2027,
+        "since": 2023,
         "title": "500 horas (en total)",
         "message": "*{}* acumula 500 horas de juego en total, sumando todas las temporadas. Y las que le quedan.",
     }
     PLAYED_1000_HOURS_LIFETIME = {
-        "since": 2027,
+        "since": 2023,
         "title": "1000 horas (en total)",
         "message": "*{}* acumula 1000 horas de juego en total, sumando todas las temporadas. Son más de 41 días seguidos sin parar.",
     }
     PLAYED_2000_HOURS_LIFETIME = {
-        "since": 2027,
+        "since": 2023,
         "special": 1,
         "title": "2000 horas (en total)",
         "message": "*{}* acumula 2000 horas de juego en total, sumando todas las temporadas. Casi tres meses seguidos, sin dormir.",
     }
     PLAYED_5000_HOURS_LIFETIME = {
-        "since": 2027,
+        "since": 2023,
         "special": 2,
         "title": "5000 horas (en total)",
         "message": "*{}* acumula 5000 horas de juego en total, sumando todas las temporadas. Casi siete meses seguidos. Que descanse alguien.",
     }
     PLAYED_10000_HOURS_LIFETIME = {
-        "since": 2027,
+        "since": 2023,
         "special": 3,
         "title": "10000 horas (en total)",
         "message": "*{}* acumula 10000 horas de juego en total, sumando todas las temporadas. Dicen que con 10.000 horas se llega a maestro. De qué, aún está por ver.",
     }
     PLAYED_100_GAMES_LIFETIME = {
-        "since": 2027,
+        "since": 2023,
         "title": "100 juegos jugados (en total)",
         "message": "*{}* ha jugado a 100 juegos distintos en total, contando todas las temporadas. Y eso que solo cuenta los distintos.",
     }
     PLAYED_200_GAMES_LIFETIME = {
-        "since": 2027,
+        "since": 2023,
         "title": "200 juegos jugados (en total)",
         "message": "*{}* ha jugado a 200 juegos distintos en total, contando todas las temporadas. Una biblioteca que ya pide estantería nueva.",
     }
     PLAYED_500_GAMES_LIFETIME = {
-        "since": 2027,
+        "since": 2023,
         "special": 1,
         "title": "500 juegos jugados (en total)",
         "message": "*{}* ha jugado a 500 juegos distintos en total, contando todas las temporadas. Esto ya no es una biblioteca, es un museo.",
     }
     PLAYED_1000_GAMES_LIFETIME = {
-        "since": 2027,
+        "since": 2023,
         "special": 2,
         "title": "1000 juegos jugados (en total)",
         "message": "*{}* ha jugado a 1000 juegos distintos en total, contando todas las temporadas. Mil juegos distintos. Que le hagan un monumento.",
     }
     COMPLETED_100_GAMES_LIFETIME = {
-        "since": 2027,
+        "since": 2023,
         "title": "100 juegos completados (en total)",
         "message": "*{}* ha completado 100 juegos distintos en total, sumando todas las temporadas. Terminar lo que se empieza, convertido en estilo de vida.",
     }
     COMPLETED_200_GAMES_LIFETIME = {
-        "since": 2027,
+        "since": 2023,
         "title": "200 juegos completados (en total)",
         "message": "*{}* ha completado 200 juegos distintos en total, sumando todas las temporadas. Dos centenares de créditos finales.",
     }
     COMPLETED_500_GAMES_LIFETIME = {
-        "since": 2027,
+        "since": 2023,
         "special": 2,
         "title": "500 juegos completados (en total)",
         "message": "*{}* ha completado 500 juegos distintos en total, sumando todas las temporadas. Medio millar de finales. Alguien tiene mucho que contar.",
     }
     COMPLETED_1000_GAMES_LIFETIME = {
-        "since": 2027,
+        "since": 2023,
         "special": 3,
         "title": "1000 juegos completados (en total)",
         "message": "*{}* ha completado 1000 juegos distintos en total, sumando todas las temporadas. Mil juegos terminados. Ya no queda nada por ver.",

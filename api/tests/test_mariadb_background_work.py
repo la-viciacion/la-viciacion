@@ -41,7 +41,7 @@ class WorkTestCase(ApiTestCase):
         ):
             patcher.start()
             self.addCleanup(patcher.stop)
-        with self.engine.begin() as conn:  # the ones added in 2026 start in 2027, and some are special or secret: it is not what these tests are about
+        with self.engine.begin() as conn:  # some are special or secret: it is not what these tests are about
             conn.execute(text("UPDATE achievements SET valid_from_season = 2023, special = 0, secret = 0"))
         self.ana = self.user("ana")
         self.bea = self.user("bea")

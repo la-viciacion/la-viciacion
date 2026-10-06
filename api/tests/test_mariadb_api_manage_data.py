@@ -504,7 +504,7 @@ class AchievementsAdminTests(ManageTestCase):
 
     def test_the_season_an_achievement_is_valid_from_is_listed_and_can_be_changed(self):
         by_key = {a["key"]: a for a in self.admin("GET", "/achievements").json()}
-        self.assertEqual((by_key["PLAYED_7_DAYS"]["valid_from_season"], by_key["COMPLETED_1_GAME"]["valid_from_season"]), (2023, 2027))
+        self.assertEqual((by_key["PLAYED_7_DAYS"]["valid_from_season"], by_key["COMPLETED_1_GAME"]["valid_from_season"]), (2023, 2023))
         first = by_key["PLAYED_7_DAYS"]["id"]
         self.assertEqual(self.admin("PATCH", f"/achievements/{first}", json={"valid_from_season": 2028}).json()["valid_from_season"], 2028)
         self.assertEqual(self.admin("PATCH", f"/achievements/{first}", json={"valid_from_season": 1999}).status_code, 422)

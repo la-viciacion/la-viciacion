@@ -29,7 +29,7 @@ class RecalculationTests(unittest.TestCase):
         ])
         self.db.commit()
         Achievements().populate_achievements(self.db)
-        self.db.query(models.Achievement).update({"valid_from_season": 2023, "special": 0, "secret": False})  # the new ones start in 2027, and some are special or secret: not what is tested here
+        self.db.query(models.Achievement).update({"valid_from_season": 2023, "special": 0, "secret": False})  # some are special or secret: not what is tested here
         self.db.commit()
         self.sent = mock.AsyncMock()
         patcher = mock.patch.object(ach_module.utils, "send_message", self.sent)

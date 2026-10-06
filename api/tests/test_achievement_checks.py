@@ -15,20 +15,6 @@ from tests.sqlite_db import make_session
 USER = types.SimpleNamespace(id=1, name="Ana", telegram_id=111)
 YEAR = datetime.date.today().year
 
-# The achievements that existed before the season each starts to count in was recorded: valid from the first
-# season of the app (2023). Every one added since starts in 2027.
-LEGACY = (
-    "COMPLETED_100_GAMES", "COMPLETED_42_GAMES", "EARLY_RISER", "HAPPY_NEW_YEAR", "JUST_IN_TIME", "NOCTURNAL",
-    "PLAYED_1000_HOURS", "PLAYED_1000_HOURS_GAME", "PLAYED_100_DAYS", "PLAYED_100_GAMES", "PLAYED_100_HOURS",
-    "PLAYED_100_HOURS_GAME", "PLAYED_10_GAMES", "PLAYED_10_GAMES_DAY", "PLAYED_12_HOURS_DAY",
-    "PLAYED_15_DAYS", "PLAYED_16_HOURS_DAY", "PLAYED_200_DAYS", "PLAYED_200_HOURS", "PLAYED_300_DAYS",
-    "PLAYED_30_DAYS", "PLAYED_365_DAYS", "PLAYED_42_GAMES", "PLAYED_4_HOURS_DAY", "PLAYED_4_HOURS_SESSION",
-    "PLAYED_500_HOURS", "PLAYED_500_HOURS_GAME", "PLAYED_50_GAMES", "PLAYED_5_GAMES_DAY", "PLAYED_60_DAYS",
-    "PLAYED_7_DAYS", "PLAYED_8_HOURS_DAY", "PLAYED_8_HOURS_GAME_DAY", "PLAYED_8_HOURS_SESSION",
-    "PLAYED_LESS_5_MIN_SESSION", "STREAK_100_DAYS", "STREAK_15_DAYS", "STREAK_200_DAYS", "STREAK_300_DAYS",
-    "STREAK_30_DAYS", "STREAK_365_DAYS", "STREAK_60_DAYS", "STREAK_7_DAYS", "TEAMWORK",
-)
-
 
 class AchievementCheckTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
@@ -37,7 +23,7 @@ class AchievementCheckTests(unittest.IsolatedAsyncioTestCase):
         self.db.commit()
         self.ach = Achievements()
         self.ach.populate_achievements(self.db)
-        self.db.query(models.Achievement).update({"valid_from_season": 2023, "special": 0, "secret": False})  # the new ones start in 2027, and some are special or secret: not what is tested here
+        self.db.query(models.Achievement).update({"valid_from_season": 2023, "special": 0, "secret": False})  # some are special or secret: not what is tested here
         self.db.commit()
         self.sent = mock.AsyncMock()
         patcher = mock.patch.object(ach_module.utils, "send_message", self.sent)
@@ -482,9 +468,9 @@ class AchievementCheckTests(unittest.IsolatedAsyncioTestCase):
         db = fresh()
         Achievements().populate_achievements(db)
         got = {a.key: (a.active, a.valid_from_season) for a in db.query(models.Achievement)}
-        self.assertEqual(got["PLAYED_7_DAYS"], (True, 2023))  # the first ones: from the first season of the app
-        self.assertEqual(got["PLAYED_1000_HOURS_GAME_LIFETIME"], (True, 2027))  # the new ones: active, but not before 2027
-        self.assertEqual(got["COMPLETED_1_GAME"], (True, 2027))
+        self.assertEqual(got["PLAYED_7_DAYS"], (True, 2023))  # from the first season of the app
+        self.assertEqual(got["PLAYED_1000_HOURS_GAME_LIFETIME"], (True, 2023))  # the later ones are retroactive too
+        self.assertEqual(got["COMPLETED_1_GAME"], (True, 2023))
         db.query(models.Achievement).filter_by(key="PLAYED_7_DAYS").delete()
         db.commit()
         Achievements().populate_achievements(db)  # one is added to an installation that has the rest
@@ -670,7 +656,7 @@ class LifetimeTests(unittest.IsolatedAsyncioTestCase):
         self.db.add_all([models.Game(id="g1", name="Doom"), models.Game(id="g2", name="Quake")])
         self.db.commit()
         Achievements().populate_achievements(self.db)
-        self.db.query(models.Achievement).update({"valid_from_season": 2023, "special": 0, "secret": False})  # the new ones start in 2027, and some are special or secret: not what is tested here
+        self.db.query(models.Achievement).update({"valid_from_season": 2023, "special": 0, "secret": False})  # some are special or secret: not what is tested here
         self.db.commit()
         self.sent = mock.AsyncMock()
         patcher = mock.patch.object(ach_module.utils, "send_message", self.sent)
@@ -855,8 +841,7 @@ class CatalogueTests(unittest.TestCase):
         without = [ach.name for ach in ach_module.AchievementsElems if "since" not in ach.value]
         self.assertEqual(without, [])  # one added without it would not be created at all
         for ach in ach_module.AchievementsElems:
-            expected = 2023 if ach.name in LEGACY else 2027  # the first ones: 2023; every one added since: 2027
-            self.assertEqual(first_season(ach), expected, ach.name)
+            self.assertEqual(first_season(ach), 2023, ach.name)  # retroactive: the history counts since the first season
 
 
     def test_the_levels_and_secrets_the_definitions_give_are_valid(self):
