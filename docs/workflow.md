@@ -73,6 +73,10 @@ Settings → Rules → Rulesets (or Branches → Branch protection rule) for `ma
 - Require status checks to pass: select **`CI`**; require the branch to be up to date.
 - Approvals: **0 while there is a single maintainer**; raise it to 1 when the second person joins (then nobody can approve their own PR). No bypass actors, and no `update` restriction rule (it would also stop merges made through PRs).
 - Block force pushes and deletion.
+
+Settings → Rules → Rulesets → **release tags** (target: tags, pattern `refs/tags/v*`): creation, update, deletion and force pushes of `v*` tags blocked, with the **Admin** repository role as the only bypass. Without it anyone with write access could tag any branch and start a release (and the prod deploy only checks that the checks passed on the tagged commit, not that the commit is on `main`). Tags are immutable once created; an admin can still delete one.
+
+When a second person joins: give them the **Write** role (they can branch, open PRs and merge their own once `CI` is green) and raise the approvals of the `main` ruleset to 1, with "Require approval of the most recent reviewable push", so nobody merges their own PR. Do not raise it before: with no bypass and a single maintainer, nobody could approve the PR. Anyone with write access can also start the **Deploy** workflow and, with a PR that edits a workflow, reach the repository secrets of the SSH deploy keys (each key can only run its deploy script on the server): give Write only to people you would trust with a deploy.
 - Do not allow bypassing (applies to admins too).
 
 Settings → General → Pull Requests:
