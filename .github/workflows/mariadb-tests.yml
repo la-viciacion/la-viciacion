@@ -1,10 +1,8 @@
 name: MariaDB tests
 
-# The tests on a real MariaDB (api/tests/test_mariadb_*.py; without a server those tests skip, which is why the
-# plain API job does not run them), in two sets: the migration ones (test_mariadb_migration*.py: they run
-# alembic dozens of times, so they are most of the time) and everything else (routes, scheduler, app boot...).
-# Called by checks.yml with the image that docker-compose.yml pins, once per set, and by mariadb-versions.yml
-# with the moving tags, for both.
+# Migrations and schema rules on a real MariaDB (api/tests/test_mariadb_*.py; without a server those tests
+# skip, which is why the plain API job does not run them). Called by checks.yml with the image that
+# docker-compose.yml pins, and by mariadb-versions.yml with the moving tags.
 on:
   workflow_call:
     inputs:
@@ -12,11 +10,6 @@ on:
         description: The MariaDB image to test against, with its tag (mariadb:12.3.3)
         required: true
         type: string
-      tests:
-        description: "The set to run: routes (everything but the migration tests), migrations or all"
-        required: false
-        type: string
-        default: all
       expect-pin:
         description: Fail unless the server is the version docker-compose.yml pins
         required: false
@@ -43,7 +36,7 @@ env:
 
 jobs:
   tests:
-    name: ${{ inputs.image }} (${{ inputs.tests }})
+    name: ${{ inputs.image }}
     runs-on: ubuntu-latest
     services:
       mariadb:
@@ -79,27 +72,6 @@ jobs:
               print("image:  ${{ inputs.image }}")
               print("server:", conn.execute(text("SELECT VERSION()")).scalar())
           PY
-      - name: API tests (${{ inputs.tests }}) on ${{ inputs.image }}
+      - name: API tests on ${{ inputs.image }}
         working-directory: api
-        env:
-          SET: ${{ inputs.tests }}
-        run: |
-          # the set is decided by the file name (tests/test_ci_scope.py pins it); an empty selection is an error
-          selected=""
-          for file in tests/test_mariadb_*.py; do
-            migration=false
-            case "$file" in tests/test_mariadb_migration*) migration=true ;; esac
-            case "$SET" in
-              all) take=true ;;
-              migrations) take=$migration ;;
-              routes) if [ "$migration" = true ]; then take=false; else take=true; fi ;;
-              *) echo "::error::unknown set '$SET'"; exit 1 ;;
-            esac
-            if [ "$take" = true ]; then
-              module=${file%.py}
-              selected="$selected ${module//\//.}"
-            fi
-          done
-          [ -n "$selected" ] || { echo "::error::no test file in the set '$SET'"; exit 1; }
-          echo "running:$selected"
-          python -m unittest $selected
+        run: python -m unittest discover -s tests -t . -p "test_mariadb_*.py"

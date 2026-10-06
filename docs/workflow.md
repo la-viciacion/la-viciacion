@@ -17,7 +17,7 @@ Simplified trunk-based development for a team of 2-3. `main` is the trunk: alway
 `.github/workflows/ci.yml` runs on every PR; **`main` is not tested again after the merge** (see [Nothing is run twice](#nothing-is-run-twice)). The required status is the single job **`CI`**, which passes only if every check that applies to the change passes (see [Which checks run for a change](#which-checks-run-for-a-change)). The checks live in `checks.yml`, the same ones that gate a release:
 
 - API tests (Python 3.14), including the Alembic history guards, the endpoint security list and the `.env.template` check.
-- The tests on a real MariaDB, in **two sets** split by file name (`mariadb-tests.yml`). The **migration set** (`test_mariadb_migration*.py`; every migration one by one on a v1 database, re-run, downgrade, an older revision with data to head, models matching the schema, generated `season` columns, constraints) runs alembic dozens of times, so it is most of the time and runs only when something it depends on changes (table below). The **routes set** (everything else: every route through real requests, the scheduler, the background work, the bot contract, the app boot) runs on every change of the API. Both on the exact image `docker-compose.yml` pins (CI reads the tag from there and a test checks the server really is that version). A weekly run (`mariadb-versions.yml`) tries the moving tags `lts` and `latest` as an early warning; it never blocks a PR.
+- Migrations and schema rules on a real MariaDB (every migration one by one on a v1 database, re-run, downgrade, an older revision with data to head, models matching the schema, generated `season` columns, constraints), on the exact image `docker-compose.yml` pins (CI reads the tag from there and a test checks the server really is that version). A weekly run (`mariadb-versions.yml`) tries the moving tags `lts` and `latest` as an early warning; it never blocks a PR.
 - The API boots on a freshly migrated MariaDB (`test_mariadb_app_boot.py`): every route the routers declare is published under `/api/v1` and answers 401 without a token (except the reviewed public ones), the docs are hidden, and startup seeds the database.
 - Bot tests (Python 3.14).
 - Front tests and ESLint.
@@ -32,22 +32,21 @@ A pull request only runs the checks its files can affect; the release workflow (
 |---|---|
 | `docs/`, `design/`, `*.md` at the root, `LICENSE`, `.gitignore`, `.gitattributes`, the PR template, `dependabot.yml` | nothing but the PR title |
 | `front/` | front tests and lint, front image; plus the API tests when it is `front/js/` or `front/Dockerfile` (a test reads them) |
-| `api/` | API tests, MariaDB routes tests, API image |
-| `api/alembic/`, `api/alembic.ini`, `api/entrypoint.sh`, `api/src/database/`, `api/src/config.py`, `api/requirements.txt`, `api/tests/mariadb_db.py`, `api/tests/v1_*`, `api/tests/test_mariadb_migration*` | the above, plus the MariaDB migration tests |
+| `api/` | API tests, MariaDB tests, API image |
 | `bot/src/` | bot tests, bot image, API tests and MariaDB tests (the contract test and the `.env.template` check read the bot's code) |
 | `bot/` (tests, requirements...) | bot tests, bot image |
 | `.env.template`, `docker-compose.dev.yml` | API tests |
-| `docker-compose.yml` | API tests and both MariaDB sets (it pins the version they run on) |
+| `docker-compose.yml` | API tests and MariaDB tests (it pins the version they run on) |
 | anything else (`.github/workflows/`, `.github/scripts/`, a new top-level path...) | **everything** |
 
-Three safeguards keep this honest. The default is to run everything: only the paths listed as inert run nothing, so a new directory or file is never silently skipped. The script is read from the base branch, so a PR cannot change the rules that judge it (changing the script is itself a change that runs everything). And `api/tests/test_ci_scope.py` pins the table above and fails if an API test starts reading a directory the script does not know about. When you add a test that reads files outside its own directory, add that path to `RULES` in `ci_scope.py` and to the table. A MariaDB test that runs alembic goes in the migration set by its name (`test_mariadb_migration_*.py`); `test_ci_scope.py` fails if one does not.
+Three safeguards keep this honest. The default is to run everything: only the paths listed as inert run nothing, so a new directory or file is never silently skipped. The script is read from the base branch, so a PR cannot change the rules that judge it (changing the script is itself a change that runs everything). And `api/tests/test_ci_scope.py` pins the table above and fails if an API test starts reading a directory the script does not know about. When you add a test that reads files outside its own directory, add that path to `RULES` in `ci_scope.py` and to the table.
 
 ### Nothing is run twice
 
 A check is worth running once per state of the code, so each one has one place:
 
 - **Pull request:** only what its files can affect (table above), plus the PR title. The branch must be up to date with `main` and the merge is a squash, so the tree that passed here is exactly the one that lands on `main`. That is why **`main` has no run of its own after a merge**: it would repeat the same checks on the same files.
-- **Tag `vX.Y.Z`** (`release.yml`): the one run of everything (both MariaDB sets included), whatever the PRs behind it touched. It is the gate for a release: `deploy.yml` refuses a `prod` deploy of a tag whose run did not pass on the commit the tag points to (if the run is older than GitHub keeps logs, 90 days, run **Release images** by hand on the tag again). The `dev` deploy needs no check of its own: `main` only receives PRs whose `CI` was green.
+- **Tag `vX.Y.Z`** (`release.yml`): the one run of everything, whatever the PRs behind it touched. It is the gate for a release: `deploy.yml` refuses a `prod` deploy of a tag whose run did not pass on the commit the tag points to (if the run is older than GitHub keeps logs, 90 days, run **Release images** by hand on the tag again). The `dev` deploy needs no check of its own: `main` only receives PRs whose `CI` was green.
 - **Weekly:** the moving MariaDB tags, as an early warning that gates nothing.
 - **Inside the MariaDB tests**, a guarantee has one test. `test_mariadb_migration_chain.py` covers, for every migration, that it applies on data, that it converges when run again, that it can be undone, that both roads end in the same schema and that the schema matches the models; `test_mariadb_migrations.py` keeps what the chain does not (the rules the database enforces and an older revision with data taken to the head). Do not add a test that proves again what one of those already proves.
 
@@ -74,6 +73,10 @@ Settings → Rules → Rulesets (or Branches → Branch protection rule) for `ma
 - Require status checks to pass: select **`CI`**; require the branch to be up to date.
 - Approvals: **0 while there is a single maintainer**; raise it to 1 when the second person joins (then nobody can approve their own PR). No bypass actors, and no `update` restriction rule (it would also stop merges made through PRs).
 - Block force pushes and deletion.
+
+Settings → Rules → Rulesets → **release tags** (target: tags, pattern `refs/tags/v*`): creation, update, deletion and force pushes of `v*` tags blocked, with the **Admin** repository role as the only bypass. Without it anyone with write access could tag any branch and start a release (and the prod deploy only checks that the checks passed on the tagged commit, not that the commit is on `main`). Tags are immutable once created; an admin can still delete one.
+
+When a second person joins: give them the **Write** role (they can branch, open PRs and merge their own once `CI` is green) and raise the approvals of the `main` ruleset to 1, with "Require approval of the most recent reviewable push", so nobody merges their own PR. Do not raise it before: with no bypass and a single maintainer, nobody could approve the PR. Anyone with write access can also start the **Deploy** workflow and, with a PR that edits a workflow, reach the repository secrets of the SSH deploy keys (each key can only run its deploy script on the server): give Write only to people you would trust with a deploy.
 - Do not allow bypassing (applies to admins too).
 
 Settings → General → Pull Requests:
