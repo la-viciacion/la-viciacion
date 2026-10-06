@@ -249,7 +249,7 @@ export const ENTITIES = {
       { label: 'Imagen', render: (r) => (r.has_image ? html`<img class="adm-ach" src="/api/v1/utils/achievement-image/${r.key}?v=${Date.now()}" alt="" />` : '—') },
       { label: 'Logro', render: (r) => html`<strong>${r.title}</strong><div class="adm-sub">${r.key}</div>` },
       { label: 'Mensaje', render: (r) => r.message || '' },
-      { label: 'Estado', render: (r) => html`${r.active ? badge('Activo', 'green') : badge('Inactivo', 'orange')}${r.secret ? badge('Secreto', 'ink') : ''}${SPECIAL_NAMES[r.special] ? badge(`Especial ${SPECIAL_NAMES[r.special].toLowerCase()}`, specialClass(r.special).trim()) : ''}${r.lifetime ? badge('Único', 'gray') : ''}` },
+      { label: 'Estado', render: (r) => html`${r.active ? badge('Activo', 'green') : badge('Inactivo', 'orange')}${r.secret ? badge('Secreto', 'ink') : ''}${SPECIAL_NAMES[r.special] ? badge(`Especial nivel ${r.special}`, specialClass(r.special).trim()) : ''}${r.lifetime ? badge('Único', 'gray') : ''}` },
       { label: 'Desde', render: (r) => r.valid_from_season },
       { label: 'Concedido', render: (r) => r.awarded },
     ],

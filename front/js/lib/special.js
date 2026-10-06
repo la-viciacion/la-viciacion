@@ -7,7 +7,7 @@ export const SPECIAL_NAMES = { 1: 'Plateado', 2: 'Dorado', 3: 'Morado' };
 /** The class that gives something the colour of the level ('' for an ordinary achievement). */
 export const specialClass = (level) => (SPECIAL_NAMES[level] ? ` special-${level}` : '');
 
-/** The tag that says an achievement is special, in its colour ('' for an ordinary one). */
+/** The tag that says an achievement is special and its level, in its colour ('' for an ordinary one). */
 export const specialTag = (level) => (SPECIAL_NAMES[level]
-  ? html`<span class="pf-tag${specialClass(level)}">Especial ${SPECIAL_NAMES[level].toLowerCase()}</span>`
+  ? html`<span class="pf-tag${specialClass(level)}">Especial nivel ${level}</span>`
   : '');

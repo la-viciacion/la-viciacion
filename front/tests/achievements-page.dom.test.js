@@ -47,7 +47,7 @@ test('what is not unlocked shows a lock, not a question mark', () => {
   assert.equal(text('.ach-card.hidden .ach-img-placeholder')[0], '🔒');
 });
 
-test('a special one shines in the colour of its level, an ordinary one does not, and the tag says which', async () => {
+test('a special one shines in the colour of its level, an ordinary one does not, and the tag says the level', async () => {
   installApi({ 'GET /group/achievements': [{ ...LIST[0], special: 1 }, { ...LIST[0], id: 3, title: 'Dorado', special: 2 }, { ...LIST[0], id: 4, title: 'Normal', special: 0 }, LIST[1]] });
   await page.render({ main: main() });
   await settle();
@@ -55,8 +55,8 @@ test('a special one shines in the colour of its level, an ordinary one does not,
   assert.ok(cards[0].classList.contains('special-1'));
   assert.ok(cards[1].classList.contains('special-2'));
   assert.ok(![...cards[2].classList].some((c) => c.startsWith('special-')));
-  assert.match(text('.ach-card')[0], /Especial plateado/);
-  assert.match(text('.ach-card')[1], /Especial dorado/);
+  assert.match(text('.ach-card')[0], /Especial nivel 1/);
+  assert.match(text('.ach-card')[1], /Especial nivel 2/);
   assert.doesNotMatch(text('.ach-card')[2], /Especial/);
 });
 
