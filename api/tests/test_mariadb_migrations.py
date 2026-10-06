@@ -120,6 +120,46 @@ class SchemaRulesTests(MariaDBTestCase):
         self.assertEqual(self.execute("SELECT COUNT(*) FROM user_settings WHERE user_id = 51").scalar(), 0)
 
 
+class AchievementLevelsTests(MariaDBTestCase):
+    """029 gives the special level and the secret mark of the code to the rows an installation has, once, and
+    never over what an admin chose."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.migrate("028_achievement_special")
+        with cls.engine.begin() as conn:
+            conn.execute(text(
+                "INSERT INTO achievements (`key`, title, message, special, secret) VALUES "
+                "('PLAYED_12_HOURS_DAY', 'a', 'm', 0, 0), "     # special in the code: it gets its level
+                "('PLAYED_16_HOURS_DAY', 'b', 'm', 3, 0), "     # an admin made it purple: it stays purple
+                "('JUST_IN_TIME', 'c', 'm', 0, 0), "            # special and secret in the code
+                "('EARLY_RISER', 'd', 'm', 0, 0), "             # secret only
+                "('PLAYED_7_DAYS', 'e', 'm', 0, 1), "           # not in the code's list: an admin's mark stays
+                "('SOMETHING_THE_CODE_DROPPED', 'f', 'm', 0, 0)"  # unknown: untouched
+            ))
+        cls.migrate()
+
+    def state(self, key):
+        with self.engine.connect() as conn:
+            row = conn.execute(text("SELECT special, secret FROM achievements WHERE `key` = :k"), {"k": key}).one()
+        return row.special, bool(row.secret)
+
+    def test_the_rows_at_their_default_get_what_the_code_says(self):
+        self.assertEqual(self.state("PLAYED_12_HOURS_DAY"), (1, False))
+        self.assertEqual(self.state("JUST_IN_TIME"), (1, True))
+        self.assertEqual(self.state("EARLY_RISER"), (0, True))
+
+    def test_what_an_admin_chose_is_never_overwritten(self):
+        self.assertEqual(self.state("PLAYED_16_HOURS_DAY"), (3, False))
+        self.assertEqual(self.state("PLAYED_7_DAYS"), (0, True))
+
+    def test_what_the_code_does_not_know_is_left_alone_and_nothing_is_inserted(self):
+        self.assertEqual(self.state("SOMETHING_THE_CODE_DROPPED"), (0, False))
+        with self.engine.connect() as conn:
+            self.assertEqual(conn.execute(text("SELECT COUNT(*) FROM achievements")).scalar(), 6)
+
+
 class UpgradeFromAnOlderRevisionTests(MariaDBTestCase):
     """A database that already has data (what production is) must survive the migrations after it."""
 

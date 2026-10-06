@@ -22,5 +22,5 @@ def get_activity(
     db: Session = Depends(get_db),
 ):
     """The latest activity of the group, newest first (derived, nothing stored); `has_more` says if there is more.
-    The achievements the caller has not unlocked come as `hidden`, without title"""
+    The secret achievements the caller has not unlocked come as `hidden`, without title"""
     return activity.feed(db, current_user.id, limit, offset)

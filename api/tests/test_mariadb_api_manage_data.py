@@ -525,6 +525,17 @@ class AchievementsAdminTests(ManageTestCase):
         self.assertTrue(next(a for a in self.admin("GET", "/achievements").json() if a["id"] == first)["secret"])
         self.assertTrue(self.admin("PATCH", f"/achievements/{first}", json={"secret": None, "title": "T"}).json()["secret"])  # it cannot be emptied
 
+    def test_an_achievement_can_be_made_special_at_one_of_three_levels(self):
+        first = self.ids()[0]
+        self.assertEqual(next(a for a in self.admin("GET", "/achievements").json() if a["id"] == first)["special"], 0)
+        for level in (3, 1, 0):
+            self.assertEqual(self.admin("PATCH", f"/achievements/{first}", json={"special": level}).json()["special"], level)
+        self.assertEqual(self.admin("PATCH", f"/achievements/{first}", json={"special": 2}).json()["special"], 2)
+        self.assertEqual(next(a for a in self.admin("GET", "/achievements").json() if a["id"] == first)["special"], 2)
+        for bad in (4, -1):
+            self.assertEqual(self.admin("PATCH", f"/achievements/{first}", json={"special": bad}).status_code, 422)
+        self.assertEqual(self.admin("PATCH", f"/achievements/{first}", json={"special": None, "title": "T"}).json()["special"], 2)  # it cannot be emptied
+
     def test_titles_and_messages_can_be_edited(self):
         first = self.ids()[0]
         done = self.admin("PATCH", f"/achievements/{first}", json={"title": "New title"}).json()

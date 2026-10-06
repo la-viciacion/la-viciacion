@@ -188,7 +188,8 @@ class Achievements:
         Existing rows are left alone: from then on the database is the source of truth, so
         the title and message an admin edits (PATCH /manage/achievements) and whether it is active are kept.
         A new one is active and valid from the season its definition says (`since`; the first season of the app
-        when it says nothing): the season is what keeps it from counting before its time.
+        when it says nothing): the season is what keeps it from counting before its time. It is also created as
+        special or secret when its definition says so (`special`, `secret`: ordinary when it says nothing).
         A row whose key the code no longer has (an achievement that was dropped) is switched off, never deleted:
         nothing can earn it any more, and whoever already has it keeps it.
         """
@@ -209,6 +210,8 @@ class Achievements:
                         title=achievement.value["title"],
                         message=achievement.value["message"],
                         valid_from_season=first_season(achievement),
+                        special=achievement.value.get("special", 0),
+                        secret=achievement.value.get("secret", False),
                     )
                 )
             db.commit()
@@ -331,17 +334,23 @@ class Achievements:
         msg = utils.get_ach_message(ach, user=user.name, db=db, game_id=game_id)
         await self._announce(db, ach, [user], msg, silent, self.get_image(db, ach.name)[0])
 
-    def _is_secret(self, db: Session, key: str) -> bool:
-        return bool(db.query(models.Achievement.secret).filter(models.Achievement.key == key).scalar())
+    def _flags(self, db: Session, key: str) -> tuple[bool, int]:
+        """(secret, special level) of an achievement."""
+        secret, special = db.query(models.Achievement.secret, models.Achievement.special).filter(models.Achievement.key == key).one()
+        return bool(secret), special or 0
 
     async def _announce(
         self, db: Session, ach: AchievementsElems, players: list, message: str, silent: bool, image=None
     ):
-        """Tell the group that `players` unlocked `ach`, with `message`. A secret one does not say which: the
-        group only hears that they unlocked a hidden achievement (no picture), and each player gets `message`
-        privately, on every channel they have (Telegram if linked, push if they have a device)."""
+        """Tell the group that `players` unlocked `ach`, with `message`. A special one says so, and its level. A
+        secret one does not say which: the group only hears that they unlocked a hidden achievement (no
+        picture), and each player gets `message` privately, on every channel they have (Telegram if linked, push
+        if they have a device)."""
         silent = silent or self.silent
-        if not self._is_secret(db, ach.name):
+        secret, special = self._flags(db, ach.name)
+        if special:
+            message = f"Logro especial de nivel {special}\n{message}"
+        if not secret:
             await utils.send_message(message, silent, image=image)
             return
         names = [utils.escape_markdown(player.name) for player in players]

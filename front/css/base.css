@@ -13,6 +13,10 @@
   --accent-gold: #f5c542;
   --accent-purple: #a78bfa;
   --accent-pink: #f472b6;
+  /* the colour of each level of a special achievement (js/lib/special.js): vivid, to shine against the dark cards */
+  --aura-1: 214, 226, 245;
+  --aura-2: 255, 200, 40;
+  --aura-3: 180, 100, 255;
   --live-green: #4ade80;
 
   --gradient-brand: linear-gradient(135deg, #3dd9b3 0%, #f5c542 100%);
@@ -159,3 +163,8 @@ body {
 /* A game's name that leads to its page: it keeps the look of the text around it */
 .game-link { color: inherit; text-decoration: none; }
 .game-link:hover { color: var(--accent-teal); text-decoration: underline; }
+
+/* A special achievement: the level sets the colour (rgb triplet) that everything painted for it reads */
+.special-1 { --aura-rgb: var(--aura-1); }
+.special-2 { --aura-rgb: var(--aura-2); }
+.special-3 { --aura-rgb: var(--aura-3); }

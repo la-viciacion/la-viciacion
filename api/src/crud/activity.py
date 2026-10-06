@@ -22,8 +22,8 @@ def _day(value) -> datetime.date:
 
 def feed(db: Session, viewer_id: int, limit: int = 30, offset: int = 0) -> dict:
     """`limit` events from `offset`, and whether there are more. Every source gives its newest
-    `offset + limit + 1` rows, which is enough to know the newest ones of the merge. The achievements the viewer
-    has not unlocked are announced without saying which."""
+    `offset + limit + 1` rows, which is enough to know the newest ones of the merge. The secret achievements the
+    viewer has not unlocked are announced without saying which."""
     n = offset + limit + 1
     mine = group.unlocked_ids(db, viewer_id)
     players = (models.User.is_active == 1, models.not_god())
@@ -89,9 +89,9 @@ def feed(db: Session, viewer_id: int, limit: int = 30, offset: int = 0) -> dict:
     ):
         add("rated", rating.updated_at, rating.user_id, name, username, rating.game_id, game_name, image, score=rating.score)
 
-    for award, name, username, title, game_id, game_name, image in (
+    for award, name, username, title, secret, game_id, game_name, image in (
         db.query(models.UserAchievement, models.User.name, models.User.username, models.Achievement.title,
-                 models.UserAchievement.game_id, models.Game.name, models.Game.image_url)
+                 models.Achievement.secret, models.UserAchievement.game_id, models.Game.name, models.Game.image_url)
         .join(models.User, models.UserAchievement.user_id == models.User.id)
         .join(models.Achievement, models.UserAchievement.achievement_id == models.Achievement.id)
         .outerjoin(models.Game, models.UserAchievement.game_id == models.Game.id)
@@ -99,8 +99,8 @@ def feed(db: Session, viewer_id: int, limit: int = 30, offset: int = 0) -> dict:
         .order_by(desc(models.UserAchievement.date), models.UserAchievement.user_id, models.UserAchievement.achievement_id)
         .limit(n)
     ):
-        # what the viewer has not unlocked stays hidden: no title, and the game would give it away
-        seen = award.achievement_id in mine
+        # a secret one the viewer has not unlocked stays hidden: no title, and the game would give it away
+        seen = award.achievement_id in mine or not secret
         add("achievement", award.date, award.user_id, name, username, game_id if seen else None,
             game_name if seen else None, image if seen else None, title=title if seen else None, hidden=not seen)
 
