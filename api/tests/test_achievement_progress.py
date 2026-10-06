@@ -17,13 +17,13 @@ def day(month, d, hour=10):
 
 class TargetTests(unittest.TestCase):
     def test_the_cumulative_families_have_a_bar(self):
-        self.assertEqual(progress.target_of("PLAYED_200_HOURS"), ("hours", "horas", 200))
-        self.assertEqual(progress.target_of("PLAYED_30_DAYS"), ("days", "días jugados", 30))
-        self.assertEqual(progress.target_of("PLAYED_42_GAMES"), ("games", "juegos jugados", 42))
-        self.assertEqual(progress.target_of("COMPLETED_5_GAMES"), ("completed", "juegos completados", 5))
-        self.assertEqual(progress.target_of("PLAYED_500_HOURS_GAME"), ("game_hours", "horas en un mismo juego", 500))
-        self.assertEqual(progress.target_of("STREAK_15_DAYS"), ("streak", "días seguidos", 15))
-        self.assertEqual(progress.target_of("PLAYED_5000_HOURS_LIFETIME"), ("hours", "horas", 5000))
+        self.assertEqual(progress.target_of("PLAYED_200_HOURS"), ("hours", 200))
+        self.assertEqual(progress.target_of("PLAYED_30_DAYS"), ("days", 30))
+        self.assertEqual(progress.target_of("PLAYED_42_GAMES"), ("games", 42))
+        self.assertEqual(progress.target_of("COMPLETED_5_GAMES"), ("completed", 5))
+        self.assertEqual(progress.target_of("PLAYED_500_HOURS_GAME"), ("game_hours", 500))
+        self.assertEqual(progress.target_of("STREAK_15_DAYS"), ("streak", 15))
+        self.assertEqual(progress.target_of("PLAYED_5000_HOURS_LIFETIME"), ("hours", 5000))
 
     def test_the_ones_about_a_moment_have_none(self):
         for key in ("PLAYED_8_HOURS_DAY", "PLAYED_4_HOURS_SESSION", "PLAYED_5_GAMES_DAY", "EARLY_RISER", "RELEASE_DAY", "TEAMWORK"):
@@ -36,12 +36,12 @@ class TargetTests(unittest.TestCase):
                       checks.STREAKS, checks.LIFETIME_TOTAL_HOURS, checks.LIFETIME_TOTAL_DAYS, checks.LIFETIME_PLAYED_GAMES,
                       checks.LIFETIME_COMPLETED_GAMES, checks.LIFETIME_HOURS_IN_A_GAME):
             for ach, needed in table:
-                self.assertEqual(progress.target_of(ach.name)[2], needed, ach.name)
+                self.assertEqual(progress.target_of(ach.name)[1], needed, ach.name)
 
     def test_the_bar_never_goes_past_its_goal(self):
-        self.assertEqual(progress.bar(250, 200, "horas"), {"current": 200, "target": 200, "unit": "horas"})
-        self.assertEqual(progress.bar(12.345, 100, "horas"), {"current": 12.3, "target": 100, "unit": "horas"})
-        self.assertEqual(progress.bar(3, 7, "días"), {"current": 3, "target": 7, "unit": "días"})
+        self.assertEqual(progress.bar(250, 200), {"current": 200, "target": 200})
+        self.assertEqual(progress.bar(12.345, 100), {"current": 12.3, "target": 100})
+        self.assertEqual(progress.bar(3, 7), {"current": 3, "target": 7})
 
 
 class CatalogProgressTests(unittest.TestCase):
@@ -72,11 +72,11 @@ class CatalogProgressTests(unittest.TestCase):
 
     def test_each_cumulative_achievement_shows_how_far_the_player_is(self):
         got = self.catalog()
-        self.assertEqual(got["PLAYED_100_HOURS"]["progress"], {"current": 6, "target": 100, "unit": "horas"})
-        self.assertEqual(got["PLAYED_7_DAYS"]["progress"], {"current": 3, "target": 7, "unit": "días jugados"})
-        self.assertEqual(got["PLAYED_10_GAMES"]["progress"], {"current": 2, "target": 10, "unit": "juegos jugados"})
-        self.assertEqual(got["PLAYED_100_HOURS_GAME"]["progress"], {"current": 4, "target": 100, "unit": "horas en un mismo juego"})
-        self.assertEqual(got["STREAK_7_DAYS"]["progress"], {"current": 3, "target": 7, "unit": "días seguidos"})
+        self.assertEqual(got["PLAYED_100_HOURS"]["progress"], {"current": 6, "target": 100})
+        self.assertEqual(got["PLAYED_7_DAYS"]["progress"], {"current": 3, "target": 7})
+        self.assertEqual(got["PLAYED_10_GAMES"]["progress"], {"current": 2, "target": 10})
+        self.assertEqual(got["PLAYED_100_HOURS_GAME"]["progress"], {"current": 4, "target": 100})
+        self.assertEqual(got["STREAK_7_DAYS"]["progress"], {"current": 3, "target": 7})
 
     def test_a_lifetime_one_counts_the_whole_history(self):
         last = datetime.datetime(YEAR - 1, 3, 1, 10)

@@ -124,7 +124,7 @@ test('a block with nothing in it is not shown', () => {
 
 test('an achievement that adds something up shows how far the player is, and the others show no bar', async () => {
   installApi({ 'GET /group/achievements': [
-    { id: 5, key: 'PLAYED_100_HOURS', title: '100 horas', unlocked_by: 0, unlocked_by_me: false, players: [], progress: { current: 35, target: 100, unit: 'horas' } },
+    { id: 5, key: 'PLAYED_100_HOURS', title: '100 horas', unlocked_by: 0, unlocked_by_me: false, players: [], progress: { current: 35, target: 100 } },
     { id: 6, key: 'EARLY', title: 'Sin barra', unlocked_by: 0, unlocked_by_me: false, players: [], progress: null },
     { id: 7, key: 'DONE', title: 'Hecho', unlocked_by: 1, unlocked_by_me: true, players: [{ user_id: 1, name: 'Ana', times: 1, last: '2026-02-01' }], progress: null },
   ] });
@@ -136,7 +136,7 @@ test('an achievement that adds something up shows how far the player is, and the
   assert.equal(bar.getAttribute('aria-valuenow'), '35');
   assert.equal(bar.getAttribute('aria-valuemax'), '100');
   assert.match(document.querySelector('.ach-bar-fill').getAttribute('style'), /width: 35%/);
-  assert.match(text('.ach-card')[0], /35 \/ 100 horas/);
+  assert.match(text('.ach-card')[0], /35 \/ 100/);
   assert.doesNotMatch(text('.ach-card')[1], /\//);
 });
 

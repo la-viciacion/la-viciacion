@@ -18,7 +18,7 @@ test('no progress is an empty bar', () => {
   assert.equal(progressPercent({ current: 5, target: 0 }), 0);
 });
 
-test('the text says how far, with the unit', () => {
-  assert.equal(progressText({ current: 35, target: 100, unit: 'horas' }), '35 / 100 horas');
-  assert.equal(progressText({ current: 12.5, target: 100, unit: 'horas' }), '12,5 / 100 horas');
+test('the text says how far, without a unit', () => {
+  assert.equal(progressText({ current: 35, target: 100 }), '35 / 100');
+  assert.equal(progressText({ current: 12.5, target: 100 }), '12,5 / 100');
 });

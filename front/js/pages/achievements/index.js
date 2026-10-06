@@ -36,7 +36,7 @@ const hiddenCard = (a) => html`
     </div>
   </article>`;
 
-// How far the viewer is from an achievement that adds something up: a bar and "35 / 100 horas".
+// How far the viewer is from an achievement that adds something up: a bar and "35 / 100" (no unit: a locked one does not say what it counts).
 const progressBar = (p) => (p ? html`
   <div class="ach-progress">
     <div class="ach-bar" role="progressbar" aria-valuemin="0" aria-valuemax="${p.target}" aria-valuenow="${p.current}" aria-label="${progressText(p)}">

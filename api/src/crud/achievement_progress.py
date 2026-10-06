@@ -15,33 +15,34 @@ from ..utils import seasons, streaks
 from . import time_entries, users  # before `achievements`: they import each other, and this order is the one that works
 from . import achievements as checks
 
-# metric -> (what the number counts, [(achievement, needed)] per season, [(achievement, needed)] of the lifetime ones)
+# metric -> [(achievement, needed)] per season, [(achievement, needed)] of the lifetime ones
 FAMILIES = {
-    "hours": ("horas", checks.TOTAL_HOURS, checks.LIFETIME_TOTAL_HOURS),
-    "days": ("días jugados", checks.TOTAL_DAYS, checks.LIFETIME_TOTAL_DAYS),
-    "games": ("juegos jugados", checks.PLAYED_GAMES, checks.LIFETIME_PLAYED_GAMES),
-    "completed": ("juegos completados", checks.COMPLETED_GAMES, checks.LIFETIME_COMPLETED_GAMES),
-    "game_hours": ("horas en un mismo juego", checks.HOURS_IN_A_GAME, checks.LIFETIME_HOURS_IN_A_GAME),
-    "streak": ("días seguidos", checks.STREAKS, ()),
+    "hours": (checks.TOTAL_HOURS, checks.LIFETIME_TOTAL_HOURS),
+    "days": (checks.TOTAL_DAYS, checks.LIFETIME_TOTAL_DAYS),
+    "games": (checks.PLAYED_GAMES, checks.LIFETIME_PLAYED_GAMES),
+    "completed": (checks.COMPLETED_GAMES, checks.LIFETIME_COMPLETED_GAMES),
+    "game_hours": (checks.HOURS_IN_A_GAME, checks.LIFETIME_HOURS_IN_A_GAME),
+    "streak": (checks.STREAKS, ()),
 }
 
-# key -> (metric, unit, needed)
+# key -> (metric, needed)
 TARGETS = {
-    ach.name: (metric, unit, needed)
-    for metric, (unit, season_table, lifetime_table) in FAMILIES.items()
+    ach.name: (metric, needed)
+    for metric, (season_table, lifetime_table) in FAMILIES.items()
     for ach, needed in (*season_table, *lifetime_table)
 }
 
 
-def target_of(key: str) -> tuple[str, str, int] | None:
-    """(metric, unit, needed) of an achievement that has a bar, None for the ones that do not."""
+def target_of(key: str) -> tuple[str, int] | None:
+    """(metric, needed) of an achievement that has a bar, None for the ones that do not."""
     return TARGETS.get(key)
 
 
-def bar(current: float, needed: int, unit: str) -> dict:
-    """What the page draws: the value (never past the goal), the goal and what they count."""
+def bar(current: float, needed: int) -> dict:
+    """What the page draws: the value (never past the goal) and the goal. There is no unit on purpose: the bar
+    shows how far the player is, not what it counts, so a locked achievement does not give away what it is about."""
     shown = min(current, needed)
-    return {"current": round(shown, 1) if isinstance(shown, float) else shown, "target": needed, "unit": unit}
+    return {"current": round(shown, 1) if isinstance(shown, float) else shown, "target": needed}
 
 
 class Metrics:
@@ -99,8 +100,8 @@ class Progress:
         target = target_of(key)
         if target is None:
             return None
-        metric, unit, needed = target
+        metric, needed = target
         scope = (seasons.ALL, valid_from_season or None) if lifetime else (seasons.current(), None)
         if scope not in self._scopes:
             self._scopes[scope] = Metrics(self.db, self.user_id, scope[0], scope[1], self.today)
-        return bar(self._scopes[scope].get(metric), needed, unit)
+        return bar(self._scopes[scope].get(metric), needed)
