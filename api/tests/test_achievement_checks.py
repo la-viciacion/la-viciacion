@@ -16,7 +16,7 @@ USER = types.SimpleNamespace(id=1, name="Ana", telegram_id=111)
 YEAR = datetime.date.today().year
 
 # The achievements that existed before the season each starts to count in was recorded: valid from the first
-# season of the app. Every one added since says its own (utils/achievements.py, "since"), and a test fails if it does not.
+# season of the app (2023). Every one added since starts in 2027.
 LEGACY = (
     "COMPLETED_100_GAMES", "COMPLETED_42_GAMES", "EARLY_RISER", "HAPPY_NEW_YEAR", "JUST_IN_TIME", "NOCTURNAL",
     "PLAYED_1000_HOURS", "PLAYED_1000_HOURS_GAME", "PLAYED_100_DAYS", "PLAYED_100_GAMES", "PLAYED_100_HOURS",
@@ -832,11 +832,11 @@ class LifetimeTests(unittest.IsolatedAsyncioTestCase):
 
 
 class CatalogueTests(unittest.TestCase):
-    def test_every_achievement_that_is_new_says_the_season_it_starts_in(self):
-        without = {ach.name for ach in ach_module.AchievementsElems if "since" not in ach.value}
-        self.assertEqual(without, set(LEGACY))  # one added without a "since" would be valid from 2023, behind everybody's back
+    def test_every_achievement_says_the_season_it_starts_in(self):
+        without = [ach.name for ach in ach_module.AchievementsElems if "since" not in ach.value]
+        self.assertEqual(without, [])  # one added without it would not be created at all
         for ach in ach_module.AchievementsElems:
-            expected = 2023 if ach.name in LEGACY else 2027
+            expected = 2023 if ach.name in LEGACY else 2027  # the first ones: 2023; every one added since: 2027
             self.assertEqual(first_season(ach), expected, ach.name)
 
 
