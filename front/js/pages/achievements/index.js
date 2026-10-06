@@ -22,7 +22,7 @@ const hiddenCard = (a) => html`
   <article class="ach-card hidden${a.secret ? ' secret' : ''}">
     <div class="ach-img ach-img-placeholder" aria-hidden="true">🔒</div>
     <div class="ach-body">
-      <div class="ach-title"><strong>${a.secret ? 'Logro secreto' : 'Logro oculto'}</strong></div>
+      <div class="ach-title"><strong>Logro oculto</strong></div>
       <div class="pf-sub">Desbloquéalo para descubrirlo.</div>
     </div>
   </article>`;

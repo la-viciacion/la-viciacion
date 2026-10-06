@@ -67,7 +67,7 @@ test('a secret one that is not unlocked still has the aura, and says nothing els
   const [plain, special] = document.querySelectorAll('.ach-card.hidden');
   assert.ok(!plain.classList.contains('secret'));
   assert.ok(special.classList.contains('secret'));
-  assert.deepEqual(text('.ach-title strong'), ['Logro oculto', 'Logro secreto']);
+  assert.deepEqual(text('.ach-title strong'), ['Logro oculto', 'Logro oculto']);  // the aura is what tells them apart
   assert.doesNotMatch(special.textContent, /Secreto|Lo tienes/);
 });
 
