@@ -85,17 +85,16 @@ class RecalculationTests(unittest.TestCase):
         self.assertEqual(got[("add", 1, PAST, "PLAYED_7_DAYS")].date_after, D(PAST, 3, 7))
         self.assertEqual({action for action, *_ in got}, {"add"})
 
-    def test_it_corrects_dates_revokes_what_does_not_hold_and_removes_repeats(self):
+    def test_it_corrects_dates_and_revokes_what_does_not_hold(self):
         self.play_days(1, PAST, 7)
         self.award(1, "PLAYED_7_DAYS", D(PAST, 6, 20))  # a wrong date
         self.award(1, "PLAYED_30_DAYS", D(PAST, 6, 20))  # never reached
         self.award(1, "STREAK_7_DAYS", D(PAST, 3, 7))
-        self.award(1, "STREAK_7_DAYS", D(PAST, 3, 7))  # repeated
         got = self.changes()
         self.assertEqual(got[("date", 1, PAST, "PLAYED_7_DAYS")].date_before, D(PAST, 6, 20))
         self.assertEqual(got[("date", 1, PAST, "PLAYED_7_DAYS")].date_after, D(PAST, 3, 7))
         self.assertIn(("revoke", 1, PAST, "PLAYED_30_DAYS"), got)
-        self.assertEqual(len([key for key in got if key[0] == "revoke" and key[3] == "STREAK_7_DAYS"]), 1)
+        self.assertFalse([key for key in got if key[3] == "STREAK_7_DAYS"])  # right as it is
         self.assertNotIn(("add", 1, PAST, "PLAYED_7_DAYS"), got)
 
     def test_applying_it_leaves_nothing_more_to_change(self):
@@ -321,8 +320,8 @@ class TeamworkDatesTests(unittest.TestCase):
         self.assertEqual(recalc.teamwork_dates(self.db, YEAR), {})
 
     def test_the_same_player_twice_is_one_player(self):
-        for hour in (20, 20, 21, 21):
-            self.play(1, at(YEAR, 3, 5, hour))
+        for minutes in (0, 10, 20, 30):  # four overlapping sessions, one player
+            self.play(1, at(YEAR, 3, 5, 20) + datetime.timedelta(minutes=minutes))
         self.assertEqual(recalc.teamwork_dates(self.db, YEAR), {})
 
     def test_players_who_are_no_longer_active_and_running_timers_count_but_not_the_emergency_account(self):

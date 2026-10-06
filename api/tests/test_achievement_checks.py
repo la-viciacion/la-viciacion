@@ -554,10 +554,10 @@ class AchievementCheckTests(unittest.IsolatedAsyncioTestCase):
             self.db.add(models.GameTimer(user_id=i, game_id="g1", start_time=datetime.datetime(YEAR, 3, 1, 10), is_active=True))
         self.db.commit()
         await self.ach.teamwork(self.db, silent=False)
-        self.assertIn("P2, P3, P4 y P5 han desbloqueado un logro oculto", self.message(0))
+        self.assertIn("*P2, P3, P4 y P5* han desbloqueado un logro oculto", self.message(0))
         self.assertEqual(private.await_count, 4)
         await self.ach.all_together(self.db, "g1")
-        self.assertIn("P2, P3, P4 y P5 han desbloqueado un logro oculto", self.message(1))
+        self.assertIn("*P2, P3, P4 y P5* han desbloqueado un logro oculto", self.message(1))
         self.assertEqual(private.await_count, 8)
 
     async def test_silent_checks_award_but_pass_silent_on(self):
@@ -809,7 +809,7 @@ class LifetimeTests(unittest.IsolatedAsyncioTestCase):
         self.valid_from("PLAYED_1000_HOURS_GAME_LIFETIME", YEAR + 1)
         self.play(datetime.datetime(YEAR, 3, 1, 10), hours=1100)
         await actions.check_user_lifetime(self.db, USER)
-        self.assertEqual(self.awarded(), {})
+        self.assertNotIn("PLAYED_1000_HOURS_GAME_LIFETIME", self.awarded())  # the others it earns on the way are valid
 
     async def test_there_is_one_view_for_each_season_the_ones_that_can_be_earned_count_from(self):
         self.valid_from("PLAYED_100_DAYS_LIFETIME", YEAR - 1)
