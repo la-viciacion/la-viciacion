@@ -484,6 +484,12 @@ class AvatarTests(UsersTestCase):
         served = self.api("GET", "/users/ana/avatar", as_user="ana")
         self.assertEqual((served.status_code, served.headers["content-type"], stored_size(served.content)), (200, "image/png", (4, 4)))
 
+    def test_the_picture_is_only_sent_again_when_it_changed(self):
+        self.assertEqual(self.upload(png()).status_code, 200)
+        served = self.api("GET", "/users/ana/avatar", as_user="ana")
+        again = self.api("GET", "/users/ana/avatar", as_user="ana", headers={"If-None-Match": served.headers["etag"]})
+        self.assertEqual((again.status_code, again.content), (304, b""))
+
     def test_a_big_picture_is_stored_scaled_down(self):
         self.assertEqual(self.upload(png((1024, 1024))).status_code, 200)
         served = self.api("GET", "/users/ana/avatar", as_user="ana")

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Response, Security, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, Security, UploadFile
 from sqlalchemy.orm import Session
 
 from .. import auth
@@ -77,19 +77,20 @@ def upload_achievement_image(
 @router.get("/achievement-image/{achievement}")
 def get_achievement_image(
     achievement: str,
+    request: Request,
     db: Session = Depends(get_db),
 ):
     """
     Get achievement image
     """
-    if not achievements.get_ach_by_key(db, achievement):
-        logger.info(msg.ACHIEVEMENT_NOT_EXISTS)
-        raise HTTPException(status_code=404, detail=msg.ACHIEVEMENT_NOT_EXISTS)
     try:
-        data = achievements.get_image(db, achievement)
-        if data[0] is None:
-            return Response(content="Achievement has no image", status_code=400)
-        return Response(content=data[0], media_type=images.media_type_of(data[0]))
+        data = achievements.get_image(db, achievement)  # None: no such achievement; (None,): it has no image
     except Exception as e:
         logger.error("Error reading achievement image: " + str(e))
         raise HTTPException(status_code=500, detail=msg.INTERNAL_ERROR)
+    if data is None:
+        logger.info(msg.ACHIEVEMENT_NOT_EXISTS)
+        raise HTTPException(status_code=404, detail=msg.ACHIEVEMENT_NOT_EXISTS)
+    if data[0] is None:
+        return Response(content="Achievement has no image", status_code=400)
+    return images.cached_image(request, bytes(data[0]), "public, max-age=300")

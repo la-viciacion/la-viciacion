@@ -1,5 +1,4 @@
 import datetime
-import hashlib
 import re
 
 from fastapi import (
@@ -9,7 +8,6 @@ from fastapi import (
     HTTPException,
     Query,
     Request,
-    Response,
     UploadFile,
 )
 from fastapi.encoders import jsonable_encoder
@@ -475,17 +473,13 @@ def get_player_photo(
     )
     if not row or not row[0]:
         raise HTTPException(status_code=404, detail="Avatar not found")
-    image = bytes(row[0])
-    etag = '"' + hashlib.sha1(image).hexdigest() + '"'
-    headers = {"ETag": etag, "Cache-Control": "private, max-age=300"}
-    if request.headers.get("if-none-match") == etag:
-        return Response(status_code=304, headers=headers)
-    return Response(content=image, media_type=images.media_type_of(image), headers=headers)
+    return images.cached_image(request, bytes(row[0]), "private, max-age=300")
 
 
 @router.get("/{username}/avatar")
 def get_avatar(
     username: str,
+    request: Request,
     active_user: models.User = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db),
 ):
@@ -500,5 +494,5 @@ def get_avatar(
         raise HTTPException(status_code=500, detail=msg.INTERNAL_ERROR)
     if not data or not data[0]:
         raise HTTPException(status_code=404, detail="Avatar not found")
-    image = bytes(data[0])
-    return Response(content=image, media_type=images.media_type_of(image))
+    # always revalidated (a 304 costs no picture): a new avatar must show at once on the owner's own screen
+    return images.cached_image(request, bytes(data[0]), "private, no-cache")

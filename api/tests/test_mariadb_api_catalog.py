@@ -257,6 +257,13 @@ class PlatformsAndAchievementImagesTests(CatalogTestCase):
         self.assertEqual((served.status_code, served.headers["content-type"]), (200, "image/png"))
         self.assertEqual(Image.open(io.BytesIO(served.content)).size, (4, 4))
 
+    def test_an_achievement_image_is_only_sent_again_when_it_changed(self):
+        key = self.key()
+        self.assertEqual(self.put(self.png()).status_code, 200)
+        served = self.api("GET", f"/utils/achievement-image/{key}")
+        again = self.api("GET", f"/utils/achievement-image/{key}", headers={"If-None-Match": served.headers["etag"]})
+        self.assertEqual((again.status_code, again.content), (304, b""))
+
     def test_a_big_achievement_image_is_stored_scaled_down(self):
         key = self.key()
         self.assertEqual(self.put(self.png((1024, 1024))).status_code, 200)

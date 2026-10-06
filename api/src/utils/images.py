@@ -3,8 +3,10 @@
 What is stored is never the upload itself: `normalize_image` shrinks it to a maximum side and encodes it again
 without metadata, so the database keeps the least that serves the screen and no EXIF (GPS, camera) survives.
 """
+import hashlib
 import io
 
+from fastapi import Request, Response
 from PIL import Image, ImageOps, UnidentifiedImageError
 
 from src.utils import messages
@@ -20,6 +22,16 @@ JPEG_QUALITY = 85
 def media_type_of(data: bytes) -> str:
     """Media type of an image that was validated when it was uploaded (only PNG or JPEG get in)."""
     return "image/png" if data.startswith(b"\x89PNG") else "image/jpeg"
+
+
+def cached_image(request: Request, data: bytes, cache_control: str) -> Response:
+    """The stored image, or a 304 when the browser already has this exact one (its ETag is a hash of the bytes):
+    the picture is only sent again when it changed."""
+    etag = '"' + hashlib.sha1(data).hexdigest() + '"'
+    headers = {"ETag": etag, "Cache-Control": cache_control}
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers=headers)
+    return Response(content=data, media_type=media_type_of(data), headers=headers)
 
 
 def validate_image(data: bytes, max_bytes: int) -> str:
