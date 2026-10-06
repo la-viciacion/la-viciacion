@@ -39,9 +39,18 @@ class TargetTests(unittest.TestCase):
                 self.assertEqual(progress.target_of(ach.name)[1], needed, ach.name)
 
     def test_the_bar_never_goes_past_its_goal(self):
-        self.assertEqual(progress.bar(250, 200), {"current": 200, "target": 200})
-        self.assertEqual(progress.bar(12.345, 100), {"current": 12.3, "target": 100})
-        self.assertEqual(progress.bar(3, 7), {"current": 3, "target": 7})
+        self.assertEqual(progress.bar(250, 200), {"percent": 100})
+        self.assertEqual(progress.bar(12.345, 100), {"percent": 12})
+        self.assertEqual(progress.bar(3, 7), {"percent": 42})
+
+    def test_a_little_progress_shows_and_none_is_empty_and_only_the_goal_fills_it(self):
+        self.assertEqual(progress.bar(0.4, 1000), {"percent": 1})
+        self.assertEqual(progress.bar(0, 10), {"percent": 0})
+        self.assertEqual(progress.bar(99.9, 100), {"percent": 99})
+        self.assertEqual(progress.bar(100, 100), {"percent": 100})
+
+    def test_the_bar_says_nothing_but_how_full_it_is(self):
+        self.assertEqual(set(progress.bar(35, 100)), {"percent"})
 
 
 class CatalogProgressTests(unittest.TestCase):
@@ -72,22 +81,22 @@ class CatalogProgressTests(unittest.TestCase):
 
     def test_each_cumulative_achievement_shows_how_far_the_player_is(self):
         got = self.catalog()
-        self.assertEqual(got["PLAYED_100_HOURS"]["progress"], {"current": 6, "target": 100})
-        self.assertEqual(got["PLAYED_7_DAYS"]["progress"], {"current": 3, "target": 7})
-        self.assertEqual(got["PLAYED_10_GAMES"]["progress"], {"current": 2, "target": 10})
-        self.assertEqual(got["PLAYED_100_HOURS_GAME"]["progress"], {"current": 4, "target": 100})
-        self.assertEqual(got["STREAK_7_DAYS"]["progress"], {"current": 3, "target": 7})
+        self.assertEqual(got["PLAYED_100_HOURS"]["progress"], {"percent": 6})
+        self.assertEqual(got["PLAYED_7_DAYS"]["progress"], {"percent": 42})
+        self.assertEqual(got["PLAYED_10_GAMES"]["progress"], {"percent": 20})
+        self.assertEqual(got["PLAYED_100_HOURS_GAME"]["progress"], {"percent": 4})
+        self.assertEqual(got["STREAK_7_DAYS"]["progress"], {"percent": 42})
 
     def test_a_lifetime_one_counts_the_whole_history(self):
         last = datetime.datetime(YEAR - 1, 3, 1, 10)
         self.db.add(models.GameTimer(user_id=1, game_id="doom", start_time=last, end_time=last + datetime.timedelta(hours=10), duration_seconds=36000, is_active=False))
         self.db.commit()
         got = self.catalog()
-        self.assertEqual(got["PLAYED_500_HOURS_LIFETIME"]["progress"]["current"], 16)
-        self.assertEqual(got["PLAYED_100_HOURS"]["progress"]["current"], 6)  # the season one ignores last year
+        self.assertEqual(got["PLAYED_500_HOURS_LIFETIME"]["progress"]["percent"], 3)
+        self.assertEqual(got["PLAYED_100_HOURS"]["progress"]["percent"], 6)  # the season one ignores last year
 
     def test_the_streak_is_the_current_run(self):
-        self.assertEqual(group.achievements_catalog(self.db, 1, datetime.date(YEAR, 6, 15))[4]["progress"]["current"], 0)
+        self.assertEqual(group.achievements_catalog(self.db, 1, datetime.date(YEAR, 6, 15))[4]["progress"]["percent"], 0)
 
     def test_the_ones_about_a_moment_and_the_unknown_have_no_bar(self):
         got = self.catalog()
@@ -111,7 +120,7 @@ class CatalogProgressTests(unittest.TestCase):
         self.db.commit()
         got = self.catalog()
         self.assertFalse(got["PLAYED_100_HOURS"]["unlocked_by_me"])  # not this season
-        self.assertEqual(got["PLAYED_100_HOURS"]["progress"]["current"], 6)
+        self.assertEqual(got["PLAYED_100_HOURS"]["progress"]["percent"], 6)
         self.assertIsNotNone(got["PLAYED_100_HOURS"]["description"])  # but whoever earned it once knows what it is
 
     def test_a_lifetime_one_earned_in_a_past_season_has_no_bar(self):

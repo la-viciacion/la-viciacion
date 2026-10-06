@@ -6,7 +6,6 @@
 import { API_BASE, api } from '../../lib/api.js';
 import { formatDate, formatPlayers } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
-import { progressPercent, progressText } from '../../lib/achievement-progress.js';
 import * as seasons from '../../lib/seasons.js';
 import { specialClass, specialTag } from '../../lib/special.js';
 import { titleView } from '../../ui/profile-summary.js';
@@ -36,13 +35,13 @@ const hiddenCard = (a) => html`
     </div>
   </article>`;
 
-// How far the viewer is from an achievement that adds something up: a bar and "35 / 100" (no unit: a locked one does not say what it counts).
+// How far the viewer is from an achievement that adds something up: only a bar, with no count, goal or unit, so that
+// a locked one does not say what it counts or where the limit is.
 const progressBar = (p) => (p ? html`
   <div class="ach-progress">
-    <div class="ach-bar" role="progressbar" aria-valuemin="0" aria-valuemax="${p.target}" aria-valuenow="${p.current}" aria-label="${progressText(p)}">
-      <div class="ach-bar-fill" style="width: ${progressPercent(p)}%"></div>
+    <div class="ach-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${p.percent}" aria-label="Progreso">
+      <div class="ach-bar-fill" style="width: ${p.percent}%"></div>
     </div>
-    <div class="pf-sub">${progressText(p)}</div>
   </div>` : '');
 
 // One the viewer has not unlocked (and is not secret) is shown dimmed, with its name only: what it is about is for

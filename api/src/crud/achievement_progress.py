@@ -39,10 +39,13 @@ def target_of(key: str) -> tuple[str, int] | None:
 
 
 def bar(current: float, needed: int) -> dict:
-    """What the page draws: the value (never past the goal) and the goal. There is no unit on purpose: the bar
-    shows how far the player is, not what it counts, so a locked achievement does not give away what it is about."""
-    shown = min(current, needed)
-    return {"current": round(shown, 1) if isinstance(shown, float) else shown, "target": needed}
+    """What the page draws: only how full the bar is, a whole percent. Neither the goal, the count nor its unit
+    are sent on purpose: a locked achievement must not give away what it counts or where the limit is. A little
+    progress still shows (never 0 once something is done) and a bar is only full when the goal is reached."""
+    if current <= 0:
+        return {"percent": 0}
+    percent = int(min(current, needed) / needed * 100)
+    return {"percent": max(1, min(100, percent))}
 
 
 class Metrics:
