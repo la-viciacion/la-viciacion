@@ -69,13 +69,14 @@ test('a secret one says so, and being secret is not being special', async () => 
   assert.ok(![...document.querySelector('.ach-card').classList].some((c) => c.startsWith('special-')));  // no aura without a level
 });
 
-test('one the viewer has not unlocked, and is not secret, is shown in full but dimmed', async () => {
-  installApi({ 'GET /group/achievements': [{ ...LIST[0], unlocked_by_me: false, unlocked_by: 0, players: [] }, LIST[1]] });
+test('one the viewer has not unlocked, and is not secret, is shown dimmed with its name only', async () => {
+  installApi({ 'GET /group/achievements': [{ ...LIST[0], unlocked_by_me: false, unlocked_by: 0, players: [], description: null }, LIST[1]] });
   await page.render({ main: main() });
   await settle();
   const [open] = document.querySelectorAll('.ach-card.locked');
   assert.match(open.textContent, /Primero <b>/);
-  assert.match(open.textContent, /Alguien lo hizo/);
+  assert.doesNotMatch(open.textContent, /Alguien lo hizo|null/);  // nothing about what it is
+  assert.match(open.textContent, /Nadie lo ha conseguido/);
   assert.equal(document.querySelectorAll('.ach-card.mine').length, 0);
   assert.equal(text('.ach-count')[0], 'Tienes 0 de 2');
 });

@@ -29,9 +29,10 @@ def unlocked_ids(db: Session, user_id: int) -> set[int]:
 
 def achievements_catalog(db: Session, viewer_id: int) -> list[dict]:
     """Every achievement with who has unlocked it (and how many times: once per season) and when last. The ones the
-    viewer has not unlocked come in full (the front dims them) unless they are secret: those come hidden, with no
-    key, title, description, picture or players, only that they exist, whether they are secret and their special
-    level (so that everybody knows there are special ones to unlock)."""
+    viewer has not unlocked come with their name and picture but **no description** (the front dims them: the player
+    has to work out what they are about) unless they are secret: those come hidden, with no key, title, description,
+    picture or players, only that they exist, whether they are secret and their special level (so that everybody
+    knows there are special ones to unlock)."""
     mine = unlocked_ids(db, viewer_id)
     players = (models.User.is_active == 1, models.not_god())
     unlocked: dict[int, dict[int, dict]] = {}
@@ -65,7 +66,7 @@ def achievements_catalog(db: Session, viewer_id: int) -> list[dict]:
             "hidden": False,
             "key": row.key,
             "title": row.title,
-            "description": describe(row.message),
+            "description": describe(row.message) if row.id in mine else None,  # what it is about is for whoever earns it
             "secret": bool(row.secret),
             "special": row.special,
             "lifetime": is_lifetime(row.key),  # earned once in a lifetime, not once a season

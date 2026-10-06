@@ -30,7 +30,8 @@ const hiddenCard = (a) => html`
     </div>
   </article>`;
 
-// One the viewer has not unlocked (and is not secret) is shown dimmed: it is what there is to aim for.
+// One the viewer has not unlocked (and is not secret) is shown dimmed, with its name only: what it is about is for
+// them to work out.
 const card = (a) => (a.hidden ? hiddenCard(a) : html`
   <article class="ach-card ${a.unlocked_by_me ? 'mine' : 'locked'}${specialClass(a.special)}">
     <div class="ach-head">
@@ -38,7 +39,7 @@ const card = (a) => (a.hidden ? hiddenCard(a) : html`
       <div class="ach-title"><strong>${a.title}</strong>${a.secret ? html`<span class="pf-tag secret">Secreto</span>` : ''}${specialTag(a.special)}${a.lifetime ? html`<span class="pf-tag muted">Único</span>` : ''}</div>
     </div>
     <div class="ach-body">
-      <div class="pf-sub">${a.description}</div>
+      ${a.description ? html`<div class="pf-sub">${a.description}</div>` : ''}
       ${who(a)}
     </div>
   </article>`);
