@@ -11,6 +11,7 @@
 import { formatDuration, formatTimestamp } from '../../lib/format.js';
 import { html } from '../../lib/html.js';
 import { platformList, platformName } from '../../lib/platforms.js';
+import { SPECIAL_NAMES, specialClass } from '../../lib/special.js';
 import { badge, seasonYears, store } from './components.js';
 import { ENTITY_OPTIONS, describe, detailParts } from './audit-labels.js';
 import { closeTimerNow } from './dialogs.js';
@@ -240,7 +241,7 @@ export const ENTITIES = {
   achievements: {
     label: 'Logros',
     nav: 'Logros',
-    description: 'Logros que se pueden conseguir: su título, mensaje e imagen, y si están activos. Uno inactivo no lo consigue nadie, no se anuncia, no se recalcula y no aparece en la página de logros; los nuevos empiezan inactivos hasta que los actives (y luego puedes recalcularlos).',
+    description: 'Logros que se pueden conseguir: su título, mensaje e imagen, y si están activos, son secretos o especiales (aura plateada, dorada o morada). Uno inactivo no lo consigue nadie, no se anuncia, no se recalcula y no aparece en la página de logros; los nuevos empiezan inactivos hasta que los actives (y luego puedes recalcularlos).',
     toolbarActions: [{ act: 'recalculate-achievements', label: 'Recalcular logros…' }],
     endpoint: '/manage/achievements',
     paged: false,
@@ -248,7 +249,7 @@ export const ENTITIES = {
       { label: 'Imagen', render: (r) => (r.has_image ? html`<img class="adm-ach" src="/api/v1/utils/achievement-image/${r.key}?v=${Date.now()}" alt="" />` : '—') },
       { label: 'Logro', render: (r) => html`<strong>${r.title}</strong><div class="adm-sub">${r.key}</div>` },
       { label: 'Mensaje', render: (r) => r.message || '' },
-      { label: 'Estado', render: (r) => html`${r.active ? badge('Activo', 'green') : badge('Inactivo', 'orange')}${r.secret ? badge('Secreto', 'purple') : ''}${r.lifetime ? badge('Único', 'gray') : ''}` },
+      { label: 'Estado', render: (r) => html`${r.active ? badge('Activo', 'green') : badge('Inactivo', 'orange')}${r.secret ? badge('Secreto', 'ink') : ''}${SPECIAL_NAMES[r.special] ? badge(`Especial ${SPECIAL_NAMES[r.special].toLowerCase()}`, specialClass(r.special).trim()) : ''}${r.lifetime ? badge('Único', 'gray') : ''}` },
       { label: 'Desde', render: (r) => r.valid_from_season },
       { label: 'Concedido', render: (r) => r.awarded },
     ],
@@ -256,7 +257,13 @@ export const ENTITIES = {
       { key: 'title', label: 'Título', type: 'text', required: true },
       { key: 'message', label: 'Mensaje ({} = usuario / juego)', type: 'text' },
       { key: 'active', label: 'Activo', type: 'checkbox' },
-      { key: 'secret', label: 'Secreto (se anuncia sin decir cuál; el jugador lo recibe en privado)', type: 'checkbox' },
+      { key: 'secret', label: 'Secreto (oculto para quien no lo tiene; se anuncia sin decir cuál y el jugador lo recibe en privado)', type: 'checkbox' },
+      {
+        key: 'special',
+        label: 'Especial (aura de su color; el aviso dice que es especial)',
+        type: 'select',
+        options: [[0, 'Ninguno'], ...Object.entries(SPECIAL_NAMES).map(([level, name]) => [Number(level), `${name} (nivel ${level})`])],
+      },
       { key: 'valid_from_season', label: 'Válido desde la temporada (antes de ella nadie lo consigue ni cuenta)', type: 'number', required: true },
       {
         key: 'image',

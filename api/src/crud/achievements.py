@@ -11,7 +11,7 @@ from ..crud import time_entries, users, games
 from ..database import models, schemas
 from ..utils import actions as actions
 from ..utils import my_utils as utils
-from ..utils.achievements import AchievementsElems, first_season, is_lifetime
+from ..utils.achievements import SPECIAL_LEVELS, AchievementsElems, first_season, is_lifetime
 from ..utils.logger import LogManager
 from ..utils import seasons, streaks
 
@@ -331,17 +331,24 @@ class Achievements:
         msg = utils.get_ach_message(ach, user=user.name, db=db, game_id=game_id)
         await self._announce(db, ach, [user], msg, silent, self.get_image(db, ach.name)[0])
 
-    def _is_secret(self, db: Session, key: str) -> bool:
-        return bool(db.query(models.Achievement.secret).filter(models.Achievement.key == key).scalar())
+    def _flags(self, db: Session, key: str) -> tuple[bool, int]:
+        """(secret, special level) of an achievement."""
+        secret, special = db.query(models.Achievement.secret, models.Achievement.special).filter(models.Achievement.key == key).one()
+        return bool(secret), special or 0
 
     async def _announce(
         self, db: Session, ach: AchievementsElems, players: list, message: str, silent: bool, image=None
     ):
-        """Tell the group that `players` unlocked `ach`, with `message`. A secret one does not say which: the
-        group only hears that they unlocked a hidden achievement (no picture), and each player gets `message`
-        privately, on every channel they have (Telegram if linked, push if they have a device)."""
+        """Tell the group that `players` unlocked `ach`, with `message`. A special one says so, with its colour. A
+        secret one does not say which: the group only hears that they unlocked a hidden achievement (no
+        picture), and each player gets `message` privately, on every channel they have (Telegram if linked, push
+        if they have a device)."""
         silent = silent or self.silent
-        if not self._is_secret(db, ach.name):
+        secret, special = self._flags(db, ach.name)
+        if special in SPECIAL_LEVELS:
+            colour, emoji = SPECIAL_LEVELS[special]
+            message = f"{emoji} Logro especial {colour} {emoji}\n{message}"
+        if not secret:
             await utils.send_message(message, silent, image=image)
             return
         names = [utils.escape_markdown(player.name) for player in players]

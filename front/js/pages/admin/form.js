@@ -1,7 +1,8 @@
 // Generic create/edit form driven by the entity field definitions.
 //
 // Field: { key, label, type, required?, omitEmpty?, step?, nameKey? (game: the row's key holding the game's name) }
-// Types: text | number | date | datetime | checkbox | platform | user | game | password | image
+// Types: text | number | date | datetime | checkbox | select | platform | user | game | password | image
+// select: { options: [[number, label], ...] }
 // image (editing only): { current: (row) => url of the picture or null, upload: (row) => route that takes the new file }
 import { api, jsonRequest } from '../../lib/api.js';
 import { html } from '../../lib/html.js';
@@ -20,6 +21,10 @@ function fieldHtml(f, value, row) {
   switch (f.type) {
     case 'checkbox':
       return html`<label class="adm-check"><input type="checkbox" id="${id}" ${v ? html`checked` : ''} /> ${f.label}</label>`;
+    case 'select':
+      return html`<label>${f.label}<select class="adm-input" id="${id}">
+        ${f.options.map(([value, name]) => html`<option value="${value}" ${String(value) === String(v) ? html`selected` : ''}>${name}</option>`)}
+      </select></label>`;
     case 'platform': {
       const known = platformList();
       return html`<label>${f.label}<select class="adm-input" id="${id}">
@@ -64,6 +69,7 @@ function readField(f) {
   const el = document.getElementById(inputId(f));
   switch (f.type) {
     case 'checkbox': return el.checked;
+    case 'select':
     case 'number': return el.value === '' ? null : Number(el.value);
     case 'datetime': return el.value ? (el.value.length === 16 ? `${el.value}:00` : el.value) : null;
     case 'user': return el.value ? Number(el.value) : null;

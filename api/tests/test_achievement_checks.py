@@ -541,6 +541,25 @@ class AchievementCheckTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("7 días jugados", self.message())
         private.assert_not_awaited()
 
+    async def test_a_special_one_says_so_with_its_colour_and_is_announced_in_full(self):
+        private = self.make_secret()
+        self.db.query(models.Achievement).filter_by(key="PLAYED_7_DAYS").update({"special": 3})
+        self.db.commit()
+        await self.ach.user_played_total_days(self.db, USER, self.days(7))
+        group = self.message()
+        self.assertIn("Logro especial morado", group)
+        self.assertIn("7 días jugados", group)  # it is not secret: nothing is held back
+        private.assert_not_awaited()
+
+    async def test_a_special_and_secret_one_is_anonymous_to_the_group_and_special_to_the_player(self):
+        private = self.make_secret("PLAYED_7_DAYS")
+        self.db.query(models.Achievement).filter_by(key="PLAYED_7_DAYS").update({"special": 1})
+        self.db.commit()
+        await self.ach.user_played_total_days(self.db, USER, self.days(7))
+        self.assertIn("ha desbloqueado un logro oculto", self.message())
+        self.assertNotIn("especial", self.message())  # it would give it away
+        self.assertIn("Logro especial plateado", private.await_args.args[1])
+
     async def test_a_silent_check_tells_nobody_not_even_the_player(self):
         private = self.make_secret("PLAYED_7_DAYS")
         await self.ach.user_played_total_days(self.db, USER, self.days(7), silent=True)

@@ -57,10 +57,17 @@ class ActivityTests(ApiTestCase):
         self.assertEqual((by_type["achievement"]["title"], by_type["achievement"]["game_id"]), (title, "celeste"))
         self.assertTrue(all(i["day"] == TODAY().isoformat() for i in items))
 
-    def test_an_achievement_the_viewer_lacks_is_announced_without_saying_which(self):
+    def test_a_secret_achievement_the_viewer_lacks_is_announced_without_saying_which(self):
         self.award(self.ana, TODAY(), "celeste")
+        with self.engine.begin() as conn:
+            conn.execute(text("UPDATE achievements SET secret = 1"))
         item = self.feed(as_user="bea")["items"][0]
         self.assertEqual((item["type"], item["hidden"], item["title"], item["game_id"], item["name"]), ("achievement", True, None, None, "Ana"))
+
+    def test_one_that_is_not_secret_is_told_in_full_to_everybody(self):
+        title = self.award(self.ana, TODAY(), "celeste")
+        item = self.feed(as_user="bea")["items"][0]
+        self.assertEqual((item["hidden"], item["title"], item["game_id"]), (False, title, "celeste"))
 
     def test_newest_days_first_and_a_game_started_once_per_player(self):
         old = TODAY() - timedelta(days=10)
