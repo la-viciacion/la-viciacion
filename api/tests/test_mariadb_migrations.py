@@ -1,20 +1,18 @@
 """Migrations and schema rules checked on a real MariaDB (see tests/mariadb_db.py).
 
-`test_migrations.py` only inspects the files; these run them. They cover steps 2, 3, 4 and 6 of the
-verification checklist in docs/migrations.md (empty -> head, an older revision with data -> head,
-re-run, downgrade and back) plus the rules that only MariaDB enforces. The checklist's step 3 with a
-copy of the production backup stays manual: it needs real data.
+`test_migrations.py` only inspects the files; these run them. They cover an older revision with data
+taken to the head (step 3 of the verification checklist in docs/migrations.md) plus the rules that only
+MariaDB enforces. Empty -> head, re-run, downgrade and back, and the models matching the schema are in
+`test_mariadb_migration_chain.py`, for every migration. The checklist's step 3 with a copy of the
+production backup stays manual: it needs real data.
 """
-import ast
 import datetime
-from pathlib import Path
 
 from sqlalchemy import inspect, text
 from sqlalchemy.exc import DBAPIError, IntegrityError
 
-from src.database import models
 from tests.mariadb_db import MariaDBTestCase
-from tests.test_migrations import VERSIONS_DIR, load_script_directory
+from tests.test_migrations import load_script_directory
 
 # Old enough to be a fixed point (applied migrations are immutable, so data seeded at this revision
 # stays valid forever) and recent enough that every later migration upgrades real-looking tables.
@@ -23,61 +21,6 @@ SEEDED_REVISION = "016_foreign_keys"
 
 def head_revision() -> str:
     return load_script_directory().get_current_head()
-
-
-def head_downgrade_is_defined() -> bool:
-    """Irreversible migrations (like 000) raise in downgrade() on purpose; there is nothing to test."""
-    rev = load_script_directory().get_revision(head_revision())
-    tree = ast.parse(Path(rev.path).read_text(encoding="utf-8"))
-    downgrade = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "downgrade")
-    return not any(isinstance(n, ast.Raise) for n in ast.walk(downgrade))
-
-
-class EmptyDatabaseToHeadTests(MariaDBTestCase):
-    @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-        cls.migrate()
-
-    def test_it_ends_at_the_single_head(self):
-        self.assertEqual(self.current_revision(), head_revision())
-
-    def test_running_it_again_changes_nothing(self):
-        result = self.alembic("upgrade", "head")
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(self.current_revision(), head_revision())
-
-    def test_every_table_and_column_of_the_models_exists(self):
-        """A model column without a migration would only fail in production, at the first query."""
-        inspector = inspect(self.engine)
-        existing = set(inspector.get_table_names())
-        for table in models.Base.metadata.sorted_tables:
-            self.assertIn(table.name, existing, f"table {table.name} has no migration")
-            columns = {c["name"] for c in inspector.get_columns(table.name)}
-            for column in table.columns:
-                self.assertIn(column.name, columns, f"{table.name}.{column.name} has no migration")
-
-    def test_season_is_generated_by_the_database_from_the_date(self):
-        # the three tables that derive it (rule 2 of AGENTS.md)
-        for table, column in (("users_games", "season"), ("game_timers", "season"), ("users_achievements", "season")):
-            extra = {c["name"]: c for c in inspect(self.engine).get_columns(table)}[column]
-            self.assertIsNotNone(extra.get("computed"), f"{table}.{column} must be a generated column")
-
-
-class DowngradeTests(MariaDBTestCase):
-    @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-        cls.migrate()
-
-    def test_one_step_down_and_up_again(self):
-        if not head_downgrade_is_defined():
-            self.skipTest("the newest migration is irreversible on purpose")
-        down = self.alembic("downgrade", "-1")
-        self.assertEqual(down.returncode, 0, down.stderr)
-        self.assertNotEqual(self.current_revision(), head_revision())
-        self.migrate()
-        self.assertEqual(self.current_revision(), head_revision())
 
 
 class SchemaRulesTests(MariaDBTestCase):
@@ -94,6 +37,12 @@ class SchemaRulesTests(MariaDBTestCase):
     def execute(self, sql, **params):
         with self.engine.begin() as conn:
             return conn.execute(text(sql), params)
+
+    def test_season_is_generated_by_the_database_from_the_date(self):
+        # the three tables that derive it (rule 2 of AGENTS.md)
+        for table, column in (("users_games", "season"), ("game_timers", "season"), ("users_achievements", "season")):
+            extra = {c["name"]: c for c in inspect(self.engine).get_columns(table)}[column]
+            self.assertIsNotNone(extra.get("computed"), f"{table}.{column} must be a generated column")
 
     def test_season_follows_the_date_and_cannot_be_written(self):
         self.execute(

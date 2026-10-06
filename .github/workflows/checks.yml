@@ -1,7 +1,7 @@
 name: Checks
 
 # Everything a change must pass before it can reach main (called by ci.yml on every PR) and
-# before an image is published (called by release.yml). ci.yml narrows it to what a pull request touches
+# before a release (called by release.yml). ci.yml narrows it to what a pull request touches
 # (.github/scripts/ci_scope.py decides); called without inputs, as release.yml does, it runs everything.
 on:
   workflow_call:

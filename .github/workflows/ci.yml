@@ -1,24 +1,22 @@
 name: CI
 
-# Runs on every pull request to main and again on main after a merge. Branch protection requires
-# the `CI` job below, so a PR can only be merged with all the checks green.
+# Runs on every pull request to main. Branch protection requires the `CI` job below, and requires the
+# branch to be up to date with main, so what a PR tested is exactly what the squash merge puts on main:
+# main is not tested again after the merge. The one run of everything is release.yml, on the tag.
 on:
   pull_request:
-    branches: [main]
-  push:
     branches: [main]
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.event.pull_request.number || github.ref }}
+  group: ci-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
   # Pull requests are squash-merged, so the title becomes the commit message on main.
   pr-title:
-    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - name: Title follows Conventional Commits
@@ -30,7 +28,7 @@ jobs:
             exit 1
           fi
 
-  # What the pull request touches decides which checks run; main, tags and anything unclassified run them all
+  # What the pull request touches decides which checks run; anything unclassified runs them all
   # (the rules and the reasons are in .github/scripts/ci_scope.py, pinned by api/tests/test_ci_scope.py).
   changes:
     runs-on: ubuntu-latest
@@ -45,12 +43,11 @@ jobs:
       # (a change to the script is itself unclassified, which runs everything).
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.pull_request.base.sha || github.sha }}
+          ref: ${{ github.event.pull_request.base.sha }}
           sparse-checkout: .github/scripts
       - id: scope
         env:
           GH_TOKEN: ${{ github.token }}
-          EVENT: ${{ github.event_name }}
           REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number }}
         run: |
@@ -58,9 +55,6 @@ jobs:
             echo 'scope=all'
             echo 'build_services=["api","front","bot"]'
           }
-          if [ "$EVENT" != "pull_request" ]; then
-            everything >> "$GITHUB_OUTPUT"; exit 0
-          fi
           # Anything that goes wrong in here must end in "run everything", never in "run nothing": a renamed
           # file counts at both ends, and the answer is only used if it has both lines.
           scope_of() {
@@ -92,7 +86,7 @@ jobs:
     needs: [pr-title, changes, checks]
     runs-on: ubuntu-latest
     steps:
-      - name: Every job passed (a skipped pr-title on push to main is fine)
+      - name: Every job passed (a skipped one did not apply to the change)
         run: |
           if [ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" = "true" ]; then
             echo "::error::A required job did not pass"; exit 1

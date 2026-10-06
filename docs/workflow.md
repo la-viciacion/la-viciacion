@@ -14,10 +14,10 @@ Simplified trunk-based development for a team of 2-3. `main` is the trunk: alway
 
 ## What CI checks
 
-`.github/workflows/ci.yml` runs on every PR and again on `main` after the merge. The required status is the single job **`CI`**, which passes only if every check that applies to the change passes (see [Which checks run for a change](#which-checks-run-for-a-change)). The checks live in `checks.yml`, the same ones that gate a release:
+`.github/workflows/ci.yml` runs on every PR; **`main` is not tested again after the merge** (see [Nothing is run twice](#nothing-is-run-twice)). The required status is the single job **`CI`**, which passes only if every check that applies to the change passes (see [Which checks run for a change](#which-checks-run-for-a-change)). The checks live in `checks.yml`, the same ones that gate a release:
 
 - API tests (Python 3.14), including the Alembic history guards, the endpoint security list and the `.env.template` check.
-- Migrations and schema rules on a real MariaDB (empty database to head, an older revision with data to head, re-run, downgrade, generated `season` columns, constraints), on the exact image `docker-compose.yml` pins (CI reads the tag from there and a test checks the server really is that version). A weekly run (`mariadb-versions.yml`) tries the moving tags `lts` and `latest` as an early warning; it never blocks a PR.
+- Migrations and schema rules on a real MariaDB (every migration one by one on a v1 database, re-run, downgrade, an older revision with data to head, models matching the schema, generated `season` columns, constraints), on the exact image `docker-compose.yml` pins (CI reads the tag from there and a test checks the server really is that version). A weekly run (`mariadb-versions.yml`) tries the moving tags `lts` and `latest` as an early warning; it never blocks a PR.
 - The API boots on a freshly migrated MariaDB (`test_mariadb_app_boot.py`): every route the routers declare is published under `/api/v1` and answers 401 without a token (except the reviewed public ones), the docs are hidden, and startup seeds the database.
 - Bot tests (Python 3.14).
 - Front tests and ESLint.
@@ -26,7 +26,7 @@ Simplified trunk-based development for a team of 2-3. `main` is the trunk: alway
 
 ### Which checks run for a change
 
-A pull request only runs the checks its files can affect; `main` after a merge, the release workflow and the weekly runs always run everything. `ci.yml` starts with a `changes` job that lists the PR's files (GitHub API) and hands them to `.github/scripts/ci_scope.py`, which answers with the checks to run (`api-tests`, `bot-tests`, `front-tests`, `mariadb`) and the images to build. The single required job `CI` counts a skipped job as passed, so a PR that touches only docs shows just `pr-title`, `changes` and `CI`.
+A pull request only runs the checks its files can affect; the release workflow (on a tag) and the weekly runs always run everything. `ci.yml` starts with a `changes` job that lists the PR's files (GitHub API) and hands them to `.github/scripts/ci_scope.py`, which answers with the checks to run (`api-tests`, `bot-tests`, `front-tests`, `mariadb`) and the images to build. The single required job `CI` counts a skipped job as passed, so a PR that touches only docs shows just `pr-title`, `changes` and `CI`.
 
 | The change touches | Runs |
 |---|---|
@@ -40,6 +40,17 @@ A pull request only runs the checks its files can affect; `main` after a merge, 
 | anything else (`.github/workflows/`, `.github/scripts/`, a new top-level path...) | **everything** |
 
 Three safeguards keep this honest. The default is to run everything: only the paths listed as inert run nothing, so a new directory or file is never silently skipped. The script is read from the base branch, so a PR cannot change the rules that judge it (changing the script is itself a change that runs everything). And `api/tests/test_ci_scope.py` pins the table above and fails if an API test starts reading a directory the script does not know about. When you add a test that reads files outside its own directory, add that path to `RULES` in `ci_scope.py` and to the table.
+
+### Nothing is run twice
+
+A check is worth running once per state of the code, so each one has one place:
+
+- **Pull request:** only what its files can affect (table above), plus the PR title. The branch must be up to date with `main` and the merge is a squash, so the tree that passed here is exactly the one that lands on `main`. That is why **`main` has no run of its own after a merge**: it would repeat the same checks on the same files.
+- **Tag `vX.Y.Z`** (`release.yml`): the one run of everything, whatever the PRs behind it touched. It is the gate for a release: `deploy.yml` refuses a `prod` deploy of a tag whose run did not pass on the commit the tag points to (if the run is older than GitHub keeps logs, 90 days, run **Release images** by hand on the tag again). The `dev` deploy needs no check of its own: `main` only receives PRs whose `CI` was green.
+- **Weekly:** the moving MariaDB tags, as an early warning that gates nothing.
+- **Inside the MariaDB tests**, a guarantee has one test. `test_mariadb_migration_chain.py` covers, for every migration, that it applies on data, that it converges when run again, that it can be undone, that both roads end in the same schema and that the schema matches the models; `test_mariadb_migrations.py` keeps what the chain does not (the rules the database enforces and an older revision with data taken to the head). Do not add a test that proves again what one of those already proves.
+
+What the minimum is, if the minutes of Actions ever become a limit, and what is still repeated, is in [roadmap.md](roadmap.md#ci-cost).
 
 To force the full run on a PR, touch a path that runs everything or run the **Release images** workflow by hand (it does everything but publish).
 

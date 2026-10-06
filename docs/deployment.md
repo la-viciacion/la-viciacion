@@ -164,7 +164,7 @@ Code rollback: set `LAVI_VERSION` in `.env` to the previous release (e.g. `2.0.0
 
 ## CI/CD
 
-`.github/workflows/ci.yml` runs the checks on every PR to `main` and after each merge (see [workflow.md](workflow.md)). The checks live in `checks.yml`, which `release.yml` reuses, so a release is gated by exactly what gates a PR. `release.yml` runs when a tag `vX.Y.Z` is pushed (or by hand from the Actions tab, which does everything but publish):
+`.github/workflows/ci.yml` runs the checks on every PR to `main` (not again after the merge, see [workflow.md](workflow.md#nothing-is-run-twice)). The checks live in `checks.yml`, which `release.yml` reuses with no narrowing, so a release is gated by everything a PR could be gated by. `release.yml` runs when a tag `vX.Y.Z` is pushed (or by hand from the Actions tab, which does everything but publish):
 
 1. **checks** (`checks.yml`, always the full set here): **api-tests**, **bot-tests** (Python 3.14) and **front-tests** (tests and lint), as separate parallel jobs. The API tests need only dummy values for the variables of `config.py` (set in the `env` of `checks.yml` and of `mariadb-tests.yml`, which does not inherit it; when you add a required variable to `config.py`, add it to both) and the `.env.template` at the repo root.
    **build**: builds the three images and looks inside each one: no `.env*`, `*.sql`, `*.dump` under `/app` or the web root, and no credential-looking variable baked in (`PASS`, `SECRET`, `TOKEN`, `KEY`).
@@ -176,7 +176,7 @@ Cut a release with `git tag v2.0.0 && git push origin v2.0.0` (see [roadmap](roa
 
 ### Deploying from GitHub
 
-`.github/workflows/deploy.yml` deploys on demand (nothing deploys on merge): Actions tab → *Deploy* → *Run workflow* on `main`, choosing the `target`. It does not wait for CI, so start it once the merge's `CI` run is green. It connects over SSH and the server does the work, so nothing about the server's layout lives in the workflow.
+`.github/workflows/deploy.yml` deploys on demand (nothing deploys on merge): Actions tab → *Deploy* → *Run workflow* on `main`, choosing the `target`. `dev` runs whatever `main` is (every commit there came from a PR with a green `CI`). `prod` first checks that the **Release images** run of the tag passed on the commit the tag points to, and stops otherwise: wait for that run after pushing the tag. It connects over SSH and the server does the work, so nothing about the server's layout lives in the workflow.
 
 | Target | What the server does | Key (repository secret) |
 |---|---|---|
