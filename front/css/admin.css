@@ -84,7 +84,6 @@
 
 .adm-ok { color: var(--accent-teal); font-size: 0.9rem; }
 
-.adm-quick { display: flex; flex-wrap: wrap; gap: 10px; }
 
 .adm-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 14px; }
 

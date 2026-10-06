@@ -23,6 +23,7 @@ export const iconTrophy = () => svg(18, '<path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/
 export const iconProfile = () => svg(18, '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><polyline points="16 11 18 13 22 9"/>');
 export const iconPerson = () => svg(18, '<circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/>');
 export const iconHeart = () => svg(18, '<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>');
+export const iconDice = () => svg(18, '<rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1"/><circle cx="15.5" cy="8.5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="8.5" cy="15.5" r="1"/><circle cx="15.5" cy="15.5" r="1"/>');
 export const iconActivity = () => svg(18, '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>');
 export const iconPlay = () => svg(16, '<polygon points="5 3 19 12 5 21 5 3"/>');
 export const iconStop = () => svg(16, '<rect x="6" y="6" width="12" height="12"/>');

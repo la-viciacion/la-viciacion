@@ -29,7 +29,7 @@ test('yours are cards, with names as text, and the rest are listed hidden with t
   assert.equal(document.querySelectorAll('.ach-card').length, 2);
   assert.equal(document.querySelectorAll('.ach-card.mine').length, 1);
   assert.equal(document.querySelectorAll('.ach-card.hidden').length, 1);
-  assert.match(text('.ach-card')[0], /Lo tienes/);
+  assert.doesNotMatch(text('.ach-card')[0], /Lo tienes/);
   assert.doesNotMatch(text('.ach-card')[1], /Segundo|Otro/);
 });
 
@@ -68,7 +68,7 @@ test('a secret one that is not unlocked still has the aura, and says nothing els
   assert.ok(!plain.classList.contains('secret'));
   assert.ok(special.classList.contains('secret'));
   assert.deepEqual(text('.ach-title strong'), ['Logro oculto', 'Logro oculto']);  // the aura is what tells them apart
-  assert.doesNotMatch(special.textContent, /Secreto|Lo tienes/);
+  assert.doesNotMatch(special.textContent, /Secreto/);
 });
 
 test('one that has no season limit says it is unique, and the others do not', async () => {

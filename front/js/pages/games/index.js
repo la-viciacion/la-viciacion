@@ -1,7 +1,7 @@
 // Games page (#/games): the whole catalog, with search, filters and order, as the way into each game's page.
 // GET /games/catalog (derived, nothing stored); a game can also be added from RAWG here.
 import { api } from '../../lib/api.js';
-import { formatDuration } from '../../lib/format.js';
+import { formatDuration, formatRelative } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
 import { gameHref } from '../../lib/links.js';
 import { iconPlus } from '../../ui/icons.js';
@@ -59,10 +59,10 @@ const card = (g) => html`
         ${g.wished ? html`<span class="pf-tag wish">En tu lista</span>` : ''}
         ${g.genres.slice(0, 2).map((genre) => html`<span class="pf-tag muted">${genre}</span>`)}
       </div>
-      <div class="gc-meta">
-        <span>${g.players === 1 ? '1 jugador' : `${g.players} jugadores`}${g.played_seconds ? ` · ${formatDuration(g.played_seconds)}` : ''}</span>
-        ${g.score_mean == null ? '' : html`<span class="gc-score" title="Nota media del grupo (${g.score_count})">${scoreBadge(Math.round(g.score_mean))}</span>`}
-      </div>
+    </div>
+    <div class="gc-meta">
+      <span>${g.players === 1 ? '1 jugador' : `${g.players} jugadores`}${g.played_seconds ? ` · ${formatDuration(g.played_seconds)}` : ''}${g.last_played ? ` · ${formatRelative(g.last_played)}` : ''}</span>
+      ${g.score_mean == null ? '' : html`<span class="gc-score" title="Nota media del grupo (${g.score_count})">${scoreBadge(Math.round(g.score_mean))}</span>`}
     </div>
   </a>`;
 
@@ -137,12 +137,12 @@ export async function render(ctx) {
     </div>
     <div class="gc-toolbar">
       <select class="adm-input" id="gcSort" aria-label="Ordenar por">${SORTS.map(([value, label]) => html`<option value="${value}">${label}</option>`)}</select>
-      <select class="adm-input" id="gcGenre" aria-label="Género"><option value="">Todos los géneros</option></select>
-      <select class="adm-input" id="gcLibrary" aria-label="Tu biblioteca">
+      <select class="adm-input" id="gcGenre" aria-label="Género" hidden><option value="">Todos los géneros</option></select>
+      <select class="adm-input" id="gcLibrary" aria-label="Tu biblioteca" hidden>
         <option value="">Toda la base de datos</option><option value="have">Los que tengo</option><option value="not">Los que no tengo</option>
       </select>
     </div>
-    <div class="gc-toggles" id="gcToggles" role="group" aria-label="Filtros">
+    <div class="gc-toggles" id="gcToggles" role="group" aria-label="Filtros" hidden>
       ${TOGGLES.map(([key, label]) => html`<button type="button" class="gc-toggle" data-toggle="${key}" aria-pressed="false">${label}</button>`)}
     </div>
     <div class="pf-sub gc-count" id="gcCount" role="status"></div>

@@ -1,4 +1,4 @@
-// "Recomendados": a weighted random pick of the games other players have and this user has never had.
+// The list of the "Recomendados" page: a weighted random pick of the games other players have and this user has never had.
 // The API decides what is recommended; this only shows it, and asks again for other ones.
 import { api } from '../../lib/api.js';
 import { formatDuration, formatPlayers } from '../../lib/format.js';

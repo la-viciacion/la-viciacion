@@ -1,4 +1,4 @@
-// Home of the panel: figures, what needs attention, quick actions and the state of the integrations.
+// Home of the panel: figures, what needs attention and the state of the integrations.
 // Everything is read when the page opens (/manage/overview, /manage/attention, /manage/settings).
 import { api } from '../../lib/api.js';
 import { formatTimestamp } from '../../lib/format.js';
@@ -28,7 +28,7 @@ function attentionItems(att) {
   }
   if (att.games_without_rawg) {
     items.push({
-      text: `${plural(att.games_without_rawg, 'juego no está enlazado', 'juegos no están enlazados')} a RAWG (sin portada ni metadatos)`,
+      text: `${plural(att.games_without_rawg, 'juego no tiene', 'juegos no tienen')} ID de RAWG (sincronízalos para completar portada y metadatos)`,
       go: 'Ver juegos',
       tab: 'games',
       filters: { rawg: 'unlinked' },
@@ -74,16 +74,6 @@ function view(ov, att, cfg) {
       </section>
 
       <section class="adm-card">
-        <h2>Acciones rápidas</h2>
-        <div class="adm-quick">
-          <button class="adm-btn" data-quick="recalculate">Recalcular logros…</button>
-          <button class="adm-btn" data-quick="rawg">Sincronizar con RAWG…</button>
-          <button class="adm-btn" data-quick="announce">Redactar aviso</button>
-          <button class="adm-btn" data-quick="user">Nuevo usuario</button>
-        </div>
-      </section>
-
-      <section class="adm-card">
         <h2>Integraciones</h2>
         ${integrations(cfg).map((it, i) => html`
           <div class="adm-attn">
@@ -103,13 +93,9 @@ export async function render(panel, { admin }) {
     panel.querySelector('.adm-home').addEventListener('click', async (e) => {
       const button = e.target.closest('button');
       if (!button) return;
-      const { go, setup, quick } = button.dataset;
+      const { go, setup } = button.dataset;
       if (go != null) admin.jumpTo(items[Number(go)].tab, items[Number(go)].filters || {});
       else if (setup != null) admin.open(setups[Number(setup)].tab);
-      else if (quick === 'recalculate') (await import('./recalculate-achievements.js')).recalculateAchievementsFlow({ onDone: admin.reload });
-      else if (quick === 'announce') admin.open('announce');
-      else if (quick === 'rawg') (await import('./rawg-sync.js')).rawgSyncFlow({ onDone: admin.reload });
-      else if (quick === 'user') admin.create('users');
     });
   } catch (err) {
     mount(panel, errorState(err.message));

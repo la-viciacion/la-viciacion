@@ -18,7 +18,8 @@ def is_upcoming(release_date: datetime.date | None, today: datetime.date) -> boo
 
 
 def days_until(release_date: datetime.date | None, today: datetime.date) -> int | None:
-    return None if release_date is None or release_date <= today else (release_date - today).days
+    """0 when it comes out today; None without a date or once it is out."""
+    return None if release_date is None or release_date < today else (release_date - today).days
 
 
 def _pending():

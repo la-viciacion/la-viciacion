@@ -55,6 +55,8 @@ class GameCatalogTests(ApiTestCase):
         self.assertEqual((game["players"], game["played_seconds"], game["completed_by"], game["score_count"], game["score_mean"]),
                          (2, 3600, 1, 2, 80.0))
         self.assertEqual((game["have"], game["my_score"], game["my_completed"]), (True, 90, True))
+        self.assertIsNotNone(game["last_played"])  # the latest session of the active players
+        self.assertIsNone(next(g for g in self.catalog()["items"] if g["id"] == "hades")["last_played"])
         other = next(g for g in self.catalog(as_user="bea")["items"] if g["id"] == "celeste")
         self.assertEqual((other["have"], other["my_score"], other["my_completed"]), (True, 70, False))
 

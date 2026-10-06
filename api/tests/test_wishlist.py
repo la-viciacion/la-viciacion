@@ -18,9 +18,10 @@ class UpcomingTests(unittest.TestCase):
         self.assertFalse(wishlist.is_upcoming(TODAY, TODAY))
         self.assertFalse(wishlist.is_upcoming(D(2020, 1, 1), TODAY))
 
-    def test_days_until_counts_only_what_has_a_future_date(self):
+    def test_days_until_counts_from_today_and_not_for_what_is_out(self):
         self.assertEqual(wishlist.days_until(D(2026, 10, 14), TODAY), 10)
-        self.assertIsNone(wishlist.days_until(TODAY, TODAY))
+        self.assertEqual(wishlist.days_until(TODAY, TODAY), 0)
+        self.assertIsNone(wishlist.days_until(D(2026, 10, 3), TODAY))
         self.assertIsNone(wishlist.days_until(None, TODAY))
 
 
