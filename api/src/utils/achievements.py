@@ -72,15 +72,6 @@ class AchievementsElems(Enum):
         + "{}"
         + "_ en un mismo día.",
     }
-    # PLAYED_8_HOURS_GAME_DAY_ONE_SESSION = {
-    #     "title": "Mi trabajo es jugar (sin parar)",
-    #     "message": "8 horas haciendo lo mismo suele llegar a aburrir, siempre que no sea jugar. "
-    #     + ""
-    #     + "{}"
-    #     + " acaba de cascarse 8 horas seguidas (o más) jugando a _"
-    #     + "{}"
-    #     + "_; cualquiera diría que le está gustando.",
-    # }
     PLAYED_100_HOURS_GAME = {
         "since": 2023,
         "title": "Cualquiera diría que le gusta ese juego",
