@@ -57,6 +57,15 @@ class AchievementsCatalogTests(ApiTestCase):
             else:  # not even the name: the other player's unlock does not reveal it
                 self.assertEqual(achievement, {"id": achievement["id"], "hidden": True, "unlocked_by_me": False})
 
+    def test_a_secret_one_says_so_only_to_whoever_has_it(self):
+        with self.engine.begin() as conn:
+            conn.execute(text("UPDATE achievements SET secret = 1 WHERE id IN (:a, :b)"), {"a": self.first, "b": self.second})
+        self.award(self.ana, self.first, TODAY())
+        by_id = {a["id"]: a for a in self.catalog()}
+        self.assertTrue(by_id[self.first]["secret"])
+        self.assertEqual(by_id[self.second], {"id": self.second, "hidden": True, "unlocked_by_me": False})  # the hidden ones give nothing away
+        self.assertNotIn("secret", by_id[self.second])
+
     def test_a_switched_off_achievement_does_not_exist_for_the_group_unless_the_viewer_has_it(self):
         with self.engine.begin() as conn:
             conn.execute(text("UPDATE achievements SET active = 0 WHERE id IN (:a, :b)"), {"a": self.first, "b": self.second})

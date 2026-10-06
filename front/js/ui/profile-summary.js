@@ -53,6 +53,6 @@ export function topView(d) {
 /** `own`: it is the viewer's own profile ("no has conseguido") and not somebody else's. */
 export function achievementsView(d, own = true) {
   return d.achievements.length
-    ? html`${d.achievements.map((a) => html`<div class="pf-row"><div class="pf-row-main">${a.hidden ? html`<em>Logro oculto</em>` : html`<strong>${a.title}</strong>`}</div><div class="pf-sub">${formatDate(a.date)}</div></div>`)}`
+    ? html`${d.achievements.map((a) => html`<div class="pf-row${a.secret ? ' ach-secret' : ''}"><div class="pf-row-main">${a.hidden ? html`<em>Logro oculto</em>` : html`<strong>${a.title}</strong>${a.secret ? html` <span class="pf-tag secret">Secreto</span>` : ''}`}</div><div class="pf-sub">${formatDate(a.date)}</div></div>`)}`
     : html`<div class="pf-empty">${own ? 'Todavía no has conseguido logros.' : 'Todavía no ha conseguido logros.'}</div>`;
 }

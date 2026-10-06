@@ -165,7 +165,7 @@ def get_profile(db: Session, user: models.User, season: int = None) -> dict:
             for r in top_games(db, user.username, limit=5, season=season)
         ],
         "achievements": [
-            {"id": r.achievement_id, "title": r.title, "date": r.date} for r in achievements[-5:][::-1]
+            {"id": r.achievement_id, "title": r.title, "date": r.date, "secret": bool(r.secret)} for r in achievements[-5:][::-1]
         ],
     }
 
@@ -896,6 +896,7 @@ def get_achievements(db: Session, username: str, season: int = None):
                 models.UserAchievement.date,
                 models.Achievement.id,
                 models.Achievement.title,
+                models.Achievement.secret,
             )
             .join(models.User, models.User.id == models.UserAchievement.user_id)
             .join(

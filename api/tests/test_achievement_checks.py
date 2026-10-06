@@ -9,7 +9,7 @@ from src.crud.achievements import Achievements
 from src.database import models
 from tests.sqlite_db import make_session
 
-USER = types.SimpleNamespace(id=1, name="Ana")
+USER = types.SimpleNamespace(id=1, name="Ana", telegram_id=111)
 YEAR = datetime.date.today().year
 
 
@@ -469,6 +469,54 @@ class AchievementCheckTests(unittest.IsolatedAsyncioTestCase):
         got = {a.key: a.active for a in db.query(models.Achievement)}
         self.assertFalse(got["PLAYED_7_DAYS"])
         self.assertTrue(got["PLAYED_15_DAYS"])
+
+    def make_secret(self, *keys):
+        self.db.query(models.Achievement).filter(models.Achievement.key.in_(keys)).update({"secret": True}, synchronize_session=False)
+        self.db.commit()
+        private = mock.AsyncMock()
+        patcher = mock.patch.object(ach_module.utils, "send_message_to_user", private)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        return private
+
+    async def test_a_secret_one_is_told_to_the_group_without_saying_which_and_to_the_player_in_full(self):
+        private = self.make_secret("PLAYED_7_DAYS")
+        await self.ach.user_played_total_days(self.db, USER, self.days(7))
+        self.assertEqual(set(self.awarded()), {"PLAYED_7_DAYS"})  # it is earned all the same
+        group = self.message()
+        self.assertIn("Ana", group)
+        self.assertIn("ha desbloqueado un logro oculto", group)
+        self.assertNotIn("7 días", group)  # nothing that gives it away
+        self.assertEqual(self.sent.await_args.kwargs, {})  # and no picture
+        private.assert_awaited_once()
+        telegram_id, text = private.await_args.args
+        self.assertEqual((telegram_id, private.await_args.kwargs), (111, {"user_id": 1}))
+        self.assertIn("7 días jugados", text)  # the player gets the whole notice
+
+    async def test_what_is_not_secret_is_announced_as_ever_and_nobody_is_told_privately(self):
+        private = self.make_secret("PLAYED_15_DAYS")
+        await self.ach.user_played_total_days(self.db, USER, self.days(7))
+        self.assertIn("7 días jugados", self.message())
+        private.assert_not_awaited()
+
+    async def test_a_silent_check_tells_nobody_not_even_the_player(self):
+        private = self.make_secret("PLAYED_7_DAYS")
+        await self.ach.user_played_total_days(self.db, USER, self.days(7), silent=True)
+        self.assertEqual(self.sent.await_args.args[1], True)
+        private.assert_not_awaited()
+
+    async def test_several_players_that_unlock_a_secret_are_named_together_and_each_is_told_privately(self):
+        private = self.make_secret("TEAMWORK", "ALL_TOGETHER")
+        for i in range(2, 6):
+            self.db.add(models.User(id=i, name=f"P{i}", username=f"p{i}", is_active=1))
+            self.db.add(models.GameTimer(user_id=i, game_id="g1", start_time=datetime.datetime(YEAR, 3, 1, 10), is_active=True))
+        self.db.commit()
+        await self.ach.teamwork(self.db, silent=False)
+        self.assertIn("P2, P3, P4 y P5 han desbloqueado un logro oculto", self.message(0))
+        self.assertEqual(private.await_count, 4)
+        await self.ach.all_together(self.db, "g1")
+        self.assertIn("P2, P3, P4 y P5 han desbloqueado un logro oculto", self.message(1))
+        self.assertEqual(private.await_count, 8)
 
     async def test_silent_checks_award_but_pass_silent_on(self):
         await self.ach.user_played_total_days(self.db, USER, self.days(7), silent=True)

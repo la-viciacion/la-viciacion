@@ -43,6 +43,23 @@ test('the picture comes from the achievement image route only when there is one'
   assert.equal(document.querySelectorAll('.ach-img-placeholder').length, 1);
 });
 
+test('what is not unlocked shows a lock, not a question mark', () => {
+  assert.equal(text('.ach-card.hidden .ach-img-placeholder')[0], '🔒');
+});
+
+test('a secret one has the golden aura and says so, and an ordinary one does not', async () => {
+  installApi({ 'GET /group/achievements': [{ ...LIST[0], secret: true }, { ...LIST[0], id: 3, title: 'Normal', secret: false }, LIST[1]] });
+  await page.render({ main: main() });
+  await settle();
+  const cards = document.querySelectorAll('.ach-card.mine');
+  assert.equal(document.querySelectorAll('.ach-card.secret').length, 1);
+  assert.ok(cards[0].classList.contains('secret'));
+  assert.ok(!cards[1].classList.contains('secret'));
+  assert.match(text('.ach-card')[0], /Secreto/);
+  assert.doesNotMatch(text('.ach-card')[1], /Secreto/);
+  assert.ok(!document.querySelector('.ach-card.hidden').classList.contains('secret'));  // what is hidden gives nothing away
+});
+
 test('an error says so', async () => {
   installApi({ 'GET /group/achievements': json({ detail: 'boom' }, 500) });
   await page.render({ main: main() });

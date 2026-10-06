@@ -47,7 +47,7 @@ def achievements_catalog(db: Session, viewer_id: int) -> list[dict]:
     catalog = []
     for row in db.query(
         models.Achievement.id, models.Achievement.key, models.Achievement.title, models.Achievement.message,
-        models.Achievement.image.isnot(None).label("has_image"), models.Achievement.active,
+        models.Achievement.image.isnot(None).label("has_image"), models.Achievement.active, models.Achievement.secret,
     ).order_by(models.Achievement.id):
         if not row.active and row.id not in mine:
             continue  # switched off: it does not exist yet, not even as a hidden one
@@ -61,6 +61,7 @@ def achievements_catalog(db: Session, viewer_id: int) -> list[dict]:
             "key": row.key,
             "title": row.title,
             "description": describe(row.message),
+            "secret": bool(row.secret),
             "has_image": bool(row.has_image),
             "unlocked_by": len(who),
             "unlocked_by_me": True,
@@ -128,7 +129,8 @@ def player_profile(db: Session, viewer_id: int, player_id: int, season=None) -> 
     data = users.get_profile(db, user, season)
     mine = unlocked_ids(db, viewer_id)
     achievements = [
-        {"title": a["title"], "date": a["date"], "hidden": False} if a["id"] in mine else {"hidden": True, "date": a["date"]}
+        {"title": a["title"], "date": a["date"], "hidden": False, "secret": a["secret"]}
+        if a["id"] in mine else {"hidden": True, "date": a["date"]}
         for a in data["achievements"]
     ]
     return {

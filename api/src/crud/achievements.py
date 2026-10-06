@@ -250,7 +250,28 @@ class Achievements:
         logger.info("Set achievement " + ach.name)
         self.set_user_achievement(db, user.id, ach.name, game_id, date)
         msg = utils.get_ach_message(ach, user=user.name, db=db, game_id=game_id)
-        await utils.send_message(msg, silent, image=self.get_image(db, ach.name)[0])
+        await self._announce(db, ach, [user], msg, silent, self.get_image(db, ach.name)[0])
+
+    def _is_secret(self, db: Session, key: str) -> bool:
+        return bool(db.query(models.Achievement.secret).filter(models.Achievement.key == key).scalar())
+
+    async def _announce(
+        self, db: Session, ach: AchievementsElems, players: list, message: str, silent: bool, image=None
+    ):
+        """Tell the group that `players` unlocked `ach`, with `message`. A secret one does not say which: the
+        group only hears that they unlocked a hidden achievement (no picture), and each player gets `message`
+        privately, on every channel they have (Telegram if linked, push if they have a device)."""
+        silent = silent or self.silent
+        if not self._is_secret(db, ach.name):
+            await utils.send_message(message, silent, image=image)
+            return
+        names = [utils.escape_markdown(player.name) for player in players]
+        who = names[0] if len(names) == 1 else ", ".join(names[:-1]) + " y " + names[-1]  # "Ana, Bob y Cris"
+        verb = "ha" if len(names) == 1 else "han"
+        await utils.send_message(f"🏆 Logro oculto 🏆\n*{who}* {verb} desbloqueado un logro oculto.", silent)
+        if not silent:
+            for player in players:
+                await utils.send_message_to_user(player.telegram_id, message, user_id=player.id)
 
     def _collect(self, user_id: int, ach: AchievementsElems, date: str | None, game_id: str | None):
         """Note what a user deserves. Its date is the one that sets the season, so it is kept inside the
@@ -465,7 +486,7 @@ class Achievements:
         # "Ana, Bob y Cris"
         names = ", ".join(player.name for player in playing).rsplit(",", 1)
         msg = utils.get_ach_message(ach, user=" y".join(names), db=db, game_id=game_id)
-        await utils.send_message(msg, silent or self.silent, image=self.get_image(db, ach.name)[0])
+        await self._announce(db, ach, new, msg, silent, self.get_image(db, ach.name)[0])
 
     async def user_played_total_days(
         self, db: Session, user: models.User, total_days: list, silent: bool = False
@@ -575,19 +596,19 @@ class Achievements:
             return
         logger.info("4 or more users are playing!")
         ach = AchievementsElems.TEAMWORK
-        someone_not_achieved = False
+        new = []
         for player in playing:
             if not self.check_already_achieved(db, player.id, ach.name):
-                someone_not_achieved = True
+                new.append(player)
                 logger.info("Set 'Teamwork' achievement for " + player.name)
                 self.set_user_achievement(db, player.id, ach.name)
-        if not someone_not_achieved:
+        if not new:
             logger.info("All users unlocked this achievement")
             return
         # "Ana, Bob y Cris"
         names = ", ".join(player.name for player in playing).rsplit(",", 1)
         msg = utils.get_ach_message(ach, user=" y".join(names))
-        await utils.send_message(msg, silent, image=self.get_image(db, ach.name)[0])
+        await self._announce(db, ach, new, msg, silent, self.get_image(db, ach.name)[0])
 
     async def timer_started(
         self,

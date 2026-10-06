@@ -19,18 +19,19 @@ const who = (a) => {
 // What the viewer has not unlocked says nothing: not even the name.
 const hiddenCard = () => html`
   <article class="ach-card hidden">
-    <div class="ach-img ach-img-placeholder" aria-hidden="true">?</div>
+    <div class="ach-img ach-img-placeholder" aria-hidden="true">🔒</div>
     <div class="ach-body">
       <div class="ach-title"><strong>Logro oculto</strong></div>
       <div class="pf-sub">Desbloquéalo para descubrirlo.</div>
     </div>
   </article>`;
 
+// A secret one has a golden aura: it was announced to the group without saying which.
 const card = (a) => (a.hidden ? hiddenCard() : html`
-  <article class="ach-card mine">
+  <article class="ach-card mine${a.secret ? ' secret' : ''}">
     ${picture(a)}
     <div class="ach-body">
-      <div class="ach-title"><strong>${a.title}</strong><span class="pf-tag done">Lo tienes</span></div>
+      <div class="ach-title"><strong>${a.title}</strong><span class="pf-tag done">Lo tienes</span>${a.secret ? html`<span class="pf-tag secret">Secreto</span>` : ''}</div>
       <div class="pf-sub">${a.description}</div>
       ${who(a)}
     </div>

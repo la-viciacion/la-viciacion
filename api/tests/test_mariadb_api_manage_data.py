@@ -504,6 +504,13 @@ class AchievementsAdminTests(ManageTestCase):
         self.assertTrue(self.admin("PATCH", f"/achievements/{first}", json={"active": True}).json()["active"])
         self.assertTrue(self.admin("PATCH", f"/achievements/{first}", json={"active": None, "title": "T"}).json()["active"])  # it cannot be emptied
 
+    def test_an_achievement_can_be_made_secret(self):
+        first = self.ids()[0]
+        self.assertFalse(next(a for a in self.admin("GET", "/achievements").json() if a["id"] == first)["secret"])
+        self.assertTrue(self.admin("PATCH", f"/achievements/{first}", json={"secret": True}).json()["secret"])
+        self.assertTrue(next(a for a in self.admin("GET", "/achievements").json() if a["id"] == first)["secret"])
+        self.assertTrue(self.admin("PATCH", f"/achievements/{first}", json={"secret": None, "title": "T"}).json()["secret"])  # it cannot be emptied
+
     def test_titles_and_messages_can_be_edited(self):
         first = self.ids()[0]
         done = self.admin("PATCH", f"/achievements/{first}", json={"title": "New title"}).json()
