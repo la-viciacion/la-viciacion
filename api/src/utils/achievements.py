@@ -25,7 +25,8 @@ def first_season(achievement) -> int:
 
 
 class AchievementsElems(Enum):
-    # Format -> KEY = {"since": season it starts to count in, "title": "", "message": ""}
+    # Format -> KEY = {"since": season it starts to count in, "special": level 1-3 (optional), "secret": True (optional), "title": "", "message": ""}
+    # "special" (1 silver, 2 gold, 3 purple) and "secret" are how the achievement is created; an admin can change them afterwards.
     # Time day
     PLAYED_4_HOURS_DAY = {
         "since": 2023,
@@ -46,6 +47,7 @@ class AchievementsElems(Enum):
     }
     PLAYED_12_HOURS_DAY = {
         "since": 2023,
+        "special": 1,
         "title": "Media jornada, 12 horas",
         "message": "Como decía 'El Rancio', media jornada son 12 horas, y ese es el tiempo que ha invertido "
         + "*"
@@ -54,6 +56,7 @@ class AchievementsElems(Enum):
     }
     PLAYED_16_HOURS_DAY = {
         "since": 2023,
+        "special": 2,
         "title": "No paro ni a cagar",
         "message": "De las 24h del día, 8 se deberían dedicar a dormir, y las otras 16 a hacer cosas. "
         + "*"
@@ -83,6 +86,7 @@ class AchievementsElems(Enum):
     }
     PLAYED_500_HOURS_GAME = {
         "since": 2023,
+        "special": 2,
         "title": "Una buena inversión",
         "message": "Si he pagado por un juego, es para jugarlo."
         + " Eso es lo que habrá pensado *"
@@ -93,6 +97,7 @@ class AchievementsElems(Enum):
     }
     PLAYED_1000_HOURS_GAME = {
         "since": 2023,
+        "special": 3,
         "title": "¿Para qué diversificar?",
         "message": "A *"
         + "{}"
@@ -114,11 +119,13 @@ class AchievementsElems(Enum):
     }
     PLAYED_500_HOURS = {
         "since": 2023,
+        "special": 1,
         "title": "500 horas",
         "message": "{} ha acumulado un total de 500 horas de juego en lo que va de año.",
     }
     PLAYED_1000_HOURS = {
         "since": 2023,
+        "special": 2,
         "title": "1000 horas",
         "message": "{} ha acumulado un total de 1000 horas de juego en lo que va de año.",
     }
@@ -160,6 +167,7 @@ class AchievementsElems(Enum):
     }
     PLAYED_42_GAMES = {
         "since": 2023,
+        "special": 1,
         "title": "La respuesta",
         "message": "*{}* ha jugado a la mágica cifra de 42 juegos."
         + " No sabemos si tendrá la respuesta al sentido de la vida, "
@@ -195,11 +203,13 @@ class AchievementsElems(Enum):
     }
     COMPLETED_25_GAMES = {
         "since": 2027,
+        "special": 1,
         "title": "25 juegos completados",
         "message": "*{}* ha completado 25 juegos. A este ritmo, el año se le queda corto.",
     }
     COMPLETED_42_GAMES = {
         "since": 2023,
+        "special": 2,
         "title": "La respuesta (de verdad)",
         "message": "Si empezar 42 juegos ya es todo un logro, no hablemos de acabar 42. "
         + "Ha quedado patente que a "
@@ -208,6 +218,7 @@ class AchievementsElems(Enum):
     }
     COMPLETED_100_GAMES = {
         "since": 2023,
+        "special": 3,
         "title": "100 juegos completados",
         "message": "*{}*"
         + " acaba de completar 100 juegos. No se me ocurre qué decir.",
@@ -221,6 +232,7 @@ class AchievementsElems(Enum):
     }
     PLAYED_10_GAMES_DAY = {
         "since": 2023,
+        "secret": True,
         "title": "Indecisión x2",
         "message": "AAAHHHRRRGGG, sigo sin saber a qué jugar. "
         + "*{}*"
@@ -256,16 +268,19 @@ class AchievementsElems(Enum):
     }
     PLAYED_200_DAYS = {
         "since": 2023,
+        "special": 1,
         "title": "200 días jugados",
         "message": "*{}* acumula un total de 200 días jugados en lo que va de año.",
     }
     PLAYED_300_DAYS = {
         "since": 2023,
+        "special": 2,
         "title": "300 días jugados",
         "message": "*{}* acumula un total de 300 días jugados en lo que va de año.",
     }
     PLAYED_365_DAYS = {
         "since": 2023,
+        "special": 3,
         "title": "365 días jugados",
         "message": "*{}* acumula un total de 365 días jugados en lo que va de año.",
     }
@@ -302,21 +317,25 @@ class AchievementsElems(Enum):
     }
     STREAK_100_DAYS = {
         "since": 2023,
+        "special": 1,
         "title": "Racha de 100 días",
         "message": "*{}*" + " acumula una racha de 100 días.",
     }
     STREAK_200_DAYS = {
         "since": 2023,
+        "special": 1,
         "title": "Racha de 200 días",
         "message": "*{}*" + " acumula una racha de 200 días.",
     }
     STREAK_300_DAYS = {
         "since": 2023,
+        "special": 2,
         "title": "Racha de 300 días",
         "message": "*{}*" + " acumula una racha de 300 días.",
     }
     STREAK_365_DAYS = {
         "since": 2023,
+        "special": 3,
         "title": "Racha de 365 días",
         "message": "*{}*" + " acumula una racha de 365 días.",
     }
@@ -330,6 +349,7 @@ class AchievementsElems(Enum):
 
     RELEASE_DAY = {
         "since": 2027,
+        "special": 1,
         "title": "Lo estaba esperando",
         "message": "*{}* ha jugado a _{}_ el mismo día de su lanzamiento. Ni un minuto de espera.",
     }
@@ -348,12 +368,15 @@ class AchievementsElems(Enum):
 
     WORK_WEEK = {
         "since": 2027,
+        "special": 1,
         "title": "Semana laboral",
         "message": "*{}* acaba de completar una semana laboral entera de 40 horas jugando. Sin vacaciones ni convenio.",
     }
 
     SAVED_BY_THE_BELL = {
         "since": 2027,
+        "special": 1,
+        "secret": True,
         "title": "Salvado por la campana",
         "message": "*{}* estaba jugando a _{}_ justo cuando cambió el año. Mientras otros se atragantaban con las uvas, él seguía con el mando en la mano.",
     }
@@ -361,6 +384,7 @@ class AchievementsElems(Enum):
     # No season limit: they count the whole history of a player and are earned once (the key ends in _LIFETIME)
     PLAYED_1000_HOURS_GAME_LIFETIME = {
         "since": 2027,
+        "special": 1,
         "title": "Una relación seria",
         "message": "*{}* lleva 1000 horas en total jugando a _{}_, sumando todas las temporadas. Esto ya no es un juego, es una relación.",
     }
@@ -381,16 +405,19 @@ class AchievementsElems(Enum):
     }
     PLAYED_1000_DAYS_LIFETIME = {
         "since": 2027,
+        "special": 1,
         "title": "1000 días jugados (en total)",
         "message": "*{}* suma 1000 días jugados en total, contando todas las temporadas. Casi tres años de su vida, con el mando en la mano.",
     }
     PLAYED_2000_DAYS_LIFETIME = {
         "since": 2027,
+        "special": 2,
         "title": "2000 días jugados (en total)",
         "message": "*{}* suma 2000 días jugados en total, contando todas las temporadas. Más de cinco años de partidas. Ya es patrimonio del grupo.",
     }
     PLAYED_5000_DAYS_LIFETIME = {
         "since": 2027,
+        "special": 3,
         "title": "5000 días jugados (en total)",
         "message": "*{}* suma 5000 días jugados en total, contando todas las temporadas. Casi catorce años jugando. Que alguien le dé las llaves de la ciudad.",
     }
@@ -406,16 +433,19 @@ class AchievementsElems(Enum):
     }
     PLAYED_2000_HOURS_LIFETIME = {
         "since": 2027,
+        "special": 1,
         "title": "2000 horas (en total)",
         "message": "*{}* acumula 2000 horas de juego en total, sumando todas las temporadas. Casi tres meses seguidos, sin dormir.",
     }
     PLAYED_5000_HOURS_LIFETIME = {
         "since": 2027,
+        "special": 2,
         "title": "5000 horas (en total)",
         "message": "*{}* acumula 5000 horas de juego en total, sumando todas las temporadas. Casi siete meses seguidos. Que descanse alguien.",
     }
     PLAYED_10000_HOURS_LIFETIME = {
         "since": 2027,
+        "special": 3,
         "title": "10000 horas (en total)",
         "message": "*{}* acumula 10000 horas de juego en total, sumando todas las temporadas. Dicen que con 10.000 horas se llega a maestro. De qué, aún está por ver.",
     }
@@ -431,11 +461,13 @@ class AchievementsElems(Enum):
     }
     PLAYED_500_GAMES_LIFETIME = {
         "since": 2027,
+        "special": 1,
         "title": "500 juegos jugados (en total)",
         "message": "*{}* ha jugado a 500 juegos distintos en total, contando todas las temporadas. Esto ya no es una biblioteca, es un museo.",
     }
     PLAYED_1000_GAMES_LIFETIME = {
         "since": 2027,
+        "special": 2,
         "title": "1000 juegos jugados (en total)",
         "message": "*{}* ha jugado a 1000 juegos distintos en total, contando todas las temporadas. Mil juegos distintos. Que le hagan un monumento.",
     }
@@ -451,17 +483,21 @@ class AchievementsElems(Enum):
     }
     COMPLETED_500_GAMES_LIFETIME = {
         "since": 2027,
+        "special": 2,
         "title": "500 juegos completados (en total)",
         "message": "*{}* ha completado 500 juegos distintos en total, sumando todas las temporadas. Medio millar de finales. Alguien tiene mucho que contar.",
     }
     COMPLETED_1000_GAMES_LIFETIME = {
         "since": 2027,
+        "special": 3,
         "title": "1000 juegos completados (en total)",
         "message": "*{}* ha completado 1000 juegos distintos en total, sumando todas las temporadas. Mil juegos terminados. Ya no queda nada por ver.",
     }
 
     JUST_IN_TIME = {
         "since": 2023,
+        "special": 1,
+        "secret": True,
         "title": "Justo a tiempo",
         "message": "*{}*"
         + " acaba de terminar "
@@ -478,6 +514,7 @@ class AchievementsElems(Enum):
 
     TEAMWORK = {
         "since": 2023,
+        "special": 1,
         "title": "Trabajo en equipo (de 4+)",
         "message": "*{}*"
         + " han demostrado que el trabajo en equipo no es un mito."
@@ -486,6 +523,7 @@ class AchievementsElems(Enum):
 
     EARLY_RISER = {
         "since": 2023,
+        "secret": True,
         "title": "Madrugador",
         "message": "*{}*"
         + " cree que a quien madruga, Dios le ayuda."
@@ -494,6 +532,7 @@ class AchievementsElems(Enum):
 
     NOCTURNAL = {
         "since": 2023,
+        "secret": True,
         "title": "Plus por nocturnidad",
         "message": "*{}*"
         + " es un animal nocturno, y por eso empieza a jugar de madrugada (a partir de las 2)."

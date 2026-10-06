@@ -29,6 +29,8 @@ class AchievementsCatalogTests(ApiTestCase):
         self.bea = self.user("bea")
         self.gone = self.user("gone", active=False)
         self.game("celeste", "Celeste")
+        with self.engine.begin() as conn:  # some are secret or special in the catalogue: each test says what it needs
+            conn.execute(text("UPDATE achievements SET secret = 0, special = 0"))
         ids = [row[0] for row in self.rows("SELECT id FROM achievements ORDER BY id LIMIT 2")]
         self.first, self.second = ids
 

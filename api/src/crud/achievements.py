@@ -188,7 +188,8 @@ class Achievements:
         Existing rows are left alone: from then on the database is the source of truth, so
         the title and message an admin edits (PATCH /manage/achievements) and whether it is active are kept.
         A new one is active and valid from the season its definition says (`since`; the first season of the app
-        when it says nothing): the season is what keeps it from counting before its time.
+        when it says nothing): the season is what keeps it from counting before its time. It is also created as
+        special or secret when its definition says so (`special`, `secret`: ordinary when it says nothing).
         A row whose key the code no longer has (an achievement that was dropped) is switched off, never deleted:
         nothing can earn it any more, and whoever already has it keeps it.
         """
@@ -209,6 +210,8 @@ class Achievements:
                         title=achievement.value["title"],
                         message=achievement.value["message"],
                         valid_from_season=first_season(achievement),
+                        special=achievement.value.get("special", 0),
+                        secret=achievement.value.get("secret", False),
                     )
                 )
             db.commit()
