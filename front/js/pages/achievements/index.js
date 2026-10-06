@@ -21,9 +21,11 @@ const who = (a) => {
 // of its level, so that everybody knows there are special ones to unlock.
 const hiddenCard = (a) => html`
   <article class="ach-card hidden${specialClass(a.special)}">
-    <div class="ach-img ach-img-placeholder" aria-hidden="true">🔒</div>
-    <div class="ach-body">
+    <div class="ach-head">
+      <div class="ach-img ach-img-placeholder" aria-hidden="true">🔒</div>
       <div class="ach-title"><strong>Logro oculto</strong></div>
+    </div>
+    <div class="ach-body">
       <div class="pf-sub">Desbloquéalo para descubrirlo.</div>
     </div>
   </article>`;
@@ -31,9 +33,11 @@ const hiddenCard = (a) => html`
 // One the viewer has not unlocked (and is not secret) is shown dimmed: it is what there is to aim for.
 const card = (a) => (a.hidden ? hiddenCard(a) : html`
   <article class="ach-card ${a.unlocked_by_me ? 'mine' : 'locked'}${specialClass(a.special)}">
-    ${picture(a)}
-    <div class="ach-body">
+    <div class="ach-head">
+      ${picture(a)}
       <div class="ach-title"><strong>${a.title}</strong>${a.secret ? html`<span class="pf-tag secret">Secreto</span>` : ''}${specialTag(a.special)}${a.lifetime ? html`<span class="pf-tag muted">Único</span>` : ''}</div>
+    </div>
+    <div class="ach-body">
       <div class="pf-sub">${a.description}</div>
       ${who(a)}
     </div>
