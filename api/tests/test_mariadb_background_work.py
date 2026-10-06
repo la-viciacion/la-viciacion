@@ -41,6 +41,8 @@ class WorkTestCase(ApiTestCase):
         ):
             patcher.start()
             self.addCleanup(patcher.stop)
+        with self.engine.begin() as conn:  # the ones added in 2026 start in 2027: it is not what these tests are about
+            conn.execute(text("UPDATE achievements SET valid_from_season = 2023"))
         self.ana = self.user("ana")
         self.bea = self.user("bea")
         for game_id in ("celeste", "hades", "tetris"):

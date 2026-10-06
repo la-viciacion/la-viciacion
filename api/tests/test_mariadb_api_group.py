@@ -74,6 +74,14 @@ class AchievementsCatalogTests(ApiTestCase):
         other = self.catalog("bea")
         self.assertEqual(next(a for a in other if a["id"] == lifetime), {"id": lifetime, "hidden": True, "unlocked_by_me": False, "secret": False})
 
+    def test_one_that_is_not_valid_yet_does_not_exist_for_the_group_unless_the_viewer_has_it(self):
+        with self.engine.begin() as conn:
+            conn.execute(text("UPDATE achievements SET valid_from_season = :s WHERE id IN (:a, :b)"), {"s": TODAY().year + 1, "a": self.first, "b": self.second})
+        self.award(self.ana, self.first, TODAY())
+        shown = {a["id"] for a in self.catalog()}
+        self.assertIn(self.first, shown)
+        self.assertNotIn(self.second, shown)
+
     def test_a_switched_off_achievement_does_not_exist_for_the_group_unless_the_viewer_has_it(self):
         with self.engine.begin() as conn:
             conn.execute(text("UPDATE achievements SET active = 0 WHERE id IN (:a, :b)"), {"a": self.first, "b": self.second})

@@ -9,11 +9,25 @@ from src.crud import time_entries
 from src.crud.achievements import Achievements
 from src.database import models
 from src.utils import seasons
-from src.utils.achievements import is_lifetime
+from src.utils.achievements import first_season, is_lifetime
 from tests.sqlite_db import make_session
 
 USER = types.SimpleNamespace(id=1, name="Ana", telegram_id=111)
 YEAR = datetime.date.today().year
+
+# The achievements that existed before the season each starts to count in was recorded: valid from the first
+# season of the app. Every one added since says its own (utils/achievements.py, "since"), and a test fails if it does not.
+LEGACY = (
+    "COMPLETED_100_GAMES", "COMPLETED_42_GAMES", "EARLY_RISER", "HAPPY_NEW_YEAR", "JUST_IN_TIME", "NOCTURNAL",
+    "PLAYED_1000_HOURS", "PLAYED_1000_HOURS_GAME", "PLAYED_100_DAYS", "PLAYED_100_GAMES", "PLAYED_100_HOURS",
+    "PLAYED_100_HOURS_GAME", "PLAYED_10_GAMES", "PLAYED_10_GAMES_DAY", "PLAYED_12_HOURS_DAY",
+    "PLAYED_15_DAYS", "PLAYED_16_HOURS_DAY", "PLAYED_200_DAYS", "PLAYED_200_HOURS", "PLAYED_300_DAYS",
+    "PLAYED_30_DAYS", "PLAYED_365_DAYS", "PLAYED_42_GAMES", "PLAYED_4_HOURS_DAY", "PLAYED_4_HOURS_SESSION",
+    "PLAYED_500_HOURS", "PLAYED_500_HOURS_GAME", "PLAYED_50_GAMES", "PLAYED_5_GAMES_DAY", "PLAYED_60_DAYS",
+    "PLAYED_7_DAYS", "PLAYED_8_HOURS_DAY", "PLAYED_8_HOURS_GAME_DAY", "PLAYED_8_HOURS_SESSION",
+    "PLAYED_LESS_5_MIN_SESSION", "STREAK_100_DAYS", "STREAK_15_DAYS", "STREAK_200_DAYS", "STREAK_300_DAYS",
+    "STREAK_30_DAYS", "STREAK_365_DAYS", "STREAK_60_DAYS", "STREAK_7_DAYS", "TEAMWORK",
+)
 
 
 class AchievementCheckTests(unittest.IsolatedAsyncioTestCase):
@@ -23,6 +37,8 @@ class AchievementCheckTests(unittest.IsolatedAsyncioTestCase):
         self.db.commit()
         self.ach = Achievements()
         self.ach.populate_achievements(self.db)
+        self.db.query(models.Achievement).update({"valid_from_season": 2023})  # the new ones start in 2027: not what is tested here
+        self.db.commit()
         self.sent = mock.AsyncMock()
         patcher = mock.patch.object(ach_module.utils, "send_message", self.sent)
         patcher.start()
@@ -460,18 +476,41 @@ class AchievementCheckTests(unittest.IsolatedAsyncioTestCase):
         await checks.user_played_total_days(self.db, USER, self.days(7))
         self.assertEqual(collected, [])
 
-    async def test_the_new_achievements_of_an_installation_that_has_some_start_switched_off(self):
+    async def test_a_new_achievement_starts_active_and_valid_from_the_season_its_definition_says(self):
         from tests.sqlite_db import make_session as fresh
 
         db = fresh()
-        Achievements().populate_achievements(db)  # nothing there yet: everything is on
-        self.assertEqual(db.query(models.Achievement).filter(models.Achievement.active == False).count(), 0)  # noqa: E712
+        Achievements().populate_achievements(db)
+        got = {a.key: (a.active, a.valid_from_season) for a in db.query(models.Achievement)}
+        self.assertEqual(got["PLAYED_7_DAYS"], (True, 2023))  # the first ones: from the first season of the app
+        self.assertEqual(got["PLAYED_1000_HOURS_GAME_LIFETIME"], (True, 2027))  # the new ones: active, but not before 2027
+        self.assertEqual(got["COMPLETED_1_GAME"], (True, 2027))
         db.query(models.Achievement).filter_by(key="PLAYED_7_DAYS").delete()
         db.commit()
         Achievements().populate_achievements(db)  # one is added to an installation that has the rest
-        got = {a.key: a.active for a in db.query(models.Achievement)}
-        self.assertFalse(got["PLAYED_7_DAYS"])
-        self.assertTrue(got["PLAYED_15_DAYS"])
+        again = {a.key: (a.active, a.valid_from_season) for a in db.query(models.Achievement)}
+        self.assertEqual(again["PLAYED_7_DAYS"], (True, 2023))
+
+    async def test_an_achievement_that_is_not_valid_yet_is_not_earned_until_its_season(self):
+        self.db.query(models.Achievement).filter_by(key="PLAYED_7_DAYS").update({"valid_from_season": YEAR + 1})
+        self.db.commit()
+        await self.ach.user_played_total_days(self.db, USER, self.days(7))
+        self.assertEqual(self.awarded(), {})
+        self.sent.assert_not_awaited()
+        self.db.query(models.Achievement).filter_by(key="PLAYED_7_DAYS").update({"valid_from_season": YEAR})
+        self.db.commit()
+        await self.ach.user_played_total_days(self.db, USER, self.days(7))
+        self.assertEqual(set(self.awarded()), {"PLAYED_7_DAYS"})
+
+    async def test_what_it_would_earn_in_a_season_before_its_own_is_not_worked_out(self):
+        self.db.query(models.Achievement).filter_by(key="PLAYED_7_DAYS").update({"valid_from_season": YEAR})
+        self.db.commit()
+        before = [datetime.date(YEAR - 1, 3, day) for day in range(1, 8)]
+        collected = []
+        await Achievements(season=YEAR - 1, collected=collected).user_played_total_days(self.db, USER, before)
+        self.assertEqual(collected, [])
+        await Achievements(season=YEAR, collected=collected).user_played_total_days(self.db, USER, self.days(7))
+        self.assertEqual([award.key for award in collected], ["PLAYED_7_DAYS"])
 
     def make_secret(self, *keys):
         self.db.query(models.Achievement).filter(models.Achievement.key.in_(keys)).update({"secret": True}, synchronize_session=False)
@@ -612,11 +651,17 @@ class LifetimeTests(unittest.IsolatedAsyncioTestCase):
         self.db.add_all([models.Game(id="g1", name="Doom"), models.Game(id="g2", name="Quake")])
         self.db.commit()
         Achievements().populate_achievements(self.db)
+        self.db.query(models.Achievement).update({"valid_from_season": 2023})  # the new ones start in 2027: not what is tested here
+        self.db.commit()
         self.sent = mock.AsyncMock()
         patcher = mock.patch.object(ach_module.utils, "send_message", self.sent)
         patcher.start()
         self.addCleanup(patcher.stop)
-        self.view = Achievements(season=seasons.ALL)
+        self.view = Achievements(season=seasons.ALL, since=2023)
+
+    def valid_from(self, key, season):
+        self.db.query(models.Achievement).filter_by(key=key).update({"valid_from_season": season})
+        self.db.commit()
 
     def awarded(self):
         rows = (
@@ -730,12 +775,49 @@ class LifetimeTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_while_none_is_switched_on_the_checks_over_the_whole_history_cost_nothing(self):
         self.switch_off_lifetime()
+        self.assertEqual(Achievements().lifetime_views(self.db), [])
         with mock.patch.object(ach_module.time_entries, "get_played_time_by_day") as by_day, \
                 mock.patch.object(ach_module.users, "played_game_dates") as games:
-            await self.view.user_played_total_time(self.db, USER)
-            await self.view.user_played_total_games(self.db, USER)
+            await actions.check_user_lifetime(self.db, USER)
         by_day.assert_not_called()
         games.assert_not_called()
+
+    async def test_only_what_was_done_from_its_season_on_counts(self):
+        self.valid_from("PLAYED_1000_HOURS_GAME_LIFETIME", YEAR)
+        self.play(datetime.datetime(YEAR - 1, 3, 1, 10), hours=600)  # before its season: it does not count
+        self.play(datetime.datetime(YEAR, 3, 1, 10), hours=500)
+        await actions.check_user_lifetime(self.db, USER)
+        self.assertNotIn("PLAYED_1000_HOURS_GAME_LIFETIME", self.awarded())  # 500 h from 2026, not 1100
+        self.valid_from("PLAYED_1000_HOURS_GAME_LIFETIME", YEAR - 1)
+        await actions.check_user_lifetime(self.db, USER)
+        self.assertEqual(self.awarded()["PLAYED_1000_HOURS_GAME_LIFETIME"], (datetime.date(YEAR, 3, 1), "g1"))
+
+    async def test_what_is_played_and_completed_before_its_season_does_not_count_either(self):
+        self.valid_from("PLAYED_100_GAMES_LIFETIME", YEAR)
+        self.valid_from("COMPLETED_100_GAMES_LIFETIME", YEAR)
+        for n in range(60):
+            self.db.add(models.UserGame(user_id=1, game_id=f"a{n}", started_date=datetime.date(YEAR - 1, 3, 1), platform=None,
+                                        completed=1, completed_date=datetime.date(YEAR - 1, 3, 2)))
+        for n in range(60):
+            self.db.add(models.UserGame(user_id=1, game_id=f"b{n}", started_date=datetime.date(YEAR, 3, 1), platform=None,
+                                        completed=1, completed_date=datetime.date(YEAR, 3, 2)))
+        self.db.commit()
+        await actions.check_user_lifetime(self.db, USER)
+        self.assertEqual(self.awarded(), {})  # 120 games in all, 60 from the season
+
+    async def test_one_that_is_not_valid_yet_is_not_worked_out(self):
+        self.valid_from("PLAYED_1000_HOURS_GAME_LIFETIME", YEAR + 1)
+        self.play(datetime.datetime(YEAR, 3, 1, 10), hours=1100)
+        await actions.check_user_lifetime(self.db, USER)
+        self.assertEqual(self.awarded(), {})
+
+    async def test_there_is_one_view_for_each_season_the_ones_that_can_be_earned_count_from(self):
+        self.valid_from("PLAYED_100_DAYS_LIFETIME", YEAR - 1)
+        self.valid_from("PLAYED_500_HOURS_LIFETIME", YEAR)
+        self.valid_from("PLAYED_1000_HOURS_LIFETIME", YEAR + 1)  # not yet: no view for it
+        views = Achievements().lifetime_views(self.db)
+        self.assertEqual([view.since for view in views], [2023, YEAR - 1, YEAR])
+        self.assertTrue(all(view.lifetime for view in views))
 
     async def test_the_seasonal_checks_never_earn_a_lifetime_one(self):
         self.play(datetime.datetime(YEAR, 3, 1, 10), hours=600)
@@ -745,8 +827,17 @@ class LifetimeTests(unittest.IsolatedAsyncioTestCase):
     async def test_the_orchestration_runs_the_lifetime_checks_too(self):
         self.play(datetime.datetime(YEAR - 1, 3, 1, 10), hours=400)
         self.play(datetime.datetime(YEAR, 3, 1, 10), hours=150)
-        await actions.check_user_lifetime(self.db, USER, checks=self.view)
+        await actions.check_user_lifetime(self.db, USER)
         self.assertIn("PLAYED_500_HOURS_LIFETIME", self.awarded())
+
+
+class CatalogueTests(unittest.TestCase):
+    def test_every_achievement_that_is_new_says_the_season_it_starts_in(self):
+        without = {ach.name for ach in ach_module.AchievementsElems if "since" not in ach.value}
+        self.assertEqual(without, set(LEGACY))  # one added without a "since" would be valid from 2023, behind everybody's back
+        for ach in ach_module.AchievementsElems:
+            expected = 2023 if ach.name in LEGACY else 2027
+            self.assertEqual(first_season(ach), expected, ach.name)
 
 
 class QueryEconomyTests(unittest.IsolatedAsyncioTestCase):

@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from ..database import models
 from . import time_entries, users
 from ..utils.achievements import is_lifetime  # after the crud modules: they import each other
+from ..utils import seasons
 
 
 def describe(message: str | None) -> str:
@@ -50,9 +51,10 @@ def achievements_catalog(db: Session, viewer_id: int) -> list[dict]:
     for row in db.query(
         models.Achievement.id, models.Achievement.key, models.Achievement.title, models.Achievement.message,
         models.Achievement.image.isnot(None).label("has_image"), models.Achievement.active, models.Achievement.secret,
+        models.Achievement.valid_from_season,
     ).order_by(models.Achievement.id):
-        if not row.active and row.id not in mine:
-            continue  # switched off: it does not exist yet, not even as a hidden one
+        if (not row.active or row.valid_from_season > seasons.current()) and row.id not in mine:
+            continue  # switched off, or not valid yet: it does not exist yet, not even as a hidden one
         if row.id not in mine:
             catalog.append({"id": row.id, "hidden": True, "unlocked_by_me": False, "secret": bool(row.secret)})  # so that everybody knows there are special ones
             continue

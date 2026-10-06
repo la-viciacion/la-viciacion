@@ -249,6 +249,7 @@ export const ENTITIES = {
       { label: 'Logro', render: (r) => html`<strong>${r.title}</strong><div class="adm-sub">${r.key}</div>` },
       { label: 'Mensaje', render: (r) => r.message || '' },
       { label: 'Estado', render: (r) => html`${r.active ? badge('Activo', 'green') : badge('Inactivo', 'orange')}${r.secret ? badge('Secreto', 'purple') : ''}${r.lifetime ? badge('Único', 'gray') : ''}` },
+      { label: 'Desde', render: (r) => r.valid_from_season },
       { label: 'Concedido', render: (r) => r.awarded },
     ],
     fields: [
@@ -256,6 +257,7 @@ export const ENTITIES = {
       { key: 'message', label: 'Mensaje ({} = usuario / juego)', type: 'text' },
       { key: 'active', label: 'Activo', type: 'checkbox' },
       { key: 'secret', label: 'Secreto (se anuncia sin decir cuál; el jugador lo recibe en privado)', type: 'checkbox' },
+      { key: 'valid_from_season', label: 'Válido desde la temporada (antes de ella nadie lo consigue ni cuenta)', type: 'number', required: true },
     ],
     name: (r) => r.title,
     actions: [{ label: 'Imagen…', run: (r, admin) => uploadAchievementImage(r, admin) }],

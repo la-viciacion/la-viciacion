@@ -29,10 +29,16 @@ class RecalculationTests(unittest.TestCase):
         ])
         self.db.commit()
         Achievements().populate_achievements(self.db)
+        self.db.query(models.Achievement).update({"valid_from_season": 2023})  # the new ones start in 2027: not what is tested here
+        self.db.commit()
         self.sent = mock.AsyncMock()
         patcher = mock.patch.object(ach_module.utils, "send_message", self.sent)
         patcher.start()
         self.addCleanup(patcher.stop)
+
+    def valid_from(self, key, season):
+        self.db.query(models.Achievement).filter_by(key=key).update({"valid_from_season": season})
+        self.db.commit()
 
     def play(self, user_id, start, minutes=60, game="g1", running=False):
         self.db.add(models.GameTimer(
@@ -243,6 +249,29 @@ class RecalculationTests(unittest.TestCase):
         self.play_a_day_each(1, D(PAST, 1, 1), 50)
         self.db.query(models.Achievement).filter_by(key=self.LIFETIME_DAYS).update({"active": False})
         self.db.commit()
+        self.assertEqual(self.changes(achievement_keys=[self.LIFETIME_DAYS]), {})
+
+    def test_what_is_not_valid_yet_in_a_season_is_neither_added_nor_revoked_there(self):
+        self.valid_from("PLAYED_7_DAYS", PAST)
+        self.play_days(1, PAST - 1, 7)
+        self.play_days(1, PAST, 7)
+        self.award(1, "PLAYED_7_DAYS", D(PAST - 1, 6, 20))  # before its season: left as it is, wrong date and all
+        got = self.changes(achievement_keys=["PLAYED_7_DAYS"])
+        self.assertEqual(set(got), {("add", 1, PAST, "PLAYED_7_DAYS")})
+
+    def test_the_ones_with_no_season_limit_count_only_from_their_season(self):
+        self.play_a_day_each(1, D(PAST - 1, 1, 1), 60)
+        self.play_a_day_each(1, D(PAST, 1, 1), 50)
+        self.valid_from(self.LIFETIME_DAYS, PAST)
+        self.assertEqual(self.changes(achievement_keys=[self.LIFETIME_DAYS]), {})  # 50 days from the season
+        self.valid_from(self.LIFETIME_DAYS, PAST - 1)
+        self.assertEqual(set(self.changes(achievement_keys=[self.LIFETIME_DAYS])), {("add", 1, PAST, self.LIFETIME_DAYS)})
+
+    def test_one_with_no_season_limit_that_is_not_valid_yet_is_left_exactly_as_it_is(self):
+        self.play_a_day_each(1, D(PAST - 1, 1, 1), 60)
+        self.play_a_day_each(1, D(PAST, 1, 1), 50)
+        self.valid_from(self.LIFETIME_DAYS, YEAR + 1)
+        self.award(1, self.LIFETIME_DAYS, D(PAST, 6, 1))
         self.assertEqual(self.changes(achievement_keys=[self.LIFETIME_DAYS]), {})
 
     def test_the_date_stays_in_its_season(self):

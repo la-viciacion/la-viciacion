@@ -68,17 +68,18 @@ async def check_user(
     await checks.release_day(db, user, silent)
 
 
-async def check_user_lifetime(db: Session, user: models.User, silent: bool = False, checks: Achievements | None = None):
-    """The achievements with no season limit (their key ends in _LIFETIME): worked out over the whole history.
-    `checks` is the view over every season (default: a new one). It costs nothing while none is switched on."""
-    checks = checks or achievements.lifetime_view()
-    if not checks.lifetime_on(db):
-        return
-    await checks.user_played_total_days(db, user, time_entries.get_played_days(db, user.id, season=seasons.ALL), silent=silent)
-    await checks.user_played_hours_game(db, user, silent=silent)
-    await checks.user_played_total_time(db, user, silent=silent)
-    await checks.user_played_total_games(db, user, silent=silent)
-    await checks.user_completed_total_games(db, user, silent=silent)
+async def check_user_lifetime(db: Session, user: models.User, silent: bool = False, collected: list | None = None):
+    """The achievements with no season limit (their key ends in _LIFETIME): worked out over the history from the
+    season each begins to count from. With `collected` (a list) it only notes what the user deserves. It costs
+    nothing while none of them is switched on and valid."""
+    base = achievements if collected is None else Achievements(silent=True, collected=collected)
+    for view in base.lifetime_views(db):
+        days = time_entries.get_played_days(db, user.id, season=seasons.ALL, since=view.since)
+        await view.user_played_total_days(db, user, days, silent=silent)
+        await view.user_played_hours_game(db, user, silent=silent)
+        await view.user_played_total_time(db, user, silent=silent)
+        await view.user_played_total_games(db, user, silent=silent)
+        await view.user_completed_total_games(db, user, silent=silent)
 
 
 async def check_users(
@@ -205,7 +206,8 @@ def after_timer_start(user_id: int, start_time: datetime.datetime, new_game_id: 
                         await users.announce_new_game(db, user, game, start_time.date(), silent=False)
                 await achievements.timer_started(db, user, start_time, game_id)
                 await achievements.user_played_total_games(db, user)
-                await achievements.lifetime_view().user_played_total_games(db, user)
+                for view in achievements.lifetime_views(db):
+                    await view.user_played_total_games(db, user)
                 if game_id is not None:
                     await achievements.all_together(db, game_id, silent=False)
             await achievements.teamwork(db, silent=False)

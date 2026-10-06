@@ -1043,6 +1043,7 @@ def list_achievements(db: Session = Depends(get_db)):
         (models.Achievement.image.isnot(None)).label("has_image"),
         models.Achievement.active,
         models.Achievement.secret,
+        models.Achievement.valid_from_season,
     ).order_by(models.Achievement.id)
     return [
         {
@@ -1054,6 +1055,7 @@ def list_achievements(db: Session = Depends(get_db)):
             "active": bool(r.active),
             "secret": bool(r.secret),
             "lifetime": is_lifetime(r.key),
+            "valid_from_season": r.valid_from_season,
             "awarded": awarded.get(r.id, 0),
         }
         for r in rows
@@ -1065,19 +1067,20 @@ class AchievementPatch(BaseModel):
     message: Optional[str] = None
     active: Optional[bool] = None  # switched off: not earned, announced, recalculated or shown
     secret: Optional[bool] = None  # announced to the group without saying which, and to the player in full, privately
+    valid_from_season: Optional[int] = Field(None, ge=2000, le=2100)  # the first season it can be earned
 
 
 @router.patch("/achievements/{achievement_id}")
 def patch_achievement(achievement_id: int, body: AchievementPatch, db: Session = Depends(get_db)):
     ach = _get_or_404(db, models.Achievement, achievement_id, "Logro")
     for k, v in body.model_dump(exclude_unset=True).items():
-        if k in ("active", "secret") and v is None:
+        if k in ("active", "secret", "valid_from_season") and v is None:
             continue  # they cannot be empty
         setattr(ach, k, v)
     db.commit()
     return {
         "id": ach.id, "key": ach.key, "title": ach.title, "message": ach.message,
-        "active": bool(ach.active), "secret": bool(ach.secret),
+        "active": bool(ach.active), "secret": bool(ach.secret), "valid_from_season": ach.valid_from_season,
     }
 
 

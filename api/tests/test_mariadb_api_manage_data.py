@@ -502,6 +502,14 @@ class AchievementsAdminTests(ManageTestCase):
         self.assertFalse(by_key["PLAYED_1000_HOURS_GAME"]["lifetime"])
         self.assertEqual(sum(a["lifetime"] for a in by_key.values()), 20)
 
+    def test_the_season_an_achievement_is_valid_from_is_listed_and_can_be_changed(self):
+        by_key = {a["key"]: a for a in self.admin("GET", "/achievements").json()}
+        self.assertEqual((by_key["PLAYED_7_DAYS"]["valid_from_season"], by_key["COMPLETED_1_GAME"]["valid_from_season"]), (2023, 2027))
+        first = by_key["PLAYED_7_DAYS"]["id"]
+        self.assertEqual(self.admin("PATCH", f"/achievements/{first}", json={"valid_from_season": 2028}).json()["valid_from_season"], 2028)
+        self.assertEqual(self.admin("PATCH", f"/achievements/{first}", json={"valid_from_season": 1999}).status_code, 422)
+        self.assertEqual(self.admin("PATCH", f"/achievements/{first}", json={"valid_from_season": None, "title": "T"}).json()["valid_from_season"], 2028)
+
     def test_an_achievement_can_be_switched_off_and_on(self):
         first = self.ids()[0]
         self.assertTrue(next(a for a in self.admin("GET", "/achievements").json() if a["id"] == first)["active"])

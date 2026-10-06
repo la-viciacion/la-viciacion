@@ -84,8 +84,11 @@ def players_played_time(db: Session, season: int = None, is_active: bool | None 
 MIN_SESSION_SECONDS = 600
 
 
-def played_days_by_user(db: Session, season: int, user_ids: list[int] | None = None) -> dict[int, list[datetime.date]]:
-    """{user_id: sorted days on which they played in the season}, only for users that played.
+def played_days_by_user(
+    db: Session, season: int, user_ids: list[int] | None = None, since: int | None = None
+) -> dict[int, list[datetime.date]]:
+    """{user_id: sorted days on which they played in the season}, only for users that played. Over every
+    season (seasons.ALL), `since` leaves out the days before that season.
 
     A day is played when a finished session of 10 minutes or more touched it: the day it began and
     the day it ended, so one that crosses midnight counts for both. Each day belongs to the season of
@@ -100,12 +103,14 @@ def played_days_by_user(db: Session, season: int, user_ids: list[int] | None = N
             sessions.c.start < datetime.datetime(season + 1, 1, 1),
             sessions.c.end >= datetime.datetime(season, 1, 1),
         )
+    elif since:
+        stmt = stmt.where(sessions.c.end >= datetime.datetime(since, 1, 1))
     if user_ids is not None:
         stmt = stmt.where(sessions.c.user_id.in_(user_ids))
     days: dict[int, set] = {}
     for user_id, start, end in db.execute(stmt).all():
         for moment in (start, end):
-            if moment is not None and (season == seasons.ALL or moment.year == season):
+            if moment is not None and (moment.year >= (since or 0) if season == seasons.ALL else moment.year == season):
                 days.setdefault(user_id, set()).add(moment.date())
     return {user_id: sorted(values) for user_id, values in days.items()}
 
@@ -216,10 +221,10 @@ def get_user_games_played_time(
     return query.group_by(sessions.c.game_id).all()
 
 
-def get_played_days(db: Session, user_id: int, season: int = None) -> list[datetime.date]:
+def get_played_days(db: Session, user_id: int, season: int = None, since: int | None = None) -> list[datetime.date]:
     """The days the user played in the season (see played_days_by_user), oldest first."""
     season = seasons.or_current(season)
-    return played_days_by_user(db, season, [user_id]).get(user_id, [])
+    return played_days_by_user(db, season, [user_id], since).get(user_id, [])
 
 
 def get_time_entry_by_time(
@@ -259,7 +264,7 @@ def get_time_entry_by_time(
     return time_entry
 
 
-def get_played_time_by_day(db: Session, user_id: int, season: int = None):
+def get_played_time_by_day(db: Session, user_id: int, season: int = None, since: int | None = None):
     season = seasons.or_current(season)
     sessions = sessions_subquery()
     played_start_days = (
@@ -267,6 +272,7 @@ def get_played_time_by_day(db: Session, user_id: int, season: int = None):
         .filter(
             sessions.c.user_id == user_id,
             _in_season(sessions.c.season, season),
+            sessions.c.season >= (since or 0),
         )
         .group_by(func.DATE(sessions.c.start))
         .all()
@@ -274,7 +280,7 @@ def get_played_time_by_day(db: Session, user_id: int, season: int = None):
     return sorted(played_start_days)
 
 
-def get_played_time_by_game_and_day(db: Session, user_id: int, season: int = None):
+def get_played_time_by_game_and_day(db: Session, user_id: int, season: int = None, since: int | None = None):
     season = seasons.or_current(season)
     sessions = sessions_subquery()
     return (
@@ -286,6 +292,7 @@ def get_played_time_by_game_and_day(db: Session, user_id: int, season: int = Non
         .filter(
             sessions.c.user_id == user_id,
             _in_season(sessions.c.season, season),
+            sessions.c.season >= (since or 0),
         )
         .group_by(func.DATE(sessions.c.start), sessions.c.game_id)
         .all()

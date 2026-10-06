@@ -11,7 +11,7 @@ from ..crud import time_entries, users, games
 from ..database import models, schemas
 from ..utils import actions as actions
 from ..utils import my_utils as utils
-from ..utils.achievements import AchievementsElems, is_lifetime
+from ..utils.achievements import AchievementsElems, first_season, is_lifetime
 from ..utils.logger import LogManager
 from ..utils import seasons, streaks
 
@@ -131,51 +131,64 @@ class Award(NamedTuple):
 class Achievements:
     """The checks of every achievement.
 
-    `season` (default: the running one) is the season they look at. With `collected` (a list) they only
+    `season` (default: the running one) is the season they look at. An achievement that is not valid in it yet
+    (`valid_from_season`) is not awarded. Over every season (seasons.ALL, see `lifetime_views`) `since` is the
+    season the history counts from. With `collected` (a list) they only
     work out what a user deserves: each achievement is appended to the list as an `Award`, and nothing is
     written or announced, whatever `silent` says. That is how a recalculation reuses the very rules of the
     live checks without being able to notify anybody.
     """
 
-    def __init__(self, silent: bool = False, season: int | None = None, collected: list | None = None) -> None:
+    def __init__(
+        self, silent: bool = False, season: int | None = None, collected: list | None = None, since: int | None = None
+    ) -> None:
         self.silent = silent
         self.season = season
         self.collected = collected
-        self._lifetime_is_on: bool | None = None
+        self.since = since
 
     @property
     def lifetime(self) -> bool:
-        """Is this the view over the whole history (see lifetime_view)?"""
+        """Is this the view over the whole history (see lifetime_views)?"""
         return self.season == seasons.ALL
 
-    def lifetime_view(self) -> "Achievements":
+    def lifetime_views(self, db: Session) -> list["Achievements"]:
         """The same checks over every season, for the achievements with no season limit (their key ends in
-        _LIFETIME): only the families that add something up have a table of them. What it finds is earned
-        once, and it shares `collected` with this one."""
-        return Achievements(silent=self.silent, season=seasons.ALL, collected=self.collected)
-
-    def lifetime_on(self, db: Session) -> bool:
-        """Is any achievement with no season limit switched on? Asked once per view: while none is, the checks
-        over the whole history cost nothing."""
-        if self._lifetime_is_on is None:
-            self._lifetime_is_on = (
-                db.query(models.Achievement.id)
-                .filter(models.Achievement.key.like("%\\_LIFETIME", escape="\\"), models.Achievement.active == True)  # noqa: E712
-                .first()
-                is not None
+        _LIFETIME): only the families that add something up have a table of them. There is one view for each season
+        that the switched-on ones that have started to count begin to count from (usually a single one), because
+        only what was done from that season on counts for them. None, while none is switched on, so it costs
+        nothing. What they find is earned once, and they share `collected` with this one."""
+        starts = (
+            db.query(models.Achievement.valid_from_season)
+            .filter(
+                models.Achievement.key.like("%\\_LIFETIME", escape="\\"),
+                models.Achievement.active == True,  # noqa: E712
+                models.Achievement.valid_from_season <= seasons.current(),
             )
-        return self._lifetime_is_on
+            .distinct()
+            .all()
+        )
+        return [
+            Achievements(silent=self.silent, season=seasons.ALL, since=since, collected=self.collected)
+            for (since,) in sorted(starts)
+        ]
 
-    def _nothing_to_do(self, db: Session) -> bool:
-        return self.lifetime and not self.lifetime_on(db)
+    def _not_in_effect(self, season: int):
+        """The condition (SQL) of the achievements that this view does not award in `season`: the ones that are
+        switched off, the ones that are not valid yet and, over every season, the ones that count from another
+        season than this view's."""
+        a = models.Achievement
+        if season == seasons.ALL:
+            return or_(a.active == False, a.valid_from_season != (self.since or 0), a.valid_from_season > seasons.current())  # noqa: E712
+        return or_(a.active == False, a.valid_from_season > season)  # noqa: E712
 
     def populate_achievements(self, db: Session):
         """Create the achievements of the code that the table does not have yet.
 
         Existing rows are left alone: from then on the database is the source of truth, so
         the title and message an admin edits (PATCH /manage/achievements) and whether it is active are kept.
-        In an installation that already has achievements, the new ones start **switched off**: an admin
-        decides when they begin to count (a new installation has everything on).
+        A new one is active and valid from the season its definition says (`since`; the first season of the app
+        when it says nothing): the season is what keeps it from counting before its time.
         """
         existing = {key for (key,) in db.query(models.Achievement.key).all()}
         missing = [a for a in AchievementsElems if a.name not in existing]
@@ -188,7 +201,7 @@ class Achievements:
                         key=achievement.name,
                         title=achievement.value["title"],
                         message=achievement.value["message"],
-                        active=not existing,
+                        valid_from_season=first_season(achievement),
                     )
                 )
             db.commit()
@@ -230,14 +243,14 @@ class Achievements:
 
     def achieved_keys(self, db: Session, user_id: int, keys, season: int = None) -> set[str]:
         """Which of the achievements `keys` need no award for the user in the season: the ones they already have
-        and the ones that are switched off (nobody earns those). One query."""
+        and the ones nobody earns now (switched off, or not valid yet in it). One query."""
         keys = [str(key) for key in keys]
         if not keys:
             return set()
-        if self.collected is not None:
-            off = {key for (key,) in db.query(models.Achievement.key).filter(models.Achievement.key.in_(keys), models.Achievement.active == False)}  # noqa: E712
-            return off | {award.key for award in self.collected if award.user_id == user_id and award.key in keys}
         season = seasons.or_current(season if season is not None else self.season)
+        if self.collected is not None:
+            off = {key for (key,) in db.query(models.Achievement.key).filter(models.Achievement.key.in_(keys), self._not_in_effect(season))}
+            return off | {award.key for award in self.collected if award.user_id == user_id and award.key in keys}
         # over every season (the achievements with no season limit) it is once in a lifetime, in any of them
         of_the_season = [] if season == seasons.ALL else [models.UserAchievement.season == season]
         rows = (
@@ -252,7 +265,7 @@ class Achievements:
             )
             .filter(
                 models.Achievement.key.in_(keys),
-                or_(models.UserAchievement.id.isnot(None), models.Achievement.active == False),  # noqa: E712
+                or_(models.UserAchievement.id.isnot(None), self._not_in_effect(season)),
             )
             .distinct()
             .all()
@@ -383,11 +396,9 @@ class Achievements:
     ):
         """Dated the day the season's running total of hours crossed each threshold (over every season, the
         running total of the whole history)."""
-        if self._nothing_to_do(db):
-            return
         total = 0
         running = []
-        for day, seconds in time_entries.get_played_time_by_day(db, user.id, self.season):
+        for day, seconds in time_entries.get_played_time_by_day(db, user.id, self.season, self.since):
             total += seconds or 0
             running.append((day, total / 60 / 60))
         await self._unlock_first_day_reaching(db, user, running, LIFETIME_TOTAL_HOURS if self.lifetime else TOTAL_HOURS, silent)
@@ -555,8 +566,6 @@ class Achievements:
     async def user_played_total_days(
         self, db: Session, user: models.User, total_days: list, silent: bool = False
     ):
-        if self._nothing_to_do(db):
-            return
         await self._unlock_reached(
             db, user, len(total_days), LIFETIME_TOTAL_DAYS if self.lifetime else TOTAL_DAYS, silent,
             date_for=lambda needed: str(total_days[needed - 1]),
@@ -589,9 +598,7 @@ class Achievements:
     ):
         """Distinct games of the season (of every season, in the view of the whole history), dated the day the
         Nth one began."""
-        if self._nothing_to_do(db):
-            return
-        dates = users.played_game_dates(db, user.id, self.season)
+        dates = users.played_game_dates(db, user.id, self.season, self.since)
         await self._unlock_reached(
             db, user, len(dates), LIFETIME_PLAYED_GAMES if self.lifetime else PLAYED_GAMES, silent,
             date_for=lambda needed: str(dates[needed - 1]),
@@ -601,9 +608,7 @@ class Achievements:
         self, db: Session, user: models.User, silent: bool = False
     ):
         """Dated the day the Nth game was completed (over every season, a game counts once)."""
-        if self._nothing_to_do(db):
-            return
-        dates = users.completed_game_dates(db, user.id, self.season)
+        dates = users.completed_game_dates(db, user.id, self.season, self.since)
         await self._unlock_reached(
             db, user, len(dates), LIFETIME_COMPLETED_GAMES if self.lifetime else COMPLETED_GAMES, silent,
             date_for=lambda needed: str(dates[needed - 1]),
@@ -615,8 +620,6 @@ class Achievements:
         """100, 500 and 1000 h in one game this season, each dated the day it crossed them. With several
         games over a line, the one that crossed first is the one named. Over every season, the hours of a game
         are all the ones it has had."""
-        if self._nothing_to_do(db):
-            return
         table = LIFETIME_HOURS_IN_A_GAME if self.lifetime else HOURS_IN_A_GAME
         have = self.achieved_keys(db, user.id, [ach.name for ach, _ in table])
         pending = [(ach, hours) for ach, hours in table if ach.name not in have]
@@ -625,7 +628,7 @@ class Achievements:
         totals: dict[str, float] = {}
         first: dict[int, tuple] = {}  # hours -> (day it crossed, game_id)
         for day, game_id, seconds in sorted(
-            (row for row in time_entries.get_played_time_by_game_and_day(db, user.id, self.season) if row[1] is not None),
+            (row for row in time_entries.get_played_time_by_game_and_day(db, user.id, self.season, self.since) if row[1] is not None),
             key=lambda row: row[0],
         ):
             totals[game_id] = totals.get(game_id, 0) + (seconds or 0)

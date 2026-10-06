@@ -107,8 +107,7 @@ async def _expected(db: Session, user: models.User, season: int) -> dict[str, Aw
 async def _expected_lifetime(db: Session, user: models.User) -> dict[str, Award]:
     """What the user deserves of the achievements with no season limit: {achievement key: Award}."""
     collected: list[Award] = []
-    checks = Achievements(silent=True, season=seasons.ALL, collected=collected)
-    await actions.check_user_lifetime(db, user, silent=True, checks=checks)
+    await actions.check_user_lifetime(db, user, silent=True, collected=collected)
     return {award.key: award for award in collected}
 
 
@@ -156,8 +155,12 @@ async def _plan(
     titles = {key: title for key, title in db.query(models.Achievement.key, models.Achievement.title).all()}
     switched_on = {key for (key,) in db.query(models.Achievement.key).filter(models.Achievement.active == True)}  # noqa: E712
     allowed = switched_on if achievement_keys is None else switched_on & set(achievement_keys)
+    valid_from = dict(db.query(models.Achievement.key, models.Achievement.valid_from_season).all())
+    this_season = seasons.current()
     lifetime_keys = {key for key in allowed if is_lifetime(key)}
     allowed -= lifetime_keys  # they have no season: they are worked out apart, once per user
+    # one that is not valid yet is left exactly as it is, in a season before its own and now
+    lifetime_keys = {key for key in lifetime_keys if valid_from[key] <= this_season}
     stored_rows = (
         db.query(models.UserAchievement.id, models.Achievement.key, models.UserAchievement.date, models.UserAchievement.game_id,
                  models.UserAchievement.season)
@@ -180,7 +183,7 @@ async def _plan(
                 day, game_id = together[season][user.id]
                 expected["ALL_TOGETHER"] = Award(user.id, "ALL_TOGETHER", day, game_id)
             stored = stored_rows.filter(models.UserAchievement.user_id == user.id, models.UserAchievement.season == season).all()
-            changes.extend(_diff(user, expected, stored, titles, allowed))
+            changes.extend(_diff(user, expected, stored, titles, {key for key in allowed if valid_from[key] <= season}))
         if lifetime_keys:  # whatever the seasons asked for: they belong to none
             stored = stored_rows.filter(models.UserAchievement.user_id == user.id, models.Achievement.key.in_(lifetime_keys)).all()
             changes.extend(_diff(user, await _expected_lifetime(db, user), stored, titles, lifetime_keys))
