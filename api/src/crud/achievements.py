@@ -2,7 +2,7 @@ import datetime
 import json
 from typing import List, NamedTuple, Union
 
-from sqlalchemy import asc, create_engine, desc, func, select, text, update
+from sqlalchemy import and_, asc, create_engine, desc, func, or_, select, text, update
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -116,7 +116,9 @@ class Achievements:
         """Create the achievements of the code that the table does not have yet.
 
         Existing rows are left alone: from then on the database is the source of truth, so
-        the title and message an admin edits (PATCH /manage/achievements) are kept.
+        the title and message an admin edits (PATCH /manage/achievements) and whether it is active are kept.
+        In an installation that already has achievements, the new ones start **switched off**: an admin
+        decides when they begin to count (a new installation has everything on).
         """
         existing = {key for (key,) in db.query(models.Achievement.key).all()}
         missing = [a for a in AchievementsElems if a.name not in existing]
@@ -129,6 +131,7 @@ class Achievements:
                         key=achievement.name,
                         title=achievement.value["title"],
                         message=achievement.value["message"],
+                        active=not existing,
                     )
                 )
             db.commit()
@@ -169,21 +172,30 @@ class Achievements:
             raise
 
     def achieved_keys(self, db: Session, user_id: int, keys, season: int = None) -> set[str]:
-        """Which of the achievements `keys` the user already has in the season: one query."""
+        """Which of the achievements `keys` need no award for the user in the season: the ones they already have
+        and the ones that are switched off (nobody earns those). One query."""
         keys = [str(key) for key in keys]
         if not keys:
             return set()
         if self.collected is not None:
-            return {award.key for award in self.collected if award.user_id == user_id and award.key in keys}
+            off = {key for (key,) in db.query(models.Achievement.key).filter(models.Achievement.key.in_(keys), models.Achievement.active == False)}  # noqa: E712
+            return off | {award.key for award in self.collected if award.user_id == user_id and award.key in keys}
         season = season if season is not None else self.season
         rows = (
             db.query(models.Achievement.key)
-            .join(models.UserAchievement, models.UserAchievement.achievement_id == models.Achievement.id)
-            .filter(
-                models.UserAchievement.user_id == user_id,
-                models.UserAchievement.season == seasons.or_current(season),
-                models.Achievement.key.in_(keys),
+            .outerjoin(
+                models.UserAchievement,
+                and_(
+                    models.UserAchievement.achievement_id == models.Achievement.id,
+                    models.UserAchievement.user_id == user_id,
+                    models.UserAchievement.season == seasons.or_current(season),
+                ),
             )
+            .filter(
+                models.Achievement.key.in_(keys),
+                or_(models.UserAchievement.id.isnot(None), models.Achievement.active == False),  # noqa: E712
+            )
+            .distinct()
             .all()
         )
         return {key for (key,) in rows}

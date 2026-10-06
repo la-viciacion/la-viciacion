@@ -3,6 +3,8 @@ import datetime
 import unittest
 from datetime import timedelta
 
+from sqlalchemy import text
+
 from src.crud import group
 from src.database import database, models
 from tests.api_support import ApiTestCase
@@ -54,6 +56,15 @@ class AchievementsCatalogTests(ApiTestCase):
                 self.assertNotIn("*", achievement["description"])
             else:  # not even the name: the other player's unlock does not reveal it
                 self.assertEqual(achievement, {"id": achievement["id"], "hidden": True, "unlocked_by_me": False})
+
+    def test_a_switched_off_achievement_does_not_exist_for_the_group_unless_the_viewer_has_it(self):
+        with self.engine.begin() as conn:
+            conn.execute(text("UPDATE achievements SET active = 0 WHERE id IN (:a, :b)"), {"a": self.first, "b": self.second})
+        self.award(self.ana, self.first, TODAY())
+        shown = {a["id"] for a in self.catalog()}
+        self.assertIn(self.first, shown)  # she has it
+        self.assertNotIn(self.second, shown)  # nobody can have it: not even as a hidden one
+        self.assertEqual(len(self.catalog("ana")), self.scalar("SELECT COUNT(*) FROM achievements WHERE active = 1") + 1)
 
     def test_who_has_it_how_many_times_and_when_last_the_latest_first(self):
         last = TODAY() - timedelta(days=400)

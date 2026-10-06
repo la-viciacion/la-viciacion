@@ -177,6 +177,25 @@ class RecalculationTests(unittest.TestCase):
         self.assertEqual(self.stored(), [("PLAYED_30_DAYS", D(YEAR, 6, 20), None)])
         self.sent.assert_not_awaited()
 
+    def test_a_switched_off_achievement_is_left_exactly_as_it_is(self):
+        self.play_days(1, PAST, 7)
+        self.award(1, "STREAK_7_DAYS", D(PAST, 6, 20))  # a wrong date, but it is off: nobody touches it
+        self.award(1, "PLAYED_30_DAYS", D(PAST, 6, 20))  # not earned, but it is off too
+        self.db.query(models.Achievement).filter(models.Achievement.key.in_(["STREAK_7_DAYS", "PLAYED_30_DAYS"])).update({"active": False}, synchronize_session=False)
+        self.db.commit()
+        got = self.changes()
+        self.assertEqual({key for _, _, _, key in got}, {"PLAYED_7_DAYS"})  # the one that is on is still added
+
+    def test_only_the_achievements_chosen_are_recalculated(self):
+        self.play_days(1, PAST, 7)
+        self.award(1, "PLAYED_30_DAYS", D(PAST, 6, 20))
+        self.assertEqual({key for _, _, _, key in self.changes(achievement_keys=["STREAK_7_DAYS"])}, {"STREAK_7_DAYS"})
+        self.assertEqual(
+            {key for _, _, _, key in self.changes(achievement_keys=["PLAYED_30_DAYS", "PLAYED_7_DAYS", "NOT_AN_ACHIEVEMENT"])},
+            {"PLAYED_30_DAYS", "PLAYED_7_DAYS"},
+        )
+        self.assertEqual(self.changes(achievement_keys=[]), {})
+
     def test_the_date_stays_in_its_season(self):
         collected = []
         checks = Achievements(season=PAST, collected=collected)

@@ -240,7 +240,7 @@ export const ENTITIES = {
   achievements: {
     label: 'Logros',
     nav: 'Catálogo',
-    description: 'Logros que se pueden conseguir: su título, mensaje e imagen.',
+    description: 'Logros que se pueden conseguir: su título, mensaje e imagen, y si están activos. Uno inactivo no lo consigue nadie, no se anuncia, no se recalcula y no aparece en la página de logros; los nuevos empiezan inactivos hasta que los actives (y luego puedes recalcularlos).',
     toolbarActions: [{ act: 'check-achievements', label: 'Comprobar logros' }, { act: 'recalculate-achievements', label: 'Recalcular logros…' }],
     endpoint: '/manage/achievements',
     paged: false,
@@ -248,11 +248,13 @@ export const ENTITIES = {
       { label: 'Imagen', render: (r) => (r.has_image ? html`<img class="adm-ach" src="/api/v1/utils/achievement-image/${r.key}?v=${Date.now()}" alt="" />` : '—') },
       { label: 'Logro', render: (r) => html`<strong>${r.title}</strong><div class="adm-sub">${r.key}</div>` },
       { label: 'Mensaje', render: (r) => r.message || '' },
+      { label: 'Estado', render: (r) => (r.active ? badge('Activo', 'green') : badge('Inactivo', 'orange')) },
       { label: 'Concedido', render: (r) => r.awarded },
     ],
     fields: [
       { key: 'title', label: 'Título', type: 'text', required: true },
       { key: 'message', label: 'Mensaje ({} = usuario / juego)', type: 'text' },
+      { key: 'active', label: 'Activo', type: 'checkbox' },
     ],
     name: (r) => r.title,
     actions: [{ label: 'Imagen…', run: (r, admin) => uploadAchievementImage(r, admin) }],

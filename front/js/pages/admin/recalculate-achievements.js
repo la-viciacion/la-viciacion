@@ -1,7 +1,8 @@
 // Recalculating the achievements.
 // It works everything out again from the sessions and the library, silently (nobody is notified), and it
 // adds, corrects and revokes, so it takes two explicit steps: a preview of exactly what would change and
-// a typed phrase. The players and the seasons can be chosen (all by default). The API enforces the phrase too.
+// a typed phrase. The players, the seasons and the achievements can be chosen (all by default; the ones that
+// are switched off are left alone). The API enforces the phrase too.
 import { api, jsonRequest } from '../../lib/api.js';
 import { formatDate } from '../../lib/format.js';
 import { html } from '../../lib/html.js';
@@ -18,9 +19,9 @@ const SECTIONS = [
 ];
 
 /** What was ticked in a group of checkboxes: null when everything is (no filter), else the values. */
-const chosen = (form, name) => {
+const chosen = (form, name, parse = Number) => {
   const boxes = [...form.querySelectorAll(`input[name=${name}]`)];
-  const ticked = boxes.filter((box) => box.checked).map((box) => Number(box.value));
+  const ticked = boxes.filter((box) => box.checked).map((box) => parse(box.value));
   return ticked.length === boxes.length ? null : ticked;
 };
 
@@ -30,18 +31,20 @@ const choices = (title, name, options) => html`
     ${options.map(([value, label]) => html`<label class="adm-check"><input type="checkbox" name="${name}" value="${value}" checked /> ${label}</label>`)}
   </fieldset>`;
 
-const query = ({ userIds, seasonList }) => {
+const query = ({ userIds, seasonList, achievementKeys }) => {
   const params = new URLSearchParams();
   (userIds || []).forEach((id) => params.append('user_ids', id));
   (seasonList || []).forEach((season) => params.append('season_list', season));
+  (achievementKeys || []).forEach((key) => params.append('achievement_keys', key));
   const text = params.toString();
   return text ? `?${text}` : '';
 };
 
-const describe = ({ userIds, seasonList }) => {
+const describe = ({ userIds, seasonList, achievementKeys }) => {
   const who = userIds ? `${userIds.length} ${userIds.length === 1 ? 'jugador' : 'jugadores'}` : 'todos los jugadores';
   const when = seasonList ? `la${seasonList.length === 1 ? '' : 's'} temporada${seasonList.length === 1 ? '' : 's'} ${seasonList.join(', ')}` : 'todas las temporadas';
-  return `${who}, ${when}`;
+  const which = achievementKeys ? `${achievementKeys.length} ${achievementKeys.length === 1 ? 'logro' : 'logros'}` : 'todos los logros activos';
+  return `${who}, ${when}, ${which}`;
 };
 
 /** Entry point. onDone() runs when the recalculation has been launched. */
@@ -49,9 +52,10 @@ export function recalculateAchievementsFlow({ onDone } = {}) {
   const m = openModal(html`
     ${modalHeader('Recalcular logros')}
     <form class="adm-form" novalidate>
-      <p class="adm-sub">Vuelve a calcular los logros a partir de las sesiones y la biblioteca, también los de los jugadores que ya no están activos. Elige a quién y qué temporadas; antes de aplicar nada verás qué cambiaría. <strong>No se avisa a nadie</strong>: ni por Telegram ni por la app.</p>
+      <p class="adm-sub">Vuelve a calcular los logros a partir de las sesiones y la biblioteca, también los de los jugadores que ya no están activos. Elige a quién, qué temporadas y qué logros (los inactivos no se tocan); antes de aplicar nada verás qué cambiaría. <strong>No se avisa a nadie</strong>: ni por Telegram ni por la app.</p>
       ${choices('Jugadores', 'user', store.users.map((u) => [u.id, u.username]))}
       ${choices('Temporadas', 'season', seasonYears().map((year) => [year, year]))}
+      ${choices('Logros', 'achievement', store.achievements.filter((a) => a.active).map((a) => [a.key, a.title]))}
       <div class="adm-error" role="alert"></div>
       <div class="adm-actions"><button type="button" class="adm-btn" data-close>Cancelar</button><button class="adm-btn primary" type="submit">Ver vista previa</button></div>
     </form>`);
@@ -64,9 +68,9 @@ export function recalculateAchievementsFlow({ onDone } = {}) {
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const error = form.querySelector('.adm-error');
-    const selection = { userIds: chosen(form, 'user'), seasonList: chosen(form, 'season') };
-    if (selection.userIds?.length === 0 || selection.seasonList?.length === 0) {
-      error.textContent = 'Elige al menos un jugador y una temporada';
+    const selection = { userIds: chosen(form, 'user'), seasonList: chosen(form, 'season'), achievementKeys: chosen(form, 'achievement', String) };
+    if (selection.userIds?.length === 0 || selection.seasonList?.length === 0 || selection.achievementKeys?.length === 0) {
+      error.textContent = 'Elige al menos un jugador, una temporada y un logro';
       return;
     }
     error.textContent = '';
@@ -141,7 +145,7 @@ function confirmStep(selection, total, onDone) {
     go.disabled = true;
     try {
       await api('/manage/recalculate-achievements', jsonRequest('POST', {
-        user_ids: selection.userIds, season_list: selection.seasonList, confirm: PHRASE,
+        user_ids: selection.userIds, season_list: selection.seasonList, achievement_keys: selection.achievementKeys, confirm: PHRASE,
       }));
       m.close();
       toast('Recálculo en marcha');

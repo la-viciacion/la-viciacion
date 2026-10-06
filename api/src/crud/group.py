@@ -47,8 +47,10 @@ def achievements_catalog(db: Session, viewer_id: int) -> list[dict]:
     catalog = []
     for row in db.query(
         models.Achievement.id, models.Achievement.key, models.Achievement.title, models.Achievement.message,
-        models.Achievement.image.isnot(None).label("has_image"),
+        models.Achievement.image.isnot(None).label("has_image"), models.Achievement.active,
     ).order_by(models.Achievement.id):
+        if not row.active and row.id not in mine:
+            continue  # switched off: it does not exist yet, not even as a hidden one
         if row.id not in mine:
             catalog.append({"id": row.id, "hidden": True, "unlocked_by_me": False})
             continue

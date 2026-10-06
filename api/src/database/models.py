@@ -157,6 +157,8 @@ class Achievement(Base):
     title = Column(String(255))
     message = Column(String(255))
     image = Column(LargeBinary)
+    # an achievement that is switched off is not earned, announced, recalculated or shown (see crud/achievements.py)
+    active = Column(Boolean, nullable=False, server_default=text("1"))
     __table_args__ = (UniqueConstraint("key"),)
 
 

@@ -102,10 +102,14 @@ async def _expected(db: Session, user: models.User, season: int) -> dict[str, Aw
     return {award.key: award for award in collected}
 
 
-def _diff(user: models.User, season: int, expected: dict[str, Award], stored: list, titles: dict[str, str]) -> list[Change]:
+def _diff(user: models.User, season: int, expected: dict[str, Award], stored: list, titles: dict[str, str], allowed: set[str]) -> list[Change]:
+    """What to change to bring `stored` to `expected`, only for the achievements in `allowed` (the ones chosen
+    that are switched on): the rest is left exactly as it is."""
+    expected = {key: award for key, award in expected.items() if key in allowed}
     by_key: dict[str, list] = {}
     for row in stored:
-        by_key.setdefault(row.key, []).append(row)
+        if row.key in allowed:
+            by_key.setdefault(row.key, []).append(row)
     changes = []
 
     def change(action, key, row=None, award=None, rows=()):
@@ -129,11 +133,18 @@ def _diff(user: models.User, season: int, expected: dict[str, Award], stored: li
     return changes
 
 
-async def _plan(db: Session, user_ids: list[int] | None = None, only_seasons: set[int] | None = None) -> list[Change]:
+async def _plan(
+    db: Session,
+    user_ids: list[int] | None = None,
+    only_seasons: set[int] | None = None,
+    achievement_keys: list[str] | None = None,
+) -> list[Change]:
     query = db.query(models.User).filter(models.not_god())
     if user_ids is not None:
         query = query.filter(models.User.id.in_(user_ids))
     titles = {key: title for key, title in db.query(models.Achievement.key, models.Achievement.title).all()}
+    switched_on = {key for (key,) in db.query(models.Achievement.key).filter(models.Achievement.active == True)}  # noqa: E712
+    allowed = switched_on if achievement_keys is None else switched_on & set(achievement_keys)
     teamwork: dict[int, dict[int, datetime.date]] = {}  # season -> user -> day
     together: dict[int, dict[int, tuple[datetime.date, str]]] = {}  # season -> user -> (day, game)
     changes: list[Change] = []
@@ -156,13 +167,19 @@ async def _plan(db: Session, user_ids: list[int] | None = None, only_seasons: se
                 .order_by(models.UserAchievement.id)
                 .all()
             )
-            changes.extend(_diff(user, season, expected, stored, titles))
+            changes.extend(_diff(user, season, expected, stored, titles, allowed))
     return changes
 
 
-def plan(db: Session, user_ids: list[int] | None = None, season_list: list[int] | None = None) -> list[Change]:
-    """What a recalculation would change, for every player and season or only the ones given. It changes nothing."""
-    return asyncio.run(_plan(db, user_ids, None if season_list is None else set(season_list)))
+def plan(
+    db: Session,
+    user_ids: list[int] | None = None,
+    season_list: list[int] | None = None,
+    achievement_keys: list[str] | None = None,
+) -> list[Change]:
+    """What a recalculation would change, for every player, season and achievement that is switched on or
+    only the ones given. It changes nothing."""
+    return asyncio.run(_plan(db, user_ids, None if season_list is None else set(season_list), achievement_keys))
 
 
 async def recalculate_user(db: Session, user_id: int, season_list: list[int]) -> list[Change]:
@@ -174,8 +191,13 @@ async def recalculate_user(db: Session, user_id: int, season_list: list[int]) ->
     return changes
 
 
-def preview(db: Session, user_ids: list[int] | None = None, season_list: list[int] | None = None) -> dict:
-    changes = plan(db, user_ids, season_list)
+def preview(
+    db: Session,
+    user_ids: list[int] | None = None,
+    season_list: list[int] | None = None,
+    achievement_keys: list[str] | None = None,
+) -> dict:
+    changes = plan(db, user_ids, season_list, achievement_keys)
     counts = {action: sum(1 for change in changes if change.action == action) for action in ("add", "date", "revoke")}
     return {"counts": counts, "changes": [change.as_dict() for change in changes]}
 
@@ -201,7 +223,9 @@ def apply(db: Session, changes: list[Change]) -> None:
         raise
 
 
-def recalculate(user_ids: list[int] | None = None, season_list: list[int] | None = None) -> None:
+def recalculate(
+    user_ids: list[int] | None = None, season_list: list[int] | None = None, achievement_keys: list[str] | None = None
+) -> None:
     """Background-task entrypoint of the admin panel: work everything out again and apply it, in silence.
 
     Under the lock of the other checks, with its own DB session, like the rest of the follow-ups."""
@@ -210,7 +234,7 @@ def recalculate(user_ids: list[int] | None = None, season_list: list[int] | None
     with actions._check_lock:
         try:
             with SessionLocal() as db:
-                changes = plan(db, user_ids, season_list)
+                changes = plan(db, user_ids, season_list, achievement_keys)
                 apply(db, changes)
             logger.info(f"Achievements recalculated: {len(changes)} changes")
         except Exception as e:

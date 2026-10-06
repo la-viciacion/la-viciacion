@@ -136,11 +136,12 @@ def check_achievements(body: CheckAchievementsBody, background_tasks: Background
 def preview_recalculate_achievements(
     user_ids: Optional[list[int]] = Query(None),
     season_list: Optional[list[int]] = Query(None),
+    achievement_keys: Optional[list[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
-    """What recalculating the achievements would change (add, correct, revoke), for all the players and
-    seasons or only the ones given. It changes nothing."""
-    return achievements_recalc.preview(db, user_ids, season_list)
+    """What recalculating the achievements would change (add, correct, revoke), for all the players, seasons
+    and achievements that are switched on or only the ones given. It changes nothing."""
+    return achievements_recalc.preview(db, user_ids, season_list, achievement_keys)
 
 
 RECALCULATE_ACHIEVEMENTS_PHRASE = "RECALCULAR"
@@ -149,16 +150,17 @@ RECALCULATE_ACHIEVEMENTS_PHRASE = "RECALCULAR"
 class RecalculateAchievementsBody(BaseModel):
     user_ids: Optional[list[int]] = Field(None, min_length=1)  # none: every player
     season_list: Optional[list[int]] = Field(None, min_length=1)  # none: every season
+    achievement_keys: Optional[list[str]] = Field(None, min_length=1)  # none: every achievement that is switched on
     confirm: str  # must equal RECALCULATE_ACHIEVEMENTS_PHRASE (the panel shows the preview first and asks for it)
 
 
 @router.post("/recalculate-achievements", status_code=202)
 def recalculate_achievements(body: RecalculateAchievementsBody, background_tasks: BackgroundTasks):
-    """Work out again the achievements of every player and season, or only the ones given, and bring what is
-    stored to it (in background). It never notifies anybody. It rewrites dates and revokes, so it has to be confirmed explicitly."""
+    """Work out again the achievements of every player, season and achievement that is switched on, or only the
+    ones given, and bring what is stored to it (in background). It never notifies anybody. It rewrites dates and revokes, so it has to be confirmed explicitly."""
     if body.confirm != RECALCULATE_ACHIEVEMENTS_PHRASE:
         raise HTTPException(status_code=400, detail="Confirmación incorrecta")
-    background_tasks.add_task(achievements_recalc.recalculate, body.user_ids, body.season_list)
+    background_tasks.add_task(achievements_recalc.recalculate, body.user_ids, body.season_list, body.achievement_keys)
     return {"message": "Recálculo en marcha"}
 
 
@@ -1050,6 +1052,7 @@ def list_achievements(db: Session = Depends(get_db)):
         models.Achievement.title,
         models.Achievement.message,
         (models.Achievement.image.isnot(None)).label("has_image"),
+        models.Achievement.active,
     ).order_by(models.Achievement.id)
     return [
         {
@@ -1058,6 +1061,7 @@ def list_achievements(db: Session = Depends(get_db)):
             "title": r.title,
             "message": r.message,
             "has_image": bool(r.has_image),
+            "active": bool(r.active),
             "awarded": awarded.get(r.id, 0),
         }
         for r in rows
@@ -1067,15 +1071,18 @@ def list_achievements(db: Session = Depends(get_db)):
 class AchievementPatch(BaseModel):
     title: Optional[str] = None
     message: Optional[str] = None
+    active: Optional[bool] = None  # switched off: not earned, announced, recalculated or shown
 
 
 @router.patch("/achievements/{achievement_id}")
 def patch_achievement(achievement_id: int, body: AchievementPatch, db: Session = Depends(get_db)):
     ach = _get_or_404(db, models.Achievement, achievement_id, "Logro")
     for k, v in body.model_dump(exclude_unset=True).items():
+        if k == "active" and v is None:
+            continue  # it cannot be empty
         setattr(ach, k, v)
     db.commit()
-    return {"id": ach.id, "key": ach.key, "title": ach.title, "message": ach.message}
+    return {"id": ach.id, "key": ach.key, "title": ach.title, "message": ach.message, "active": bool(ach.active)}
 
 
 # ── Awarded achievements (what each player has unlocked) ────────

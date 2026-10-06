@@ -415,6 +415,61 @@ class AchievementCheckTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("P2, P3 y P4", self.message())
         self.assertIn("Doom", self.message())
 
+    def switch_off(self, *keys):
+        self.db.query(models.Achievement).filter(models.Achievement.key.in_(keys)).update({"active": False}, synchronize_session=False)
+        self.db.commit()
+
+    async def test_a_switched_off_achievement_is_not_earned_nor_announced_and_the_rest_still_are(self):
+        self.switch_off("PLAYED_7_DAYS", "STREAK_7_DAYS", "TEAMWORK")
+        await self.ach.user_played_total_days(self.db, USER, self.days(15))
+        await self.ach.user_streak(self.db, USER, self.days(15))
+        self.assertEqual(set(self.awarded()), {"PLAYED_15_DAYS", "STREAK_15_DAYS"})
+        self.assertEqual(self.sent.await_count, 2)
+
+    async def test_switching_it_on_makes_it_earnable_again(self):
+        self.switch_off("PLAYED_7_DAYS")
+        await self.ach.user_played_total_days(self.db, USER, self.days(7))
+        self.assertEqual(self.awarded(), {})
+        self.db.query(models.Achievement).filter_by(key="PLAYED_7_DAYS").update({"active": True})
+        self.db.commit()
+        await self.ach.user_played_total_days(self.db, USER, self.days(7))
+        self.assertEqual(set(self.awarded()), {"PLAYED_7_DAYS"})
+
+    async def test_what_a_switched_off_achievement_already_has_is_kept(self):
+        await self.ach.user_played_total_days(self.db, USER, self.days(7))
+        self.switch_off("PLAYED_7_DAYS")
+        self.assertEqual(set(self.awarded()), {"PLAYED_7_DAYS"})
+
+    async def test_teamwork_and_the_games_at_once_ignore_it_when_it_is_off(self):
+        self.switch_off("ALL_TOGETHER")
+        for i in (2, 3, 4):
+            self.db.add(models.User(id=i, name=f"P{i}", username=f"p{i}", is_active=1))
+            self.db.add(models.GameTimer(user_id=i, game_id="g1", start_time=datetime.datetime(YEAR, 3, 1, 10), is_active=True))
+        self.db.commit()
+        await self.ach.all_together(self.db, "g1")
+        self.assertEqual(self.awarded(), {})
+        self.sent.assert_not_awaited()
+
+    async def test_a_check_that_only_works_out_what_is_deserved_skips_it_too(self):
+        self.switch_off("PLAYED_7_DAYS")
+        collected = []
+        checks = Achievements(season=YEAR, collected=collected)
+        await checks.user_played_total_days(self.db, USER, self.days(7))
+        self.assertEqual(collected, [])
+
+    async def test_the_new_achievements_of_an_installation_that_has_some_start_switched_off(self):
+        from tests.sqlite_db import make_session as fresh
+
+        db = fresh()
+        Achievements().populate_achievements(db)  # nothing there yet: everything is on
+        self.assertEqual(db.query(models.Achievement).filter(models.Achievement.active == False).count(), 0)  # noqa: E712
+        db.query(models.Achievement).filter_by(key="PLAYED_7_DAYS").delete()
+        db.commit()
+        Achievements().populate_achievements(db)  # one is added to an installation that has the rest
+        got = {a.key: a.active for a in db.query(models.Achievement)}
+        self.assertFalse(got["PLAYED_7_DAYS"])
+        self.assertTrue(got["PLAYED_15_DAYS"])
+
     async def test_silent_checks_award_but_pass_silent_on(self):
         await self.ach.user_played_total_days(self.db, USER, self.days(7), silent=True)
         self.assertEqual(self.sent.await_args.args[1], True)

@@ -496,6 +496,14 @@ class AchievementsAdminTests(ManageTestCase):
         self.assertEqual((by_id[first]["awarded"], by_id[second]["awarded"]), (2, 0))
         self.assertFalse(by_id[first]["has_image"])
 
+    def test_an_achievement_can_be_switched_off_and_on(self):
+        first = self.ids()[0]
+        self.assertTrue(next(a for a in self.admin("GET", "/achievements").json() if a["id"] == first)["active"])
+        self.assertFalse(self.admin("PATCH", f"/achievements/{first}", json={"active": False}).json()["active"])
+        self.assertFalse(next(a for a in self.admin("GET", "/achievements").json() if a["id"] == first)["active"])
+        self.assertTrue(self.admin("PATCH", f"/achievements/{first}", json={"active": True}).json()["active"])
+        self.assertTrue(self.admin("PATCH", f"/achievements/{first}", json={"active": None, "title": "T"}).json()["active"])  # it cannot be emptied
+
     def test_titles_and_messages_can_be_edited(self):
         first = self.ids()[0]
         done = self.admin("PATCH", f"/achievements/{first}", json={"title": "New title"}).json()

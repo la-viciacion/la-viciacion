@@ -99,12 +99,17 @@ class OverviewTests(OpsTestCase):
             for body in ({"confirm": "RECALCULAR", "user_ids": []}, {"confirm": "RECALCULAR", "season_list": []}):
                 self.assertEqual(self.admin("POST", "/recalculate-achievements", json=body).status_code, 422)  # none is not everybody
             run.assert_not_called()
-            response = self.admin("POST", "/recalculate-achievements", json={"confirm": "RECALCULAR", "user_ids": [self.ana], "season_list": [2025]})
+            self.assertEqual(
+                self.admin("POST", "/recalculate-achievements", json={"confirm": "RECALCULAR", "achievement_keys": []}).status_code, 422
+            )
+            response = self.admin("POST", "/recalculate-achievements", json={
+                "confirm": "RECALCULAR", "user_ids": [self.ana], "season_list": [2025], "achievement_keys": ["STREAK_7_DAYS"],
+            })
             self.assertEqual(response.status_code, 202)
-            run.assert_called_once_with([self.ana], [2025])
+            run.assert_called_once_with([self.ana], [2025], ["STREAK_7_DAYS"])
             run.reset_mock()
             self.admin("POST", "/recalculate-achievements", json={"confirm": "RECALCULAR"})
-            run.assert_called_once_with(None, None)
+            run.assert_called_once_with(None, None, None)
 
     def test_the_preview_lists_the_changes_and_makes_none(self):
         for day in range(1, 8):
@@ -124,6 +129,15 @@ class OverviewTests(OpsTestCase):
         self.assertEqual(self.admin("GET", "/recalculate-achievements/preview", params=params(users=[self.ana + 999])).json()["counts"]["add"], 0)
         self.assertEqual(self.admin("GET", "/recalculate-achievements/preview", params=params(seasons=[seasons.current() - 1])).json()["counts"]["add"], 2)
         self.assertEqual(self.admin("GET", "/recalculate-achievements/preview", params=params(seasons=[seasons.current()])).json()["counts"]["add"], 0)
+        only = self.admin("GET", "/recalculate-achievements/preview", params={"achievement_keys": ["STREAK_7_DAYS"]}).json()
+        self.assertEqual({c["key"] for c in only["changes"]}, {"STREAK_7_DAYS"})
+
+    def test_a_switched_off_achievement_is_not_in_the_preview(self):
+        for day in range(1, 8):
+            self.session(self.ana, "celeste", datetime.datetime(seasons.current() - 1, 3, day, 10), 60)
+        self.admin("PATCH", f"/achievements/{self.scalar('SELECT id FROM achievements WHERE `key` = :k', k='STREAK_7_DAYS')}", json={"active": False})
+        body = self.admin("GET", "/recalculate-achievements/preview").json()
+        self.assertEqual({c["key"] for c in body["changes"]}, {"PLAYED_7_DAYS"})
 
 
 class RawgSyncTests(OpsTestCase):

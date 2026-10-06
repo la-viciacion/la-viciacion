@@ -61,7 +61,7 @@ export async function render({ main, user }) {
   try {
     await loadPlatforms();
     const [users, achievements] = await Promise.all([api('/manage/users?limit=200'), api('/manage/achievements')]);
-    store.achievements = (achievements || []).map((a) => ({ id: a.id, title: a.title }));
+    store.achievements = (achievements || []).map((a) => ({ id: a.id, key: a.key, title: a.title, active: a.active }));
     store.users = (users?.items || []).map((u) => ({ id: u.id, username: u.username, name: u.name, telegram_id: u.telegram_id }));
   } catch (err) {
     mount(root, errorState(err.message));
