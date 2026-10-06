@@ -25,11 +25,39 @@ const chosen = (form, name, parse = Number) => {
   return ticked.length === boxes.length ? null : ticked;
 };
 
-const choices = (title, name, options) => html`
-  <fieldset class="adm-choices">
-    <legend>${title} <button type="button" class="adm-link" data-all="${name}">todos</button> · <button type="button" class="adm-link" data-none="${name}">ninguno</button></legend>
-    ${options.map(([value, label]) => html`<label class="adm-check"><input type="checkbox" name="${name}" value="${value}" checked /> ${label}</label>`)}
-  </fieldset>`;
+/** A block of options to tick (all ticked to begin with): its title and how many are ticked, a button for all or
+ *  none, and a grid of equal columns; a long list (`long`) scrolls inside its own block. */
+const choices = (title, name, options, { long = false } = {}) => html`
+  <section class="adm-pick" data-pick="${name}">
+    <div class="adm-pick-head">
+      <strong>${title}</strong>
+      <span class="adm-pick-count" data-count="${name}">${options.length} de ${options.length}</span>
+      <span class="adm-pick-tools">
+        <button type="button" class="adm-btn sm" data-all="${name}">Todos</button>
+        <button type="button" class="adm-btn sm" data-none="${name}">Ninguno</button>
+      </span>
+    </div>
+    <div class="adm-pick-grid${long ? ' long' : ''}">
+      ${options.map(([value, label]) => html`<label class="adm-pick-item" title="${label}"><input type="checkbox" name="${name}" value="${value}" checked /><span>${label}</span></label>`)}
+    </div>
+  </section>`;
+
+const GROUPS = [['user', 'jugador', 'jugadores'], ['season', 'temporada', 'temporadas'], ['achievement', 'logro', 'logros']];
+
+/** Shows how many are ticked in each block and in the summary, and does not let go on with a block empty. */
+function refreshPicks(form) {
+  const parts = [];
+  let empty = false;
+  for (const [name, one, many] of GROUPS) {
+    const boxes = [...form.querySelectorAll(`input[name=${name}]`)];
+    const ticked = boxes.filter((box) => box.checked).length;
+    form.querySelector(`[data-count=${name}]`).textContent = `${ticked} de ${boxes.length}`;
+    parts.push(`${ticked} ${ticked === 1 ? one : many}`);
+    if (!ticked) empty = true;
+  }
+  form.querySelector('.adm-pick-summary').textContent = empty ? 'Elige al menos uno de cada' : `Se recalcularán ${parts.join(' · ')}`;
+  form.querySelector('button[type=submit]').disabled = empty;
+}
 
 const query = ({ userIds, seasonList, achievementKeys }) => {
   const params = new URLSearchParams();
@@ -52,27 +80,29 @@ export function recalculateAchievementsFlow({ onDone } = {}) {
   const m = openModal(html`
     ${modalHeader('Recalcular logros')}
     <form class="adm-form" novalidate>
-      <p class="adm-sub">Vuelve a calcular los logros a partir de las sesiones y la biblioteca, también los de los jugadores que ya no están activos. Elige a quién, qué temporadas y qué logros (los inactivos no se tocan); antes de aplicar nada verás qué cambiaría. <strong>No se avisa a nadie</strong>: ni por Telegram ni por la app.</p>
+      <p class="adm-sub">Vuelve a calcular los logros a partir de las sesiones y la biblioteca, también los de los jugadores que ya no están activos. Los logros inactivos no se tocan. Antes de aplicar nada verás qué cambiaría. <strong>No se avisa a nadie</strong>, ni por Telegram ni por la app.</p>
       ${choices('Jugadores', 'user', store.users.map((u) => [u.id, u.username]))}
       ${choices('Temporadas', 'season', seasonYears().map((year) => [year, year]))}
-      ${choices('Logros', 'achievement', store.achievements.filter((a) => a.active).map((a) => [a.key, a.title]))}
+      ${choices('Logros', 'achievement', store.achievements.filter((a) => a.active).map((a) => [a.key, a.title]), { long: true })}
+      <div class="adm-pick-summary" role="status"></div>
       <div class="adm-error" role="alert"></div>
       <div class="adm-actions"><button type="button" class="adm-btn" data-close>Cancelar</button><button class="adm-btn primary" type="submit">Ver vista previa</button></div>
-    </form>`);
+    </form>`, { wide: true });
   const form = m.el.querySelector('form');
   form.addEventListener('click', (e) => {
     const { all, none } = e.target.dataset;
     const name = all || none;
-    if (name) form.querySelectorAll(`input[name=${name}]`).forEach((box) => { box.checked = Boolean(all); });
+    if (!name) return;
+    form.querySelectorAll(`input[name=${name}]`).forEach((box) => { box.checked = Boolean(all); });
+    refreshPicks(form);
   });
+  form.addEventListener('change', () => refreshPicks(form));
+  refreshPicks(form);
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const error = form.querySelector('.adm-error');
     const selection = { userIds: chosen(form, 'user'), seasonList: chosen(form, 'season'), achievementKeys: chosen(form, 'achievement', String) };
-    if (selection.userIds?.length === 0 || selection.seasonList?.length === 0 || selection.achievementKeys?.length === 0) {
-      error.textContent = 'Elige al menos un jugador, una temporada y un logro';
-      return;
-    }
+    if (selection.userIds?.length === 0 || selection.seasonList?.length === 0 || selection.achievementKeys?.length === 0) return;
     error.textContent = '';
     const submit = form.querySelector('button[type=submit]');
     submit.disabled = true;
