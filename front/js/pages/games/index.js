@@ -137,12 +137,12 @@ export async function render(ctx) {
     </div>
     <div class="gc-toolbar">
       <select class="adm-input" id="gcSort" aria-label="Ordenar por">${SORTS.map(([value, label]) => html`<option value="${value}">${label}</option>`)}</select>
-      <select class="adm-input" id="gcGenre" aria-label="Género"><option value="">Todos los géneros</option></select>
-      <select class="adm-input" id="gcLibrary" aria-label="Tu biblioteca">
+      <select class="adm-input" id="gcGenre" aria-label="Género" hidden><option value="">Todos los géneros</option></select>
+      <select class="adm-input" id="gcLibrary" aria-label="Tu biblioteca" hidden>
         <option value="">Toda la base de datos</option><option value="have">Los que tengo</option><option value="not">Los que no tengo</option>
       </select>
     </div>
-    <div class="gc-toggles" id="gcToggles" role="group" aria-label="Filtros">
+    <div class="gc-toggles" id="gcToggles" role="group" aria-label="Filtros" hidden>
       ${TOGGLES.map(([key, label]) => html`<button type="button" class="gc-toggle" data-toggle="${key}" aria-pressed="false">${label}</button>`)}
     </div>
     <div class="pf-sub gc-count" id="gcCount" role="status"></div>
