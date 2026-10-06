@@ -97,6 +97,10 @@
 }
 
 .adm-input:focus { outline: none; border-color: var(--accent-teal); }
+/* nobody uses the spin arrows of the number fields: they are typed */
+.adm-input[type="number"] { appearance: textfield; -moz-appearance: textfield; }
+.adm-input[type="number"]::-webkit-inner-spin-button,
+.adm-input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 
 .adm-btn {
   background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border);
