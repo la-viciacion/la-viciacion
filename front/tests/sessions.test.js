@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { fromInputValue, toInputValue } from '../js/lib/format.js';
-import { current, isCurrent } from '../js/lib/seasons.js';
-import { sessionProblem } from '../js/pages/home/sessions.js';
+import { available, current, isCurrent } from '../js/lib/seasons.js';
+import { confirmQuestion, sessionProblem } from '../js/pages/home/sessions.js';
 
 const NOW = new Date(2026, 8, 29, 20, 0); // Tue 29 Sep 2026 20:00 local
 
@@ -13,6 +13,11 @@ test('datetime-local helpers round trip', () => {
   assert.equal(fromInputValue('2026-09-29T13:05:30'), '2026-09-29T13:05:30');
 });
 
+test('the seasons of the achievements page go from the first one to the running one, newest first', () => {
+  assert.deepEqual(available(NOW), [2026, 2025, 2024, 2023]);
+  assert.deepEqual(available(new Date(2023, 5, 1)), [2023]);
+});
+
 test('seasons', () => {
   assert.equal(current(NOW), 2026);
   assert.equal(isCurrent(new Date(2026, 0, 1), NOW), true);
@@ -21,6 +26,11 @@ test('seasons', () => {
 
 test('a valid session has no problem', () => {
   assert.equal(sessionProblem('2026-09-29T10:00', '2026-09-29T11:30', NOW), null);
+});
+
+test('a new session asks how much time it adds', () => {
+  assert.equal(confirmQuestion('Doom', '2026-09-29T10:00', '2026-09-29T11:30'), 'Vas a añadir 1 h 30 min a «Doom». ¿Es correcto?');
+  assert.equal(confirmQuestion('Doom', '2026-09-29T10:00', '2026-09-29T10:45'), 'Vas a añadir 45 min a «Doom». ¿Es correcto?');
 });
 
 test('sessionProblem explains what is wrong', () => {

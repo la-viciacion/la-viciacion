@@ -19,11 +19,14 @@ router = APIRouter(
 
 @router.get("/achievements")
 def get_achievements(
+    season: int | None = Query(None, ge=2000, description="The season of the season achievements (default: the running one)"),
     current_user: models.User = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db),
 ):
     """Every achievement with who of the group has unlocked it (derived, nothing stored)"""
-    return group.achievements_catalog(db, current_user.id)
+    if season is not None and season > seasons.current():
+        raise HTTPException(status_code=400, detail="Esa temporada todavía no existe")
+    return group.achievements_catalog(db, current_user.id, season=season)
 
 
 @router.get("/players")

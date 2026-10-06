@@ -270,6 +270,7 @@
 }
 .sess-input:focus { outline: none; border-color: var(--accent-teal); }
 .sess-hint { font-size: 0.78rem; color: var(--text-muted); }
+.sess-confirm { padding: 10px 12px; border: 1px solid var(--accent-teal); border-radius: var(--radius-sm); font-size: 0.9rem; font-weight: 600; }
 .sess-error { min-height: 1.2em; font-size: 0.85rem; color: var(--accent-pink); }
 .sess-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .sess-spacer { flex: 1; }

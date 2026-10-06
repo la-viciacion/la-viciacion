@@ -39,6 +39,11 @@ export function sessionProblem(start, end, now = new Date()) {
   return null;
 }
 
+/** The question before adding a manual session: how much time goes into the game. */
+export function confirmQuestion(gameName, start, end) {
+  return `Vas a añadir ${formatDuration((new Date(end) - new Date(start)) / 1000)} a «${gameName}». ¿Es correcto?`;
+}
+
 const platformOptions = (selected) => platformList().map((p) => html`<option value="${p.id}" ${p.id === selected ? html`selected` : ''}>${p.name}</option>`);
 
 /**
@@ -65,6 +70,7 @@ export async function openSessionForm({ game, session = null }) {
       <label>Inicio <input class="sess-input" type="datetime-local" name="start" step="60" max="${now}" value="${session ? toInputValue(session.start_time) : ''}" required /></label>
       <label>Fin <input class="sess-input" type="datetime-local" name="end" step="60" max="${now}" value="${session ? toInputValue(session.end_time) : ''}" required /></label>
       <div class="sess-hint">Solo sesiones de esta temporada (${seasons.current()}), de menos de 24 horas y que no se solapen con otras tuyas.</div>
+      <div class="sess-confirm" role="status" hidden></div>
       <div class="sess-error" role="alert"></div>
       <div class="sess-actions">
         ${session ? html`<button type="button" class="sess-btn danger" data-delete>Eliminar sesión</button>` : ''}
@@ -78,12 +84,25 @@ export async function openSessionForm({ game, session = null }) {
   const error = form.querySelector('.sess-error');
   const fail = (message) => { error.textContent = message; };
 
+  // A new session asks first how much time it adds; changing any field asks again.
+  const confirm = form.querySelector('.sess-confirm');
+  const submit = form.querySelector('[type=submit]');
+  let confirmed = false;
+  const ask = (question) => {
+    confirmed = question !== null;
+    confirm.hidden = !confirmed;
+    confirm.textContent = question || '';
+    submit.textContent = confirmed ? 'Sí, añadir' : 'Añadir';
+  };
+  if (!session) form.addEventListener('input', () => ask(null));
+
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     fail('');
     if (!form.platform.value) return fail('Elige la plataforma');
     const problem = sessionProblem(form.start.value, form.end.value);
     if (problem) return fail(problem);
+    if (!session && !confirmed) return ask(confirmQuestion(game.name, form.start.value, form.end.value));
     const body = {
       platform: form.platform.value,
       start_time: fromInputValue(form.start.value),

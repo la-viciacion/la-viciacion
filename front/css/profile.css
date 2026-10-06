@@ -200,6 +200,11 @@
 
 /* Achievements page */
 .ach-count { margin: 0 0 12px; }
+.ach-block { margin-bottom: 28px; }
+.ach-note { margin: 0 0 12px; }
+.ach-progress { display: flex; flex-direction: column; gap: 4px; }
+.ach-bar { height: 8px; border-radius: 999px; background: var(--bg-card-hover); overflow: hidden; }
+.ach-bar-fill { height: 100%; border-radius: inherit; background: var(--gradient-brand); }
 .ach-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
 .ach-card { display: flex; flex-direction: column; gap: 10px; padding: 12px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); }
 .ach-card.mine { border-color: var(--border-accent); background: var(--gradient-card); }
