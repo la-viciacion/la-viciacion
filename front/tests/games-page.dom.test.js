@@ -9,7 +9,7 @@ const page = await import('../js/pages/games/index.js');
 
 const GAME = (id, name, extra = {}) => ({
   id, name, image_url: null, genres: ['Indie', 'Platformer', 'Extra'], release_date: null, players: 2, played_seconds: 7200,
-  completed_by: 0, score_count: 2, score_mean: 80, have: false, my_score: null, my_completed: false, playing_now: false, last_activity: null, ...extra,
+  completed_by: 0, score_count: 2, score_mean: 80, have: false, my_score: null, my_completed: false, playing_now: false, last_activity: null, last_played: null, ...extra,
 });
 
 let calls;
@@ -25,7 +25,7 @@ beforeEach(async () => {
     'GET /games/catalog?limit=24&offset=0&sort=name': { total: 1, items: [GAME('hades', 'Hades')], genres: ['Indie', 'Platformer'] },
     'GET /games/catalog?limit=24&offset=0&sort=activity&q=hades': { total: 1, items: [GAME('hades', 'Hades')], genres: ['Indie'] },
     'GET /games/catalog?limit=24&offset=0&sort=activity&genre=Indie&library=have&playing=true': { total: 0, items: [], genres: [] },
-    'GET /games/catalog?limit=24&offset=0&sort=activity': { total: 30, items: [GAME('celeste', 'Celeste <b>', { have: true, playing_now: true, wished: true }), GAME('hades', 'Hades', { players: 1, score_mean: null })], genres: ['Indie', 'Platformer'] },
+    'GET /games/catalog?limit=24&offset=0&sort=activity': { total: 30, items: [GAME('celeste', 'Celeste <b>', { have: true, playing_now: true, wished: true, last_played: new Date().toISOString() }), GAME('hades', 'Hades', { players: 1, score_mean: null })], genres: ['Indie', 'Platformer'] },
   });
   await page.render({ main: main() });
   await settle();
@@ -44,6 +44,8 @@ test('it lists the games as cards linking to their page, with names as text and 
   assert.equal(document.querySelector('.gc-card').getAttribute('href'), '#/game/celeste');
   assert.equal(text('#gcCount')[0], '30 juegos');
   assert.equal(document.querySelectorAll('.gc-card .score-badge').length, 1); // Hades has no ratings
+  assert.match(text('.gc-meta')[0], /· Hoy/); // the last session, relative
+  assert.doesNotMatch(text('.gc-meta')[1], /Hoy|Ayer/); // Hades has none: nothing to say
   assert.deepEqual(text('.gc-card .pf-tag').slice(0, 5), ['Jugándose', 'En tu biblioteca', 'En tu lista', 'Indie', 'Platformer']); // two genres at most
 });
 

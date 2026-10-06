@@ -110,6 +110,7 @@ def catalog(
             "my_completed": mine_done,
             "playing_now": game.id in live,
             "last_activity": last,
+            "last_played": last_session,
         })
 
     name = lambda r: (r["name"] or "").lower()  # noqa: E731
