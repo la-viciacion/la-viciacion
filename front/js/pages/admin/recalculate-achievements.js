@@ -12,6 +12,13 @@ import { seasonYears, statTile, store } from './components.js';
 
 const PHRASE = 'RECALCULAR';
 
+/** The game of a change by name; when it changes from one game to another, both. */
+const gameOf = (c) => {
+  const before = c.game_before_name;
+  const after = c.game_after_name;
+  return before && after && before !== after ? `${before} → ${after}` : after || before || '';
+};
+
 const SECTIONS = [
   ['add', 'Se concederán', (c) => formatDate(c.date_after)],
   ['date', 'Cambiarán de fecha o de juego', (c) => `${formatDate(c.date_before)} → ${formatDate(c.date_after)}`],
@@ -135,7 +142,7 @@ function previewStep(selection, { counts, changes }, onDone) {
         ${SECTIONS.map(([action, title, when]) => {
     const rows = changes.filter((c) => c.action === action);
     return rows.length ? html`<details class="adm-details"><summary>${title} (${rows.length})</summary>
-          ${rows.map((c) => html`<div class="adm-sub"><strong>${c.user}</strong> · ${c.season} · ${c.title} · ${when(c)}${c.game_after || c.game_before ? html` · ${c.game_after || c.game_before}` : ''}</div>`)}
+          ${rows.map((c) => html`<div class="adm-sub"><strong>${c.user}</strong> · ${c.season} · ${c.title} · ${when(c)}${gameOf(c) ? html` · <em>${gameOf(c)}</em>` : ''}</div>`)}
         </details>` : '';
   })}`
     : html`<div class="adm-ok">Todo en orden: no hay nada que cambiar.</div>`}

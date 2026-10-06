@@ -196,6 +196,14 @@ class RecalculationTests(unittest.TestCase):
         )
         self.assertEqual(self.changes(achievement_keys=[]), {})
 
+    def test_the_preview_names_the_games_instead_of_giving_their_ids(self):
+        self.db.add(models.UserGame(user_id=1, game_id="g1", started_date=D(PAST, 3, 1), platform=None, completed=1, completed_date=D(PAST, 3, 3)))
+        self.play(1, at(PAST, 3, 1, 12), minutes=120)
+        self.db.commit()
+        got = {c["key"]: c for c in recalc.preview(self.db)["changes"]}
+        self.assertEqual((got["JUST_IN_TIME"]["game_after"], got["JUST_IN_TIME"]["game_after_name"]), ("g1", "Doom"))
+        self.assertIsNone(got["COMPLETED_1_GAME"]["game_after_name"])  # most have no game
+
     def test_the_date_stays_in_its_season(self):
         collected = []
         checks = Achievements(season=PAST, collected=collected)

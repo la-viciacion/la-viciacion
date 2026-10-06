@@ -199,7 +199,16 @@ def preview(
 ) -> dict:
     changes = plan(db, user_ids, season_list, achievement_keys)
     counts = {action: sum(1 for change in changes if change.action == action) for action in ("add", "date", "revoke")}
-    return {"counts": counts, "changes": [change.as_dict() for change in changes]}
+    wanted = {game for change in changes for game in (change.game_before, change.game_after) if game}
+    names = dict(db.query(models.Game.id, models.Game.name).filter(models.Game.id.in_(list(wanted))).all()) if wanted else {}
+    items = []
+    for change in changes:
+        item = change.as_dict()
+        # the panel shows the name of the game, not its id
+        item["game_before_name"] = names.get(change.game_before, change.game_before)
+        item["game_after_name"] = names.get(change.game_after, change.game_after)
+        items.append(item)
+    return {"counts": counts, "changes": items}
 
 
 def apply(db: Session, changes: list[Change]) -> None:
