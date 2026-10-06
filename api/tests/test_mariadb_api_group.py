@@ -114,11 +114,18 @@ class AchievementsCatalogTests(ApiTestCase):
         self.award(self.ana, self.first, last)
         self.award(self.ana, self.first, TODAY() - timedelta(days=5))  # another season: it is earned once per season
         self.award(self.bea, self.first, TODAY() - timedelta(days=2))
-        self.award(self.gone, self.first, TODAY())
+        self.award(self.gone, self.first, TODAY())  # a player who no longer plays still earned it
         first = next(a for a in self.catalog() if a["id"] == self.first)
-        self.assertEqual(first["unlocked_by"], 2)
+        self.assertEqual(first["unlocked_by"], 3)
         self.assertEqual([(p["name"], p["times"], p["last"]) for p in first["players"]],
-                         [("Bea", 1, (TODAY() - timedelta(days=2)).isoformat()), ("Ana", 2, (TODAY() - timedelta(days=5)).isoformat())])
+                         [("Gone", 1, TODAY().isoformat()), ("Bea", 1, (TODAY() - timedelta(days=2)).isoformat()),
+                          ("Ana", 2, (TODAY() - timedelta(days=5)).isoformat())])
+
+    def test_the_emergency_account_never_counts(self):
+        god = self.user("admin", admin=True)  # the emergency account
+        self.award(god, self.first, TODAY())
+        first = next(a for a in self.catalog() if a["id"] == self.first)
+        self.assertEqual(first["unlocked_by"], 0)
 
     def test_it_says_which_ones_are_yours(self):
         self.award(self.bea, self.second, TODAY())
