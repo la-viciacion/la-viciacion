@@ -61,6 +61,11 @@ async def check_user(
     await checks.happy_new_year(db, user, silent)
     await checks.early_riser(db, user, silent)
     await checks.nocturnal(db, user, silent)
+    await checks.completed_in_a_day(db, user, silent)
+    await checks.prodigal_son(db, user, played_days, silent)
+    await checks.work_week(db, user, silent)
+    await checks.saved_by_the_bell(db, user, silent)
+    await checks.release_day(db, user, silent)
 
 
 async def check_users(
@@ -165,7 +170,8 @@ def after_timer_start(user_id: int, start_time: datetime.datetime, new_game_id: 
 
     Only what a running timer can unlock is checked here (the rest needs a finished
     session and is checked when it stops): the time of day and the date it started at
-    (early riser, nocturnal, new year) and teamwork, which counts the timers running right now. `new_game_id` is set when it is the
+    (early riser, nocturnal, new year, the game's release day) and teamwork and "all together", which count the
+    timers running right now. `new_game_id` is set when it is the
     first time the user plays that game this season: the group hears about it here, so the
     request that started the timer does not wait for the notification.
     """
@@ -176,13 +182,17 @@ def after_timer_start(user_id: int, start_time: datetime.datetime, new_game_id: 
         try:
             user = users.get_user_by_id(db, user_id)
             if user is not None:
-                await send_timer_notice(db, time_entries.get_active_game_timer_by_user(db, user_id))
+                timer = time_entries.get_active_game_timer_by_user(db, user_id)
+                game_id = timer.game_id if timer is not None else None
+                await send_timer_notice(db, timer)
                 if new_game_id is not None:
                     game = games.get_game_by_id(db, new_game_id)
                     if game is not None:
                         await users.announce_new_game(db, user, game, start_time.date(), silent=False)
-                await achievements.timer_started(db, user, start_time)
+                await achievements.timer_started(db, user, start_time, game_id)
                 await achievements.user_played_total_games(db, user)
+                if game_id is not None:
+                    await achievements.all_together(db, game_id, silent=False)
             await achievements.teamwork(db, silent=False)
         finally:
             db.close()

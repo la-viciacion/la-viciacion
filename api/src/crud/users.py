@@ -780,6 +780,7 @@ async def after_completion(db: Session, entry: models.UserGame, silent: bool):
         db, user, completion_time, avg_time, entry.game_id, silent=silent
     )
     await achievements.user_completed_total_games(db, user, silent=silent)
+    await achievements.completed_in_a_day(db, user, silent=silent)
 
     message = (
         user.name

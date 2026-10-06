@@ -230,6 +230,25 @@ class TeamworkDatesTests(unittest.TestCase):
         self.assertEqual(recalc.teamwork_dates(self.db, YEAR), {})
         self.assertEqual(set(recalc.teamwork_dates(self.db, YEAR - 1)), {1, 2, 3, 4})
 
+    def test_three_players_on_the_same_game_at_once_get_it_with_the_game(self):
+        self.db.add(models.Game(id="g2", name="Quake"))
+        for user_id, game, hour in ((1, "g1", 20), (2, "g1", 20), (3, "g1", 21), (4, "g2", 21)):
+            self.db.add(models.GameTimer(
+                user_id=user_id, game_id=game, start_time=at(YEAR, 3, 5, hour), end_time=at(YEAR, 3, 5, hour + 2), duration_seconds=7200, is_active=False,
+            ))
+        self.db.commit()
+        got = recalc.all_together_days(self.db, YEAR)
+        self.assertEqual(got, {1: (D(YEAR, 3, 5), "g1"), 2: (D(YEAR, 3, 5), "g1"), 3: (D(YEAR, 3, 5), "g1")})  # not the one on another game
+
+    def test_two_players_or_three_on_different_games_are_not_all_together(self):
+        self.db.add(models.Game(id="g2", name="Quake"))
+        for user_id, game in ((1, "g1"), (2, "g1"), (3, "g2")):
+            self.db.add(models.GameTimer(
+                user_id=user_id, game_id=game, start_time=at(YEAR, 3, 5, 20), end_time=at(YEAR, 3, 5, 22), duration_seconds=7200, is_active=False,
+            ))
+        self.db.commit()
+        self.assertEqual(recalc.all_together_days(self.db, YEAR), {})
+
     def test_it_is_part_of_the_recalculation(self):
         for user_id in (1, 2, 3, 4):
             self.play(user_id, at(YEAR - 1, 3, 5, 20))

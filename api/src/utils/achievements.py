@@ -152,6 +152,22 @@ class AchievementsElems(Enum):
         + "*{}*. Estamos hablando de arrancar un nuevo"
         + " juego cada 3,65 días de media (si dejara de empezar juegos nuevos). Pensemos en ello.",
     }
+    COMPLETED_1_GAME = {
+        "title": "Primer juego completado",
+        "message": "*{}* acaba de completar su primer juego del año. Y esto no ha hecho más que empezar.",
+    }
+    COMPLETED_5_GAMES = {
+        "title": "5 juegos completados",
+        "message": "*{}* acaba de completar su juego número 5. Esto ya va en serio.",
+    }
+    COMPLETED_10_GAMES = {
+        "title": "10 juegos completados",
+        "message": "*{}* ya lleva 10 juegos completados. Se nota que sabe terminar lo que empieza (a diferencia de otros).",
+    }
+    COMPLETED_25_GAMES = {
+        "title": "25 juegos completados",
+        "message": "*{}* ha completado 25 juegos. A este ritmo, el año se le queda corto.",
+    }
     COMPLETED_42_GAMES = {
         "title": "La respuesta (de verdad)",
         "message": "Si empezar 42 juegos ya es todo un logro, no hablemos de acabar 42. "
@@ -256,6 +272,36 @@ class AchievementsElems(Enum):
     }
 
     # Others
+    COMPLETED_IN_A_DAY = {
+        "title": "Del tirón",
+        "message": "*{}* ha empezado y terminado _{}_ en un solo día. Sin dormir, sin pausas y sin remordimientos.",
+    }
+
+    RELEASE_DAY = {
+        "title": "Lo estaba esperando",
+        "message": "*{}* ha jugado a _{}_ el mismo día de su lanzamiento. Ni un minuto de espera.",
+    }
+
+    ALL_TOGETHER = {
+        "title": "Todos a una",
+        "message": "*{}* están jugando a la vez (tres o más) a _{}_. Como en los viejos tiempos de las LAN party.",
+    }
+
+    PRODIGAL_SON = {
+        "title": "El hijo pródigo",
+        "message": "*{}* vuelve a jugar tras 30 días (o más) sin tocar un mando. Se le echaba de menos, aunque algunos ni lo habían notado.",
+    }
+
+    WORK_WEEK = {
+        "title": "Semana laboral",
+        "message": "*{}* acaba de completar una semana laboral entera de 40 horas jugando. Sin vacaciones ni convenio.",
+    }
+
+    SAVED_BY_THE_BELL = {
+        "title": "Salvado por la campana",
+        "message": "*{}* estaba jugando a _{}_ justo cuando cambió el año. Mientras otros se atragantaban con las uvas, él seguía con el mando en la mano.",
+    }
+
     JUST_IN_TIME = {
         "title": "Justo a tiempo",
         "message": "*{}*"

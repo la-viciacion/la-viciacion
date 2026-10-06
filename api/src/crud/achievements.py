@@ -62,7 +62,18 @@ PLAYED_GAMES = (
     (E.PLAYED_50_GAMES, 50),
     (E.PLAYED_100_GAMES, 100),
 )
-COMPLETED_GAMES = ((E.COMPLETED_42_GAMES, 42), (E.COMPLETED_100_GAMES, 100))
+COMPLETED_GAMES = (
+    (E.COMPLETED_1_GAME, 1),
+    (E.COMPLETED_5_GAMES, 5),
+    (E.COMPLETED_10_GAMES, 10),
+    (E.COMPLETED_25_GAMES, 25),
+    (E.COMPLETED_42_GAMES, 42),
+    (E.COMPLETED_100_GAMES, 100),
+)
+# "El hijo pródigo": days without playing, "Semana laboral": hours in a week, "Todos a una": players on a game
+PRODIGAL_GAP_DAYS = 30
+WORK_WEEK_HOURS = 40
+ALL_TOGETHER_PLAYERS = 3
 HOURS_IN_A_GAME = (
     (E.PLAYED_100_HOURS_GAME, 100),
     (E.PLAYED_500_HOURS_GAME, 500),
@@ -375,6 +386,75 @@ class Achievements:
             game = games.get_game_by_id(db, game_id)
             await self.just_in_time(db, user, played, game.avg_time if game else None, game_id, date=str(day), silent=silent)
 
+    async def prodigal_son(self, db: Session, user: models.User, played_days: list, silent: bool = False):
+        """Back after 30 days or more without playing, inside the season. Dated the day they came back."""
+        for before, after in zip(played_days, played_days[1:]):
+            if (after - before).days - 1 >= PRODIGAL_GAP_DAYS:
+                await self._unlock_if_new(db, user, AchievementsElems.PRODIGAL_SON, silent, date=str(after))
+                return
+
+    async def work_week(self, db: Session, user: models.User, silent: bool = False):
+        """40 hours in one week (Monday to Sunday), each session counting for the day it began on. Dated
+        the day the week got to them."""
+        ach = AchievementsElems.WORK_WEEK
+        if self.check_already_achieved(db, user.id, ach.name):
+            return
+        weeks: dict[datetime.date, int] = {}
+        for day, seconds in time_entries.get_played_time_by_day(db, user.id, self.season):  # oldest first
+            day = day if isinstance(day, datetime.date) else datetime.date.fromisoformat(day)
+            monday = day - datetime.timedelta(days=day.weekday())
+            weeks[monday] = weeks.get(monday, 0) + (seconds or 0)
+            if weeks[monday] / 60 / 60 >= WORK_WEEK_HOURS:
+                await self._award(db, user, ach, silent, date=str(day))
+                return
+
+    async def saved_by_the_bell(self, db: Session, user: models.User, silent: bool = False):
+        """A session that was running when the year changed (31 December into 1 January). It belongs to the
+        previous season by its start, so the achievement is dated 1 January: that is what sets its season."""
+        new_year = datetime.datetime(seasons.or_current(self.season), 1, 1)
+        entry = time_entries.get_first_time_entry_across(db, user.id, new_year)
+        if entry is not None:
+            await self._unlock_if_new(
+                db, user, AchievementsElems.SAVED_BY_THE_BELL, silent, date=str(new_year), game_id=entry.game_id
+            )
+
+    async def completed_in_a_day(self, db: Session, user: models.User, silent: bool = False):
+        """A game completed in a season whose sessions all began on the same day: the earliest one, dated
+        the day it was completed."""
+        for day, game_id in users.completed_entries(db, user.id, self.season):
+            if len(time_entries.get_game_session_days(db, user.id, game_id, self.season)) == 1:
+                await self._unlock_if_new(
+                    db, user, AchievementsElems.COMPLETED_IN_A_DAY, silent, date=str(day), game_id=game_id
+                )
+                return
+
+    async def release_day(self, db: Session, user: models.User, silent: bool = False):
+        """A session of a game that began on the day the game came out (wished or not)."""
+        entry = time_entries.get_first_time_entry_on_release_day(db, user.id, self.season)
+        if entry is not None:
+            await self._unlock_if_new(
+                db, user, AchievementsElems.RELEASE_DAY, silent, date=str(entry.start), game_id=entry.game_id
+            )
+
+    async def all_together(self, db: Session, game_id: str, silent: bool = False):
+        """Three or more players with a timer running on the same game: unlocked for every one of them, with
+        one message. It is judged when a timer starts (the third player's), so only real timers count."""
+        running = time_entries.active_timer_user_ids_of_game(db, game_id)
+        playing: List[models.User] = [user for user in users.get_users(db) if user.id in running]
+        if len(playing) < ALL_TOGETHER_PLAYERS:
+            return
+        ach = AchievementsElems.ALL_TOGETHER
+        new = [player for player in playing if not self.check_already_achieved(db, player.id, ach.name)]
+        if not new:
+            return
+        for player in new:
+            logger.info("Set 'All together' achievement for " + player.name)
+            self.set_user_achievement(db, player.id, ach.name, game_id)
+        # "Ana, Bob y Cris"
+        names = ", ".join(player.name for player in playing).rsplit(",", 1)
+        msg = utils.get_ach_message(ach, user=" y".join(names), db=db, game_id=game_id)
+        await utils.send_message(msg, silent or self.silent, image=self.get_image(db, ach.name)[0])
+
     async def user_played_total_days(
         self, db: Session, user: models.User, total_days: list, silent: bool = False
     ):
@@ -498,9 +578,15 @@ class Achievements:
         await utils.send_message(msg, silent, image=self.get_image(db, ach.name)[0])
 
     async def timer_started(
-        self, db: Session, user: models.User, start_time: datetime.datetime, silent: bool = False
+        self,
+        db: Session,
+        user: models.User,
+        start_time: datetime.datetime,
+        game_id: str | None = None,
+        silent: bool = False,
     ):
-        """Achievements decided by the moment a timer starts (early riser, nocturnal, new year)."""
+        """Achievements decided by the moment a timer starts (early riser, nocturnal, new year and playing
+        a game on its release day)."""
         for ach, first_hour, last_hour in (
             (AchievementsElems.EARLY_RISER, 5, 6),
             (AchievementsElems.NOCTURNAL, 2, 5),
@@ -509,6 +595,11 @@ class Achievements:
                 await self._unlock_if_new(db, user, ach, silent, date=str(start_time))
         if (start_time.month, start_time.day) == (1, 1):
             await self._unlock_if_new(db, user, AchievementsElems.HAPPY_NEW_YEAR, silent, date=str(start_time))
+        game = games.get_game_by_id(db, game_id) if game_id else None
+        if game is not None and game.release_date == start_time.date():
+            await self._unlock_if_new(
+                db, user, AchievementsElems.RELEASE_DAY, silent, date=str(start_time), game_id=game_id
+            )
 
     async def early_riser(self, db: Session, user: models.User, silent: bool):
         entry = time_entries.get_first_time_entry_between_hours(db, user.id, 5, 6, self.season)

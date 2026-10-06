@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from ..database import models
 from ..utils import actions  # noqa: F401  (imported first: the crud and utils modules import each other)
 from ..utils.logger import LogManager
-from .achievements import Achievements, Award
+from .achievements import ALL_TOGETHER_PLAYERS, Achievements, Award
 
 logger = LogManager().get_logger()
 
@@ -45,28 +45,43 @@ class Change(NamedTuple):
         return data
 
 
-def teamwork_dates(db: Session, season: int, now: datetime.datetime | None = None) -> dict[int, datetime.date]:
-    """{user_id: the day they first played with at least three others at once in the season}.
+def _crowds(
+    db: Session, season: int, minimum: int, per_game: bool, now: datetime.datetime | None = None
+) -> dict[int, tuple[datetime.date, str | None]]:
+    """{user_id: (the day they first played with enough others at once in the season, the game)}.
 
-    It is the sessions that overlap, whoever the players and whatever the session: a timer still running
-    counts until now, and so does one that was forgotten (they cannot be told apart yet)."""
+    It is the sessions that overlap, whoever the players and whatever the session (a manual one cannot be
+    told from a timer): one still running counts until now, and so does one that was forgotten (they cannot
+    be told apart yet). With `per_game` only the sessions of the same game count together."""
     now = now or datetime.datetime.now()
     rows = (
-        db.query(models.GameTimer.user_id, models.GameTimer.start_time, models.GameTimer.end_time)
+        db.query(models.GameTimer.user_id, models.GameTimer.game_id, models.GameTimer.start_time, models.GameTimer.end_time)
         .join(models.User, models.User.id == models.GameTimer.user_id)
         .filter(models.GameTimer.season == season, models.not_god())
         .all()
     )
-    dates: dict[int, datetime.date] = {}
-    running: list[tuple[datetime.datetime, int]] = []  # (end, user) of the sessions on at the moment
-    for user_id, start, end in sorted(rows, key=lambda row: row[1]):
-        running = [(until, other) for until, other in running if until > start]
-        running.append((end or now, user_id))
-        together = {other for _, other in running}
-        if len(together) >= TEAMWORK_PLAYERS:
+    found: dict[int, tuple[datetime.date, str | None]] = {}
+    running: dict[str | None, list[tuple[datetime.datetime, int]]] = {}  # per game: (end, user) of the sessions on
+    for user_id, game_id, start, end in sorted(rows, key=lambda row: row[2]):
+        key = game_id if per_game else None
+        on = [(until, other) for until, other in running.get(key, []) if until > start]
+        on.append((end or now, user_id))
+        running[key] = on
+        together = {other for _, other in on}
+        if len(together) >= minimum:
             for other in together:
-                dates.setdefault(other, start.date())
-    return dates
+                found.setdefault(other, (start.date(), key))
+    return found
+
+
+def teamwork_dates(db: Session, season: int, now: datetime.datetime | None = None) -> dict[int, datetime.date]:
+    """{user_id: the day they first played with at least three others at once in the season}."""
+    return {user_id: day for user_id, (day, _) in _crowds(db, season, TEAMWORK_PLAYERS, False, now).items()}
+
+
+def all_together_days(db: Session, season: int, now: datetime.datetime | None = None) -> dict[int, tuple[datetime.date, str]]:
+    """{user_id: (the day they first played a game with at least two others at once, the game)}."""
+    return _crowds(db, season, ALL_TOGETHER_PLAYERS, True, now)
 
 
 def _seasons_of(db: Session, user_id: int) -> set[int]:
@@ -120,6 +135,7 @@ async def _plan(db: Session, user_id: int | None, only_seasons: set[int] | None 
         query = query.filter(models.User.id == user_id)
     titles = {key: title for key, title in db.query(models.Achievement.key, models.Achievement.title).all()}
     teamwork: dict[int, dict[int, datetime.date]] = {}  # season -> user -> day
+    together: dict[int, dict[int, tuple[datetime.date, str]]] = {}  # season -> user -> (day, game)
     changes: list[Change] = []
     for user in query.order_by(models.User.id).all():
         for season in sorted(_seasons_of(db, user.id) if only_seasons is None else _seasons_of(db, user.id) & only_seasons):
@@ -128,6 +144,11 @@ async def _plan(db: Session, user_id: int | None, only_seasons: set[int] | None 
                 teamwork[season] = teamwork_dates(db, season)
             if user.id in teamwork[season]:
                 expected["TEAMWORK"] = Award(user.id, "TEAMWORK", teamwork[season][user.id], None)
+            if season not in together:
+                together[season] = all_together_days(db, season)
+            if user.id in together[season]:
+                day, game_id = together[season][user.id]
+                expected["ALL_TOGETHER"] = Award(user.id, "ALL_TOGETHER", day, game_id)
             stored = (
                 db.query(models.UserAchievement.id, models.Achievement.key, models.UserAchievement.date, models.UserAchievement.game_id)
                 .join(models.Achievement, models.Achievement.id == models.UserAchievement.achievement_id)

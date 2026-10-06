@@ -25,6 +25,14 @@ class AchievementCheckTests(unittest.IsolatedAsyncioTestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
 
+    def awards_of_everybody(self):
+        return [
+            (user_id, key, game_id)
+            for user_id, key, game_id in self.db.query(models.UserAchievement.user_id, models.Achievement.key, models.UserAchievement.game_id)
+            .join(models.Achievement, models.Achievement.id == models.UserAchievement.achievement_id)
+            .all()
+        ]
+
     def awarded(self):
         rows = (
             self.db.query(models.Achievement.key, models.UserAchievement.date, models.UserAchievement.game_id)
@@ -124,7 +132,11 @@ class AchievementCheckTests(unittest.IsolatedAsyncioTestCase):
         self.db.commit()
         await self.ach.user_completed_total_games(self.db, USER)
         got = self.awarded()
-        self.assertEqual(set(got), {"COMPLETED_42_GAMES"})
+        self.assertEqual(
+            set(got), {"COMPLETED_1_GAME", "COMPLETED_5_GAMES", "COMPLETED_10_GAMES", "COMPLETED_25_GAMES", "COMPLETED_42_GAMES"}
+        )
+        self.assertEqual(got["COMPLETED_1_GAME"][0], datetime.date(YEAR, 1, 1))
+        self.assertEqual(got["COMPLETED_5_GAMES"][0], datetime.date(YEAR, 1, 5))
         self.assertEqual(got["COMPLETED_42_GAMES"][0], datetime.date(YEAR, 1, 1) + datetime.timedelta(days=41))
 
     async def test_hours_in_a_game_are_dated_the_day_they_crossed_100_and_name_the_game(self):
@@ -313,6 +325,95 @@ class AchievementCheckTests(unittest.IsolatedAsyncioTestCase):
         self.session_of(datetime.datetime(YEAR, 3, 1, 8), 3)  # a manual session looks the same as a timer
         await self.ach.user_session_time(self.db, USER)
         self.assertEqual(self.awarded(), {})
+
+    async def test_the_prodigal_son_needs_thirty_days_without_playing(self):
+        await self.ach.prodigal_son(self.db, USER, [datetime.date(YEAR, 1, 1), datetime.date(YEAR, 1, 31)])  # 29 days without
+        self.assertEqual(self.awarded(), {})
+        await self.ach.prodigal_son(self.db, USER, [datetime.date(YEAR, 1, 1), datetime.date(YEAR, 2, 1), datetime.date(YEAR, 6, 1)])
+        got = self.awarded()
+        self.assertEqual(set(got), {"PRODIGAL_SON"})
+        self.assertEqual(got["PRODIGAL_SON"][0], datetime.date(YEAR, 2, 1))  # the first time they came back
+        self.assertEqual(self.sent.await_count, 1)
+
+    async def test_a_work_week_is_forty_hours_between_monday_and_sunday(self):
+        march_1 = datetime.date(YEAR, 3, 1)
+        monday = march_1 - datetime.timedelta(days=march_1.weekday())
+        for offset in (6, 7, 8, 9, 10):  # Sunday of the week before and Monday to Thursday: 5 days, but two weeks
+            day = monday + datetime.timedelta(days=offset - 7)
+            self.session_of(datetime.datetime.combine(day, datetime.time(9)), 8 * 60)
+        await self.ach.work_week(self.db, USER)
+        self.assertEqual(self.awarded(), {})  # 8 h on the Sunday and 32 h in the week itself
+        friday = monday + datetime.timedelta(days=4)
+        self.session_of(datetime.datetime.combine(friday, datetime.time(9)), 8 * 60)
+        await self.ach.work_week(self.db, USER)
+        got = self.awarded()
+        self.assertEqual(set(got), {"WORK_WEEK"})
+        self.assertEqual(got["WORK_WEEK"][0], friday)
+
+    async def test_saved_by_the_bell_needs_a_session_running_at_midnight(self):
+        self.session_of(datetime.datetime(YEAR - 1, 12, 31, 22, 0), 60)  # ends at 23:00
+        self.session_of(datetime.datetime(YEAR - 1, 12, 31, 23, 0), 60)  # ends exactly at midnight
+        self.session_of(datetime.datetime(YEAR, 1, 1, 0, 0), 30)  # starts at midnight
+        await self.ach.saved_by_the_bell(self.db, USER)
+        self.assertEqual(self.awarded(), {})
+        self.session_of(datetime.datetime(YEAR - 1, 12, 31, 23, 30), 60)  # 23:30 to 00:30
+        await self.ach.saved_by_the_bell(self.db, USER)
+        got = self.awarded()
+        self.assertEqual(got["SAVED_BY_THE_BELL"], (datetime.date(YEAR, 1, 1), "g1"))  # of the new season, naming the game
+        self.assertIn("Doom", self.message())
+
+    async def test_a_game_completed_in_one_day_needs_all_its_sessions_on_that_day(self):
+        self.library_entry("g1", datetime.date(YEAR, 3, 1), completed=datetime.date(YEAR, 3, 4))
+        self.db.commit()
+        self.session_of(datetime.datetime(YEAR, 3, 1, 20), 120)
+        self.session_of(datetime.datetime(YEAR, 3, 1, 23), 30)
+        await self.ach.completed_in_a_day(self.db, USER)
+        self.assertEqual(self.awarded()["COMPLETED_IN_A_DAY"], (datetime.date(YEAR, 3, 4), "g1"))  # dated the completion
+
+    async def test_a_game_played_on_two_days_is_not_completed_in_one(self):
+        self.library_entry("g1", datetime.date(YEAR, 3, 1), completed=datetime.date(YEAR, 3, 4))
+        self.db.commit()
+        self.session_of(datetime.datetime(YEAR, 3, 1, 20), 120)
+        self.session_of(datetime.datetime(YEAR, 3, 2, 20), 120)
+        await self.ach.completed_in_a_day(self.db, USER)
+        self.assertEqual(self.awarded(), {})
+
+    async def test_playing_a_game_the_day_it_came_out(self):
+        self.db.query(models.Game).filter_by(id="g1").update({"release_date": datetime.date(YEAR, 3, 5)})
+        self.db.commit()
+        self.session_of(datetime.datetime(YEAR, 3, 6, 20), 30)  # a day late
+        await self.ach.release_day(self.db, USER)
+        self.assertEqual(self.awarded(), {})
+        self.session_of(datetime.datetime(YEAR, 3, 5, 20), 30)
+        await self.ach.release_day(self.db, USER)
+        self.assertEqual(self.awarded()["RELEASE_DAY"], (datetime.date(YEAR, 3, 5), "g1"))
+
+    async def test_a_timer_started_on_the_release_day_earns_it_at_once(self):
+        self.db.query(models.Game).filter_by(id="g1").update({"release_date": datetime.date(YEAR, 3, 5)})
+        self.db.commit()
+        await self.ach.timer_started(self.db, USER, datetime.datetime(YEAR, 3, 4, 20), "g1")
+        await self.ach.timer_started(self.db, USER, datetime.datetime(YEAR, 3, 5, 20), None)
+        self.assertEqual(self.awarded(), {})
+        await self.ach.timer_started(self.db, USER, datetime.datetime(YEAR, 3, 5, 20), "g1")
+        self.assertEqual(self.awarded()["RELEASE_DAY"], (datetime.date(YEAR, 3, 5), "g1"))
+
+    async def test_three_players_on_the_same_game_are_all_together(self):
+        for i in (2, 3):
+            self.db.add(models.User(id=i, name=f"P{i}", username=f"p{i}", is_active=1))
+            self.db.add(models.GameTimer(user_id=i, game_id="g1", start_time=datetime.datetime(YEAR, 3, 1, 10), is_active=True))
+        self.db.commit()
+        await self.ach.all_together(self.db, "g1")
+        self.assertEqual(self.awarded(), {})  # two are not enough
+        self.db.add(models.User(id=4, name="P4", username="p4", is_active=1))
+        self.db.add(models.GameTimer(user_id=4, game_id="g1", start_time=datetime.datetime(YEAR, 3, 1, 10), is_active=True))
+        self.db.add(models.GameTimer(user_id=5, game_id="g2", start_time=datetime.datetime(YEAR, 3, 1, 10), is_active=True))  # another game
+        self.db.commit()
+        await self.ach.all_together(self.db, "g1")
+        await self.ach.all_together(self.db, "g1")
+        self.assertEqual(self.sent.await_count, 1)
+        self.assertEqual({user for user, key, _ in self.awards_of_everybody() if key == "ALL_TOGETHER"}, {2, 3, 4})
+        self.assertIn("P2, P3 y P4", self.message())
+        self.assertIn("Doom", self.message())
 
     async def test_silent_checks_award_but_pass_silent_on(self):
         await self.ach.user_played_total_days(self.db, USER, self.days(7), silent=True)

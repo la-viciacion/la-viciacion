@@ -339,6 +339,66 @@ def get_first_time_entry_between_hours(
     )
 
 
+def active_timer_user_ids_of_game(db: Session, game_id: str) -> set[int]:
+    """Ids of the users that have a timer running on the game right now."""
+    rows = (
+        db.query(models.GameTimer.user_id)
+        .filter(models.GameTimer.is_active == True, models.GameTimer.game_id == game_id)  # noqa: E712
+        .distinct()
+        .all()
+    )
+    return {user_id for (user_id,) in rows}
+
+
+def get_first_time_entry_across(db: Session, user_id: int, moment: datetime.datetime):
+    """The earliest finished session that was running at `moment` (it began before and ended after), or None.
+
+    Returns:
+        Row | None: row with (user_id, game_id, season, start, end, duration)
+    """
+    sessions = sessions_subquery()
+    return (
+        db.query(sessions)
+        .filter(sessions.c.user_id == user_id, sessions.c.start < moment, sessions.c.end > moment)
+        .order_by(sessions.c.start)
+        .first()
+    )
+
+
+def get_game_session_days(db: Session, user_id: int, game_id: str, season: int = None) -> list:
+    """The distinct days the user's sessions of a game began on, in the season."""
+    season = seasons.or_current(season)
+    sessions = sessions_subquery()
+    return [
+        day
+        for (day,) in db.query(func.DATE(sessions.c.start))
+        .filter(sessions.c.user_id == user_id, sessions.c.game_id == game_id, sessions.c.season == season)
+        .distinct()
+        .all()
+    ]
+
+
+def get_first_time_entry_on_release_day(db: Session, user_id: int, season: int = None):
+    """The earliest session of the season that began on the day its game came out, or None.
+
+    Returns:
+        Row | None: row with (user_id, game_id, season, start, end, duration)
+    """
+    season = seasons.or_current(season)
+    sessions = sessions_subquery()
+    return (
+        db.query(sessions)
+        .join(models.Game, models.Game.id == sessions.c.game_id)
+        .filter(
+            sessions.c.user_id == user_id,
+            sessions.c.season == season,
+            func.DATE(sessions.c.start) == models.Game.release_date,
+        )
+        .order_by(sessions.c.start)
+        .first()
+    )
+
+
 def active_timer_user_ids(db: Session) -> set[int]:
     """Ids of the users that have a timer running right now: one query for everybody."""
     rows = db.query(models.GameTimer.user_id).filter(models.GameTimer.is_active == True).distinct().all()  # noqa: E712

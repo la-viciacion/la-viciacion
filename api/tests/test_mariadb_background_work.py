@@ -274,6 +274,17 @@ class TeamworkTests(WorkTestCase):
         self.team_check()
         self.assertEqual(len([m for m in self.sent if E.TEAMWORK.value["title"] in m["text"]]), 1)
 
+    def test_the_third_player_on_a_game_unlocks_all_together_for_the_three(self):
+        cai = self.user("cai")
+        self.start_timers("ana", "bea")
+        self.real_actions["after_timer_start"](self.ana, datetime.datetime.now(), None)
+        self.assertNotIn("ALL_TOGETHER", self.awarded())
+        self.start_timers("cai")
+        self.real_actions["after_timer_start"](cai, datetime.datetime.now(), None)
+        for user_id in (self.ana, self.bea, cai):
+            self.assertEqual(self.awarded(user_id)["ALL_TOGETHER"][1], "celeste", user_id)
+        self.assertEqual(len([m for m in self.sent if E.ALL_TOGETHER.value["title"] in m["text"]]), 1)
+
     def test_a_disabled_player_does_not_count(self):
         self.user("cai"), self.user("dan", active=False)
         self.start_timers("ana", "bea", "cai", "dan")
@@ -376,6 +387,17 @@ class StartAndStopWorkTests(WorkTestCase):
         self.real_actions["after_timer_start"](self.ana, at(3, 4, 5, 15), None)
         self.assertIn("EARLY_RISER", self.awarded())
         self.assertNotIn("NOCTURNAL", self.awarded())
+
+    def test_a_timer_started_on_the_release_day_of_its_game_unlocks_it_at_once(self):
+        today = datetime.date.today()
+        with self.engine.begin() as conn:
+            conn.execute(text("UPDATE games SET release_date = :d WHERE id = 'celeste'"), {"d": today})
+        started = datetime.datetime.now().replace(microsecond=0)
+        with database.SessionLocal() as db:
+            db.add(models.GameTimer(user_id=self.ana, game_id="celeste", start_time=started, is_active=True, platform="pc"))
+            db.commit()
+        self.real_actions["after_timer_start"](self.ana, started, None)
+        self.assertEqual(self.awarded()["RELEASE_DAY"][1], "celeste")
 
     def test_a_timer_that_starts_in_the_small_hours_unlocks_nocturnal(self):
         self.real_actions["after_timer_start"](self.ana, at(3, 4, 3, 0), None)

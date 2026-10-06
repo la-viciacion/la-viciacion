@@ -14,7 +14,7 @@ Everything Telegram-related is managed from the admin panel (**Notificaciones �
 
 - **Settings** live in the `app_settings` table: general notifications switch, admin-alerts switch (independent), weekly summary on/off + weekday + time, and the Telegram bot token, group id and admin chat id. The token is stored encrypted (key derived from `SECRET_KEY`; if you rotate `SECRET_KEY`, enter the token again) and the panel never shows it back; only the bot (logged in as the superadmin) reads it, through `GET /manage/settings/telegram`. `TELEGRAM_TOKEN`, `TELEGRAM_GROUP_ID` and `TELEGRAM_ADMIN_CHAT_ID` in `.env` only **seed** the table the first time the API starts.
 - The **bot** reads its token and chats from the API and restarts itself (Docker brings it back) within about a minute when they change.
-- **Scheduled jobs** run inside the API process (`api/src/utils/scheduler.py`), so no external cron is needed: weekly summary (private message to each active user with a Telegram id or a push device), (the pinned timer notification is only sent when the timer starts: its periodic refresh is switched off, `TIMER_NOTICE_REFRESH` in the scheduler), hourly forgotten-timer check that reminds once per timer (after 4 hours by default; each user can switch it off, choose whether it reaches them by Telegram and/or push, and choose their own whole number of hours, 1-24, in Profile → Ajustes → Notificaciones; a channel the user cannot be reached by, such as Telegram without a linked account or push without a device, does not count, and with none left no check is made), daily 05:00 check (announces the streaks lost the day before), daily 09:00 wishlist check (see [Wishlist](#wishlist-and-upcoming-releases)). Each run is recorded in `job_runs`, so a restart never repeats a run, and a job that was due while the API was down still runs when it returns (weekly summary: within 6 hours). Achievements and ranking announcements are event-driven: when a timer stops, a session or library entry changes (an admin's changes check the player silently) or an admin asks for it, everything is checked; when a timer starts, only what a running timer can unlock (early riser, nocturnal, new year, teamwork) and the "new game" notice, once per game and season; completing a game also checks the completed-games achievements. Manual sessions never notify. Totals, rankings and streaks are never stored: they are computed from the sessions when requested, so a new season simply starts at zero.
+- **Scheduled jobs** run inside the API process (`api/src/utils/scheduler.py`), so no external cron is needed: weekly summary (private message to each active user with a Telegram id or a push device), (the pinned timer notification is only sent when the timer starts: its periodic refresh is switched off, `TIMER_NOTICE_REFRESH` in the scheduler), hourly forgotten-timer check that reminds once per timer (after 4 hours by default; each user can switch it off, choose whether it reaches them by Telegram and/or push, and choose their own whole number of hours, 1-24, in Profile → Ajustes → Notificaciones; a channel the user cannot be reached by, such as Telegram without a linked account or push without a device, does not count, and with none left no check is made), daily 05:00 check (announces the streaks lost the day before), daily 09:00 wishlist check (see [Wishlist](#wishlist-and-upcoming-releases)). Each run is recorded in `job_runs`, so a restart never repeats a run, and a job that was due while the API was down still runs when it returns (weekly summary: within 6 hours). Achievements and ranking announcements are event-driven: when a timer stops, a session or library entry changes (an admin's changes check the player silently) or an admin asks for it, everything is checked; when a timer starts, only what a running timer can unlock (early riser, nocturnal, new year, the release day of a game, teamwork, all together) and the "new game" notice, once per game and season; completing a game also checks the completed-games achievements. Manual sessions never notify. Totals, rankings and streaks are never stored: they are computed from the sessions when requested, so a new season simply starts at zero.
 - Each user can set their own Telegram id in their profile and admins can edit it for anyone; it is unique.
 
 ## Push notifications (installed PWA)
@@ -73,6 +73,36 @@ The button at the left of the top bar opens the menu, a panel that slides in fro
 ## Players pages
 
 **Jugadores** (menu → Explorar, `#/players`) lists the active players of the group: photo, name, total hours, games, completed, achievements and either what they are playing now (green aura) or when they played last; the ones playing come first, then the latest to play. Pressing one opens **their page**, `#/player/<id>`, with what is public: the figures of a season or of all of them (the same pills as the profile), most played games with their ratings, latest achievements and what they play now. It never shows the email, the Telegram id, the settings or the library detail, and a player who hides "playing now" (Ajustes) still appears, only without the live status. `GET /group/players` and `GET /group/players/{id}?season=`, derived; nothing is stored. Never the emergency account or inactive players.
+
+## Achievements catalogue
+
+Every achievement is earned **once per season** and dated the day it was reached. "General" means the check that runs after a stopped timer, a change to sessions or library entries, an import and the admin **Comprobar logros**. A session counts for a played day, a streak or the games of a day only when it lasts 10 minutes or more; hours add up whatever the length of each session. The texts, in Spanish, are in `api/src/utils/achievements.py` and then in the database (editable in the panel).
+
+| Achievement | Condition | Evaluated |
+|---|---|---|
+| 4, 8, 12 and 16 hours in a day | Sum of the sessions that began that day | general |
+| 8 hours in one game in a day | 8 h or more to one game in sessions that began the same day | general |
+| 100, 500 and 1000 hours in a game | Hours in a game in the season (the game that got there first is named) | general |
+| 100, 200, 500 and 1000 hours | Hours in the season | general |
+| Lo he abierto sin querer | A timer stopped within 5 minutes (more than 0 s). Manual sessions and edits never earn it | when a timer stops |
+| 4 and 8 hours in a session | A single session of 4 h or more, and one of 8 h or more | general |
+| 10, 42, 50 and 100 games played | Distinct games in the library of the season (counted from the first timer) | when a timer starts, general |
+| 1, 5, 10, 25, 42 and 100 games completed | Games completed in the season | when a game is completed, general |
+| Del tirón | A game completed whose sessions of the season all began the same day | when a game is completed, general |
+| Indecisión (5 and 10 games in a day) | Distinct games with sessions of 10 min or more that began the same day | general |
+| 7, 15, 30, 60, 100, 200, 300 and 365 days played | Days touched by a session of 10 min or more (the day it began and the day it ended) | general |
+| Streaks of 7, 15, 30, 60, 100, 200, 300 and 365 days | Consecutive played days; each is dated the day a run got to that length | general |
+| El hijo pródigo | Back after 30 days or more without playing, inside the season | general |
+| Semana laboral | 40 hours in a week (Monday to Sunday, each session counting on the day it began) | general |
+| Feliz año nuevo | A timer that starts on 1 January, or a session that touches it | when a timer starts, general |
+| Salvado por la campana | A session that was running when the year changed (31 December into 1 January); dated 1 January | general |
+| Madrugador / Plus por nocturnidad | A timer that starts between 5:00 and 5:59 / between 2:00 and 4:59 | when a timer starts, general |
+| Lo estaba esperando | A session of a game that began on the day the game came out (wished or not) | when a timer starts, general |
+| Justo a tiempo | The time played in the season, within 5 % of the HLTB average of the game | when a game is completed |
+| Trabajo en equipo | 4 or more players with a timer running when someone starts theirs | when a timer starts |
+| Todos a una | 3 or more players with a timer running on the same game when someone starts theirs | when a timer starts |
+
+Teamwork and "Todos a una" only count timers (never manual sessions) while they happen, and a forgotten timer still counts as playing. **Recalcular logros** works them out from the overlapping sessions instead.
 
 ## Achievements page
 
