@@ -27,7 +27,8 @@ def unlocked_ids(db: Session, user_id: int) -> set[int]:
 
 def achievements_catalog(db: Session, viewer_id: int) -> list[dict]:
     """Every achievement with who has unlocked it (and how many times: once per season) and when last. The ones the
-    viewer has not unlocked come hidden: no key, title, description, picture or players, only that they exist."""
+    viewer has not unlocked come hidden: no key, title, description, picture or players, only that they exist and
+    whether they are secret (so that everybody knows there are special ones to unlock)."""
     mine = unlocked_ids(db, viewer_id)
     players = (models.User.is_active == 1, models.not_god())
     unlocked: dict[int, dict[int, dict]] = {}
@@ -52,7 +53,7 @@ def achievements_catalog(db: Session, viewer_id: int) -> list[dict]:
         if not row.active and row.id not in mine:
             continue  # switched off: it does not exist yet, not even as a hidden one
         if row.id not in mine:
-            catalog.append({"id": row.id, "hidden": True, "unlocked_by_me": False})
+            catalog.append({"id": row.id, "hidden": True, "unlocked_by_me": False, "secret": bool(row.secret)})  # so that everybody knows there are special ones
             continue
         who = sorted(unlocked.get(row.id, {}).values(), key=lambda w: (w["last"], w["name"].lower()), reverse=True)
         catalog.append({
@@ -130,7 +131,7 @@ def player_profile(db: Session, viewer_id: int, player_id: int, season=None) -> 
     mine = unlocked_ids(db, viewer_id)
     achievements = [
         {"title": a["title"], "date": a["date"], "hidden": False, "secret": a["secret"]}
-        if a["id"] in mine else {"hidden": True, "date": a["date"]}
+        if a["id"] in mine else {"hidden": True, "date": a["date"], "secret": a["secret"]}
         for a in data["achievements"]
     ]
     return {

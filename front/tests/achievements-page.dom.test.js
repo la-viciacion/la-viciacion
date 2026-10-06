@@ -57,7 +57,18 @@ test('a secret one has the golden aura and says so, and an ordinary one does not
   assert.ok(!cards[1].classList.contains('secret'));
   assert.match(text('.ach-card')[0], /Secreto/);
   assert.doesNotMatch(text('.ach-card')[1], /Secreto/);
-  assert.ok(!document.querySelector('.ach-card.hidden').classList.contains('secret'));  // what is hidden gives nothing away
+  assert.ok(!document.querySelector('.ach-card.hidden').classList.contains('secret'));  // an ordinary hidden one has no aura
+});
+
+test('a secret one that is not unlocked still has the aura, and says nothing else about itself', async () => {
+  installApi({ 'GET /group/achievements': [LIST[1], { id: 5, hidden: true, unlocked_by_me: false, secret: true }] });
+  await page.render({ main: main() });
+  await settle();
+  const [plain, special] = document.querySelectorAll('.ach-card.hidden');
+  assert.ok(!plain.classList.contains('secret'));
+  assert.ok(special.classList.contains('secret'));
+  assert.deepEqual(text('.ach-title strong'), ['Logro oculto', 'Logro secreto']);
+  assert.doesNotMatch(special.textContent, /Secreto|Lo tienes/);
 });
 
 test('an error says so', async () => {

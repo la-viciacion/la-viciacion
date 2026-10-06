@@ -205,6 +205,7 @@
 .ach-card.hidden { opacity: 0.6; }
 .ach-card.secret { border-color: var(--accent-gold); box-shadow: 0 0 14px rgba(245, 197, 66, 0.45), inset 0 0 18px rgba(245, 197, 66, 0.08); }
 .ach-card.secret .ach-img { box-shadow: 0 0 10px rgba(245, 197, 66, 0.6); }
+.ach-card.hidden.secret { opacity: 0.9; }
 .pf-row.ach-secret { box-shadow: inset 3px 0 0 var(--accent-gold); }
 .pf-tag.secret { background: rgba(245, 197, 66, 0.15); color: var(--accent-gold); }
 .ach-img { width: 56px; height: 56px; border-radius: var(--radius-sm); object-fit: cover; flex: none; }

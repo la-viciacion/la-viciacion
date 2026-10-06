@@ -16,18 +16,19 @@ const who = (a) => {
   return html`<div class="pf-sub">Lo han conseguido ${a.unlocked_by}: ${formatPlayers(names, 4)}. Último: ${formatDate(a.players[0].last)}</div>`;
 };
 
-// What the viewer has not unlocked says nothing: not even the name.
-const hiddenCard = () => html`
-  <article class="ach-card hidden">
+// What the viewer has not unlocked says nothing: not even the name. A secret one still has its golden aura, so
+// that everybody knows there are special ones to unlock.
+const hiddenCard = (a) => html`
+  <article class="ach-card hidden${a.secret ? ' secret' : ''}">
     <div class="ach-img ach-img-placeholder" aria-hidden="true">🔒</div>
     <div class="ach-body">
-      <div class="ach-title"><strong>Logro oculto</strong></div>
+      <div class="ach-title"><strong>${a.secret ? 'Logro secreto' : 'Logro oculto'}</strong></div>
       <div class="pf-sub">Desbloquéalo para descubrirlo.</div>
     </div>
   </article>`;
 
 // A secret one has a golden aura: it was announced to the group without saying which.
-const card = (a) => (a.hidden ? hiddenCard() : html`
+const card = (a) => (a.hidden ? hiddenCard(a) : html`
   <article class="ach-card mine${a.secret ? ' secret' : ''}">
     ${picture(a)}
     <div class="ach-body">
