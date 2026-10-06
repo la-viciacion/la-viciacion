@@ -66,6 +66,14 @@ class AchievementsCatalogTests(ApiTestCase):
         # whoever lacks it knows that it exists and that it is special, and nothing more
         self.assertEqual(by_id[self.second], {"id": self.second, "hidden": True, "unlocked_by_me": False, "secret": True})
 
+    def test_the_ones_with_no_season_limit_say_so_once_unlocked(self):
+        lifetime = self.scalar("SELECT id FROM achievements WHERE `key` = 'PLAYED_100_DAYS_LIFETIME'")
+        self.award(self.ana, lifetime, TODAY())
+        by_id = {a["id"]: a for a in self.catalog()}
+        self.assertTrue(by_id[lifetime]["lifetime"])
+        other = self.catalog("bea")
+        self.assertEqual(next(a for a in other if a["id"] == lifetime), {"id": lifetime, "hidden": True, "unlocked_by_me": False, "secret": False})
+
     def test_a_switched_off_achievement_does_not_exist_for_the_group_unless_the_viewer_has_it(self):
         with self.engine.begin() as conn:
             conn.execute(text("UPDATE achievements SET active = 0 WHERE id IN (:a, :b)"), {"a": self.first, "b": self.second})

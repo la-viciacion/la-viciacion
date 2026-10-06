@@ -5,8 +5,11 @@ from unittest import mock
 
 from src.utils import actions  # noqa: F401  (imported first: the crud and utils modules import each other)
 from src.crud import achievements as ach_module
+from src.crud import time_entries
 from src.crud.achievements import Achievements
 from src.database import models
+from src.utils import seasons
+from src.utils.achievements import is_lifetime
 from tests.sqlite_db import make_session
 
 USER = types.SimpleNamespace(id=1, name="Ana", telegram_id=111)
@@ -599,6 +602,151 @@ class AchievementCheckTests(unittest.IsolatedAsyncioTestCase):
         self.db.commit()
         await self.ach.teamwork(self.db, silent=False)
         self.assertEqual(self.awarded(), {})
+
+
+class LifetimeTests(unittest.IsolatedAsyncioTestCase):
+    """The achievements whose key ends in _LIFETIME: the whole history of a player, earned once."""
+
+    def setUp(self):
+        self.db = make_session()
+        self.db.add_all([models.Game(id="g1", name="Doom"), models.Game(id="g2", name="Quake")])
+        self.db.commit()
+        Achievements().populate_achievements(self.db)
+        self.sent = mock.AsyncMock()
+        patcher = mock.patch.object(ach_module.utils, "send_message", self.sent)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.view = Achievements(season=seasons.ALL)
+
+    def awarded(self):
+        rows = (
+            self.db.query(models.Achievement.key, models.UserAchievement.date, models.UserAchievement.game_id)
+            .join(models.UserAchievement, models.UserAchievement.achievement_id == models.Achievement.id)
+            .all()
+        )
+        return {key: (date, game_id) for key, date, game_id in rows}
+
+    def play(self, start, hours=1, game="g1"):
+        self.db.add(models.GameTimer(
+            user_id=1, game_id=game, start_time=start, end_time=start + datetime.timedelta(hours=hours),
+            duration_seconds=int(hours * 3600), is_active=False,
+        ))
+        self.db.commit()
+
+    def switch_off_lifetime(self):
+        self.db.query(models.Achievement).filter(models.Achievement.key.like("%\\_LIFETIME", escape="\\")).update(
+            {"active": False}, synchronize_session=False
+        )
+        self.db.commit()
+
+    def test_the_key_is_the_rule_and_every_one_of_them_has_its_table(self):
+        tables = (
+            ach_module.LIFETIME_TOTAL_HOURS, ach_module.LIFETIME_TOTAL_DAYS, ach_module.LIFETIME_PLAYED_GAMES,
+            ach_module.LIFETIME_COMPLETED_GAMES, ach_module.LIFETIME_HOURS_IN_A_GAME,
+        )
+        in_tables = {ach.name for table in tables for ach, _ in table}
+        by_name = {ach.name for ach in ach_module.AchievementsElems if is_lifetime(ach.name)}
+        self.assertEqual(in_tables, by_name)  # a typo in the suffix would turn one into a seasonal one without a word
+        self.assertEqual(len(by_name), 20)
+        for table in tables:
+            self.assertTrue(all(is_lifetime(ach.name) for ach, _ in table))
+        for table in (ach_module.TOTAL_HOURS, ach_module.TOTAL_DAYS, ach_module.PLAYED_GAMES, ach_module.COMPLETED_GAMES, ach_module.HOURS_IN_A_GAME):
+            self.assertFalse(any(is_lifetime(ach.name) for ach, _ in table))
+
+    async def test_1000_hours_in_a_game_add_up_over_the_seasons_and_name_the_game(self):
+        self.play(datetime.datetime(YEAR - 1, 3, 1, 10), hours=600)
+        self.play(datetime.datetime(YEAR, 3, 1, 10), hours=500)  # 1100: it crosses on this day
+        self.play(datetime.datetime(YEAR, 3, 2, 10), hours=900, game="g2")  # another game does not count
+        await self.view.user_played_hours_game(self.db, USER)
+        await self.view.user_played_hours_game(self.db, USER)  # and it is earned once
+        got = self.awarded()
+        self.assertEqual(got, {"PLAYED_1000_HOURS_GAME_LIFETIME": (datetime.date(YEAR, 3, 1), "g1")})
+        self.assertEqual(self.sent.await_count, 1)
+        self.assertIn("Doom", self.sent.await_args.args[0])
+
+    async def test_neither_season_alone_is_enough_but_a_seasonal_check_is_not_this_one(self):
+        self.play(datetime.datetime(YEAR - 1, 3, 1, 10), hours=550)
+        self.play(datetime.datetime(YEAR, 3, 1, 10), hours=550)
+        await Achievements().user_played_hours_game(self.db, USER)  # the season: only 550 h
+        self.assertEqual(set(self.awarded()), {"PLAYED_100_HOURS_GAME", "PLAYED_500_HOURS_GAME"})  # and none of the lifetime ones
+
+    async def test_a_lifetime_one_already_earned_in_another_season_is_not_earned_again(self):
+        key_id = self.db.query(models.Achievement.id).filter_by(key="PLAYED_1000_HOURS_GAME_LIFETIME").scalar()
+        self.db.add(models.UserAchievement(user_id=1, achievement_id=key_id, date=datetime.date(YEAR - 1, 6, 1), game_id="g1"))
+        self.db.commit()
+        self.play(datetime.datetime(YEAR, 3, 1, 10), hours=1100)
+        await self.view.user_played_hours_game(self.db, USER)
+        self.assertEqual(self.db.query(models.UserAchievement).count(), 1)
+        self.sent.assert_not_awaited()
+
+    async def test_total_hours_add_up_over_the_seasons(self):
+        self.play(datetime.datetime(YEAR - 1, 3, 1, 10), hours=400)
+        self.play(datetime.datetime(YEAR, 3, 1, 10), hours=150)
+        await self.view.user_played_total_time(self.db, USER)
+        self.assertEqual(self.awarded(), {"PLAYED_500_HOURS_LIFETIME": (datetime.date(YEAR, 3, 1), None)})
+
+    async def test_played_days_add_up_over_the_seasons_and_are_dated_the_day_that_reached_them(self):
+        for day in range(60):
+            self.play(datetime.datetime(YEAR - 1, 1, 1, 10) + datetime.timedelta(days=day), hours=0.5)
+        for day in range(50):
+            self.play(datetime.datetime(YEAR, 1, 1, 10) + datetime.timedelta(days=day), hours=0.5)
+        days = time_entries.get_played_days(self.db, 1, season=seasons.ALL)
+        await self.view.user_played_total_days(self.db, USER, days)
+        got = self.awarded()
+        self.assertEqual(set(got), {"PLAYED_100_DAYS_LIFETIME"})
+        self.assertEqual(got["PLAYED_100_DAYS_LIFETIME"][0], datetime.date(YEAR, 1, 1) + datetime.timedelta(days=39))  # 60 + 40
+
+    async def test_games_played_count_each_game_once_whatever_the_seasons(self):
+        for n in range(50):
+            self.db.add(models.UserGame(user_id=1, game_id=f"a{n}", started_date=datetime.date(YEAR - 1, 3, 1), platform=None, completed=0))
+        for n in range(49):
+            self.db.add(models.UserGame(user_id=1, game_id=f"b{n}", started_date=datetime.date(YEAR, 3, 1), platform=None, completed=0))
+        self.db.add(models.UserGame(user_id=1, game_id="a0", started_date=datetime.date(YEAR, 4, 1), platform=None, completed=0))  # again
+        self.db.commit()
+        await self.view.user_played_total_games(self.db, USER)
+        self.assertEqual(self.awarded(), {})  # 99 different ones
+        self.db.add(models.UserGame(user_id=1, game_id="b49", started_date=datetime.date(YEAR, 5, 1), platform=None, completed=0))
+        self.db.commit()
+        await self.view.user_played_total_games(self.db, USER)
+        self.assertEqual(self.awarded(), {"PLAYED_100_GAMES_LIFETIME": (datetime.date(YEAR, 5, 1), None)})
+
+    async def test_games_completed_count_each_game_once_whatever_the_seasons(self):
+        for n in range(50):
+            self.db.add(models.UserGame(user_id=1, game_id=f"a{n}", started_date=datetime.date(YEAR - 1, 3, 1), platform=None,
+                                        completed=1, completed_date=datetime.date(YEAR - 1, 3, 2)))
+        for n in range(49):
+            self.db.add(models.UserGame(user_id=1, game_id=f"b{n}", started_date=datetime.date(YEAR, 3, 1), platform=None,
+                                        completed=1, completed_date=datetime.date(YEAR, 3, 2)))
+        self.db.add(models.UserGame(user_id=1, game_id="a0", started_date=datetime.date(YEAR, 4, 1), platform=None,
+                                    completed=1, completed_date=datetime.date(YEAR, 4, 2)))  # the same game completed again
+        self.db.commit()
+        await self.view.user_completed_total_games(self.db, USER)
+        self.assertEqual(self.awarded(), {})
+        self.db.add(models.UserGame(user_id=1, game_id="b49", started_date=datetime.date(YEAR, 5, 1), platform=None,
+                                    completed=1, completed_date=datetime.date(YEAR, 5, 2)))
+        self.db.commit()
+        await self.view.user_completed_total_games(self.db, USER)
+        self.assertEqual(self.awarded(), {"COMPLETED_100_GAMES_LIFETIME": (datetime.date(YEAR, 5, 2), None)})
+
+    async def test_while_none_is_switched_on_the_checks_over_the_whole_history_cost_nothing(self):
+        self.switch_off_lifetime()
+        with mock.patch.object(ach_module.time_entries, "get_played_time_by_day") as by_day, \
+                mock.patch.object(ach_module.users, "played_game_dates") as games:
+            await self.view.user_played_total_time(self.db, USER)
+            await self.view.user_played_total_games(self.db, USER)
+        by_day.assert_not_called()
+        games.assert_not_called()
+
+    async def test_the_seasonal_checks_never_earn_a_lifetime_one(self):
+        self.play(datetime.datetime(YEAR, 3, 1, 10), hours=600)
+        await Achievements().user_played_total_time(self.db, USER)
+        self.assertEqual(set(self.awarded()), {"PLAYED_100_HOURS", "PLAYED_200_HOURS", "PLAYED_500_HOURS"})
+
+    async def test_the_orchestration_runs_the_lifetime_checks_too(self):
+        self.play(datetime.datetime(YEAR - 1, 3, 1, 10), hours=400)
+        self.play(datetime.datetime(YEAR, 3, 1, 10), hours=150)
+        await actions.check_user_lifetime(self.db, USER, checks=self.view)
+        self.assertIn("PLAYED_500_HOURS_LIFETIME", self.awarded())
 
 
 class QueryEconomyTests(unittest.IsolatedAsyncioTestCase):

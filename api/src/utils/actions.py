@@ -68,6 +68,19 @@ async def check_user(
     await checks.release_day(db, user, silent)
 
 
+async def check_user_lifetime(db: Session, user: models.User, silent: bool = False, checks: Achievements | None = None):
+    """The achievements with no season limit (their key ends in _LIFETIME): worked out over the whole history.
+    `checks` is the view over every season (default: a new one). It costs nothing while none is switched on."""
+    checks = checks or achievements.lifetime_view()
+    if not checks.lifetime_on(db):
+        return
+    await checks.user_played_total_days(db, user, time_entries.get_played_days(db, user.id, season=seasons.ALL), silent=silent)
+    await checks.user_played_hours_game(db, user, silent=silent)
+    await checks.user_played_total_time(db, user, silent=silent)
+    await checks.user_played_total_games(db, user, silent=silent)
+    await checks.user_completed_total_games(db, user, silent=silent)
+
+
 async def check_users(
     db: Session,
     silent: bool = False,
@@ -77,8 +90,8 @@ async def check_users(
     """Check the achievements of every user (or of `user_ids`).
 
     Event-driven: it runs after a timer stops or a session or library entry changes (routers/timers.py,
-    routers/manage.py, the import) and when an admin asks for it. Teamwork is not checked here: only a
-    timer that starts can make it true (after_timer_start).
+    routers/manage.py, the import). Teamwork is not checked here: only a timer that starts can make it
+    true (after_timer_start).
     """
     start_time = time.time()
     users_db = users.get_users(db, only_active_users)
@@ -90,6 +103,7 @@ async def check_users(
             # one user's failure must not skip the checks of the rest
             try:
                 await check_user(db, user, silent=silent)
+                await check_user_lifetime(db, user, silent=silent)
             except Exception as e:
                 db.rollback()
                 logger.error(f"Error checking achievements of {user.username}: {e}")
@@ -191,6 +205,7 @@ def after_timer_start(user_id: int, start_time: datetime.datetime, new_game_id: 
                         await users.announce_new_game(db, user, game, start_time.date(), silent=False)
                 await achievements.timer_started(db, user, start_time, game_id)
                 await achievements.user_played_total_games(db, user)
+                await achievements.lifetime_view().user_played_total_games(db, user)
                 if game_id is not None:
                     await achievements.all_together(db, game_id, silent=False)
             await achievements.teamwork(db, silent=False)

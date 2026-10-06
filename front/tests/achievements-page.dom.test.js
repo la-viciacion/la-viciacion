@@ -71,6 +71,15 @@ test('a secret one that is not unlocked still has the aura, and says nothing els
   assert.doesNotMatch(special.textContent, /Secreto|Lo tienes/);
 });
 
+test('one that has no season limit says it is unique, and the others do not', async () => {
+  installApi({ 'GET /group/achievements': [{ ...LIST[0], lifetime: true }, { ...LIST[0], id: 3, title: 'Normal' }, LIST[1]] });
+  await page.render({ main: main() });
+  await settle();
+  assert.match(text('.ach-card')[0], /Único/);
+  assert.doesNotMatch(text('.ach-card')[1], /Único/);
+  assert.doesNotMatch(text('.ach-card')[2], /Único/);  // what is hidden says nothing
+});
+
 test('an error says so', async () => {
   installApi({ 'GET /group/achievements': json({ detail: 'boom' }, 500) });
   await page.render({ main: main() });

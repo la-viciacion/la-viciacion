@@ -11,7 +11,7 @@ from ..crud import time_entries, users, games
 from ..database import models, schemas
 from ..utils import actions as actions
 from ..utils import my_utils as utils
-from ..utils.achievements import AchievementsElems
+from ..utils.achievements import AchievementsElems, is_lifetime
 from ..utils.logger import LogManager
 from ..utils import seasons, streaks
 
@@ -70,6 +70,36 @@ COMPLETED_GAMES = (
     (E.COMPLETED_42_GAMES, 42),
     (E.COMPLETED_100_GAMES, 100),
 )
+# The achievements with no season limit (their key ends in _LIFETIME): the same families, over the whole history.
+# A check looks at one table or the other according to its season: the running one, or seasons.ALL.
+LIFETIME_TOTAL_HOURS = (
+    (E.PLAYED_500_HOURS_LIFETIME, 500),
+    (E.PLAYED_1000_HOURS_LIFETIME, 1000),
+    (E.PLAYED_2000_HOURS_LIFETIME, 2000),
+    (E.PLAYED_5000_HOURS_LIFETIME, 5000),
+    (E.PLAYED_10000_HOURS_LIFETIME, 10000),
+)
+LIFETIME_TOTAL_DAYS = (
+    (E.PLAYED_100_DAYS_LIFETIME, 100),
+    (E.PLAYED_200_DAYS_LIFETIME, 200),
+    (E.PLAYED_500_DAYS_LIFETIME, 500),
+    (E.PLAYED_1000_DAYS_LIFETIME, 1000),
+    (E.PLAYED_2000_DAYS_LIFETIME, 2000),
+    (E.PLAYED_5000_DAYS_LIFETIME, 5000),
+)
+LIFETIME_PLAYED_GAMES = (
+    (E.PLAYED_100_GAMES_LIFETIME, 100),
+    (E.PLAYED_200_GAMES_LIFETIME, 200),
+    (E.PLAYED_500_GAMES_LIFETIME, 500),
+    (E.PLAYED_1000_GAMES_LIFETIME, 1000),
+)
+LIFETIME_COMPLETED_GAMES = (
+    (E.COMPLETED_100_GAMES_LIFETIME, 100),
+    (E.COMPLETED_200_GAMES_LIFETIME, 200),
+    (E.COMPLETED_500_GAMES_LIFETIME, 500),
+    (E.COMPLETED_1000_GAMES_LIFETIME, 1000),
+)
+LIFETIME_HOURS_IN_A_GAME = ((E.PLAYED_1000_HOURS_GAME_LIFETIME, 1000),)
 # "El hijo pródigo": days without playing, "Semana laboral": hours in a week, "Todos a una": players on a game
 PRODIGAL_GAP_DAYS = 30
 WORK_WEEK_HOURS = 40
@@ -111,6 +141,33 @@ class Achievements:
         self.silent = silent
         self.season = season
         self.collected = collected
+        self._lifetime_is_on: bool | None = None
+
+    @property
+    def lifetime(self) -> bool:
+        """Is this the view over the whole history (see lifetime_view)?"""
+        return self.season == seasons.ALL
+
+    def lifetime_view(self) -> "Achievements":
+        """The same checks over every season, for the achievements with no season limit (their key ends in
+        _LIFETIME): only the families that add something up have a table of them. What it finds is earned
+        once, and it shares `collected` with this one."""
+        return Achievements(silent=self.silent, season=seasons.ALL, collected=self.collected)
+
+    def lifetime_on(self, db: Session) -> bool:
+        """Is any achievement with no season limit switched on? Asked once per view: while none is, the checks
+        over the whole history cost nothing."""
+        if self._lifetime_is_on is None:
+            self._lifetime_is_on = (
+                db.query(models.Achievement.id)
+                .filter(models.Achievement.key.like("%\\_LIFETIME", escape="\\"), models.Achievement.active == True)  # noqa: E712
+                .first()
+                is not None
+            )
+        return self._lifetime_is_on
+
+    def _nothing_to_do(self, db: Session) -> bool:
+        return self.lifetime and not self.lifetime_on(db)
 
     def populate_achievements(self, db: Session):
         """Create the achievements of the code that the table does not have yet.
@@ -180,7 +237,9 @@ class Achievements:
         if self.collected is not None:
             off = {key for (key,) in db.query(models.Achievement.key).filter(models.Achievement.key.in_(keys), models.Achievement.active == False)}  # noqa: E712
             return off | {award.key for award in self.collected if award.user_id == user_id and award.key in keys}
-        season = season if season is not None else self.season
+        season = seasons.or_current(season if season is not None else self.season)
+        # over every season (the achievements with no season limit) it is once in a lifetime, in any of them
+        of_the_season = [] if season == seasons.ALL else [models.UserAchievement.season == season]
         rows = (
             db.query(models.Achievement.key)
             .outerjoin(
@@ -188,7 +247,7 @@ class Achievements:
                 and_(
                     models.UserAchievement.achievement_id == models.Achievement.id,
                     models.UserAchievement.user_id == user_id,
-                    models.UserAchievement.season == seasons.or_current(season),
+                    *of_the_season,
                 ),
             )
             .filter(
@@ -278,8 +337,10 @@ class Achievements:
         season it is worked out for."""
         if date is None:
             raise ValueError("a recalculation needs the date of every achievement: " + ach.name)
-        season = seasons.or_current(self.season)
-        day = min(max(utils.convert_date_from_text(date).date(), datetime.date(season, 1, 1)), datetime.date(season, 12, 31))
+        day = utils.convert_date_from_text(date).date()
+        if not self.lifetime:
+            season = seasons.or_current(self.season)
+            day = min(max(day, datetime.date(season, 1, 1)), datetime.date(season, 12, 31))
         self.collected.append(Award(user_id, ach.name, day, game_id))
 
     async def _unlock_reached(
@@ -320,13 +381,16 @@ class Achievements:
     async def user_played_total_time(
         self, db: Session, user: models.User, silent: bool = False
     ):
-        """Dated the day the season's running total of hours crossed each threshold."""
+        """Dated the day the season's running total of hours crossed each threshold (over every season, the
+        running total of the whole history)."""
+        if self._nothing_to_do(db):
+            return
         total = 0
         running = []
         for day, seconds in time_entries.get_played_time_by_day(db, user.id, self.season):
             total += seconds or 0
             running.append((day, total / 60 / 60))
-        await self._unlock_first_day_reaching(db, user, running, TOTAL_HOURS, silent)
+        await self._unlock_first_day_reaching(db, user, running, LIFETIME_TOTAL_HOURS if self.lifetime else TOTAL_HOURS, silent)
 
     async def _unlock_first_day_reaching(
         self,
@@ -491,8 +555,10 @@ class Achievements:
     async def user_played_total_days(
         self, db: Session, user: models.User, total_days: list, silent: bool = False
     ):
+        if self._nothing_to_do(db):
+            return
         await self._unlock_reached(
-            db, user, len(total_days), TOTAL_DAYS, silent,
+            db, user, len(total_days), LIFETIME_TOTAL_DAYS if self.lifetime else TOTAL_DAYS, silent,
             date_for=lambda needed: str(total_days[needed - 1]),
         )
 
@@ -521,28 +587,39 @@ class Achievements:
     async def user_played_total_games(
         self, db: Session, user: models.User, silent: bool = False
     ):
-        """Distinct games of the season, dated the day the Nth one began."""
+        """Distinct games of the season (of every season, in the view of the whole history), dated the day the
+        Nth one began."""
+        if self._nothing_to_do(db):
+            return
         dates = users.played_game_dates(db, user.id, self.season)
         await self._unlock_reached(
-            db, user, len(dates), PLAYED_GAMES, silent, date_for=lambda needed: str(dates[needed - 1])
+            db, user, len(dates), LIFETIME_PLAYED_GAMES if self.lifetime else PLAYED_GAMES, silent,
+            date_for=lambda needed: str(dates[needed - 1]),
         )
 
     async def user_completed_total_games(
         self, db: Session, user: models.User, silent: bool = False
     ):
-        """Dated the day the Nth game was completed."""
+        """Dated the day the Nth game was completed (over every season, a game counts once)."""
+        if self._nothing_to_do(db):
+            return
         dates = users.completed_game_dates(db, user.id, self.season)
         await self._unlock_reached(
-            db, user, len(dates), COMPLETED_GAMES, silent, date_for=lambda needed: str(dates[needed - 1])
+            db, user, len(dates), LIFETIME_COMPLETED_GAMES if self.lifetime else COMPLETED_GAMES, silent,
+            date_for=lambda needed: str(dates[needed - 1]),
         )
 
     async def user_played_hours_game(
         self, db: Session, user: models.User, silent: bool = False
     ):
         """100, 500 and 1000 h in one game this season, each dated the day it crossed them. With several
-        games over a line, the one that crossed first is the one named."""
-        have = self.achieved_keys(db, user.id, [ach.name for ach, _ in HOURS_IN_A_GAME])
-        pending = [(ach, hours) for ach, hours in HOURS_IN_A_GAME if ach.name not in have]
+        games over a line, the one that crossed first is the one named. Over every season, the hours of a game
+        are all the ones it has had."""
+        if self._nothing_to_do(db):
+            return
+        table = LIFETIME_HOURS_IN_A_GAME if self.lifetime else HOURS_IN_A_GAME
+        have = self.achieved_keys(db, user.id, [ach.name for ach, _ in table])
+        pending = [(ach, hours) for ach, hours in table if ach.name not in have]
         if not pending:
             return
         totals: dict[str, float] = {}

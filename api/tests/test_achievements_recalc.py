@@ -204,6 +204,47 @@ class RecalculationTests(unittest.TestCase):
         self.assertEqual((got["JUST_IN_TIME"]["game_after"], got["JUST_IN_TIME"]["game_after_name"]), ("g1", "Doom"))
         self.assertIsNone(got["COMPLETED_1_GAME"]["game_after_name"])  # most have no game
 
+    def play_a_day_each(self, user_id, first_day, days):
+        for offset in range(days):
+            self.play(user_id, datetime.datetime.combine(first_day, datetime.time(10)) + datetime.timedelta(days=offset), minutes=30)
+
+    LIFETIME_DAYS = "PLAYED_100_DAYS_LIFETIME"
+
+    def test_the_ones_with_no_season_limit_are_worked_out_once_per_player_over_every_season(self):
+        self.play_a_day_each(1, D(PAST - 1, 1, 1), 60)
+        self.play_a_day_each(1, D(PAST, 1, 1), 50)
+        got = self.changes(achievement_keys=[self.LIFETIME_DAYS])
+        self.assertEqual(set(got), {("add", 1, PAST, self.LIFETIME_DAYS)})  # the season of the day that reached them
+        self.assertEqual(got[("add", 1, PAST, self.LIFETIME_DAYS)].date_after, D(PAST, 1, 1) + datetime.timedelta(days=39))
+
+    def test_one_earned_twice_keeps_the_first_and_revokes_the_other(self):
+        self.play_a_day_each(1, D(PAST - 1, 1, 1), 60)
+        self.play_a_day_each(1, D(PAST, 1, 1), 50)
+        reached = D(PAST, 1, 1) + datetime.timedelta(days=39)
+        self.award(1, self.LIFETIME_DAYS, reached)
+        self.award(1, self.LIFETIME_DAYS, D(YEAR, 6, 1))
+        got = self.changes(achievement_keys=[self.LIFETIME_DAYS])
+        self.assertEqual(set(got), {("revoke", 1, YEAR, self.LIFETIME_DAYS)})
+
+    def test_their_season_is_not_asked_for_and_the_seasonal_pass_leaves_them_alone(self):
+        self.play_a_day_each(1, D(PAST - 1, 1, 1), 60)
+        self.play_a_day_each(1, D(PAST, 1, 1), 50)
+        self.award(1, self.LIFETIME_DAYS, D(PAST, 1, 1) + datetime.timedelta(days=39))
+        # a season that has nothing of it: the answer is the same, and the row of another season is not "revoked"
+        self.assertEqual(self.changes(season_list=[YEAR], achievement_keys=[self.LIFETIME_DAYS]), {})
+        everything = self.changes()
+        self.assertFalse([key for key in everything if key[3] == self.LIFETIME_DAYS])
+        self.assertEqual(
+            set(self.changes(user_ids=[1], season_list=[YEAR], achievement_keys=["PLAYED_1000_DAYS_LIFETIME", self.LIFETIME_DAYS])), set()
+        )
+
+    def test_one_that_is_switched_off_is_not_touched(self):
+        self.play_a_day_each(1, D(PAST - 1, 1, 1), 60)
+        self.play_a_day_each(1, D(PAST, 1, 1), 50)
+        self.db.query(models.Achievement).filter_by(key=self.LIFETIME_DAYS).update({"active": False})
+        self.db.commit()
+        self.assertEqual(self.changes(achievement_keys=[self.LIFETIME_DAYS]), {})
+
     def test_the_date_stays_in_its_season(self):
         collected = []
         checks = Achievements(season=PAST, collected=collected)

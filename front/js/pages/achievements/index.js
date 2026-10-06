@@ -32,7 +32,7 @@ const card = (a) => (a.hidden ? hiddenCard(a) : html`
   <article class="ach-card mine${a.secret ? ' secret' : ''}">
     ${picture(a)}
     <div class="ach-body">
-      <div class="ach-title"><strong>${a.title}</strong><span class="pf-tag done">Lo tienes</span>${a.secret ? html`<span class="pf-tag secret">Secreto</span>` : ''}</div>
+      <div class="ach-title"><strong>${a.title}</strong><span class="pf-tag done">Lo tienes</span>${a.secret ? html`<span class="pf-tag secret">Secreto</span>` : ''}${a.lifetime ? html`<span class="pf-tag muted">Único</span>` : ''}</div>
       <div class="pf-sub">${a.description}</div>
       ${who(a)}
     </div>

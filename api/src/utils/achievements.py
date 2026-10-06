@@ -8,6 +8,15 @@ from ..database import models
 from . import my_utils as utils
 
 
+# An achievement whose key ends like this has no season limit: it counts the whole history of a player and is
+# earned once, not once a season (see crud/achievements.py). Nothing else says so: the name is the rule.
+LIFETIME_SUFFIX = "_LIFETIME"
+
+
+def is_lifetime(key: str) -> bool:
+    return str(key).endswith(LIFETIME_SUFFIX)
+
+
 class AchievementsElems(Enum):
     # Format -> KEY = {"title":"", "message":""}
     # Time day
@@ -300,6 +309,88 @@ class AchievementsElems(Enum):
     SAVED_BY_THE_BELL = {
         "title": "Salvado por la campana",
         "message": "*{}* estaba jugando a _{}_ justo cuando cambió el año. Mientras otros se atragantaban con las uvas, él seguía con el mando en la mano.",
+    }
+
+    # No season limit: they count the whole history of a player and are earned once (the key ends in _LIFETIME)
+    PLAYED_1000_HOURS_GAME_LIFETIME = {
+        "title": "Una relación seria",
+        "message": "*{}* lleva 1000 horas en total jugando a _{}_, sumando todas las temporadas. Esto ya no es un juego, es una relación.",
+    }
+    PLAYED_100_DAYS_LIFETIME = {
+        "title": "100 días jugados (en total)",
+        "message": "*{}* suma 100 días jugados en total, contando todas las temporadas. La costumbre ya va cogiendo forma.",
+    }
+    PLAYED_200_DAYS_LIFETIME = {
+        "title": "200 días jugados (en total)",
+        "message": "*{}* suma 200 días jugados en total, contando todas las temporadas. La costumbre ya es ley.",
+    }
+    PLAYED_500_DAYS_LIFETIME = {
+        "title": "500 días jugados (en total)",
+        "message": "*{}* suma 500 días jugados en total, contando todas las temporadas. Más de un año y pico de partidas.",
+    }
+    PLAYED_1000_DAYS_LIFETIME = {
+        "title": "1000 días jugados (en total)",
+        "message": "*{}* suma 1000 días jugados en total, contando todas las temporadas. Casi tres años de su vida, con el mando en la mano.",
+    }
+    PLAYED_2000_DAYS_LIFETIME = {
+        "title": "2000 días jugados (en total)",
+        "message": "*{}* suma 2000 días jugados en total, contando todas las temporadas. Más de cinco años de partidas. Ya es patrimonio del grupo.",
+    }
+    PLAYED_5000_DAYS_LIFETIME = {
+        "title": "5000 días jugados (en total)",
+        "message": "*{}* suma 5000 días jugados en total, contando todas las temporadas. Casi catorce años jugando. Que alguien le dé las llaves de la ciudad.",
+    }
+    PLAYED_500_HOURS_LIFETIME = {
+        "title": "500 horas (en total)",
+        "message": "*{}* acumula 500 horas de juego en total, sumando todas las temporadas. Y las que le quedan.",
+    }
+    PLAYED_1000_HOURS_LIFETIME = {
+        "title": "1000 horas (en total)",
+        "message": "*{}* acumula 1000 horas de juego en total, sumando todas las temporadas. Son más de 41 días seguidos sin parar.",
+    }
+    PLAYED_2000_HOURS_LIFETIME = {
+        "title": "2000 horas (en total)",
+        "message": "*{}* acumula 2000 horas de juego en total, sumando todas las temporadas. Casi tres meses seguidos, sin dormir.",
+    }
+    PLAYED_5000_HOURS_LIFETIME = {
+        "title": "5000 horas (en total)",
+        "message": "*{}* acumula 5000 horas de juego en total, sumando todas las temporadas. Casi siete meses seguidos. Que descanse alguien.",
+    }
+    PLAYED_10000_HOURS_LIFETIME = {
+        "title": "10000 horas (en total)",
+        "message": "*{}* acumula 10000 horas de juego en total, sumando todas las temporadas. Dicen que con 10.000 horas se llega a maestro. De qué, aún está por ver.",
+    }
+    PLAYED_100_GAMES_LIFETIME = {
+        "title": "100 juegos jugados (en total)",
+        "message": "*{}* ha jugado a 100 juegos distintos en total, contando todas las temporadas. Y eso que solo cuenta los distintos.",
+    }
+    PLAYED_200_GAMES_LIFETIME = {
+        "title": "200 juegos jugados (en total)",
+        "message": "*{}* ha jugado a 200 juegos distintos en total, contando todas las temporadas. Una biblioteca que ya pide estantería nueva.",
+    }
+    PLAYED_500_GAMES_LIFETIME = {
+        "title": "500 juegos jugados (en total)",
+        "message": "*{}* ha jugado a 500 juegos distintos en total, contando todas las temporadas. Esto ya no es una biblioteca, es un museo.",
+    }
+    PLAYED_1000_GAMES_LIFETIME = {
+        "title": "1000 juegos jugados (en total)",
+        "message": "*{}* ha jugado a 1000 juegos distintos en total, contando todas las temporadas. Mil juegos distintos. Que le hagan un monumento.",
+    }
+    COMPLETED_100_GAMES_LIFETIME = {
+        "title": "100 juegos completados (en total)",
+        "message": "*{}* ha completado 100 juegos distintos en total, sumando todas las temporadas. Terminar lo que se empieza, convertido en estilo de vida.",
+    }
+    COMPLETED_200_GAMES_LIFETIME = {
+        "title": "200 juegos completados (en total)",
+        "message": "*{}* ha completado 200 juegos distintos en total, sumando todas las temporadas. Dos centenares de créditos finales.",
+    }
+    COMPLETED_500_GAMES_LIFETIME = {
+        "title": "500 juegos completados (en total)",
+        "message": "*{}* ha completado 500 juegos distintos en total, sumando todas las temporadas. Medio millar de finales. Alguien tiene mucho que contar.",
+    }
+    COMPLETED_1000_GAMES_LIFETIME = {
+        "title": "1000 juegos completados (en total)",
+        "message": "*{}* ha completado 1000 juegos distintos en total, sumando todas las temporadas. Mil juegos terminados. Ya no queda nada por ver.",
     }
 
     JUST_IN_TIME = {

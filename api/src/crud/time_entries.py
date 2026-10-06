@@ -266,7 +266,7 @@ def get_played_time_by_day(db: Session, user_id: int, season: int = None):
         db.query(func.DATE(sessions.c.start), func.sum(sessions.c.duration))
         .filter(
             sessions.c.user_id == user_id,
-            sessions.c.season == season,
+            _in_season(sessions.c.season, season),
         )
         .group_by(func.DATE(sessions.c.start))
         .all()
@@ -285,7 +285,7 @@ def get_played_time_by_game_and_day(db: Session, user_id: int, season: int = Non
         )
         .filter(
             sessions.c.user_id == user_id,
-            sessions.c.season == season,
+            _in_season(sessions.c.season, season),
         )
         .group_by(func.DATE(sessions.c.start), sessions.c.game_id)
         .all()

@@ -18,6 +18,8 @@ from sqlalchemy.orm import Session
 
 from ..database import models
 from ..utils import actions  # noqa: F401  (imported first: the crud and utils modules import each other)
+from ..utils import seasons
+from ..utils.achievements import is_lifetime
 from ..utils.logger import LogManager
 from .achievements import ALL_TOGETHER_PLAYERS, Achievements, Award
 
@@ -102,9 +104,18 @@ async def _expected(db: Session, user: models.User, season: int) -> dict[str, Aw
     return {award.key: award for award in collected}
 
 
-def _diff(user: models.User, season: int, expected: dict[str, Award], stored: list, titles: dict[str, str], allowed: set[str]) -> list[Change]:
+async def _expected_lifetime(db: Session, user: models.User) -> dict[str, Award]:
+    """What the user deserves of the achievements with no season limit: {achievement key: Award}."""
+    collected: list[Award] = []
+    checks = Achievements(silent=True, season=seasons.ALL, collected=collected)
+    await actions.check_user_lifetime(db, user, silent=True, checks=checks)
+    return {award.key: award for award in collected}
+
+
+def _diff(user: models.User, expected: dict[str, Award], stored: list, titles: dict[str, str], allowed: set[str]) -> list[Change]:
     """What to change to bring `stored` to `expected`, only for the achievements in `allowed` (the ones chosen
-    that are switched on): the rest is left exactly as it is."""
+    that are switched on): the rest is left exactly as it is. The season of a change is the one of the row it
+    touches, or the one the date of what is added falls in."""
     expected = {key: award for key, award in expected.items() if key in allowed}
     by_key: dict[str, list] = {}
     for row in stored:
@@ -114,7 +125,7 @@ def _diff(user: models.User, season: int, expected: dict[str, Award], stored: li
 
     def change(action, key, row=None, award=None, rows=()):
         return Change(
-            action, user.id, user.name, season, key, titles.get(key, key),
+            action, user.id, user.name, row.season if row else award.date.year, key, titles.get(key, key),
             row.date if row else None, award.date if award else None,
             row.game_id if row else None, award.game_id if award else None, tuple(rows),
         )
@@ -127,7 +138,7 @@ def _diff(user: models.User, season: int, expected: dict[str, Award], stored: li
         first, *repeated = rows
         if (first.date, first.game_id) != (award.date, award.game_id):
             changes.append(change("date", key, first, award, [first.id]))
-        changes.extend(change("revoke", key, row, None, [row.id]) for row in repeated)  # one per season
+        changes.extend(change("revoke", key, row, None, [row.id]) for row in repeated)  # one per season, or one in all
     for key, rows in by_key.items():
         changes.extend(change("revoke", key, row, None, [row.id]) for row in rows)
     return changes
@@ -145,6 +156,14 @@ async def _plan(
     titles = {key: title for key, title in db.query(models.Achievement.key, models.Achievement.title).all()}
     switched_on = {key for (key,) in db.query(models.Achievement.key).filter(models.Achievement.active == True)}  # noqa: E712
     allowed = switched_on if achievement_keys is None else switched_on & set(achievement_keys)
+    lifetime_keys = {key for key in allowed if is_lifetime(key)}
+    allowed -= lifetime_keys  # they have no season: they are worked out apart, once per user
+    stored_rows = (
+        db.query(models.UserAchievement.id, models.Achievement.key, models.UserAchievement.date, models.UserAchievement.game_id,
+                 models.UserAchievement.season)
+        .join(models.Achievement, models.Achievement.id == models.UserAchievement.achievement_id)
+        .order_by(models.UserAchievement.id)
+    )
     teamwork: dict[int, dict[int, datetime.date]] = {}  # season -> user -> day
     together: dict[int, dict[int, tuple[datetime.date, str]]] = {}  # season -> user -> (day, game)
     changes: list[Change] = []
@@ -160,14 +179,11 @@ async def _plan(
             if user.id in together[season]:
                 day, game_id = together[season][user.id]
                 expected["ALL_TOGETHER"] = Award(user.id, "ALL_TOGETHER", day, game_id)
-            stored = (
-                db.query(models.UserAchievement.id, models.Achievement.key, models.UserAchievement.date, models.UserAchievement.game_id)
-                .join(models.Achievement, models.Achievement.id == models.UserAchievement.achievement_id)
-                .filter(models.UserAchievement.user_id == user.id, models.UserAchievement.season == season)
-                .order_by(models.UserAchievement.id)
-                .all()
-            )
-            changes.extend(_diff(user, season, expected, stored, titles, allowed))
+            stored = stored_rows.filter(models.UserAchievement.user_id == user.id, models.UserAchievement.season == season).all()
+            changes.extend(_diff(user, expected, stored, titles, allowed))
+        if lifetime_keys:  # whatever the seasons asked for: they belong to none
+            stored = stored_rows.filter(models.UserAchievement.user_id == user.id, models.Achievement.key.in_(lifetime_keys)).all()
+            changes.extend(_diff(user, await _expected_lifetime(db, user), stored, titles, lifetime_keys))
     return changes
 
 

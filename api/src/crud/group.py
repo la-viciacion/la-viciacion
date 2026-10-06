@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from ..database import models
 from . import time_entries, users
+from ..utils.achievements import is_lifetime  # after the crud modules: they import each other
 
 
 def describe(message: str | None) -> str:
@@ -63,6 +64,7 @@ def achievements_catalog(db: Session, viewer_id: int) -> list[dict]:
             "title": row.title,
             "description": describe(row.message),
             "secret": bool(row.secret),
+            "lifetime": is_lifetime(row.key),  # earned once in a lifetime, not once a season
             "has_image": bool(row.has_image),
             "unlocked_by": len(who),
             "unlocked_by_me": True,

@@ -496,6 +496,12 @@ class AchievementsAdminTests(ManageTestCase):
         self.assertEqual((by_id[first]["awarded"], by_id[second]["awarded"]), (2, 0))
         self.assertFalse(by_id[first]["has_image"])
 
+    def test_the_catalogue_says_which_ones_have_no_season_limit(self):
+        by_key = {a["key"]: a for a in self.admin("GET", "/achievements").json()}
+        self.assertTrue(by_key["PLAYED_1000_HOURS_GAME_LIFETIME"]["lifetime"])
+        self.assertFalse(by_key["PLAYED_1000_HOURS_GAME"]["lifetime"])
+        self.assertEqual(sum(a["lifetime"] for a in by_key.values()), 20)
+
     def test_an_achievement_can_be_switched_off_and_on(self):
         first = self.ids()[0]
         self.assertTrue(next(a for a in self.admin("GET", "/achievements").json() if a["id"] == first)["active"])

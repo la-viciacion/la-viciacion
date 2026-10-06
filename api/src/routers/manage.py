@@ -24,6 +24,7 @@ from ..crud import achievements_recalc
 from ..crud import users as users_crud
 from ..database import models
 from ..utils import actions, ai, audit, my_utils, push, rawg_sync, seasons, settings, sql_dump
+from ..utils.achievements import is_lifetime
 from ..utils import email as mail
 from ..database.schemas import NOTES_MAX
 from ..utils.logger import LogManager
@@ -1052,6 +1053,7 @@ def list_achievements(db: Session = Depends(get_db)):
             "has_image": bool(r.has_image),
             "active": bool(r.active),
             "secret": bool(r.secret),
+            "lifetime": is_lifetime(r.key),
             "awarded": awarded.get(r.id, 0),
         }
         for r in rows

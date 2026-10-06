@@ -455,13 +455,18 @@ def played_game_dates(db: Session, user_id: int, season: int = None) -> list[dat
 
 def completed_entries(db: Session, user_id: int, season: int = None) -> list[tuple[datetime.date, str]]:
     """(day, game_id) of each completion of the season, oldest first (one per completed library entry, as
-    count_completed_games counts them)."""
+    count_completed_games counts them). Over every season, a game is one completion: the first."""
     season = seasons.or_current(season)
     when = func.coalesce(models.UserGame.completed_date, models.UserGame.started_date)
     query = db.query(when, models.UserGame.game_id).filter(models.UserGame.user_id == user_id, models.UserGame.completed == 1)
     if season != seasons.ALL:
         query = query.filter(models.UserGame.season == season)
-    return sorted((day, game_id) for day, game_id in query.all())
+        return sorted((day, game_id) for day, game_id in query.all())
+    first: dict[str, datetime.date] = {}
+    for day, game_id in query.all():
+        if game_id not in first or day < first[game_id]:
+            first[game_id] = day
+    return sorted((day, game_id) for game_id, day in first.items())
 
 
 def completed_game_dates(db: Session, user_id: int, season: int = None) -> list[datetime.date]:
@@ -780,6 +785,7 @@ async def after_completion(db: Session, entry: models.UserGame, silent: bool):
         db, user, completion_time, avg_time, entry.game_id, silent=silent
     )
     await achievements.user_completed_total_games(db, user, silent=silent)
+    await achievements.lifetime_view().user_completed_total_games(db, user, silent=silent)
     await achievements.completed_in_a_day(db, user, silent=silent)
 
     message = (
