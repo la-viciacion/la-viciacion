@@ -7,7 +7,7 @@ import { html, mount } from '../../lib/html.js';
 import { loadPlatforms } from '../../lib/platforms.js';
 import { toast } from '../../ui/toast.js';
 import { errorState, store } from './components.js';
-import { checkAchievementsDialog, deleteRow, pickGame } from './dialogs.js';
+import { deleteRow, pickGame } from './dialogs.js';
 import { ENTITIES, TABS } from './entities.js';
 import { openForm } from './form.js';
 import { SECTIONS, hashFor, sectionOf, tabFromHash } from './nav.js';
@@ -342,7 +342,6 @@ async function onClick(e) {
       }
       case 'prev': st.offset = Math.max(0, st.offset - PAGE); return load();
       case 'next': st.offset += PAGE; return load();
-      case 'check-achievements': return checkAchievementsDialog();
       case 'recalculate-achievements': {
         const { recalculateAchievementsFlow } = await import('./recalculate-achievements.js');
         return recalculateAchievementsFlow({ onDone: admin.reload });

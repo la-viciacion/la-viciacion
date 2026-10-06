@@ -120,18 +120,6 @@ def attention(db: Session = Depends(get_db)):
     }
 
 
-class CheckAchievementsBody(BaseModel):
-    user_id: Optional[int] = None
-    silent: bool = True
-
-
-@router.post("/check-achievements", status_code=202)
-def check_achievements(body: CheckAchievementsBody, background_tasks: BackgroundTasks):
-    """Check the achievements of all users, or one, against their sessions (in background)."""
-    background_tasks.add_task(actions.after_session_change, body.user_id, body.silent)
-    return {"message": "Comprobación en marcha"}
-
-
 @router.get("/recalculate-achievements/preview")
 def preview_recalculate_achievements(
     user_ids: Optional[list[int]] = Query(None),

@@ -83,13 +83,6 @@ class OverviewTests(OpsTestCase):
         body = self.admin("GET", "/attention").json()
         self.assertEqual((body["stale_timers"], body["stale_timers_oldest"], body["users_without_telegram"]), (0, [], 1))
 
-    def test_checking_the_achievements_runs_in_the_background(self):
-        everybody = self.admin("POST", "/check-achievements", json={})
-        self.assertEqual(everybody.status_code, 202)
-        self.background["after_session_change"].assert_called_with(None, True)
-        self.admin("POST", "/check-achievements", json={"user_id": self.ana, "silent": False})
-        self.background["after_session_change"].assert_called_with(self.ana, False)
-
     def test_recalculating_the_achievements_needs_the_phrase_and_runs_in_the_background(self):
         recalculate = mock.patch.object(manage.achievements_recalc, "recalculate")
         with recalculate as run:

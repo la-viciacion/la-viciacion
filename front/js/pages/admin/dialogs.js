@@ -5,7 +5,6 @@ import { toLocalISO } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
 import { modalHeader, openModal } from '../../ui/modal.js';
 import { toast } from '../../ui/toast.js';
-import { store } from './components.js';
 
 /** Yes/no dialog. Resolves to true only when the confirm button is pressed. */
 export function confirmDialog(title, body, { danger = false, ok = 'Confirmar' } = {}) {
@@ -116,31 +115,4 @@ export function uploadAchievementImage(row, admin) {
     }
   });
   input.click();
-}
-
-export function checkAchievementsDialog() {
-  const m = openModal(html`
-    ${modalHeader('Comprobar logros')}
-    <form class="adm-form" novalidate>
-      <p class="adm-sub">Vuelve a comprobar los logros a partir de las sesiones. Los totales, rankings y rachas se calculan siempre al momento, no hace falta recalcularlos. Se ejecuta en segundo plano.</p>
-      <label>Usuario
-        <select class="adm-input" name="user"><option value="">Todos</option>${store.users.map((u) => html`<option value="${u.id}">${u.username}</option>`)}</select>
-      </label>
-      <label class="adm-check"><input type="checkbox" name="silent" checked /> Sin notificaciones (Telegram)</label>
-      <div class="adm-actions"><button type="button" class="adm-btn" data-close>Cancelar</button><button class="adm-btn primary" type="submit">Comprobar</button></div>
-    </form>`);
-  m.el.querySelector('form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const form = e.currentTarget;
-    try {
-      await api('/manage/check-achievements', jsonRequest('POST', {
-        user_id: form.user.value ? Number(form.user.value) : null,
-        silent: form.silent.checked,
-      }));
-      m.close();
-      toast('Comprobación en marcha');
-    } catch (err) {
-      toast(err.message, 'err');
-    }
-  });
 }

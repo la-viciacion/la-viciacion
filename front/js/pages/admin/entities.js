@@ -241,7 +241,7 @@ export const ENTITIES = {
     label: 'Logros',
     nav: 'Logros',
     description: 'Logros que se pueden conseguir: su título, mensaje e imagen, y si están activos. Uno inactivo no lo consigue nadie, no se anuncia, no se recalcula y no aparece en la página de logros; los nuevos empiezan inactivos hasta que los actives (y luego puedes recalcularlos).',
-    toolbarActions: [{ act: 'check-achievements', label: 'Comprobar logros' }, { act: 'recalculate-achievements', label: 'Recalcular logros…' }],
+    toolbarActions: [{ act: 'recalculate-achievements', label: 'Recalcular logros…' }],
     endpoint: '/manage/achievements',
     paged: false,
     columns: [
@@ -267,7 +267,7 @@ ENTITIES.awards = {
   label: 'Logros concedidos',
   nav: 'Concedidos',
   description: 'Qué ha desbloqueado cada jugador y cuándo.',
-  toolbarActions: [{ act: 'check-achievements', label: 'Comprobar logros' }, { act: 'recalculate-achievements', label: 'Recalcular logros…' }],
+  toolbarActions: [{ act: 'recalculate-achievements', label: 'Recalcular logros…' }],
   endpoint: '/manage/user-achievements',
   filters: ['user', 'game'],
   selects: [
