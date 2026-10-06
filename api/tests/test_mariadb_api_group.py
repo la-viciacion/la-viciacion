@@ -110,17 +110,31 @@ class AchievementsCatalogTests(ApiTestCase):
         self.assertNotIn(self.second, shown)  # nobody can have it: not even as a hidden one
         self.assertEqual(len(self.catalog("ana")), self.scalar("SELECT COUNT(*) FROM achievements WHERE active = 1 AND valid_from_season <= :y", y=TODAY().year) + 1)
 
-    def test_who_has_it_how_many_times_and_when_last_the_latest_first(self):
-        last = TODAY() - timedelta(days=400)
-        self.award(self.ana, self.first, last)
-        self.award(self.ana, self.first, TODAY() - timedelta(days=5))  # another season: it is earned once per season
-        self.award(self.bea, self.first, TODAY() - timedelta(days=2))
-        self.award(self.gone, self.first, TODAY())  # a player who no longer plays still earned it
+    def test_who_has_it_in_the_season_and_when_last_the_latest_first(self):
+        year = TODAY().year
+        self.award(self.ana, self.first, datetime.date(year - 1, 5, 1))  # earned once per season: another season's is not counted
+        self.award(self.ana, self.first, datetime.date(year, 1, 5))
+        self.award(self.bea, self.first, datetime.date(year, 1, 20))
+        self.award(self.gone, self.first, datetime.date(year, 2, 1))  # a player who no longer plays still earned it
         first = next(a for a in self.catalog() if a["id"] == self.first)
         self.assertEqual(first["unlocked_by"], 3)
         self.assertEqual([(p["name"], p["times"], p["last"]) for p in first["players"]],
-                         [("Gone", 1, TODAY().isoformat()), ("Bea", 1, (TODAY() - timedelta(days=2)).isoformat()),
-                          ("Ana", 2, (TODAY() - timedelta(days=5)).isoformat())])
+                         [("Gone", 1, f"{year}-02-01"), ("Bea", 1, f"{year}-01-20"), ("Ana", 1, f"{year}-01-05")])
+
+    def test_a_past_season_shows_what_that_season_had(self):
+        year = TODAY().year
+        self.award(self.ana, self.first, datetime.date(year - 1, 5, 1))
+        self.award(self.bea, self.first, datetime.date(year, 1, 20))
+        past = self.api("GET", "/group/achievements", as_user="ana", params={"season": year - 1}).json()
+        first = next(a for a in past if a["id"] == self.first)
+        self.assertEqual((first["unlocked_by"], first["unlocked_by_me"], first["players"][0]["name"]), (1, True, "Ana"))
+        now = next(a for a in self.catalog() if a["id"] == self.first)
+        self.assertEqual((now["unlocked_by"], now["unlocked_by_me"], now["players"][0]["name"]), (1, False, "Bea"))
+        self.assertIsNotNone(now["description"])  # ana knows what it is: she earned it once
+
+    def test_a_season_that_has_not_started_is_refused(self):
+        self.assertEqual(self.api("GET", "/group/achievements", as_user="ana", params={"season": TODAY().year + 1}).status_code, 400)
+        self.assertEqual(self.api("GET", "/group/achievements", as_user="ana", params={"season": "x"}).status_code, 422)
 
     def test_the_emergency_account_never_counts(self):
         god = self.user("admin", admin=True)  # the emergency account

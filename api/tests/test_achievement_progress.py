@@ -106,17 +106,88 @@ class CatalogProgressTests(unittest.TestCase):
         self.assertIsNone(got["PLAYED_100_HOURS"]["progress"])
         self.assertTrue(got["PLAYED_100_HOURS"]["unlocked_by_me"])
 
-    def test_one_earned_in_a_past_season_still_shows_this_season(self):
+    def test_one_earned_in_a_past_season_still_shows_this_season_and_is_known(self):
         self.db.add(models.UserAchievement(user_id=1, achievement_id=2, date=datetime.date(YEAR - 1, 6, 9)))
         self.db.commit()
         got = self.catalog()
-        self.assertTrue(got["PLAYED_100_HOURS"]["unlocked_by_me"])
+        self.assertFalse(got["PLAYED_100_HOURS"]["unlocked_by_me"])  # not this season
         self.assertEqual(got["PLAYED_100_HOURS"]["progress"]["current"], 6)
+        self.assertIsNotNone(got["PLAYED_100_HOURS"]["description"])  # but whoever earned it once knows what it is
 
     def test_a_lifetime_one_earned_in_a_past_season_has_no_bar(self):
         self.db.add(models.UserAchievement(user_id=1, achievement_id=8, date=datetime.date(YEAR - 1, 6, 9)))
         self.db.commit()
         self.assertIsNone(self.catalog()["PLAYED_500_HOURS_LIFETIME"]["progress"])
+
+
+class SeasonViewTests(unittest.TestCase):
+    """The season achievements of a chosen season: what is said of them is about that season only."""
+
+    def setUp(self):
+        self.db = make_session()
+        self.db.add_all([
+            models.User(id=1, username="ana", name="Ana", is_active=1, is_admin=0),
+            models.User(id=2, username="bea", name="Bea", is_active=1, is_admin=0),
+            models.Achievement(id=1, key="PLAYED_100_HOURS", title="100 h", message="*{}* 100 horas", active=True, secret=False, special=0, valid_from_season=2023),
+            models.Achievement(id=2, key="PLAYED_7_DAYS", title="7 días", message="x", active=True, secret=False, special=0, valid_from_season=YEAR),
+            models.Achievement(id=3, key="PLAYED_500_HOURS_LIFETIME", title="500 h", message="x", active=True, secret=False, special=0, valid_from_season=2023),
+            models.Achievement(id=4, key="EARLY_RISER", title="Madrugador", message="x", active=True, secret=True, special=0, valid_from_season=2023),
+        ])
+        past = datetime.date(YEAR - 1, 5, 1)
+        self.db.add_all([
+            models.UserAchievement(user_id=1, achievement_id=1, date=past),
+            models.UserAchievement(user_id=2, achievement_id=1, date=past),
+            models.UserAchievement(user_id=2, achievement_id=1, date=datetime.date(YEAR, 2, 1)),
+            models.UserAchievement(user_id=1, achievement_id=3, date=past),
+            models.UserAchievement(user_id=1, achievement_id=4, date=past),
+        ])
+        self.db.commit()
+
+    def view(self, season=None, viewer=1):
+        return {a.get("key", a["id"]): a for a in group.achievements_catalog(self.db, viewer, TODAY, season)}
+
+    def test_a_past_season_says_who_had_it_then_and_whether_the_viewer_did(self):
+        got = self.view(YEAR - 1)
+        self.assertTrue(got["PLAYED_100_HOURS"]["unlocked_by_me"])
+        self.assertEqual(got["PLAYED_100_HOURS"]["unlocked_by"], 2)
+        self.assertEqual([p["times"] for p in got["PLAYED_100_HOURS"]["players"]], [1, 1])  # once a season
+
+    def test_the_running_season_counts_only_this_season(self):
+        got = self.view()
+        self.assertFalse(got["PLAYED_100_HOURS"]["unlocked_by_me"])
+        self.assertEqual(got["PLAYED_100_HOURS"]["unlocked_by"], 1)
+        self.assertEqual(got["PLAYED_100_HOURS"]["players"][0]["name"], "Bea")
+        self.assertEqual(self.view(YEAR)["PLAYED_100_HOURS"]["unlocked_by"], 1)
+
+    def test_an_achievement_that_did_not_exist_yet_is_not_listed(self):
+        self.assertNotIn("PLAYED_7_DAYS", self.view(YEAR - 1))
+        self.assertIn("PLAYED_7_DAYS", self.view(YEAR))
+
+    def test_a_closed_season_has_no_bars(self):
+        past = self.view(YEAR - 1)
+        self.assertTrue(all(a["progress"] is None for a in past.values() if not a.get("hidden")))
+        self.assertIsNotNone(self.view(YEAR)["PLAYED_100_HOURS"]["progress"])
+
+    def test_the_lifetime_ones_do_not_depend_on_the_season(self):
+        for season in (YEAR - 1, YEAR):
+            got = self.view(season)["PLAYED_500_HOURS_LIFETIME"]
+            self.assertTrue(got["unlocked_by_me"])
+            self.assertTrue(got["lifetime"])
+
+    def test_a_secret_one_stays_known_to_whoever_earned_it_in_any_season(self):
+        got = self.view(YEAR)["EARLY_RISER"]
+        self.assertFalse(got["hidden"])
+        self.assertFalse(got["unlocked_by_me"])  # not this season
+        self.assertTrue(self.view(YEAR - 1)["EARLY_RISER"]["unlocked_by_me"])
+        self.assertTrue(self.view(YEAR, viewer=2)[4]["hidden"])  # bea never had it
+
+    def test_a_future_season_is_refused_by_the_route(self):
+        from fastapi import HTTPException
+        from src.routers import group as route
+
+        with self.assertRaises(HTTPException) as ctx:
+            route.get_achievements(YEAR + 1, models.User(id=1), self.db)
+        self.assertEqual(ctx.exception.status_code, 400)
 
 
 if __name__ == "__main__":

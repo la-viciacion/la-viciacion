@@ -1,11 +1,13 @@
 // Achievements page (#/achievements): the achievements the viewer has unlocked with their picture and description, and
 // who of the group has unlocked them and when; the rest are listed hidden. They come in two blocks, the ones earned
 // once a season and the lifetime ones (earned once, counting the whole history). The ones that add something up show
-// how far the viewer is from them. GET /group/achievements (derived, nothing stored).
+// how far the viewer is from them. The season block has a pill per season: each shows only the achievements of that
+// season, with who had them and whether the viewer did then. GET /group/achievements (derived, nothing stored).
 import { API_BASE, api } from '../../lib/api.js';
 import { formatDate, formatPlayers } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
 import { progressPercent, progressText } from '../../lib/achievement-progress.js';
+import * as seasons from '../../lib/seasons.js';
 import { specialClass, specialTag } from '../../lib/special.js';
 import { titleView } from '../../ui/profile-summary.js';
 
@@ -59,29 +61,50 @@ const card = (a) => (a.hidden ? hiddenCard(a) : html`
   </article>`);
 
 const BLOCKS = [
-  { title: 'De temporada', note: 'Se consiguen una vez por temporada y cuentan solo lo jugado en ella.', pick: (a) => !a.lifetime },
+  { title: 'De temporada', note: 'Se consiguen una vez por temporada y cuentan solo lo jugado en ella.', pick: (a) => !a.lifetime, seasonal: true },
   { title: 'Lifetime', note: 'Cuentan todo tu historial y se consiguen una sola vez.', pick: (a) => a.lifetime },
 ];
 
-const block = ({ title, note }, list) => html`
+let shown = seasons.current(); // the season on screen in the season block
+
+const pills = () => html`
+  <div class="pf-season ach-seasons" role="group" aria-label="Temporada">${seasons.available().map((year) => html`
+    <button type="button" class="pf-season-badge" data-season="${year}" aria-pressed="${String(year === shown)}">Temporada ${year}</button>`)}
+  </div>`;
+
+const block = ({ title, note, seasonal }, list) => html`
   <section class="ach-block">
     <div class="section-header">${titleView(title)}</div>
     <div class="pf-sub ach-note">${note} Tienes ${list.filter((a) => a.unlocked_by_me).length} de ${list.length}.</div>
+    ${seasonal ? pills() : ''}
     <div class="ach-grid">${list.map(card)}</div>
   </section>`;
 
+// The season block always shows (with its pills), even when the season has nothing: another one may have.
+async function load(main) {
+  const target = main.querySelector('#achList');
+  try {
+    const list = await api(shown === seasons.current() ? '/group/achievements' : `/group/achievements?season=${shown}`);
+    if (!list) return;
+    const mine = list.filter((a) => a.unlocked_by_me).length;
+    mount(target, html`
+      <div class="pf-sub ach-count" role="status">Tienes ${mine} de ${list.length}</div>
+      ${BLOCKS.map((b) => ({ b, items: list.filter(b.pick) })).filter(({ b, items }) => items.length || b.seasonal).map(({ b, items }) => block(b, items))}`);
+  } catch (err) {
+    mount(target, html`<div class="pf-empty">Error cargando los logros: ${err.message}</div>`);
+  }
+}
+
 export async function render({ main }) {
+  shown = seasons.current();
   mount(main, html`
     <h1 class="pf-title pg-title">Logros</h1>
     <div id="achList"><div class="loading-spinner">Cargando logros...</div></div>`);
-  try {
-    const list = await api('/group/achievements');
-    if (!list) return;
-    const mine = list.filter((a) => a.unlocked_by_me).length;
-    mount(main.querySelector('#achList'), html`
-      <div class="pf-sub ach-count" role="status">Tienes ${mine} de ${list.length}</div>
-      ${BLOCKS.map((b) => ({ b, items: list.filter(b.pick) })).filter(({ items }) => items.length).map(({ b, items }) => block(b, items))}`);
-  } catch (err) {
-    mount(main.querySelector('#achList'), html`<div class="pf-empty">Error cargando los logros: ${err.message}</div>`);
-  }
+  main.querySelector('#achList').addEventListener('click', (e) => {
+    const pill = e.target.closest('[data-season]');
+    if (!pill || pill.getAttribute('aria-pressed') === 'true') return;
+    shown = Number(pill.dataset.season);
+    load(main);
+  });
+  await load(main);
 }

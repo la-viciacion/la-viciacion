@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { fromInputValue, toInputValue } from '../js/lib/format.js';
-import { current, isCurrent } from '../js/lib/seasons.js';
+import { available, current, isCurrent } from '../js/lib/seasons.js';
 import { confirmQuestion, sessionProblem } from '../js/pages/home/sessions.js';
 
 const NOW = new Date(2026, 8, 29, 20, 0); // Tue 29 Sep 2026 20:00 local
@@ -11,6 +11,11 @@ test('datetime-local helpers round trip', () => {
   assert.equal(toInputValue('2026-09-29T13:05:07'), '2026-09-29T13:05');
   assert.equal(fromInputValue('2026-09-29T13:05'), '2026-09-29T13:05:00');
   assert.equal(fromInputValue('2026-09-29T13:05:30'), '2026-09-29T13:05:30');
+});
+
+test('the seasons of the achievements page go from the first one to the running one, newest first', () => {
+  assert.deepEqual(available(NOW), [2026, 2025, 2024, 2023]);
+  assert.deepEqual(available(new Date(2023, 5, 1)), [2023]);
 });
 
 test('seasons', () => {

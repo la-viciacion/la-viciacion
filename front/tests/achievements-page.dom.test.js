@@ -140,6 +140,40 @@ test('an achievement that adds something up shows how far the player is, and the
   assert.doesNotMatch(text('.ach-card')[1], /\//);
 });
 
+test('the season block has a pill per season, newest first, and the running one is pressed', () => {
+  const year = new Date().getFullYear();
+  const pills = [...document.querySelectorAll('.ach-seasons [data-season]')];
+  assert.deepEqual(pills.map((p) => p.dataset.season), Array.from({ length: year - 2022 }, (_, i) => String(year - i)));
+  assert.deepEqual(pills.filter((p) => p.getAttribute('aria-pressed') === 'true').map((p) => p.dataset.season), [String(year)]);
+  assert.equal(document.querySelectorAll('.ach-seasons').length, 1);
+  assert.equal(document.querySelector('.ach-seasons').closest('.ach-block').querySelector('.section-title').textContent, 'De temporada');
+});
+
+test('choosing a season asks for it and shows what that season had, keeping the lifetime block', async () => {
+  const year = new Date().getFullYear();
+  const calls = installApi({ 'GET /group/achievements': ({ path }) => (path.includes(`season=${year - 1}`)
+    ? [{ ...LIST[0], title: 'Del año pasado' }, { ...LIST[0], id: 9, lifetime: true, title: 'Para siempre' }]
+    : LIST) });
+  await page.render({ main: main() });
+  await settle();
+  document.querySelector(`.ach-seasons [data-season="${year - 1}"]`).click();
+  await settle();
+  assert.equal(calls.at(-1).path, `/group/achievements?season=${year - 1}`);
+  assert.deepEqual(text('.ach-block:first-of-type .ach-title strong'), ['Del año pasado']);
+  assert.deepEqual(text('.ach-block .section-title'), ['De temporada', 'Lifetime']);
+  assert.equal(document.querySelector(`.ach-seasons [aria-pressed="true"]`).dataset.season, String(year - 1));
+  document.querySelector(`.ach-seasons [data-season="${year}"]`).click();
+  await settle();
+  assert.equal(calls.at(-1).path, '/group/achievements'); // the running season is the default one
+});
+
+test('a season with no achievements still shows its pills so another can be chosen', async () => {
+  installApi({ 'GET /group/achievements': [] });
+  await page.render({ main: main() });
+  await settle();
+  assert.equal(document.querySelectorAll('.ach-seasons [data-season]').length > 0, true);
+});
+
 test('an error says so', async () => {
   installApi({ 'GET /group/achievements': json({ detail: 'boom' }, 500) });
   await page.render({ main: main() });
