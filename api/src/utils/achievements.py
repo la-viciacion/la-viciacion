@@ -284,7 +284,7 @@ class AchievementsElems(Enum):
 
     ALL_TOGETHER = {
         "title": "Todos a una",
-        "message": "*{}* están jugando a la vez (tres o más) a _{}_. Como en los viejos tiempos de las LAN party.",
+        "message": "*{}* están jugando a la vez a _{}_. Como en los viejos tiempos de las LAN party.",
     }
 
     PRODIGAL_SON = {
