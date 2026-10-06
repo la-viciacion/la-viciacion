@@ -73,8 +73,8 @@ async function route() {
   showLoading();
 
   try {
-    const page = await loadPage(location.hash);
-    const user = await api('/auth/active_user');
+    // the page's code and the user travel together: nothing waits for the other
+    const [page, user] = await Promise.all([loadPage(location.hash), api('/auth/active_user')]);
     if (!user || !isCurrent()) return;
 
     if (page.adminOnly && !user.is_admin) {
