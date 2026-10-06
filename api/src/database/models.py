@@ -162,7 +162,7 @@ class Achievement(Base):
     # a secret one is hidden from whoever has not unlocked it, and announced to the group without saying which
     # (the player gets the whole notice privately)
     secret = Column(Boolean, nullable=False, server_default=text("0"))
-    # 0 = an ordinary one; 1, 2 and 3 are special ones with an aura of their own colour (utils/achievements.py)
+    # 0 = an ordinary one; 1, 2 and 3 are special ones: silver, gold and purple aura (front/js/lib/special.js)
     special = Column(SmallInteger, nullable=False, server_default=text("0"))
     # the first season it can be earned (before it nothing is awarded, recalculated or shown); see utils/achievements.py
     valid_from_season = Column(SmallInteger, nullable=False, server_default=text("2023"))

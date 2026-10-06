@@ -11,7 +11,7 @@ from ..crud import time_entries, users, games
 from ..database import models, schemas
 from ..utils import actions as actions
 from ..utils import my_utils as utils
-from ..utils.achievements import SPECIAL_EMOJI, AchievementsElems, first_season, is_lifetime
+from ..utils.achievements import AchievementsElems, first_season, is_lifetime
 from ..utils.logger import LogManager
 from ..utils import seasons, streaks
 
@@ -345,9 +345,8 @@ class Achievements:
         if they have a device)."""
         silent = silent or self.silent
         secret, special = self._flags(db, ach.name)
-        if special in SPECIAL_EMOJI:
-            emoji = SPECIAL_EMOJI[special]
-            message = f"{emoji} Logro especial de nivel {special} {emoji}\n{message}"
+        if special:
+            message = f"Logro especial de nivel {special}\n{message}"
         if not secret:
             await utils.send_message(message, silent, image=image)
             return

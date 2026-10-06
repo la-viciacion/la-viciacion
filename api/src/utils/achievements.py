@@ -17,11 +17,6 @@ def is_lifetime(key: str) -> bool:
     return str(key).endswith(LIFETIME_SUFFIX)
 
 
-# A special achievement (achievements.special) has a level, and the level is a colour: 1 silver, 2 gold, 3 purple.
-# 0 is an ordinary one. The front paints the aura; the announcements say the level, with an emoji of its colour.
-SPECIAL_EMOJI = {1: "🥈", 2: "🥇", 3: "💜"}
-
-
 # The season an achievement starts to count in when the code creates it: "since", which every definition has (a
 # test fails if one does not). The ones that already existed say 2023, the first season of the app; the new ones
 # say their own (2027 for the ones added in 2026). An admin can change it afterwards: the database is the truth.
