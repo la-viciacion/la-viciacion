@@ -37,7 +37,7 @@ class AchievementCheckTests(unittest.IsolatedAsyncioTestCase):
         self.db.commit()
         self.ach = Achievements()
         self.ach.populate_achievements(self.db)
-        self.db.query(models.Achievement).update({"valid_from_season": 2023})  # the new ones start in 2027: not what is tested here
+        self.db.query(models.Achievement).update({"valid_from_season": 2023, "special": 0, "secret": False})  # the new ones start in 2027, and some are special or secret: not what is tested here
         self.db.commit()
         self.sent = mock.AsyncMock()
         patcher = mock.patch.object(ach_module.utils, "send_message", self.sent)
@@ -541,6 +541,25 @@ class AchievementCheckTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("7 días jugados", self.message())
         private.assert_not_awaited()
 
+    async def test_a_special_one_says_so_with_its_level_and_is_announced_in_full(self):
+        private = self.make_secret()
+        self.db.query(models.Achievement).filter_by(key="PLAYED_7_DAYS").update({"special": 3})
+        self.db.commit()
+        await self.ach.user_played_total_days(self.db, USER, self.days(7))
+        group = self.message()
+        self.assertIn("Logro especial de nivel 3", group)
+        self.assertIn("7 días jugados", group)  # it is not secret: nothing is held back
+        private.assert_not_awaited()
+
+    async def test_a_special_and_secret_one_is_anonymous_to_the_group_and_special_to_the_player(self):
+        private = self.make_secret("PLAYED_7_DAYS")
+        self.db.query(models.Achievement).filter_by(key="PLAYED_7_DAYS").update({"special": 1})
+        self.db.commit()
+        await self.ach.user_played_total_days(self.db, USER, self.days(7))
+        self.assertIn("ha desbloqueado un logro oculto", self.message())
+        self.assertNotIn("especial", self.message())  # it would give it away
+        self.assertIn("Logro especial de nivel 1", private.await_args.args[1])
+
     async def test_a_silent_check_tells_nobody_not_even_the_player(self):
         private = self.make_secret("PLAYED_7_DAYS")
         await self.ach.user_played_total_days(self.db, USER, self.days(7), silent=True)
@@ -651,7 +670,7 @@ class LifetimeTests(unittest.IsolatedAsyncioTestCase):
         self.db.add_all([models.Game(id="g1", name="Doom"), models.Game(id="g2", name="Quake")])
         self.db.commit()
         Achievements().populate_achievements(self.db)
-        self.db.query(models.Achievement).update({"valid_from_season": 2023})  # the new ones start in 2027: not what is tested here
+        self.db.query(models.Achievement).update({"valid_from_season": 2023, "special": 0, "secret": False})  # the new ones start in 2027, and some are special or secret: not what is tested here
         self.db.commit()
         self.sent = mock.AsyncMock()
         patcher = mock.patch.object(ach_module.utils, "send_message", self.sent)
@@ -838,6 +857,31 @@ class CatalogueTests(unittest.TestCase):
         for ach in ach_module.AchievementsElems:
             expected = 2023 if ach.name in LEGACY else 2027  # the first ones: 2023; every one added since: 2027
             self.assertEqual(first_season(ach), expected, ach.name)
+
+
+    def test_the_levels_and_secrets_the_definitions_give_are_valid(self):
+        for ach in ach_module.AchievementsElems:
+            self.assertIn(ach.value.get("special", 0), (0, 1, 2, 3), ach.name)
+            self.assertIn(ach.value.get("secret", False), (True, False), ach.name)
+
+    def test_a_new_row_is_created_as_special_or_secret_when_its_definition_says_so(self):
+        db = make_session()
+        Achievements().populate_achievements(db)
+        rows = {row.key: row for row in db.query(models.Achievement)}
+        self.assertEqual((rows["PLAYED_42_GAMES"].special, rows["PLAYED_42_GAMES"].secret), (1, False))
+        self.assertEqual((rows["JUST_IN_TIME"].special, rows["JUST_IN_TIME"].secret), (1, True))
+        self.assertEqual((rows["EARLY_RISER"].special, rows["EARLY_RISER"].secret), (0, True))
+        self.assertEqual((rows["PLAYED_7_DAYS"].special, rows["PLAYED_7_DAYS"].secret), (0, False))
+        for ach in ach_module.AchievementsElems:
+            self.assertEqual(rows[ach.name].special, ach.value.get("special", 0), ach.name)
+
+    def test_what_the_migration_sets_is_about_achievements_that_exist(self):
+        from tests.test_migrations import load_script_directory
+
+        migration = load_script_directory().get_revision("029_achievement_levels").module
+        names = {ach.name for ach in ach_module.AchievementsElems}
+        self.assertLessEqual({key for key, _ in migration.SPECIAL} | set(migration.SECRET), names)  # a typo would silently do nothing
+        self.assertTrue(all(level in (1, 2, 3) for _, level in migration.SPECIAL))
 
 
 class QueryEconomyTests(unittest.IsolatedAsyncioTestCase):

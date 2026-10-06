@@ -204,11 +204,20 @@
 .ach-card { display: flex; flex-direction: column; gap: 10px; padding: 12px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); }
 .ach-card.mine { border-color: var(--border-accent); background: var(--gradient-card); }
 .ach-card.hidden { opacity: 0.6; }
-.ach-card.secret { border-color: var(--accent-gold); box-shadow: 0 0 14px rgba(245, 197, 66, 0.45), inset 0 0 18px rgba(245, 197, 66, 0.08); }
-.ach-card.secret .ach-img { box-shadow: 0 0 10px rgba(245, 197, 66, 0.6); }
-.ach-card.hidden.secret { opacity: 0.9; }
-.pf-row.ach-secret { box-shadow: inset 3px 0 0 var(--accent-gold); }
-.pf-tag.secret { background: rgba(245, 197, 66, 0.15); color: var(--accent-gold); }
+.ach-card.locked { opacity: 0.55; }
+/* A special one shines in the colour of its level, unlocked or not */
+.ach-card[class*="special-"] { border-color: rgb(var(--aura-rgb)); box-shadow: 0 0 16px rgba(var(--aura-rgb), 0.55), inset 0 0 20px rgba(var(--aura-rgb), 0.12); animation: ach-shine 2.8s ease-in-out infinite alternate; }
+.ach-card[class*="special-"] .ach-img { box-shadow: 0 0 12px rgba(var(--aura-rgb), 0.75); }
+.ach-card.hidden[class*="special-"] { opacity: 0.9; }
+.ach-card.locked[class*="special-"] { opacity: 0.75; }
+@keyframes ach-shine {
+  from { box-shadow: 0 0 10px rgba(var(--aura-rgb), 0.35), inset 0 0 14px rgba(var(--aura-rgb), 0.08); }
+  to { box-shadow: 0 0 24px rgba(var(--aura-rgb), 0.8), inset 0 0 24px rgba(var(--aura-rgb), 0.16); }
+}
+@media (prefers-reduced-motion: reduce) { .ach-card[class*="special-"] { animation: none; } }
+.pf-row[class*="special-"] { box-shadow: inset 3px 0 0 rgb(var(--aura-rgb)), inset 14px 0 18px -14px rgba(var(--aura-rgb), 0.6); }
+.pf-tag[class*="special-"] { background: rgba(var(--aura-rgb), 0.16); color: rgb(var(--aura-rgb)); }
+.pf-tag.secret { background: rgba(255, 255, 255, 0.9); color: #0a0a14; }
 .ach-img { width: 56px; height: 56px; border-radius: var(--radius-sm); object-fit: cover; flex: none; }
 .ach-img-placeholder { display: flex; align-items: center; justify-content: center; background: var(--bg-surface); font-size: 1.5rem; }
 .ach-head { display: flex; align-items: center; gap: 12px; }

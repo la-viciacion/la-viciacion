@@ -180,6 +180,10 @@
 
 .adm-badge.gray { background: var(--bg-card-hover); color: var(--text-secondary); }
 
+.adm-badge.ink { background: rgba(255,255,255,0.9); color: #0a0a14; }
+
+.adm-badge[class*="special-"] { background: rgba(var(--aura-rgb), 0.16); color: rgb(var(--aura-rgb)); box-shadow: 0 0 8px rgba(var(--aura-rgb), 0.45); }
+
 .adm-pager { display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-top: 12px; color: var(--text-secondary); font-size: 0.85rem; }
 
 .adm-body { padding: 12px 20px 0; color: var(--text-secondary); font-size: 0.92rem; }

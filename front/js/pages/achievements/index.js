@@ -3,6 +3,7 @@
 import { API_BASE, api } from '../../lib/api.js';
 import { formatDate, formatPlayers } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
+import { specialClass, specialTag } from '../../lib/special.js';
 
 export const active = null; // it belongs to no item of the top bar
 
@@ -16,10 +17,10 @@ const who = (a) => {
   return html`<div class="pf-sub">Lo han conseguido ${a.unlocked_by}: ${formatPlayers(names, 4)}. Último: ${formatDate(a.players[0].last)}</div>`;
 };
 
-// What the viewer has not unlocked says nothing: not even the name. A secret one still has its golden aura, so
-// that everybody knows there are special ones to unlock.
+// A secret one that the viewer has not unlocked says nothing: not even the name. A special one still has the aura
+// of its level, so that everybody knows there are special ones to unlock.
 const hiddenCard = (a) => html`
-  <article class="ach-card hidden${a.secret ? ' secret' : ''}">
+  <article class="ach-card hidden${specialClass(a.special)}">
     <div class="ach-head">
       <div class="ach-img ach-img-placeholder" aria-hidden="true">🔒</div>
       <div class="ach-title"><strong>Logro oculto</strong></div>
@@ -29,12 +30,12 @@ const hiddenCard = (a) => html`
     </div>
   </article>`;
 
-// A secret one has a golden aura: it was announced to the group without saying which.
+// One the viewer has not unlocked (and is not secret) is shown dimmed: it is what there is to aim for.
 const card = (a) => (a.hidden ? hiddenCard(a) : html`
-  <article class="ach-card mine${a.secret ? ' secret' : ''}">
+  <article class="ach-card ${a.unlocked_by_me ? 'mine' : 'locked'}${specialClass(a.special)}">
     <div class="ach-head">
       ${picture(a)}
-      <div class="ach-title"><strong>${a.title}</strong>${a.secret ? html`<span class="pf-tag secret">Secreto</span>` : ''}${a.lifetime ? html`<span class="pf-tag muted">Único</span>` : ''}</div>
+      <div class="ach-title"><strong>${a.title}</strong>${a.secret ? html`<span class="pf-tag secret">Secreto</span>` : ''}${specialTag(a.special)}${a.lifetime ? html`<span class="pf-tag muted">Único</span>` : ''}</div>
     </div>
     <div class="ach-body">
       <div class="pf-sub">${a.description}</div>
