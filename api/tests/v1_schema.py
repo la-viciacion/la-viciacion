@@ -5,7 +5,7 @@ existed, are removed). It includes what a v1 database had and the migration chai
 archives (`logs`, `request_sync`, `other_tags`, `core_notifications`, the `*_historical` and
 `*_2024`/`*_legacy` tables, the Clockify columns), which migration 000 does not create because
 a database that starts empty never needs them. Applied migrations are immutable, so this stays valid
-forever; it is the starting point of tests/test_mariadb_v1_upgrade.py.
+forever; it is the starting point of tests/test_mariadb_migration_v1_upgrade.py.
 """
 
 # table name -> CREATE TABLE statement, in the order the dump listed them

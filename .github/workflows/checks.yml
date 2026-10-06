@@ -7,7 +7,7 @@ on:
   workflow_call:
     inputs:
       scope:
-        description: "The checks to run: all, or a comma-separated subset of api-tests, bot-tests, front-tests, mariadb, or none"
+        description: "The checks to run: all, or a comma-separated subset of api-tests, bot-tests, front-tests, mariadb, mariadb-migrations, or none"
         type: string
         default: all
       build-services:
@@ -85,7 +85,7 @@ jobs:
   # The MariaDB that docker-compose.yml pins is the one the tests run on: it is read from there, so what is
   # tested and what is deployed cannot drift apart.
   mariadb-image:
-    if: inputs.scope == 'all' || contains(format(',{0},', inputs.scope), ',mariadb,')
+    if: inputs.scope == 'all' || contains(format(',{0},', inputs.scope), ',mariadb,') || contains(format(',{0},', inputs.scope), ',mariadb-migrations,')
     runs-on: ubuntu-latest
     outputs:
       image: ${{ steps.pin.outputs.image }}
@@ -99,11 +99,24 @@ jobs:
           fi
           echo "image=$image" >> "$GITHUB_OUTPUT"
 
+  # Routes, scheduler, app boot...: on every change of the API.
   api-mariadb:
     needs: mariadb-image
+    if: inputs.scope == 'all' || contains(format(',{0},', inputs.scope), ',mariadb,')
     uses: ./.github/workflows/mariadb-tests.yml
     with:
       image: ${{ needs.mariadb-image.outputs.image }}
+      tests: routes
+      expect-pin: true
+
+  # The migrations (most of the time of the MariaDB tests): only when something they depend on changes.
+  api-mariadb-migrations:
+    needs: mariadb-image
+    if: inputs.scope == 'all' || contains(format(',{0},', inputs.scope), ',mariadb-migrations,')
+    uses: ./.github/workflows/mariadb-tests.yml
+    with:
+      image: ${{ needs.mariadb-image.outputs.image }}
+      tests: migrations
       expect-pin: true
 
   # Build every image and look inside it before anything is published.
