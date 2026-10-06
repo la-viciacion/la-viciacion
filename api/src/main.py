@@ -11,7 +11,7 @@ from .database.database import SessionLocal
 from .crud import users as users_crud
 from .crud.achievements import Achievements
 from .utils import push as push_utils
-from .utils import scheduler, settings
+from .utils import achievement_images, scheduler, settings
 from .routers import activity, basic, games, group, manage, push, statistics, timers, users, utils
 from .utils.logger import LogManager
 from .utils.request_log import RequestLogMiddleware
@@ -58,6 +58,11 @@ with SessionLocal() as db:
     settings.seed_from_env(db)
     push_utils.ensure_vapid_keys(db)  # the routers' `push` module has the same name
     Achievements().populate_achievements(db)
+    try:
+        logger.info(f"Achievement images from disk: {achievement_images.load_into_database(db)}")
+    except Exception as e:  # a picture must never keep the API from starting
+        db.rollback()
+        logger.error(f"Error loading the achievement images: {e}")
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
