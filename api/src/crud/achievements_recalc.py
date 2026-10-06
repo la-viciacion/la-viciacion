@@ -129,10 +129,10 @@ def _diff(user: models.User, season: int, expected: dict[str, Award], stored: li
     return changes
 
 
-async def _plan(db: Session, user_id: int | None, only_seasons: set[int] | None = None) -> list[Change]:
+async def _plan(db: Session, user_ids: list[int] | None = None, only_seasons: set[int] | None = None) -> list[Change]:
     query = db.query(models.User).filter(models.not_god())
-    if user_id is not None:
-        query = query.filter(models.User.id == user_id)
+    if user_ids is not None:
+        query = query.filter(models.User.id.in_(user_ids))
     titles = {key: title for key, title in db.query(models.Achievement.key, models.Achievement.title).all()}
     teamwork: dict[int, dict[int, datetime.date]] = {}  # season -> user -> day
     together: dict[int, dict[int, tuple[datetime.date, str]]] = {}  # season -> user -> (day, game)
@@ -160,22 +160,22 @@ async def _plan(db: Session, user_id: int | None, only_seasons: set[int] | None 
     return changes
 
 
-def plan(db: Session, user_id: int | None = None) -> list[Change]:
-    """What a recalculation would change, for everybody or one user. It changes nothing."""
-    return asyncio.run(_plan(db, user_id))
+def plan(db: Session, user_ids: list[int] | None = None, season_list: list[int] | None = None) -> list[Change]:
+    """What a recalculation would change, for every player and season or only the ones given. It changes nothing."""
+    return asyncio.run(_plan(db, user_ids, None if season_list is None else set(season_list)))
 
 
 async def recalculate_user(db: Session, user_id: int, season_list: list[int]) -> list[Change]:
     """Work out again the achievements of one user in some seasons and apply it, in silence. It is what
     follows a session that was edited or deleted: what it earned and no longer holds is revoked. The
     caller is already in an event loop and holds the lock of the checks."""
-    changes = await _plan(db, user_id, set(season_list))
+    changes = await _plan(db, [user_id], set(season_list))
     apply(db, changes)
     return changes
 
 
-def preview(db: Session, user_id: int | None = None) -> dict:
-    changes = plan(db, user_id)
+def preview(db: Session, user_ids: list[int] | None = None, season_list: list[int] | None = None) -> dict:
+    changes = plan(db, user_ids, season_list)
     counts = {action: sum(1 for change in changes if change.action == action) for action in ("add", "date", "revoke")}
     return {"counts": counts, "changes": [change.as_dict() for change in changes]}
 
@@ -201,7 +201,7 @@ def apply(db: Session, changes: list[Change]) -> None:
         raise
 
 
-def recalculate(user_id: int | None = None) -> None:
+def recalculate(user_ids: list[int] | None = None, season_list: list[int] | None = None) -> None:
     """Background-task entrypoint of the admin panel: work everything out again and apply it, in silence.
 
     Under the lock of the other checks, with its own DB session, like the rest of the follow-ups."""
@@ -210,7 +210,7 @@ def recalculate(user_id: int | None = None) -> None:
     with actions._check_lock:
         try:
             with SessionLocal() as db:
-                changes = plan(db, user_id)
+                changes = plan(db, user_ids, season_list)
                 apply(db, changes)
             logger.info(f"Achievements recalculated: {len(changes)} changes")
         except Exception as e:

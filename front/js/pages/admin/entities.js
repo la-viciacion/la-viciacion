@@ -11,7 +11,7 @@
 import { formatDuration, formatTimestamp } from '../../lib/format.js';
 import { html } from '../../lib/html.js';
 import { platformList, platformName } from '../../lib/platforms.js';
-import { badge, store } from './components.js';
+import { badge, seasonYears, store } from './components.js';
 import { ENTITY_OPTIONS, describe, detailParts } from './audit-labels.js';
 import { closeTimerNow, uploadAchievementImage } from './dialogs.js';
 
@@ -20,11 +20,10 @@ const duration = (sec) => (sec == null ? '—' : formatDuration(sec));
 const platform = (id) => platformName(id) || '—';
 
 // Filters shared by the tables that have seasons / platforms (options are read when the toolbar is drawn)
-const firstSeason = 2023;
 const seasonSelect = {
   key: 'season',
   label: 'Temporada',
-  options: () => [['', 'Temporada: todas'], ...Array.from({ length: new Date().getFullYear() - firstSeason + 1 }, (_, i) => String(new Date().getFullYear() - i)).map((y) => [y, y])],
+  options: () => [['', 'Temporada: todas'], ...seasonYears().map((y) => [String(y), y])],
 };
 const platformSelect = { key: 'platform', label: 'Plataforma', options: () => [['', 'Plataforma: todas'], ...platformList().map((p) => [p.id, p.name])] };
 

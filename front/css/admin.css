@@ -195,6 +195,9 @@
 
 .adm-form label.adm-check { flex-direction: row; }
 
+.adm-choices { display: flex; flex-wrap: wrap; gap: 6px 18px; border: 0; padding: 0; margin: 0; }
+.adm-choices legend { padding: 0; margin-bottom: 6px; font-size: 0.85rem; color: var(--text-secondary); font-weight: 600; }
+
 .adm-field-game { display: flex; flex-direction: column; gap: 6px; font-size: 0.85rem; color: var(--text-secondary); font-weight: 600; }
 
 .adm-field-game > div { display: flex; align-items: center; gap: 10px; }

@@ -130,7 +130,16 @@ class RecalculationTests(unittest.TestCase):
     def test_one_user_can_be_recalculated_alone(self):
         self.play_days(1, PAST, 7)
         self.play_days(2, PAST, 7)
-        self.assertEqual({user_id for _, user_id, *_ in self.changes(user_id=2)}, {2})
+        self.assertEqual({user_id for _, user_id, *_ in self.changes(user_ids=[2])}, {2})
+
+    def test_some_players_and_some_seasons_can_be_chosen(self):
+        self.play_days(1, PAST, 7)
+        self.play_days(1, PAST - 1, 7)
+        self.play_days(2, PAST, 7)
+        got = self.changes(user_ids=[1, 2], season_list=[PAST])
+        self.assertEqual({(user_id, season) for _, user_id, season, _ in got}, {(1, PAST), (2, PAST)})
+        self.assertEqual({(user_id, season) for _, user_id, season, _ in self.changes(season_list=[PAST - 1])}, {(1, PAST - 1)})
+        self.assertEqual(self.changes(user_ids=[1], season_list=[YEAR]), {})
 
     def test_every_season_is_worked_out_on_its_own(self):
         self.play_days(1, PAST, 7)

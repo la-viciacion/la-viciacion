@@ -96,9 +96,15 @@ class OverviewTests(OpsTestCase):
             for body in ({}, {"confirm": "si"}, {"confirm": "recalcular"}):
                 self.assertIn(self.admin("POST", "/recalculate-achievements", json=body).status_code, (400, 422))
             run.assert_not_called()
-            response = self.admin("POST", "/recalculate-achievements", json={"confirm": "RECALCULAR", "user_id": self.ana})
-        self.assertEqual(response.status_code, 202)
-        run.assert_called_once_with(self.ana)
+            for body in ({"confirm": "RECALCULAR", "user_ids": []}, {"confirm": "RECALCULAR", "season_list": []}):
+                self.assertEqual(self.admin("POST", "/recalculate-achievements", json=body).status_code, 422)  # none is not everybody
+            run.assert_not_called()
+            response = self.admin("POST", "/recalculate-achievements", json={"confirm": "RECALCULAR", "user_ids": [self.ana], "season_list": [2025]})
+            self.assertEqual(response.status_code, 202)
+            run.assert_called_once_with([self.ana], [2025])
+            run.reset_mock()
+            self.admin("POST", "/recalculate-achievements", json={"confirm": "RECALCULAR"})
+            run.assert_called_once_with(None, None)
 
     def test_the_preview_lists_the_changes_and_makes_none(self):
         for day in range(1, 8):
@@ -107,6 +113,17 @@ class OverviewTests(OpsTestCase):
         self.assertEqual(body["counts"], {"add": 2, "date": 0, "revoke": 0})
         self.assertEqual({c["key"] for c in body["changes"]}, {"PLAYED_7_DAYS", "STREAK_7_DAYS"})
         self.assertEqual(self.scalar("SELECT COUNT(*) FROM users_achievements"), 0)
+
+    def test_the_preview_can_be_limited_to_players_and_seasons(self):
+        for day in range(1, 8):
+            self.session(self.ana, "celeste", datetime.datetime(seasons.current() - 1, 3, day, 10), 60)
+        params = lambda **kw: {key: value for key, value in (("user_ids", kw.get("users")), ("season_list", kw.get("seasons"))) if value}  # noqa: E731
+        everything = self.admin("GET", "/recalculate-achievements/preview").json()["counts"]["add"]
+        self.assertEqual(everything, 2)
+        self.assertEqual(self.admin("GET", "/recalculate-achievements/preview", params=params(users=[self.ana])).json()["counts"]["add"], 2)
+        self.assertEqual(self.admin("GET", "/recalculate-achievements/preview", params=params(users=[self.ana + 999])).json()["counts"]["add"], 0)
+        self.assertEqual(self.admin("GET", "/recalculate-achievements/preview", params=params(seasons=[seasons.current() - 1])).json()["counts"]["add"], 2)
+        self.assertEqual(self.admin("GET", "/recalculate-achievements/preview", params=params(seasons=[seasons.current()])).json()["counts"]["add"], 0)
 
 
 class RawgSyncTests(OpsTestCase):

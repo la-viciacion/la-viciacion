@@ -133,27 +133,32 @@ def check_achievements(body: CheckAchievementsBody, background_tasks: Background
 
 
 @router.get("/recalculate-achievements/preview")
-def preview_recalculate_achievements(user_id: Optional[int] = None, db: Session = Depends(get_db)):
-    """What recalculating every achievement of every season would change (add, correct, revoke), for all
-    the players or one. It changes nothing."""
-    return achievements_recalc.preview(db, user_id)
+def preview_recalculate_achievements(
+    user_ids: Optional[list[int]] = Query(None),
+    season_list: Optional[list[int]] = Query(None),
+    db: Session = Depends(get_db),
+):
+    """What recalculating the achievements would change (add, correct, revoke), for all the players and
+    seasons or only the ones given. It changes nothing."""
+    return achievements_recalc.preview(db, user_ids, season_list)
 
 
 RECALCULATE_ACHIEVEMENTS_PHRASE = "RECALCULAR"
 
 
 class RecalculateAchievementsBody(BaseModel):
-    user_id: Optional[int] = None
+    user_ids: Optional[list[int]] = Field(None, min_length=1)  # none: every player
+    season_list: Optional[list[int]] = Field(None, min_length=1)  # none: every season
     confirm: str  # must equal RECALCULATE_ACHIEVEMENTS_PHRASE (the panel shows the preview first and asks for it)
 
 
 @router.post("/recalculate-achievements", status_code=202)
 def recalculate_achievements(body: RecalculateAchievementsBody, background_tasks: BackgroundTasks):
-    """Work out again every achievement of every season and bring what is stored to it (in background).
-    It never notifies anybody. It rewrites dates and revokes, so it has to be confirmed explicitly."""
+    """Work out again the achievements of every player and season, or only the ones given, and bring what is
+    stored to it (in background). It never notifies anybody. It rewrites dates and revokes, so it has to be confirmed explicitly."""
     if body.confirm != RECALCULATE_ACHIEVEMENTS_PHRASE:
         raise HTTPException(status_code=400, detail="Confirmación incorrecta")
-    background_tasks.add_task(achievements_recalc.recalculate, body.user_id)
+    background_tasks.add_task(achievements_recalc.recalculate, body.user_ids, body.season_list)
     return {"message": "Recálculo en marcha"}
 
 
