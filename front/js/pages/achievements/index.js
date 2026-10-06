@@ -1,9 +1,13 @@
 // Achievements page (#/achievements): the achievements the viewer has unlocked with their picture and description, and
-// who of the group has unlocked them and when; the rest are listed hidden. GET /group/achievements (derived, nothing stored).
+// who of the group has unlocked them and when; the rest are listed hidden. They come in two blocks, the ones earned
+// once a season and the lifetime ones (earned once, counting the whole history). The ones that add something up show
+// how far the viewer is from them. GET /group/achievements (derived, nothing stored).
 import { API_BASE, api } from '../../lib/api.js';
 import { formatDate, formatPlayers } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
+import { progressPercent, progressText } from '../../lib/achievement-progress.js';
 import { specialClass, specialTag } from '../../lib/special.js';
+import { titleView } from '../../ui/profile-summary.js';
 
 export const active = null; // it belongs to no item of the top bar
 
@@ -30,6 +34,15 @@ const hiddenCard = (a) => html`
     </div>
   </article>`;
 
+// How far the viewer is from an achievement that adds something up: a bar and "35 / 100 horas".
+const progressBar = (p) => (p ? html`
+  <div class="ach-progress">
+    <div class="ach-bar" role="progressbar" aria-valuemin="0" aria-valuemax="${p.target}" aria-valuenow="${p.current}" aria-label="${progressText(p)}">
+      <div class="ach-bar-fill" style="width: ${progressPercent(p)}%"></div>
+    </div>
+    <div class="pf-sub">${progressText(p)}</div>
+  </div>` : '');
+
 // One the viewer has not unlocked (and is not secret) is shown dimmed, with its name only: what it is about is for
 // them to work out.
 const card = (a) => (a.hidden ? hiddenCard(a) : html`
@@ -40,9 +53,22 @@ const card = (a) => (a.hidden ? hiddenCard(a) : html`
     </div>
     <div class="ach-body">
       ${a.description ? html`<div class="pf-sub">${a.description}</div>` : ''}
+      ${progressBar(a.progress)}
       ${who(a)}
     </div>
   </article>`);
+
+const BLOCKS = [
+  { title: 'De temporada', note: 'Se consiguen una vez por temporada y cuentan solo lo jugado en ella.', pick: (a) => !a.lifetime },
+  { title: 'Lifetime', note: 'Cuentan todo tu historial y se consiguen una sola vez.', pick: (a) => a.lifetime },
+];
+
+const block = ({ title, note }, list) => html`
+  <section class="ach-block">
+    <div class="section-header">${titleView(title)}</div>
+    <div class="pf-sub ach-note">${note} Tienes ${list.filter((a) => a.unlocked_by_me).length} de ${list.length}.</div>
+    <div class="ach-grid">${list.map(card)}</div>
+  </section>`;
 
 export async function render({ main }) {
   mount(main, html`
@@ -54,7 +80,7 @@ export async function render({ main }) {
     const mine = list.filter((a) => a.unlocked_by_me).length;
     mount(main.querySelector('#achList'), html`
       <div class="pf-sub ach-count" role="status">Tienes ${mine} de ${list.length}</div>
-      <div class="ach-grid">${list.map(card)}</div>`);
+      ${BLOCKS.map((b) => ({ b, items: list.filter(b.pick) })).filter(({ items }) => items.length).map(({ b, items }) => block(b, items))}`);
   } catch (err) {
     mount(main.querySelector('#achList'), html`<div class="pf-empty">Error cargando los logros: ${err.message}</div>`);
   }

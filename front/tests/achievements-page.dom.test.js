@@ -96,9 +96,48 @@ test('one that has no season limit says it is unique, and the others do not', as
   installApi({ 'GET /group/achievements': [{ ...LIST[0], lifetime: true }, { ...LIST[0], id: 3, title: 'Normal' }, LIST[1]] });
   await page.render({ main: main() });
   await settle();
-  assert.match(text('.ach-card')[0], /Único/);
-  assert.doesNotMatch(text('.ach-card')[1], /Único/);
-  assert.doesNotMatch(text('.ach-card')[2], /Único/);  // what is hidden says nothing
+  // the season block comes first: the normal one, the hidden one, then the lifetime one
+  assert.doesNotMatch(text('.ach-card')[0], /Único/);
+  assert.doesNotMatch(text('.ach-card')[1], /Único/);  // what is hidden says nothing
+  assert.match(text('.ach-card')[2], /Único/);
+});
+
+test('there are two blocks, the season ones and the lifetime ones, each with the cards that belong to it', async () => {
+  installApi({ 'GET /group/achievements': [
+    { ...LIST[0], lifetime: true, title: 'Para siempre' }, { ...LIST[0], id: 3, title: 'De año' },
+    { id: 4, hidden: true, unlocked_by_me: false, lifetime: true }, LIST[1],
+  ] });
+  await page.render({ main: main() });
+  await settle();
+  assert.deepEqual(text('.ach-block .section-title'), ['De temporada', 'Lifetime']);
+  const [season, lifetime] = document.querySelectorAll('.ach-block');
+  assert.deepEqual([...season.querySelectorAll('.ach-title strong')].map((e) => e.textContent), ['De año', 'Logro oculto']);
+  assert.deepEqual([...lifetime.querySelectorAll('.ach-title strong')].map((e) => e.textContent), ['Para siempre', 'Logro oculto']);
+  assert.match(season.querySelector('.ach-note').textContent, /Tienes 1 de 2/);
+  assert.match(lifetime.querySelector('.ach-note').textContent, /Tienes 1 de 2/);
+  assert.equal(text('.ach-count')[0], 'Tienes 2 de 4');
+});
+
+test('a block with nothing in it is not shown', () => {
+  assert.deepEqual(text('.ach-block .section-title'), ['De temporada']);
+});
+
+test('an achievement that adds something up shows how far the player is, and the others show no bar', async () => {
+  installApi({ 'GET /group/achievements': [
+    { id: 5, key: 'PLAYED_100_HOURS', title: '100 horas', unlocked_by: 0, unlocked_by_me: false, players: [], progress: { current: 35, target: 100, unit: 'horas' } },
+    { id: 6, key: 'EARLY', title: 'Sin barra', unlocked_by: 0, unlocked_by_me: false, players: [], progress: null },
+    { id: 7, key: 'DONE', title: 'Hecho', unlocked_by: 1, unlocked_by_me: true, players: [{ user_id: 1, name: 'Ana', times: 1, last: '2026-02-01' }], progress: null },
+  ] });
+  await page.render({ main: main() });
+  await settle();
+  assert.equal(document.querySelectorAll('.ach-bar').length, 1);
+  const bar = document.querySelector('.ach-bar');
+  assert.equal(bar.getAttribute('role'), 'progressbar');
+  assert.equal(bar.getAttribute('aria-valuenow'), '35');
+  assert.equal(bar.getAttribute('aria-valuemax'), '100');
+  assert.match(document.querySelector('.ach-bar-fill').getAttribute('style'), /width: 35%/);
+  assert.match(text('.ach-card')[0], /35 \/ 100 horas/);
+  assert.doesNotMatch(text('.ach-card')[1], /\//);
 });
 
 test('an error says so', async () => {

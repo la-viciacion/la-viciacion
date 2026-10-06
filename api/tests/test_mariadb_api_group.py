@@ -70,14 +70,14 @@ class AchievementsCatalogTests(ApiTestCase):
         by_id = {a["id"]: a for a in self.catalog()}
         self.assertTrue(by_id[self.first]["secret"])
         # whoever lacks it knows that it exists, and nothing more
-        self.assertEqual(by_id[self.second], {"id": self.second, "hidden": True, "unlocked_by_me": False, "secret": True, "special": 0})
+        self.assertEqual(by_id[self.second], {"id": self.second, "hidden": True, "unlocked_by_me": False, "secret": True, "special": 0, "lifetime": False})
 
     def test_the_level_of_a_special_one_is_known_to_everybody_even_when_it_is_secret_and_locked(self):
         with self.engine.begin() as conn:
             conn.execute(text("UPDATE achievements SET special = 3, secret = 1 WHERE id = :a"), {"a": self.first})
             conn.execute(text("UPDATE achievements SET special = 1 WHERE id = :a"), {"a": self.second})
         by_id = {a["id"]: a for a in self.catalog()}
-        self.assertEqual(by_id[self.first], {"id": self.first, "hidden": True, "unlocked_by_me": False, "secret": True, "special": 3})  # the lock and its aura
+        self.assertEqual(by_id[self.first], {"id": self.first, "hidden": True, "unlocked_by_me": False, "secret": True, "special": 3, "lifetime": False})  # the lock and its aura
         self.assertEqual((by_id[self.second]["hidden"], by_id[self.second]["special"]), (False, 1))  # dimmed, with its colour
         self.award(self.ana, self.first, TODAY())
         self.assertEqual({a["id"]: a["special"] for a in self.catalog()}[self.first], 3)

@@ -1,6 +1,7 @@
 """What the group has in common, derived when asked (nothing stored): the achievements and who has them, the
 players and what is public of each one. Only active players are listed (never the emergency account), but who has
 an achievement counts everybody who earned it, even if they no longer play."""
+import datetime
 import re
 
 from sqlalchemy import func
@@ -8,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from ..database import models
 from . import time_entries, users
+from .achievement_progress import Progress
 from ..utils.achievements import is_lifetime  # after the crud modules: they import each other
 from ..utils import seasons
 
@@ -28,13 +30,25 @@ def unlocked_ids(db: Session, user_id: int) -> set[int]:
     return {a for (a,) in db.query(models.UserAchievement.achievement_id).filter(models.UserAchievement.user_id == user_id)}
 
 
-def achievements_catalog(db: Session, viewer_id: int) -> list[dict]:
+def unlocked_this_season(db: Session, user_id: int) -> set[int]:
+    return {
+        a for (a,) in db.query(models.UserAchievement.achievement_id).filter(
+            models.UserAchievement.user_id == user_id, models.UserAchievement.season == seasons.current()
+        )
+    }
+
+
+def achievements_catalog(db: Session, viewer_id: int, today: datetime.date | None = None) -> list[dict]:
     """Every achievement with who has unlocked it (and how many times: once per season) and when last. The ones the
     viewer has not unlocked come with their name and picture but **no description** (the front dims them: the player
     has to work out what they are about) unless they are secret: those come hidden, with no key, title, description,
     picture or players, only that they exist, whether they are secret and their special level (so that everybody
-    knows there are special ones to unlock)."""
+    knows there are special ones to unlock). The ones that add something up (hours, days, games, completions, a
+    streak) come with the viewer's `progress` towards them, until they have them: a season one counts the running
+    season, so one earned in a past season still shows how far this season is."""
     mine = unlocked_ids(db, viewer_id)
+    this_season = unlocked_this_season(db, viewer_id)
+    progress = Progress(db, viewer_id, today)
     unlocked: dict[int, dict[int, dict]] = {}
     for achievement_id, user_id, username, name, date in (
         db.query(models.UserAchievement.achievement_id, models.UserAchievement.user_id, models.User.username, models.User.name,
@@ -58,7 +72,10 @@ def achievements_catalog(db: Session, viewer_id: int) -> list[dict]:
         if (not row.active or row.valid_from_season > seasons.current()) and row.id not in mine:
             continue  # switched off, or not valid yet: it does not exist yet, not even as a hidden one
         if row.id not in mine and row.secret:
-            catalog.append({"id": row.id, "hidden": True, "unlocked_by_me": False, "secret": True, "special": row.special})
+            catalog.append({
+                "id": row.id, "hidden": True, "unlocked_by_me": False, "secret": True, "special": row.special,
+                "lifetime": is_lifetime(row.key),  # which block of the page it goes in; says nothing about what it is
+            })
             continue
         who = sorted(unlocked.get(row.id, {}).values(), key=lambda w: (w["last"], w["name"].lower()), reverse=True)
         catalog.append({
@@ -70,6 +87,8 @@ def achievements_catalog(db: Session, viewer_id: int) -> list[dict]:
             "secret": bool(row.secret),
             "special": row.special,
             "lifetime": is_lifetime(row.key),  # earned once in a lifetime, not once a season
+            "progress": None if (row.id in mine if is_lifetime(row.key) else row.id in this_season)
+            else progress.of(row.key, row.valid_from_season, is_lifetime(row.key)),
             "has_image": bool(row.has_image),
             "unlocked_by": len(who),
             "unlocked_by_me": row.id in mine,
