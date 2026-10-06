@@ -20,9 +20,11 @@ const who = (a) => {
 // that everybody knows there are special ones to unlock.
 const hiddenCard = (a) => html`
   <article class="ach-card hidden${a.secret ? ' secret' : ''}">
-    <div class="ach-img ach-img-placeholder" aria-hidden="true">🔒</div>
-    <div class="ach-body">
+    <div class="ach-head">
+      <div class="ach-img ach-img-placeholder" aria-hidden="true">🔒</div>
       <div class="ach-title"><strong>Logro oculto</strong></div>
+    </div>
+    <div class="ach-body">
       <div class="pf-sub">Desbloquéalo para descubrirlo.</div>
     </div>
   </article>`;
@@ -30,9 +32,11 @@ const hiddenCard = (a) => html`
 // A secret one has a golden aura: it was announced to the group without saying which.
 const card = (a) => (a.hidden ? hiddenCard(a) : html`
   <article class="ach-card mine${a.secret ? ' secret' : ''}">
-    ${picture(a)}
-    <div class="ach-body">
+    <div class="ach-head">
+      ${picture(a)}
       <div class="ach-title"><strong>${a.title}</strong>${a.secret ? html`<span class="pf-tag secret">Secreto</span>` : ''}${a.lifetime ? html`<span class="pf-tag muted">Único</span>` : ''}</div>
+    </div>
+    <div class="ach-body">
       <div class="pf-sub">${a.description}</div>
       ${who(a)}
     </div>

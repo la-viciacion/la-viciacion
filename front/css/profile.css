@@ -201,7 +201,7 @@
 /* Achievements page */
 .ach-count { margin: 0 0 12px; }
 .ach-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
-.ach-card { display: flex; gap: 12px; padding: 12px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); }
+.ach-card { display: flex; flex-direction: column; gap: 10px; padding: 12px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); }
 .ach-card.mine { border-color: var(--border-accent); background: var(--gradient-card); }
 .ach-card.hidden { opacity: 0.6; }
 .ach-card.secret { border-color: var(--accent-gold); box-shadow: 0 0 14px rgba(245, 197, 66, 0.45), inset 0 0 18px rgba(245, 197, 66, 0.08); }
@@ -211,6 +211,7 @@
 .pf-tag.secret { background: rgba(245, 197, 66, 0.15); color: var(--accent-gold); }
 .ach-img { width: 56px; height: 56px; border-radius: var(--radius-sm); object-fit: cover; flex: none; }
 .ach-img-placeholder { display: flex; align-items: center; justify-content: center; background: var(--bg-surface); font-size: 1.5rem; }
+.ach-head { display: flex; align-items: center; gap: 12px; }
 .ach-body { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .ach-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 @media (max-width: 640px) { .ach-grid { grid-template-columns: 1fr; } }
