@@ -12,7 +12,7 @@ because some tests read files outside their own directory (tests/test_ci_scope.p
 import json
 import sys
 
-ALL_CHECKS = ("api-tests", "bot-tests", "front-tests", "mariadb", "mariadb-migrations")
+ALL_CHECKS = ("api-tests", "bot-tests", "front-tests", "mariadb")
 ALL_SERVICES = ("api", "front", "bot")
 
 # Nothing in these is executed, built or read by a test.
@@ -22,24 +22,10 @@ INERT_FILES = {
     ".github/pull_request_template.md", ".github/dependabot.yml", ".github/copilot-instructions.md",
 }
 
-# Checks that run when a path starts with the prefix (or equals the file). A prefix ending in "/" or "*" matches
-# everything that starts with it.
-# `mariadb` is the MariaDB tests but the migration ones (routes, scheduler, app boot...); `mariadb-migrations` is
-# test_mariadb_migration*.py, which run alembic dozens of times and are most of the time: they run only when
-# something they depend on changes (the migrations, the models and the config alembic loads, the version of the
-# libraries and of MariaDB, and the tests and fixtures of their own).
+# Checks that run when a path starts with the prefix (or equals the file).
 RULES = (
-    # the API: its own tests, the tests on a real MariaDB (not the migration ones) and the image
+    # the API: its own tests, the tests on a real MariaDB and the image
     ("api/", {"api-tests", "mariadb"}, {"api"}),
-    ("api/alembic/", {"mariadb-migrations"}, set()),
-    ("api/alembic.ini", {"mariadb-migrations"}, set()),
-    ("api/entrypoint.sh", {"mariadb-migrations"}, set()),  # it is what runs `alembic upgrade head` on every start
-    ("api/src/database/", {"mariadb-migrations"}, set()),
-    ("api/src/config.py", {"mariadb-migrations"}, set()),
-    ("api/requirements.txt", {"mariadb-migrations"}, set()),
-    ("api/tests/mariadb_db.py", {"mariadb-migrations"}, set()),
-    ("api/tests/v1_*", {"mariadb-migrations"}, set()),  # the synthetic v1 database
-    ("api/tests/test_mariadb_migration*", {"mariadb-migrations"}, set()),
     # the bot: its tests and image; the API tests that use the bot as the real client (test_mariadb_bot_contract)
     # and the one that checks the variables it reads against .env.template
     ("bot/src/", {"bot-tests", "api-tests", "mariadb"}, {"bot"}),
@@ -50,7 +36,7 @@ RULES = (
     ("front/", {"front-tests"}, {"front"}),
     # test_env_template and test_deployment_pins read these from the repository root
     (".env.template", {"api-tests"}, set()),
-    ("docker-compose.yml", {"api-tests", "mariadb", "mariadb-migrations"}, set()),  # it pins the MariaDB version the tests run on
+    ("docker-compose.yml", {"api-tests", "mariadb"}, set()),  # it pins the MariaDB version the tests run on
     ("docker-compose.dev.yml", {"api-tests"}, set()),
 )
 
@@ -63,7 +49,7 @@ def scope(paths):
             continue
         matched = False
         for prefix, rule_checks, rule_services in RULES:
-            if path == prefix or (prefix.endswith(("/", "*")) and path.startswith(prefix.rstrip("*"))):
+            if path == prefix or (prefix.endswith("/") and path.startswith(prefix)):
                 # the specific rules are listed first and do not stop the broader ones: bot/src/ also
                 # matches bot/, which only adds what it already has
                 checks |= rule_checks
