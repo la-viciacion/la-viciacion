@@ -3,7 +3,9 @@ name: Deploy
 # Deploys on demand (Actions tab -> Deploy -> Run workflow). It connects over SSH and the server holds the
 # whole procedure; each key can run one script and nothing else (`command=` in its authorized_keys entry).
 #   dev   builds main from the checkout of the dev stack (deploy.sh).
-#   prod  builds a release tag on the server (`latest` = the newest vX.Y.Z tag, or e.g. 2.0.0).
+#   prod  builds a release tag on the server (`latest` = the newest vX.Y.Z tag, or e.g. 2.0.0). It refuses a tag
+#         whose "Release images" run (every check) did not pass on the commit the tag points to.
+#   dev   needs no such check: main only receives pull requests whose CI was green (branch protection).
 # Each target has its own key (DEPLOY_SSH_KEY_DEV / DEPLOY_SSH_KEY_PROD); the host, the user and the host key are
 # shared. They are repository secrets, not environment secrets, on purpose: GitHub Free ignores environments
 # (and their secrets) in a private repository, so this keeps working if the repository is ever made private.
@@ -54,7 +56,35 @@ jobs:
     if: inputs.target == 'prod' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read
     steps:
+      # The server builds the tag itself, so nothing else would notice a release whose checks failed (or never ran).
+      - name: The release passed every check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          if ! printf '%s' "$VERSION" | grep -E -q '^(latest|[0-9]+\.[0-9]+\.[0-9]+)$'; then
+            echo "::error::version must be 'latest' or X.Y.Z"; exit 1
+          fi
+          if [ "$VERSION" = latest ]; then
+            tag=$(gh api "repos/$REPO/tags" --paginate --jq '.[].name' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1 || true)
+          else
+            tag="v$VERSION"
+          fi
+          [ -n "$tag" ] || { echo "::error::there is no release tag"; exit 1; }
+          sha=$(gh api "repos/$REPO/commits/$tag" --jq .sha) || { echo "::error::the tag $tag does not exist"; exit 1; }
+          passed=$(gh run list --repo "$REPO" --workflow release.yml --branch "$tag" --status success \
+            --json headSha --jq "[.[] | select(.headSha == \"$sha\")] | length")
+          if [ "$passed" = 0 ]; then
+            echo "::error::$tag has no passing 'Release images' run on its commit ($sha). Wait for it, or run that workflow by hand on the tag."
+            exit 1
+          fi
+          echo "$tag passed every check ($sha)"
+
       - name: Run the prod deploy script on the server
         env:
           SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY_PROD }}

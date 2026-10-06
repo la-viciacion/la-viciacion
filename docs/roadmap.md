@@ -6,9 +6,20 @@ These are deliberately **undefined for now**. Do not invent or enforce them; whe
 
 - **Versioning and releases**: the version of the app is the `vX.Y.Z` tag, injected into the API image at build time (`APP_VERSION`, see [deployment.md](deployment.md)); no file holds it (`front/package.json` still says `2.0.0` but nothing reads it). Changelog format and release notes are still open.
 - **Commit conventions**: enforced only on the PR title (it becomes the squash commit); no changelog tooling yet.
-- **CI/CD**: checks run on every PR and on `main`, and gate the release workflow (see [deployment.md](deployment.md#cicd)). Open: automatic deployment, `arm64` images.
+- **CI/CD**: checks run on every PR (not again on `main`) and in full on every tag, and the prod deploy requires that tag run to have passed (see [deployment.md](deployment.md#cicd)). Open: automatic deployment, `arm64` images, and the cost items below.
 
 Until then: no tags or releases.
+
+## CI cost
+
+The CI repeats nothing between a PR and `main` any more (see [workflow.md](workflow.md#nothing-is-run-twice)). What is left, from most to least worth doing, if the minutes of Actions ever become a limit (a run takes ~3.5 min in the clock and ~5.5 min of work, ~13 billed because each job is rounded up to the minute; the MariaDB job is ~190 s of it):
+
+1. **Split the MariaDB job.** Run the route tests (`test_mariadb_api_*`, `app_boot`, `bot_contract`...) on every API change, and the migration ones (`migration_chain`, `migrations`, `v1_upgrade`, `migration_refusals`) only when `api/alembic/` or the models change, and on the tag. It needs `ci_scope.py` (and `test_ci_scope.py`) to tell the two sets apart, and a way to select them by file name.
+2. **Build the images on a PR only when something that goes into them changes** (`Dockerfile`, `requirements.txt`, `package*.json`, `.dockerignore`, `nginx`); the tag builds them all anyway.
+3. **Fewer, bigger jobs.** `bot-tests`, `front-tests`, `mariadb-image`, `changes` and `pr-title` take seconds each and are billed a minute each; grouping them saves ~5 billed minutes per run.
+4. **Publish what was checked.** When `PUBLISH_IMAGES` is on, `release.yml` builds each image twice (once in `build`, once in `publish`); the second hits the cache but could push the first.
+5. **The weekly `lts` run** overlaps the pinned one while `docker-compose.yml` pins the newest patch of the LTS; drop it if it never says anything the pinned run did not.
+6. **Candidates inside the MariaDB tests**, to remove only with evidence they never catch anything: `UpgradeFromAnOlderRevisionTests` in `test_mariadb_migrations.py` goes through the same migrations as the v1 chain tests with a different seed, and the two classes of `test_mariadb_v1_upgrade.py` that refuse a duplicated e-mail or Telegram id overlap the refusal cases of `test_mariadb_migration_refusals.py` in mechanism, not in data.
 
 ## Known debt / candidate improvements
 
