@@ -1,5 +1,6 @@
 """What the group has in common, derived when asked (nothing stored): the achievements and who has them, the
-players and what is public of each one. Only active players count (never the emergency account)."""
+players and what is public of each one. Only active players are listed (never the emergency account), but who has
+an achievement counts everybody who earned it, even if they no longer play."""
 import re
 
 from sqlalchemy import func
@@ -33,13 +34,12 @@ def achievements_catalog(db: Session, viewer_id: int) -> list[dict]:
     key, title, description, picture or players, only that they exist, whether they are secret and their special
     level (so that everybody knows there are special ones to unlock)."""
     mine = unlocked_ids(db, viewer_id)
-    players = (models.User.is_active == 1, models.not_god())
     unlocked: dict[int, dict[int, dict]] = {}
     for achievement_id, user_id, username, name, date in (
         db.query(models.UserAchievement.achievement_id, models.UserAchievement.user_id, models.User.username, models.User.name,
                  models.UserAchievement.date)
         .join(models.User, models.UserAchievement.user_id == models.User.id)
-        .filter(*players)
+        .filter(models.not_god())  # whoever earned it counts, even if they no longer play
     ):
         who = unlocked.setdefault(achievement_id, {}).setdefault(
             user_id, {"user_id": user_id, "name": name or username, "times": 0, "last": date},
