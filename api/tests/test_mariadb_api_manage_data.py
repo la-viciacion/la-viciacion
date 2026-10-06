@@ -289,10 +289,10 @@ class SessionsAdminTests(ManageTestCase):
         check = self.background["after_session_change"]
         created = self.admin("POST", "/timers", json=self.body()).json()
         timer_id, season = created["id"], seasons.of(datetime.datetime.fromisoformat(created["start_time"]))
-        check.assert_called_once_with(self.ana, True)  # a new session can only earn more
+        check.assert_called_once_with(self.ana, True, recalculate=[season])
         check.reset_mock()
         self.admin("PATCH", f"/timers/{timer_id}", json={"notes": "fixed"})
-        check.assert_called_once_with(self.ana, True, recalculate=[season])  # an edited or deleted one may no longer earn
+        check.assert_called_once_with(self.ana, True, recalculate=[season])
         check.reset_mock()
         self.admin("DELETE", f"/timers/{timer_id}")
         check.assert_called_once_with(self.ana, True, recalculate=[season])
@@ -366,14 +366,18 @@ class LibraryAdminTests(ManageTestCase):
 
     def test_every_change_of_an_admin_checks_the_achievements_of_that_player_silently(self):
         check = self.background["after_session_change"]
+        season = seasons.current()
         created = self.admin("POST", "/library", json={"user_id": self.bea, "game_id": "celeste", "platform": "pc"}).json()
-        check.assert_called_once_with(self.bea, True)
+        check.assert_called_once_with(self.bea, True, recalculate=[season])
         check.reset_mock()
         self.admin("PATCH", f"/library/{created['id']}", json={"completed": True})
-        check.assert_called_once_with(self.bea, True)
+        check.assert_called_once_with(self.bea, True, recalculate=[season])
+        check.reset_mock()
+        self.admin("PATCH", f"/library/{created['id']}", json={"started_date": f"{season - 1}-06-01"})
+        check.assert_called_once_with(self.bea, True, recalculate=[season - 1, season])  # it changed season
         check.reset_mock()
         self.admin("DELETE", f"/library/{created['id']}")
-        check.assert_called_once_with(self.bea, True)
+        check.assert_called_once_with(self.bea, True, recalculate=[season - 1])
 
 
 class ScoresAdminTests(ManageTestCase):

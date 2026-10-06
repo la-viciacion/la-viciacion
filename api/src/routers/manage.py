@@ -635,14 +635,10 @@ class TimerCreate(BaseModel):
     notes: Optional[str] = Field(None, max_length=NOTES_MAX)
 
 
-def _recheck_achievements(background_tasks: BackgroundTasks, user_id: int, recalculate: list[int] | None = None) -> None:
-    """An admin's change to the sessions or the library can earn the player an achievement: check it
-    silently, like a manual session of their own (nothing is announced to the group). A session that was
-    edited or deleted gives the seasons to work out again (`recalculate`): it may no longer earn what it did."""
-    if recalculate:
-        background_tasks.add_task(actions.after_session_change, user_id, True, recalculate=recalculate)
-    else:
-        background_tasks.add_task(actions.after_session_change, user_id, True)
+def _recheck_achievements(background_tasks: BackgroundTasks, user_id: int, season_list: list[int]) -> None:
+    """Whatever an admin changes in the sessions or the library of a player can earn them an achievement or
+    take one away: their achievements of those seasons are worked out again, silently (nothing is announced)."""
+    background_tasks.add_task(actions.after_session_change, user_id, True, recalculate=season_list)
 
 
 def _check_range(start: datetime.datetime, end: Optional[datetime.datetime]):
@@ -669,7 +665,7 @@ def create_timer(body: TimerCreate, background_tasks: BackgroundTasks, db: Sessi
     db.add(timer)
     users_crud.ensure_library_entry(db, body.user_id, body.game_id, body.platform, body.start_time)
     _commit(db, "Sesión")
-    _recheck_achievements(background_tasks, body.user_id)
+    _recheck_achievements(background_tasks, body.user_id, [seasons.of(body.start_time)])
     return _timer_out(timer, None, None)
 
 
@@ -811,7 +807,7 @@ def create_library(body: LibraryCreate, background_tasks: BackgroundTasks, db: S
     )
     db.add(row)
     _commit(db, "Biblioteca")
-    _recheck_achievements(background_tasks, body.user_id)
+    _recheck_achievements(background_tasks, body.user_id, [seasons.of(row.started_date)])
     return _library_out(row, None, None)
 
 
@@ -829,19 +825,21 @@ def patch_library(row_id: int, body: LibraryPatch, background_tasks: BackgroundT
     data = body.model_dump(exclude_unset=True)
     if "completed" in data and data["completed"] is not None:
         data["completed"] = int(data["completed"])
+    season_before = seasons.of(row.started_date)
     for k, v in data.items():
         setattr(row, k, v)
     _commit(db, "Biblioteca")
-    _recheck_achievements(background_tasks, row.user_id)
+    _recheck_achievements(background_tasks, row.user_id, sorted({season_before, seasons.of(row.started_date)}))
     return _library_out(row, None, None)
 
 
 @router.delete("/library/{row_id}")
 def delete_library(row_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     row = _get_or_404(db, models.UserGame, row_id, "Entrada de biblioteca")
+    user_id, season = row.user_id, seasons.of(row.started_date)
     db.delete(row)
     db.commit()
-    _recheck_achievements(background_tasks, row.user_id)
+    _recheck_achievements(background_tasks, user_id, [season])
     return {"message": "Entrada eliminada"}
 
 
