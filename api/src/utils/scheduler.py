@@ -11,7 +11,7 @@ what nothing else can trigger remains here:
                     timers that are due (each user chooses the interval, 10 minutes or more).
                     Switched off by TIMER_NOTICE_REFRESH: only the first notification is sent
   forgotten_timers  every hour, reminds who has a timer running for too long
-  daily_streaks     every day at 05:00, checks achievements + announces lost streaks
+  daily_streaks     every day at 05:00, announces the streaks lost the day before
   daily_wishlist    every day at 09:00, refreshes the release date of the games somebody waits for
                     and, while actions.WISHLIST_PRIVATE_NOTICE is on (off), tells who wished a game that comes out today
   wishlist_eve      every day at 12:30, tells the group which wished games come out tomorrow
@@ -113,14 +113,10 @@ def _finish(db: Session, job: str, status: str) -> None:
     db.commit()
 
 
-def _run(db: Session, job: str, coroutine_factory, use_lock: bool = False) -> None:
+def _run(db: Session, job: str, coroutine_factory) -> None:
     logger.info(f"Scheduled job {job} starting")
     try:
-        if use_lock:
-            with actions._check_lock:
-                status = asyncio.run(coroutine_factory())
-        else:
-            status = asyncio.run(coroutine_factory())
+        status = asyncio.run(coroutine_factory())
         _finish(db, job, f"ok: {status}" if status else "ok")
     except Exception as e:
         logger.error(f"Scheduled job {job} failed: {e}")
@@ -149,7 +145,7 @@ async def _forgotten_timers(db: Session) -> str:
 
 
 async def _daily_streaks(db: Session) -> str:
-    await actions.check_users(db, silent=False, announce_streak_loss=True)
+    await actions.announce_lost_streaks(db)
     return ""
 
 
@@ -185,7 +181,7 @@ def tick(now: datetime.datetime | None = None) -> None:
 
         slot = daily_slot(now, DAILY_STREAKS_HOUR)
         if is_due(now, slot, _last_run(db, "daily_streaks"), DAILY_GRACE) and _claim(db, "daily_streaks", slot, now):
-            _run(db, "daily_streaks", lambda: _daily_streaks(db), use_lock=True)
+            _run(db, "daily_streaks", lambda: _daily_streaks(db))
 
         slot = daily_slot(now, DAILY_WISHLIST_HOUR)
         if is_due(now, slot, _last_run(db, "daily_wishlist"), DAILY_GRACE) and _claim(db, "daily_wishlist", slot, now):

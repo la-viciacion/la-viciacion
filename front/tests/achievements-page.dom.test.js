@@ -43,6 +43,43 @@ test('the picture comes from the achievement image route only when there is one'
   assert.equal(document.querySelectorAll('.ach-img-placeholder').length, 1);
 });
 
+test('what is not unlocked shows a lock, not a question mark', () => {
+  assert.equal(text('.ach-card.hidden .ach-img-placeholder')[0], '🔒');
+});
+
+test('a secret one has the golden aura and says so, and an ordinary one does not', async () => {
+  installApi({ 'GET /group/achievements': [{ ...LIST[0], secret: true }, { ...LIST[0], id: 3, title: 'Normal', secret: false }, LIST[1]] });
+  await page.render({ main: main() });
+  await settle();
+  const cards = document.querySelectorAll('.ach-card.mine');
+  assert.equal(document.querySelectorAll('.ach-card.secret').length, 1);
+  assert.ok(cards[0].classList.contains('secret'));
+  assert.ok(!cards[1].classList.contains('secret'));
+  assert.match(text('.ach-card')[0], /Secreto/);
+  assert.doesNotMatch(text('.ach-card')[1], /Secreto/);
+  assert.ok(!document.querySelector('.ach-card.hidden').classList.contains('secret'));  // an ordinary hidden one has no aura
+});
+
+test('a secret one that is not unlocked still has the aura, and says nothing else about itself', async () => {
+  installApi({ 'GET /group/achievements': [LIST[1], { id: 5, hidden: true, unlocked_by_me: false, secret: true }] });
+  await page.render({ main: main() });
+  await settle();
+  const [plain, special] = document.querySelectorAll('.ach-card.hidden');
+  assert.ok(!plain.classList.contains('secret'));
+  assert.ok(special.classList.contains('secret'));
+  assert.deepEqual(text('.ach-title strong'), ['Logro oculto', 'Logro oculto']);  // the aura is what tells them apart
+  assert.doesNotMatch(special.textContent, /Secreto|Lo tienes/);
+});
+
+test('one that has no season limit says it is unique, and the others do not', async () => {
+  installApi({ 'GET /group/achievements': [{ ...LIST[0], lifetime: true }, { ...LIST[0], id: 3, title: 'Normal' }, LIST[1]] });
+  await page.render({ main: main() });
+  await settle();
+  assert.match(text('.ach-card')[0], /Único/);
+  assert.doesNotMatch(text('.ach-card')[1], /Único/);
+  assert.doesNotMatch(text('.ach-card')[2], /Único/);  // what is hidden says nothing
+});
+
 test('an error says so', async () => {
   installApi({ 'GET /group/achievements': json({ detail: 'boom' }, 500) });
   await page.render({ main: main() });

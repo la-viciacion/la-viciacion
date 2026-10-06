@@ -157,6 +157,12 @@ class Achievement(Base):
     title = Column(String(255))
     message = Column(String(255))
     image = Column(LargeBinary)
+    # an achievement that is switched off is not earned, announced, recalculated or shown (see crud/achievements.py)
+    active = Column(Boolean, nullable=False, server_default=text("1"))
+    # a secret one is announced to the group without saying which, and to the player in full (privately)
+    secret = Column(Boolean, nullable=False, server_default=text("0"))
+    # the first season it can be earned (before it nothing is awarded, recalculated or shown); see utils/achievements.py
+    valid_from_season = Column(SmallInteger, nullable=False, server_default=text("2023"))
     __table_args__ = (UniqueConstraint("key"),)
 
 

@@ -20,9 +20,11 @@ from sqlalchemy.orm import Session
 
 from .. import auth
 from ..auth import get_db
+from ..crud import achievements_recalc
 from ..crud import users as users_crud
 from ..database import models
 from ..utils import actions, ai, audit, my_utils, push, rawg_sync, seasons, settings, sql_dump
+from ..utils.achievements import is_lifetime
 from ..utils import email as mail
 from ..database.schemas import NOTES_MAX
 from ..utils.logger import LogManager
@@ -119,16 +121,36 @@ def attention(db: Session = Depends(get_db)):
     }
 
 
-class CheckAchievementsBody(BaseModel):
-    user_id: Optional[int] = None
-    silent: bool = True
+@router.get("/recalculate-achievements/preview")
+def preview_recalculate_achievements(
+    user_ids: Optional[list[int]] = Query(None),
+    season_list: Optional[list[int]] = Query(None),
+    achievement_keys: Optional[list[str]] = Query(None),
+    db: Session = Depends(get_db),
+):
+    """What recalculating the achievements would change (add, correct, revoke), for all the players, seasons
+    and achievements that are switched on or only the ones given. It changes nothing."""
+    return achievements_recalc.preview(db, user_ids, season_list, achievement_keys)
 
 
-@router.post("/check-achievements", status_code=202)
-def check_achievements(body: CheckAchievementsBody, background_tasks: BackgroundTasks):
-    """Check the achievements of all users, or one, against their sessions (in background)."""
-    background_tasks.add_task(actions.after_session_change, body.user_id, body.silent)
-    return {"message": "Comprobación en marcha"}
+RECALCULATE_ACHIEVEMENTS_PHRASE = "RECALCULAR"
+
+
+class RecalculateAchievementsBody(BaseModel):
+    user_ids: Optional[list[int]] = Field(None, min_length=1)  # none: every player
+    season_list: Optional[list[int]] = Field(None, min_length=1)  # none: every season
+    achievement_keys: Optional[list[str]] = Field(None, min_length=1)  # none: every achievement that is switched on
+    confirm: str  # must equal RECALCULATE_ACHIEVEMENTS_PHRASE (the panel shows the preview first and asks for it)
+
+
+@router.post("/recalculate-achievements", status_code=202)
+def recalculate_achievements(body: RecalculateAchievementsBody, background_tasks: BackgroundTasks):
+    """Work out again the achievements of every player, season and achievement that is switched on, or only the
+    ones given, and bring what is stored to it (in background). It never notifies anybody. It rewrites dates and revokes, so it has to be confirmed explicitly."""
+    if body.confirm != RECALCULATE_ACHIEVEMENTS_PHRASE:
+        raise HTTPException(status_code=400, detail="Confirmación incorrecta")
+    background_tasks.add_task(achievements_recalc.recalculate, body.user_ids, body.season_list, body.achievement_keys)
+    return {"message": "Recálculo en marcha"}
 
 
 # ── Backup ──────────────────────────────────────────────────────
@@ -609,13 +631,19 @@ class TimerCreate(BaseModel):
     notes: Optional[str] = Field(None, max_length=NOTES_MAX)
 
 
+def _recheck_achievements(background_tasks: BackgroundTasks, user_id: int, season_list: list[int]) -> None:
+    """Whatever an admin changes in the sessions or the library of a player can earn them an achievement or
+    take one away: their achievements of those seasons are worked out again, silently (nothing is announced)."""
+    background_tasks.add_task(actions.after_session_change, user_id, True, recalculate=season_list)
+
+
 def _check_range(start: datetime.datetime, end: Optional[datetime.datetime]):
     if end is not None and end <= start:
         raise HTTPException(status_code=400, detail="El fin debe ser posterior al inicio")
 
 
 @router.post("/timers", status_code=201)
-def create_timer(body: TimerCreate, db: Session = Depends(get_db)):
+def create_timer(body: TimerCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """Create a finished session by hand (e.g. a forgotten timer)."""
     _get_or_404(db, models.User, body.user_id, "Usuario")
     _get_or_404(db, models.Game, body.game_id, "Juego")
@@ -633,6 +661,7 @@ def create_timer(body: TimerCreate, db: Session = Depends(get_db)):
     db.add(timer)
     users_crud.ensure_library_entry(db, body.user_id, body.game_id, body.platform, body.start_time)
     _commit(db, "Sesión")
+    _recheck_achievements(background_tasks, body.user_id, [seasons.of(body.start_time)])
     return _timer_out(timer, None, None)
 
 
@@ -678,6 +707,7 @@ def patch_timer(timer_id: int, body: TimerPatch, background_tasks: BackgroundTas
     if was_running and not timer.is_active:
         # a stuck timer was finished by hand: its pinned notification has to go
         background_tasks.add_task(actions.after_timer_stop, timer.user_id, timer.game_id, timer.duration_seconds)
+    _recheck_achievements(background_tasks, timer.user_id, sorted({old_entry[2], seasons.of(timer.start_time)}))
     return _timer_out(timer, None, None)
 
 
@@ -686,8 +716,10 @@ def delete_timer(timer_id: int, background_tasks: BackgroundTasks, db: Session =
     timer = _get_or_404(db, models.GameTimer, timer_id, "Sesión")
     if timer.is_active:
         background_tasks.add_task(actions.after_timer_stop, timer.user_id, timer.game_id, None)
+    user_id, season = timer.user_id, seasons.of(timer.start_time)
     db.delete(timer)
     db.commit()
+    _recheck_achievements(background_tasks, user_id, [season])
     return {"message": "Sesión eliminada"}
 
 
@@ -759,7 +791,7 @@ class LibraryCreate(BaseModel):
 
 
 @router.post("/library", status_code=201)
-def create_library(body: LibraryCreate, db: Session = Depends(get_db)):
+def create_library(body: LibraryCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     _get_or_404(db, models.User, body.user_id, "Usuario")
     _get_or_404(db, models.Game, body.game_id, "Juego")
     row = models.UserGame(
@@ -771,6 +803,7 @@ def create_library(body: LibraryCreate, db: Session = Depends(get_db)):
     )
     db.add(row)
     _commit(db, "Biblioteca")
+    _recheck_achievements(background_tasks, body.user_id, [seasons.of(row.started_date)])
     return _library_out(row, None, None)
 
 
@@ -783,22 +816,26 @@ class LibraryPatch(BaseModel):
 
 
 @router.patch("/library/{row_id}")
-def patch_library(row_id: int, body: LibraryPatch, db: Session = Depends(get_db)):
+def patch_library(row_id: int, body: LibraryPatch, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     row = _get_or_404(db, models.UserGame, row_id, "Entrada de biblioteca")
     data = body.model_dump(exclude_unset=True)
     if "completed" in data and data["completed"] is not None:
         data["completed"] = int(data["completed"])
+    season_before = seasons.of(row.started_date)
     for k, v in data.items():
         setattr(row, k, v)
     _commit(db, "Biblioteca")
+    _recheck_achievements(background_tasks, row.user_id, sorted({season_before, seasons.of(row.started_date)}))
     return _library_out(row, None, None)
 
 
 @router.delete("/library/{row_id}")
-def delete_library(row_id: int, db: Session = Depends(get_db)):
+def delete_library(row_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     row = _get_or_404(db, models.UserGame, row_id, "Entrada de biblioteca")
+    user_id, season = row.user_id, seasons.of(row.started_date)
     db.delete(row)
     db.commit()
+    _recheck_achievements(background_tasks, user_id, [season])
     return {"message": "Entrada eliminada"}
 
 
@@ -1004,6 +1041,9 @@ def list_achievements(db: Session = Depends(get_db)):
         models.Achievement.title,
         models.Achievement.message,
         (models.Achievement.image.isnot(None)).label("has_image"),
+        models.Achievement.active,
+        models.Achievement.secret,
+        models.Achievement.valid_from_season,
     ).order_by(models.Achievement.id)
     return [
         {
@@ -1012,6 +1052,10 @@ def list_achievements(db: Session = Depends(get_db)):
             "title": r.title,
             "message": r.message,
             "has_image": bool(r.has_image),
+            "active": bool(r.active),
+            "secret": bool(r.secret),
+            "lifetime": is_lifetime(r.key),
+            "valid_from_season": r.valid_from_season,
             "awarded": awarded.get(r.id, 0),
         }
         for r in rows
@@ -1021,15 +1065,23 @@ def list_achievements(db: Session = Depends(get_db)):
 class AchievementPatch(BaseModel):
     title: Optional[str] = None
     message: Optional[str] = None
+    active: Optional[bool] = None  # switched off: not earned, announced, recalculated or shown
+    secret: Optional[bool] = None  # announced to the group without saying which, and to the player in full, privately
+    valid_from_season: Optional[int] = Field(None, ge=2000, le=2100)  # the first season it can be earned
 
 
 @router.patch("/achievements/{achievement_id}")
 def patch_achievement(achievement_id: int, body: AchievementPatch, db: Session = Depends(get_db)):
     ach = _get_or_404(db, models.Achievement, achievement_id, "Logro")
     for k, v in body.model_dump(exclude_unset=True).items():
+        if k in ("active", "secret", "valid_from_season") and v is None:
+            continue  # they cannot be empty
         setattr(ach, k, v)
     db.commit()
-    return {"id": ach.id, "key": ach.key, "title": ach.title, "message": ach.message}
+    return {
+        "id": ach.id, "key": ach.key, "title": ach.title, "message": ach.message,
+        "active": bool(ach.active), "secret": bool(ach.secret), "valid_from_season": ach.valid_from_season,
+    }
 
 
 # ── Awarded achievements (what each player has unlocked) ────────

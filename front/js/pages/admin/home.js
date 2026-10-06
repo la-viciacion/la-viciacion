@@ -4,7 +4,6 @@ import { api } from '../../lib/api.js';
 import { formatTimestamp } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
 import { badge, errorState, overviewStats } from './components.js';
-import { checkAchievementsDialog } from './dialogs.js';
 
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
@@ -77,7 +76,7 @@ function view(ov, att, cfg) {
       <section class="adm-card">
         <h2>Acciones rápidas</h2>
         <div class="adm-quick">
-          <button class="adm-btn" data-quick="achievements">Comprobar logros</button>
+          <button class="adm-btn" data-quick="recalculate">Recalcular logros…</button>
           <button class="adm-btn" data-quick="rawg">Sincronizar con RAWG…</button>
           <button class="adm-btn" data-quick="announce">Redactar aviso</button>
           <button class="adm-btn" data-quick="user">Nuevo usuario</button>
@@ -107,7 +106,7 @@ export async function render(panel, { admin }) {
       const { go, setup, quick } = button.dataset;
       if (go != null) admin.jumpTo(items[Number(go)].tab, items[Number(go)].filters || {});
       else if (setup != null) admin.open(setups[Number(setup)].tab);
-      else if (quick === 'achievements') checkAchievementsDialog();
+      else if (quick === 'recalculate') (await import('./recalculate-achievements.js')).recalculateAchievementsFlow({ onDone: admin.reload });
       else if (quick === 'announce') admin.open('announce');
       else if (quick === 'rawg') (await import('./rawg-sync.js')).rawgSyncFlow({ onDone: admin.reload });
       else if (quick === 'user') admin.create('users');

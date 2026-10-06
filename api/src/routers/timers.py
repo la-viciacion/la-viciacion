@@ -463,8 +463,11 @@ def update_session_endpoint(
     db: Session = Depends(get_db),
 ):
     """Correct a finished session (platform, start, end)."""
+    old_start = db.query(GameTimer.start_time).filter(GameTimer.id == timer_id).scalar()
     timer = update_session(db, current_user, timer_id, body)
-    background_tasks.add_task(actions.after_session_change, timer.user_id, True)
+    # the achievements of the seasons it was in and is in now are worked out again: it may no longer earn what it did
+    changed = sorted({seasons.of(old_start), seasons.of(timer.start_time)}) if old_start else [seasons.of(timer.start_time)]
+    background_tasks.add_task(actions.after_session_change, timer.user_id, True, recalculate=changed)
     return timer
 
 
@@ -476,9 +479,9 @@ def delete_session_endpoint(
     db: Session = Depends(get_db),
 ):
     """Remove a finished session (entered by mistake)."""
-    owner = db.query(GameTimer.user_id).filter(GameTimer.id == timer_id).scalar()
+    owner, start = db.query(GameTimer.user_id, GameTimer.start_time).filter(GameTimer.id == timer_id).first() or (None, None)
     delete_session(db, current_user, timer_id)
-    background_tasks.add_task(actions.after_session_change, owner, True)
+    background_tasks.add_task(actions.after_session_change, owner, True, recalculate=[seasons.of(start)])
     return {"message": "Sesión eliminada"}
 
 
@@ -526,7 +529,10 @@ def stop_timer_endpoint(
     auth.ensure_self_or_admin(current_user, user_id=user_id)
     ranking_before = actions.ranking_snapshot(db)
     timer = stop_timer(db, timer_id, user_id)
-    background_tasks.add_task(actions.after_session_change, user_id, False, ranking_before)
+    background_tasks.add_task(
+        actions.after_session_change, user_id, False, ranking_before,
+        stopped=(timer.game_id, timer.start_time, timer.duration_seconds),
+    )
     background_tasks.add_task(actions.after_timer_stop, user_id, timer.game_id, timer.duration_seconds)
     return timer
 

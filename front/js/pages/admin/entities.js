@@ -11,20 +11,19 @@
 import { formatDuration, formatTimestamp } from '../../lib/format.js';
 import { html } from '../../lib/html.js';
 import { platformList, platformName } from '../../lib/platforms.js';
-import { badge, store } from './components.js';
+import { badge, seasonYears, store } from './components.js';
 import { ENTITY_OPTIONS, describe, detailParts } from './audit-labels.js';
-import { closeTimerNow, uploadAchievementImage } from './dialogs.js';
+import { closeTimerNow } from './dialogs.js';
 
 const platformField = { key: 'platform', label: 'Plataforma', type: 'platform' };
 const duration = (sec) => (sec == null ? '—' : formatDuration(sec));
 const platform = (id) => platformName(id) || '—';
 
 // Filters shared by the tables that have seasons / platforms (options are read when the toolbar is drawn)
-const firstSeason = 2023;
 const seasonSelect = {
   key: 'season',
   label: 'Temporada',
-  options: () => [['', 'Temporada: todas'], ...Array.from({ length: new Date().getFullYear() - firstSeason + 1 }, (_, i) => String(new Date().getFullYear() - i)).map((y) => [y, y])],
+  options: () => [['', 'Temporada: todas'], ...seasonYears().map((y) => [String(y), y])],
 };
 const platformSelect = { key: 'platform', label: 'Plataforma', options: () => [['', 'Plataforma: todas'], ...platformList().map((p) => [p.id, p.name])] };
 
@@ -240,23 +239,34 @@ export const ENTITIES = {
 
   achievements: {
     label: 'Logros',
-    nav: 'Catálogo',
-    description: 'Logros que se pueden conseguir: su título, mensaje e imagen.',
-    toolbarActions: [{ act: 'check-achievements', label: 'Comprobar logros' }],
+    nav: 'Logros',
+    description: 'Logros que se pueden conseguir: su título, mensaje e imagen, y si están activos. Uno inactivo no lo consigue nadie, no se anuncia, no se recalcula y no aparece en la página de logros; los nuevos empiezan inactivos hasta que los actives (y luego puedes recalcularlos).',
+    toolbarActions: [{ act: 'recalculate-achievements', label: 'Recalcular logros…' }],
     endpoint: '/manage/achievements',
     paged: false,
     columns: [
       { label: 'Imagen', render: (r) => (r.has_image ? html`<img class="adm-ach" src="/api/v1/utils/achievement-image/${r.key}?v=${Date.now()}" alt="" />` : '—') },
       { label: 'Logro', render: (r) => html`<strong>${r.title}</strong><div class="adm-sub">${r.key}</div>` },
       { label: 'Mensaje', render: (r) => r.message || '' },
+      { label: 'Estado', render: (r) => html`${r.active ? badge('Activo', 'green') : badge('Inactivo', 'orange')}${r.secret ? badge('Secreto', 'purple') : ''}${r.lifetime ? badge('Único', 'gray') : ''}` },
+      { label: 'Desde', render: (r) => r.valid_from_season },
       { label: 'Concedido', render: (r) => r.awarded },
     ],
     fields: [
       { key: 'title', label: 'Título', type: 'text', required: true },
       { key: 'message', label: 'Mensaje ({} = usuario / juego)', type: 'text' },
+      { key: 'active', label: 'Activo', type: 'checkbox' },
+      { key: 'secret', label: 'Secreto (se anuncia sin decir cuál; el jugador lo recibe en privado)', type: 'checkbox' },
+      { key: 'valid_from_season', label: 'Válido desde la temporada (antes de ella nadie lo consigue ni cuenta)', type: 'number', required: true },
+      {
+        key: 'image',
+        label: 'Imagen (PNG o JPG; sin elegir se queda la actual)',
+        type: 'image',
+        current: (r) => (r.has_image ? `/api/v1/utils/achievement-image/${r.key}` : null),
+        upload: (r) => `/utils/achievement-image/${encodeURIComponent(r.key)}`,
+      },
     ],
     name: (r) => r.title,
-    actions: [{ label: 'Imagen…', run: (r, admin) => uploadAchievementImage(r, admin) }],
     canDelete: false,
   },
 };
@@ -265,7 +275,7 @@ ENTITIES.awards = {
   label: 'Logros concedidos',
   nav: 'Concedidos',
   description: 'Qué ha desbloqueado cada jugador y cuándo.',
-  toolbarActions: [{ act: 'check-achievements', label: 'Comprobar logros' }],
+  toolbarActions: [{ act: 'recalculate-achievements', label: 'Recalcular logros…' }],
   endpoint: '/manage/user-achievements',
   filters: ['user', 'game'],
   selects: [
@@ -284,7 +294,7 @@ ENTITIES.awards = {
   name: (r) => `${r.user || r.user_id} · ${r.title || r.key}`,
   canDelete: true,
   deleteLabel: 'Revocar',
-  deleteNote: 'El logro se revoca sin avisar por Telegram. Si el jugador sigue cumpliendo la condición, el próximo recálculo (o el de las 05:00) lo volverá a conceder: corrige antes los datos que lo provocaron.',
+  deleteNote: 'El logro se revoca sin avisar por Telegram. Si el jugador sigue cumpliendo la condición, el próximo recálculo lo volverá a conceder: corrige antes los datos que lo provocaron.',
 };
 
 ENTITIES.audit = {

@@ -16,5 +16,9 @@ export const overviewStats = (ov) => [
 
 export const errorState = (message) => html`<div class="empty-state"><span>⚠️</span>${message}</div>`;
 
+/** Seasons the panel offers (the app began recording in 2023), the running one first. */
+export const FIRST_SEASON = 2023;
+export const seasonYears = () => Array.from({ length: new Date().getFullYear() - FIRST_SEASON + 1 }, (_, i) => new Date().getFullYear() - i);
+
 /** Runs in the admin panel state: users (for selects) loaded once at start. */
 export const store = { users: [], achievements: [], me: null };

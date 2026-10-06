@@ -96,6 +96,8 @@ class AfterTimerStartTests(unittest.TestCase):
             mock.patch.object(actions.achievements, "timer_started", new=mock.AsyncMock()),
             mock.patch.object(actions.achievements, "user_played_total_games", new=mock.AsyncMock()),
             mock.patch.object(actions.achievements, "teamwork", new=mock.AsyncMock()),
+            mock.patch.object(actions.achievements, "all_together", new=mock.AsyncMock()),
+            mock.patch.object(actions.achievements, "lifetime_views", return_value=[]),
             mock.patch.object(actions.users, "get_user_by_id", return_value=types.SimpleNamespace(id=1)),
             mock.patch.object(actions.games, "get_game_by_id", return_value=types.SimpleNamespace(id="g")),
             mock.patch.object(actions.users, "announce_new_game", announce),

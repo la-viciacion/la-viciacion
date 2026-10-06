@@ -41,6 +41,8 @@ class WorkTestCase(ApiTestCase):
         ):
             patcher.start()
             self.addCleanup(patcher.stop)
+        with self.engine.begin() as conn:  # the ones added in 2026 start in 2027: it is not what these tests are about
+            conn.execute(text("UPDATE achievements SET valid_from_season = 2023"))
         self.ana = self.user("ana")
         self.bea = self.user("bea")
         for game_id in ("celeste", "hades", "tetris"):
@@ -54,11 +56,17 @@ class WorkTestCase(ApiTestCase):
                 await actions.check_users(db, silent=silent, user_ids=user_ids, **kwargs)
         asyncio.run(run())
 
-    def check_one(self, username="ana", silent=False, announce_streak_loss=False):
+    def check_one(self, username="ana", silent=False):
         async def run():
             with database.SessionLocal() as db:
                 user = db.query(models.User).filter_by(username=username).one()
-                await actions.check_user(db, user, silent=silent, announce_streak_loss=announce_streak_loss)
+                await actions.check_user(db, user, silent=silent)
+        asyncio.run(run())
+
+    def announce_lost_streaks(self, today):
+        async def run():
+            with database.SessionLocal() as db:
+                await actions.announce_lost_streaks(db, today)
         asyncio.run(run())
 
     def awarded(self, user_id=None) -> dict:
@@ -104,7 +112,6 @@ class DaysAndStreaksTests(WorkTestCase):
         self.check_one()
         got = self.awarded()
         self.assertNotIn("PLAYED_7_DAYS", got)
-        self.assertIn("PLAYED_LESS_5_MIN_SESSION", got)  # but a very short session earns its own
 
     def test_a_gap_breaks_the_streak_not_the_count_of_days(self):
         self.play_days(self.ana, 3)
@@ -134,12 +141,13 @@ class DaysAndStreaksTests(WorkTestCase):
         today = datetime.date.today()
         for back in range(2, 14):  # twelve days, the last one two days ago
             self.session(self.ana, "celeste", datetime.datetime.combine(today - timedelta(days=back), datetime.time(20, 0)), 30)
-        self.check_one(announce_streak_loss=True)
+        self.announce_lost_streaks(today)
         lost = [m["text"] for m in self.sent if "perder la racha" in m["text"]]
         self.assertEqual(len(lost), 1)
         self.assertIn("12 días", lost[0])
         self.sent.clear()
-        self.check_one(announce_streak_loss=False)
+        self.announce_lost_streaks(today + timedelta(days=1))  # the day after: nothing more to say
+        self.check_one()  # and a check of the achievements never announces it
         self.assertFalse([m for m in self.sent if "perder la racha" in m["text"]])
 
 
@@ -163,14 +171,20 @@ class TimeAndSessionTests(WorkTestCase):
         text = next(m["text"] for m in self.sent if E.PLAYED_100_HOURS_GAME.value["title"] in m["text"])
         self.assertIn("Celeste", text)
 
-    def test_a_session_of_five_minutes_or_less(self):
+    def test_a_timer_stopped_within_five_minutes_earns_opened_by_mistake(self):
         self.session(self.ana, "celeste", at(3, 1), 4)
-        self.check_one()
+        self.real_actions["after_session_change"](self.ana, False, None, stopped=("celeste", at(3, 1), 4 * 60))
         self.assertEqual(self.awarded()["PLAYED_LESS_5_MIN_SESSION"], (f"{YEAR}-03-01", "celeste"))
 
-    def test_a_session_of_zero_seconds_never_counts(self):
-        self.session(self.ana, "celeste", at(3, 1), 0)
+    def test_a_manual_or_edited_session_never_earns_it(self):
+        self.session(self.ana, "celeste", at(3, 1), 4)
         self.check_one()
+        self.real_actions["after_session_change"](self.ana, True)
+        self.assertNotIn("PLAYED_LESS_5_MIN_SESSION", self.awarded())
+
+    def test_a_timer_stopped_at_once_or_after_more_than_five_minutes_does_not(self):
+        for seconds in (0, 5 * 60 + 1):
+            self.real_actions["after_session_change"](self.ana, False, None, stopped=("celeste", at(3, 1), seconds))
         self.assertNotIn("PLAYED_LESS_5_MIN_SESSION", self.awarded())
 
     def test_playing_many_different_games_in_one_day(self):
@@ -235,10 +249,17 @@ class TeamworkTests(WorkTestCase):
                 db.add(models.GameTimer(user_id=user.id, game_id="celeste", start_time=datetime.datetime.now(), is_active=True, platform="pc"))
             db.commit()
 
+    def team_check(self):
+        """What starting a timer runs (after_timer_start): teamwork is not part of the general check."""
+        async def run():
+            with database.SessionLocal() as db:
+                await actions.achievements.teamwork(db, silent=False)
+        asyncio.run(run())
+
     def test_four_players_at_once_unlock_it_for_everybody_with_one_message(self):
         cai, dan = self.user("cai"), self.user("dan")
         self.start_timers("ana", "bea", "cai", "dan")
-        self.check()
+        self.team_check()
         for user_id in (self.ana, self.bea, cai, dan):
             self.assertIn("TEAMWORK", self.awarded(user_id), user_id)
         teamwork = [m["text"] for m in self.sent if E.TEAMWORK.value["title"] in m["text"]]
@@ -248,15 +269,32 @@ class TeamworkTests(WorkTestCase):
     def test_three_are_not_enough_and_a_repeat_stays_quiet(self):
         self.user("cai"), self.user("dan")
         self.start_timers("ana", "bea", "cai")
-        self.check()
+        self.team_check()
         self.assertEqual(self.sent, [])
         self.start_timers("dan")
-        self.check()
-        self.check()
+        self.team_check()
+        self.team_check()
         self.assertEqual(len([m for m in self.sent if E.TEAMWORK.value["title"] in m["text"]]), 1)
+
+    def test_the_third_player_on_a_game_unlocks_all_together_for_the_three(self):
+        cai = self.user("cai")
+        self.start_timers("ana", "bea")
+        self.real_actions["after_timer_start"](self.ana, datetime.datetime.now(), None)
+        self.assertNotIn("ALL_TOGETHER", self.awarded())
+        self.start_timers("cai")
+        self.real_actions["after_timer_start"](cai, datetime.datetime.now(), None)
+        for user_id in (self.ana, self.bea, cai):
+            self.assertEqual(self.awarded(user_id)["ALL_TOGETHER"][1], "celeste", user_id)
+        self.assertEqual(len([m for m in self.sent if E.ALL_TOGETHER.value["title"] in m["text"]]), 1)
 
     def test_a_disabled_player_does_not_count(self):
         self.user("cai"), self.user("dan", active=False)
+        self.start_timers("ana", "bea", "cai", "dan")
+        self.team_check()
+        self.assertFalse([m for m in self.sent if E.TEAMWORK.value["title"] in m["text"]])
+
+    def test_the_general_check_does_not_evaluate_it(self):
+        self.user("cai"), self.user("dan")
         self.start_timers("ana", "bea", "cai", "dan")
         self.check()
         self.assertFalse([m for m in self.sent if E.TEAMWORK.value["title"] in m["text"]])
@@ -318,6 +356,16 @@ class CompletionWorkTests(WorkTestCase):
         self.real_actions["after_completion"](entry, False)
         self.assertIn("JUST_IN_TIME", self.awarded())
 
+    def test_only_the_time_of_the_season_counts_towards_the_average(self):
+        with self.engine.begin() as conn:
+            conn.execute(text("UPDATE games SET avg_time = 7200 WHERE id = 'celeste'"))
+        entry = self.library_entry(self.ana, "celeste", datetime.date(YEAR, 3, 1), completed=1, completed_date=datetime.date(YEAR, 3, 5))
+        self.session(self.ana, "celeste", datetime.datetime(YEAR - 1, 11, 1, 20, 0), 60)  # last season's hour
+        self.session(self.ana, "celeste", at(3, 1), 60)
+        self.real_actions["after_completion"](entry, False)
+        self.assertNotIn("JUST_IN_TIME", self.awarded())
+        self.assertIn("*Celeste* en 01h00m", self.sent[-1]["text"])
+
     def test_a_game_far_from_the_average_does_not(self):
         with self.engine.begin() as conn:
             conn.execute(text("UPDATE games SET avg_time = 36000 WHERE id = 'celeste'"))
@@ -342,6 +390,17 @@ class StartAndStopWorkTests(WorkTestCase):
         self.assertIn("EARLY_RISER", self.awarded())
         self.assertNotIn("NOCTURNAL", self.awarded())
 
+    def test_a_timer_started_on_the_release_day_of_its_game_unlocks_it_at_once(self):
+        today = datetime.date.today()
+        with self.engine.begin() as conn:
+            conn.execute(text("UPDATE games SET release_date = :d WHERE id = 'celeste'"), {"d": today})
+        started = datetime.datetime.now().replace(microsecond=0)
+        with database.SessionLocal() as db:
+            db.add(models.GameTimer(user_id=self.ana, game_id="celeste", start_time=started, is_active=True, platform="pc"))
+            db.commit()
+        self.real_actions["after_timer_start"](self.ana, started, None)
+        self.assertEqual(self.awarded()["RELEASE_DAY"][1], "celeste")
+
     def test_a_timer_that_starts_in_the_small_hours_unlocks_nocturnal(self):
         self.real_actions["after_timer_start"](self.ana, at(3, 4, 3, 0), None)
         self.assertIn("NOCTURNAL", self.awarded())
@@ -353,6 +412,31 @@ class StartAndStopWorkTests(WorkTestCase):
     def test_stopping_a_timer_clears_its_notification_even_without_devices(self):
         self.real_actions["after_timer_stop"](self.ana, "celeste", 600)
         self.real_actions["after_timer_stop"](self.ana, "no-such-game", None)
+
+
+class EditedSessionTests(WorkTestCase):
+    def test_deleting_a_session_revokes_what_it_earned_without_telling_anybody(self):
+        self.play_days(self.ana, 7)
+        self.check_one()
+        self.assertIn("STREAK_7_DAYS", self.awarded())
+        with self.engine.begin() as conn:
+            conn.execute(text("DELETE FROM game_timers WHERE user_id = :u ORDER BY start_time DESC LIMIT 1"), {"u": self.ana})
+        self.sent.clear()
+        self.real_actions["after_session_change"](self.ana, True, recalculate=[YEAR])
+        got = self.awarded()
+        self.assertNotIn("PLAYED_7_DAYS", got)
+        self.assertNotIn("STREAK_7_DAYS", got)
+        self.assertEqual(self.sent, [])
+
+    def test_only_the_seasons_asked_for_are_worked_out_again(self):
+        key_id = self.scalar("SELECT id FROM achievements WHERE `key` = 'PLAYED_30_DAYS'")
+        with self.engine.begin() as conn:
+            conn.execute(text("INSERT INTO users_achievements (user_id, achievement_id, date) VALUES (:u, :a, :d)"),
+                         {"u": self.ana, "a": key_id, "d": datetime.date(YEAR - 1, 6, 1)})
+        self.real_actions["after_session_change"](self.ana, True, recalculate=[YEAR])
+        self.assertEqual(self.scalar("SELECT COUNT(*) FROM users_achievements WHERE user_id = :u", u=self.ana), 1)
+        self.real_actions["after_session_change"](self.ana, True, recalculate=[YEAR - 1])
+        self.assertEqual(self.scalar("SELECT COUNT(*) FROM users_achievements WHERE user_id = :u", u=self.ana), 0)
 
 
 class RankingAnnouncementTests(WorkTestCase):

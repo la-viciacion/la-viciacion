@@ -141,6 +141,8 @@ class ActiveStopCancelTests(TimerTestCase):
         user, silent, ranking_before = self.background["after_session_change"].call_args.args
         self.assertEqual((user, silent), (self.ana, False))
         self.assertIsInstance(ranking_before, dict)
+        game_id, _, duration = self.background["after_session_change"].call_args.kwargs["stopped"]
+        self.assertEqual((game_id, duration), ("celeste", stopped["duration_seconds"]))  # what only a real timer can earn
         self.background["after_timer_stop"].assert_called_once_with(self.ana, "celeste", stopped["duration_seconds"])
 
     def test_a_timer_started_ahead_of_the_clock_stops_with_zero_not_negative_time(self):
@@ -340,7 +342,8 @@ class EditSessionTests(TimerTestCase):
     def test_it_changes_times_and_recomputes_the_duration(self):
         response = self.patch(end_time=iso(self.start_at + timedelta(hours=2)))
         self.assertEqual((response.status_code, response.json()["duration_seconds"]), (200, 2 * 3600))
-        self.background["after_session_change"].assert_called_once_with(self.ana, True)
+        # what it earned may no longer hold: the achievements of its season are worked out again
+        self.background["after_session_change"].assert_called_once_with(self.ana, True, recalculate=[seasons.of(self.start_at)])
 
     def test_it_changes_the_notes_and_can_clear_them(self):
         self.assertEqual(self.patch(notes="first try").json()["notes"], "first try")
@@ -393,15 +396,16 @@ class EditSessionTests(TimerTestCase):
 class DeleteSessionTests(TimerTestCase):
     def setUp(self):
         super().setUp()
-        start = ago(hours=4)
-        self.session_id = self.manual(start=start, end=start + timedelta(hours=1)).json()["id"]
+        self.began = ago(hours=4)
+        self.session_id = self.manual(start=self.began, end=self.began + timedelta(hours=1)).json()["id"]
         self.background["after_session_change"].reset_mock()
 
     def test_it_removes_the_session_and_schedules_the_follow_up(self):
         response = self.api("DELETE", f"/timers/{self.session_id}", as_user="ana")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(self.scalar("SELECT COUNT(*) FROM game_timers"), 0)
-        self.background["after_session_change"].assert_called_once_with(self.ana, True)
+        # the achievements of its season are worked out again: it may have earned some
+        self.background["after_session_change"].assert_called_once_with(self.ana, True, recalculate=[seasons.of(self.began)])
 
     def test_only_the_owner_or_an_admin_can_delete(self):
         self.assertEqual(self.api("DELETE", f"/timers/{self.session_id}", as_user="bea").status_code, 403)

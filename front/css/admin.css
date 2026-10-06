@@ -195,6 +195,20 @@
 
 .adm-form label.adm-check { flex-direction: row; }
 
+/* A block of options to tick (recalculating achievements): a header with its count and all/none, a grid of equal columns */
+.adm-pick { border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-card); }
+.adm-pick-head { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+.adm-pick-head strong { color: var(--text-primary); font-size: 0.9rem; }
+.adm-pick-count { color: var(--text-secondary); font-size: 0.8rem; }
+.adm-pick-tools { margin-left: auto; display: flex; gap: 6px; }
+.adm-pick-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0 12px; padding: 6px 8px; }
+.adm-pick-grid.long { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); max-height: 210px; overflow-y: auto; }
+.adm-form .adm-pick-item { flex-direction: row; align-items: center; gap: 8px; padding: 5px 6px; border-radius: var(--radius-sm); font-size: 0.85rem; font-weight: 500; color: var(--text-primary); cursor: pointer; min-width: 0; }
+.adm-form .adm-pick-item:hover { background: var(--bg-card-hover); }
+.adm-pick-item input { flex: none; }
+.adm-pick-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.adm-pick-summary { color: var(--text-secondary); font-size: 0.85rem; text-align: right; }
+
 .adm-field-game { display: flex; flex-direction: column; gap: 6px; font-size: 0.85rem; color: var(--text-secondary); font-weight: 600; }
 
 .adm-field-game > div { display: flex; align-items: center; gap: 10px; }

@@ -16,6 +16,7 @@ test('the writes that are not on a row have their own sentence', () => {
   assert.equal(describe(entry({ method: 'POST', entity: 'users', entity_id: '3', path: '/api/v1/manage/users/3/password' })), 'Cambió la contraseña de un usuario');
   assert.equal(describe(entry({ method: 'POST', entity: 'push', entity_id: null, path: '/api/v1/manage/push/announce' })), 'Envió un aviso en la app');
   assert.equal(describe(entry({ method: 'POST', entity: 'telegram', entity_id: null, path: '/api/v1/manage/telegram/announce' })), 'Envió un aviso por Telegram');
+  assert.equal(describe(entry({ method: 'POST', entity: 'recalculate-achievements', entity_id: null, path: '/api/v1/manage/recalculate-achievements' })), 'Pidió recalcular todos los logros');
 });
 
 test('an entity it does not know is still described', () => {

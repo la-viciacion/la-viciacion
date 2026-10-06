@@ -1,7 +1,8 @@
 // Generic create/edit form driven by the entity field definitions.
 //
 // Field: { key, label, type, required?, omitEmpty?, step?, nameKey? (game: the row's key holding the game's name) }
-// Types: text | number | date | datetime | checkbox | platform | user | game | password
+// Types: text | number | date | datetime | checkbox | platform | user | game | password | image
+// image (editing only): { current: (row) => url of the picture or null, upload: (row) => route that takes the new file }
 import { api, jsonRequest } from '../../lib/api.js';
 import { html } from '../../lib/html.js';
 import { PASSWORD_HINT, generatePassword, isValidPassword } from '../../lib/password.js';
@@ -36,6 +37,10 @@ function fieldHtml(f, value, row) {
       return html`<div class="adm-field-game"><span>${f.label}</span>
         <div><span class="adm-picked" id="${id}_name">${(f.nameKey && row?.[f.nameKey]) || (v ? v : 'Ninguno')}</span> <button type="button" class="adm-btn sm" data-pickfor="${f.key}">${v ? 'Cambiar…' : 'Elegir…'}</button></div>
         <input type="hidden" id="${id}" value="${v}" /></div>`;
+    case 'image':
+      return html`<label>${f.label}
+        ${row && f.current(row) ? html`<img class="adm-ach" src="${f.current(row)}?v=${Date.now()}" alt="" />` : ''}
+        <input class="adm-input" type="file" accept="image/png,image/jpeg" id="${id}" /></label>`;
     case 'password':
       return html`<div class="adm-field-pw"><span>${f.label}</span>
         <div>
@@ -124,8 +129,15 @@ async function submit(entity, row, fields, modal, admin) {
   errorEl.textContent = '';
   const body = {};
   let newPassword = null;
+  const uploads = [];
 
   for (const f of fields) {
+    if (f.type === 'image') {
+      // A new picture goes to its own route once the rest is saved; no file chosen leaves the current one.
+      const file = document.getElementById(inputId(f)).files[0];
+      if (file) uploads.push({ file, url: f.upload(row) });
+      continue;
+    }
     if (f.type === 'password') {
       // Editing: an optional new password sent separately. Creating: a normal field.
       const typed = document.getElementById(inputId(f)).value || null;
@@ -154,6 +166,11 @@ async function submit(entity, row, fields, modal, admin) {
     } else {
       await api(`${entity.endpoint}/${row.id}`, jsonRequest('PATCH', body));
       if (newPassword !== null) await api(`${entity.endpoint}/${row.id}/password`, jsonRequest('POST', { password: newPassword }));
+      for (const { file, url } of uploads) {
+        const form = new FormData();
+        form.append('file', file);
+        await api(url, { method: 'PATCH', body: form });
+      }
     }
     modal.close();
     toast(!row ? 'Creado' : newPassword !== null ? 'Guardado y contraseña cambiada' : 'Guardado');

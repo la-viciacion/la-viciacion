@@ -42,35 +42,44 @@ async def check_user(
     db: Session,
     user: models.User,
     silent: bool = False,
-    announce_streak_loss: bool = False,
+    checks: Achievements | None = None,
 ):
-    """Check every achievement of one user against their sessions and library."""
-    current_season = seasons.current()
-    today = datetime.date.today()
+    """Check every achievement of one user against their sessions and library. `checks` is the set
+    of checks to run (default: the running season's, storing and announcing what it finds)."""
+    checks = checks or achievements
+    played_days = time_entries.get_played_days(db, user.id, season=checks.season)
+    await checks.user_played_total_days(db, user, played_days, silent=silent)
+    await checks.user_played_hours_game(db, user, silent=silent)
+    await checks.user_played_total_time(db, user, silent=silent)
+    await checks.user_session_time(db, user, silent=silent)
+    await checks.user_played_total_games(db, user, silent=silent)
+    await checks.user_completed_total_games(db, user, silent=silent)
+    await checks.user_streak(db, user, played_days, silent=silent)
+    await checks.user_played_day_time(db, user, silent)
+    await checks.user_played_hours_game_day(db, user, silent=silent)
+    await checks.user_played_games_per_day(db, user, silent=silent)
+    await checks.happy_new_year(db, user, silent)
+    await checks.early_riser(db, user, silent)
+    await checks.nocturnal(db, user, silent)
+    await checks.completed_in_a_day(db, user, silent)
+    await checks.prodigal_son(db, user, played_days, silent)
+    await checks.work_week(db, user, silent)
+    await checks.saved_by_the_bell(db, user, silent)
+    await checks.release_day(db, user, silent)
 
-    played_days = time_entries.get_played_days(db, user.id)[1]
-    await achievements.user_played_total_days(db, user, played_days, silent=silent)
-    best_streak_date, best_streak = streaks.streak_summary(played_days, today, current_season)[:2]
-    if announce_streak_loss:
-        await announce_lost_streak(user, played_days, today, silent)
-    for game_id, played_time in time_entries.get_user_games_played_time(db, user.id):
-        if played_time is not None:
-            await achievements.user_played_hours_game(
-                db=db, user=user, game_id=game_id, played_time=played_time, silent=silent
-            )
-    played_time = time_entries.get_user_played_time(db, user.id)
-    played_time = played_time[1] if played_time is not None else 0
-    await achievements.user_played_total_time(db, user, played_time, silent=silent)
-    await achievements.user_session_time(db, user, silent=silent)
-    await achievements.user_played_total_games(db, user, silent=silent)
-    await achievements.user_completed_total_games(db, user, silent=silent)
-    await achievements.user_streak(db, user, best_streak, best_streak_date, silent=silent)
-    await achievements.user_played_day_time(db, user, silent)
-    await achievements.user_played_hours_game_day(db, user, silent=silent)
-    await achievements.user_played_games_per_day(db, user, silent=silent)
-    await achievements.happy_new_year(db, user, silent)
-    await achievements.early_riser(db, user, silent)
-    await achievements.nocturnal(db, user, silent)
+
+async def check_user_lifetime(db: Session, user: models.User, silent: bool = False, collected: list | None = None):
+    """The achievements with no season limit (their key ends in _LIFETIME): worked out over the history from the
+    season each begins to count from. With `collected` (a list) it only notes what the user deserves. It costs
+    nothing while none of them is switched on and valid."""
+    base = achievements if collected is None else Achievements(silent=True, collected=collected)
+    for view in base.lifetime_views(db):
+        days = time_entries.get_played_days(db, user.id, season=seasons.ALL, since=view.since)
+        await view.user_played_total_days(db, user, days, silent=silent)
+        await view.user_played_hours_game(db, user, silent=silent)
+        await view.user_played_total_time(db, user, silent=silent)
+        await view.user_played_total_games(db, user, silent=silent)
+        await view.user_completed_total_games(db, user, silent=silent)
 
 
 async def check_users(
@@ -78,12 +87,12 @@ async def check_users(
     silent: bool = False,
     only_active_users: bool = True,
     user_ids: list[int] | None = None,
-    announce_streak_loss: bool = False,
 ):
     """Check the achievements of every user (or of `user_ids`).
 
-    Event-driven: it runs right after a timer stops (routers/timers.py), from the
-    admin panel, and from the scheduler (utils/scheduler.py) for the daily check.
+    Event-driven: it runs after a timer stops or a session or library entry changes (routers/timers.py,
+    routers/manage.py, the import). Teamwork is not checked here: only a timer that starts can make it
+    true (after_timer_start).
     """
     start_time = time.time()
     users_db = users.get_users(db, only_active_users)
@@ -94,12 +103,12 @@ async def check_users(
         for user in users_db:
             # one user's failure must not skip the checks of the rest
             try:
-                await check_user(db, user, silent=silent, announce_streak_loss=announce_streak_loss)
+                await check_user(db, user, silent=silent)
+                await check_user_lifetime(db, user, silent=silent)
             except Exception as e:
                 db.rollback()
                 logger.error(f"Error checking achievements of {user.username}: {e}")
                 failures.append(user.username)
-        await achievements.teamwork(db, silent)
         elapsed_time = time.time() - start_time
         if elapsed_time > 30:
             await utils.send_message_to_admins(
@@ -124,6 +133,8 @@ def after_session_change(
     user_id: int | None = None,
     silent: bool = False,
     ranking_before: dict | None = None,
+    stopped: tuple | None = None,
+    recalculate: list[int] | None = None,
 ):
     """Background-task entrypoint for routers/timers.py and the admin panel.
 
@@ -134,14 +145,29 @@ def after_session_change(
     BackgroundTask runs) and its own event loop.
 
     `ranking_before` is the snapshot taken before the change (see ranking_snapshot); when
-    given and not silent, the ranking changes it caused are announced.
+    given and not silent, the ranking changes it caused are announced. `stopped` is (game_id, start,
+    duration in seconds) of the timer that has just been stopped: what only a real timer can earn
+    ("Lo he abierto sin querer") is judged from it, never from the sessions in the database.
+
+    `recalculate` is the seasons of a session that was edited or deleted: instead of only adding what
+    the user has earned, their achievements of those seasons are worked out again, so what the session
+    earned and no longer holds is revoked (see crud/achievements_recalc.py). It never notifies.
     """
     from ..database.database import SessionLocal
 
     async def _run():
         db = SessionLocal()
         try:
-            await check_users(db, silent=silent, user_ids=None if user_id is None else [user_id])
+            if recalculate:
+                from ..crud import achievements_recalc  # imports this module too
+
+                await achievements_recalc.recalculate_user(db, user_id, recalculate)
+            else:
+                await check_users(db, silent=silent, user_ids=None if user_id is None else [user_id])
+            if stopped is not None:
+                user = users.get_user_by_id(db, user_id)
+                if user is not None:
+                    await achievements.opened_by_mistake(db, user, *stopped, silent=silent)
             if ranking_before is not None:
                 await announce_ranking_changes(db, ranking_before, silent)
         finally:
@@ -158,8 +184,9 @@ def after_timer_start(user_id: int, start_time: datetime.datetime, new_game_id: 
     """Background-task entrypoint for a timer that has just started.
 
     Only what a running timer can unlock is checked here (the rest needs a finished
-    session and is checked when it stops): the time of day it started at and
-    teamwork, which counts the timers running right now. `new_game_id` is set when it is the
+    session and is checked when it stops): the time of day and the date it started at
+    (early riser, nocturnal, new year, the game's release day) and teamwork and "all together", which count the
+    timers running right now. `new_game_id` is set when it is the
     first time the user plays that game this season: the group hears about it here, so the
     request that started the timer does not wait for the notification.
     """
@@ -170,13 +197,19 @@ def after_timer_start(user_id: int, start_time: datetime.datetime, new_game_id: 
         try:
             user = users.get_user_by_id(db, user_id)
             if user is not None:
-                await send_timer_notice(db, time_entries.get_active_game_timer_by_user(db, user_id))
+                timer = time_entries.get_active_game_timer_by_user(db, user_id)
+                game_id = timer.game_id if timer is not None else None
+                await send_timer_notice(db, timer)
                 if new_game_id is not None:
                     game = games.get_game_by_id(db, new_game_id)
                     if game is not None:
                         await users.announce_new_game(db, user, game, start_time.date(), silent=False)
-                await achievements.timer_started(db, user, start_time)
+                await achievements.timer_started(db, user, start_time, game_id)
                 await achievements.user_played_total_games(db, user)
+                for view in achievements.lifetime_views(db):
+                    await view.user_played_total_games(db, user)
+                if game_id is not None:
+                    await achievements.all_together(db, game_id, silent=False)
             await achievements.teamwork(db, silent=False)
         finally:
             db.close()
@@ -225,13 +258,16 @@ def after_completion(entry_id: int, silent: bool = False):
             logger.error("Error in post-completion tasks: " + str(e))
 
 
-async def announce_lost_streak(user: models.User, played_dates: list[datetime.date], today: datetime.date, silent: bool):
-    """Announce a streak of more than 10 days on the day it is lost (daily check)."""
-    lost = streaks.lost_streak(played_dates, today)
-    if lost is not None:
-        msg = user.name + " acaba de perder la racha de " + str(lost) + " días."
-        logger.info(msg)
-        await utils.send_message(msg, silent)
+async def announce_lost_streaks(db: Session, today: datetime.date | None = None, silent: bool = False):
+    """Daily: announce the streaks of more than 10 days that were lost. It is the one thing nothing
+    else can trigger: a streak is lost on a day nobody plays."""
+    today = today or datetime.date.today()
+    for user in users.get_users(db):
+        lost = streaks.lost_streak(time_entries.get_played_days(db, user.id), today)
+        if lost is not None:
+            msg = user.name + " acaba de perder la racha de " + str(lost) + " días."
+            logger.info(msg)
+            await utils.send_message(msg, silent)
 
 
 ####################

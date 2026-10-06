@@ -21,6 +21,7 @@ const ACTIONS = [
   ['POST', /^push\/announce$/, 'Envió un aviso en la app'],
   ['POST', /^telegram\/announce$/, 'Envió un aviso por Telegram'],
   ['POST', /^check-achievements$/, 'Pidió comprobar los logros'],
+  ['POST', /^recalculate-achievements$/, 'Pidió recalcular todos los logros'],
   ['POST', /^rawg-sync\//, 'Usó la sincronización con RAWG'],
 ];
 

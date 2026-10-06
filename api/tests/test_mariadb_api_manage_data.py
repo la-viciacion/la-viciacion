@@ -285,6 +285,31 @@ class SessionsAdminTests(ManageTestCase):
         self.background["after_timer_stop"].assert_called_once_with(self.ana, "celeste", None)
         self.assertEqual(self.admin("DELETE", f"/timers/{timer_id}").status_code, 404)
 
+    def test_every_change_of_an_admin_checks_the_achievements_of_that_player_silently(self):
+        check = self.background["after_session_change"]
+        created = self.admin("POST", "/timers", json=self.body()).json()
+        timer_id, season = created["id"], seasons.of(datetime.datetime.fromisoformat(created["start_time"]))
+        check.assert_called_once_with(self.ana, True, recalculate=[season])
+        check.reset_mock()
+        self.admin("PATCH", f"/timers/{timer_id}", json={"notes": "fixed"})
+        check.assert_called_once_with(self.ana, True, recalculate=[season])
+        check.reset_mock()
+        self.admin("DELETE", f"/timers/{timer_id}")
+        check.assert_called_once_with(self.ana, True, recalculate=[season])
+
+    def test_moving_a_session_to_another_season_works_out_both_again(self):
+        check = self.background["after_session_change"]
+        created = self.admin("POST", "/timers", json=self.body()).json()
+        check.reset_mock()
+        start = datetime.datetime.fromisoformat(created["start_time"])
+        last_year = start.replace(year=start.year - 1)
+        self.admin("PATCH", f"/timers/{created['id']}", json={"start_time": last_year.isoformat(), "end_time": (last_year + timedelta(hours=1)).isoformat()})
+        check.assert_called_once_with(self.ana, True, recalculate=[start.year - 1, start.year])
+
+    def test_a_rejected_change_checks_nothing(self):
+        self.admin("POST", "/timers", json=self.body(end_time=ago(hours=6).isoformat()))
+        self.background["after_session_change"].assert_not_called()
+
     def test_deleting_a_finished_session_schedules_nothing(self):
         timer_id = self.session(self.ana, "celeste", ago(hours=4), 30)
         self.admin("DELETE", f"/timers/{timer_id}")
@@ -338,6 +363,21 @@ class LibraryAdminTests(ManageTestCase):
         self.assertEqual(self.admin("DELETE", f"/library/{self.second}").status_code, 200)
         self.assertEqual(self.admin("DELETE", f"/library/{self.second}").status_code, 404)
         self.assertEqual(self.entries()["total"], 2)
+
+    def test_every_change_of_an_admin_checks_the_achievements_of_that_player_silently(self):
+        check = self.background["after_session_change"]
+        season = seasons.current()
+        created = self.admin("POST", "/library", json={"user_id": self.bea, "game_id": "celeste", "platform": "pc"}).json()
+        check.assert_called_once_with(self.bea, True, recalculate=[season])
+        check.reset_mock()
+        self.admin("PATCH", f"/library/{created['id']}", json={"completed": True})
+        check.assert_called_once_with(self.bea, True, recalculate=[season])
+        check.reset_mock()
+        self.admin("PATCH", f"/library/{created['id']}", json={"started_date": f"{season - 1}-06-01"})
+        check.assert_called_once_with(self.bea, True, recalculate=[season - 1, season])  # it changed season
+        check.reset_mock()
+        self.admin("DELETE", f"/library/{created['id']}")
+        check.assert_called_once_with(self.bea, True, recalculate=[season - 1])
 
 
 class ScoresAdminTests(ManageTestCase):
@@ -455,6 +495,35 @@ class AchievementsAdminTests(ManageTestCase):
         by_id = {a["id"]: a for a in self.admin("GET", "/achievements").json()}
         self.assertEqual((by_id[first]["awarded"], by_id[second]["awarded"]), (2, 0))
         self.assertFalse(by_id[first]["has_image"])
+
+    def test_the_catalogue_says_which_ones_have_no_season_limit(self):
+        by_key = {a["key"]: a for a in self.admin("GET", "/achievements").json()}
+        self.assertTrue(by_key["PLAYED_1000_HOURS_GAME_LIFETIME"]["lifetime"])
+        self.assertFalse(by_key["PLAYED_1000_HOURS_GAME"]["lifetime"])
+        self.assertEqual(sum(a["lifetime"] for a in by_key.values()), 20)
+
+    def test_the_season_an_achievement_is_valid_from_is_listed_and_can_be_changed(self):
+        by_key = {a["key"]: a for a in self.admin("GET", "/achievements").json()}
+        self.assertEqual((by_key["PLAYED_7_DAYS"]["valid_from_season"], by_key["COMPLETED_1_GAME"]["valid_from_season"]), (2023, 2027))
+        first = by_key["PLAYED_7_DAYS"]["id"]
+        self.assertEqual(self.admin("PATCH", f"/achievements/{first}", json={"valid_from_season": 2028}).json()["valid_from_season"], 2028)
+        self.assertEqual(self.admin("PATCH", f"/achievements/{first}", json={"valid_from_season": 1999}).status_code, 422)
+        self.assertEqual(self.admin("PATCH", f"/achievements/{first}", json={"valid_from_season": None, "title": "T"}).json()["valid_from_season"], 2028)
+
+    def test_an_achievement_can_be_switched_off_and_on(self):
+        first = self.ids()[0]
+        self.assertTrue(next(a for a in self.admin("GET", "/achievements").json() if a["id"] == first)["active"])
+        self.assertFalse(self.admin("PATCH", f"/achievements/{first}", json={"active": False}).json()["active"])
+        self.assertFalse(next(a for a in self.admin("GET", "/achievements").json() if a["id"] == first)["active"])
+        self.assertTrue(self.admin("PATCH", f"/achievements/{first}", json={"active": True}).json()["active"])
+        self.assertTrue(self.admin("PATCH", f"/achievements/{first}", json={"active": None, "title": "T"}).json()["active"])  # it cannot be emptied
+
+    def test_an_achievement_can_be_made_secret(self):
+        first = self.ids()[0]
+        self.assertFalse(next(a for a in self.admin("GET", "/achievements").json() if a["id"] == first)["secret"])
+        self.assertTrue(self.admin("PATCH", f"/achievements/{first}", json={"secret": True}).json()["secret"])
+        self.assertTrue(next(a for a in self.admin("GET", "/achievements").json() if a["id"] == first)["secret"])
+        self.assertTrue(self.admin("PATCH", f"/achievements/{first}", json={"secret": None, "title": "T"}).json()["secret"])  # it cannot be emptied
 
     def test_titles_and_messages_can_be_edited(self):
         first = self.ids()[0]

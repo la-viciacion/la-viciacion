@@ -45,6 +45,19 @@ def streak_summary(played_dates: list[datetime.date], today: datetime.date, seas
     return end_max_streak_date, max_streak, current_streak, end_max_gap_date, max_gap, current_gap
 
 
+def streak_reach_dates(played_dates: list[datetime.date], lengths) -> dict[int, datetime.date]:
+    """For each streak length in `lengths` that some run of consecutive days reaches, the first day
+    on which a run got to it (the 7th day of the first run of 7, wherever the best run is)."""
+    reached: dict[int, datetime.date] = {}
+    run = 0
+    for i, day in enumerate(played_dates):
+        run = run + 1 if i > 0 and (day - played_dates[i - 1]).days == 1 else 1
+        for length in lengths:
+            if run >= length and length not in reached:
+                reached[length] = day
+    return reached
+
+
 def lost_streak(played_dates: list[datetime.date], today: datetime.date, minimum: int = 10) -> int | None:
     """Length of the streak a user has just lost, or None.
 

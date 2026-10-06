@@ -31,13 +31,13 @@ class SchedulerTestCase(ApiTestCase):
         async def check_forgotten_timer(db, user):
             self.calls.append(("forgotten", user.username))
 
-        async def check_users(db, silent=False, only_active_users=True, user_ids=None, announce_streak_loss=False):
-            self.calls.append(("daily_streaks", silent, announce_streak_loss))
+        async def announce_lost_streaks(db, today=None, silent=False):
+            self.calls.append(("daily_streaks", silent))
 
         for patcher in (
             mock.patch.object(actions, "weekly_resume", new=weekly_resume),
             mock.patch.object(actions, "check_forgotten_timer", new=check_forgotten_timer),
-            mock.patch.object(actions, "check_users", new=check_users),
+            mock.patch.object(actions, "announce_lost_streaks", new=announce_lost_streaks),
             mock.patch.object(actions, "push_has_devices", return_value=False),
         ):
             patcher.start()
@@ -160,7 +160,7 @@ class HourlyAndDailyJobTests(SchedulerTestCase):
 
     def test_the_daily_check_announces_lost_streaks_and_runs_at_five(self):
         scheduler.tick(at(5, 10))
-        self.assertIn(("daily_streaks", False, True), self.calls)
+        self.assertIn(("daily_streaks", False), self.calls)
         self.calls.clear()
         scheduler.tick(at(5, 40))
         scheduler.tick(at(8, 30))
@@ -174,7 +174,7 @@ class HourlyAndDailyJobTests(SchedulerTestCase):
     def test_the_daily_check_does_not_depend_on_the_notifications_switch(self):
         self.set_settings(**{"notifications.enabled": False})
         scheduler.tick(at(5, 10))
-        self.assertEqual([c for c in self.calls if c[0] == "daily_streaks"], [("daily_streaks", False, True)])
+        self.assertEqual([c for c in self.calls if c[0] == "daily_streaks"], [("daily_streaks", False)])
 
 
 class TimerNoticeJobTests(SchedulerTestCase):
@@ -207,20 +207,20 @@ class TimerNoticeJobTests(SchedulerTestCase):
 
 class FailingJobTests(SchedulerTestCase):
     def test_a_failing_job_is_recorded_and_the_others_still_run(self):
-        async def broken(db, silent=False, only_active_users=True, user_ids=None, announce_streak_loss=False):
-            raise RuntimeError("achievements exploded")
+        async def broken(db, today=None, silent=False):
+            raise RuntimeError("streaks exploded")
 
-        with mock.patch.object(actions, "check_users", new=broken):
+        with mock.patch.object(actions, "announce_lost_streaks", new=broken):
             scheduler.tick(at(5, 10))
-        self.assertEqual(self.jobs()["daily_streaks"][1], "error: achievements exploded")
+        self.assertEqual(self.jobs()["daily_streaks"][1], "error: streaks exploded")
         scheduler.tick(at(9, 1, day=7))  # next week: other jobs are unaffected
         self.assertEqual(self.jobs()["weekly_summary"][1], "ok: 1 users")
 
     def test_a_failure_does_not_make_the_job_repeat_in_the_same_slot(self):
-        async def broken(db, silent=False, only_active_users=True, user_ids=None, announce_streak_loss=False):
+        async def broken(db, today=None, silent=False):
             raise RuntimeError("nope")
 
-        with mock.patch.object(actions, "check_users", new=broken):
+        with mock.patch.object(actions, "announce_lost_streaks", new=broken):
             scheduler.tick(at(5, 10))
             scheduler.tick(at(5, 12))
         self.assertEqual(self.jobs()["daily_streaks"][1], "error: nope")
@@ -229,10 +229,10 @@ class FailingJobTests(SchedulerTestCase):
         self.assertEqual([c for c in self.calls if c[0] == "daily_streaks"], [])  # still the same slot
 
     def test_a_long_error_message_fits_the_column(self):
-        async def broken(db, silent=False, only_active_users=True, user_ids=None, announce_streak_loss=False):
+        async def broken(db, today=None, silent=False):
             raise RuntimeError("x" * 600)
 
-        with mock.patch.object(actions, "check_users", new=broken):
+        with mock.patch.object(actions, "announce_lost_streaks", new=broken):
             scheduler.tick(at(5, 10))
         self.assertEqual(len(self.jobs()["daily_streaks"][1]), 255)
 

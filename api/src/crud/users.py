@@ -133,7 +133,7 @@ def get_profile(db: Session, user: models.User, season: int = None) -> dict:
     every = season == seasons.ALL
     from . import time_entries as time_entries_crud
 
-    played_days = time_entries_crud.get_played_days(db, user.id, season=season)[1]
+    played_days = time_entries_crud.get_played_days(db, user.id, season=season)
     best_date, best_streak, current_streak = streaks.streak_summary(
         played_days, datetime.date.today(), seasons.current() if every else season
     )[:3]
@@ -165,7 +165,7 @@ def get_profile(db: Session, user: models.User, season: int = None) -> dict:
             for r in top_games(db, user.username, limit=5, season=season)
         ],
         "achievements": [
-            {"id": r.achievement_id, "title": r.title, "date": r.date} for r in achievements[-5:][::-1]
+            {"id": r.achievement_id, "title": r.title, "date": r.date, "secret": bool(r.secret)} for r in achievements[-5:][::-1]
         ],
     }
 
@@ -441,6 +441,41 @@ def count_completed_games(db: Session, user_id: int, season: int = None):
     except SQLAlchemyError as e:
         logger.error("Error counting completed games: " + str(e))
         raise e
+
+
+def played_game_dates(db: Session, user_id: int, season: int = None, since: int | None = None) -> list[datetime.date]:
+    """The day the user first played each distinct game of the season, oldest first: the Nth one is
+    the day their Nth game began. Over every season, `since` counts only what was played from that season."""
+    season = seasons.or_current(season)
+    query = db.query(func.min(models.UserGame.started_date)).filter(models.UserGame.user_id == user_id)
+    if season != seasons.ALL:
+        query = query.filter(models.UserGame.season == season)
+    elif since:
+        query = query.filter(models.UserGame.season >= since)
+    return sorted(day for (day,) in query.group_by(models.UserGame.game_id).all())
+
+
+def completed_entries(db: Session, user_id: int, season: int = None, since: int | None = None) -> list[tuple[datetime.date, str]]:
+    """(day, game_id) of each completion of the season, oldest first (one per completed library entry, as
+    count_completed_games counts them). Over every season, a game is one completion: the first."""
+    season = seasons.or_current(season)
+    when = func.coalesce(models.UserGame.completed_date, models.UserGame.started_date)
+    query = db.query(when, models.UserGame.game_id).filter(models.UserGame.user_id == user_id, models.UserGame.completed == 1)
+    if season != seasons.ALL:
+        query = query.filter(models.UserGame.season == season)
+        return sorted((day, game_id) for day, game_id in query.all())
+    if since:
+        query = query.filter(models.UserGame.season >= since)
+    first: dict[str, datetime.date] = {}
+    for day, game_id in query.all():
+        if game_id not in first or day < first[game_id]:
+            first[game_id] = day
+    return sorted((day, game_id) for game_id, day in first.items())
+
+
+def completed_game_dates(db: Session, user_id: int, season: int = None, since: int | None = None) -> list[datetime.date]:
+    """The day of each completion of the season, oldest first."""
+    return [day for day, _ in completed_entries(db, user_id, season, since)]
 
 
 def first_entry_per_game(rows, limit: int | None = None) -> list:
@@ -754,6 +789,9 @@ async def after_completion(db: Session, entry: models.UserGame, silent: bool):
         db, user, completion_time, avg_time, entry.game_id, silent=silent
     )
     await achievements.user_completed_total_games(db, user, silent=silent)
+    for view in achievements.lifetime_views(db):
+        await view.user_completed_total_games(db, user, silent=silent)
+    await achievements.completed_in_a_day(db, user, silent=silent)
 
     message = (
         user.name
@@ -788,7 +826,7 @@ def get_streaks(db: Session, username: str):
     try:
         user = get_user_by_username(db, username)
         season = seasons.current()
-        days = time_entries_crud.get_played_days(db, user.id, season=season)[1]
+        days = time_entries_crud.get_played_days(db, user.id, season=season)
         best_date, best, current = streaks.streak_summary(days, datetime.date.today(), season)[:3]
         return [{"current_streak": current, "best_streak": best, "best_streak_date": best_date}]
     except Exception as e:
@@ -869,6 +907,7 @@ def get_achievements(db: Session, username: str, season: int = None):
                 models.UserAchievement.date,
                 models.Achievement.id,
                 models.Achievement.title,
+                models.Achievement.secret,
             )
             .join(models.User, models.User.id == models.UserAchievement.user_id)
             .join(

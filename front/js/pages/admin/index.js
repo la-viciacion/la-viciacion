@@ -7,7 +7,7 @@ import { html, mount } from '../../lib/html.js';
 import { loadPlatforms } from '../../lib/platforms.js';
 import { toast } from '../../ui/toast.js';
 import { errorState, store } from './components.js';
-import { checkAchievementsDialog, deleteRow, pickGame } from './dialogs.js';
+import { deleteRow, pickGame } from './dialogs.js';
 import { ENTITIES, TABS } from './entities.js';
 import { openForm } from './form.js';
 import { SECTIONS, hashFor, sectionOf, tabFromHash } from './nav.js';
@@ -61,7 +61,7 @@ export async function render({ main, user }) {
   try {
     await loadPlatforms();
     const [users, achievements] = await Promise.all([api('/manage/users?limit=200'), api('/manage/achievements')]);
-    store.achievements = (achievements || []).map((a) => ({ id: a.id, title: a.title }));
+    store.achievements = (achievements || []).map((a) => ({ id: a.id, key: a.key, title: a.title, active: a.active }));
     store.users = (users?.items || []).map((u) => ({ id: u.id, username: u.username, name: u.name, telegram_id: u.telegram_id }));
   } catch (err) {
     mount(root, errorState(err.message));
@@ -342,7 +342,10 @@ async function onClick(e) {
       }
       case 'prev': st.offset = Math.max(0, st.offset - PAGE); return load();
       case 'next': st.offset += PAGE; return load();
-      case 'check-achievements': return checkAchievementsDialog();
+      case 'recalculate-achievements': {
+        const { recalculateAchievementsFlow } = await import('./recalculate-achievements.js');
+        return recalculateAchievementsFlow({ onDone: admin.reload });
+      }
       case 'rawg-sync': {
         const { rawgSyncFlow } = await import('./rawg-sync.js');
         return rawgSyncFlow({ onDone: admin.reload });

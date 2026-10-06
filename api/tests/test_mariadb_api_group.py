@@ -3,6 +3,8 @@ import datetime
 import unittest
 from datetime import timedelta
 
+from sqlalchemy import text
+
 from src.crud import group
 from src.database import database, models
 from tests.api_support import ApiTestCase
@@ -45,7 +47,7 @@ class AchievementsCatalogTests(ApiTestCase):
         self.award(self.bea, self.second, TODAY())
         self.award(self.ana, self.first, TODAY())
         body = self.catalog()
-        self.assertEqual(len(body), self.scalar("SELECT COUNT(*) FROM achievements"))
+        self.assertEqual(len(body), self.scalar("SELECT COUNT(*) FROM achievements WHERE valid_from_season <= :y", y=TODAY().year))  # the ones of a later season are not there yet
         self.assertEqual([a["id"] for a in body], sorted(a["id"] for a in body))
         for achievement in body:
             if achievement["id"] == self.first:
@@ -53,7 +55,43 @@ class AchievementsCatalogTests(ApiTestCase):
                 self.assertNotIn("{}", achievement["description"])
                 self.assertNotIn("*", achievement["description"])
             else:  # not even the name: the other player's unlock does not reveal it
-                self.assertEqual(achievement, {"id": achievement["id"], "hidden": True, "unlocked_by_me": False})
+                self.assertEqual(achievement, {"id": achievement["id"], "hidden": True, "unlocked_by_me": False, "secret": False})
+
+    def test_a_secret_one_is_known_to_be_secret_by_everybody_but_nothing_else_about_it(self):
+        with self.engine.begin() as conn:
+            conn.execute(text("UPDATE achievements SET secret = 1 WHERE id IN (:a, :b)"), {"a": self.first, "b": self.second})
+        self.award(self.ana, self.first, TODAY())
+        by_id = {a["id"]: a for a in self.catalog()}
+        self.assertTrue(by_id[self.first]["secret"])
+        # whoever lacks it knows that it exists and that it is special, and nothing more
+        self.assertEqual(by_id[self.second], {"id": self.second, "hidden": True, "unlocked_by_me": False, "secret": True})
+
+    def test_the_ones_with_no_season_limit_say_so_once_unlocked(self):
+        lifetime = self.scalar("SELECT id FROM achievements WHERE `key` = 'PLAYED_100_DAYS_LIFETIME'")
+        with self.engine.begin() as conn:
+            conn.execute(text("UPDATE achievements SET valid_from_season = 2023 WHERE id = :id"), {"id": lifetime})  # valid, so the others see it as a hidden one
+        self.award(self.ana, lifetime, TODAY())
+        by_id = {a["id"]: a for a in self.catalog()}
+        self.assertTrue(by_id[lifetime]["lifetime"])
+        other = self.catalog("bea")
+        self.assertEqual(next(a for a in other if a["id"] == lifetime), {"id": lifetime, "hidden": True, "unlocked_by_me": False, "secret": False})
+
+    def test_one_that_is_not_valid_yet_does_not_exist_for_the_group_unless_the_viewer_has_it(self):
+        with self.engine.begin() as conn:
+            conn.execute(text("UPDATE achievements SET valid_from_season = :s WHERE id IN (:a, :b)"), {"s": TODAY().year + 1, "a": self.first, "b": self.second})
+        self.award(self.ana, self.first, TODAY())
+        shown = {a["id"] for a in self.catalog()}
+        self.assertIn(self.first, shown)
+        self.assertNotIn(self.second, shown)
+
+    def test_a_switched_off_achievement_does_not_exist_for_the_group_unless_the_viewer_has_it(self):
+        with self.engine.begin() as conn:
+            conn.execute(text("UPDATE achievements SET active = 0 WHERE id IN (:a, :b)"), {"a": self.first, "b": self.second})
+        self.award(self.ana, self.first, TODAY())
+        shown = {a["id"] for a in self.catalog()}
+        self.assertIn(self.first, shown)  # she has it
+        self.assertNotIn(self.second, shown)  # nobody can have it: not even as a hidden one
+        self.assertEqual(len(self.catalog("ana")), self.scalar("SELECT COUNT(*) FROM achievements WHERE active = 1 AND valid_from_season <= :y", y=TODAY().year) + 1)
 
     def test_who_has_it_how_many_times_and_when_last_the_latest_first(self):
         last = TODAY() - timedelta(days=400)

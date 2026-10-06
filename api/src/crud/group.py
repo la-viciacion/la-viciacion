@@ -7,6 +7,8 @@ from sqlalchemy.orm import Session
 
 from ..database import models
 from . import time_entries, users
+from ..utils.achievements import is_lifetime  # after the crud modules: they import each other
+from ..utils import seasons
 
 
 def describe(message: str | None) -> str:
@@ -27,7 +29,8 @@ def unlocked_ids(db: Session, user_id: int) -> set[int]:
 
 def achievements_catalog(db: Session, viewer_id: int) -> list[dict]:
     """Every achievement with who has unlocked it (and how many times: once per season) and when last. The ones the
-    viewer has not unlocked come hidden: no key, title, description, picture or players, only that they exist."""
+    viewer has not unlocked come hidden: no key, title, description, picture or players, only that they exist and
+    whether they are secret (so that everybody knows there are special ones to unlock)."""
     mine = unlocked_ids(db, viewer_id)
     players = (models.User.is_active == 1, models.not_god())
     unlocked: dict[int, dict[int, dict]] = {}
@@ -47,10 +50,13 @@ def achievements_catalog(db: Session, viewer_id: int) -> list[dict]:
     catalog = []
     for row in db.query(
         models.Achievement.id, models.Achievement.key, models.Achievement.title, models.Achievement.message,
-        models.Achievement.image.isnot(None).label("has_image"),
+        models.Achievement.image.isnot(None).label("has_image"), models.Achievement.active, models.Achievement.secret,
+        models.Achievement.valid_from_season,
     ).order_by(models.Achievement.id):
+        if (not row.active or row.valid_from_season > seasons.current()) and row.id not in mine:
+            continue  # switched off, or not valid yet: it does not exist yet, not even as a hidden one
         if row.id not in mine:
-            catalog.append({"id": row.id, "hidden": True, "unlocked_by_me": False})
+            catalog.append({"id": row.id, "hidden": True, "unlocked_by_me": False, "secret": bool(row.secret)})  # so that everybody knows there are special ones
             continue
         who = sorted(unlocked.get(row.id, {}).values(), key=lambda w: (w["last"], w["name"].lower()), reverse=True)
         catalog.append({
@@ -59,6 +65,8 @@ def achievements_catalog(db: Session, viewer_id: int) -> list[dict]:
             "key": row.key,
             "title": row.title,
             "description": describe(row.message),
+            "secret": bool(row.secret),
+            "lifetime": is_lifetime(row.key),  # earned once in a lifetime, not once a season
             "has_image": bool(row.has_image),
             "unlocked_by": len(who),
             "unlocked_by_me": True,
@@ -126,7 +134,8 @@ def player_profile(db: Session, viewer_id: int, player_id: int, season=None) -> 
     data = users.get_profile(db, user, season)
     mine = unlocked_ids(db, viewer_id)
     achievements = [
-        {"title": a["title"], "date": a["date"], "hidden": False} if a["id"] in mine else {"hidden": True, "date": a["date"]}
+        {"title": a["title"], "date": a["date"], "hidden": False, "secret": a["secret"]}
+        if a["id"] in mine else {"hidden": True, "date": a["date"], "secret": a["secret"]}
         for a in data["achievements"]
     ]
     return {

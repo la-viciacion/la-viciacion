@@ -1,8 +1,7 @@
 import datetime
 import unittest
-from unittest import mock
 
-from src.crud import time_entries, users
+from src.crud import users
 from src.database import models
 from src.utils import seasons
 from tests.sqlite_db import make_session
@@ -18,18 +17,8 @@ def session(db, game, year, month, day, hours=1):
     ))
 
 
-def with_dates(real):
-    """SQLite's DATE() gives text where MariaDB gives dates."""
-    def wrapper(*args, **kwargs):
-        return tuple([datetime.date.fromisoformat(d) for d in days] for days in real(*args, **kwargs))
-    return wrapper
-
-
 class ProfileSeasonsTests(unittest.TestCase):
     def setUp(self):
-        patch = mock.patch.object(time_entries, "get_played_days", with_dates(time_entries.get_played_days))
-        patch.start()
-        self.addCleanup(patch.stop)
         self.db = make_session()
         self.user = models.User(id=1, name="Ana", username="ana", is_active=1)
         self.db.add_all([self.user, models.Game(id="doom", name="Doom"), models.Game(id="hades", name="Hades")])
