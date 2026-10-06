@@ -189,12 +189,19 @@ class Achievements:
         the title and message an admin edits (PATCH /manage/achievements) and whether it is active are kept.
         A new one is active and valid from the season its definition says (`since`; the first season of the app
         when it says nothing): the season is what keeps it from counting before its time.
+        A row whose key the code no longer has (an achievement that was dropped) is switched off, never deleted:
+        nothing can earn it any more, and whoever already has it keeps it.
         """
         existing = {key for (key,) in db.query(models.Achievement.key).all()}
         missing = [a for a in AchievementsElems if a.name not in existing]
-        if not missing:
+        dropped = existing - {a.name for a in AchievementsElems}
+        if not missing and not dropped:
             return
         try:
+            if dropped:
+                db.query(models.Achievement).filter(models.Achievement.key.in_(dropped)).update(
+                    {models.Achievement.active: False}, synchronize_session=False
+                )
             for achievement in missing:
                 db.add(
                     models.Achievement(

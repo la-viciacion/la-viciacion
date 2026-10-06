@@ -36,6 +36,14 @@ class RecalculationTests(unittest.TestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
 
+    def test_an_achievement_the_code_dropped_is_switched_off_not_deleted(self):
+        self.db.add(models.Achievement(key="LONG_GONE", title="Old", message="x", active=True))
+        self.db.commit()
+        Achievements().populate_achievements(self.db)
+        gone = self.db.query(models.Achievement).filter_by(key="LONG_GONE").one()
+        self.assertFalse(gone.active)
+        self.assertTrue(self.db.query(models.Achievement).filter_by(key="PLAYED_8_HOURS_SESSION").one().active)
+
     def valid_from(self, key, season):
         self.db.query(models.Achievement).filter_by(key=key).update({"valid_from_season": season})
         self.db.commit()
