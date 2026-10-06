@@ -1,11 +1,11 @@
 // What the wishlist says about a game. Pure, so it can be tested.
 import { formatDate, formatPlayers } from './format.js';
 
-/** How long until a game comes out: "Sale hoy", "Mañana", "En 12 días", "En 3 meses", or "Sin fecha confirmada". */
+/** How long until a game comes out: "Ya ha salido", "Mañana", "En 12 días", "En 3 meses", or "Sin fecha confirmada". */
 export function countdown(game) {
   if (!game.release_date) return 'Sin fecha confirmada';
   const days = game.days_until;
-  if (days == null) return 'Sale hoy';
+  if (days == null) return 'Ya ha salido'; // the API sends no days for a date that is today or past
   if (days === 1) return 'Mañana';
   if (days <= 60) return `En ${days} días`;
   return `En ${Math.round(days / 30)} meses`;
