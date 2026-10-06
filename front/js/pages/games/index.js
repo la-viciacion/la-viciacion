@@ -59,10 +59,10 @@ const card = (g) => html`
         ${g.wished ? html`<span class="pf-tag wish">En tu lista</span>` : ''}
         ${g.genres.slice(0, 2).map((genre) => html`<span class="pf-tag muted">${genre}</span>`)}
       </div>
-      <div class="gc-meta">
-        <span>${g.players === 1 ? '1 jugador' : `${g.players} jugadores`}${g.played_seconds ? ` · ${formatDuration(g.played_seconds)}` : ''}${g.last_played ? ` · ${formatRelative(g.last_played)}` : ''}</span>
-        ${g.score_mean == null ? '' : html`<span class="gc-score" title="Nota media del grupo (${g.score_count})">${scoreBadge(Math.round(g.score_mean))}</span>`}
-      </div>
+    </div>
+    <div class="gc-meta">
+      <span>${g.players === 1 ? '1 jugador' : `${g.players} jugadores`}${g.played_seconds ? ` · ${formatDuration(g.played_seconds)}` : ''}${g.last_played ? ` · ${formatRelative(g.last_played)}` : ''}</span>
+      ${g.score_mean == null ? '' : html`<span class="gc-score" title="Nota media del grupo (${g.score_count})">${scoreBadge(Math.round(g.score_mean))}</span>`}
     </div>
   </a>`;
 
