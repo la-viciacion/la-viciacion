@@ -96,23 +96,3 @@ export async function closeTimerNow(row, admin) {
   toast('Timer cerrado');
   await admin.reload();
 }
-
-export function uploadAchievementImage(row, admin) {
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = 'image/png,image/jpeg';
-  input.addEventListener('change', async () => {
-    const file = input.files[0];
-    if (!file) return;
-    try {
-      const form = new FormData();
-      form.append('file', file);
-      await api(`/utils/achievement-image/${encodeURIComponent(row.key)}`, { method: 'PATCH', body: form });
-      toast('Imagen actualizada');
-      await admin.reload();
-    } catch (err) {
-      toast(err.message, 'err');
-    }
-  });
-  input.click();
-}

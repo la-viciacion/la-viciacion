@@ -13,7 +13,7 @@ import { html } from '../../lib/html.js';
 import { platformList, platformName } from '../../lib/platforms.js';
 import { badge, seasonYears, store } from './components.js';
 import { ENTITY_OPTIONS, describe, detailParts } from './audit-labels.js';
-import { closeTimerNow, uploadAchievementImage } from './dialogs.js';
+import { closeTimerNow } from './dialogs.js';
 
 const platformField = { key: 'platform', label: 'Plataforma', type: 'platform' };
 const duration = (sec) => (sec == null ? '—' : formatDuration(sec));
@@ -258,9 +258,15 @@ export const ENTITIES = {
       { key: 'active', label: 'Activo', type: 'checkbox' },
       { key: 'secret', label: 'Secreto (se anuncia sin decir cuál; el jugador lo recibe en privado)', type: 'checkbox' },
       { key: 'valid_from_season', label: 'Válido desde la temporada (antes de ella nadie lo consigue ni cuenta)', type: 'number', required: true },
+      {
+        key: 'image',
+        label: 'Imagen (PNG o JPG; sin elegir se queda la actual)',
+        type: 'image',
+        current: (r) => (r.has_image ? `/api/v1/utils/achievement-image/${r.key}` : null),
+        upload: (r) => `/utils/achievement-image/${encodeURIComponent(r.key)}`,
+      },
     ],
     name: (r) => r.title,
-    actions: [{ label: 'Imagen…', run: (r, admin) => uploadAchievementImage(r, admin) }],
     canDelete: false,
   },
 };
