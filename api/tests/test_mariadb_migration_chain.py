@@ -1,6 +1,6 @@
 """Every migration of the chain, one by one, on a real MariaDB (see tests/mariadb_db.py).
 
-`test_mariadb_migrations.py` and `test_mariadb_v1_upgrade.py` check the ends of the road (empty or v1
+`test_mariadb_migrations.py` and `test_mariadb_migration_v1_upgrade.py` check the ends of the road (empty or v1
 to head). These check each step: that it applies on data, that running it again changes nothing,
 that it can be undone, that both roads end in the same schema and that the schema is what the models
 say. They automate steps 2, 4, 6 and 7 of the checklist in docs/migrations.md for all migrations.

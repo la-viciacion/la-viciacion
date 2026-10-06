@@ -5,7 +5,7 @@ wrong and leaves the database as it was, so that a person decides. For each refu
 the three things that matter: it fails and names the offending data, the database stays at the last
 revision that was applied (with the schema untouched), and once the data is fixed running it again
 converges to the head. The v1 database of tests/v1_fixture.py is the starting point; 007 and 009 are in
-test_mariadb_v1_upgrade.py.
+test_mariadb_migration_v1_upgrade.py.
 """
 from sqlalchemy import inspect, text
 
