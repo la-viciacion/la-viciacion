@@ -1,6 +1,6 @@
 // Profile picture: pick a file, crop and shrink it in the browser, upload it, and swap it in
 // the profile header and the navbar without reloading.
-import { api } from '../../lib/api.js';
+import { api, forgetAvatars } from '../../lib/api.js';
 import { flash } from './flash.js';
 
 const AVATAR_SIZE = 256;
@@ -47,6 +47,7 @@ export function initAvatar(main, { path }) {
       const form = new FormData();
       form.append('file', small, 'avatar.jpg');
       await api(path, { method: 'PATCH', body: form });
+      forgetAvatars();
       const url = URL.createObjectURL(small);
       showAvatar(main.querySelector('#pfAvatar'), url);
       showAvatar(document.querySelector('.navbar-avatar'), url);

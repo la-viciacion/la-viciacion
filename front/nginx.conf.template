@@ -12,6 +12,14 @@ server {
         return 404;
     }
 
+    # Text compresses to a fraction (the app is ~500 KB of modules, and the API answers JSON). Images are
+    # already compressed; html is always eligible.
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_proxied any;
+    gzip_types text/css text/javascript application/javascript application/json image/svg+xml application/manifest+json;
+
     location /api/ {
         # the profile's "Importar datos" posts a whole export file (nginx's default is 1 MB)
         client_max_body_size 8m;
@@ -27,6 +35,12 @@ server {
     # Code is revalidated on every load (cheap 304s); a deploy shows up immediately.
     location ~* \.(html|js|css)$ {
         add_header Cache-Control "no-cache";
+        try_files $uri =404;
+    }
+
+    # The icons never change under the same name: the browser keeps them for a day
+    location /assets/ {
+        add_header Cache-Control "public, max-age=86400";
         try_files $uri =404;
     }
 

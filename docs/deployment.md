@@ -47,7 +47,7 @@ Docker Compose, four containers on the `la-viciacion` network:
 
 | Container | Image / build | Ports | Notes |
 |---|---|---|---|
-| `laviciacion-front` | `ghcr.io/la-viciacion/laviciacion-front` (built from `front/Dockerfile`: `nginx:1.31-alpine`, static files copied in) | `3000` | Proxies `/api/` to `API_UPSTREAM`; `no-cache` on html/js/css; SPA fallback to `index.html` |
+| `laviciacion-front` | `ghcr.io/la-viciacion/laviciacion-front` (built from `front/Dockerfile`: `nginx:1.31-alpine`, static files copied in) | `3000` | Proxies `/api/` to `API_UPSTREAM`; gzip for text and JSON; `no-cache` on html/js/css, one day for `/assets/`; SPA fallback to `index.html` |
 | `laviciacion-api` | `ghcr.io/la-viciacion/laviciacion-api` (`api/Dockerfile`: `python:3.14-slim-trixie`) | `127.0.0.1:5000` | `entrypoint.sh`: wait for DB → `alembic upgrade head` → `uvicorn` (`--proxy-headers`) |
 | `laviciacion-bot` | `ghcr.io/la-viciacion/laviciacion-bot` (`bot/Dockerfile`: `python:3.14-slim-trixie`) | none | Depends on the API; restarts itself when Telegram settings change |
 | `laviciacion-db` | `mariadb:12.3.3` (official, pinned) | `127.0.0.1:3307` | Healthcheck gates the API start; data in `./db/data` (or a named volume, see [Database storage](#database-storage-linux-vs-windows)) |

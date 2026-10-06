@@ -7,8 +7,17 @@ const TOKEN_KEY = 'lv_token';
 export const session = {
   getToken: () => localStorage.getItem(TOKEN_KEY),
   setToken: (token) => localStorage.setItem(TOKEN_KEY, token),
-  clear: () => localStorage.removeItem(TOKEN_KEY),
+  clear: () => {
+    localStorage.removeItem(TOKEN_KEY);
+    avatars.clear();
+  },
 };
+
+// username -> Promise<object URL | null>: the navbar asks for the avatar on every screen change
+const avatars = new Map();
+
+/** Forget the loaded avatars (the user changed theirs): the next screen asks for it again. */
+export const forgetAvatars = () => avatars.clear();
 
 let onUnauthorized = () => {};
 
@@ -73,7 +82,11 @@ export async function login(username, password) {
 }
 
 /** Object URL of the user's avatar, or null when they have none. */
-export async function loadAvatarUrl(username) {
-  const blob = await api(`/users/${encodeURIComponent(username)}/avatar`).catch(() => null);
-  return blob instanceof Blob && blob.size ? URL.createObjectURL(blob) : null;
+export function loadAvatarUrl(username) {
+  if (!avatars.has(username)) {
+    avatars.set(username, api(`/users/${encodeURIComponent(username)}/avatar`)
+      .catch(() => null)
+      .then((blob) => (blob instanceof Blob && blob.size ? URL.createObjectURL(blob) : null)));
+  }
+  return avatars.get(username);
 }

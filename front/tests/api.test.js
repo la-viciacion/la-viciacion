@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, test } from 'node:test';
-import { API_BASE, api, jsonRequest, loadAvatarUrl, login, session, setUnauthorizedHandler } from '../js/lib/api.js';
+import { API_BASE, api, forgetAvatars, jsonRequest, loadAvatarUrl, login, session, setUnauthorizedHandler } from '../js/lib/api.js';
 
 // the browser's localStorage and fetch, as far as the client uses them
 const storage = new Map();
@@ -149,6 +149,16 @@ test('the avatar is an object URL, or null when the user has none', async () => 
   } finally {
     URL.createObjectURL = realCreate;
   }
+});
+
+test('an avatar is asked for once until it is forgotten', async () => {
+  answer = json({}, 404);
+  await loadAvatarUrl('eva');
+  await loadAvatarUrl('eva');
+  assert.equal(calls.length, 1);
+  forgetAvatars();
+  await loadAvatarUrl('eva');
+  assert.equal(calls.length, 2);
 });
 
 test('the username of the avatar request is encoded', async () => {

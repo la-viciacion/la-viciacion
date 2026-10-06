@@ -18,9 +18,6 @@ async function refresh() {
 }
 
 export async function render({ user, main, isCurrent }) {
-  await loadPlatforms();
-  if (!isCurrent()) return;
-
   mount(main, html`
     <section id="timerSection" aria-label="Timer">
       <div class="loading-spinner">Cargando timer...</div>
@@ -52,8 +49,9 @@ export async function render({ user, main, isCurrent }) {
   main.querySelector('#historyList').addEventListener('keydown', onHistoryKey);
   main.querySelector('#historyMore').addEventListener('click', onHistoryClick);
 
-  // Active timer first: it decides whether "Seguir" buttons are enabled.
-  await loadTimerCard();
+  // Active timer first: it decides whether "Seguir" buttons are enabled. The platforms (the history names
+  // them) are fetched meanwhile.
+  await Promise.all([loadPlatforms(), loadTimerCard()]);
   if (!isCurrent()) return;
   await loadHistory(true);
 
