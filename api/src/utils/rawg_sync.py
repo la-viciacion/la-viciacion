@@ -191,11 +191,17 @@ def _pending_query(db, overwrite: bool):
     return q.filter(or_(*blanks))
 
 
+def _alphabetical_first(games: list[models.Game], limit: int) -> list[models.Game]:
+    return sorted(games, key=lambda g: (g.name.casefold(), g.id))[:limit]
+
+
 # ── public API ──────────────────────────────────────────────────
 
 
-def estimate(db, overwrite: bool = False) -> dict:
+def estimate(db, overwrite: bool = False, max_games: int | None = None) -> dict:
     games = _pending_query(db, overwrite).all()
+    if max_games:
+        games = _alphabetical_first(games, max_games)
     no_id = [g for g in games if g.rawg_id is None]
     with_id = [g for g in games if g.rawg_id is not None]
     steam = lambda gs: sum(1 for g in gs if _needs_steam(g, overwrite))  # noqa: E731
@@ -223,8 +229,11 @@ def cancel() -> bool:
     return running
 
 
-def start(max_calls: int, overwrite: bool) -> bool:
-    """Launch the background run. False if one is already running."""
+def start(max_calls: int, overwrite: bool, max_games: int | None = None) -> bool:
+    """Launch the background run. False if one is already running.
+
+    `max_games` keeps only the first N pending games in alphabetical order (no other criterion); without it
+    every pending game is processed, the most played first."""
     if not config.RAWG_API_KEY:
         raise RuntimeError("No hay clave de RAWG configurada")
     with _lock:
@@ -238,6 +247,7 @@ def start(max_calls: int, overwrite: bool) -> bool:
             finished_at=None,
             overwrite=overwrite,
             max_calls=max_calls,
+            max_games=max_games,
             calls=0,
             total=0,
             processed=0,
@@ -250,7 +260,7 @@ def start(max_calls: int, overwrite: bool) -> bool:
             duplicates=[],
             errors=[],
         )
-    threading.Thread(target=_run, args=(max_calls, overwrite), daemon=True).start()
+    threading.Thread(target=_run, args=(max_calls, overwrite, max_games), daemon=True).start()
     return True
 
 
@@ -270,18 +280,21 @@ def _bump(key: str):
         _status[key] += 1
 
 
-def _run(max_calls: int, overwrite: bool):
+def _run(max_calls: int, overwrite: bool, max_games: int | None):
     db = SessionLocal()
     client = _Client(max_calls)
     reason = "completed"
     try:
-        # Most-played games first, so a small call cap still covers what matters.
-        sessions = dict(
-            db.query(models.GameTimer.game_id, func.count(models.GameTimer.id))
-            .group_by(models.GameTimer.game_id)
-            .all()
-        )
-        games = sorted(_pending_query(db, overwrite).all(), key=lambda g: -sessions.get(g.id, 0))
+        if max_games:
+            games = _alphabetical_first(_pending_query(db, overwrite).all(), max_games)
+        else:
+            # Most-played games first, so a small call cap still covers what matters.
+            sessions = dict(
+                db.query(models.GameTimer.game_id, func.count(models.GameTimer.id))
+                .group_by(models.GameTimer.game_id)
+                .all()
+            )
+            games = sorted(_pending_query(db, overwrite).all(), key=lambda g: -sessions.get(g.id, 0))
         _set(total=len(games))
         consecutive_errors = 0
 

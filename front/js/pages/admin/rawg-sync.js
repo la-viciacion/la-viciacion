@@ -27,23 +27,32 @@ export async function rawgSyncFlow({ onDone }) {
   return optionsStep(onDone);
 }
 
+const estimateStats = (est) => html`
+  ${statTile(`juegos por procesar de ${est.total_games}`, est.pending_games)}
+  ${statTile('llamadas a RAWG (máx.)', `~${est.estimated_calls}`)}
+  ${statTile(`de la cuota mensual (${number(est.monthly_quota)})`, `${((est.estimated_calls / est.monthly_quota) * 100).toFixed(1)}%`)}`;
+
+/** The number of games the admin limited the run to, or null for all of them (blank or invalid). */
+const gamesLimit = (form) => {
+  const n = Number(form.games.value);
+  return form.games.value.trim() !== '' && Number.isInteger(n) && n >= 1 ? n : null;
+};
+
 async function optionsStep(onDone) {
   const est = await api('/manage/rawg-sync/estimate');
-  const quota = ((est.estimated_calls / est.monthly_quota) * 100).toFixed(1);
   const m = openModal(html`
     ${modalHeader('Sincronizar juegos con RAWG')}
     <form class="adm-form" novalidate>
       <p class="adm-sub">Busca cada juego en RAWG para guardar su <strong>ID</strong> y completar los datos que falten (desarrolladora, géneros, fecha, imagen, slug y Steam ID). El nombre nunca se modifica.</p>
-      <div class="adm-stats adm-stats-sm">
-        ${statTile(`juegos por procesar de ${est.total_games}`, est.pending_games)}
-        ${statTile('llamadas a RAWG (máx.)', `~${est.estimated_calls}`)}
-        ${statTile(`de la cuota mensual (${number(est.monthly_quota)})`, `${quota}%`)}
-      </div>
+      <div class="adm-stats adm-stats-sm" id="rgEstimate">${estimateStats(est)}</div>
       <label>Tope de llamadas para esta ejecución
         <input class="adm-input" type="number" name="max" min="1" max="${MAX_CALLS_LIMIT}" value="${Math.min(2000, Math.max(50, est.estimated_calls))}" />
       </label>
+      <label>Juegos a procesar (vacío = todos los pendientes)
+        <input class="adm-input" type="number" name="games" min="1" step="1" placeholder="Todos" />
+      </label>
       <label class="adm-check"><input type="checkbox" name="overwrite" /> Sincronizar todo (resincronización completa: pisa los cambios hechos a mano)</label>
-      <div class="adm-sub">Se procesan primero los juegos con más sesiones. Por defecto solo se tienen en cuenta los que les falta información básica (ID de RAWG, etiquetas, desarrolladora, géneros, fecha, imagen o slug) y solo se rellenan campos vacíos. Duración aproximada: ${Math.ceil((est.estimated_calls * 0.5) / 60)} min.</div>
+      <div class="adm-sub">Por defecto se procesan primero los juegos con más sesiones. Si limitas el número de juegos, se toman los primeros por orden alfabético, sin más criterio. Por defecto solo se tienen en cuenta los que les falta información básica (ID de RAWG, etiquetas, desarrolladora, géneros, fecha, imagen o slug) y solo se rellenan campos vacíos, así que los que ya la tengan no cuentan en la siguiente ejecución. Con «Sincronizar todo» entran todos los juegos, de modo que un límite repetiría siempre los mismos. Duración aproximada con los datos de arriba: ~${Math.ceil((est.estimated_calls * 0.5) / 60)} min.</div>
       <div class="adm-error" role="alert"></div>
       <div class="adm-actions">
         <button type="button" class="adm-btn" data-close>Cancelar</button>
@@ -51,27 +60,46 @@ async function optionsStep(onDone) {
       </div>
     </form>`, { wide: true });
 
-  m.el.querySelector('form').addEventListener('submit', (e) => {
+  const form = m.el.querySelector('form');
+  // The figures above follow the limit and the "all" switch; the call cap stays the admin's own choice.
+  const refreshEstimate = async () => {
+    const params = new URLSearchParams({ overwrite: form.overwrite.checked });
+    const limit = gamesLimit(form);
+    if (limit) params.set('max_games', limit);
+    try {
+      mount(m.el.querySelector('#rgEstimate'), estimateStats(await api(`/manage/rawg-sync/estimate?${params}`)));
+    } catch (err) {
+      m.el.querySelector('.adm-error').textContent = err.message;
+    }
+  };
+  form.games.addEventListener('change', refreshEstimate);
+  form.overwrite.addEventListener('change', refreshEstimate);
+
+  form.addEventListener('submit', (e) => {
     e.preventDefault();
-    const form = e.currentTarget;
     const max = Number(form.max.value);
     if (!(max >= 1 && max <= MAX_CALLS_LIMIT)) {
       m.el.querySelector('.adm-error').textContent = `El tope debe estar entre 1 y ${MAX_CALLS_LIMIT}`;
       return;
     }
+    if (form.games.value.trim() !== '' && gamesLimit(form) === null) {
+      m.el.querySelector('.adm-error').textContent = 'El número de juegos debe ser un entero de 1 en adelante (o vacío para todos)';
+      return;
+    }
     const overwrite = form.overwrite.checked;
+    const games = gamesLimit(form);
     m.close();
-    confirmStep(max, overwrite, onDone);
+    confirmStep(max, overwrite, games, onDone);
   });
 }
 
-function confirmStep(max, overwrite, onDone) {
+function confirmStep(max, overwrite, games, onDone) {
   const m = openModal(html`
     ${modalHeader('⚠️ Segunda confirmación')}
     <form class="adm-form" novalidate>
       <div class="adm-warn">
         <strong>Este es un proceso intensivo.</strong> Hará hasta <strong>${number(max)}</strong> llamadas a la API de RAWG,
-        que cuentan contra el límite mensual del plan gratuito (20.000). Tarda varios minutos y modifica datos de juegos${overwrite ? html`, <strong>resincronizándolos todos y sobrescribiendo los valores existentes</strong>` : ''}.
+        que cuentan contra el límite mensual del plan gratuito (20.000). Tarda varios minutos y modifica datos de ${games ? html`los primeros <strong>${number(games)}</strong> juegos por orden alfabético` : 'juegos'}${overwrite ? html`, <strong>resincronizándolos todos y sobrescribiendo los valores existentes</strong>` : ''}.
         <br/>Lánzalo solo en casos de extrema necesidad.
       </div>
       <label>Escribe <strong>${SYNC_PHRASE}</strong> para habilitar el botón<input class="adm-input" name="phrase" autocomplete="off" /></label>
@@ -91,7 +119,7 @@ function confirmStep(max, overwrite, onDone) {
     if (!typedOk()) return;
     go.disabled = true;
     try {
-      await api('/manage/rawg-sync/start', jsonRequest('POST', { confirm: SYNC_PHRASE, max_calls: max, overwrite }));
+      await api('/manage/rawg-sync/start', jsonRequest('POST', { confirm: SYNC_PHRASE, max_calls: max, overwrite, max_games: games }));
       m.close();
       progress(onDone);
     } catch (err) {
