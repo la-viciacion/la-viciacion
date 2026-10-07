@@ -31,8 +31,12 @@ El mensaje debe estar preparado para poder ser interpretado en formato Markdown.
 Debes incluir siempre el nombre del usuario.
 Debes incluir siempre el nombre del juego.
 Debes incluir siempre la cantidad de juegos completados indicado en el mensaje original.
-Debes añadir, además, la media de tiempo que se indica en el mensaje original. Esta media no es la media del
-usuario, sino la media que se tarda en completar ese juego.
+Debes incluir siempre el tiempo que le ha costado al usuario completar el juego (el que aparece justo después del
+nombre del juego, tras la palabra "en"), tal como está escrito en el mensaje original (por ejemplo, 12h30m).
+Si el mensaje original indica la media de tiempo, debes incluirla también, y puedes compararla con el tiempo del
+usuario (más rápido, más lento, parecido). Esta media no es la media del usuario, sino la que se suele tardar en
+completar ese juego. Si el mensaje no indica la media, no la menciones.
+No te inventes ninguna cifra: usa solo las del mensaje original.
 """
 
 NEW_GAME_RECOMMENDATION = """
