@@ -256,7 +256,8 @@
   border-radius: var(--radius-pill); padding: 5px 14px; font: inherit; font-size: 0.8rem; font-weight: 600;
   cursor: pointer; white-space: nowrap; transition: all 0.2s ease;
 }
-.btn-manual:hover { background: var(--bg-card-hover); }
+.btn-manual:hover:not(:disabled) { background: var(--bg-card-hover); }
+.btn-manual:disabled { opacity: 0.35; cursor: not-allowed; }
 .manual-session-row { display: flex; justify-content: center; margin: 4px 0 16px; }
 .session-end { display: flex; align-items: center; gap: 10px; }
 .btn-session {

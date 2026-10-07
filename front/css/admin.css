@@ -204,7 +204,11 @@
 
 /* A block of options to tick (recalculating achievements): a header with its count and all/none, a grid of equal columns */
 .adm-pick { border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-card); }
-.adm-pick-head { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+.adm-pick-head { display: flex; align-items: center; gap: 10px; padding: 8px 12px; cursor: pointer; list-style: none; user-select: none; }
+.adm-pick-head::-webkit-details-marker { display: none; }
+.adm-pick[open] > .adm-pick-head { border-bottom: 1px solid var(--border); }
+.adm-pick-chevron { flex: none; width: 7px; height: 7px; border-right: 2px solid var(--text-secondary); border-bottom: 2px solid var(--text-secondary); transform: rotate(-45deg); transition: transform 0.15s ease; }
+.adm-pick[open] > .adm-pick-head .adm-pick-chevron { transform: rotate(45deg); }
 .adm-pick-head strong { color: var(--text-primary); font-size: 0.9rem; }
 .adm-pick-count { color: var(--text-secondary); font-size: 0.8rem; }
 .adm-pick-tools { margin-left: auto; display: flex; gap: 6px; }

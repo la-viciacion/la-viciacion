@@ -32,22 +32,24 @@ const chosen = (form, name, parse = Number) => {
   return ticked.length === boxes.length ? null : ticked;
 };
 
-/** A block of options to tick (all ticked to begin with): its title and how many are ticked, a button for all or
- *  none, and a grid of equal columns; a long list (`long`) scrolls inside its own block. */
+/** A collapsible block of options to tick (all ticked to begin with, folded: the count already says what is
+ *  ticked): its title and how many are ticked, a button for all or none, and a grid of equal columns; a long
+ *  list (`long`) scrolls inside its own block. */
 const choices = (title, name, options, { long = false } = {}) => html`
-  <section class="adm-pick" data-pick="${name}">
-    <div class="adm-pick-head">
+  <details class="adm-pick" data-pick="${name}">
+    <summary class="adm-pick-head">
+      <span class="adm-pick-chevron" aria-hidden="true"></span>
       <strong>${title}</strong>
       <span class="adm-pick-count" data-count="${name}">${options.length} de ${options.length}</span>
       <span class="adm-pick-tools">
         <button type="button" class="adm-btn sm" data-all="${name}">Todos</button>
         <button type="button" class="adm-btn sm" data-none="${name}">Ninguno</button>
       </span>
-    </div>
+    </summary>
     <div class="adm-pick-grid${long ? ' long' : ''}">
       ${options.map(([value, label]) => html`<label class="adm-pick-item" title="${label}"><input type="checkbox" name="${name}" value="${value}" checked /><span>${label}</span></label>`)}
     </div>
-  </section>`;
+  </details>`;
 
 const GROUPS = [['user', 'jugador', 'jugadores'], ['season', 'temporada', 'temporadas'], ['achievement', 'logro', 'logros']];
 
@@ -100,6 +102,7 @@ export function recalculateAchievementsFlow({ onDone } = {}) {
     const { all, none } = e.target.dataset;
     const name = all || none;
     if (!name) return;
+    e.preventDefault(); // the buttons live in the summary: pressing them must not fold the block
     form.querySelectorAll(`input[name=${name}]`).forEach((box) => { box.checked = Boolean(all); });
     refreshPicks(form);
   });
