@@ -12,7 +12,8 @@ import { toast } from '../../ui/toast.js';
 import { errorState } from './components.js';
 import { confirmDialog } from './dialogs.js';
 
-const SECRETS = ['telegram.token', 'ai.api_key']; // never loaded back: sent only when something is typed
+const SECRETS = ['ai.api_key']; // never loaded back: sent only when something is typed
+const LOCKED = ['telegram.token', 'telegram.group_id', 'telegram.admin_chat_id']; // shown only as set or not, never editable
 const READ_ONLY = ['mail', 'backup']; // cards with nothing to save
 const AI_PROVIDERS = [['google', 'Google (Gemini)'], ['openai', 'OpenAI']];
 
@@ -54,7 +55,7 @@ function aiUse(use) {
 }
 
 function view(values, jobs, pushDevices, mail, aiUses) {
-  const token = values['telegram.token'];
+  const state = (key) => (values[key].is_set ? 'Configurado' : 'Sin configurar');
   const aiKey = values['ai.api_key'];
   const vapid = values['push.vapid_private'];
   const cards = {
@@ -81,13 +82,10 @@ function view(values, jobs, pushDevices, mail, aiUses) {
     telegram: html`
       <section class="adm-set-card">
         <h3>Telegram</h3>
-        <label>Token del bot
-          <input class="adm-input" type="password" name="telegram.token" autocomplete="new-password"
-                 placeholder="${token.is_set ? `Configurado (${token.hint}). Escribe uno nuevo para cambiarlo` : 'Sin configurar'}" />
-        </label>
-        <label>ID del canal o grupo <input class="adm-input" type="text" name="telegram.group_id" inputmode="numeric" /></label>
-        <label>ID del chat de administración <input class="adm-input" type="text" name="telegram.admin_chat_id" inputmode="numeric" /></label>
-        <div class="adm-sub">El bot se reinicia solo (en un minuto aproximadamente) cuando cambia alguno de estos valores. Los grupos tienen IDs negativos.</div>
+        <label>Token del bot <input class="adm-input" type="text" value="${state('telegram.token')}" disabled /></label>
+        <label>ID del canal o grupo <input class="adm-input" type="text" value="${state('telegram.group_id')}" disabled /></label>
+        <label>ID del chat de administración <input class="adm-input" type="text" value="${state('telegram.admin_chat_id')}" disabled /></label>
+        <div class="adm-sub">Estos valores no se pueden ver ni cambiar desde el panel.</div>
         <div><button type="button" class="adm-btn" data-set-act="test">Enviar mensaje de prueba al grupo</button></div>
       </section>`,
 
@@ -281,7 +279,7 @@ export async function render(target, { entity }) {
   try {
     const { values, jobs, push_devices: pushDevices, mail, ai_uses: uses } = await api('/manage/settings');
     aiUses = uses;
-    loaded = Object.fromEntries(Object.entries(values).filter(([key]) => !SECRETS.includes(key) && !key.startsWith('push.vapid')));
+    loaded = Object.fromEntries(Object.entries(values).filter(([key]) => !SECRETS.includes(key) && !LOCKED.includes(key) && !key.startsWith('push.vapid')));
     for (const key of SECRETS) loaded[key] = null;
     mount(panel, view(values, jobs, pushDevices, mail, aiUses));
     const form = panel.querySelector('#admSettings');

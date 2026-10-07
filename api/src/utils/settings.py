@@ -43,6 +43,7 @@ class Spec:
     check: Callable[[Any], str | None] | None = None  # error message or None
     blank_ok: bool = False  # an empty text is a valid value (it means "the default")
     resettable: bool = False  # `None` deletes the stored value, so the default applies again
+    locked: bool = False  # the panel shows only whether it is set and cannot change it (the seed and the bot still use it)
 
 
 def _chat_id(value: str) -> str | None:
@@ -104,9 +105,9 @@ REGISTRY: dict[str, Spec] = {
     "ai.provider": Spec("str", "google", env="AI_PROVIDER", check=_ai_provider),
     "ai.api_key": Spec("str", None, secret=True, env="AI_API_KEY"),
     "ai.model": Spec("str", None, env="AI_MODEL", check=_ai_model, blank_ok=True),  # empty: the provider's default
-    "telegram.token": Spec("str", None, secret=True, env="TELEGRAM_TOKEN", check=_token),
-    "telegram.group_id": Spec("str", None, env="TELEGRAM_GROUP_ID", check=_chat_id),
-    "telegram.admin_chat_id": Spec("str", None, env="TELEGRAM_ADMIN_CHAT_ID", check=_chat_id),
+    "telegram.token": Spec("str", None, secret=True, locked=True, env="TELEGRAM_TOKEN", check=_token),
+    "telegram.group_id": Spec("str", None, locked=True, env="TELEGRAM_GROUP_ID", check=_chat_id),
+    "telegram.admin_chat_id": Spec("str", None, locked=True, env="TELEGRAM_ADMIN_CHAT_ID", check=_chat_id),
 }
 
 # One prompt (default: the one in the code) and one switch per place the AI writes (utils/ai_prompts.py).
@@ -220,13 +221,15 @@ def ai_uses(db: Session) -> list[dict]:
 
 
 def public_view(db: Session) -> dict[str, Any]:
-    """Values for the admin panel; a secret is reduced to whether it is set and its last characters."""
+    """Values for the admin panel; a secret is reduced to whether it is set and its last characters, a locked
+    setting to whether it is set."""
     values = get_all(db)
     out = {}
     for key, spec in REGISTRY.items():
-        if spec.secret:
+        if spec.secret or spec.locked:
             secret = values[key]
-            out[key] = {"is_set": bool(secret), "hint": ("…" + secret[-4:]) if secret and spec.hint else None}
+            show_hint = spec.secret and spec.hint and not spec.locked
+            out[key] = {"is_set": bool(secret), "hint": ("…" + secret[-4:]) if secret and show_hint else None}
         else:
             out[key] = values[key]
     return out
