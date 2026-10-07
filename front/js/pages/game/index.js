@@ -27,6 +27,7 @@ function playerRow(p) {
       ${playerAvatar(p, p.playing ? 'live' : '')}
       <div class="gm-player-main">
         <div class="gm-player-name">${p.name}${p.is_me ? ' (tú)' : ''}
+          ${p.is_active ? '' : html`<span class="pf-tag muted">Inactivo</span>`}
           ${p.playing ? html`<span class="pf-tag live">Jugando ahora</span>` : ''}
           ${p.completed ? html`<span class="pf-tag done">Completado${p.completions > 1 ? ` ×${p.completions}` : ''}</span>` : ''}
         </div>

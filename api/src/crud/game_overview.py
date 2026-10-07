@@ -1,7 +1,7 @@
 """What the group has done with one game: who has it, their hours, completions and ratings.
 
 Everything here is derived from the library, the sessions and the ratings when asked; nothing is stored.
-Only active players count (never the emergency account), like the rankings and the recommendations."""
+Every player counts, active or not (never the emergency account), like the rankings and the recommendations."""
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -14,18 +14,21 @@ def overview(db: Session, game_id: str, viewer_id: int) -> dict | None:
     game = db.get(models.Game, game_id)
     if game is None:
         return None
-    players = (models.User.is_active == 1, models.not_god())
+    players = (models.not_god(),)
 
     entries: dict[int, dict] = {}
-    for user_id, username, name, season, completed in (
-        db.query(models.UserGame.user_id, models.User.username, models.User.name, models.UserGame.season, models.UserGame.completed)
+    for user_id, username, name, is_active, season, completed in (
+        db.query(
+            models.UserGame.user_id, models.User.username, models.User.name, models.User.is_active,
+            models.UserGame.season, models.UserGame.completed,
+        )
         .join(models.User, models.UserGame.user_id == models.User.id)
         .filter(models.UserGame.game_id == game_id, *players)
         .all()
     ):
         player = entries.setdefault(
             user_id,
-            {"user_id": user_id, "username": username, "name": name or username, "seasons": set(), "completions": set()},
+            {"user_id": user_id, "username": username, "name": name or username, "is_active": bool(is_active), "seasons": set(), "completions": set()},
         )
         player["seasons"].add(season)
         if completed:
@@ -58,6 +61,7 @@ def overview(db: Session, game_id: str, viewer_id: int) -> dict | None:
             "user_id": user_id,
             "username": player["username"],
             "name": player["name"],
+            "is_active": player["is_active"],
             "played_seconds": seconds,
             "sessions": sessions,
             "last_played": last,

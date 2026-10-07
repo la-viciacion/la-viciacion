@@ -1,6 +1,6 @@
 """The latest things the group has done, newest first: hours played, games started, completed and rated,
 achievements unlocked. Derived from the sessions, the library, the ratings and the achievements when asked;
-nothing is stored. Only active players count (never the emergency account)."""
+nothing is stored. Every player counts, active or not (never the emergency account)."""
 import datetime
 
 from sqlalchemy import desc, func
@@ -26,7 +26,7 @@ def feed(db: Session, viewer_id: int, limit: int = 30, offset: int = 0) -> dict:
     viewer has not unlocked are announced without saying which."""
     n = offset + limit + 1
     mine = group.unlocked_ids(db, viewer_id)
-    players = (models.User.is_active == 1, models.not_god())
+    players = (models.not_god(),)
     ratings = {(u, g): s for u, g, s in db.query(models.GameScore.user_id, models.GameScore.game_id, models.GameScore.score)}
     events: list[dict] = []
 

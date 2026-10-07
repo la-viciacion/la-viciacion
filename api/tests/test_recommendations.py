@@ -63,9 +63,9 @@ class RecommendationsForTests(unittest.TestCase):
         self.assertEqual(doom["genres"], ["Shooter", "Action"])
         self.assertEqual(doom["image_url"], "doom.jpg")
 
-    def test_inactive_players_and_the_emergency_account_recommend_nothing(self):
+    def test_inactive_players_recommend_and_the_emergency_account_does_not(self):
         add_library(self.db, [(4, "doom", 1), (5, "hades", 1)])
-        self.assertEqual(self.names(), [])
+        self.assertEqual(self.names(), ["Doom"])
 
     def test_limit_picks_that_many_of_the_candidates_keeping_their_order(self):
         add_library(self.db, [(2, "doom", 0), (3, "doom", 0), (2, "hades", 0), (2, "zelda", 0), (2, "quake", 0)])
@@ -119,14 +119,14 @@ class WeightTests(unittest.TestCase):
     def item(self, **kw):
         return {"players": ["Bob"], "completed_by": 0, "played_seconds": 0, "sessions": 0, "genres": [], **kw}
 
-    def test_candidates_carry_what_the_others_played_but_not_the_users_nor_inactive_players(self):
+    def test_candidates_carry_what_the_others_played_but_not_the_users(self):
         add_library(self.db, [(2, "doom", 0), (3, "doom", 0), (4, "doom", 0)])
         add_session(self.db, 2, "doom", 2, day=1)
         add_session(self.db, 3, "doom", 3, day=2)
-        add_session(self.db, 4, "doom", 50, day=3)  # inactive: not counted
+        add_session(self.db, 4, "doom", 50, day=3)  # inactive: counted like the rest
         add_session(self.db, 1, "doom", 40, day=4)  # the user's own time is not "what the others played"
         doom = games.recommendation_candidates(self.db, 1)[0]
-        self.assertEqual((doom["played_seconds"], doom["sessions"]), (5 * 3600, 2))
+        self.assertEqual((doom["played_seconds"], doom["sessions"]), (55 * 3600, 3))
 
     def test_affinity_and_weight_work_with_decimal_sums_like_mariadb_returns(self):
         # SQLite sums to int, MariaDB to Decimal: mixing Decimal with float used to raise a TypeError
@@ -144,11 +144,11 @@ class WeightTests(unittest.TestCase):
         self.db.add_all(models.GameScore(user_id=user_id, game_id=game_id, score=score) for user_id, game_id, score in rows)
         self.db.commit()
 
-    def test_candidates_carry_the_ratings_of_the_others_but_not_the_users_nor_inactive_players(self):
+    def test_candidates_carry_the_ratings_of_the_others_but_not_the_users(self):
         add_library(self.db, [(2, "doom", 0), (3, "doom", 0), (4, "doom", 0), (2, "hades", 0)])
         self.rate([(2, "doom", 80), (3, "doom", 60), (4, "doom", 1), (1, "doom", 1)])
         by_name = {g["game_name"]: g for g in games.recommendation_candidates(self.db, 1)}
-        self.assertEqual((by_name["Doom"]["score_count"], by_name["Doom"]["score_mean"]), (2, 70.0))
+        self.assertEqual((by_name["Doom"]["score_count"], by_name["Doom"]["score_mean"]), (3, 47.0))
         self.assertEqual((by_name["Hades"]["score_count"], by_name["Hades"]["score_mean"]), (0, None))
 
     def test_no_ratings_leave_the_weight_alone(self):
@@ -179,7 +179,7 @@ class WeightTests(unittest.TestCase):
         self.rate([(2, "doom", 40), (3, "doom", 40)])
         self.assertEqual(games.rating_prior(self.db), games.SCORE_PRIOR)  # too few to tell
         self.rate([(2, "hades", 40), (3, "hades", 40), (2, "zelda", 40), (3, "zelda", 40)] + [(1, g, 40) for g in ("doom", "hades", "zelda")] + [(2, "mine", 40), (4, "doom", 100)])
-        self.assertEqual(games.rating_prior(self.db), 40.0)  # 10 ratings by active players; the inactive one is left out
+        self.assertAlmostEqual(games.rating_prior(self.db), 500 / 11)  # 11 ratings, the inactive player's included
         # relative to a low average, a 40 is not "bad"
         self.assertEqual(games.score_factor(5, 40, prior=40.0), 1.0)
 

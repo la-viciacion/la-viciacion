@@ -533,7 +533,7 @@ class PlayerPhotoTests(UsersTestCase):
         self.assertEqual(self.api("PATCH", f"/users/{username}/avatar", as_user=username,
                                   files={"file": ("a.png", data or png(), "image/png")}).status_code, 200)
 
-    def test_any_logged_in_player_sees_the_photo_of_an_active_player(self):
+    def test_any_logged_in_player_sees_the_photo_of_a_player(self):
         self.upload(data=png())
         served = self.photo(self.ana)
         self.assertEqual((served.status_code, served.headers["content-type"], stored_size(served.content)), (200, "image/png", (4, 4)))
@@ -543,13 +543,13 @@ class PlayerPhotoTests(UsersTestCase):
         etag = self.photo(self.ana).headers["etag"]
         self.assertEqual(self.photo(self.ana, **{"If-None-Match": etag}).status_code, 304)
 
-    def test_nothing_for_a_player_without_photo_an_unknown_one_or_an_inactive_one(self):
+    def test_nothing_for_a_player_without_photo_or_an_unknown_one_and_the_photo_of_an_inactive_one_is_served(self):
         self.assertEqual(self.photo(self.ana).status_code, 404)
         self.assertEqual(self.photo(999999).status_code, 404)
         gone = self.user("gone", active=False)
         with self.engine.begin() as conn:
             conn.execute(text("UPDATE users SET avatar = :a WHERE id = :i"), {"a": png(), "i": gone})
-        self.assertEqual(self.photo(gone).status_code, 404)
+        self.assertEqual(self.photo(gone).status_code, 200)
 
     def test_it_needs_a_login(self):
         self.upload()

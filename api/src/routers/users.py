@@ -463,12 +463,12 @@ def get_player_photo(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    """The photo of an active player, for every logged-in user: the group sees each other (the chip of who is
+    """The photo of a player, for every logged-in user: the group sees each other (the chip of who is
     playing now). Unlike /{username}/avatar it is not limited to the owner on purpose; it only ever returns an
-    image, and nothing for inactive accounts or the emergency account."""
+    image, and nothing for the emergency account."""
     row = (
         db.query(models.User.avatar)
-        .filter(models.User.id == player_id, models.User.is_active == 1, models.not_god())
+        .filter(models.User.id == player_id, models.not_god())
         .first()
     )
     if not row or not row[0]:
