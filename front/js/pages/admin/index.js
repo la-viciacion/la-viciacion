@@ -10,7 +10,7 @@ import { errorState, store } from './components.js';
 import { deleteRow, pickGame } from './dialogs.js';
 import { ENTITIES, TABS } from './entities.js';
 import { openForm } from './form.js';
-import { SECTIONS, hashFor, sectionOf, tabFromHash } from './nav.js';
+import { SECTIONS, TAB_IDS, hashFor, sectionOf, tabFromHash } from './nav.js';
 
 export const active = 'admin';
 export const mainClass = 'admin-main';
@@ -23,6 +23,7 @@ let root;
 let current = 'home';
 const lastTab = new Map(); // section -> the tab it was left on
 let searchTimer;
+const awardRows = new Map(); // id -> the awarded achievements listed under an achievement, for their edit and revoke buttons
 
 // What entities/dialogs may call back into.
 const admin = {
@@ -55,7 +56,7 @@ export function dispose() {
 export async function render({ main, user }) {
   root = main;
   store.me = user.id;
-  current = tabFromHash(location.hash, TABS);
+  current = tabFromHash(location.hash, TAB_IDS);
   mount(root, html`<div class="loading-spinner">Cargando panel...</div>`);
 
   try {
@@ -71,6 +72,7 @@ export async function render({ main, user }) {
   root.addEventListener('click', onClick);
   root.addEventListener('input', onInput);
   root.addEventListener('change', onChange);
+  root.addEventListener('toggle', onToggle, true); // does not bubble
   window.addEventListener('scroll', closeMenus, true);
   window.addEventListener('resize', closeMenus);
   drawLayout();
@@ -217,6 +219,10 @@ function toolbarView(entity, st) {
           : html`<button class="adm-btn" data-act="filter-game">Filtrar por juego…</button>`)
         : ''}
       ${entity.filters?.includes('active') ? html`<label class="adm-check"><input type="checkbox" id="admFilterActive" ${f.active ? html`checked` : ''} /> Solo en curso</label>` : ''}
+      ${entity.orders ? html`
+        <select class="adm-input" data-order aria-label="Orden">
+          ${entity.orders.map(([value, label]) => html`<option value="${value}" ${value === `${st.sort?.key}:${st.sort?.dir}` ? html`selected` : ''}>${label}</option>`)}
+        </select>` : ''}
       ${(entity.selects || []).map((s) => html`
         <select class="adm-input" data-filter="${s.key}" aria-label="${s.label}">
           ${(typeof s.options === 'function' ? s.options() : s.options).map(([value, label]) => html`<option value="${value}" ${(f[s.key] || '') === value ? html`selected` : ''}>${label}</option>`)}
@@ -298,6 +304,9 @@ function onChange(e) {
     st.filters.user_id = e.target.value || undefined;
   } else if (e.target.id === 'admFilterActive') {
     st.filters.active = e.target.checked || undefined;
+  } else if (e.target.dataset.order != null) {
+    const [key, dir] = e.target.value.split(':');
+    st.sort = { key, dir };
   } else if (e.target.dataset.filter) {
     st.filters[e.target.dataset.filter] = e.target.value || undefined;
   } else {
@@ -305,6 +314,30 @@ function onChange(e) {
   }
   st.offset = 0;
   load();
+}
+
+// Who has an achievement: listed when its row is opened.
+async function onToggle(e) {
+  const box = e.target;
+  if (!box.matches?.('.adm-awardees') || !box.open || box.dataset.loaded) return;
+  box.dataset.loaded = '1';
+  const list = box.querySelector('.adm-awardees-list');
+  mount(list, html`<div class="adm-sub">Cargando…</div>`);
+  try {
+    const { items } = await api(`/manage/user-achievements?achievement_id=${box.dataset.achievement}&sort=date&order=desc&limit=200`);
+    for (const r of items) awardRows.set(r.id, r);
+    mount(list, html`${items.map((r) => html`
+      <div class="adm-awardee">
+        <span><strong>${r.user || r.user_id}</strong><span class="adm-sub">${r.game ? ` · ${r.game}` : ''} · ${r.date}</span></span>
+        <span>
+          <button class="adm-btn sm" data-act="award-edit" data-award="${r.id}">Editar</button>
+          <button class="adm-btn sm danger" data-act="award-revoke" data-award="${r.id}">Revocar</button>
+        </span>
+      </div>`)}`);
+  } catch (err) {
+    box.dataset.loaded = '';
+    mount(list, html`<div class="adm-error">${err.message}</div>`);
+  }
 }
 
 async function onClick(e) {
@@ -350,6 +383,8 @@ async function onClick(e) {
         const { rawgSyncFlow } = await import('./rawg-sync.js');
         return rawgSyncFlow({ onDone: admin.reload });
       }
+      case 'award-edit': return openForm(ENTITIES.awards, awardRows.get(Number(button.dataset.award)), admin);
+      case 'award-revoke': return deleteRow(ENTITIES.awards, awardRows.get(Number(button.dataset.award)), admin);
       case 'create': return openForm(entity, null, admin);
       case 'edit': return openForm(entity, row, admin);
       case 'delete': return deleteRow(entity, row, admin);

@@ -403,7 +403,7 @@ class GamePatch(BaseModel):
     rawg_id: Optional[int] = None
 
 
-def _game_out(g: models.Game, sessions: int = 0, players: int = 0) -> dict:
+def _game_out(g: models.Game, sessions: int = 0, players: int = 0, played_seconds: int = 0) -> dict:
     return {
         "id": g.id,
         "name": g.name,
@@ -417,23 +417,26 @@ def _game_out(g: models.Game, sessions: int = 0, players: int = 0) -> dict:
         "rawg_id": g.rawg_id,
         "sessions": sessions,
         "players": players,
+        "played_seconds": int(played_seconds or 0),
     }
 
 
 @router.get("/games")
 def list_games(
     search: Optional[str] = None,
-    rawg: Optional[str] = Query(None, pattern="^(linked|unlinked)$"),
-    usage: Optional[str] = Query(None, pattern="^(used|unused)$"),
-    sort: str = Query("name", pattern="^(name|release_date|sessions|players)$"),
+    sort: str = Query("name", pattern="^(name|release_date|played|players)$"),
     order: str = Query("asc", pattern="^(asc|desc)$"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
-    """Games with their usage. Filters: linked to RAWG, used (has sessions or players)."""
+    """Games with their usage (sessions, time played and players)."""
     session_counts = (
-        db.query(models.GameTimer.game_id.label("gid"), func.count(models.GameTimer.id).label("n"))
+        db.query(
+            models.GameTimer.game_id.label("gid"),
+            func.count(models.GameTimer.id).label("n"),
+            func.coalesce(func.sum(models.GameTimer.duration_seconds), 0).label("secs"),
+        )
         .group_by(models.GameTimer.game_id)
         .subquery()
     )
@@ -444,23 +447,19 @@ def list_games(
     )
     sessions = func.coalesce(session_counts.c.n, 0)
     players = func.coalesce(player_counts.c.n, 0)
+    played = func.coalesce(session_counts.c.secs, 0)
     q = (
-        db.query(models.Game, sessions.label("sessions"), players.label("players"))
+        db.query(models.Game, sessions.label("sessions"), players.label("players"), played.label("played"))
         .outerjoin(session_counts, session_counts.c.gid == models.Game.id)
         .outerjoin(player_counts, player_counts.c.gid == models.Game.id)
     )
     if search:
         q = q.filter(models.Game.name.like(_like(search)))
-    if rawg:
-        q = q.filter(models.Game.rawg_id.isnot(None) if rawg == "linked" else models.Game.rawg_id.is_(None))
-    if usage:
-        in_use = (sessions > 0) | (players > 0)
-        q = q.filter(in_use if usage == "used" else ~in_use)
     total = q.count()
-    column = {"name": models.Game.name, "release_date": models.Game.release_date, "sessions": sessions, "players": players}[sort]
+    column = {"name": models.Game.name, "release_date": models.Game.release_date, "played": played, "players": players}[sort]
     direction = column.desc() if order == "desc" else column.asc()
     rows = q.order_by(direction, models.Game.name, models.Game.id).limit(limit).offset(offset).all()
-    return {"total": total, "items": [_game_out(g, s, p) for g, s, p in rows]}
+    return {"total": total, "items": [_game_out(g, s, p, t) for g, s, p, t in rows]}
 
 
 @router.patch("/games/{game_id}")

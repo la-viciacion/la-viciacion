@@ -3,16 +3,18 @@
 //
 // Entity: { label, nav? (shorter name for its tab), description? (line under the title), endpoint, search?, filters?, columns, fields, createFields?,
 //           createLabel?, name(row), actions?, toolbarActions?, canDelete, deleteLabel?, deleteNote?,
-//           selects?, defaultSort?, readOnly? (no edit button) }
+//           selects?, orders?, defaultSort?, readOnly? (no edit button) }
 //         or a custom page: { label, custom (module in this folder exporting render(panel, { entity, admin })) }
 // Column: { label, render(row) -> html``, filter?(row) -> filters to apply on click, sort? (API sort key) }
 // Select: { key, label, options: [[value, label], ...] | () => [...] }   sent to the API as ?key=value
+// Orders: [['key:dir', label], ...]   a dropdown that sets the sort (key and dir are the API's sort and order)
 // Action: { label, show?(row), run(row, admin) }   admin = { jumpTo, open, reload }
 import { formatDuration, formatTimestamp } from '../../lib/format.js';
 import { html } from '../../lib/html.js';
+import { gameHref } from '../../lib/links.js';
 import { platformList, platformName } from '../../lib/platforms.js';
 import { SPECIAL_NAMES, specialClass } from '../../lib/special.js';
-import { badge, seasonYears, store } from './components.js';
+import { badge, seasonYears } from './components.js';
 import { ENTITY_OPTIONS, describe, detailParts } from './audit-labels.js';
 import { closeTimerNow } from './dialogs.js';
 
@@ -38,11 +40,9 @@ export const ENTITIES = {
     endpoint: '/manage/users',
     search: true,
     columns: [
-      { label: 'Usuario', render: (r) => html`<strong>${r.username}</strong><div class="adm-sub">${r.name || ''}</div>` },
+      { label: 'Usuario', render: (r) => r.username },
+      { label: 'Nombre', render: (r) => r.name || '—' },
       { label: 'Email', render: (r) => r.email || '—' },
-      { label: 'Telegram', render: (r) => r.telegram_id ?? '—' },
-      { label: 'Sesiones', render: (r) => r.sessions },
-      { label: 'Biblioteca', render: (r) => r.library },
       { label: 'Estado', render: (r) => html`${r.is_admin ? badge('Admin', 'purple') : ''}${badge(r.is_active ? 'Activo' : 'Inactivo', r.is_active ? 'green' : 'red')}` },
     ],
     fields: [
@@ -78,22 +78,19 @@ export const ENTITIES = {
     endpoint: '/manage/games',
     search: true,
     defaultSort: { key: 'name', dir: 'asc' },
-    selects: [
-      { key: 'usage', label: 'Uso', options: [['', 'Uso: todos'], ['used', 'Con sesiones o jugadores'], ['unused', 'Sin uso']] },
-      { key: 'rawg', label: 'RAWG', options: [['', 'RAWG: todos'], ['linked', 'Enlazados a RAWG'], ['unlinked', 'Sin enlazar']] },
-    ],
+    orders: [['name:asc', 'Orden: alfabético'], ['release_date:desc', 'Más nuevos'], ['played:desc', 'Más jugados']],
     columns: [
       {
         label: 'Juego',
         sort: 'name',
         render: (r) => html`<div class="adm-game">
           ${r.image_url ? html`<img src="${r.image_url}" alt="" loading="lazy" />` : html`<span>🎮</span>`}
-          <div><strong>${r.name}</strong><div class="adm-sub">${r.dev || ''}</div></div>
+          <div><a class="adm-link" href="${gameHref(r.id)}"><strong>${r.name}</strong></a><div class="adm-sub">${r.dev || ''}</div></div>
         </div>`,
       },
       { label: 'Géneros', render: (r) => r.genres || '—' },
       { label: 'Lanzamiento', sort: 'release_date', render: (r) => r.release_date || '—' },
-      { label: 'Sesiones', sort: 'sessions', render: (r) => r.sessions },
+      { label: 'Horas', sort: 'played', render: (r) => duration(r.played_seconds) },
       { label: 'Jugadores', sort: 'players', render: (r) => r.players },
     ],
     fields: [
@@ -247,7 +244,13 @@ export const ENTITIES = {
     paged: false,
     columns: [
       { label: 'Imagen', render: (r) => (r.has_image ? html`<img class="adm-ach" src="/api/v1/utils/achievement-image/${r.key}?v=${Date.now()}" alt="" />` : '—') },
-      { label: 'Logro', render: (r) => html`<strong>${r.title}</strong><div class="adm-sub">${r.key}</div>` },
+      {
+        label: 'Logro',
+        // pressing it lists who has it (loaded when opened, see awardees in index.js)
+        render: (r) => (r.awarded
+          ? html`<details class="adm-awardees" data-achievement="${r.id}"><summary><strong>${r.title}</strong><div class="adm-sub">${r.key}</div></summary><div class="adm-awardees-list"></div></details>`
+          : html`<strong>${r.title}</strong><div class="adm-sub">${r.key}</div>`),
+      },
       { label: 'Estado', render: (r) => html`${r.active ? badge('Activo', 'green') : badge('Inactivo', 'orange')}${r.secret ? badge('Secreto', 'ink') : ''}${SPECIAL_NAMES[r.special] ? badge(`Especial nivel ${r.special}`, specialClass(r.special).trim()) : ''}${r.lifetime ? badge('Único', 'gray') : ''}` },
       { label: 'Desde', render: (r) => r.valid_from_season },
       { label: 'Concedido', render: (r) => r.awarded },
@@ -278,24 +281,10 @@ export const ENTITIES = {
 };
 
 ENTITIES.awards = {
+  // Not a section of its own: its rows are listed under each achievement and edited from there.
   label: 'Logros concedidos',
-  nav: 'Concedidos',
-  description: 'Qué ha desbloqueado cada jugador y cuándo.',
-  toolbarActions: [{ act: 'recalculate-achievements', label: 'Recalcular logros…' }],
   endpoint: '/manage/user-achievements',
-  filters: ['user', 'game'],
-  selects: [
-    { key: 'achievement_id', label: 'Logro', options: () => [['', 'Logro: todos'], ...store.achievements.map((a) => [String(a.id), a.title])] },
-    seasonSelect,
-  ],
-  defaultSort: { key: 'date', dir: 'desc' },
-  columns: [
-    userColumn,
-    { label: 'Logro', sort: 'achievement', render: (r) => html`<strong>${r.title || r.key}</strong><div class="adm-sub">${r.key || ''}</div>` },
-    { label: 'Juego', sort: 'game', render: (r) => r.game || r.game_id || '—', filter: (r) => (r.game_id ? { game_id: r.game_id, game_name: r.game } : {}) },
-    { label: 'Fecha', sort: 'date', render: (r) => r.date },
-    { label: 'Temp.', sort: 'season', render: (r) => r.season ?? '—' },
-  ],
+  columns: [],
   fields: [{ key: 'date', label: 'Fecha en la que se obtuvo (su año es la temporada)', type: 'date', required: true }],
   name: (r) => `${r.user || r.user_id} · ${r.title || r.key}`,
   canDelete: true,

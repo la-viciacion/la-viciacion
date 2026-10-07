@@ -254,6 +254,10 @@
 
 .adm-details > div { margin-top: 8px; }
 
+.adm-awardees summary { cursor: pointer; }
+.adm-awardees-list { margin-top: 8px; }
+.adm-awardee { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; padding: 6px 0; border-bottom: 1px dashed var(--border); }
+
 .adm-amb { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 0; border-bottom: 1px dashed var(--border); }
 
 .adm-amb strong { width: 100%; font-size: 0.88rem; }
