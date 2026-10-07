@@ -15,7 +15,8 @@ ALLOWED_FORMATS = {"PNG": "image/png", "JPEG": "image/jpeg"}
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024  # what may be sent; what is stored is far smaller
 MAX_PIXELS = 16_000_000  # refuses decompression bombs before decoding anything
 AVATAR_MAX_SIDE = 256
-ACHIEVEMENT_MAX_SIDE = 512
+ACHIEVEMENT_MAX_SIDE = 256  # an icon shown at 56 px; also what the repository keeps on disk
+PALETTE_COLORS = 256
 JPEG_QUALITY = 85
 
 
@@ -72,10 +73,24 @@ def _mode_to_keep(image: Image.Image) -> str:
     return image.mode if image.mode in ("L", "RGB") else "RGB"
 
 
-def normalize_image(data: bytes, max_side: int, max_bytes: int = MAX_UPLOAD_BYTES) -> bytes:
+def _to_palette(image: Image.Image) -> Image.Image:
+    """The picture with at most PALETTE_COLORS colours, dithered, transparency kept. For illustrations (logos,
+    icons) the difference is not visible and the PNG ends up a fraction of the size; not for photos."""
+    if image.mode == "L":
+        return image  # at most 256 greys already
+    # one that already has few enough colours is kept exactly: no dithering, so a picture that was reduced before
+    # does not lose anything more each time it goes through here
+    dither = Image.Dither.NONE if image.getcolors(PALETTE_COLORS) is not None else Image.Dither.FLOYDSTEINBERG
+    # the octree method keeps the alpha channel, and is also the one that gives the smallest file
+    method = Image.Quantize.FASTOCTREE if image.mode == "RGBA" else Image.Quantize.MEDIANCUT
+    return image.quantize(PALETTE_COLORS, method=method, dither=dither)
+
+
+def normalize_image(data: bytes, max_side: int, max_bytes: int = MAX_UPLOAD_BYTES, palette: bool = False) -> bytes:
     """Validate `data` (same errors as `validate_image`) and return it scaled down to fit in `max_side` x `max_side`
     (never enlarged, proportions kept: the uploader supplies a square one) and encoded again without metadata.
-    The format is kept: PNG stays PNG (with its transparency), JPEG stays JPEG."""
+    The format is kept: PNG stays PNG (with its transparency), JPEG stays JPEG. With `palette` a PNG is also
+    reduced to a palette of colours (see `_to_palette`): only for illustrations."""
     media_type = validate_image(data, max_bytes)
     try:
         with Image.open(io.BytesIO(data)) as source:
@@ -86,7 +101,7 @@ def normalize_image(data: bytes, max_side: int, max_bytes: int = MAX_UPLOAD_BYTE
     image.thumbnail((max_side, max_side), Image.Resampling.LANCZOS)
     out = io.BytesIO()
     if media_type == "image/png":
-        image.save(out, "PNG", optimize=True)
+        (_to_palette(image) if palette else image).save(out, "PNG", optimize=True)
     else:
         image.save(out, "JPEG", quality=JPEG_QUALITY, optimize=True)
     return out.getvalue()

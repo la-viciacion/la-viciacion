@@ -63,7 +63,7 @@ def upload_achievement_image(
         logger.info(msg.ACHIEVEMENT_NOT_EXISTS)
         raise HTTPException(status_code=404, detail=msg.ACHIEVEMENT_NOT_EXISTS)
     try:
-        data = images.normalize_image(file.file.read(images.MAX_UPLOAD_BYTES + 1), images.ACHIEVEMENT_MAX_SIDE)
+        data = images.normalize_image(file.file.read(images.MAX_UPLOAD_BYTES + 1), images.ACHIEVEMENT_MAX_SIDE, palette=True)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=images.upload_error(e))
     try:

@@ -25,9 +25,9 @@ def jpg(size=64) -> bytes:
     return out.getvalue()
 
 
-def noisy_png() -> bytes:
+def noisy_png(size: int = 200) -> bytes:
     out = io.BytesIO()
-    Image.effect_noise((200, 200), 40).convert("RGBA").save(out, "PNG")
+    Image.effect_noise((size, size), 40).convert("RGBA").save(out, "PNG")
     return out.getvalue()
 
 
@@ -56,7 +56,7 @@ class LoadIntoDatabaseTests(unittest.TestCase):
         big = png(size=1200)
         self.put("ONE.png", big)
         self.assertEqual(self.load(), {"loaded": 1, "unchanged": 0, "skipped": 0})
-        self.assertEqual(bytes(self.image("ONE")), images.normalize_image(big, images.ACHIEVEMENT_MAX_SIDE))
+        self.assertEqual(bytes(self.image("ONE")), images.normalize_image(big, images.ACHIEVEMENT_MAX_SIDE, palette=True))
         with Image.open(io.BytesIO(bytes(self.image("ONE")))) as stored:
             self.assertEqual(stored.size, (images.ACHIEVEMENT_MAX_SIDE, images.ACHIEVEMENT_MAX_SIDE))
 
@@ -123,6 +123,12 @@ class CompressForDiskTests(unittest.TestCase):
         self.assertLess(len(small), len(data))
         with Image.open(io.BytesIO(small)) as image:
             self.assertEqual((image.format, image.size), ("PNG", (200, 200)))
+
+    def test_a_big_picture_is_scaled_down_and_a_small_one_is_never_enlarged(self):
+        with Image.open(io.BytesIO(store.compress_for_disk(noisy_png(size=900)))) as big:
+            self.assertEqual(big.size, (images.ACHIEVEMENT_MAX_SIDE, images.ACHIEVEMENT_MAX_SIDE))
+        with Image.open(io.BytesIO(store.compress_for_disk(noisy_png(size=100)))) as small:
+            self.assertEqual(small.size, (100, 100))
 
     def test_a_transparent_corner_stays_transparent(self):
         base = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
