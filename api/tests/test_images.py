@@ -72,6 +72,17 @@ class NormalizeImageTests(unittest.TestCase):
         data = normalize_image(image_bytes("PNG", size=(600, 600), mode="RGBA"), 512)
         self.assertEqual((opened(data).mode, opened(data).size), ("RGBA", (512, 512)))
 
+    def test_a_palette_makes_a_png_much_smaller_and_keeps_its_transparency(self):
+        noisy = Image.effect_noise((300, 300), 60).convert("RGBA")
+        noisy.paste((0, 0, 0, 0), (0, 0, 20, 20))
+        buffer = io.BytesIO()
+        noisy.save(buffer, "PNG")
+        plain = normalize_image(buffer.getvalue(), 512)
+        reduced = normalize_image(buffer.getvalue(), 512, palette=True)
+        self.assertLess(len(reduced), len(plain))
+        small = opened(reduced).convert("RGBA")
+        self.assertEqual((small.getpixel((5, 5))[3], small.getpixel((150, 150))[3]), (0, 255))
+
     def test_a_palette_png_with_transparency_keeps_it(self):
         buffer = io.BytesIO()
         Image.new("P", (10, 10)).save(buffer, "PNG", transparency=0)

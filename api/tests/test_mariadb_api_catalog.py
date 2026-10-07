@@ -268,7 +268,7 @@ class PlatformsAndAchievementImagesTests(CatalogTestCase):
         key = self.key()
         self.assertEqual(self.put(self.png((1024, 1024))).status_code, 200)
         served = self.api("GET", f"/utils/achievement-image/{key}")
-        self.assertEqual(Image.open(io.BytesIO(served.content)).size, (512, 512))
+        self.assertEqual(Image.open(io.BytesIO(served.content)).size, (256, 256))
 
     def test_an_unknown_achievement_is_a_404(self):
         self.assertEqual(self.api("GET", "/utils/achievement-image/nope").status_code, 404)

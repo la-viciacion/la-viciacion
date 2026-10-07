@@ -279,10 +279,11 @@ class TeamworkTests(WorkTestCase):
     def test_the_third_player_on_a_game_unlocks_all_together_for_the_three(self):
         cai = self.user("cai")
         self.start_timers("ana", "bea")
-        self.real_actions["after_timer_start"](self.ana, datetime.datetime.now(), None)
+        now = datetime.datetime.now().replace(microsecond=0)  # as the database gives it back: with microseconds, a run at 02:00-06:00 dates an early riser from a text that does not parse
+        self.real_actions["after_timer_start"](self.ana, now, None)
         self.assertNotIn("ALL_TOGETHER", self.awarded())
         self.start_timers("cai")
-        self.real_actions["after_timer_start"](cai, datetime.datetime.now(), None)
+        self.real_actions["after_timer_start"](cai, now, None)
         for user_id in (self.ana, self.bea, cai):
             self.assertEqual(self.awarded(user_id)["ALL_TOGETHER"][1], "celeste", user_id)
         self.assertEqual(len([m for m in self.sent if E.ALL_TOGETHER.value["title"] in m["text"]]), 1)

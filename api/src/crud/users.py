@@ -1,7 +1,7 @@
 import datetime
 import json
-from typing import Union
 import random
+from typing import Union
 
 import bcrypt
 from sqlalchemy import (
@@ -9,24 +9,25 @@ from sqlalchemy import (
     asc,
     create_engine,
     desc,
+    extract,
     func,
     or_,
     select,
     text,
     update,
-    extract,
 )
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-# from sqlalchemy.util import immutabledict
-
 from ..config import Config
 from ..database import models, schemas
 from ..utils import my_utils as utils
-from . import games, scores
-from ..utils.logger import LogManager
 from ..utils import seasons, streaks
+from ..utils.logger import LogManager
+from . import games, scores
+
+# from sqlalchemy.util import immutabledict
+
 
 log_manager = LogManager()
 logger = log_manager.get_logger()
@@ -39,7 +40,7 @@ config = Config()
 
 
 GOD_USERNAME = models.GOD_USERNAME
-GOD_NAME = "Dios"
+GOD_NAME = "Admin"
 
 
 def hash_password(password: str) -> str:
@@ -55,7 +56,7 @@ def _matches_password(password: str, stored: str | None) -> bool:
 
 def ensure_god_user(db: Session):
     """
-    Emergency administrator: make sure the "admin" user ("Dios") exists, is active,
+    Emergency administrator: make sure the "admin" user ("Admin") exists, is active,
     is admin and has the password defined in GOD_ADMIN_PASS. Runs on every API start,
     so restarting the API always restores access even if the account was altered.
     """
