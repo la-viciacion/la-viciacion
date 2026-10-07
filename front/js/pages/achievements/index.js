@@ -7,7 +7,8 @@ import { API_BASE, api } from '../../lib/api.js';
 import { formatDate, formatPlayers } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
 import * as seasons from '../../lib/seasons.js';
-import { specialClass, specialTag } from '../../lib/special.js';
+import { specialClass } from '../../lib/special.js';
+import { iconChevron } from '../../ui/icons.js';
 import { titleView } from '../../ui/profile-summary.js';
 
 export const active = null; // it belongs to no item of the top bar
@@ -50,7 +51,7 @@ const card = (a) => (a.hidden ? hiddenCard(a) : html`
   <article class="ach-card ${a.unlocked_by_me ? 'mine' : 'locked'}${specialClass(a.special)}">
     <div class="ach-head">
       ${picture(a)}
-      <div class="ach-title"><strong>${a.title}</strong>${a.secret ? html`<span class="pf-tag secret">Secreto</span>` : ''}${specialTag(a.special)}${a.lifetime ? html`<span class="pf-tag muted">Único</span>` : ''}</div>
+      <div class="ach-title"><strong>${a.title}</strong>${a.secret ? html`<span class="pf-tag secret">Secreto</span>` : ''}</div>
     </div>
     <div class="ach-body">
       ${a.description ? html`<div class="pf-sub">${a.description}</div>` : ''}
@@ -65,6 +66,7 @@ const BLOCKS = [
 ];
 
 let shown = seasons.current(); // the season on screen in the season block
+const folded = new Set(); // the titles of the blocks the viewer has folded: they start open, and stay as left when a season changes
 
 const pills = () => html`
   <div class="pf-season ach-seasons" role="group" aria-label="Temporada">${seasons.available().map((year) => html`
@@ -72,11 +74,15 @@ const pills = () => html`
   </div>`;
 
 const block = ({ title, note, seasonal }, list) => html`
-  <section class="ach-block">
-    <div class="section-header">${titleView(title)}</div>
-    <div class="pf-sub ach-note">${note} Tienes ${list.filter((a) => a.unlocked_by_me).length} de ${list.length}.</div>
-    ${seasonal ? pills() : ''}
-    <div class="ach-grid">${list.map(card)}</div>
+  <section class="ach-block ${folded.has(title) ? 'folded' : ''}">
+    <button type="button" class="section-header ach-fold" data-fold="${title}" aria-expanded="${String(!folded.has(title))}">
+      ${titleView(title)}<span class="ach-chevron" aria-hidden="true">${iconChevron()}</span>
+    </button>
+    <div class="ach-content">
+      <div class="pf-sub ach-note">${note} Tienes ${list.filter((a) => a.unlocked_by_me).length} de ${list.length}.</div>
+      ${seasonal ? pills() : ''}
+      <div class="ach-grid">${list.map(card)}</div>
+    </div>
   </section>`;
 
 // The season block always shows (with its pills), even when the season has nothing: another one may have.
@@ -96,10 +102,19 @@ async function load(main) {
 
 export async function render({ main }) {
   shown = seasons.current();
+  folded.clear();
   mount(main, html`
     <h1 class="pf-title pg-title">Logros</h1>
     <div id="achList"><div class="loading-spinner">Cargando logros...</div></div>`);
   main.querySelector('#achList').addEventListener('click', (e) => {
+    const fold = e.target.closest('[data-fold]');
+    if (fold) {
+      const title = fold.dataset.fold;
+      if (!folded.delete(title)) folded.add(title);
+      fold.closest('.ach-block').classList.toggle('folded', folded.has(title));
+      fold.setAttribute('aria-expanded', String(!folded.has(title)));
+      return;
+    }
     const pill = e.target.closest('[data-season]');
     if (!pill || pill.getAttribute('aria-pressed') === 'true') return;
     shown = Number(pill.dataset.season);

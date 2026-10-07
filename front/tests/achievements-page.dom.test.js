@@ -47,7 +47,7 @@ test('what is not unlocked shows a lock, not a question mark', () => {
   assert.equal(text('.ach-card.hidden .ach-img-placeholder')[0], '🔒');
 });
 
-test('a special one shines in the colour of its level, an ordinary one does not, and the tag says the level', async () => {
+test('a special one shines in the colour of its level, an ordinary one does not, with no tag saying the level', async () => {
   installApi({ 'GET /group/achievements': [{ ...LIST[0], special: 1 }, { ...LIST[0], id: 3, title: 'Dorado', special: 2 }, { ...LIST[0], id: 4, title: 'Normal', special: 0 }, LIST[1]] });
   await page.render({ main: main() });
   await settle();
@@ -55,9 +55,7 @@ test('a special one shines in the colour of its level, an ordinary one does not,
   assert.ok(cards[0].classList.contains('special-1'));
   assert.ok(cards[1].classList.contains('special-2'));
   assert.ok(![...cards[2].classList].some((c) => c.startsWith('special-')));
-  assert.match(text('.ach-card')[0], /Especial nivel 1/);
-  assert.match(text('.ach-card')[1], /Especial nivel 2/);
-  assert.doesNotMatch(text('.ach-card')[2], /Especial/);
+  assert.doesNotMatch(text('.ach-card').join(' '), /Especial/);  // the aura is enough
 });
 
 test('a secret one says so, and being secret is not being special', async () => {
@@ -90,16 +88,6 @@ test('a secret one that is not unlocked still has the aura of its level, and say
   assert.ok(special.classList.contains('special-3'));
   assert.deepEqual(text('.ach-title strong'), ['Logro oculto', 'Logro oculto']);  // the aura is what tells them apart
   assert.doesNotMatch(special.textContent, /Secreto|Especial/);
-});
-
-test('one that has no season limit says it is unique, and the others do not', async () => {
-  installApi({ 'GET /group/achievements': [{ ...LIST[0], lifetime: true }, { ...LIST[0], id: 3, title: 'Normal' }, LIST[1]] });
-  await page.render({ main: main() });
-  await settle();
-  // the season block comes first: the normal one, the hidden one, then the lifetime one
-  assert.doesNotMatch(text('.ach-card')[0], /Único/);
-  assert.doesNotMatch(text('.ach-card')[1], /Único/);  // what is hidden says nothing
-  assert.match(text('.ach-card')[2], /Único/);
 });
 
 test('there are two blocks, the season ones and the lifetime ones, each with the cards that belong to it', async () => {
@@ -163,6 +151,24 @@ test('choosing a season asks for it and shows what that season had, keeping the 
   document.querySelector(`.ach-seasons [data-season="${year}"]`).click();
   await settle();
   assert.equal(calls.at(-1).path, '/group/achievements'); // the running season is the default one
+});
+
+test('every block starts open and can be folded, and stays as left when a season is chosen', async () => {
+  const year = new Date().getFullYear();
+  installApi({ 'GET /group/achievements': [{ ...LIST[0], title: 'De año' }, { ...LIST[0], id: 9, lifetime: true, title: 'Para siempre' }] });
+  await page.render({ main: main() });
+  await settle();
+  const folds = () => [...document.querySelectorAll('.ach-fold')];
+  assert.deepEqual(folds().map((f) => f.getAttribute('aria-expanded')), ['true', 'true']);
+  assert.equal(document.querySelectorAll('.ach-block.folded').length, 0);
+  folds()[1].click();
+  assert.deepEqual(folds().map((f) => f.getAttribute('aria-expanded')), ['true', 'false']);
+  assert.ok(document.querySelectorAll('.ach-block')[1].classList.contains('folded'));
+  document.querySelector(`.ach-seasons [data-season="${year - 1}"]`).click();
+  await settle();
+  assert.deepEqual(folds().map((f) => f.getAttribute('aria-expanded')), ['true', 'false']);
+  folds()[1].click();
+  assert.equal(document.querySelectorAll('.ach-block.folded').length, 0);
 });
 
 test('a season with no achievements still shows its pills so another can be chosen', async () => {
