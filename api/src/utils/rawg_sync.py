@@ -176,13 +176,16 @@ def _needs_steam(game: models.Game, overwrite: bool) -> bool:
 
 
 def _pending_query(db, overwrite: bool):
-    """Games worth a call: no rawg_id, or a rawg_id with blank fields (or all, on overwrite)."""
+    """Games worth a call: no rawg_id, or a rawg_id with basic info missing (or all, on overwrite).
+
+    The Steam id is not basic: most games are not on Steam, so a blank one would keep them pending forever.
+    It is still filled in when the game is processed for another reason."""
     q = db.query(models.Game)
     if overwrite:
         return q
     blanks = [
         models.Game.rawg_id.is_(None),
-        *[getattr(models.Game, f).is_(None) | (getattr(models.Game, f) == "") for f in FIELDS],
+        *[getattr(models.Game, f).is_(None) | (getattr(models.Game, f) == "") for f in FIELDS if f != "steam_id"],
         models.Game.dev == "-",
     ]
     return q.filter(or_(*blanks))

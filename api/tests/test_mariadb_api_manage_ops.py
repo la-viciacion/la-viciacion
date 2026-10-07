@@ -142,6 +142,16 @@ class RawgSyncTests(OpsTestCase):
         self.assertGreaterEqual(body["estimated_calls"], 1)
         self.assertGreaterEqual(self.admin("GET", "/rawg-sync/estimate", params={"overwrite": True}).json()["pending_games"], body["pending_games"])
 
+    def test_a_game_only_missing_its_steam_id_is_not_pending_but_one_missing_its_tags_is(self):
+        complete = dict(rawg_id=5, slug="s", dev="Dev", release_date=datetime.date(2020, 1, 1),
+                        image_url="https://i/x.jpg", genres="Indie", tags="Horror")
+        pending = lambda: self.admin("GET", "/rawg-sync/estimate").json()["pending_games"]  # noqa: E731
+        before = pending()
+        self.game("nosteam", "No Steam", **complete)
+        self.assertEqual(pending(), before)
+        self.game("notags", "No tags", **{**complete, "rawg_id": 6, "tags": None})
+        self.assertEqual(pending(), before + 1)
+
     def test_the_status_is_whatever_the_last_run_left(self):
         self.assertIsInstance(self.admin("GET", "/rawg-sync/status").json(), dict)
 

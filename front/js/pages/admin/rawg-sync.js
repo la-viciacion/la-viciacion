@@ -42,8 +42,8 @@ async function optionsStep(onDone) {
       <label>Tope de llamadas para esta ejecución
         <input class="adm-input" type="number" name="max" min="1" max="${MAX_CALLS_LIMIT}" value="${Math.min(2000, Math.max(50, est.estimated_calls))}" />
       </label>
-      <label class="adm-check"><input type="checkbox" name="overwrite" /> Sobrescribir datos existentes (pisa ediciones manuales)</label>
-      <div class="adm-sub">Se procesan primero los juegos con más sesiones. Sin sobrescribir, solo se rellenan campos vacíos. Duración aproximada: ${Math.ceil((est.estimated_calls * 0.5) / 60)} min.</div>
+      <label class="adm-check"><input type="checkbox" name="overwrite" /> Sincronizar todo (resincronización completa: pisa los cambios hechos a mano)</label>
+      <div class="adm-sub">Se procesan primero los juegos con más sesiones. Por defecto solo se tienen en cuenta los que les falta información básica (ID de RAWG, etiquetas, desarrolladora, géneros, fecha, imagen o slug) y solo se rellenan campos vacíos. Duración aproximada: ${Math.ceil((est.estimated_calls * 0.5) / 60)} min.</div>
       <div class="adm-error" role="alert"></div>
       <div class="adm-actions">
         <button type="button" class="adm-btn" data-close>Cancelar</button>
@@ -71,7 +71,7 @@ function confirmStep(max, overwrite, onDone) {
     <form class="adm-form" novalidate>
       <div class="adm-warn">
         <strong>Este es un proceso intensivo.</strong> Hará hasta <strong>${number(max)}</strong> llamadas a la API de RAWG,
-        que cuentan contra el límite mensual del plan gratuito (20.000). Tarda varios minutos y modifica datos de juegos${overwrite ? html`, <strong>sobrescribiendo los valores existentes</strong>` : ''}.
+        que cuentan contra el límite mensual del plan gratuito (20.000). Tarda varios minutos y modifica datos de juegos${overwrite ? html`, <strong>resincronizándolos todos y sobrescribiendo los valores existentes</strong>` : ''}.
         <br/>Lánzalo solo en casos de extrema necesidad.
       </div>
       <label>Escribe <strong>${SYNC_PHRASE}</strong> para habilitar el botón<input class="adm-input" name="phrase" autocomplete="off" /></label>
