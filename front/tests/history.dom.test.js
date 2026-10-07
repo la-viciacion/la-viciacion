@@ -47,8 +47,8 @@ test('one row per game, with the markup of a name shown as text and the "show mo
   assert.deepEqual(text('.history-name'), ['Celeste', 'Hades <b>']);
   assert.equal(document.querySelectorAll('.history-name b').length, 0);
   assert.equal(text('#historyMoreBtn')[0], 'Mostrar más (9)');
-  assert.ok(document.querySelector('[data-game-id="celeste"] .btn-continue.done'));
-  assert.equal(document.querySelector('[data-game-id="hades"] .btn-continue.done'), null);
+  assert.ok(document.querySelector('[data-game-id="celeste"] .btn-complete.done'));
+  assert.equal(document.querySelector('[data-game-id="hades"] .btn-complete.done'), null);
   assert.match(text('[data-game-id="celeste"] .history-meta')[0], /3 sesiones/);
 });
 

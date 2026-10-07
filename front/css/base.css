@@ -11,6 +11,7 @@
 
   --accent-teal: #3dd9b3;
   --accent-gold: #f5c542;
+  --check-pending: #c9c9e0; /* the complete mark of a game that is not completed yet */
   --accent-purple: #a78bfa;
   --accent-pink: #f472b6;
   /* the colour of each level of a special achievement (js/lib/special.js): vivid, to shine against the dark cards */

@@ -19,7 +19,7 @@ import { gameHref } from '../../lib/links.js';
 import { platformName } from '../../lib/platforms.js';
 import { SCORE_HINT, SCORE_MAX, SCORE_MIN, parseScore, saveScore } from '../../lib/score.js';
 import * as seasons from '../../lib/seasons.js';
-import { iconCalendar, iconCheck, iconClock, iconFlag, iconStar, iconUndo } from '../../ui/icons.js';
+import { iconCalendar, iconCircleCheck, iconClock, iconFlag, iconStar, iconUndo } from '../../ui/icons.js';
 import { scoreBadge } from '../../ui/score-badge.js';
 import { initSessions, openSessionForm } from '../home/sessions.js';
 
@@ -154,10 +154,10 @@ function abandonButtons(g) {
 function actions(g) {
   const sessionsButton = html`${act('sessions', g.id, iconClock, 'Sesiones', { extra: `aria-expanded="${sessions.has(g.id)}"` })}${act('rate', g.id, iconStar, g.score == null ? 'Puntuar' : 'Cambiar nota')}`;
   if (g.can_complete) {
-    return html`${sessionsButton}${act('complete', g.id, iconCheck, 'Marcar completado', { primary: true })}${abandonButtons(g)}`;
+    return html`${sessionsButton}${act('complete', g.id, () => iconCircleCheck(18), 'Marcar completado')}${abandonButtons(g)}`;
   }
   if (!g.completed) {
-    return html`${sessionsButton}<button class="pf-btn" disabled title="${blockedReason(g, season)}" aria-label="Marcar completado: ${blockedReason(g, season)}">${iconCheck()}<span class="pf-label">Marcar completado</span></button>${abandonButtons(g)}`;
+    return html`${sessionsButton}<button class="pf-btn" disabled title="${blockedReason(g, season)}" aria-label="Marcar completado: ${blockedReason(g, season)}">${iconCircleCheck(18)}<span class="pf-label">Marcar completado</span></button>${abandonButtons(g)}`;
   }
   if (g.complete_blocked === 'closed_season') return sessionsButton;
   return html`${sessionsButton}${act('edit-date', g.id, iconCalendar, 'Cambiar fecha')}${act('uncomplete', g.id, iconUndo, 'Desmarcar')}`;
