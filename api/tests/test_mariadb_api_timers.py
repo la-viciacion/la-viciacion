@@ -302,11 +302,15 @@ class ManualSessionTests(TimerTestCase):
         touching = self.manual(game="hades", start=start + timedelta(hours=2), end=start + timedelta(hours=3))
         self.assertEqual(touching.status_code, 201)
 
-    def test_it_cannot_overlap_a_running_timer(self):
+    def test_it_is_refused_while_a_timer_is_running_even_without_overlap(self):
         self.start()
-        ends_ahead_of_the_timer = datetime.datetime.now().replace(microsecond=0) + timedelta(seconds=30)
-        clash = self.manual(start=ago(hours=1), end=ends_ahead_of_the_timer)
+        clash = self.manual(start=ago(hours=5), end=ago(hours=4))
         self.assertEqual(clash.status_code, 409)
+        self.assertIn("timer en curso", clash.json()["detail"])
+
+    def test_a_running_timer_of_another_user_does_not_matter(self):
+        self.start(user="bea")
+        self.assertEqual(self.manual(start=ago(hours=5), end=ago(hours=4)).status_code, 201)
 
     def test_other_users_sessions_do_not_matter(self):
         start = ago(hours=5)

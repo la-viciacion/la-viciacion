@@ -350,6 +350,8 @@ def create_manual_session(db: Session, current_user: User, body: ManualSessionCr
     if db.query(Game.id).filter(Game.id == body.game_id).first() is None:
         _reject(404, "Juego no encontrado")
     platform = _valid_platform(db, body.platform)
+    if db.query(GameTimer.id).filter(GameTimer.user_id == user_id, GameTimer.is_active == True).first() is not None:
+        _reject(409, "Tienes un timer en curso: páralo o cancélalo antes de añadir una sesión manual")
     validate_session(db, current_user, user_id, body.start_time, body.end_time)
 
     timer = GameTimer(

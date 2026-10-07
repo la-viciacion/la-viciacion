@@ -10,10 +10,19 @@ import { hasActive, initTimer, loadTimerCard, startTimer, stopClock } from './ti
 
 export const active = 'home';
 
+/** A manual session is refused while a timer runs (the API says so too): stop or cancel it first. */
+function syncManualButton() {
+  const button = document.getElementById('manualSessionBtn');
+  if (!button) return;
+  button.disabled = hasActive;
+  button.title = hasActive ? 'Para o cancela el timer en curso para añadir una sesión manual' : '';
+}
+
 /** Re-render only the timer card and the history, keeping the page in place. */
 async function refresh() {
   stopClock();
   await loadTimerCard();
+  syncManualButton();
   await loadHistory(true);
 }
 
@@ -53,6 +62,7 @@ export async function render({ user, main, isCurrent }) {
   // them) are fetched meanwhile.
   await Promise.all([loadPlatforms(), loadTimerCard()]);
   if (!isCurrent()) return;
+  syncManualButton();
   await loadHistory(true);
 
   if (location.hash === '#/new') {
