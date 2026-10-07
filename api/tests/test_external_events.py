@@ -42,6 +42,13 @@ class DaysTests(unittest.TestCase):
         leap = datetime.date(1992, 2, 29)
         self.assertEqual(events.days_of("BIRTHDAY_LIFETIME", [2027, 2028], leap), {datetime.date(2027, 2, 28), datetime.date(2028, 2, 29)})
 
+    def test_the_eclipses_need_a_city(self):
+        for key in ("SOLAR_ECLIPSE_LIFETIME", "LUNAR_ECLIPSE_LIFETIME"):
+            self.assertEqual(events.days_of(key, [2027, 2028, 2029], None), frozenset(), key)
+        self.assertEqual(events.windows_of("LUNAR_ECLIPSE_LIFETIME", [2029], None), [])
+        self.assertEqual(events.days_of("SOLAR_ECLIPSE_LIFETIME", [2027], None, (40.4165, -3.7026)), {datetime.date(2027, 8, 2)})
+        self.assertIsNone(events.windows_of("SOLAR_ECLIPSE_LIFETIME", [2027], (40.4165, -3.7026)))  # only the day matters
+
     def test_every_achievement_of_a_day_is_known(self):
         for key in events.DAYS:
             self.assertIsInstance(events.days_of(key, [2027], datetime.date(1990, 1, 1)), frozenset)

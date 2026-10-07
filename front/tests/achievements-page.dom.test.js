@@ -90,6 +90,17 @@ test('a secret one that is not unlocked still has the aura of its level, and say
   assert.doesNotMatch(special.textContent, /Secreto|Especial/);
 });
 
+test('a hidden one says who has it, and only that, so that it is seen to be possible', async () => {
+  const players = [{ user_id: 2, name: 'Bea' }, { user_id: 3, name: 'Cai' }];
+  installApi({ 'GET /group/achievements': [{ id: 6, hidden: true, unlocked_by_me: false, secret: true, special: 1, unlocked_by: 2, players }, LIST[1]] });
+  await page.render({ main: main() });
+  await settle();
+  const card = document.querySelector('.ach-card.hidden');
+  assert.match(card.textContent, /Lo han conseguido 2: Bea y Cai/);
+  assert.doesNotMatch(card.textContent, /Último|\d{1,2}\/\d{1,2}|×/);  // no date, no times
+  assert.match(document.querySelectorAll('.ach-card.hidden')[1].textContent, /Nadie lo ha conseguido todavía/);
+});
+
 test('there are two blocks, the season ones and the lifetime ones, each with the cards that belong to it', async () => {
   installApi({ 'GET /group/achievements': [
     { ...LIST[0], lifetime: true, title: 'Para siempre' }, { ...LIST[0], id: 3, title: 'De año' },

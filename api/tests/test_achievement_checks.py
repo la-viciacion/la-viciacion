@@ -527,15 +527,17 @@ class AchievementCheckTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("7 días jugados", self.message())
         private.assert_not_awaited()
 
-    async def test_a_special_one_says_so_with_its_level_and_is_announced_in_full(self):
+    async def test_a_special_one_is_secret_even_if_it_is_not_marked_so_and_says_its_level_to_the_player(self):
         private = self.make_secret()
         self.db.query(models.Achievement).filter_by(key="PLAYED_7_DAYS").update({"special": 3})
         self.db.commit()
+        self.assertFalse(self.db.query(models.Achievement.secret).filter_by(key="PLAYED_7_DAYS").scalar())  # the mark is not set
         await self.ach.user_played_total_days(self.db, USER, self.days(7))
         group = self.message()
-        self.assertIn("Logro especial de nivel 3", group)
-        self.assertIn("7 días jugados", group)  # it is not secret: nothing is held back
-        private.assert_not_awaited()
+        self.assertIn("ha desbloqueado un logro oculto", group)  # the group is told nothing else about it...
+        self.assertTrue(group.startswith("Logro especial de nivel 3\n"))  # ...but its level, the interesting part
+        self.assertNotIn("7 días", group)
+        self.assertIn("Logro especial de nivel 3", private.await_args.args[1])
 
     async def test_a_special_and_secret_one_is_anonymous_to_the_group_and_special_to_the_player(self):
         private = self.make_secret("PLAYED_7_DAYS")
@@ -543,8 +545,9 @@ class AchievementCheckTests(unittest.IsolatedAsyncioTestCase):
         self.db.commit()
         await self.ach.user_played_total_days(self.db, USER, self.days(7))
         self.assertIn("ha desbloqueado un logro oculto", self.message())
-        self.assertNotIn("especial", self.message())  # it would give it away
+        self.assertTrue(self.message().startswith("Logro especial de nivel 1\n"))  # the level is told to the group too
         self.assertIn("Logro especial de nivel 1", private.await_args.args[1])
+        self.assertNotIn("7 días", self.message())
 
     async def test_a_silent_check_tells_nobody_not_even_the_player(self):
         private = self.make_secret("PLAYED_7_DAYS")
@@ -875,7 +878,7 @@ class OutsideWorldTests(unittest.IsolatedAsyncioTestCase):
         self.view = Achievements(season=seasons.ALL, since=2023)
 
     def clear_sky(self):
-        for cached in (astronomy.full_moons, astronomy.eclipses, astronomy.sun_events):
+        for cached in (astronomy.full_moons, astronomy._eclipses_of, astronomy._solar_eclipse_days_at, astronomy._lunar_eclipse_nights_at, astronomy.sun_events):
             cached.cache_clear()
 
     def play(self, start, hours=1.0, game="g1", minutes=None):
@@ -964,9 +967,10 @@ class OutsideWorldTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.awarded()["BIRTHDAY_LIFETIME"], (datetime.date(2027, 6, 15), None))
 
     async def test_the_sky_full_moon_eclipses_and_solstices(self):
+        self.settings(place_name="Madrid", place_latitude=40.4165, place_longitude=-3.7026)
         self.play(datetime.datetime(2027, 1, 22, 20))  # full moon at 12:17 UTC
-        self.play(datetime.datetime(2027, 2, 6, 20))  # annular solar eclipse
-        self.play(datetime.datetime(2028, 12, 31, 20))  # total lunar eclipse
+        self.play(datetime.datetime(2027, 8, 2, 20))  # total solar eclipse, seen from Madrid at 0.88
+        self.play(datetime.datetime(2029, 6, 25, 22))  # total lunar eclipse in the night of the 25th, after the sunset in Madrid
         self.play(datetime.datetime(2027, 6, 21, 20))  # summer solstice
         self.play(datetime.datetime(2027, 12, 22, 20))  # winter solstice
         self.play(datetime.datetime(2027, 3, 20, 20))  # spring equinox
@@ -975,13 +979,32 @@ class OutsideWorldTests(unittest.IsolatedAsyncioTestCase):
         got = {key: date for key, (date, _) in self.awarded().items()}
         self.assertEqual(got, {
             "FULL_MOON_LIFETIME": datetime.date(2027, 1, 22),
-            "SOLAR_ECLIPSE_LIFETIME": datetime.date(2027, 2, 6),
-            "LUNAR_ECLIPSE_LIFETIME": datetime.date(2028, 12, 31),
+            "SOLAR_ECLIPSE_LIFETIME": datetime.date(2027, 8, 2),
+            "LUNAR_ECLIPSE_LIFETIME": datetime.date(2029, 6, 25),
             "SUMMER_SOLSTICE_LIFETIME": datetime.date(2027, 6, 21),
             "WINTER_SOLSTICE_LIFETIME": datetime.date(2027, 12, 22),
             "SPRING_EQUINOX_LIFETIME": datetime.date(2027, 3, 20),
             "AUTUMN_EQUINOX_LIFETIME": datetime.date(2027, 9, 23),
         })
+
+    async def test_the_eclipses_need_the_city_of_the_player_and_a_visible_eclipse(self):
+        self.play(datetime.datetime(2027, 8, 2, 20))
+        self.play(datetime.datetime(2029, 6, 25, 22))
+        await self.view.external_days(self.db, USER)
+        self.assertFalse({"SOLAR_ECLIPSE_LIFETIME", "LUNAR_ECLIPSE_LIFETIME"} & set(self.awarded()))  # no city, no eclipse
+        self.settings(place_name="Buenos Aires", place_latitude=-34.6, place_longitude=-58.4)
+        await self.view.external_days(self.db, USER)
+        self.assertNotIn("SOLAR_ECLIPSE_LIFETIME", self.awarded())  # the eclipse of August 2027 is not seen from there
+
+    async def test_a_lunar_eclipse_asks_for_a_timer_started_in_its_night_after_the_sunset(self):
+        self.settings(place_name="Madrid", place_latitude=40.4165, place_longitude=-3.7026)
+        self.play(datetime.datetime(2029, 6, 25, 12))  # the day of the eclipse's night, but before the sunset (19:49 UTC)
+        self.play(datetime.datetime(2029, 6, 26, 12))  # the day it was over, after the sunrise (4:46 UTC)
+        await self.view.external_days(self.db, USER)
+        self.assertNotIn("LUNAR_ECLIPSE_LIFETIME", self.awarded())
+        self.play(datetime.datetime(2029, 6, 26, 1, 30))  # past midnight, still in the night
+        await self.view.external_days(self.db, USER)
+        self.assertEqual(self.awarded()["LUNAR_ECLIPSE_LIFETIME"], (datetime.date(2029, 6, 26), None))
 
     async def test_an_ordinary_day_earns_nothing(self):
         self.play(datetime.datetime(2027, 2, 2, 20))
@@ -1133,6 +1156,17 @@ class CatalogueTests(unittest.TestCase):
         self.assertEqual((rows["PLAYED_7_DAYS"].special, rows["PLAYED_7_DAYS"].secret), (0, False))
         for ach in ach_module.AchievementsElems:
             self.assertEqual(rows[ach.name].special, ach.value.get("special", 0), ach.name)
+
+    def test_what_the_review_migration_sets_is_about_achievements_that_exist_and_says_what_the_code_says(self):
+        from tests.test_migrations import load_script_directory
+
+        migration = load_script_directory().get_revision("033_achievement_review").module
+        by_name = {ach.name: ach for ach in ach_module.AchievementsElems}
+        self.assertLessEqual({key for key, _, _ in migration.SPECIAL} | set(migration.SECRET), set(by_name))
+        for key, _, level in migration.SPECIAL:
+            self.assertEqual(by_name[key].value.get("special", 0), level, key)  # the snapshot is what the code says now
+        for key in migration.SECRET:
+            self.assertTrue(by_name[key].value.get("secret"), key)
 
     def test_what_the_migration_sets_is_about_achievements_that_exist(self):
         from tests.test_migrations import load_script_directory

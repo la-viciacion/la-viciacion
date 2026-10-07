@@ -91,7 +91,7 @@ def feed(db: Session, viewer_id: int, limit: int = 30, offset: int = 0) -> dict:
 
     for award, name, username, title, secret, game_id, game_name, image in (
         db.query(models.UserAchievement, models.User.name, models.User.username, models.Achievement.title,
-                 models.Achievement.secret, models.UserAchievement.game_id, models.Game.name, models.Game.image_url)
+                 models.Achievement.is_secret, models.UserAchievement.game_id, models.Game.name, models.Game.image_url)
         .join(models.User, models.UserAchievement.user_id == models.User.id)
         .join(models.Achievement, models.UserAchievement.achievement_id == models.Achievement.id)
         .outerjoin(models.Game, models.UserAchievement.game_id == models.Game.id)

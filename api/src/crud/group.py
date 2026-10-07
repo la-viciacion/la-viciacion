@@ -41,9 +41,10 @@ def unlocked_in_season(db: Session, user_id: int, season: int) -> set[int]:
 def achievements_catalog(db: Session, viewer_id: int, today: datetime.date | None = None, season: int | None = None) -> list[dict]:
     """Every achievement with who has unlocked it and when last. The ones the viewer has not unlocked come with
     their name and picture but **no description** (the front dims them: the player has to work out what they are
-    about) unless they are secret: those come hidden, with no key, title, description, picture or players, only that
+    about) unless they are secret: those come hidden, with no key, title, description or picture (and of the players only their names, no dates), only that
     they exist, whether they are secret and their special level (so that everybody knows there are special ones to
-    unlock). Whoever has unlocked an achievement once knows what it is: that is what shows the description and
+    unlock). One that is switched on but not valid yet (`valid_from_season` in the future), secret or not, is listed
+    that way too, in the running season, so it is already there as a hidden one when it begins to count. Whoever has unlocked an achievement once knows what it is: that is what shows the description and
     lifts the secrecy, whatever the season on screen. The same goes for its key and its picture, which would
     give away what it is about: they are only sent for the ones the viewer has unlocked at some point.
 
@@ -59,7 +60,7 @@ def achievements_catalog(db: Session, viewer_id: int, today: datetime.date | Non
 
     achievements = db.query(
         models.Achievement.id, models.Achievement.key, models.Achievement.title, models.Achievement.message,
-        models.Achievement.image.isnot(None).label("has_image"), models.Achievement.active, models.Achievement.secret,
+        models.Achievement.image.isnot(None).label("has_image"), models.Achievement.active, models.Achievement.is_secret.label("secret"),
         models.Achievement.special, models.Achievement.valid_from_season,
     ).order_by(models.Achievement.id).all()
     lifetime_ids = {a.id for a in achievements if is_lifetime(a.key)}
@@ -85,15 +86,22 @@ def achievements_catalog(db: Session, viewer_id: int, today: datetime.date | Non
         lifetime = row.id in lifetime_ids
         mine = row.id in (known if lifetime else mine_in_season)
         listed_in = seasons.current() if lifetime else season
-        if (not row.active or row.valid_from_season > listed_in) and not mine:
+        # one that is switched on but starts to count in a later season is listed as a hidden one, secret or not, in the
+        # running season (with its aura, if it is special): nobody has it and nobody can tell what it is, and when its
+        # season comes the usual rules apply
+        upcoming = row.active and row.valid_from_season > listed_in and listed_in == seasons.current()
+        if (not row.active or row.valid_from_season > listed_in) and not mine and not upcoming:
             continue  # switched off, or not valid yet: it does not exist yet, not even as a hidden one
-        if row.id not in known and row.secret:
+        who = sorted(unlocked.get(row.id, {}).values(), key=lambda w: (w["last"], w["name"].lower()), reverse=True)
+        if row.id not in known and (row.secret or upcoming):
             catalog.append({
-                "id": row.id, "hidden": True, "unlocked_by_me": False, "secret": True, "special": row.special,
+                "id": row.id, "hidden": True, "unlocked_by_me": False, "secret": bool(row.secret), "special": row.special,
                 "lifetime": lifetime,  # which block of the page it goes in; says nothing about what it is
+                # the only thing a hidden one says: who has it (no date, no times), so that it is seen to be possible
+                "unlocked_by": len(who),
+                "players": [{"user_id": w["user_id"], "name": w["name"]} for w in who],
             })
             continue
-        who = sorted(unlocked.get(row.id, {}).values(), key=lambda w: (w["last"], w["name"].lower()), reverse=True)
         is_known = row.id in known
         catalog.append({
             "id": row.id,

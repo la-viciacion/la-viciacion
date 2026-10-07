@@ -358,30 +358,29 @@ class Achievements:
 
     def _flags(self, db: Session, key: str) -> tuple[bool, int]:
         """(secret, special level) of an achievement."""
-        secret, special = db.query(models.Achievement.secret, models.Achievement.special).filter(models.Achievement.key == key).one()
+        secret, special = db.query(models.Achievement.is_secret, models.Achievement.special).filter(models.Achievement.key == key).one()
         return bool(secret), special or 0
 
     async def _announce(
         self, db: Session, ach: AchievementsElems, players: list, message: str, silent: bool, image=None
     ):
-        """Tell the group that `players` unlocked `ach`, with `message`. A special one says so, and its level. A
-        secret one does not say which: the group only hears that they unlocked a hidden achievement (no
-        picture), and each player gets `message` privately, on every channel they have (Telegram if linked, push
-        if they have a device)."""
+        """Tell the group that `players` unlocked `ach`, with `message`. A special one says so, and its level, even
+        if it is secret (the level is the interesting part and says nothing about what it is). A secret one does not
+        say which: the group only hears that they unlocked a hidden achievement (no picture), and each player gets
+        `message` privately, on every channel they have (Telegram if linked, push if they have a device)."""
         silent = silent or self.silent
         secret, special = self._flags(db, ach.name)
-        if special:
-            message = f"Logro especial de nivel {special}\n{message}"
+        level = f"Logro especial de nivel {special}\n" if special else ""
         if not secret:
-            await utils.send_message(message, silent, image=image)
+            await utils.send_message(level + message, silent, image=image)
             return
         names = [utils.escape_markdown(player.name) for player in players]
         who = names[0] if len(names) == 1 else ", ".join(names[:-1]) + " y " + names[-1]  # "Ana, Bob y Cris"
         verb = "ha" if len(names) == 1 else "han"
-        await utils.send_message(f"🏆 Logro oculto 🏆\n*{who}* {verb} desbloqueado un logro oculto.", silent)
+        await utils.send_message(f"{level}🏆 Logro oculto 🏆\n*{who}* {verb} desbloqueado un logro oculto.", silent)
         if not silent:
             for player in players:
-                await utils.send_message_to_user(player.telegram_id, message, user_id=player.id)
+                await utils.send_message_to_user(player.telegram_id, level + message, user_id=player.id)
 
     def _collect(self, user_id: int, ach: AchievementsElems, date: str | None, game_id: str | None):
         """Note what a user deserves. Its date is the one that sets the season, so it is kept inside the
@@ -755,6 +754,7 @@ class Achievements:
         if not sessions:
             return
         born = user_settings.birth_date(db, user.id)
+        place = user_settings.place(db, user.id)
         years = range(min(session.start.year for session in sessions), max(session.start.year for session in sessions) + 1)
         names = {}
         if any(ach.name in external_events.GAME_RULES for ach in pending):
@@ -765,11 +765,14 @@ class Achievements:
                 )
             }
         for ach in pending:
-            days = external_events.days_of(ach.name, years, born)
+            days = external_events.days_of(ach.name, years, born, place)
+            windows = external_events.windows_of(ach.name, years, place)
             rule = external_events.GAME_RULES.get(ach.name)
             for session in sessions:
                 if session.start.date() not in days or (rule is not None and not rule(*names.get(session.game_id, (None, None)))):
                     continue
+                if windows is not None and not any(first <= session.start <= last for first, last in windows):
+                    continue  # the day, but not the time: the lunar eclipse asks for a timer started after the sunset
                 await self._award(
                     db, user, ach, silent, date=str(session.start.date()), game_id=session.game_id if rule else None
                 )

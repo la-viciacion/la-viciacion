@@ -23,8 +23,12 @@ const who = (a) => {
   return html`<div class="pf-sub">Lo han conseguido ${a.unlocked_by}: ${formatPlayers(names, 4)}. Último: ${formatDate(a.players[0].last)}</div>`;
 };
 
-// A secret one that the viewer has not unlocked says nothing: not even the name. A special one still has the aura
-// of its level, so that everybody knows there are special ones to unlock.
+// A secret one that the viewer has not unlocked says nothing: not even the name, only who has it (so that it is seen
+// to be possible). A special one still has the aura of its level, so that everybody knows there are special ones to unlock.
+const hiddenWho = (a) => (a.unlocked_by
+  ? html`<div class="pf-sub">Lo han conseguido ${a.unlocked_by}: ${formatPlayers(a.players.map((p) => p.name), 4)}</div>`
+  : html`<div class="pf-sub">Nadie lo ha conseguido todavía.</div>`);
+
 const hiddenCard = (a) => html`
   <article class="ach-card hidden${specialClass(a.special)}">
     <div class="ach-head">
@@ -33,6 +37,7 @@ const hiddenCard = (a) => html`
     </div>
     <div class="ach-body">
       <div class="pf-sub">Desbloquéalo para descubrirlo.</div>
+      ${hiddenWho(a)}
     </div>
   </article>`;
 

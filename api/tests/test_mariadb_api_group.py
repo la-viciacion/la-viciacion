@@ -49,16 +49,21 @@ class AchievementsCatalogTests(ApiTestCase):
         self.award(self.bea, self.second, TODAY())
         self.award(self.ana, self.first, TODAY())
         body = self.catalog()
-        self.assertEqual(len(body), self.scalar("SELECT COUNT(*) FROM achievements WHERE valid_from_season <= :y", y=TODAY().year))  # the ones of a later season are not there yet
+        with self.engine.begin() as conn:
+            upcoming = {row[0] for row in conn.execute(text("SELECT id FROM achievements WHERE valid_from_season > :y"), {"y": TODAY().year})}
+        self.assertEqual(len(body), self.scalar("SELECT COUNT(*) FROM achievements WHERE valid_from_season <= :y OR active = 1", y=TODAY().year))  # the ones of a later season are there too, hidden
         self.assertEqual([a["id"] for a in body], sorted(a["id"] for a in body))
         for achievement in body:
             if achievement["id"] == self.first:
                 self.assertFalse(achievement["hidden"])
                 self.assertNotIn("{}", achievement["description"])
                 self.assertNotIn("*", achievement["description"])
-            else:  # it is there to aim for: nothing is secret
-                self.assertFalse(achievement["hidden"])
+            else:  # it is there to aim for: nothing is secret, but the ones of a later season are still hidden
+                self.assertEqual(achievement["hidden"], achievement["id"] in upcoming)
                 self.assertFalse(achievement["unlocked_by_me"])
+                if achievement["hidden"]:
+                    self.assertEqual(set(achievement), {"id", "hidden", "unlocked_by_me", "secret", "special", "lifetime", "unlocked_by", "players"})  # no name, only who has it
+                    continue
                 self.assertTrue(achievement["title"])
                 self.assertIsNone(achievement["description"])  # what it is about is for whoever earns it
                 self.assertIsNone(achievement["key"])  # nor its key, nor its picture: they would say it
@@ -72,15 +77,30 @@ class AchievementsCatalogTests(ApiTestCase):
         by_id = {a["id"]: a for a in self.catalog()}
         self.assertTrue(by_id[self.first]["secret"])
         # whoever lacks it knows that it exists, and nothing more
-        self.assertEqual(by_id[self.second], {"id": self.second, "hidden": True, "unlocked_by_me": False, "secret": True, "special": 0, "lifetime": False})
+        self.assertEqual(by_id[self.second], {"id": self.second, "hidden": True, "unlocked_by_me": False, "secret": True, "special": 0, "lifetime": False,
+                                              "unlocked_by": 0, "players": []})
 
-    def test_the_level_of_a_special_one_is_known_to_everybody_even_when_it_is_secret_and_locked(self):
+    def test_a_hidden_one_says_who_has_it_and_nothing_else_so_that_it_is_seen_to_be_possible(self):
+        with self.engine.begin() as conn:
+            conn.execute(text("UPDATE achievements SET secret = 1 WHERE id = :a"), {"a": self.second})
+        self.award(self.bea, self.second, TODAY())
+        self.award(self.gone, self.second, TODAY() - datetime.timedelta(days=1))
+        seen = {a["id"]: a for a in self.catalog("ana")}[self.second]
+        self.assertTrue(seen["hidden"])
+        self.assertEqual(seen["unlocked_by"], 2)
+        self.assertEqual(seen["players"], [{"user_id": self.bea, "name": "Bea"}, {"user_id": self.gone, "name": "Gone"}])  # the latest first, no date
+        for key in ("title", "description", "key", "has_image", "progress"):
+            self.assertNotIn(key, seen)
+        self.assertTrue({a["id"]: a for a in self.catalog("bea")}[self.second]["unlocked_by_me"])  # whoever has it sees it in full
+
+    def test_the_level_of_a_special_one_is_known_to_everybody_even_when_it_is_locked_and_a_special_one_is_always_hidden(self):
         with self.engine.begin() as conn:
             conn.execute(text("UPDATE achievements SET special = 3, secret = 1 WHERE id = :a"), {"a": self.first})
             conn.execute(text("UPDATE achievements SET special = 1 WHERE id = :a"), {"a": self.second})
         by_id = {a["id"]: a for a in self.catalog()}
-        self.assertEqual(by_id[self.first], {"id": self.first, "hidden": True, "unlocked_by_me": False, "secret": True, "special": 3, "lifetime": False})  # the lock and its aura
-        self.assertEqual((by_id[self.second]["hidden"], by_id[self.second]["special"]), (False, 1))  # dimmed, with its colour
+        self.assertEqual(by_id[self.first], {"id": self.first, "hidden": True, "unlocked_by_me": False, "secret": True, "special": 3, "lifetime": False,
+                                             "unlocked_by": 0, "players": []})  # the lock and its aura
+        self.assertEqual((by_id[self.second]["hidden"], by_id[self.second]["special"], by_id[self.second]["secret"]), (True, 1, True))  # special: hidden even if not marked
         self.award(self.ana, self.first, TODAY())
         self.assertEqual({a["id"]: a["special"] for a in self.catalog()}[self.first], 3)
 
@@ -95,13 +115,24 @@ class AchievementsCatalogTests(ApiTestCase):
         seen = next(a for a in other if a["id"] == lifetime)  # whoever lacks it sees it, once, dimmed
         self.assertEqual((seen["hidden"], seen["unlocked_by_me"], seen["lifetime"]), (False, False, True))
 
-    def test_one_that_is_not_valid_yet_does_not_exist_for_the_group_unless_the_viewer_has_it(self):
+    def test_one_that_is_not_valid_yet_is_listed_hidden_unless_the_viewer_has_it(self):
         with self.engine.begin() as conn:
             conn.execute(text("UPDATE achievements SET valid_from_season = :s WHERE id IN (:a, :b)"), {"s": TODAY().year + 1, "a": self.first, "b": self.second})
         self.award(self.ana, self.first, TODAY())
-        shown = {a["id"] for a in self.catalog()}
-        self.assertIn(self.first, shown)
-        self.assertNotIn(self.second, shown)
+        by_id = {a["id"]: a for a in self.catalog()}
+        self.assertFalse(by_id[self.first]["hidden"])  # she has it: it shows in full
+        self.assertEqual(by_id[self.second], {"id": self.second, "hidden": True, "unlocked_by_me": False, "secret": False, "special": 0, "lifetime": False,
+                                              "unlocked_by": 0, "players": []})
+
+    def test_one_that_is_not_valid_yet_keeps_its_aura_and_is_not_there_in_a_closed_season(self):
+        with self.engine.begin() as conn:
+            conn.execute(text("UPDATE achievements SET special = 2, valid_from_season = :s WHERE id = :a"), {"s": TODAY().year + 1, "a": self.second})
+        by_id = {a["id"]: a for a in self.catalog("bea")}
+        self.assertEqual((by_id[self.second]["hidden"], by_id[self.second]["special"]), (True, 2))
+        self.assertNotIn(self.second, {a["id"] for a in self.api("GET", f"/group/achievements?season={TODAY().year - 1}", as_user="bea").json()})  # not in a closed season
+        with self.engine.begin() as conn:
+            conn.execute(text("UPDATE achievements SET active = 0 WHERE id = :a"), {"a": self.second})
+        self.assertNotIn(self.second, {a["id"] for a in self.catalog("bea")})  # switched off: it does not exist
 
     def test_a_switched_off_achievement_does_not_exist_for_the_group_unless_the_viewer_has_it(self):
         with self.engine.begin() as conn:
@@ -110,7 +141,7 @@ class AchievementsCatalogTests(ApiTestCase):
         shown = {a["id"] for a in self.catalog()}
         self.assertIn(self.first, shown)  # she has it
         self.assertNotIn(self.second, shown)  # nobody can have it: not even as a hidden one
-        self.assertEqual(len(self.catalog("ana")), self.scalar("SELECT COUNT(*) FROM achievements WHERE active = 1 AND valid_from_season <= :y", y=TODAY().year) + 1)
+        self.assertEqual(len(self.catalog("ana")), self.scalar("SELECT COUNT(*) FROM achievements WHERE active = 1", y=TODAY().year) + 1)
 
     def test_who_has_it_in_the_season_and_when_last_the_latest_first(self):
         year = TODAY().year
@@ -164,7 +195,11 @@ class AchievementsCatalogTests(ApiTestCase):
         with self.engine.begin() as conn:
             conn.execute(text("UPDATE achievements SET secret = 0 WHERE id = :a"), {"a": self.second})
         shown = self.api("GET", f"/group/players/{self.bea}", as_user="ana").json()["achievements"]
-        self.assertEqual([a["hidden"] for a in shown], [False, False])  # nothing is hidden when nothing is secret
+        self.assertEqual(sorted(a["hidden"] for a in shown), [False, True])  # still special: as hidden as a secret one
+        with self.engine.begin() as conn:
+            conn.execute(text("UPDATE achievements SET special = 0 WHERE id = :a"), {"a": self.second})
+        shown = self.api("GET", f"/group/players/{self.bea}", as_user="ana").json()["achievements"]
+        self.assertEqual([a["hidden"] for a in shown], [False, False])  # nothing is hidden when nothing is secret or special
 
 
 class PlayersTests(ApiTestCase):

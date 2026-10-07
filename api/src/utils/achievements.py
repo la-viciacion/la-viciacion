@@ -48,6 +48,7 @@ class AchievementsElems(Enum):
     PLAYED_12_HOURS_DAY = {
         "since": 2023,
         "special": 1,
+        "secret": True,
         "title": "Media jornada, 12 horas",
         "message": "Como decía 'El Rancio', media jornada son 12 horas, y ese es el tiempo que ha invertido "
         + "*"
@@ -77,6 +78,7 @@ class AchievementsElems(Enum):
     }
     PLAYED_100_HOURS_GAME = {
         "since": 2023,
+        "special": 1,
         "title": "Cualquiera diría que le gusta ese juego",
         "message": "Todo apunta a que a *"
         + "{}"
@@ -142,6 +144,7 @@ class AchievementsElems(Enum):
     }
     PLAYED_4_HOURS_SESSION = {
         "since": 2023,
+        "secret": True,
         "title": "Sesión de 4 horas",
         "message": "*{}"
         + "* acaba de jugar 4 horas seguidas (o más) a _"
@@ -176,11 +179,13 @@ class AchievementsElems(Enum):
     }
     PLAYED_50_GAMES = {
         "since": 2023,
+        "special": 1,
         "title": "50 juegos jugados",
         "message": "*{}* acaba de empezar su juego número 50.",
     }
     PLAYED_100_GAMES = {
         "since": 2023,
+        "special": 2,
         "title": "100 juegos (jugados)",
         "message": "A 100 juegos acaba de jugar "
         + "*{}*. Estamos hablando de arrancar un nuevo"
@@ -210,6 +215,7 @@ class AchievementsElems(Enum):
     COMPLETED_42_GAMES = {
         "since": 2023,
         "special": 2,
+        "secret": True,
         "title": "La respuesta (de verdad)",
         "message": "Si empezar 42 juegos ya es todo un logro, no hablemos de acabar 42. "
         + "Ha quedado patente que a "
@@ -232,6 +238,7 @@ class AchievementsElems(Enum):
     }
     PLAYED_10_GAMES_DAY = {
         "since": 2023,
+        "special": 1,
         "secret": True,
         "title": "Indecisión x2",
         "message": "AAAHHHRRRGGG, sigo sin saber a qué jugar. "
@@ -269,18 +276,21 @@ class AchievementsElems(Enum):
     PLAYED_200_DAYS = {
         "since": 2023,
         "special": 1,
+        "secret": True,
         "title": "200 días jugados",
         "message": "*{}* acumula un total de 200 días jugados en lo que va de año.",
     }
     PLAYED_300_DAYS = {
         "since": 2023,
         "special": 2,
+        "secret": True,
         "title": "300 días jugados",
         "message": "*{}* acumula un total de 300 días jugados en lo que va de año.",
     }
     PLAYED_365_DAYS = {
         "since": 2023,
         "special": 3,
+        "secret": True,
         "title": "365 días jugados",
         "message": "*{}* acumula un total de 365 días jugados en lo que va de año.",
     }
@@ -343,6 +353,7 @@ class AchievementsElems(Enum):
     # Others
     COMPLETED_IN_A_DAY = {
         "since": 2023,
+        "secret": True,
         "title": "Del tirón",
         "message": "*{}* ha empezado y terminado _{}_ en un solo día. Sin dormir, sin pausas y sin remordimientos.",
     }
@@ -384,7 +395,7 @@ class AchievementsElems(Enum):
     # No season limit: they count the whole history of a player and are earned once (the key ends in _LIFETIME)
     PLAYED_1000_HOURS_GAME_LIFETIME = {
         "since": 2023,
-        "special": 1,
+        "special": 2,
         "title": "Una relación seria",
         "message": "*{}* lleva 1000 horas en total jugando a _{}_, sumando todas las temporadas. Esto ya no es un juego, es una relación.",
     }
@@ -498,12 +509,14 @@ class AchievementsElems(Enum):
     # have no season limit and count from 2027 (see docs/features.md)
     STORM_LIFETIME = {
         "since": 2027,
+        "special": 1,
         "secret": True,
         "title": "Jugando bajo la tormenta",
         "message": "*{}* ha seguido jugando mientras fuera caía una tormenta. Que se vaya la luz, que ya volverá.",
     }
     HORROR_FOG_LIFETIME = {
         "since": 2027,
+        "special": 2,
         "secret": True,
         "title": "Niebla en Silent Hill",
         "message": "*{}* ha jugado a _{}_ mientras la niebla cubría la ciudad. No se ve nada, pero ahí fuera tampoco.",
@@ -522,6 +535,7 @@ class AchievementsElems(Enum):
     }
     LEAP_DAY_LIFETIME = {
         "since": 2027,
+        "special": 1,
         "secret": True,
         "title": "Un día que no existe",
         "message": "*{}* ha jugado un 29 de febrero, un día que solo sale cada cuatro años. Lo ha aprovechado como se merece.",
@@ -540,12 +554,14 @@ class AchievementsElems(Enum):
     }
     LUNAR_ECLIPSE_LIFETIME = {
         "since": 2027,
+        "special": 3,
         "secret": True,
         "title": "Eclipse lunar",
         "message": "*{}* ha jugado el día de un eclipse de luna. Mientras el cielo se oscurecía, la partida seguía.",
     }
     SOLAR_ECLIPSE_LIFETIME = {
         "since": 2027,
+        "special": 3,
         "secret": True,
         "title": "Eclipse solar",
         "message": "*{}* ha jugado el día de un eclipse de sol. Con las persianas bajadas ya estaba, pero hoy había motivo.",
@@ -576,6 +592,7 @@ class AchievementsElems(Enum):
     }
     BIRTH_YEAR_GAME_LIFETIME = {
         "since": 2027,
+        "special": 1,
         "secret": True,
         "title": "De la misma quinta",
         "message": "*{}* ha jugado a _{}_, que salió el mismo año en que nació. Dos veteranos de la misma quinta.",
@@ -600,6 +617,7 @@ class AchievementsElems(Enum):
 
     HAPPY_NEW_YEAR = {
         "since": 2023,
+        "secret": True,
         "title": "Feliz año nuevo",
         "message": "*{}*"
         + " empieza el año jugando. Esperemos que haga alguna cosa más.",
@@ -608,6 +626,7 @@ class AchievementsElems(Enum):
     TEAMWORK = {
         "since": 2023,
         "special": 1,
+        "secret": True,
         "title": "Trabajo en equipo (de 4+)",
         "message": "*{}*"
         + " han demostrado que el trabajo en equipo no es un mito."
