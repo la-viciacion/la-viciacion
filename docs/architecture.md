@@ -97,7 +97,7 @@ Runs inside the API process (thread ticking every 30 s). Jobs: `weekly_summary`,
 
 ## Runtime settings (`utils/settings.py`)
 
-Table `app_settings` (global, admin-edited); keys are validated/coerced by `settings.coerce`. The Telegram token is stored encrypted (key derived from `SECRET_KEY`; rotating `SECRET_KEY` requires re-entering it) and is never returned to the panel. `.env` values (`TELEGRAM_*`) only seed the table the first time.
+Table `app_settings` (global, admin-edited); keys are validated/coerced by `settings.coerce`. The Telegram token is stored encrypted (key derived from `SECRET_KEY`; rotating `SECRET_KEY` requires re-entering it) and is never returned to the panel. The token and the two chat ids are locked: the panel only shows whether they are set and cannot change them. `.env` values (`TELEGRAM_*`) only seed the table the first time.
 
 ## Personal settings (`utils/user_settings.py`)
 

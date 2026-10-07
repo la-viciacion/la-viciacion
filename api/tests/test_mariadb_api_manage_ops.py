@@ -200,9 +200,11 @@ class SettingsTests(OpsTestCase):
             db.add(models.JobRun(job="weekly_summary", last_run_at=ago(hours=1), last_status="ok"))
             db.commit()
         body = self.admin("GET", "/settings").json()
-        self.assertEqual(body["values"]["telegram.group_id"], "-100123")
-        self.assertEqual(body["values"]["telegram.token"], {"is_set": True, "hint": "…" + TOKEN[-4:]})
+        self.assertEqual(body["values"]["telegram.group_id"], {"is_set": True, "hint": None})
+        self.assertEqual(body["values"]["telegram.admin_chat_id"], {"is_set": False, "hint": None})
+        self.assertEqual(body["values"]["telegram.token"], {"is_set": True, "hint": None})
         self.assertNotIn(TOKEN, str(body))
+        self.assertNotIn("-100123", str(body))
         self.assertEqual(body["jobs"]["weekly_summary"]["last_status"], "ok")
         self.assertEqual(body["push_devices"], {"devices": 0, "users": 0})
         self.assertEqual(body["mail"]["test_recipient"], "root@example.com")
@@ -233,8 +235,14 @@ class SettingsTests(OpsTestCase):
         self.assertEqual(refused.status_code, 400)
         self.assertIn("Generar claves", refused.json()["detail"])
 
+    def test_the_telegram_token_and_ids_cannot_be_changed_from_the_panel(self):
+        for key, value in (("telegram.token", TOKEN), ("telegram.group_id", "-100999"), ("telegram.admin_chat_id", "42")):
+            refused = self.admin("PUT", "/settings", json={"values": {key: value, "weekly.time": "10:30"}})
+            self.assertEqual(refused.status_code, 400, key)
+        self.assertEqual(self.admin("GET", "/settings").json()["values"]["weekly.time"], "09:00")
+
     def test_a_secret_is_stored_encrypted(self):
-        self.admin("PUT", "/settings", json={"values": {"telegram.token": TOKEN}})
+        self.set_settings(**{"telegram.token": TOKEN})
         stored = self.scalar("SELECT value FROM app_settings WHERE `key` = 'telegram.token'")
         self.assertNotIn(TOKEN, stored)
 

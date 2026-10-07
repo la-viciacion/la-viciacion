@@ -1210,6 +1210,8 @@ def put_settings(body: SettingsBody, admin: models.User = Depends(auth.require_a
     """Change several settings at once; nothing is stored if one of them is invalid."""
     if any(key.startswith("push.vapid") for key in body.values):
         raise HTTPException(status_code=400, detail="Las claves VAPID se generan con «Generar claves», no se escriben")
+    if any(settings.REGISTRY[key].locked for key in body.values if key in settings.REGISTRY):
+        raise HTTPException(status_code=400, detail="El token y los IDs de Telegram no se pueden cambiar desde el panel")
     try:
         changed = settings.set_values(db, body.values, user_id=admin.id)
     except ValueError as e:
