@@ -85,6 +85,11 @@ class PromptsAskForWhatTheNoticesCarryTests(unittest.TestCase):
                        "Si el mensaje no indica la media, no la menciones", "No te inventes ninguna cifra"):
             self.assertIn(wanted, text)
 
+    def test_the_completed_notice_goes_to_the_group_so_it_asks_for_the_third_person(self):
+        self.assertIn("tercera persona", self.prompt("completed_game"))
+        self.assertIn("sin dirigirte a él", self.prompt("completed_game"))
+        self.assertIn("tercera persona", self.prompt("completed_game_recommendation"))
+
     def test_completed_game_does_not_ask_for_an_average_that_may_not_be_there(self):
         self.assertNotIn("Debes añadir, además, la media", self.prompt("completed_game"))
 

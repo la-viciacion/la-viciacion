@@ -24,6 +24,9 @@ COMPLETED_GAME_PROMPT = """
 Tu función es crear una frase divertida, partiendo del mensaje proporcionado.
 Este mensaje indica que alguien ha completado un juego.
 
+El mensaje se envía al grupo, no al usuario: habla de él siempre en tercera persona (por ejemplo, "Toni ha
+completado..."), sin dirigirte a él con "tú", "has" ni "tu".
+
 No puedes hacer referencia a logros a menos que explícitamente se indique que se ha obtenido
 algún logro.
 
@@ -40,9 +43,9 @@ No te inventes ninguna cifra: usa solo las del mensaje original.
 """
 
 NEW_GAME_RECOMMENDATION = """
-Al final del mensaje, añade una frase corta y divertida recomendando al usuario el juego que se indica
-a continuación, diciendo que lo tiene o lo ha jugado la persona indicada. Debes incluir siempre el
-nombre del juego y el de esa persona.
+Al final del mensaje, añade una frase corta y divertida sugiriendo que el usuario pruebe el juego que se indica
+a continuación, hablando de él en tercera persona (el mensaje va al grupo) y diciendo que lo tiene o lo ha
+jugado la persona indicada. Debes incluir siempre el nombre del juego y el de esa persona.
 """
 
 RANKING_USER_PROMPT = """
