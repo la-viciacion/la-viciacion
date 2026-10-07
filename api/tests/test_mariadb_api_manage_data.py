@@ -500,7 +500,7 @@ class AchievementsAdminTests(ManageTestCase):
         by_key = {a["key"]: a for a in self.admin("GET", "/achievements").json()}
         self.assertTrue(by_key["PLAYED_1000_HOURS_GAME_LIFETIME"]["lifetime"])
         self.assertFalse(by_key["PLAYED_1000_HOURS_GAME"]["lifetime"])
-        self.assertEqual(sum(a["lifetime"] for a in by_key.values()), 20)
+        self.assertEqual(sum(a["lifetime"] for a in by_key.values()), 35)  # 20 that add up and 15 about the world outside the app
 
     def test_the_season_an_achievement_is_valid_from_is_listed_and_can_be_changed(self):
         by_key = {a["key"]: a for a in self.admin("GET", "/achievements").json()}

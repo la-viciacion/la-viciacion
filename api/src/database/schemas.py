@@ -37,6 +37,12 @@ class UserSettingsUpdate(BaseModel):
     timer_notice_minutes: int | None = None
     # whether the others see the user in "playing now"; None goes back to the default (shown)
     show_playing: bool | None = None
+    # the city the player lives in, as a geocoder gave it (all three, or none: null removes it); checked in the route
+    place_name: str | None = Field(default=None, max_length=255)
+    place_latitude: float | None = Field(default=None, ge=-90, le=90)
+    place_longitude: float | None = Field(default=None, ge=-180, le=180)
+    # for the birthday achievement; null removes it (the range is checked in the route)
+    birth_date: datetime.date | None = None
 
 
 class CompletionUpdate(BaseModel):
@@ -65,6 +71,7 @@ class Game(BaseModel):
     steam_id: str | None = None
     image_url: str | None = None
     genres: str | None = None
+    tags: str | None = None
     avg_time: int | None = 0
     slug: str | None = None
     rawg_id: int | None = None
@@ -79,6 +86,7 @@ class NewGame(BaseModel):
     steam_id: Optional[str | None] = None
     image_url: Optional[str | None] = None
     genres: Optional[str | None] = None
+    tags: Optional[str | None] = None
     avg_time: Optional[int | None] = None
     slug: Optional[str | None] = None
     rawg_id: Optional[int | None] = None

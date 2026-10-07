@@ -2,6 +2,10 @@ FROM python:3.14-slim-trixie
 
 WORKDIR /app
 
+# The season changes and the sessions are dated at local midnight, and the weather and sky achievements read
+# the same hours. Only a default: the TZ of the .env, when there is one, wins (see docs/configuration.md).
+ENV TZ=Europe/Madrid
+
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 

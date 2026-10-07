@@ -4,6 +4,8 @@ A NULL column, or no row at all, means "use the default", so the defaults live
 here and can change without touching anyone's data. Global, admin-edited values
 are a different thing: see settings.py (`app_settings`).
 """
+import datetime
+
 from sqlalchemy.orm import Session
 
 from ..database import models
@@ -17,6 +19,8 @@ MIN_TIMER_NOTICE_MINUTES = 10
 MAX_TIMER_NOTICE_MINUTES = 120
 DEFAULT_SHOW_PLAYING = True
 DEFAULT_FORGOTTEN_TIMER_CHANNEL = True
+PLACE_COLUMNS = ("place_name", "place_latitude", "place_longitude")
+EARLIEST_BIRTH_DATE = datetime.date(1900, 1, 1)
 
 
 def valid_forgotten_timer_hours(hours) -> bool:
@@ -26,6 +30,31 @@ def valid_forgotten_timer_hours(hours) -> bool:
 
 def valid_timer_notice_minutes(minutes) -> bool:
     return isinstance(minutes, int) and not isinstance(minutes, bool) and MIN_TIMER_NOTICE_MINUTES <= minutes <= MAX_TIMER_NOTICE_MINUTES
+
+
+def valid_place(changes: dict) -> bool:
+    """A place is its name and both coordinates, or nothing at all: the three are set together or cleared together."""
+    given = [changes.get(column) for column in PLACE_COLUMNS if column in changes]
+    if not given:
+        return True
+    return len(given) == len(PLACE_COLUMNS) and (all(value is None for value in given) or all(value is not None for value in given))
+
+
+def valid_birth_date(day, today: datetime.date | None = None) -> bool:
+    return day is None or EARLIEST_BIRTH_DATE <= day <= (today or datetime.date.today())
+
+
+def place(db: Session, user_id: int) -> tuple[float, float] | None:
+    """(latitude, longitude) of the city the user chose, or None if they have not."""
+    row = db.get(models.UserSettings, user_id)
+    if row is None or row.place_latitude is None or row.place_longitude is None:
+        return None
+    return float(row.place_latitude), float(row.place_longitude)
+
+
+def birth_date(db: Session, user_id: int) -> datetime.date | None:
+    row = db.get(models.UserSettings, user_id)
+    return None if row is None else row.birth_date
 
 
 def forgotten_timer_hours(db: Session, user_id: int) -> int:
@@ -72,6 +101,10 @@ def get(db: Session, user_id: int) -> dict:
         "show_playing": None if row is None or row.show_playing is None else bool(row.show_playing),
         "forgotten_timer_telegram": None if row is None or row.forgotten_timer_telegram is None else bool(row.forgotten_timer_telegram),
         "forgotten_timer_push": None if row is None or row.forgotten_timer_push is None else bool(row.forgotten_timer_push),
+        "place_name": row.place_name if row else None,
+        "place_latitude": None if row is None or row.place_latitude is None else float(row.place_latitude),
+        "place_longitude": None if row is None or row.place_longitude is None else float(row.place_longitude),
+        "birth_date": row.birth_date.isoformat() if row is not None and row.birth_date is not None else None,
         "defaults": {
             "forgotten_timer_telegram": DEFAULT_FORGOTTEN_TIMER_CHANNEL,
             "forgotten_timer_push": DEFAULT_FORGOTTEN_TIMER_CHANNEL,
@@ -94,7 +127,7 @@ def update(db: Session, user_id: int, changes: dict) -> dict:
         row.timer_notice_minutes = changes["timer_notice_minutes"]
     if "show_playing" in changes:
         row.show_playing = changes["show_playing"]
-    for column in ("forgotten_timer_telegram", "forgotten_timer_push"):
+    for column in ("forgotten_timer_telegram", "forgotten_timer_push", *PLACE_COLUMNS, "birth_date"):
         if column in changes:
             setattr(row, column, changes[column])
     db.commit()

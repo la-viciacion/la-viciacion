@@ -72,6 +72,13 @@
 
 #pfPush { margin-top: 12px; }
 
+#pfAbout { display: flex; flex-direction: column; gap: 12px; }
+.pf-place-current { font-weight: 600; color: var(--text-primary); }
+.pf-place-search { display: flex; gap: 8px; }
+.pf-place-search input { flex: 1; min-width: 0; }
+.pf-place-results { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.pf-place-results .pf-btn { width: 100%; text-align: left; }
+
 /* A checkbox goes to the right of the text that says what it does */
 .pf-form label.pf-check { flex-direction: row; align-items: center; justify-content: space-between; gap: 16px; cursor: pointer; }
 

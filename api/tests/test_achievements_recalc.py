@@ -30,6 +30,10 @@ class RecalculationTests(unittest.TestCase):
         self.db.commit()
         Achievements().populate_achievements(self.db)
         self.db.query(models.Achievement).update({"valid_from_season": 2023, "special": 0, "secret": False})  # some are special or secret: not what is tested here
+        # the ones about the world outside the app (a full moon, an eclipse...) would fall on any date these tests play on
+        self.db.query(models.Achievement).filter(models.Achievement.key.in_([ach.name for ach in ach_module.EXTERNAL_LIFETIME])).update(
+            {"active": False}, synchronize_session=False
+        )
         self.db.commit()
         self.sent = mock.AsyncMock()
         patcher = mock.patch.object(ach_module.utils, "send_message", self.sent)

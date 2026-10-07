@@ -13,7 +13,7 @@ from ..utils import actions as actions
 from ..utils import my_utils as utils
 from ..utils.achievements import AchievementsElems, first_season, is_lifetime
 from ..utils.logger import LogManager
-from ..utils import seasons, streaks
+from ..utils import external_events, seasons, streaks, user_settings, weather
 
 log_manager = LogManager()
 logger = log_manager.get_logger()
@@ -104,6 +104,11 @@ LIFETIME_HOURS_IN_A_GAME = ((E.PLAYED_1000_HOURS_GAME_LIFETIME, 1000),)
 PRODIGAL_GAP_DAYS = 30
 WORK_WEEK_HOURS = 40
 ALL_TOGETHER_PLAYERS = 3
+# The achievements about the world outside the app (key ending in _LIFETIME too): they are not about how much was
+# played but about when and what, so they have no threshold tables. The ones of a date are in external_events.DAYS.
+DATE_ACHIEVEMENTS = tuple(E[key] for key in external_events.DAYS)
+WEATHER_ACHIEVEMENTS = (E.STORM_LIFETIME, E.HORROR_FOG_LIFETIME)
+EXTERNAL_LIFETIME = (*DATE_ACHIEVEMENTS, *WEATHER_ACHIEVEMENTS, E.ARCHAEOLOGIST_LIFETIME, E.BIRTH_YEAR_GAME_LIFETIME)
 HOURS_IN_A_GAME = (
     (E.PLAYED_100_HOURS_GAME, 100),
     (E.PLAYED_500_HOURS_GAME, 500),
@@ -128,6 +133,13 @@ class Award(NamedTuple):
     game_id: str | None
 
 
+class Played(NamedTuple):
+    """A session, or the timer that has just started, as the checks about the outside world see it."""
+
+    game_id: str
+    start: datetime.datetime
+
+
 class Achievements:
     """The checks of every achievement.
 
@@ -140,12 +152,20 @@ class Achievements:
     """
 
     def __init__(
-        self, silent: bool = False, season: int | None = None, collected: list | None = None, since: int | None = None
+        self,
+        silent: bool = False,
+        season: int | None = None,
+        collected: list | None = None,
+        since: int | None = None,
+        undecided: set | None = None,
     ) -> None:
         self.silent = silent
         self.season = season
         self.collected = collected
         self.since = since
+        # with `collected`: the keys a check could not decide (the weather service did not answer), which a
+        # recalculation must leave as they are instead of revoking them
+        self.undecided = undecided
 
     @property
     def lifetime(self) -> bool:
@@ -169,7 +189,9 @@ class Achievements:
             .all()
         )
         return [
-            Achievements(silent=self.silent, season=seasons.ALL, since=since, collected=self.collected)
+            Achievements(
+                silent=self.silent, season=seasons.ALL, since=since, collected=self.collected, undecided=self.undecided
+            )
             for (since,) in sorted(starts)
         ]
 
@@ -705,6 +727,129 @@ class Achievements:
         names = ", ".join(player.name for player in playing).rsplit(",", 1)
         msg = utils.get_ach_message(ach, user=" y".join(names))
         await self._announce(db, ach, new, msg, silent, self.get_image(db, ach.name)[0])
+
+    def _undecided(self, achievements) -> None:
+        """Note that these could not be told now, for a recalculation not to take them away."""
+        if self.undecided is not None:
+            self.undecided.update(ach.name for ach in achievements)
+
+    def _pending(self, db: Session, user: models.User, achievements) -> list:
+        """The achievements of the list the user still has to earn here (the ones that are on, valid and not theirs)."""
+        done = self.achieved_keys(db, user.id, [ach.name for ach in achievements])
+        return [ach for ach in achievements if ach.name not in done]
+
+    def _played(self, db: Session, user: models.User, played: list | None) -> list:
+        """What the outside-world checks look through: the session or timer that has just started (`played`, from
+        the moment a timer starts) or every finished session of the user, oldest first. Only what began from the
+        season this view counts from."""
+        if played is None:
+            return time_entries.get_sessions_since(db, user.id, self.since)
+        return [one for one in played if one.start.year >= (self.since or 0)]
+
+    async def external_days(self, db: Session, user: models.User, silent: bool = False, played: list | None = None):
+        """The achievements of a day outside the app (a festivity, a birthday, a full moon, an eclipse, a solstice...):
+        a session or timer that started on the day, of any length. The first one earns it, dated that day; the ones
+        that ask for a kind of game (Star Wars on the 4th of May) name it."""
+        pending = self._pending(db, user, DATE_ACHIEVEMENTS)
+        sessions = self._played(db, user, played) if pending else []
+        if not sessions:
+            return
+        born = user_settings.birth_date(db, user.id)
+        years = range(min(session.start.year for session in sessions), max(session.start.year for session in sessions) + 1)
+        names = {}
+        if any(ach.name in external_events.GAME_RULES for ach in pending):
+            names = {
+                game_id: (name, tags)
+                for game_id, name, tags in db.query(models.Game.id, models.Game.name, models.Game.tags).filter(
+                    models.Game.id.in_({session.game_id for session in sessions})
+                )
+            }
+        for ach in pending:
+            days = external_events.days_of(ach.name, years, born)
+            rule = external_events.GAME_RULES.get(ach.name)
+            for session in sessions:
+                if session.start.date() not in days or (rule is not None and not rule(*names.get(session.game_id, (None, None)))):
+                    continue
+                await self._award(
+                    db, user, ach, silent, date=str(session.start.date()), game_id=session.game_id if rule else None
+                )
+                break
+
+    async def weather(self, db: Session, user: models.User, silent: bool = False, played: list | None = None):
+        """A thunderstorm at the hour a session or timer started, and fog while it is a horror game, at the city the
+        player chose. Open-Meteo says what the weather was; if it cannot be reached nothing is decided now."""
+        pending = self._pending(db, user, WEATHER_ACHIEVEMENTS)
+        place = user_settings.place(db, user.id) if pending else None
+        sessions = self._played(db, user, played) if place else []
+        if not sessions:
+            return
+        try:
+            codes = weather.codes_for_days(db, *place, {session.start.date() for session in sessions})
+        except weather.WeatherUnavailable:
+            self._undecided(pending)
+            return
+        horror = {
+            game_id
+            for game_id, name, tags in db.query(models.Game.id, models.Game.name, models.Game.tags).filter(
+                models.Game.id.in_({session.game_id for session in sessions})
+            )
+            if external_events.is_horror(name, tags)
+        }
+        for ach in pending:
+            for session in sessions:
+                if ach is E.STORM_LIFETIME:
+                    found = weather.at(codes, session.start, weather.THUNDERSTORM)
+                else:
+                    found = session.game_id in horror and weather.at(codes, session.start, weather.FOG)
+                if found:
+                    await self._award(
+                        db, user, ach, silent, date=str(session.start),
+                        game_id=session.game_id if ach is E.HORROR_FOG_LIFETIME else None,
+                    )
+                    break
+
+    async def archaeologist(self, db: Session, user: models.User, silent: bool = False, played: list | None = None):
+        """A session or timer of a game that was 25 years old or more the day it started (a game with no release
+        date never counts). Dated that moment, naming the game."""
+        if not self._pending(db, user, (E.ARCHAEOLOGIST_LIFETIME,)):
+            return
+        sessions = self._played(db, user, played)
+        releases = self._releases(db, sessions)
+        for session in sessions:
+            if external_events.is_archaeological(releases.get(session.game_id), session.start.date()):
+                await self._award(
+                    db, user, E.ARCHAEOLOGIST_LIFETIME, silent, date=str(session.start), game_id=session.game_id
+                )
+                return
+
+    async def birth_year_game(self, db: Session, user: models.User, silent: bool = False, played: list | None = None):
+        """A session or timer of a game that came out the year the player was born (they need a birth date, and
+        the game a release date). Dated that moment, naming the game."""
+        if not self._pending(db, user, (E.BIRTH_YEAR_GAME_LIFETIME,)):
+            return
+        born = user_settings.birth_date(db, user.id)
+        if born is None:
+            return
+        sessions = self._played(db, user, played)
+        releases = self._releases(db, sessions)
+        for session in sessions:
+            release = releases.get(session.game_id)
+            if release is not None and release.year == born.year:
+                await self._award(
+                    db, user, E.BIRTH_YEAR_GAME_LIFETIME, silent, date=str(session.start), game_id=session.game_id
+                )
+                return
+
+    @staticmethod
+    def _releases(db: Session, sessions: list) -> dict:
+        """{game id: release date} of the games of these sessions that have one."""
+        if not sessions:
+            return {}
+        return dict(
+            db.query(models.Game.id, models.Game.release_date).filter(
+                models.Game.id.in_({session.game_id for session in sessions}), models.Game.release_date.isnot(None)
+            )
+        )
 
     async def timer_started(
         self,

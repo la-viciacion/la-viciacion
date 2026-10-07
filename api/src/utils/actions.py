@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from ..config import Config
 from ..crud import games, rankings, time_entries, users, wishlist
-from ..crud.achievements import Achievements
+from ..crud.achievements import Achievements, Played
 from ..database import models, schemas
 from . import my_utils as utils
 from . import push, rawg_sync
@@ -68,11 +68,18 @@ async def check_user(
     await checks.release_day(db, user, silent)
 
 
-async def check_user_lifetime(db: Session, user: models.User, silent: bool = False, collected: list | None = None):
+async def check_user_lifetime(
+    db: Session,
+    user: models.User,
+    silent: bool = False,
+    collected: list | None = None,
+    undecided: set | None = None,
+):
     """The achievements with no season limit (their key ends in _LIFETIME): worked out over the history from the
-    season each begins to count from. With `collected` (a list) it only notes what the user deserves. It costs
-    nothing while none of them is switched on and valid."""
-    base = achievements if collected is None else Achievements(silent=True, collected=collected)
+    season each begins to count from. With `collected` (a list) it only notes what the user deserves, and in
+    `undecided` the keys that could not be told (the weather service was down). It costs nothing while none of
+    them is switched on and valid."""
+    base = achievements if collected is None else Achievements(silent=True, collected=collected, undecided=undecided)
     for view in base.lifetime_views(db):
         days = time_entries.get_played_days(db, user.id, season=seasons.ALL, since=view.since)
         await view.user_played_total_days(db, user, days, silent=silent)
@@ -80,6 +87,10 @@ async def check_user_lifetime(db: Session, user: models.User, silent: bool = Fal
         await view.user_played_total_time(db, user, silent=silent)
         await view.user_played_total_games(db, user, silent=silent)
         await view.user_completed_total_games(db, user, silent=silent)
+        await view.external_days(db, user, silent=silent)
+        await view.weather(db, user, silent=silent)
+        await view.archaeologist(db, user, silent=silent)
+        await view.birth_year_game(db, user, silent=silent)
 
 
 async def check_users(
@@ -185,7 +196,7 @@ def after_timer_start(user_id: int, start_time: datetime.datetime, new_game_id: 
 
     Only what a running timer can unlock is checked here (the rest needs a finished
     session and is checked when it stops): the time of day and the date it started at
-    (early riser, nocturnal, new year, the game's release day) and teamwork and "all together", which count the
+    (early riser, nocturnal, new year, the game's release day, and the achievements about the world outside the app) and teamwork and "all together", which count the
     timers running right now. `new_game_id` is set when it is the
     first time the user plays that game this season: the group hears about it here, so the
     request that started the timer does not wait for the notification.
@@ -206,8 +217,14 @@ def after_timer_start(user_id: int, start_time: datetime.datetime, new_game_id: 
                         await users.announce_new_game(db, user, game, start_time.date(), silent=False)
                 await achievements.timer_started(db, user, start_time, game_id)
                 await achievements.user_played_total_games(db, user)
+                started = [Played(game_id, start_time)] if game_id is not None else []
                 for view in achievements.lifetime_views(db):
                     await view.user_played_total_games(db, user)
+                    # the world outside the app: the day, the sky, the weather and the age of the game at this very start
+                    await view.external_days(db, user, played=started)
+                    await view.weather(db, user, played=started)
+                    await view.archaeologist(db, user, played=started)
+                    await view.birth_year_game(db, user, played=started)
                 if game_id is not None:
                     await achievements.all_together(db, game_id, silent=False)
             await achievements.teamwork(db, silent=False)
