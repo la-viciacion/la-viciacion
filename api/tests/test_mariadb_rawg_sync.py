@@ -85,8 +85,8 @@ class SyncTestCase(ApiTestCase):
             patcher.start()
             self.addCleanup(patcher.stop)
 
-    def sync(self, max_calls=1000, overwrite=False):
-        self.assertTrue(rawg_sync.start(max_calls, overwrite))
+    def sync(self, max_calls=1000, overwrite=False, max_games=None):
+        self.assertTrue(rawg_sync.start(max_calls, overwrite, max_games))
         return rawg_sync.status()
 
     def game_row(self, game_id):
@@ -250,6 +250,36 @@ class SyncRunTests(SyncTestCase):
         self.assertEqual((status["stop_reason"], status["updated"]), ("max_calls", 1))
         self.assertEqual(self.game_row("often").rawg_id, 2)
         self.assertIsNone(self.game_row("rarely").rawg_id)
+
+    def known_games(self, *names):
+        for rawg_id, name in enumerate(names, start=1):
+            self.game(name.lower(), name)
+            self.rawg.search_results[name.lower()] = [rawg_game(rawg_id, name)]
+            # tags too: without them the game would still count as missing basic info
+            self.rawg.details[rawg_id] = rawg_game(rawg_id, name, tags=[{"name": "Singleplayer", "language": "eng"}])
+
+    def test_a_game_limit_takes_the_first_ones_alphabetically_whatever_their_sessions(self):
+        self.known_games("charlie", "Bravo", "alpha", "Delta")  # mixed case: "Bravo" < "alpha" only without case folding
+        self.user("ana")
+        self.session(self.scalar("SELECT id FROM users"), "charlie", datetime.datetime(2026, 3, 1, 8), 30)  # the most played one
+        status = self.sync(max_games=2)
+        self.assertEqual((status["total"], status["processed"], status["max_games"]), (2, 2, 2))
+        self.assertEqual([self.game_row(g).rawg_id is not None for g in ("alpha", "bravo", "charlie", "delta")], [True, True, False, False])
+
+    def test_a_second_run_leaves_out_the_games_that_already_have_their_basic_info(self):
+        self.known_games("Alpha", "Bravo", "Charlie")
+        self.assertEqual(self.sync(max_games=2)["total"], 2)
+        second = self.sync(max_games=2)
+        self.assertEqual((second["total"], second["processed"]), (1, 1))
+        self.assertIsNotNone(self.game_row("charlie").rawg_id)
+
+    def test_the_estimate_counts_only_the_games_a_limit_would_process(self):
+        self.known_games("Alpha", "Bravo", "Charlie")
+        with database.SessionLocal() as db:
+            everything, limited = rawg_sync.estimate(db), rawg_sync.estimate(db, max_games=1)
+        self.assertEqual((everything["pending_games"], limited["pending_games"]), (3, 1))
+        self.assertEqual((everything["total_games"], limited["total_games"]), (3, 3))
+        self.assertLess(limited["estimated_calls"], everything["estimated_calls"])
 
     def test_cancelling_during_a_run_stops_it_before_the_next_game(self):
         self.game("a", "A")

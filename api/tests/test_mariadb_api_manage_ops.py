@@ -172,7 +172,17 @@ class RawgSyncTests(OpsTestCase):
              mock.patch.object(rawg_sync, "status", return_value={"state": "running"}):
             response = self.admin("POST", "/rawg-sync/start", json={"confirm": "SINCRONIZAR", "max_calls": 50, "overwrite": True})
         self.assertEqual((response.status_code, response.json()), (202, {"state": "running"}))
-        start.assert_called_once_with(50, True)
+        start.assert_called_once_with(50, True, None)
+
+    def test_the_game_limit_reaches_the_run_and_must_be_at_least_one(self):
+        with mock.patch.object(rawg_sync, "start", return_value=True) as start, \
+             mock.patch.object(rawg_sync, "status", return_value={"state": "running"}):
+            self.admin("POST", "/rawg-sync/start", json={"confirm": "SINCRONIZAR", "max_calls": 50, "max_games": 10})
+        start.assert_called_once_with(50, False, 10)
+        for games in (0, -3):
+            self.assertEqual(self.admin("POST", "/rawg-sync/start", json={"confirm": "SINCRONIZAR", "max_games": games}).status_code, 400)
+            self.assertEqual(self.admin("GET", "/rawg-sync/estimate", params={"max_games": games}).status_code, 400)
+        self.assertEqual(self.admin("GET", "/rawg-sync/estimate", params={"max_games": 1}).status_code, 200)
 
     def test_cancelling_says_whether_something_was_running(self):
         with mock.patch.object(rawg_sync, "cancel", return_value=True):

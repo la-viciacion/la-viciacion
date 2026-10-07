@@ -504,9 +504,11 @@ RAWG_SYNC_PHRASE = "SINCRONIZAR"
 
 
 @router.get("/rawg-sync/estimate")
-def rawg_sync_estimate(overwrite: bool = False, db: Session = Depends(get_db)):
+def rawg_sync_estimate(overwrite: bool = False, max_games: Optional[int] = None, db: Session = Depends(get_db)):
     """How many games/calls a sync would take. Makes no RAWG request."""
-    return rawg_sync.estimate(db, overwrite)
+    if max_games is not None and max_games < 1:
+        raise HTTPException(status_code=400, detail="max_games debe ser al menos 1")
+    return rawg_sync.estimate(db, overwrite, max_games)
 
 
 @router.get("/rawg-sync/status")
@@ -518,6 +520,7 @@ class RawgSyncBody(BaseModel):
     confirm: str                       # must equal RAWG_SYNC_PHRASE (the panel asks for it twice)
     max_calls: int = 2000
     overwrite: bool = False
+    max_games: Optional[int] = None    # only the first N pending games, alphabetically; None = all of them
 
 
 @router.post("/rawg-sync/start", status_code=202)
@@ -526,8 +529,10 @@ def rawg_sync_start(body: RawgSyncBody):
         raise HTTPException(status_code=400, detail="Confirmación incorrecta")
     if not 1 <= body.max_calls <= 20000:
         raise HTTPException(status_code=400, detail="max_calls debe estar entre 1 y 20000")
+    if body.max_games is not None and body.max_games < 1:
+        raise HTTPException(status_code=400, detail="max_games debe ser al menos 1")
     try:
-        started = rawg_sync.start(body.max_calls, body.overwrite)
+        started = rawg_sync.start(body.max_calls, body.overwrite, body.max_games)
     except RuntimeError as e:
         raise HTTPException(status_code=400, detail=str(e))
     if not started:
