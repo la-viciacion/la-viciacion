@@ -66,7 +66,7 @@ Single `.env` (template: `.env.template`; every variable and what it does: [conf
 
 - Strong unique values for `GOD_ADMIN_PASS`, `SECRET_KEY`, `MARIADB_*`.
 - `CORS_ORIGINS` is a JSON list with the real public origin(s).
-- `TZ` set (drives the current season and the scheduled job times).
+- `TZ` set (drives the current season and the scheduled job times; the API image defaults it to `Europe/Madrid`, and the one in `.env` wins).
 - `ENVIRONMENT=production`; Sentry DSNs if wanted.
 - Password recovery (optional) needs `PUBLIC_URL` (the public address of the app, e.g. `https://lavi.example.com`) and an SMTP server: `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURITY`, `SMTP_EMAIL` (From), `SMTP_USER`/`SMTP_PASS`. Without them the feature answers "not configured". Migration `017_password_resets` adds its table. Try it once after deploying: the **Correo** card of the admin panel (Sistema) shows the state and sends a test email to your own account (your admin user needs an email); then ask for a link from the login page. Check the spam folder of a new sender.
 - Push notifications (optional) need HTTPS in front of the app; their VAPID keys are generated from the panel, not set in `.env`.

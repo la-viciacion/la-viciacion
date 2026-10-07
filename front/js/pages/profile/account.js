@@ -4,7 +4,8 @@ import { PASSWORD_HINT, isValidPassword } from '../../lib/password.js';
 import { flash } from './flash.js';
 
 // `user` is the session user: it is updated in place after saving so the rest of the app sees the change.
-export function initAccount(main, { user, userPath }) {
+// `about` gives the city and birth date block (about.js, null until it has loaded), which is saved with the rest.
+export function initAccount(main, { user, userPath, about = () => null }) {
   main.querySelector('#pfData').addEventListener('submit', async (e) => {
     e.preventDefault();
     const form = e.currentTarget;
@@ -14,6 +15,7 @@ export function initAccount(main, { user, userPath }) {
     const changes = { name: form.name.value, telegram_id: telegram === '' ? null : Number(telegram) };
     if (form.email.value.trim()) changes.email = form.email.value;
     try {
+      await about()?.save();
       const updated = await api(userPath('profile'), jsonRequest('PATCH', changes));
       Object.assign(user, { name: updated.name, email: updated.email, telegram_id: updated.telegram_id });
       const shown = updated.name || updated.username;

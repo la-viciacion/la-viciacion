@@ -210,7 +210,7 @@ class SyncRunTests(SyncTestCase):
         self.assertEqual(self.rawg.calls, ["/games/101"])
 
     def test_a_game_with_everything_filled_is_not_even_looked_at(self):
-        self.game("full", "Full", rawg_id=5, slug="full", dev="Dev", genres="RPG", image_url="https://i", steam_id="1",
+        self.game("full", "Full", rawg_id=5, slug="full", dev="Dev", genres="RPG", tags="Singleplayer", image_url="https://i", steam_id="1",
                   release_date=datetime.date(2020, 1, 1))
         status = self.sync()
         self.assertEqual((status["total"], status["calls"], self.rawg.calls), (0, 0, []))

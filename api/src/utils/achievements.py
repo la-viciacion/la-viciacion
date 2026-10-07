@@ -494,6 +494,99 @@ class AchievementsElems(Enum):
         "message": "*{}* ha completado 1000 juegos distintos en total, sumando todas las temporadas. Mil juegos terminados. Ya no queda nada por ver.",
     }
 
+    # About the world outside the app: the weather, the calendar, the sky and the age of a game. All of them are hidden,
+    # have no season limit and count from 2027 (see docs/features.md)
+    STORM_LIFETIME = {
+        "since": 2027,
+        "secret": True,
+        "title": "Jugando bajo la tormenta",
+        "message": "*{}* ha seguido jugando mientras fuera caía una tormenta. Que se vaya la luz, que ya volverá.",
+    }
+    HORROR_FOG_LIFETIME = {
+        "since": 2027,
+        "secret": True,
+        "title": "Niebla en Silent Hill",
+        "message": "*{}* ha jugado a _{}_ mientras la niebla cubría la ciudad. No se ve nada, pero ahí fuera tampoco.",
+    }
+    STAR_WARS_DAY_LIFETIME = {
+        "since": 2027,
+        "secret": True,
+        "title": "Que la Fuerza te acompañe",
+        "message": "*{}* ha celebrado el 4 de mayo jugando a _{}_. May the Fourth be with you.",
+    }
+    MARIO_DAY_LIFETIME = {
+        "since": 2027,
+        "secret": True,
+        "title": "Mario Day",
+        "message": "*{}* ha celebrado el 10 de marzo (MAR10) jugando a _{}_. ¡Wahoo!",
+    }
+    LEAP_DAY_LIFETIME = {
+        "since": 2027,
+        "secret": True,
+        "title": "Un día que no existe",
+        "message": "*{}* ha jugado un 29 de febrero, un día que solo sale cada cuatro años. Lo ha aprovechado como se merece.",
+    }
+    BIRTHDAY_LIFETIME = {
+        "since": 2027,
+        "secret": True,
+        "title": "Cumpleaños feliz",
+        "message": "*{}* cumple años y lo celebra jugando, que es lo que de verdad le hace ilusión. ¡Felicidades!",
+    }
+    FULL_MOON_LIFETIME = {
+        "since": 2027,
+        "secret": True,
+        "title": "Luna llena",
+        "message": "*{}* ha jugado un día de luna llena. Sin hombres lobo a la vista, solo un mando y mucho tiempo.",
+    }
+    LUNAR_ECLIPSE_LIFETIME = {
+        "since": 2027,
+        "secret": True,
+        "title": "Eclipse lunar",
+        "message": "*{}* ha jugado el día de un eclipse de luna. Mientras el cielo se oscurecía, la partida seguía.",
+    }
+    SOLAR_ECLIPSE_LIFETIME = {
+        "since": 2027,
+        "secret": True,
+        "title": "Eclipse solar",
+        "message": "*{}* ha jugado el día de un eclipse de sol. Con las persianas bajadas ya estaba, pero hoy había motivo.",
+    }
+    SPRING_EQUINOX_LIFETIME = {
+        "since": 2027,
+        "secret": True,
+        "title": "Equinoccio de primavera",
+        "message": "*{}* ha jugado el día del equinoccio de primavera. Día y noche iguales de largos, pero las horas de juego nunca salen iguales.",
+    }
+    SUMMER_SOLSTICE_LIFETIME = {
+        "since": 2027,
+        "secret": True,
+        "title": "Solsticio de verano",
+        "message": "*{}* ha jugado el día más largo del año, el del solsticio de verano. Más luz solar que desaprovechar.",
+    }
+    AUTUMN_EQUINOX_LIFETIME = {
+        "since": 2027,
+        "secret": True,
+        "title": "Equinoccio de otoño",
+        "message": "*{}* ha jugado el día del equinoccio de otoño. Llegan las tardes de manta y mando.",
+    }
+    WINTER_SOLSTICE_LIFETIME = {
+        "since": 2027,
+        "secret": True,
+        "title": "Solsticio de invierno",
+        "message": "*{}* ha jugado la noche más larga del año, la del solsticio de invierno. Más oscuridad para jugar.",
+    }
+    BIRTH_YEAR_GAME_LIFETIME = {
+        "since": 2027,
+        "secret": True,
+        "title": "De la misma quinta",
+        "message": "*{}* ha jugado a _{}_, que salió el mismo año en que nació. Dos veteranos de la misma quinta.",
+    }
+    ARCHAEOLOGIST_LIFETIME = {
+        "since": 2027,
+        "secret": True,
+        "title": "Arqueólogo",
+        "message": "*{}* ha desenterrado _{}_, un juego con 25 años (o más) a sus espaldas. Con brocha, paciencia y un emulador.",
+    }
+
     JUST_IN_TIME = {
         "since": 2023,
         "special": 1,

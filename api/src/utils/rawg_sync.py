@@ -147,11 +147,12 @@ def _details(client: _Client, rawg_id: int, need_steam: bool) -> dict:
         "release_date": released,
         "image_url": d.get("background_image"),
         "genres": ",".join(g["name"] for g in d.get("genres") or [] if g.get("name")),
+        "tags": ",".join(t["name"] for t in d.get("tags") or [] if t.get("name") and t.get("language") == "eng"),
         "steam_id": steam,
     }
 
 
-FIELDS = ("slug", "dev", "release_date", "image_url", "genres", "steam_id")
+FIELDS = ("slug", "dev", "release_date", "image_url", "genres", "tags", "steam_id")
 
 
 def _apply(game: models.Game, det: dict, overwrite: bool) -> list[str]:

@@ -9,6 +9,7 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     LargeBinary,
+    Numeric,
     SmallInteger,
     String,
     Text,
@@ -74,6 +75,13 @@ class UserSettings(Base):
     timer_notice_minutes = Column(SmallInteger, nullable=True)
     # whether the others see this player in "playing now" (NULL = the default: shown)
     show_playing = Column(Boolean, nullable=True)
+    # where the player lives: a city chosen from a geocoder's answer (never a GPS fix), for the weather achievements.
+    # All three are set or none is (checked in utils/user_settings.py)
+    place_name = Column(String(255), nullable=True)
+    place_latitude = Column(Numeric(8, 5), nullable=True)
+    place_longitude = Column(Numeric(8, 5), nullable=True)
+    # for the birthday achievement; only the player and the admins can read it
+    birth_date = Column(Date, nullable=True)
     updated_at = Column(DateTime, server_default=text("CURRENT_TIMESTAMP"), onupdate=text("CURRENT_TIMESTAMP"))
 
 
@@ -87,6 +95,8 @@ class Game(Base):
     steam_id = Column(String(255))
     image_url = Column(String(255))
     genres = Column(String(255))
+    # RAWG's tags, comma separated ("Horror, Singleplayer, ..."): what the genres leave out (there is no Horror genre)
+    tags = Column(Text, nullable=True)
     avg_time = Column(Integer)
     slug = Column(String(255))
     rawg_id = Column(Integer, nullable=True, index=True)
@@ -147,6 +157,21 @@ class GameScore(Base):
         UniqueConstraint("user_id", "game_id", name="uq_game_scores_user_game"),
         CheckConstraint("score BETWEEN 1 AND 100", name="ck_game_scores_range"),
     )
+
+
+class WeatherDay(Base):
+    """The weather of one past day at one place, kept so that a day is asked for to Open-Meteo only once.
+
+    It is outside data that never changes after the day is over, not something derived from the sessions: that is why
+    it can be stored. `codes` are the 24 WMO weather codes of the hours of the day, comma separated."""
+
+    __tablename__ = "weather_days"
+
+    # the place rounded to two decimals ("40.42,-3.70"): about a kilometre, and players in one city share it
+    place = Column(String(24), primary_key=True)
+    day = Column(Date, primary_key=True)
+    codes = Column(String(120), nullable=False)
+    fetched_at = Column(DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP"))
 
 
 class Achievement(Base):

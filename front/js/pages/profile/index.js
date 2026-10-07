@@ -10,6 +10,7 @@ import { html, mount } from '../../lib/html.js';
 import { PASSWORD_HINT } from '../../lib/password.js';
 import * as seasons from '../../lib/seasons.js';
 import { achievementsView, sectionTitle, seasonName, seasonPills, seasonSuffix, statsView, titleView, topView } from '../../ui/profile-summary.js';
+import { initAbout } from './about.js';
 import { initAccount } from './account.js';
 import { initAvatar } from './avatar.js';
 import { initData } from './data.js';
@@ -35,6 +36,7 @@ let main;
 let user;
 let avatarUrl;
 let opened; // tabs already initialised
+let aboutYou; // the city and birth date inside "Mis datos" (about.js): saved with the rest of the form
 let onLogout;
 let shown; // season asked for: a year, or seasons.ALL; null = the running one
 let onScreen; // season on screen once resolved: a year, or seasons.ALL
@@ -83,6 +85,7 @@ function showTab(id) {
     initNotifications(main.querySelector('#pfNotifs'), { path: userPath('settings') }).catch(() => {});
     if (SHOW_PLAYING_OPTION) initPreferences(main.querySelector('#pfPrefs'), { path: userPath('settings') }).catch(() => {});
     initPush(main.querySelector('#pfPush')).catch(() => {}); // optional: never breaks the page
+    initAbout(main.querySelector('#pfAbout'), { path: userPath('settings') }).then((about) => { aboutYou = about; }).catch(() => {});
     initData(main.querySelector('#pfDataFiles'), { username: user.username });
   }
 }
@@ -192,6 +195,7 @@ function draw(d) {
       <label>Email (con el que inicias sesión)<input class="adm-input" type="email" name="email" value="${d.user.email || ''}" autocomplete="email" /></label>
       <label>Telegram ID<input class="adm-input" type="number" name="telegram_id" value="${d.user.telegram_id ?? ''}" /></label>
       <div class="pf-sub">Solo cámbialo si sabes lo que haces: es el número con el que el bot te reconoce y te escribe. Uno incorrecto puede dejarte sin avisos o enviárselos a otra persona.</div>
+      <div id="pfAbout" class="pf-form"></div>
       <div class="pf-msg" id="pfDataMsg" role="status"></div>
       <div><button class="pf-btn primary" type="submit">Guardar datos</button></div>
     </form>
@@ -235,5 +239,5 @@ function draw(d) {
   main.querySelector('#pfSeasons').addEventListener('click', onSeason);
   main.querySelector('#pfLogout').addEventListener('click', () => onLogout());
   initAvatar(main, { path: userPath('avatar') });
-  initAccount(main, { user, userPath });
+  initAccount(main, { user, userPath, about: () => aboutYou });
 }

@@ -8,6 +8,14 @@ Copy `.env.template` to `.env` and fill in your values. That single file is read
 
 `docker-compose.yml` and the `Dockerfile`s are ready to use as they are; they contain no secrets. The images hold no configuration either: everything arrives at run time through `.env` (see [deployment.md](deployment.md#images)).
 
+## Time zone
+
+The API image sets `TZ=Europe/Madrid` as a default, so a deployment that does not mention it still runs on Madrid time (the season changes and the sessions are dated at its midnight, and the weather and sky achievements read the same hours). A `TZ` in `.env` (the template has the same value) overrides it, and it is also the zone asked of Open-Meteo for the weather.
+
+## Services without a key
+
+The weather and the search of a city in the profile use [Open-Meteo](https://open-meteo.com), a public API that needs no key, account or setting: there is nothing to configure, only outbound HTTPS from the API container. If it cannot be reached the city search answers a 503 and the weather achievements wait for the next check.
+
 ## Users and login
 
 - Accounts are created by an admin in the panel (Usuarios, "Nuevo usuario"); there is no public sign-up. The admin sets the initial password and shares it with the user, who can change it from their profile.

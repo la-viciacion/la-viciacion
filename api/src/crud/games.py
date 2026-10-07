@@ -276,6 +276,7 @@ def _store_game(db: Session, game: schemas.NewGame, game_info: schemas.NewGame) 
         image_url=game_info.image_url,
         release_date=game_info.release_date,
         genres=game_info.genres,
+        tags=game_info.tags,
         avg_time=game_info.avg_time,
         slug=game_info.slug,
         rawg_id=game_info.rawg_id,

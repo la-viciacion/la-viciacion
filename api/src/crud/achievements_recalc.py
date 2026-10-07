@@ -104,11 +104,13 @@ async def _expected(db: Session, user: models.User, season: int) -> dict[str, Aw
     return {award.key: award for award in collected}
 
 
-async def _expected_lifetime(db: Session, user: models.User) -> dict[str, Award]:
-    """What the user deserves of the achievements with no season limit: {achievement key: Award}."""
+async def _expected_lifetime(db: Session, user: models.User) -> tuple[dict[str, Award], set[str]]:
+    """What the user deserves of the achievements with no season limit: ({achievement key: Award}, the keys that
+    could not be told, because the weather service did not answer, and are left as they are)."""
     collected: list[Award] = []
-    await actions.check_user_lifetime(db, user, silent=True, collected=collected)
-    return {award.key: award for award in collected}
+    undecided: set[str] = set()
+    await actions.check_user_lifetime(db, user, silent=True, collected=collected, undecided=undecided)
+    return {award.key: award for award in collected}, undecided
 
 
 def _diff(user: models.User, expected: dict[str, Award], stored: list, titles: dict[str, str], allowed: set[str]) -> list[Change]:
@@ -186,7 +188,8 @@ async def _plan(
             changes.extend(_diff(user, expected, stored, titles, {key for key in allowed if valid_from[key] <= season}))
         if lifetime_keys:  # whatever the seasons asked for: they belong to none
             stored = stored_rows.filter(models.UserAchievement.user_id == user.id, models.Achievement.key.in_(lifetime_keys)).all()
-            changes.extend(_diff(user, await _expected_lifetime(db, user), stored, titles, lifetime_keys))
+            expected, undecided = await _expected_lifetime(db, user)
+            changes.extend(_diff(user, expected, stored, titles, lifetime_keys - undecided))
     return changes
 
 

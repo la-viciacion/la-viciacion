@@ -385,6 +385,19 @@ def get_game_session_days(db: Session, user_id: int, game_id: str, season: int =
     ]
 
 
+def get_sessions_since(db: Session, user_id: int, since: int | None = None) -> list:
+    """The user's finished sessions, of any length, that began in season `since` or later, oldest first, as
+    (game_id, start) rows. What the achievements about the outside world look through: they are about the moment a
+    session started, like the timer that has just started is."""
+    sessions = sessions_subquery()
+    return (
+        db.query(sessions.c.game_id, sessions.c.start)
+        .filter(sessions.c.user_id == user_id, sessions.c.season >= (since or 0))
+        .order_by(sessions.c.start)
+        .all()
+    )
+
+
 def get_first_time_entry_on_release_day(db: Session, user_id: int, season: int = None):
     """The earliest session of the season that began on the day its game came out, or None.
 

@@ -8,7 +8,7 @@ from src.crud import achievements as ach_module
 from src.crud import time_entries
 from src.crud.achievements import Achievements
 from src.database import models
-from src.utils import seasons
+from src.utils import astronomy, seasons, weather
 from src.utils.achievements import first_season, is_lifetime
 from tests.sqlite_db import make_session
 
@@ -695,9 +695,11 @@ class LifetimeTests(unittest.IsolatedAsyncioTestCase):
             ach_module.LIFETIME_COMPLETED_GAMES, ach_module.LIFETIME_HOURS_IN_A_GAME,
         )
         in_tables = {ach.name for table in tables for ach, _ in table}
+        outside_world = {ach.name for ach in ach_module.EXTERNAL_LIFETIME}  # about when and what, not how much: no tables
         by_name = {ach.name for ach in ach_module.AchievementsElems if is_lifetime(ach.name)}
-        self.assertEqual(in_tables, by_name)  # a typo in the suffix would turn one into a seasonal one without a word
-        self.assertEqual(len(by_name), 20)
+        self.assertEqual(in_tables | outside_world, by_name)  # a typo in the suffix would turn one into a seasonal one without a word
+        self.assertTrue(in_tables.isdisjoint(outside_world))
+        self.assertEqual((len(in_tables), len(outside_world)), (20, 15))
         for table in tables:
             self.assertTrue(all(is_lifetime(ach.name) for ach, _ in table))
         for table in (ach_module.TOTAL_HOURS, ach_module.TOTAL_DAYS, ach_module.PLAYED_GAMES, ach_module.COMPLETED_GAMES, ach_module.HOURS_IN_A_GAME):
@@ -836,12 +838,284 @@ class LifetimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("PLAYED_500_HOURS_LIFETIME", self.awarded())
 
 
+# the ones whose message names a game: the player and the game
+WITH_A_GAME = {"HORROR_FOG_LIFETIME", "STAR_WARS_DAY_LIFETIME", "MARIO_DAY_LIFETIME", "ARCHAEOLOGIST_LIFETIME", "BIRTH_YEAR_GAME_LIFETIME"}
+
+
+def utc(jde):
+    """The sky in UTC, whatever the time zone of the machine that runs the test."""
+    return datetime.datetime(1970, 1, 1) + datetime.timedelta(seconds=(jde - astronomy.UNIX_EPOCH_JD) * 86400.0 - astronomy.DELTA_T)
+
+
+class OutsideWorldTests(unittest.IsolatedAsyncioTestCase):
+    """The achievements about the weather, the calendar, the sky and the age of a game (all with no season limit)."""
+
+    def setUp(self):
+        self.db = make_session()
+        self.db.add_all([
+            models.Game(id="g1", name="Doom", slug="doom", release_date=datetime.date(1993, 12, 10), tags="Singleplayer"),
+            models.Game(id="sw", name="STAR WARS Jedi: Fallen Order", slug="sw", release_date=datetime.date(2019, 11, 15)),
+            models.Game(id="mario", name="Super Mario Odyssey", slug="mario", release_date=datetime.date(2017, 10, 27)),
+            models.Game(id="sh", name="Silent Hill 2", slug="sh", release_date=datetime.date(2001, 9, 24), tags="Horror,Singleplayer"),
+            models.Game(id="new", name="Hades II", slug="new", release_date=datetime.date(2025, 9, 25)),
+        ])
+        self.db.commit()
+        Achievements().populate_achievements(self.db)
+        self.db.query(models.Achievement).update({"valid_from_season": 2023, "special": 0, "secret": False})
+        self.db.commit()
+        self.sent = mock.AsyncMock()
+        for patcher in (
+            mock.patch.object(ach_module.utils, "send_message", self.sent),
+            mock.patch.object(astronomy, "_local", utc),
+        ):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        self.clear_sky()
+        self.addCleanup(self.clear_sky)
+        self.view = Achievements(season=seasons.ALL, since=2023)
+
+    def clear_sky(self):
+        for cached in (astronomy.full_moons, astronomy.eclipses, astronomy.sun_events):
+            cached.cache_clear()
+
+    def play(self, start, hours=1.0, game="g1", minutes=None):
+        length = datetime.timedelta(minutes=minutes) if minutes is not None else datetime.timedelta(hours=hours)
+        self.db.add(models.GameTimer(
+            user_id=1, game_id=game, start_time=start, end_time=start + length,
+            duration_seconds=int(length.total_seconds()), is_active=False,
+        ))
+        self.db.commit()
+
+    def awarded(self):
+        rows = (
+            self.db.query(models.Achievement.key, models.UserAchievement.date, models.UserAchievement.game_id)
+            .join(models.UserAchievement, models.UserAchievement.achievement_id == models.Achievement.id)
+            .all()
+        )
+        return {key: (date, game_id) for key, date, game_id in rows}
+
+    def settings(self, **values):
+        self.db.add(models.UserSettings(user_id=1, **values))
+        self.db.commit()
+
+    async def test_star_wars_day_needs_a_star_wars_game_and_names_it(self):
+        self.play(datetime.datetime(2027, 5, 4, 20), game="g1")  # the day, but not the game
+        await self.view.external_days(self.db, USER)
+        self.assertNotIn("STAR_WARS_DAY_LIFETIME", self.awarded())
+        self.play(datetime.datetime(2027, 5, 5, 20), game="sw")  # the game, but not the day
+        await self.view.external_days(self.db, USER)
+        self.assertNotIn("STAR_WARS_DAY_LIFETIME", self.awarded())
+        self.play(datetime.datetime(2028, 5, 4, 20), game="sw")
+        await self.view.external_days(self.db, USER)
+        await self.view.external_days(self.db, USER)  # and it is earned once
+        self.assertEqual(self.awarded()["STAR_WARS_DAY_LIFETIME"], (datetime.date(2028, 5, 4), "sw"))
+        self.assertIn("STAR WARS Jedi", self.message(0))
+
+    def message(self, index):
+        return self.sent.await_args_list[index].args[0]
+
+    async def test_mario_day_is_the_10th_of_march_with_a_mario_game(self):
+        self.play(datetime.datetime(2027, 3, 10, 18), game="mario")
+        await self.view.external_days(self.db, USER)
+        self.assertEqual(self.awarded()["MARIO_DAY_LIFETIME"], (datetime.date(2027, 3, 10), "mario"))
+
+    async def test_a_session_of_any_length_counts(self):
+        self.play(datetime.datetime(2027, 3, 10, 18), game="mario", minutes=1)
+        await self.view.external_days(self.db, USER)
+        self.assertIn("MARIO_DAY_LIFETIME", self.awarded())
+
+    async def test_the_leap_day_is_the_day_a_session_started_not_the_one_it_reached(self):
+        self.play(datetime.datetime(2028, 2, 28, 23, 30), hours=2)  # it ends on the 29th, but it started on the 28th
+        await self.view.external_days(self.db, USER)
+        self.assertEqual(self.awarded(), {})
+        self.play(datetime.datetime(2028, 2, 29, 0, 10), hours=1)
+        await self.view.external_days(self.db, USER)
+        self.assertEqual(self.awarded()["LEAP_DAY_LIFETIME"], (datetime.date(2028, 2, 29), None))
+
+    async def test_a_timer_that_starts_earns_it_before_any_session_is_finished(self):
+        started = [ach_module.Played("sw", datetime.datetime(2027, 5, 4, 20, 5))]  # running: not in the database yet
+        await self.view.external_days(self.db, USER, played=started)
+        await self.view.archaeologist(self.db, USER, played=started)
+        self.assertEqual(self.awarded(), {"STAR_WARS_DAY_LIFETIME": (datetime.date(2027, 5, 4), "sw")})  # 2019: not 25 years old
+        started = [ach_module.Played("sh", datetime.datetime(2027, 5, 5, 20, 5))]
+        await self.view.archaeologist(self.db, USER, played=started)
+        self.assertEqual(self.awarded()["ARCHAEOLOGIST_LIFETIME"], (datetime.date(2027, 5, 5), "sh"))
+
+    async def test_a_timer_that_starts_before_the_season_it_counts_from_does_not_count(self):
+        view = Achievements(season=seasons.ALL, since=2028)
+        await view.external_days(self.db, USER, played=[ach_module.Played("sw", datetime.datetime(2027, 5, 4, 20))])
+        self.assertEqual(self.awarded(), {})
+
+    async def test_the_start_of_a_timer_is_wired_to_the_orchestration(self):
+        started = [ach_module.Played("sw", datetime.datetime(2027, 5, 4, 20))]
+        self.settings(place_name="Madrid", place_latitude=40.4165, place_longitude=-3.70256)
+        with mock.patch.object(weather, "codes_for_days", return_value={datetime.date(2027, 5, 4): [95] * 24}):
+            for view in Achievements().lifetime_views(self.db):
+                await view.external_days(self.db, USER, played=started)
+                await view.weather(self.db, USER, played=started)
+        self.assertEqual(set(self.awarded()), {"STAR_WARS_DAY_LIFETIME", "STORM_LIFETIME"})
+
+    async def test_a_birthday_needs_a_birth_date(self):
+        self.play(datetime.datetime(2027, 6, 15, 12))
+        await self.view.external_days(self.db, USER)
+        self.assertNotIn("BIRTHDAY_LIFETIME", self.awarded())
+        self.settings(birth_date=datetime.date(1990, 6, 15))
+        await self.view.external_days(self.db, USER)
+        self.assertEqual(self.awarded()["BIRTHDAY_LIFETIME"], (datetime.date(2027, 6, 15), None))
+
+    async def test_the_sky_full_moon_eclipses_and_solstices(self):
+        self.play(datetime.datetime(2027, 1, 22, 20))  # full moon at 12:17 UTC
+        self.play(datetime.datetime(2027, 2, 6, 20))  # annular solar eclipse
+        self.play(datetime.datetime(2028, 12, 31, 20))  # total lunar eclipse
+        self.play(datetime.datetime(2027, 6, 21, 20))  # summer solstice
+        self.play(datetime.datetime(2027, 12, 22, 20))  # winter solstice
+        self.play(datetime.datetime(2027, 3, 20, 20))  # spring equinox
+        self.play(datetime.datetime(2027, 9, 23, 20))  # autumn equinox
+        await self.view.external_days(self.db, USER)
+        got = {key: date for key, (date, _) in self.awarded().items()}
+        self.assertEqual(got, {
+            "FULL_MOON_LIFETIME": datetime.date(2027, 1, 22),
+            "SOLAR_ECLIPSE_LIFETIME": datetime.date(2027, 2, 6),
+            "LUNAR_ECLIPSE_LIFETIME": datetime.date(2028, 12, 31),
+            "SUMMER_SOLSTICE_LIFETIME": datetime.date(2027, 6, 21),
+            "WINTER_SOLSTICE_LIFETIME": datetime.date(2027, 12, 22),
+            "SPRING_EQUINOX_LIFETIME": datetime.date(2027, 3, 20),
+            "AUTUMN_EQUINOX_LIFETIME": datetime.date(2027, 9, 23),
+        })
+
+    async def test_an_ordinary_day_earns_nothing(self):
+        self.play(datetime.datetime(2027, 2, 2, 20))
+        await self.view.external_days(self.db, USER)
+        self.assertEqual(self.awarded(), {})
+
+    async def test_only_what_was_played_from_its_season_on_counts(self):
+        self.db.query(models.Achievement).filter_by(key="LEAP_DAY_LIFETIME").update({"valid_from_season": 2029})
+        self.db.commit()
+        self.play(datetime.datetime(2028, 2, 29, 20))
+        for view in Achievements().lifetime_views(self.db):
+            await view.external_days(self.db, USER)
+        self.assertNotIn("LEAP_DAY_LIFETIME", self.awarded())
+
+    async def test_the_archaeologist_needs_a_game_of_25_years_on_the_day_it_was_played(self):
+        self.play(datetime.datetime(2027, 3, 1, 20), game="new")
+        await self.view.archaeologist(self.db, USER)
+        self.assertEqual(self.awarded(), {})
+        self.play(datetime.datetime(2027, 3, 2, 20), game="sh")  # 2001: 25 years in September 2026
+        await self.view.archaeologist(self.db, USER)
+        self.assertEqual(self.awarded()["ARCHAEOLOGIST_LIFETIME"], (datetime.date(2027, 3, 2), "sh"))
+
+    async def test_a_game_without_release_date_is_never_archaeological(self):
+        self.db.add(models.Game(id="x", name="Unknown", slug="x"))
+        self.db.commit()
+        self.play(datetime.datetime(2027, 3, 1, 20), game="x")
+        await self.view.archaeologist(self.db, USER)
+        self.assertEqual(self.awarded(), {})
+
+    async def test_a_game_of_the_year_the_player_was_born_in(self):
+        self.play(datetime.datetime(2027, 3, 1, 20), game="g1")  # 1993
+        await self.view.birth_year_game(self.db, USER)
+        self.assertEqual(self.awarded(), {})  # no birth date yet
+        self.settings(birth_date=datetime.date(1993, 8, 30))
+        await self.view.birth_year_game(self.db, USER)
+        self.assertEqual(self.awarded()["BIRTH_YEAR_GAME_LIFETIME"], (datetime.date(2027, 3, 1), "g1"))
+
+    async def test_a_game_of_another_year_or_without_date_is_not_of_their_year(self):
+        self.db.add(models.Game(id="x", name="Unknown", slug="x"))
+        self.db.commit()
+        self.settings(birth_date=datetime.date(1994, 1, 1))
+        self.play(datetime.datetime(2027, 3, 1, 20), game="g1")  # 1993: a year before
+        self.play(datetime.datetime(2027, 3, 2, 20), game="x")
+        await self.view.birth_year_game(self.db, USER)
+        self.assertEqual(self.awarded(), {})
+        await self.view.birth_year_game(self.db, USER, played=[ach_module.Played("g1", datetime.datetime(2027, 3, 3, 20))])
+        self.assertEqual(self.awarded(), {})
+
+    def stormy(self, day, hours):
+        codes = [0] * 24
+        for hour in hours:
+            codes[hour] = 95
+        return {day: codes}
+
+    async def test_a_storm_while_playing_at_the_city_of_the_player(self):
+        self.settings(place_name="Madrid", place_latitude=40.4165, place_longitude=-3.70256)
+        self.play(datetime.datetime(2027, 7, 1, 21, 30), hours=1)
+        codes = self.stormy(datetime.date(2027, 7, 1), [21])  # the hour it started in
+        with mock.patch.object(weather, "codes_for_days", return_value=codes) as asked:
+            await self.view.weather(self.db, USER)
+        self.assertEqual(self.awarded()["STORM_LIFETIME"], (datetime.date(2027, 7, 1), None))
+        self.assertEqual(asked.call_args.args[:3], (self.db, 40.4165, -3.70256))
+        self.assertEqual(set(asked.call_args.args[3]), {datetime.date(2027, 7, 1)})
+
+    async def test_a_storm_in_another_hour_than_the_one_it_started_in_is_not_enough(self):
+        self.settings(place_name="Madrid", place_latitude=40.4165, place_longitude=-3.70256)
+        self.play(datetime.datetime(2027, 7, 1, 21, 30), hours=1)
+        with mock.patch.object(weather, "codes_for_days", return_value=self.stormy(datetime.date(2027, 7, 1), [22])):
+            await self.view.weather(self.db, USER)
+        self.assertEqual(self.awarded(), {})
+
+    async def test_fog_counts_only_with_a_horror_game(self):
+        self.settings(place_name="Madrid", place_latitude=40.4165, place_longitude=-3.70256)
+        foggy = {datetime.date(2027, 11, 3): [45] * 24}
+        self.play(datetime.datetime(2027, 11, 3, 21), game="g1")
+        with mock.patch.object(weather, "codes_for_days", return_value=foggy):
+            await self.view.weather(self.db, USER)
+        self.assertEqual(self.awarded(), {})
+        self.play(datetime.datetime(2027, 11, 3, 23), game="sh")
+        with mock.patch.object(weather, "codes_for_days", return_value=foggy):
+            await self.view.weather(self.db, USER)
+        self.assertEqual(self.awarded()["HORROR_FOG_LIFETIME"], (datetime.date(2027, 11, 3), "sh"))
+        self.assertIn("Silent Hill 2", self.message(0))
+
+    async def test_without_a_city_the_weather_is_not_even_asked(self):
+        self.play(datetime.datetime(2027, 7, 1, 21, 30))
+        with mock.patch.object(weather, "codes_for_days") as asked:
+            await self.view.weather(self.db, USER)
+        asked.assert_not_called()
+        self.assertEqual(self.awarded(), {})
+
+    async def test_when_open_meteo_is_down_nothing_is_decided_and_a_recalculation_is_told_so(self):
+        self.settings(place_name="Madrid", place_latitude=40.4165, place_longitude=-3.70256)
+        self.play(datetime.datetime(2027, 7, 1, 21, 30))
+        undecided = set()
+        view = Achievements(season=seasons.ALL, since=2023, collected=[], undecided=undecided)
+        with mock.patch.object(weather, "codes_for_days", side_effect=weather.WeatherUnavailable("down")):
+            await view.weather(self.db, USER)
+            await self.view.weather(self.db, USER)  # a live check just tries again next time
+        self.assertEqual(undecided, {"STORM_LIFETIME", "HORROR_FOG_LIFETIME"})
+        self.assertEqual(self.awarded(), {})
+
+    async def test_the_orchestration_runs_them_and_a_recalculation_keeps_what_it_could_not_tell(self):
+        from src.crud import achievements_recalc
+
+        self.settings(place_name="Madrid", place_latitude=40.4165, place_longitude=-3.70256)
+        self.play(datetime.datetime(2027, 5, 4, 20), game="sw")
+        self.play(datetime.datetime(2027, 7, 1, 21, 30))
+        stormy = self.stormy(datetime.date(2027, 7, 1), [21])
+        user = self.db.merge(models.User(id=1, name="Ana", username="ana"))
+        with mock.patch.object(weather, "codes_for_days", return_value=stormy):
+            await actions.check_user_lifetime(self.db, user)
+        self.assertEqual(set(self.awarded()), {"STAR_WARS_DAY_LIFETIME", "STORM_LIFETIME", "ARCHAEOLOGIST_LIFETIME"})  # Doom is from 1993
+        with mock.patch.object(weather, "codes_for_days", side_effect=weather.WeatherUnavailable("down")):
+            expected, undecided = await achievements_recalc._expected_lifetime(self.db, user)
+        self.assertIn("STAR_WARS_DAY_LIFETIME", expected)  # what needs no weather is worked out as ever
+        self.assertNotIn("STORM_LIFETIME", expected)
+        self.assertIn("STORM_LIFETIME", undecided)  # so the recalculation leaves it alone instead of revoking it
+
+
 class CatalogueTests(unittest.TestCase):
     def test_every_achievement_says_the_season_it_starts_in(self):
         without = [ach.name for ach in ach_module.AchievementsElems if "since" not in ach.value]
         self.assertEqual(without, [])  # one added without it would not be created at all
+        outside_world = {ach.name for ach in ach_module.EXTERNAL_LIFETIME}
         for ach in ach_module.AchievementsElems:
-            self.assertEqual(first_season(ach), 2023, ach.name)  # retroactive: the history counts since the first season
+            # retroactive: the history counts since the first season; the ones about the world outside the app begin in 2027
+            self.assertEqual(first_season(ach), 2027 if ach.name in outside_world else 2023, ach.name)
+
+    def test_the_ones_about_the_world_outside_the_app_are_all_hidden_and_without_a_season_limit(self):
+        for ach in ach_module.EXTERNAL_LIFETIME:
+            self.assertTrue(is_lifetime(ach.name), ach.name)
+            self.assertTrue(ach.value.get("secret"), ach.name)
+            self.assertEqual(ach.value["message"].count("{}"), 2 if ach.name in WITH_A_GAME else 1, ach.name)
 
 
     def test_the_levels_and_secrets_the_definitions_give_are_valid(self):

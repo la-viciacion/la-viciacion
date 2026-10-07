@@ -19,7 +19,7 @@ from .. import auth
 from ..auth import get_db
 from ..crud import data_export, games, scores, users, wishlist
 from ..database import models, schemas
-from ..utils import actions, images
+from ..utils import actions, images, places
 from ..utils import messages as msg
 from ..utils import my_utils as utils
 from ..utils.logger import LogManager
@@ -63,6 +63,18 @@ def get_users(
     """
     users_db = users.get_users(db)
     return users_db
+
+
+@router.get("/places/search")
+def search_places(
+    q: str = Query(..., max_length=places.MAX_QUERY),
+    active_user: models.User = Depends(auth.get_current_active_user),
+):
+    """Cities that match a name (Open-Meteo's geocoding), for the player to pick where they live"""
+    try:
+        return places.search(q)
+    except places.PlacesUnavailable:
+        raise HTTPException(status_code=503, detail=msg.PLACES_UNAVAILABLE)
 
 
 @router.get("/{username}", response_model=schemas.User)
@@ -175,6 +187,10 @@ def update_settings(
                 min=user_settings.MIN_TIMER_NOTICE_MINUTES, max=user_settings.MAX_TIMER_NOTICE_MINUTES
             ),
         )
+    if not user_settings.valid_place(changes):
+        raise HTTPException(status_code=400, detail=msg.PLACE_INCOMPLETE)
+    if "birth_date" in changes and not user_settings.valid_birth_date(changes["birth_date"]):
+        raise HTTPException(status_code=400, detail=msg.BIRTH_DATE_INVALID)
     return user_settings.update(db, user.id, changes)
 
 

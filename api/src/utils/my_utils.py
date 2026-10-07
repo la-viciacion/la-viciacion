@@ -208,6 +208,8 @@ async def get_game_details_by_rawg_id(rawg_id: int) -> dict | None:
     released = data.get("released")
     image_url = data.get("background_image")
     genres = ",".join([g["name"] for g in data.get("genres", []) if "name" in g])
+    # the tags RAWG has in other languages are the same ones again: only the English ones
+    tags = ",".join([t["name"] for t in data.get("tags") or [] if t.get("name") and t.get("language") == "eng"])
 
     # Developers and publishers from RAWG
     dev_list = [d["name"] for d in data.get("developers", []) if "name" in d]
@@ -264,6 +266,7 @@ async def get_game_details_by_rawg_id(rawg_id: int) -> dict | None:
         "steam_id": str(steam_id) if steam_id else "",
         "image_url": image_url,
         "genres": genres,
+        "tags": tags,
         "avg_time": int(avg_time) if avg_time else 0,
     }
 
@@ -322,6 +325,7 @@ async def get_new_game_info(game) -> schemas.NewGame:
             steam_id=details["steam_id"],
             image_url=details["image_url"],
             genres=details["genres"],
+            tags=details["tags"],
             avg_time=details["avg_time"],
             slug=details["slug"],
             rawg_id=details["rawg_id"],
@@ -336,6 +340,7 @@ async def get_new_game_info(game) -> schemas.NewGame:
         steam_id="",
         image_url="",
         genres="",
+        tags="",
         avg_time=0,
         slug="",
         rawg_id=None,
