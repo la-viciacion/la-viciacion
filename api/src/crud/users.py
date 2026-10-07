@@ -353,6 +353,28 @@ def get_avatar(db: Session, username: str):
         raise
 
 
+def new_game_message(user_name: str, game_name: str, slug: str | None, number: int) -> str:
+    """The notice of a game just started: who, which game (a link to RAWG when it has a slug) and the number of
+    games they have started this season. The AI rewrites it keeping all three (see ai_prompts.NEW_GAME_PROMPT)."""
+    started_game = utils.escape_markdown(game_name)
+    if slug:
+        started_game = "[" + started_game + "](https://rawg.io/games/" + slug + ")"
+    return "*" + utils.escape_markdown(user_name) + "* acaba de empezar " + started_game + ", su juego número " + str(number) + " de este año."
+
+
+def completion_message(user_name: str, number: int, game_name: str, played_seconds: int, average_seconds: int | None) -> str:
+    """The notice of a game just completed: who, the number of games they have completed this season, which
+    game, **how long it took them** (what they played it in the season) and, when it is known, the average time
+    to complete it. The AI rewrites it keeping all of that (see ai_prompts.COMPLETED_GAME_PROMPT)."""
+    msg = (
+        utils.escape_markdown(user_name) + " acaba de completar su juego número " + str(number)
+        + ": *" + utils.escape_markdown(game_name) + "* en " + str(utils.format_duration(played_seconds)) + "."
+    )
+    if average_seconds:
+        msg += " La media está en " + str(utils.format_duration(average_seconds)) + "."
+    return msg
+
+
 async def announce_new_game(
     db: Session, user: models.User, game_db: models.Game, started_date, silent: bool
 ) -> None:
@@ -360,18 +382,7 @@ async def announce_new_game(
     try:
         # the season of the new entry, not the running one: a backdated start belongs to its own season
         played_games = count_played_games(db, user.id, seasons.of(started_date))
-        started_game = utils.escape_markdown(game_db.name)
-        if game_db.slug:
-            started_game = "[" + started_game + "](https://rawg.io/games/" + game_db.slug + ")"
-        msg = (
-            "*"
-            + utils.escape_markdown(user.name)
-            + "* acaba de empezar "
-            + started_game
-            + ", su juego número "
-            + str(played_games)
-            + " de este año."
-        )
+        msg = new_game_message(user.name, game_db.name, game_db.slug, played_games)
         await utils.send_message(
             msg,
             silent,
@@ -795,18 +806,7 @@ async def after_completion(db: Session, entry: models.UserGame, silent: bool):
         await view.user_completed_total_games(db, user, silent=silent)
     await achievements.completed_in_a_day(db, user, silent=silent)
 
-    message = (
-        user.name
-        + " acaba de completar su juego número "
-        + str(count_completed_games(db, user.id, entry.season))
-        + ": *"
-        + game.name
-        + "* en "
-        + str(utils.format_duration(completion_time))
-        + ". La media está en "
-        + str(utils.format_duration(avg_time))
-        + "."
-    )
+    message = completion_message(user.name, count_completed_games(db, user.id, entry.season), game.name, completion_time, avg_time)
     logger.info(message)
     new_game_info = None
     suggestions = games.recommended_games(db, entry.user_id, genres=game.genres)
