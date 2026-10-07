@@ -1,7 +1,7 @@
 // Generic create/edit form driven by the entity field definitions.
 //
 // Field: { key, label, type, required?, omitEmpty?, step?, nameKey? (game: the row's key holding the game's name) }
-// Types: text | number | date | datetime | checkbox | select | platform | user | game | password | image
+// Types: text | textarea (rows?) | number | date | datetime | checkbox | select | platform | user | game | password | image
 // select: { options: [[number, label], ...] }
 // image (editing only): { current: (row) => url of the picture or null, upload: (row) => route that takes the new file }
 import { api, jsonRequest } from '../../lib/api.js';
@@ -58,6 +58,8 @@ function fieldHtml(f, value, row) {
       return html`<label>${f.label}<input class="adm-input" type="datetime-local" step="1" id="${id}" value="${String(v).slice(0, 19)}" /></label>`;
     case 'date':
       return html`<label>${f.label}<input class="adm-input" type="date" id="${id}" value="${String(v).slice(0, 10)}" /></label>`;
+    case 'textarea':
+      return html`<label>${f.label}<textarea class="adm-input" id="${id}" rows="${f.rows || 4}">${v}</textarea></label>`;
     case 'number':
       return html`<label>${f.label}<input class="adm-input" type="number" step="${f.step || '1'}" id="${id}" value="${v}" /></label>`;
     default:
