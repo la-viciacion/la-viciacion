@@ -202,6 +202,11 @@
 .ach-count { margin: 0 0 12px; }
 .ach-block { margin-bottom: 28px; }
 .ach-note { margin: 0 0 12px; }
+.ach-fold { width: 100%; padding: 0; background: none; border: 0; font: inherit; color: inherit; cursor: pointer; text-align: left; }
+.ach-chevron { display: flex; color: var(--text-muted); transition: transform 0.2s ease; }
+.ach-block.folded .ach-chevron { transform: rotate(-90deg); }
+.ach-block.folded .ach-content { display: none; }
+.ach-block.folded .ach-fold { margin-bottom: 0; }
 .ach-progress { display: flex; flex-direction: column; gap: 4px; }
 .ach-bar { height: 8px; border-radius: 999px; background: var(--bg-card-hover); overflow: hidden; }
 .ach-bar-fill { height: 100%; border-radius: inherit; background: var(--gradient-brand); }
@@ -210,11 +215,9 @@
 .ach-card.mine { border-color: var(--border-accent); background: var(--gradient-card); }
 .ach-card.hidden { opacity: 0.6; }
 .ach-card.locked { opacity: 0.55; }
-/* A special one shines in the colour of its level, unlocked or not */
+/* A special one shines in the colour of its level, unlocked or not (and dimmed like any other when it is not) */
 .ach-card[class*="special-"] { border-color: rgb(var(--aura-rgb)); box-shadow: 0 0 16px rgba(var(--aura-rgb), 0.55), inset 0 0 20px rgba(var(--aura-rgb), 0.12); animation: ach-shine 2.8s ease-in-out infinite alternate; }
 .ach-card[class*="special-"] .ach-img { box-shadow: 0 0 12px rgba(var(--aura-rgb), 0.75); }
-.ach-card.hidden[class*="special-"] { opacity: 0.9; }
-.ach-card.locked[class*="special-"] { opacity: 0.75; }
 @keyframes ach-shine {
   from { box-shadow: 0 0 10px rgba(var(--aura-rgb), 0.35), inset 0 0 14px rgba(var(--aura-rgb), 0.08); }
   to { box-shadow: 0 0 24px rgba(var(--aura-rgb), 0.8), inset 0 0 24px rgba(var(--aura-rgb), 0.16); }
