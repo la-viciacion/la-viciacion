@@ -71,6 +71,8 @@ docker compose logs -f laviciacion-api
 
 # API tests (from api/, needs the root .env or equivalent env vars)
 cd api && python -m unittest discover -s tests -t .   # includes migration-history guards (needs alembic installed)
+cd api && python run_tests.py --no-db                  # the same in parallel, ~30 s without MariaDB
+cd api && python run_tests.py --db --skip-migrations   # with a MariaDB for tests (Docker), ~80 s; --db alone, ~4 min
 
 # Front tests + lint (from front/)
 cd front && npm test && npm run lint

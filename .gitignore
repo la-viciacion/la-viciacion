@@ -373,3 +373,6 @@ db/init/*
 *.sql
 *.sql.gz
 *.dump
+
+# Local test timings of api/run_tests.py
+api/.test_timings.json
