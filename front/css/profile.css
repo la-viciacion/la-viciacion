@@ -235,11 +235,20 @@
 
 /* Players pages */
 .pl-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
-.pl-card { display: flex; align-items: center; gap: 14px; padding: 12px; text-decoration: none; color: inherit; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); }
-.pl-card:hover { border-color: var(--accent-teal); background: var(--bg-card-hover); }
-.pl-card .pl-avatar { width: 52px; height: 52px; font-size: 1.2rem; border-color: var(--bg-card); }
+.pl-card { display: flex; flex-direction: column; gap: 14px; padding: 16px; text-decoration: none; color: inherit; background: var(--gradient-card), var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s; }
+.pl-card:hover { transform: translateY(-2px); border-color: var(--accent-teal); box-shadow: var(--shadow-glow); }
+.pl-card.live { border-color: rgba(74, 222, 128, 0.35); background: linear-gradient(145deg, rgba(74, 222, 128, 0.1) 0%, rgba(61, 217, 179, 0.03) 100%), var(--bg-card); }
+.pl-card.inactive { background: var(--bg-card); }
+.pl-card.inactive .pl-card-head, .pl-card.inactive .pl-figs { opacity: 0.55; }
+.pl-card.inactive:hover .pl-card-head, .pl-card.inactive:hover .pl-figs { opacity: 0.85; }
+.pl-card-head { display: flex; align-items: center; gap: 14px; }
+.pl-card .pl-avatar { width: 56px; height: 56px; font-size: 1.3rem; border-color: var(--bg-card); }
 .pl-card-main { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.pl-card-name { font-weight: 700; }
+.pl-card-name { font-weight: 700; font-size: 1.05rem; }
+.pl-figs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding-top: 12px; border-top: 1px solid var(--border); }
+.pl-fig { text-align: center; }
+.pl-fig-value { font-weight: 700; font-size: 1.05rem; color: var(--accent-teal); }
+.pl-fig-label { color: var(--text-secondary); font-size: 0.72rem; }
 .pf-head .pl-avatar { width: 72px; height: 72px; font-size: 1.8rem; border-color: var(--bg-base); }
 @media (max-width: 640px) { .pl-cards { grid-template-columns: 1fr; } }
 

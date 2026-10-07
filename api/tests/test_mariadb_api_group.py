@@ -183,14 +183,15 @@ class PlayersTests(ApiTestCase):
         self.assertEqual(self.api("GET", "/group/players").status_code, 401)
         self.assertEqual(self.api("GET", f"/group/players/{self.ana}").status_code, 401)
 
-    def test_only_the_active_players_with_their_figures(self):
+    def test_every_player_with_their_figures_and_whether_they_are_active(self):
         self.library_entry(self.ana, "celeste", TODAY(), "pc", completed=1, completed_date=TODAY())
         self.library_entry(self.ana, "hades", TODAY(), "pc")
         self.session(self.ana, "celeste", datetime.datetime.now() - timedelta(hours=5), 60)
         self.session(self.ana, "hades", datetime.datetime.now() - timedelta(hours=3), 30)
         self.library_entry(self.gone, "celeste", TODAY(), "pc")
         rows = {p["name"]: p for p in self.players()}
-        self.assertEqual(sorted(rows), ["Ana", "Bea"])
+        self.assertEqual(sorted(rows), ["Ana", "Bea", "Gone"])
+        self.assertEqual((rows["Ana"]["is_active"], rows["Gone"]["is_active"], rows["Gone"]["games"]), (True, False, 1))
         self.assertEqual((rows["Ana"]["played_seconds"], rows["Ana"]["games"], rows["Ana"]["completed"], rows["Ana"]["achievements"]), (5400, 2, 1, 0))
         self.assertEqual((rows["Bea"]["games"], rows["Bea"]["last_played"], rows["Bea"]["playing"]), (0, None, None))
         self.assertEqual((rows["Ana"]["is_me"], rows["Bea"]["is_me"]), (True, False))
@@ -201,7 +202,7 @@ class PlayersTests(ApiTestCase):
         cai = self.user("cai")
         self.api("POST", "/timers/start", as_user="cai", json={"user_id": cai, "game_id": "celeste", "platform": "pc"})
         body = self.players()
-        self.assertEqual([p["name"] for p in body], ["Cai", "Ana", "Bea"])
+        self.assertEqual([p["name"] for p in body], ["Cai", "Ana", "Bea", "Gone"])
         self.assertEqual(body[0]["playing"]["game_name"], "Celeste")
 
     def test_hiding_removes_only_the_live_status(self):
@@ -222,7 +223,7 @@ class PlayersTests(ApiTestCase):
         self.assertEqual(body["stats"]["played_time"], 5400)
         self.assertEqual([(g["game_name"], g["score"]) for g in body["top_games"]], [("Celeste", 77)])
         self.assertEqual(body["is_me"], False)
-        self.assertEqual(set(body), {"user", "season", "seasons", "stats", "top_games", "achievements", "playing", "is_me"})
+        self.assertEqual(set(body), {"user", "season", "seasons", "stats", "top_games", "achievements", "playing", "is_active", "is_me"})
         self.assertNotIn("111", str(body))  # the Telegram id
         self.assertNotIn("example.com", str(body))  # the email
 
@@ -232,6 +233,7 @@ class PlayersTests(ApiTestCase):
         self.assertEqual(self.api("GET", f"/group/players/{self.ana}", as_user="bea", params={"season": "2020"}).json()["season"], 2020)
         self.assertEqual(self.api("GET", f"/group/players/{self.ana}", as_user="bea", params={"season": "x"}).status_code, 422)
 
-    def test_unknown_and_inactive_players_are_not_found(self):
+    def test_an_inactive_player_has_a_page_and_an_unknown_one_does_not(self):
         self.assertEqual(self.api("GET", "/group/players/999999", as_user="ana").status_code, 404)
-        self.assertEqual(self.api("GET", f"/group/players/{self.gone}", as_user="ana").status_code, 404)
+        gone = self.api("GET", f"/group/players/{self.gone}", as_user="ana")
+        self.assertEqual((gone.status_code, gone.json()["is_active"]), (200, False))

@@ -61,7 +61,7 @@ def recommended_games(
         )
         .join(models.Game, models.UserGame.game_id == models.Game.id)
         .join(models.User, models.UserGame.user_id == models.User.id)
-        .filter(models.UserGame.user_id != user_id, models.not_god(), models.User.is_active == 1)
+        .filter(models.UserGame.user_id != user_id, models.not_god())
         .filter(models.UserGame.game_id.notin_(played_by_user))
         .filter(or_(*genres_filter) if genres_filter else true())
         .limit(limit)
@@ -98,7 +98,6 @@ def recommendation_candidates(db: Session, user_id: int) -> list[dict]:
         .filter(
             models.UserGame.user_id != user_id,
             models.UserGame.game_id.notin_(owned),
-            models.User.is_active == 1,
             models.not_god(),
         )
         .all()
@@ -125,7 +124,6 @@ def recommendation_candidates(db: Session, user_id: int) -> list[dict]:
             models.GameTimer.game_id.in_(list(found)),
             models.GameTimer.is_active == False,  # noqa: E712
             models.GameTimer.user_id != user_id,
-            models.User.is_active == 1,
             models.not_god(),
         )
         .group_by(models.GameTimer.game_id)
@@ -140,7 +138,6 @@ def recommendation_candidates(db: Session, user_id: int) -> list[dict]:
         .filter(
             models.GameScore.game_id.in_(list(found)),
             models.GameScore.user_id != user_id,
-            models.User.is_active == 1,
             models.not_god(),
         )
         .group_by(models.GameScore.game_id)
@@ -191,11 +188,11 @@ def genre_affinity(db: Session, user_id: int) -> dict[str, float]:
 
 
 def rating_prior(db: Session) -> float:
-    """The average rating of the active players, or SCORE_PRIOR while there are too few ratings to tell."""
+    """The average rating of the players, or SCORE_PRIOR while there are too few ratings to tell."""
     count, mean = (
         db.query(func.count(models.GameScore.id), func.avg(models.GameScore.score))
         .join(models.User, models.GameScore.user_id == models.User.id)
-        .filter(models.User.is_active == 1, models.not_god())
+        .filter(models.not_god())
         .one()
     )
     return float(mean) if count and count >= SCORE_PRIOR_MIN else SCORE_PRIOR

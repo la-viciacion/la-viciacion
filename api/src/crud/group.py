@@ -1,6 +1,6 @@
 """What the group has in common, derived when asked (nothing stored): the achievements and who has them, the
-players and what is public of each one. Only active players are listed (never the emergency account), but who has
-an achievement counts everybody who earned it, even if they no longer play."""
+players and what is public of each one. Every player is listed, active or not (an inactive one cannot log in or act, nothing more; never the
+emergency account), and who has an achievement counts everybody who earned it."""
 import datetime
 import re
 
@@ -124,7 +124,6 @@ def _playing_now(db: Session, viewer_id: int) -> dict[int, dict]:
 def players(db: Session, viewer_id: int) -> list[dict]:
     """The players of the group with their figures (every season) and what they are playing now; the ones playing
     first, then the latest to play, then by name."""
-    active = (models.User.is_active == 1, models.not_god())
     time = {
         user_id: (int(seconds or 0), last)  # MariaDB returns SUM() as Decimal
         for user_id, seconds, last in db.query(
@@ -143,7 +142,7 @@ def players(db: Session, viewer_id: int) -> list[dict]:
     playing = _playing_now(db, viewer_id)
 
     rows = []
-    for user in db.query(models.User).filter(*active):
+    for user in db.query(models.User).filter(models.not_god()):
         seconds, last = time.get(user.id, (0, None))
         rows.append({
             "user_id": user.id,
@@ -155,6 +154,7 @@ def players(db: Session, viewer_id: int) -> list[dict]:
             "achievements": awards.get(user.id, 0),
             "last_played": last,
             "playing": playing.get(user.id),
+            "is_active": bool(user.is_active),
             "is_me": user.id == viewer_id,
         })
     rows.sort(key=lambda r: (r["playing"] is None, -(r["last_played"].timestamp() if r["last_played"] else 0), r["name"].lower()))
@@ -164,10 +164,10 @@ def players(db: Session, viewer_id: int) -> list[dict]:
 def player_profile(db: Session, viewer_id: int, player_id: int, season=None) -> dict | None:
     """What is public of a player: name, figures of a season (or all of them), most played games with their
     ratings, streaks, latest achievements and what they are playing now. Never the email, the Telegram id, the
-    settings or the library. None if there is no such active player."""
+    settings or the library. None if there is no such player."""
     user = (
         db.query(models.User)
-        .filter(models.User.id == player_id, models.User.is_active == 1, models.not_god())
+        .filter(models.User.id == player_id, models.not_god())
         .first()
     )
     if user is None:
@@ -187,5 +187,6 @@ def player_profile(db: Session, viewer_id: int, player_id: int, season=None) -> 
         "top_games": data["top_games"],
         "achievements": achievements,
         "playing": _playing_now(db, viewer_id).get(user.id),
+        "is_active": bool(user.is_active),
         "is_me": user.id == viewer_id,
     }

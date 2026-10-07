@@ -55,7 +55,7 @@ def sessions_subquery():
     )
 
 
-def players_played_time(db: Session, season: int = None, is_active: bool | None = True) -> list[dict]:
+def players_played_time(db: Session, season: int = None, is_active: bool | None = None) -> list[dict]:
     """Every player with the seconds played in the season (0 if none), most first."""
     season = seasons.or_current(season)
     sessions = sessions_subquery()
@@ -115,7 +115,7 @@ def played_days_by_user(
     return {user_id: sorted(values) for user_id, values in days.items()}
 
 
-def players_played_dates(db: Session, season: int = None, is_active: bool | None = True) -> dict:
+def players_played_dates(db: Session, season: int = None, is_active: bool | None = None) -> dict:
     """{user_id: sorted list of the days played in the season} (see played_days_by_user).
 
     Every player is a key, with an empty list when they have not played."""
@@ -127,7 +127,7 @@ def players_played_dates(db: Session, season: int = None, is_active: bool | None
     return {user_id: played.get(user_id, []) for (user_id,) in db.execute(players).all()}
 
 
-def games_played_time(db: Session, season: int = None, limit: int | None = None, is_active: bool | None = True) -> list[dict]:
+def games_played_time(db: Session, season: int = None, limit: int | None = None, is_active: bool | None = None) -> list[dict]:
     """Games with the seconds played in the season, most first (only games that were played)."""
     season = seasons.or_current(season)
     sessions = sessions_subquery()

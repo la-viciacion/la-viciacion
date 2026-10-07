@@ -42,20 +42,25 @@ class GameCatalogTests(ApiTestCase):
         self.library_entry(self.bea, "zelda", TODAY() - timedelta(days=10), "pc")
         self.assertEqual(self.names(), ["Hades", "Zelda", "Celeste", "Nobody Has It"])
 
+    def test_the_players_who_are_no_longer_active_count_like_the_rest(self):
+        self.library_entry(self.gone, "celeste", TODAY(), "pc", completed=1, completed_date=TODAY())
+        self.session(self.gone, "celeste", datetime.datetime.now() - timedelta(hours=3), 60)
+        self.rate(self.gone, "celeste", 50)
+        game = next(g for g in self.catalog()["items"] if g["id"] == "celeste")
+        self.assertEqual((game["players"], game["played_seconds"], game["completed_by"], game["score_count"], game["score_mean"]),
+                         (1, 3600, 1, 1, 50.0))
+
     def test_a_game_carries_what_the_group_has_done_with_it(self):
         self.library_entry(self.ana, "celeste", TODAY(), "pc", completed=1, completed_date=TODAY())
         self.library_entry(self.bea, "celeste", TODAY(), "pc")
-        self.library_entry(self.gone, "celeste", TODAY(), "pc", completed=1, completed_date=TODAY())
         self.session(self.ana, "celeste", datetime.datetime.now() - timedelta(hours=3), 60)
-        self.session(self.gone, "celeste", datetime.datetime.now() - timedelta(hours=3), 600)
         self.rate(self.ana, "celeste", 90)
         self.rate(self.bea, "celeste", 70)
-        self.rate(self.gone, "celeste", 1)
         game = next(g for g in self.catalog()["items"] if g["id"] == "celeste")
         self.assertEqual((game["players"], game["played_seconds"], game["completed_by"], game["score_count"], game["score_mean"]),
                          (2, 3600, 1, 2, 80.0))
         self.assertEqual((game["have"], game["my_score"], game["my_completed"]), (True, 90, True))
-        self.assertIsNotNone(game["last_played"])  # the latest session of the active players
+        self.assertIsNotNone(game["last_played"])
         self.assertIsNone(next(g for g in self.catalog()["items"] if g["id"] == "hades")["last_played"])
         other = next(g for g in self.catalog(as_user="bea")["items"] if g["id"] == "celeste")
         self.assertEqual((other["have"], other["my_score"], other["my_completed"]), (True, 70, False))

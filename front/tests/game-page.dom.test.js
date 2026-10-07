@@ -11,8 +11,8 @@ const OVERVIEW = {
   game: { id: 'celeste', name: 'Celeste <b>', image_url: null, genres: ['Platformer'], dev: 'Maddy', release_date: '2018-01-25', avg_time: 30000 },
   summary: { players: 2, played_seconds: 10800, completed_by: 1, score_count: 2, score_mean: 80 },
   players: [
-    { user_id: 2, username: 'bea', name: 'Bea', played_seconds: 7200, sessions: 2, last_played: '2026-03-01T20:00:00', seasons: [2026], completed: true, completions: 1, score: 70, playing: true, is_me: false },
-    { user_id: 1, username: 'ana', name: 'Ana', played_seconds: 3600, sessions: 1, last_played: null, seasons: [2026, 2025], completed: false, completions: 0, score: null, playing: false, is_me: true },
+    { user_id: 2, username: 'bea', name: 'Bea', played_seconds: 7200, sessions: 2, last_played: '2026-03-01T20:00:00', seasons: [2026], completed: true, completions: 1, score: 70, playing: true, is_active: true, is_me: false },
+    { user_id: 1, username: 'ana', name: 'Ana', played_seconds: 3600, sessions: 1, last_played: null, seasons: [2026, 2025], completed: false, completions: 0, score: null, playing: false, is_active: false, is_me: true },
   ],
   wished: false,
   wanted_by: [],

@@ -1,6 +1,6 @@
 """The catalog of games for the Juegos page: every game with what the group has done with it, filtered, ordered
-and paged. Derived from the library, the sessions and the ratings when asked; nothing is stored. Only active
-players count (never the emergency account)."""
+and paged. Derived from the library, the sessions and the ratings when asked; nothing is stored. Every
+player counts, active or not (never the emergency account)."""
 import datetime
 
 from sqlalchemy import func
@@ -34,7 +34,7 @@ def catalog(
 ) -> dict:
     """`library`: "have" (in the viewer's library) or "not". `completed` / `rated`: by the viewer.
     `playing`: somebody is playing it right now. `with_players`: at least one player has it."""
-    players = (models.User.is_active == 1, models.not_god())
+    players = (models.not_god(),)
 
     owners: dict[str, set[int]] = {}
     completers: dict[str, set[int]] = {}

@@ -56,6 +56,7 @@ class GameOverviewTests(ApiTestCase):
         body = self.overview().json()
         self.assertEqual([(p["name"], p["played_seconds"], p["sessions"]) for p in body["players"]], [("Bea", 7200, 2), ("Ana", 3600, 1)])
         self.assertEqual([p["is_me"] for p in body["players"]], [False, True])
+        self.assertEqual([p["is_active"] for p in body["players"]], [True, True])
         self.assertEqual((body["summary"]["players"], body["summary"]["played_seconds"]), (2, 10800))
 
     def test_seasons_completions_and_ratings(self):
@@ -72,11 +73,13 @@ class GameOverviewTests(ApiTestCase):
         self.assertEqual((by_name["Bea"]["completed"], by_name["Bea"]["score"]), (False, 70))
         self.assertEqual((body["summary"]["completed_by"], body["summary"]["score_count"], body["summary"]["score_mean"]), (1, 2, 80.0))
 
-    def test_inactive_players_and_other_games_are_left_out(self):
+    def test_inactive_players_are_listed_and_other_games_are_left_out(self):
         self.library_entry(self.gone, "celeste", TODAY(), "pc", completed=1, completed_date=TODAY())
         self.rate(self.gone, "celeste", 5)
         self.library_entry(self.ana, "hades", TODAY(), "pc")
-        self.assertEqual(self.overview().json()["players"], [])
+        players = self.overview().json()["players"]
+        self.assertEqual([(p["name"], p["completed"], p["score"]) for p in players], [("Gone", True, 5)])
+        self.assertFalse(players[0]["is_active"])
 
     def test_who_is_playing_it_right_now_is_marked_unless_stale_or_hidden(self):
         for user in (self.ana, self.bea, self.cai):
