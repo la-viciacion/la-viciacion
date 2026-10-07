@@ -5,7 +5,7 @@ import { formatDateTime, formatDuration, formatRelative } from '../../lib/format
 import { html, mount } from '../../lib/html.js';
 import { gameHref } from '../../lib/links.js';
 import { platformName } from '../../lib/platforms.js';
-import { iconCheck, iconChevron, iconPlay } from '../../ui/icons.js';
+import { iconChevron, iconCircleCheck, iconCircleCheckDone, iconPlay } from '../../ui/icons.js';
 import { scoreBadge } from '../../ui/score-badge.js';
 import { hasActive } from './timer.js';
 
@@ -84,8 +84,8 @@ function groupRow(g) {
             ${g.platforms.map((p) => html`<span class="platform-pill">${platformName(p)}</span>`)}
           </div>
         </div>
-        <button class="btn-continue ${g.completed ? 'done' : ''}" data-action="complete" data-game-id="${g.game_id}"
-                title="${g.completed ? 'Completado esta temporada' : 'Marcar como completado'}" aria-label="${g.completed ? `${name} ya está completado` : `Marcar ${name} como completado`}">${iconCheck()}</button>
+        <button class="btn-complete ${g.completed ? 'done' : ''}" data-action="complete" data-game-id="${g.game_id}"
+                title="${g.completed ? 'Completado esta temporada' : 'Marcar como completado'}" aria-label="${g.completed ? `${name} ya está completado` : `Marcar ${name} como completado`}">${g.completed ? iconCircleCheckDone() : iconCircleCheck()}</button>
         <button class="btn-continue" data-action="continue" data-game-id="${g.game_id}"
                 ${hasActive ? html`disabled title="Ya tienes un timer activo"` : html`title="Seguir jugando"`} aria-label="Seguir jugando a ${name}">${iconPlay()}</button>
         <span class="history-chevron" aria-hidden="true">${iconChevron()}</span>

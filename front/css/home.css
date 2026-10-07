@@ -201,14 +201,17 @@
 
 .btn-continue:hover:not(:disabled) { background: var(--accent-teal); color: #0a0a14; }
 
-/* check button: gold while the game is open, green once completed this season */
-.btn-continue[data-action="complete"] { color: var(--accent-gold); border-color: rgba(245, 197, 66, 0.4); }
-
-.btn-continue[data-action="complete"]:hover { background: var(--accent-gold); color: #0a0a14; }
-
-.btn-continue[data-action="complete"].done { color: var(--accent-teal); border-color: var(--accent-teal); background: rgba(61, 217, 179, 0.15); }
-
-.btn-continue[data-action="complete"].done:hover { background: var(--accent-teal); color: #0a0a14; }
+/* complete mark, no box: an empty circle in soft white while the game is open (its tick lights up on hover), a filled
+   green circle once it is completed this season. The hit area stays about 36 px even though nothing draws it. */
+.btn-complete {
+  display: flex; flex-shrink: 0; padding: 6px; background: none; border: none; border-radius: 50%;
+  color: var(--check-pending); cursor: pointer; transition: color 0.2s ease;
+}
+.btn-complete svg { width: 24px; height: 24px; }
+.btn-complete .ck-tick { opacity: 0.45; transition: opacity 0.2s ease; }
+.btn-complete:hover, .btn-complete:focus-visible { color: var(--text-primary); }
+.btn-complete:hover .ck-tick, .btn-complete:focus-visible .ck-tick { opacity: 1; }
+.btn-complete.done, .btn-complete.done:hover { color: var(--accent-teal); }
 
 .btn-continue:disabled { opacity: 0.35; cursor: not-allowed; }
 

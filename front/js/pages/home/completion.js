@@ -11,8 +11,6 @@ import { toast } from '../../ui/toast.js';
 import { scoreBadge } from '../../ui/score-badge.js';
 import { openRating } from './rating.js';
 
-const CONFIRM_MS = 4000;
-
 /** Opens the modal of `game` ({ id, name }) for the user `username`; onChange runs after a completion. */
 export async function openCompletion({ username, game, onChange }) {
   const path = `/users/${encodeURIComponent(username)}/library`;
@@ -62,18 +60,10 @@ export async function openCompletion({ username, game, onChange }) {
     }
   }
 
-  // The completion is announced to the group: the first click asks, the second (within 4 s) confirms.
+  // The completion is announced to the group, but opening this modal was already the question: one click completes.
   body.addEventListener('click', async (e) => {
     const button = e.target.closest('[data-complete]');
     if (!button) return;
-    if (!button.dataset.armed) {
-      button.dataset.armed = '1';
-      button.textContent = '¿Seguro? Pulsa otra vez';
-      setTimeout(() => {
-        if (button.isConnected) { delete button.dataset.armed; button.textContent = 'Marcar completado'; }
-      }, CONFIRM_MS);
-      return;
-    }
     button.disabled = true;
     try {
       await api(`${path}/${button.dataset.complete}/completion`, jsonRequest('PATCH', { completed: true }));
