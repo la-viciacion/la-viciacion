@@ -157,6 +157,7 @@ function progressView(s) {
     <div class="adm-actions">
       ${running ? html`<button class="adm-btn danger" id="rgCancel">Cancelar sincronización</button>` : ''}
       <button class="adm-btn" id="rgClose">${running ? 'Ocultar' : 'Cerrar'}</button>
+      ${running ? '' : html`<button class="adm-btn primary" id="rgAgain">Nueva sincronización</button>`}
     </div>`;
 }
 
@@ -170,6 +171,11 @@ function progress(onDone) {
   const draw = (s) => {
     mount(body, progressView(s));
     body.querySelector('#rgClose').addEventListener('click', () => m.close());
+    // The last run stays on screen after it ends (its ambiguous games are still to be resolved), so a new one starts from here.
+    body.querySelector('#rgAgain')?.addEventListener('click', () => {
+      m.close();
+      optionsStep(onDone).catch((err) => toast(err.message, 'err'));
+    });
     body.querySelector('#rgCancel')?.addEventListener('click', async () => {
       await api('/manage/rawg-sync/cancel', { method: 'POST' });
       toast('Cancelando…');
