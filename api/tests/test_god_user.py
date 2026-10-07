@@ -38,16 +38,16 @@ class EnsureGodUserTests(unittest.TestCase):
         user = types.SimpleNamespace(name="x", password=stored, is_admin=0, is_active=0)
         users.ensure_god_user(db_with(user))
         self.assertEqual(user.password, stored)
-        self.assertEqual((user.name, user.is_admin, user.is_active), ("Dios", 1, 1))
+        self.assertEqual((user.name, user.is_admin, user.is_active), ("Admin", 1, 1))
 
     def test_a_changed_password_is_restored(self):
-        user = types.SimpleNamespace(name="Dios", password=hashed("Other!Passw0rd1"), is_admin=1, is_active=1)
+        user = types.SimpleNamespace(name="Admin", password=hashed("Other!Passw0rd1"), is_admin=1, is_active=1)
         users.ensure_god_user(db_with(user))
         self.assertTrue(bcrypt.checkpw(PASSWORD.encode(), user.password.encode()))
 
     def test_an_unusable_stored_hash_is_replaced(self):
         for stored in (None, "", "not-a-hash"):
-            user = types.SimpleNamespace(name="Dios", password=stored, is_admin=1, is_active=1)
+            user = types.SimpleNamespace(name="Admin", password=stored, is_admin=1, is_active=1)
             users.ensure_god_user(db_with(user))
             self.assertTrue(bcrypt.checkpw(PASSWORD.encode(), user.password.encode()), repr(stored))
 
