@@ -21,12 +21,12 @@ config = Config()
 ####################
 
 
-def user_hours_players(db: Session, limit: int = None, is_active: bool | None = True) -> list[dict]:
+def user_hours_players(db: Session, limit: int = None, is_active: bool | None = None) -> list[dict]:
     rows = time_entries.players_played_time(db, is_active=is_active)
     return rows[:limit] if limit else rows
 
 
-def players_with_dates(db: Session, is_active: bool | None = True):
+def players_with_dates(db: Session, is_active: bool | None = None):
     """(user_id, name, played days) of every player, for the rankings derived from the days played.
 
     Three rankings need it (days, best and current streak): a caller that asks for several
@@ -35,7 +35,7 @@ def players_with_dates(db: Session, is_active: bool | None = True):
     return [(user_id, names[user_id], days) for user_id, days in time_entries.players_played_dates(db, is_active=is_active).items()]
 
 
-def user_days_played(db: Session, limit: int = None, is_active: bool | None = True, players=None) -> list[dict]:
+def user_days_played(db: Session, limit: int = None, is_active: bool | None = None, players=None) -> list[dict]:
     rows = [
         {"user_id": user_id, "name": name, "played_days": len(days)}
         for user_id, name, days in (players if players is not None else players_with_dates(db, is_active))
@@ -51,7 +51,7 @@ def _streaks(db: Session, is_active: bool | None, players=None):
         yield user_id, name, streaks.streak_summary(days, today, season)
 
 
-def user_best_streak(db: Session, limit: int = None, is_active: bool | None = True, players=None) -> list[dict]:
+def user_best_streak(db: Session, limit: int = None, is_active: bool | None = None, players=None) -> list[dict]:
     rows = [
         {"user_id": user_id, "name": name, "best_streak": summary[1], "best_streak_date": summary[0]}
         for user_id, name, summary in _streaks(db, is_active, players)
@@ -60,7 +60,7 @@ def user_best_streak(db: Session, limit: int = None, is_active: bool | None = Tr
     return rows[:limit] if limit else rows
 
 
-def user_current_streak(db: Session, limit: int = None, is_active: bool | None = True, players=None) -> list[dict]:
+def user_current_streak(db: Session, limit: int = None, is_active: bool | None = None, players=None) -> list[dict]:
     rows = [
         {"user_id": user_id, "name": name, "current_streak": summary[2]}
         for user_id, name, summary in _streaks(db, is_active, players)
@@ -73,7 +73,7 @@ def user_ranking_achievements(
     db: Session,
     limit: int = None,
     season: int = None,
-    is_active: bool | None = True,
+    is_active: bool | None = None,
 ):
     season = seasons.or_current(season)
     try:
@@ -101,7 +101,7 @@ def user_played_games(
     db: Session,
     limit: int = None,
     season: int = None,
-    is_active: bool | None = True,
+    is_active: bool | None = None,
 ):
     season = seasons.or_current(season)
     try:
@@ -130,7 +130,7 @@ def user_played_games(
         raise e
 
 
-def library_counts(db: Session, season: int = None, is_active: bool | None = True) -> list[dict]:
+def library_counts(db: Session, season: int = None, is_active: bool | None = None) -> list[dict]:
     """Per player: library entries of the season and how many are completed (one query).
 
     Every player is there, with zeros when they have no entries."""
@@ -158,7 +158,7 @@ def user_completed_games(
     db: Session,
     limit: int = None,
     season: int = None,
-    is_active: bool | None = True,
+    is_active: bool | None = None,
     counts=None,
 ):
     counts = counts if counts is not None else library_counts(db, season, is_active)
@@ -222,7 +222,7 @@ def platform_played_games(db: Session, limit: int = None):
         raise e
 
 
-def user_ratio(db: Session, season: int = None, is_active: bool | None = True, counts=None):
+def user_ratio(db: Session, season: int = None, is_active: bool | None = None, counts=None):
     counts = counts if counts is not None else library_counts(db, season, is_active)
     data = [
         {

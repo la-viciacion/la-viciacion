@@ -26,16 +26,16 @@ class RankingsFromTheDatabaseTests(unittest.TestCase):
         entries = [
             (1, "g1", 1), (1, "g2", 1), (1, "g3", 0),      # Ana: 3 entries, 2 completed
             (2, "g1", 0), (2, "g2", 0),                    # Bob: 2 entries, none completed
-            (4, "g1", 1),                                  # inactive: never listed
+            (4, "g1", 1),                                  # inactive: listed like the rest
         ]
         for user_id, game_id, completed in entries:
             self.db.add(models.UserGame(user_id=user_id, game_id=game_id, completed=completed, started_date=start, platform="pc"))
         self.db.add(models.UserGame(user_id=1, game_id="g1", completed=1, started_date=datetime.date(YEAR - 1, 5, 1), platform="ps"))
         self.db.commit()
 
-    def test_counts_cover_every_active_player_for_the_season_only(self):
+    def test_counts_cover_every_player_for_the_season_only(self):
         counts = {c["user_id"]: (c["entries"], c["completed"]) for c in rankings.library_counts(self.db)}
-        self.assertEqual(counts, {1: (3, 2), 2: (2, 0), 3: (0, 0)})
+        self.assertEqual(counts, {1: (3, 2), 2: (2, 0), 3: (0, 0), 4: (1, 1)})
 
     def test_another_season_is_counted_on_its_own(self):
         counts = {c["user_id"]: (c["entries"], c["completed"]) for c in rankings.library_counts(self.db, YEAR - 1)}
@@ -43,11 +43,11 @@ class RankingsFromTheDatabaseTests(unittest.TestCase):
 
     def test_completed_games_ranking(self):
         got = rankings.user_completed_games(self.db)
-        self.assertEqual([(r["user_id"], r["completed_games"]) for r in got], [(1, 2), (2, 0), (3, 0)])
+        self.assertEqual([(r["user_id"], r["completed_games"]) for r in got], [(1, 2), (4, 1), (2, 0), (3, 0)])
 
     def test_ratio_ranking_rounds_and_puts_zeros_last_by_id(self):
         got = rankings.user_ratio(self.db)
-        self.assertEqual([(r["user_id"], r["ratio"]) for r in got], [(1, 0.67), (2, 0), (3, 0)])
+        self.assertEqual([(r["user_id"], r["ratio"]) for r in got], [(4, 1.0), (1, 0.67), (2, 0), (3, 0)])
 
     def test_each_ranking_is_one_query_not_one_per_player(self):
         queries = []

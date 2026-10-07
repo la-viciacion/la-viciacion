@@ -24,7 +24,7 @@ function draw(d) {
       ${playerAvatar(header, d.playing ? 'live' : '')}
       <div class="pf-head-text">
         <h1 class="pf-title">${d.user.name}${d.is_me ? ' (tú)' : ''}</h1>
-        <div class="pf-sub">@${d.user.username}</div>
+        <div class="pf-sub">@${d.user.username}${d.is_active === false ? html` <span class="pf-tag muted">Inactivo</span>` : ''}</div>
         ${d.playing ? html`<div class="pf-sub"><span class="pf-tag live">Jugando ahora</span> <a class="game-link" href="${gameHref(d.playing.game_id)}">${d.playing.game_name}</a></div>` : ''}
       </div>
     </div>

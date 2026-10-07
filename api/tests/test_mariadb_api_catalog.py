@@ -331,12 +331,12 @@ class RankingsTests(CatalogTestCase):
         self.assertEqual(list(data), ["user_hours", "nope"])
         self.assertEqual(data["nope"], {"message": "More rankings are coming"})
 
-    def test_the_emergency_account_and_the_disabled_never_appear(self):
+    def test_the_emergency_account_never_appears_but_the_disabled_do(self):
         self.user("admin", admin=True)
         self.user("gone", active=False)
         names = {r["name"] for r in self.rankings(ranking="user_hours")["user_hours"]}
         self.assertNotIn("Admin", names)
-        self.assertNotIn("Gone", names)
+        self.assertIn("Gone", names)
 
     def test_a_previous_season_does_not_count(self):
         self.session(self.bea, "celeste", datetime.datetime(seasons.current() - 1, 5, 1, 20, 0), 600)

@@ -80,13 +80,11 @@ class ActivityTests(ApiTestCase):
             ("started", "Bea", (old - timedelta(days=400)).isoformat()),
         ])
 
-    def test_inactive_players_and_running_timers_are_left_out(self):
-        self.library_entry(self.gone, "celeste", TODAY(), "pc", completed=1, completed_date=TODAY())
-        self.session(self.gone, "celeste", ago(hours=2), 30)
-        self.rate(self.gone, "celeste", 10)
+    def test_inactive_players_count_but_running_timers_are_left_out(self):
+        self.library_entry(self.gone, "celeste", TODAY() - timedelta(days=2), "pc")
         self.api("POST", "/timers/start", as_user="ana", json={"user_id": self.ana, "game_id": "hades", "platform": "pc"})
         items = self.feed()["items"]
-        self.assertEqual([(i["type"], i["name"]) for i in items], [("started", "Ana")])  # the entry the timer opened, no "played"
+        self.assertEqual([(i["type"], i["name"]) for i in items], [("started", "Ana"), ("started", "Gone")])  # the entry the timer opened, no "played"
 
     def test_paging(self):
         for n in range(5):
