@@ -146,7 +146,7 @@ class AchievementLevelsTests(MariaDBTestCase):
         return row.special, bool(row.secret)
 
     def test_the_rows_at_their_default_get_what_the_code_says(self):
-        self.assertEqual(self.state("PLAYED_12_HOURS_DAY"), (1, False))
+        self.assertEqual(self.state("PLAYED_12_HOURS_DAY"), (1, True))  # 029 gave it the level, 033 (up to the head) made it secret
         self.assertEqual(self.state("JUST_IN_TIME"), (1, True))
         self.assertEqual(self.state("EARLY_RISER"), (0, True))
 
@@ -158,6 +158,48 @@ class AchievementLevelsTests(MariaDBTestCase):
         self.assertEqual(self.state("SOMETHING_THE_CODE_DROPPED"), (0, False))
         with self.engine.connect() as conn:
             self.assertEqual(conn.execute(text("SELECT COUNT(*) FROM achievements")).scalar(), 6)
+
+
+class AchievementReviewTests(MariaDBTestCase):
+    """033 brings the level and the secret mark of the rows an installation has to the reviewed catalogue, once, and
+    never over what an admin chose."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.migrate("032_weather_days")
+        with cls.engine.begin() as conn:
+            conn.execute(text(
+                "INSERT INTO achievements (`key`, title, message, special, secret) VALUES "
+                "('PLAYED_100_HOURS_GAME', 'a', 'm', 0, 0), "                 # at the old level: it is raised
+                "('PLAYED_50_GAMES', 'b', 'm', 3, 0), "                       # an admin made it purple: it stays purple
+                "('PLAYED_1000_HOURS_GAME_LIFETIME', 'c', 'm', 1, 0), "      # silver in the old code: now gold
+                "('SOLAR_ECLIPSE_LIFETIME', 'd', 'm', 0, 1), "               # created without a level
+                "('PLAYED_4_HOURS_SESSION', 'e', 'm', 0, 0), "               # now secret
+                "('PLAYED_7_DAYS', 'f', 'm', 0, 1), "                        # not in the list: an admin's mark stays
+                "('SOMETHING_THE_CODE_DROPPED', 'g', 'm', 0, 0)"             # unknown: untouched
+            ))
+        cls.migrate()
+
+    def state(self, key):
+        with self.engine.connect() as conn:
+            row = conn.execute(text("SELECT special, secret FROM achievements WHERE `key` = :k"), {"k": key}).one()
+        return row.special, bool(row.secret)
+
+    def test_the_rows_at_the_old_values_get_what_the_code_says(self):
+        self.assertEqual(self.state("PLAYED_100_HOURS_GAME"), (1, False))
+        self.assertEqual(self.state("PLAYED_1000_HOURS_GAME_LIFETIME"), (2, False))
+        self.assertEqual(self.state("SOLAR_ECLIPSE_LIFETIME"), (3, True))
+        self.assertEqual(self.state("PLAYED_4_HOURS_SESSION"), (0, True))
+
+    def test_what_an_admin_chose_is_never_overwritten(self):
+        self.assertEqual(self.state("PLAYED_50_GAMES"), (3, False))
+        self.assertEqual(self.state("PLAYED_7_DAYS"), (0, True))
+
+    def test_what_the_code_does_not_know_is_left_alone_and_nothing_is_inserted(self):
+        self.assertEqual(self.state("SOMETHING_THE_CODE_DROPPED"), (0, False))
+        with self.engine.connect() as conn:
+            self.assertEqual(conn.execute(text("SELECT COUNT(*) FROM achievements")).scalar(), 7)
 
 
 class UpgradeFromAnOlderRevisionTests(MariaDBTestCase):

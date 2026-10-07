@@ -11,7 +11,7 @@ def utc(jde):
 
 
 def clear_caches():
-    for cached in (astronomy.full_moons, astronomy.eclipses, astronomy.sun_events):
+    for cached in (astronomy.full_moons, astronomy._eclipses_of, astronomy._solar_eclipse_days_at, astronomy._lunar_eclipse_nights_at, astronomy.sun_events):
         cached.cache_clear()
 
 
@@ -65,5 +65,54 @@ class AstronomyTests(unittest.TestCase):
 
     def test_the_days_are_dates_of_the_local_clock(self):
         self.assertIn(datetime.date(2026, 3, 3), astronomy.moon_days(2026))
-        self.assertEqual(astronomy.eclipse_days(2028, "lunar"), {datetime.date(2028, 1, 12), datetime.date(2028, 7, 6), datetime.date(2028, 12, 31)})
         self.assertEqual(astronomy.sun_event_days(2027)["WINTER_SOLSTICE"], datetime.date(2027, 12, 22))
+
+
+MADRID = (40.4165, -3.7026)
+BUENOS_AIRES = (-34.6, -58.4)
+
+
+class SeenFromACityTests(unittest.TestCase):
+    """Which eclipses count for a player: the ones seen from their city, big enough."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.clock = mock.patch.object(astronomy, "_local", utc)
+        cls.clock.start()
+        clear_caches()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.clock.stop()
+        clear_caches()
+
+    def days(self, year, place=MADRID):
+        return sorted(astronomy.solar_eclipse_days_at(year, *place))
+
+    def nights(self, year, place=MADRID):
+        return astronomy.lunar_eclipse_nights_at(year, *place)
+
+    def test_the_magnitude_at_a_place_is_the_fraction_of_the_sun_covered_there(self):
+        august = [jde for kind, jde, _ in astronomy._eclipses_of(2027) if kind == "solar"][-1]
+        magnitude, when = astronomy.solar_eclipse_at(*MADRID, august)
+        self.assertAlmostEqual(magnitude, 0.88, delta=0.03)  # total in the south of Spain, partial in Madrid
+        self.assertLess(abs(when - august), 0.1)
+        self.assertEqual(astronomy.solar_eclipse_at(*BUENOS_AIRES, august)[0], 0.0)  # the Sun is below the horizon there, or far from the path
+
+    def test_a_solar_eclipse_counts_when_it_is_seen_big_enough_from_the_city(self):
+        self.assertEqual(self.days(2027), [datetime.date(2027, 8, 2)])
+        self.assertEqual(self.days(2029), [])  # four partial eclipses on Earth, none big enough from Madrid
+        self.assertEqual(self.days(2034), [])  # the one of March is seen at 0.14: below the minimum
+        self.assertEqual(self.days(2027, BUENOS_AIRES), [datetime.date(2027, 2, 6)])  # the annular one of February
+
+    def test_a_lunar_eclipse_counts_with_the_moon_up_and_enough_umbra_and_gives_the_night_it_is_in(self):
+        june, december = self.nights(2029)
+        self.assertEqual([moment.strftime("%Y-%m-%d") for moment in (june[0], june[1], december[0])], ["2029-06-25", "2029-06-26", "2029-12-20"])
+        self.assertLess(abs((june[0] - datetime.datetime(2029, 6, 25, 19, 49)).total_seconds()), 300)  # the sunset in Madrid, in UTC
+        self.assertLess(abs((june[1] - datetime.datetime(2029, 6, 26, 4, 46)).total_seconds()), 300)  # and the next sunrise
+        self.assertEqual(self.nights(2028), ())  # January: a bite of 0.06; July: below the horizon in Madrid; December: rising
+        self.assertEqual(self.nights(2034), ())  # the umbra of 0.01
+        self.assertTrue(astronomy.moon_is_up(*MADRID, [jde for kind, jde, _ in astronomy._eclipses_of(2029) if kind == "lunar"][0]))
+
+    def test_the_minimums_are_the_ones_agreed(self):
+        self.assertEqual((astronomy.SOLAR_MIN_MAGNITUDE, astronomy.LUNAR_MIN_UMBRAL), (0.25, 0.1))

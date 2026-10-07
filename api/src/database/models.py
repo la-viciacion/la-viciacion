@@ -16,7 +16,7 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
-from sqlalchemy.orm import deferred
+from sqlalchemy.orm import column_property, deferred
 
 from .database import Base
 
@@ -189,6 +189,9 @@ class Achievement(Base):
     secret = Column(Boolean, nullable=False, server_default=text("0"))
     # 0 = an ordinary one; 1, 2 and 3 are special ones: silver, gold and purple aura (front/js/lib/special.js)
     special = Column(SmallInteger, nullable=False, server_default=text("0"))
+    # what every reader asks, not `secret` alone: an achievement is secret when it is marked so or when it is special
+    # (a special one is as hidden as a secret one), so raising its level hides it without touching the mark
+    is_secret = column_property((secret == True) | (special > 0))  # noqa: E712
     # the first season it can be earned (before it nothing is awarded, recalculated or shown); see utils/achievements.py
     valid_from_season = Column(SmallInteger, nullable=False, server_default=text("2023"))
     __table_args__ = (UniqueConstraint("key"),)

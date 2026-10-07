@@ -57,30 +57,46 @@ def is_archaeological(release: datetime.date | None, played: datetime.date) -> b
 
 
 def _one_day(month: int, day: int):
-    return lambda year, born: frozenset({datetime.date(year, month, day)})
+    return lambda year, born, place: frozenset({datetime.date(year, month, day)})
 
 
-def _leap_day(year: int, born) -> frozenset:
+def _leap_day(year: int, born, place) -> frozenset:
     return frozenset({datetime.date(year, 2, 29)}) if calendar.isleap(year) else frozenset()
 
 
-def _birthday(year: int, born) -> frozenset:
+def _birthday(year: int, born, place) -> frozenset:
     return frozenset() if born is None else frozenset({birthday(born, year)})
 
 
 def _sun_event(name: str):
-    return lambda year, born: frozenset({astronomy.sun_event_days(year)[name]})
+    return lambda year, born, place: frozenset({astronomy.sun_event_days(year)[name]})
 
 
-# achievement key -> the days of a year it is about, given the player's birth date (None if they have not set it)
+def _solar_eclipse(year: int, born, place) -> frozenset:
+    """The days of a solar eclipse seen from the player's city: none without a city."""
+    return frozenset() if place is None else astronomy.solar_eclipse_days_at(year, *place)
+
+
+def lunar_eclipse_nights(years, place) -> list[tuple[datetime.datetime, datetime.datetime]]:
+    """The nights, (sunset, next sunrise), of the lunar eclipses seen from the player's city."""
+    return [] if place is None else [night for year in years for night in astronomy.lunar_eclipse_nights_at(year, *place)]
+
+
+def _lunar_eclipse(year: int, born, place) -> frozenset:
+    """The days a lunar eclipse night touches (the sunset's and the sunrise's): the night itself is `lunar_eclipse_nights`."""
+    return frozenset(day.date() for night in lunar_eclipse_nights([year], place) for day in night)
+
+
+# achievement key -> the days of a year it is about, given the player's birth date and city, (latitude, longitude)
+# (None if they have not set them)
 DAYS = {
     "STAR_WARS_DAY_LIFETIME": _one_day(5, 4),
     "MARIO_DAY_LIFETIME": _one_day(3, 10),
     "LEAP_DAY_LIFETIME": _leap_day,
     "BIRTHDAY_LIFETIME": _birthday,
-    "FULL_MOON_LIFETIME": lambda year, born: astronomy.moon_days(year),
-    "LUNAR_ECLIPSE_LIFETIME": lambda year, born: astronomy.eclipse_days(year, "lunar"),
-    "SOLAR_ECLIPSE_LIFETIME": lambda year, born: astronomy.eclipse_days(year, "solar"),
+    "FULL_MOON_LIFETIME": lambda year, born, place: astronomy.moon_days(year),
+    "LUNAR_ECLIPSE_LIFETIME": _lunar_eclipse,
+    "SOLAR_ECLIPSE_LIFETIME": _solar_eclipse,
     "SPRING_EQUINOX_LIFETIME": _sun_event("SPRING_EQUINOX"),
     "SUMMER_SOLSTICE_LIFETIME": _sun_event("SUMMER_SOLSTICE"),
     "AUTUMN_EQUINOX_LIFETIME": _sun_event("AUTUMN_EQUINOX"),
@@ -94,6 +110,12 @@ GAME_RULES = {
 }
 
 
-def days_of(key: str, years, born: datetime.date | None) -> frozenset[datetime.date]:
+def windows_of(key: str, years, place) -> list | None:
+    """The stretches of time (from, to) in which the achievement `key` counts, if it asks for a moment of the day and not
+    only for the day: a timer has to start inside one. None for the ones that only ask for the day."""
+    return lunar_eclipse_nights(years, place) if key == "LUNAR_ECLIPSE_LIFETIME" else None
+
+
+def days_of(key: str, years, born: datetime.date | None, place: tuple[float, float] | None = None) -> frozenset[datetime.date]:
     """Every day of `years` that the achievement `key` is about."""
-    return frozenset(day for year in years for day in DAYS[key](year, born))
+    return frozenset(day for year in years for day in DAYS[key](year, born, place))

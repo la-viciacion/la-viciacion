@@ -3,8 +3,9 @@
 The formulas are the ones of Jean Meeus, *Astronomical Algorithms* (2nd ed.): chapter 27 (equinoxes and
 solstices), 49 (phases of the Moon) and 54 (eclipses). They are accurate to a couple of minutes over the years
 that matter here, far more than a game session needs: the achievements only ask on which *day* something
-happens. Eclipses are judged from the Earth as a whole (an eclipse the player could not see from their city
-still counts), like the rest of the app, which never asks where a player is for anything but the weather.
+happens. Which eclipses there are on the Earth comes from those formulas; whether one can be seen from a
+given city (and how much of the Sun is covered there) is worked out with the positions of the Sun and the Moon of
+the `ephem` library, which carries its own tables (nothing is downloaded).
 
 Every instant is turned into the server's local time (`TZ`, Europe/Madrid in a deployment) with the C library,
 the way the rest of the app reads the clock, so a "day" here is the same day as a session's date.
@@ -12,6 +13,8 @@ the way the rest of the app reads the clock, so a "day" here is the same day as 
 import datetime
 import functools
 import math
+
+import ephem
 
 # TT - UT in seconds: 69 s in the 2020s, 72 s by 2040. A minute is enough for a day, so one value serves.
 DELTA_T = 70.0
@@ -172,19 +175,25 @@ def full_moons(year: int) -> tuple[datetime.datetime, ...]:
 
 
 @functools.lru_cache(maxsize=None)
-def eclipses(year: int) -> tuple[tuple[str, datetime.datetime], ...]:
-    """The eclipses of the year as (kind, moment of the greatest eclipse in local time), oldest first. The kind
-    is "solar" (partial, annular, total or hybrid) or "lunar": only the ones where the Moon enters the umbra,
-    partial or total. A penumbral one cannot be told with the naked eye, so it does not count."""
+def _eclipses_of(year: int) -> tuple[tuple[str, float, float], ...]:
+    """The eclipses of the year as (kind, greatest eclipse in Julian Ephemeris Days, umbral magnitude: of a lunar one,
+    0 for a solar one), oldest first. The kind is "solar" (partial, annular, total or hybrid) or "lunar": only the
+    ones where the Moon enters the umbra, partial or total. A penumbral one cannot be told with the naked eye."""
     found = []
     for k in _k_range(year):
         new = _Phase(k).eclipse(full=False)
         if new is not None and abs(new[1]) < 1.5433 + new[2]:
-            found.append(("solar", _local(new[0])))
+            found.append(("solar", new[0], 0.0))
         full = _Phase(k + 0.5).eclipse(full=True)
-        if full is not None and (1.0128 - full[2] - abs(full[1])) / 0.5450 > 0:
-            found.append(("lunar", _local(full[0])))
-    return tuple(sorted(((kind, moment) for kind, moment in found if moment.year == year), key=lambda item: item[1]))
+        umbral = 0.0 if full is None else (1.0128 - full[2] - abs(full[1])) / 0.5450
+        if umbral > 0:
+            found.append(("lunar", full[0], umbral))
+    return tuple(sorted((item for item in found if _local(item[1]).year == year), key=lambda item: item[1]))
+
+
+def eclipses(year: int) -> tuple[tuple[str, datetime.datetime], ...]:
+    """The eclipses of the year anywhere on Earth as (kind, moment of the greatest eclipse in local time)."""
+    return tuple((kind, _local(jde)) for kind, jde, _ in _eclipses_of(year))
 
 
 # (A, B, C) of Meeus table 27.C: the periodic terms that bring a mean equinox or solstice to the true one.
@@ -225,9 +234,102 @@ def moon_days(year: int) -> frozenset[datetime.date]:
     return frozenset(moment.date() for moment in full_moons(year))
 
 
-def eclipse_days(year: int, kind: str) -> frozenset[datetime.date]:
-    """The days of the year (local) of the "solar" or "lunar" eclipses."""
-    return frozenset(moment.date() for found, moment in eclipses(year) if found == kind)
+# What an eclipse has to be to count for a player: seen from their city, a solar one covering at least this fraction
+# of the Sun's diameter, a lunar one entering the umbra at least this much (the Moon above the horizon at its greatest)
+SOLAR_MIN_MAGNITUDE = 0.25
+LUNAR_MIN_UMBRAL = 0.1
+# The Julian Date of the zero of `ephem`'s dates (31 December 1899, 12:00)
+_EPHEM_ZERO = 2415020.0
+# How far from the greatest eclipse the sun is looked at, and how often: a solar eclipse lasts about three hours at
+# most at one place
+_SCAN_MINUTES = 210
+_SCAN_STEP_MINUTES = 2
+
+
+def _observer(latitude: float, longitude: float) -> ephem.Observer:
+    observer = ephem.Observer()
+    observer.lat, observer.lon = str(latitude), str(longitude)
+    observer.elevation = 0
+    observer.pressure = 0  # no refraction: the horizon is the geometric one, plenty for a day
+    return observer
+
+
+def _ephem_date(jde: float) -> ephem.Date:
+    return ephem.Date(jde - DELTA_T / 86400.0 - _EPHEM_ZERO)
+
+
+def solar_eclipse_at(latitude: float, longitude: float, jde: float) -> tuple[float, float]:
+    """(the greatest magnitude, when it is, in JDE) of a solar eclipse as seen from a place, looking around the moment
+    of the greatest eclipse of the Earth. The magnitude is the fraction of the Sun's diameter covered, with the Sun
+    above the horizon: 0 if nothing is seen from there."""
+    observer = _observer(latitude, longitude)
+    best = (0.0, jde)
+    for minutes in range(-_SCAN_MINUTES, _SCAN_MINUTES + 1, _SCAN_STEP_MINUTES):
+        moment = jde + minutes / 1440.0
+        observer.date = _ephem_date(moment)
+        sun, moon = ephem.Sun(observer), ephem.Moon(observer)
+        if sun.alt <= 0:
+            continue
+        separation = float(ephem.separation((sun.ra, sun.dec), (moon.ra, moon.dec)))
+        magnitude = (float(sun.radius) + float(moon.radius) - separation) / (2 * float(sun.radius))
+        if magnitude > best[0]:
+            best = (magnitude, moment)
+    return best
+
+
+def moon_is_up(latitude: float, longitude: float, jde: float) -> bool:
+    observer = _observer(latitude, longitude)
+    observer.date = _ephem_date(jde)
+    return ephem.Moon(observer).alt > 0
+
+
+def _sunset_and_sunrise(latitude: float, longitude: float, jde: float) -> tuple[float, float] | None:
+    """(the sunset before `jde`, the sunrise after it), both in JDE, or None if the Sun does not set there that day."""
+    observer = _observer(latitude, longitude)
+    observer.horizon = "-0:34"  # the usual one: the refraction of the horizon, with the pressure at 0 of `_observer`
+    observer.date = _ephem_date(jde)
+    try:
+        setting = observer.previous_setting(ephem.Sun())
+        rising = observer.next_rising(ephem.Sun())
+    except (ephem.AlwaysUpError, ephem.NeverUpError):
+        return None
+    return tuple(float(moment) + _EPHEM_ZERO + DELTA_T / 86400.0 for moment in (setting, rising))
+
+
+@functools.lru_cache(maxsize=None)
+def _solar_eclipse_days_at(year: int, latitude: float, longitude: float) -> frozenset[datetime.date]:
+    days = set()
+    for kind, jde, _ in _eclipses_of(year):
+        if kind == "solar":
+            magnitude, when = solar_eclipse_at(latitude, longitude, jde)
+            if magnitude >= SOLAR_MIN_MAGNITUDE:
+                days.add(_local(when).date())
+    return frozenset(days)
+
+
+def solar_eclipse_days_at(year: int, latitude: float, longitude: float) -> frozenset[datetime.date]:
+    """The days of the year (local) of the solar eclipses that count from a place: seen from there with at least
+    `SOLAR_MIN_MAGNITUDE`. The place is taken to two decimals, about a kilometre."""
+    return _solar_eclipse_days_at(year, round(latitude, 2), round(longitude, 2))
+
+
+@functools.lru_cache(maxsize=None)
+def _lunar_eclipse_nights_at(year: int, latitude: float, longitude: float) -> tuple[tuple[datetime.datetime, datetime.datetime], ...]:
+    nights = []
+    for kind, jde, umbral in _eclipses_of(year):
+        if kind != "lunar" or umbral < LUNAR_MIN_UMBRAL or not moon_is_up(latitude, longitude, jde):
+            continue
+        night = _sunset_and_sunrise(latitude, longitude, jde)
+        if night is not None:
+            nights.append((_local(night[0]), _local(night[1])))
+    return tuple(nights)
+
+
+def lunar_eclipse_nights_at(year: int, latitude: float, longitude: float) -> tuple[tuple[datetime.datetime, datetime.datetime], ...]:
+    """The nights of the year, as (sunset, next sunrise) in local time, in which a lunar eclipse counts from a place:
+    the Moon is up at its greatest and enters the umbra by at least `LUNAR_MIN_UMBRAL`. Playing in one of them means
+    starting after that sunset."""
+    return _lunar_eclipse_nights_at(year, round(latitude, 2), round(longitude, 2))
 
 
 def sun_event_days(year: int) -> dict[str, datetime.date]:

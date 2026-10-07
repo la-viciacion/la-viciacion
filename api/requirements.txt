@@ -9,6 +9,7 @@ pymysql==1.2.3
 sqlalchemy==2.1.2
 alembic==1.20.0
 requests==2.34.2
+ephem==4.2.1
 howlongtobeatpy==1.0.24
 python_telegram_bot==22.8
 pywebpush==2.5.0
