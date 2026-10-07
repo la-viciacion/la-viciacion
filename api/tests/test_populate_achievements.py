@@ -1,6 +1,7 @@
 import unittest
 from unittest import mock
 
+from src.utils import actions  # noqa: F401  (imported first: the crud and utils modules import each other)
 from src.crud.achievements import Achievements
 from src.database import models
 from src.utils.achievements import AchievementsElems
