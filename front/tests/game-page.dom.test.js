@@ -8,7 +8,7 @@ globalThis.location = window.location; // the page reads the address
 const page = await import('../js/pages/game/index.js');
 
 const OVERVIEW = {
-  game: { id: 'celeste', name: 'Celeste <b>', image_url: null, genres: ['Platformer'], dev: 'Maddy', release_date: '2018-01-25', avg_time: 30000 },
+  game: { id: 'celeste', name: 'Celeste <b>', image_url: null, genres: ['Platformer'], tags: ['Singleplayer', 'platformer', 'Pixel <i>'], dev: 'Maddy', release_date: '2018-01-25', avg_time: 30000 },
   summary: { players: 2, played_seconds: 10800, completed_by: 1, score_count: 2, score_mean: 80 },
   players: [
     { user_id: 2, username: 'bea', name: 'Bea', played_seconds: 7200, sessions: 2, last_played: '2026-03-01T20:00:00', seasons: [2026], completed: true, completions: 1, score: 70, playing: true, is_active: true, is_me: false },
@@ -83,4 +83,10 @@ test('an unknown game says so', async () => {
   installApi({ 'GET /games/celeste/overview': json({ detail: 'Game not exists' }, 404) });
   await page.render({ main: main(), user: { id: 1, username: 'ana' } });
   assert.match(main().textContent, /Este juego no existe/);
+});
+
+test('it shows the genres and the tags, without repeating a genre among the tags and escaping them', () => {
+  assert.deepEqual(text('.gm-genres:not(.gm-tags) .pf-tag'), ['Platformer']);
+  assert.deepEqual(text('.gm-tags .pf-tag'), ['Singleplayer', 'Pixel <i>']);
+  assert.equal(document.querySelectorAll('.gm-tags i').length, 0);
 });

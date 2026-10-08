@@ -398,6 +398,7 @@ class GamePatch(BaseModel):
     steam_id: Optional[str] = None
     image_url: Optional[str] = None
     genres: Optional[str] = None
+    tags: Optional[str] = None
     avg_time: Optional[int] = None
     slug: Optional[str] = None
     rawg_id: Optional[int] = None
@@ -412,6 +413,7 @@ def _game_out(g: models.Game, sessions: int = 0, players: int = 0, played_second
         "steam_id": g.steam_id,
         "image_url": g.image_url,
         "genres": g.genres,
+        "tags": g.tags,
         "avg_time": g.avg_time,
         "slug": g.slug,
         "rawg_id": g.rawg_id,

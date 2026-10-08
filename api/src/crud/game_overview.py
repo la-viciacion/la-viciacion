@@ -82,6 +82,7 @@ def overview(db: Session, game_id: str, viewer_id: int) -> dict | None:
             "name": game.name,
             "image_url": game.image_url,
             "genres": games.genre_list(game.genres),
+            "tags": games.genre_list(game.tags),
             "dev": game.dev,
             "release_date": game.release_date,
             "avg_time": game.avg_time or None,

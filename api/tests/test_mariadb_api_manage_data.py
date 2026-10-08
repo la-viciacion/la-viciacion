@@ -184,6 +184,9 @@ class GamesAdminTests(ManageTestCase):
     def test_patching_a_game(self):
         done = self.admin("PATCH", "/games/hades", json={"dev": "Supergiant", "avg_time": 22, "release_date": "2020-09-17", "rawg_id": 404}).json()
         self.assertEqual((done["dev"], done["avg_time"], done["release_date"], done["rawg_id"]), ("Supergiant", 22, "2020-09-17", 404))
+        tagged = self.admin("PATCH", "/games/hades", json={"tags": "Roguelike,Action"}).json()
+        self.assertEqual(tagged["tags"], "Roguelike,Action")  # added by hand, and the list shows them
+        self.assertEqual(next(g for g in self.admin("GET", "/games").json()["items"] if g["id"] == "hades")["tags"], "Roguelike,Action")
         self.assertEqual(self.admin("PATCH", "/games/hades", json={"name": "  "}).status_code, 400)
         self.assertEqual(self.admin("PATCH", "/games/hades", json={"name": "Celeste"}).status_code, 409)  # names are unique
         self.assertEqual(self.admin("PATCH", "/games/nope", json={"dev": "x"}).status_code, 404)

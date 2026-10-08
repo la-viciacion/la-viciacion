@@ -41,6 +41,9 @@ function playerRow(p) {
 
 function draw(data) {
   const { game, summary, players } = data;
+  // RAWG repeats some genres among its tags (Indie, Action...): showing them twice says nothing more
+  const known = new Set(game.genres.map((genre) => genre.toLowerCase()));
+  const tags = (game.tags || []).filter((tag) => !known.has(tag.toLowerCase()));
   const mine = players.find((p) => p.is_me);
   const details = [game.dev, game.release_date ? formatDate(game.release_date) : null,
     game.avg_time ? `se completa en unas ${formatDuration(game.avg_time)}` : null].filter(Boolean).join(' · ');
@@ -54,6 +57,7 @@ function draw(data) {
       <div>
         <h1 class="pf-title">${game.name}</h1>
         <div class="gm-genres">${game.genres.map((genre) => html`<span class="pf-tag muted">${genre}</span>`)}</div>
+        ${tags.length ? html`<div class="gm-genres gm-tags" aria-label="Etiquetas">${tags.map((tag) => html`<span class="pf-tag muted">${tag}</span>`)}</div>` : ''}
         ${details ? html`<div class="pf-sub">${details}</div>` : ''}
       </div>
     </div>
