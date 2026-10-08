@@ -181,12 +181,17 @@ class CreateGameTests(CatalogTestCase):
         game = self.create(rawg_id=101).json()
         self.assertEqual((game["name"], game["avg_time"]), ("Celeste", 0))
 
-    def test_without_a_rawg_id_the_best_search_result_is_used(self):
+    def test_without_a_rawg_id_the_game_is_added_as_typed_never_as_the_best_search_result(self):
         self.with_rawg(Rawg(search=[CELESTE], details={101: CELESTE}))
-        game = self.create(name="celeste").json()
-        self.assertEqual((game["name"], game["rawg_id"]), ("Celeste", 101))
+        game = self.create(name="Celeste: Farewell").json()
+        self.assertEqual((game["name"], game["rawg_id"], game["slug"]), ("Celeste: Farewell", None, ""))
 
-    def test_when_rawg_knows_nothing_the_game_is_added_as_typed(self):
+    def test_a_game_typed_by_hand_keeps_the_optional_details_it_was_given(self):
+        self.with_rawg(Rawg())
+        game = self.create(name="My Indie Thing", dev=" Me ", release_date="2026-09-17").json()
+        self.assertEqual((game["dev"], game["release_date"], game["rawg_id"], game["avg_time"]), ("Me", "2026-09-17", None, 0))
+
+    def test_when_only_the_name_is_given_the_rest_is_left_empty(self):
         self.with_rawg(Rawg())
         game = self.create(name="My Indie Thing").json()
         self.assertEqual((game["name"], game["dev"], game["rawg_id"], game["avg_time"]), ("My Indie Thing", "-", None, 0))
@@ -199,7 +204,7 @@ class CreateGameTests(CatalogTestCase):
         self.game("celeste", "Celeste", rawg_id=101)
         self.assertEqual(self.create(name="Whatever", rawg_id=101).status_code, 400)
         duplicate = self.create(name="CELESTE")
-        self.assertEqual((duplicate.status_code, duplicate.json()["detail"]), (400, "Game already in DB"))
+        self.assertEqual((duplicate.status_code, duplicate.json()["detail"]), (400, "Ese juego ya está en el catálogo"))
         self.assertEqual(self.scalar("SELECT COUNT(*) FROM games"), 1)
 
     def test_a_typed_name_is_trimmed_before_it_is_compared_and_stored(self):
@@ -220,7 +225,7 @@ class CreateGameTests(CatalogTestCase):
     def test_rawg_resolving_to_a_game_already_here_returns_that_game(self):
         self.game("celeste", "Celeste")
         self.with_rawg(Rawg(search=[CELESTE], details={101: CELESTE}))
-        response = self.create(name="celeste classic remaster")  # a different typed name that RAWG resolves to Celeste
+        response = self.create(name="celeste classic remaster", rawg_id=101)  # a different typed name that RAWG resolves to Celeste
         self.assertEqual(response.json()["id"], "celeste")
         self.assertEqual(self.scalar("SELECT COUNT(*) FROM games"), 1)
 

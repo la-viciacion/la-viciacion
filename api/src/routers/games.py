@@ -6,6 +6,7 @@ from .. import auth
 from ..auth import get_db
 from ..crud import game_catalog, game_overview, games
 from ..database import models, schemas
+from ..utils import messages
 from ..utils import my_utils as utils
 from ..utils.logger import LogManager
 
@@ -108,11 +109,11 @@ def get_game_by_id(game_id: str, db: Session = Depends(get_db)):
 
 @router.post("/", response_model=schemas.Game, status_code=201)
 async def create_game(game: schemas.NewGame, db: Session = Depends(get_db)):
-    """Add a new game to DB, resolving details via RAWG."""
+    """Add a new game to DB: from its RAWG entry when `rawg_id` is given, as typed otherwise (only the name is required)."""
     # the duplicate check and the stored name must see the same text: " Celeste" is "Celeste"
     game.name = game.name.strip()
     if not game.name:
-        raise HTTPException(status_code=400, detail="The name cannot be empty")
+        raise HTTPException(status_code=400, detail=messages.GAME_NAME_EMPTY)
     await run_in_threadpool(_refuse_duplicates, db, game)
     return await games.new_game(db=db, game=game)
 
@@ -125,12 +126,12 @@ def _refuse_duplicates(db: Session, game: schemas.NewGame) -> None:
             .first()
         )
         if existing:
-            raise HTTPException(status_code=400, detail="Game already in DB")
+            raise HTTPException(status_code=400, detail=messages.GAME_ALREADY_IN_CATALOGUE)
 
     games_db = games.get_game_by_name(db, game.name)
     for game_db in games_db:
         if game_db.name.strip().lower() == game.name.strip().lower():
-            raise HTTPException(status_code=400, detail="Game already in DB")
+            raise HTTPException(status_code=400, detail=messages.GAME_ALREADY_IN_CATALOGUE)
 
 
 @router.put("/{game_id}", response_model=schemas.Game, status_code=200)
