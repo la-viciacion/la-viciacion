@@ -181,9 +181,15 @@
 .ac-text { min-width: 0; color: var(--text-secondary); overflow-wrap: anywhere; }
 .ac-text strong { color: var(--text-primary); }
 
-/* Statistics placeholder */
-.wip-card { align-items: flex-start; }
-.wip-card .menu-wip { margin-left: 0; }
+/* Statistics page */
+.st-block { margin-bottom: 28px; }
+.st-line { display: block; width: 100%; height: auto; }
+.st-grid { stroke: var(--border); stroke-width: 1; }
+.st-axis { fill: var(--text-muted); font-size: 11px; }
+.st-path { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.st-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 0.85rem; }
+.st-key { display: inline-flex; align-items: center; gap: 6px; }
+.st-key i { width: 10px; height: 10px; border-radius: 50%; background: var(--c); }
 
 /* Games page */
 .gc-toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
