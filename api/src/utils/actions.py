@@ -160,9 +160,10 @@ def after_session_change(
     duration in seconds) of the timer that has just been stopped: what only a real timer can earn
     ("Lo he abierto sin querer") is judged from it, never from the sessions in the database.
 
-    `recalculate` is the seasons of a session that was edited or deleted: instead of only adding what
+    `recalculate` is the seasons of a session that was added, edited or deleted: instead of only adding what
     the user has earned, their achievements of those seasons are worked out again, so what the session
-    earned and no longer holds is revoked (see crud/achievements_recalc.py). It never notifies.
+    earned and no longer holds is revoked (see crud/achievements_recalc.py). What it adds is announced unless
+    `silent` (an admin's changes are silent); a revocation never is.
     """
     from ..database.database import SessionLocal
 
@@ -172,7 +173,7 @@ def after_session_change(
             if recalculate:
                 from ..crud import achievements_recalc  # imports this module too
 
-                await achievements_recalc.recalculate_user(db, user_id, recalculate)
+                await achievements_recalc.recalculate_user(db, user_id, recalculate, notify=not silent)
             else:
                 await check_users(db, silent=silent, user_ids=None if user_id is None else [user_id])
             if stopped is not None:

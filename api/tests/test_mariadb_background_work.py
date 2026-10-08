@@ -430,6 +430,49 @@ class EditedSessionTests(WorkTestCase):
         self.assertNotIn("STREAK_7_DAYS", got)
         self.assertEqual(self.sent, [])
 
+    def test_a_session_added_by_hand_announces_what_it_earns(self):
+        self.play_days(self.ana, 6)
+        self.sent.clear()
+        self.session(self.ana, "celeste", at(3, 7), 30)  # the seventh day: the session a player enters by hand
+        self.real_actions["after_session_change"](self.ana, False, recalculate=[YEAR])
+        self.assertTrue({"PLAYED_7_DAYS", "STREAK_7_DAYS"} <= set(self.awarded()))
+        told = [m["text"] for m in self.sent]
+        self.assertTrue(any("Ana" in text for text in told), told)
+        self.assertTrue(all(not m["silent"] for m in self.sent))
+
+    def test_the_same_change_made_silently_announces_nothing_but_still_stores_it(self):
+        self.play_days(self.ana, 7)
+        self.real_actions["after_session_change"](self.ana, True, recalculate=[YEAR])
+        self.assertIn("PLAYED_7_DAYS", self.awarded())
+        self.assertEqual(self.sent, [])
+
+    def test_what_is_already_held_is_not_announced_again(self):
+        self.play_days(self.ana, 7)
+        self.real_actions["after_session_change"](self.ana, False, recalculate=[YEAR])
+        self.sent.clear()
+        self.real_actions["after_session_change"](self.ana, False, recalculate=[YEAR])
+        self.assertEqual(self.sent, [])
+
+    def test_a_session_edited_by_a_player_revokes_what_it_no_longer_holds_without_announcing_it(self):
+        self.play_days(self.ana, 7)
+        self.check_one()
+        self.assertIn("PLAYED_7_DAYS", self.awarded())
+        with self.engine.begin() as conn:  # the seventh session is corrected to a day the player already played
+            conn.execute(text("UPDATE game_timers SET start_time = start_time - INTERVAL 23 HOUR, end_time = end_time - INTERVAL 23 HOUR "
+                              "WHERE user_id = :u ORDER BY start_time DESC LIMIT 1"), {"u": self.ana})
+        self.sent.clear()
+        self.real_actions["after_session_change"](self.ana, False, recalculate=[YEAR])
+        self.assertNotIn("PLAYED_7_DAYS", self.awarded())
+        # a revocation is never announced (moving the session may earn something else, which is)
+        self.assertFalse([m for m in self.sent if E.PLAYED_7_DAYS.value["title"] in m["text"]])
+
+    def test_the_ones_that_need_several_players_are_never_announced_from_a_recalculation(self):
+        for user in (self.ana, self.bea, self.user("cris"), self.user("dani")):
+            self.session(user, "celeste", at(3, 4, 20), 60)
+        self.real_actions["after_session_change"](self.ana, False, recalculate=[YEAR])
+        self.assertIn("TEAMWORK", self.awarded())
+        self.assertFalse([m for m in self.sent if "TEAMWORK" in str(m) or E.TEAMWORK.value["title"] in m["text"]])
+
     def test_only_the_seasons_asked_for_are_worked_out_again(self):
         key_id = self.scalar("SELECT id FROM achievements WHERE `key` = 'PLAYED_30_DAYS'")
         with self.engine.begin() as conn:
