@@ -215,6 +215,40 @@ class SyncRunTests(SyncTestCase):
         status = self.sync()
         self.assertEqual((status["total"], status["calls"], self.rawg.calls), (0, 0, []))
 
+    def complete(self, game_id, name, **overrides):
+        self.game(game_id, name, **{"rawg_id": 5, "slug": "s", "dev": "Dev", "genres": "RPG", "tags": "Singleplayer",
+                                    "image_url": "https://i", "steam_id": "1", "release_date": datetime.date(2020, 1, 1), **overrides})
+
+    def test_a_game_rawg_has_no_tags_for_is_asked_once_and_not_on_every_run(self):
+        self.complete("notags", "No tags", rawg_id=7, tags=None)
+        self.rawg.details[7] = rawg_game(7, "No tags")  # RAWG answers without tags
+        first = self.sync()
+        self.assertEqual((first["total"], first["updated"]), (1, 1))
+        self.assertEqual(self.game_row("notags").tags, "")
+        self.rawg.calls.clear()
+        second = self.sync()
+        self.assertEqual((second["total"], second["calls"], self.rawg.calls), (0, 0, []))
+
+    def test_a_developer_or_a_release_date_rawg_does_not_have_does_not_keep_a_game_pending(self):
+        self.complete("nodev", "No dev", rawg_id=8, dev="-")
+        self.complete("nodate", "No date", rawg_id=9, release_date=None)
+        self.complete("emptytags", "Empty tags", rawg_id=10, tags="")
+        status = self.sync()
+        self.assertEqual((status["total"], status["calls"], self.rawg.calls), (0, 0, []))
+
+    def test_a_missing_slug_image_or_genres_still_make_a_game_pending(self):
+        self.complete("noslug", "No slug", rawg_id=11, slug=None)
+        self.complete("noimage", "No image", rawg_id=12, image_url="")
+        self.complete("nogenres", "No genres", rawg_id=13, genres=None)
+        for rawg_id in (11, 12, 13):
+            self.rawg.details[rawg_id] = rawg_game(rawg_id, "x", tags=[{"name": "Singleplayer", "language": "eng"}])
+        self.assertEqual(self.sync()["total"], 3)
+
+    def test_overwrite_still_takes_every_game(self):
+        self.complete("full", "Full", rawg_id=14)
+        self.rawg.details[14] = rawg_game(14, "Full")
+        self.assertEqual(self.sync(overwrite=True)["total"], 1)
+
     def test_an_ambiguous_name_is_left_for_the_admin_with_the_candidates(self):
         self.game("zelda", "Zelda")
         self.rawg.search_results["zelda"] = [rawg_game(1, "Zelda: Link"), rawg_game(2, "Zelda II")]
@@ -354,9 +388,9 @@ class SyncRunTests(SyncTestCase):
         self.assertEqual(len(rawg_sync.status()["not_found"]), 1)  # not two
 
     def test_a_game_whose_details_change_nothing_is_counted_as_unchanged(self):
-        self.game("a", "A", rawg_id=1, slug="a", dev="Maddy Makes Games", genres="Indie,Platformer",
+        self.game("a", "A", rawg_id=1, slug="a", dev="Maddy Makes Games", genres="Indie,Platformer", tags="",
                   image_url="https://img/1.jpg", steam_id="1", release_date=datetime.date(2018, 1, 25))
-        self.rawg.details[1] = rawg_game(1, "A", slug="a")
+        self.rawg.details[1] = rawg_game(1, "A", slug="a")  # and RAWG still has no tags for it
         self.assertEqual(self.sync(overwrite=True)["unchanged"], 1)
 
 
