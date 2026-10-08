@@ -168,6 +168,9 @@ def _apply(game: models.Game, det: dict, overwrite: bool) -> list[str]:
             if getattr(game, f) != new:
                 setattr(game, f, new)
                 changed.append(f)
+    if game.tags is None and det.get("tags") == "":
+        game.tags = ""                            # RAWG has none for this game: asked once, not on every run
+        changed.append("tags")
     return changed
 
 
@@ -178,17 +181,22 @@ def _needs_steam(game: models.Game, overwrite: bool) -> bool:
 def _pending_query(db, overwrite: bool):
     """Games worth a call: no rawg_id, or a rawg_id with basic info missing (or all, on overwrite).
 
-    The Steam id is not basic: most games are not on Steam, so a blank one would keep them pending forever.
-    It is still filled in when the game is processed for another reason."""
+    Basic info is what RAWG gives nearly every game: slug, image and genres, and the tags once (NULL = never asked;
+    an empty string = RAWG has none, which `_apply` records so the game is not asked again). Not basic: the Steam id
+    (most games are not on Steam), the developer and the release date (RAWG often has neither, and a game it
+    cannot fill would keep coming back at one or two calls each time). They are still filled in when the game is
+    processed for another reason."""
     q = db.query(models.Game)
     if overwrite:
         return q
-    blanks = [
+    blank = lambda column: column.is_(None) | (column == "")  # noqa: E731
+    return q.filter(or_(
         models.Game.rawg_id.is_(None),
-        *[getattr(models.Game, f).is_(None) | (getattr(models.Game, f) == "") for f in FIELDS if f != "steam_id"],
-        models.Game.dev == "-",
-    ]
-    return q.filter(or_(*blanks))
+        blank(models.Game.slug),
+        blank(models.Game.image_url),
+        blank(models.Game.genres),
+        models.Game.tags.is_(None),
+    ))
 
 
 def _alphabetical_first(games: list[models.Game], limit: int) -> list[models.Game]:
