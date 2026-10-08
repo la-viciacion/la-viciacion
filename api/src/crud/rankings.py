@@ -166,16 +166,19 @@ def user_completed_games(
     return sorted(data, key=lambda x: (-x["completed_games"], x["user_id"]))
 
 
-def games_last_played(db: Session, limit: int = 10):
+def games_last_played(db: Session, limit: int = 10, is_active: bool | None = None):
     """The games played most recently, each once, with the start of their latest session."""
     try:
         sessions = time_entries.sessions_subquery()
         last = func.max(sessions.c.start).label("start")
         # group and cut first (game ids only), then look the names up for the few that remain
+        users_filter = [models.not_god()]
+        if is_active is not None:
+            users_filter.append(models.User.is_active == is_active)
         latest = (
             select(sessions.c.game_id, last)
             .join(models.User, models.User.id == sessions.c.user_id)
-            .where(models.not_god())
+            .where(*users_filter)
             .group_by(sessions.c.game_id)
             .order_by(desc(last))
             .limit(limit)
@@ -194,11 +197,11 @@ def games_last_played(db: Session, limit: int = 10):
         raise e
 
 
-def games_most_played(db: Session, limit: int = 10) -> list[dict]:
-    return time_entries.games_played_time(db, limit=limit)
+def games_most_played(db: Session, limit: int = 10, is_active: bool | None = None) -> list[dict]:
+    return time_entries.games_played_time(db, limit=limit, is_active=is_active)
 
 
-def platform_played_games(db: Session, limit: int = None):
+def platform_played_games(db: Session, limit: int = None, is_active: bool | None = None):
     try:
         stmt = (
             select(
@@ -211,7 +214,7 @@ def platform_played_games(db: Session, limit: int = None):
                 models.UserGame.platform == models.PlatformTag.id,
             )
             .join(models.User, models.User.id == models.UserGame.user_id)
-            .where(models.not_god())
+            .where(models.not_god(), *([models.User.is_active == is_active] if is_active is not None else []))
             .group_by(models.UserGame.platform)
             .order_by(func.count(models.UserGame.platform).desc())
             .limit(limit)

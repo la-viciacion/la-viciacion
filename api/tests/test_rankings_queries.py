@@ -50,6 +50,18 @@ class RankingsFromTheDatabaseTests(unittest.TestCase):
         got = rankings.user_ratio(self.db)
         self.assertEqual([(r["user_id"], r["ratio"]) for r in got], [(4, 1.0), (1, 0.67), (2, 0), (3, 0)])
 
+    def test_only_active_leaves_out_inactive_players_everywhere(self):
+        for ranking in (
+            rankings.user_completed_games(self.db, is_active=True),
+            rankings.user_ratio(self.db, is_active=True),
+            rankings.user_days_played(self.db, is_active=True),
+            rankings.user_hours_players(self.db, is_active=True),
+            rankings.user_played_games(self.db, is_active=True),
+            rankings.user_current_streak(self.db, is_active=True),
+            rankings.user_best_streak(self.db, is_active=True),
+        ):
+            self.assertNotIn(4, [dict(getattr(r, "_mapping", r))["user_id"] for r in ranking])
+
     def test_each_ranking_is_one_query_not_one_per_player(self):
         queries = []
         event.listen(self.db.get_bind(), "before_cursor_execute", lambda *a: queries.append(a[2]))

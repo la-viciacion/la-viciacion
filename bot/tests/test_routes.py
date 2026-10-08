@@ -95,7 +95,7 @@ class RankingTextTests(RouteTestCase):
     async def check(self, handler, key, rows, header, expected_rows):
         self.given([{"data": rows}])
         text, result, _ = await self.run_route(handler)
-        self.assertTrue(self.asked().endswith(f"/statistics/rankings?ranking={key}"), self.asked())
+        self.assertTrue(self.asked().endswith(f"/statistics/rankings?ranking={key}&only_active=true"), self.asked())
         self.assertEqual(text, header + expected_rows)
 
     async def test_every_ranking_asks_for_its_own_key_and_prints_position_name_and_value(self):

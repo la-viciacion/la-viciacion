@@ -34,21 +34,22 @@ def plain(data):
 class _SharedRankingData:
     """What several rankings need, computed the first time and reused within one request."""
 
-    def __init__(self, db: Session):
+    def __init__(self, db: Session, is_active: bool | None = None):
         self._db = db
+        self._is_active = is_active
         self._players = None
         self._counts = None
 
     @property
     def players(self):  # days played by every player: days, best and current streak
         if self._players is None:
-            self._players = rankings.players_with_dates(self._db)
+            self._players = rankings.players_with_dates(self._db, self._is_active)
         return self._players
 
     @property
     def counts(self):  # library entries and completions per player: completed games, ratio
         if self._counts is None:
-            self._counts = rankings.library_counts(self._db)
+            self._counts = rankings.library_counts(self._db, is_active=self._is_active)
         return self._counts
 
 
@@ -73,10 +74,12 @@ class RankingStatisticsTypes(str, Enum):
 )
 def get_ranking_statistics(
     ranking: str = None,
+    only_active: bool = False,
     db: Session = Depends(get_db),
 ):
     """
     Get general rankings. To retrieve only specific rankings, add 'ranking' param with desired rankings, separated by comma (,).
+    With `only_active=true` the inactive users are left out (the Telegram bot asks for it; the app counts everybody).
 
     Allowed values: 'user_hours', 'user_days', 'user_played_games',
     'user_completed_games', 'achievements', 'user_ratio', 'user_current_streak',
@@ -86,20 +89,21 @@ def get_ranking_statistics(
         rankings_list = ranking.split(",")
     else:
         rankings_list = [elem.value for elem in RankingStatisticsTypes]
-    shared = _SharedRankingData(db)
+    is_active = True if only_active else None
+    shared = _SharedRankingData(db, is_active)
     response = []
     for ranking_type in rankings_list:
         content = {}
         if ranking_type == RankingStatisticsTypes.user_hours:
-            data = rankings.user_hours_players(db)
+            data = rankings.user_hours_players(db, is_active=is_active)
         elif ranking_type == RankingStatisticsTypes.user_days:
             data = rankings.user_days_played(db, players=shared.players)
         elif ranking_type == RankingStatisticsTypes.user_played_games:
-            data = rankings.user_played_games(db)
+            data = rankings.user_played_games(db, is_active=is_active)
         elif ranking_type == RankingStatisticsTypes.user_completed_games:
             data = rankings.user_completed_games(db, counts=shared.counts)
         elif ranking_type == RankingStatisticsTypes.achievements:
-            data = rankings.user_ranking_achievements(db)
+            data = rankings.user_ranking_achievements(db, is_active=is_active)
         elif ranking_type == RankingStatisticsTypes.user_ratio:
             data = rankings.user_ratio(db, counts=shared.counts)
         elif ranking_type == RankingStatisticsTypes.user_current_streak:
@@ -107,13 +111,13 @@ def get_ranking_statistics(
         elif ranking_type == RankingStatisticsTypes.user_best_streak:
             data = rankings.user_best_streak(db, players=shared.players)
         elif ranking_type == RankingStatisticsTypes.games_most_played:
-            data = rankings.games_most_played(db)
+            data = rankings.games_most_played(db, is_active=is_active)
         elif ranking_type == RankingStatisticsTypes.platform_played:
-            data = rankings.platform_played_games(db)
+            data = rankings.platform_played_games(db, is_active=is_active)
         elif ranking_type == RankingStatisticsTypes.debt:
             data = [{"message": "Debt is not implemented yet"}]
         elif ranking_type == RankingStatisticsTypes.games_last_played:
-            data = rankings.games_last_played(db)
+            data = rankings.games_last_played(db, is_active=is_active)
         else:
             data = {"message": "More rankings are coming"}
         content["type"] = ranking_type

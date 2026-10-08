@@ -39,7 +39,7 @@ class RankingRoutes:
     ) -> None:
         logger.info("Ranking hours")
         ranking = utils.fetch_json(
-            "GET", config.API_URL + "/statistics/rankings?ranking=user_hours"
+            "GET", config.API_URL + "/statistics/rankings?ranking=user_hours&only_active=true"
         )
         ranking = utils.load_json_response(ranking[0])
         msg = "Así está el ranking de horas de vicio:\n"
@@ -60,7 +60,7 @@ class RankingRoutes:
     ) -> None:
         logger.info("Ranking days")
         ranking = utils.fetch_json(
-            "GET", config.API_URL + "/statistics/rankings?ranking=user_days"
+            "GET", config.API_URL + "/statistics/rankings?ranking=user_days&only_active=true"
         )
         ranking = utils.load_json_response(ranking[0])
         msg = "Así está el ranking de días de vicio:\n"
@@ -81,7 +81,7 @@ class RankingRoutes:
     ) -> None:
         logger.info("Ranking played")
         ranking = utils.fetch_json(
-            "GET", config.API_URL + "/statistics/rankings?ranking=user_played_games"
+            "GET", config.API_URL + "/statistics/rankings?ranking=user_played_games&only_active=true"
         )
         ranking = utils.load_json_response(ranking[0])
         msg = "Ranking de juegos jugados:\n"
@@ -103,7 +103,7 @@ class RankingRoutes:
     ) -> None:
         logger.info("Ranking achievements")
         ranking = utils.fetch_json(
-            "GET", config.API_URL + "/statistics/rankings?ranking=achievements"
+            "GET", config.API_URL + "/statistics/rankings?ranking=achievements&only_active=true"
         )
         ranking = utils.load_json_response(ranking[0])
         msg = "Ranking de logros:\n"
@@ -125,7 +125,7 @@ class RankingRoutes:
     ) -> None:
         logger.info("Ranking streak")
         ranking = utils.fetch_json(
-            "GET", config.API_URL + "/statistics/rankings?ranking=user_best_streak"
+            "GET", config.API_URL + "/statistics/rankings?ranking=user_best_streak&only_active=true"
         )
         ranking = utils.load_json_response(ranking[0])
         msg = "Así va el ranking de racha de días:\n"
@@ -146,7 +146,7 @@ class RankingRoutes:
     ) -> None:
         logger.info("Ranking current streak")
         ranking = utils.fetch_json(
-            "GET", config.API_URL + "/statistics/rankings?ranking=user_current_streak"
+            "GET", config.API_URL + "/statistics/rankings?ranking=user_current_streak&only_active=true"
         )
         ranking = utils.load_json_response(ranking[0])
         msg = "Estas son las rachas de días actuales:\n"
@@ -167,7 +167,7 @@ class RankingRoutes:
     ) -> None:
         logger.info("Ranking ratio")
         ranking = utils.fetch_json(
-            "GET", config.API_URL + "/statistics/rankings?ranking=user_ratio"
+            "GET", config.API_URL + "/statistics/rankings?ranking=user_ratio&only_active=true"
         )
         ranking = utils.load_json_response(ranking[0])
         msg = "Así está el ranking de ratio (completados / jugados):\n"
@@ -188,7 +188,7 @@ class RankingRoutes:
     ) -> None:
         logger.info("Ranking completed games")
         ranking = utils.fetch_json(
-            "GET", config.API_URL + "/statistics/rankings?ranking=user_completed_games"
+            "GET", config.API_URL + "/statistics/rankings?ranking=user_completed_games&only_active=true"
         )
         ranking = utils.load_json_response(ranking[0])
         msg = "Ranking de juegos completados:\n"
@@ -210,7 +210,7 @@ class RankingRoutes:
     ) -> None:
         logger.info("Ranking most played")
         ranking = utils.fetch_json(
-            "GET", config.API_URL + "/statistics/rankings?ranking=games_most_played"
+            "GET", config.API_URL + "/statistics/rankings?ranking=games_most_played&only_active=true"
         )
         ranking = utils.load_json_response(ranking[0])
         msg = "Ranking de juegos más jugados:\n"
