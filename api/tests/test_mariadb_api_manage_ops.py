@@ -12,13 +12,11 @@ from src.routers import manage
 from src.utils import ai, email as mail, my_utils, push, rawg_sync, seasons, settings
 from tests.api_support import ApiTestCase
 from tests.app_routes import declared_routes, requestable
+from tests import clock
+from tests.clock import ago
 
 TOKEN = "123456789:" + "A" * 30
 VAPID_PUBLIC = "B" * 87
-
-
-def ago(**delta) -> datetime.datetime:
-    return datetime.datetime.now().replace(microsecond=0) - timedelta(**delta)
 
 
 class OpsTestCase(ApiTestCase):

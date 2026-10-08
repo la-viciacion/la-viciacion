@@ -6,11 +6,8 @@ from sqlalchemy import text
 
 from src.utils import seasons
 from tests.api_support import ApiTestCase
-
-
-def ago(**delta) -> datetime.datetime:
-    """A moment in the past, to the second. Tests keep to a few hours so they stay in the running season."""
-    return datetime.datetime.now().replace(microsecond=0) - timedelta(**delta)
+from tests import clock
+from tests.clock import ago
 
 
 def iso(moment: datetime.datetime) -> str:

@@ -4,8 +4,9 @@ from datetime import timedelta
 
 from src.database import database, models
 from tests.api_support import ApiTestCase
+from tests import clock
 
-TODAY = datetime.date.today
+TODAY = clock.today
 
 
 class GameCatalogTests(ApiTestCase):

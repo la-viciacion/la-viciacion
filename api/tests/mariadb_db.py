@@ -17,12 +17,22 @@ import unittest
 import uuid
 from pathlib import Path
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import sessionmaker
 
+from tests import clock
+
 API_DIR = Path(__file__).resolve().parent.parent
 ADMIN_URL = os.environ.get("TEST_MARIADB_URL", "").strip()
+
+
+def pin_server_clock(dbapi_connection, connection_record, connection_proxy):
+    """The columns that default to CURRENT_TIMESTAMP (`updated_at`, `added_at`) are filled by the server's clock, which the
+    pinned clock of the tests (tests/clock.py) does not reach: without this a rating made "now" would be dated months
+    after the sessions the same test made "5 hours ago". Not on the real server, only for connections of the tests."""
+    with dbapi_connection.cursor() as cursor:
+        cursor.execute("SET SESSION timestamp = UNIX_TIMESTAMP(%s)", (clock.now().strftime("%Y-%m-%d %H:%M:%S"),))
 
 
 class MariaDBTestCase(unittest.TestCase):
@@ -42,6 +52,7 @@ class MariaDBTestCase(unittest.TestCase):
         with cls._admin.connect() as conn:
             conn.execute(text(f"CREATE DATABASE `{cls.db_name}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"))
         cls.engine = create_engine(make_url(ADMIN_URL).set(database=cls.db_name))
+        event.listen(cls.engine, "checkout", pin_server_clock)
 
     @classmethod
     def tearDownClass(cls):

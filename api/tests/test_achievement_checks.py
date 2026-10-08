@@ -11,9 +11,10 @@ from src.database import models
 from src.utils import astronomy, seasons, weather
 from src.utils.achievements import first_season, is_lifetime
 from tests.sqlite_db import make_session
+from tests import clock
 
 USER = types.SimpleNamespace(id=1, name="Ana", telegram_id=111)
-YEAR = datetime.date.today().year
+YEAR = clock.YEAR
 
 
 class AchievementCheckTests(unittest.IsolatedAsyncioTestCase):

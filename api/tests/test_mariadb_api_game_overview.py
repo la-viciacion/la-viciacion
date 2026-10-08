@@ -6,12 +6,10 @@ from datetime import timedelta
 from src.database import models
 from src.utils import seasons
 from tests.api_support import ApiTestCase
+from tests import clock
+from tests.clock import ago
 
-TODAY = datetime.date.today
-
-
-def ago(**delta) -> datetime.datetime:
-    return datetime.datetime.now().replace(microsecond=0) - timedelta(**delta)
+TODAY = clock.today
 
 
 class GameOverviewTests(ApiTestCase):

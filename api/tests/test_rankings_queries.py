@@ -8,8 +8,9 @@ from src.crud import rankings, users
 from src.database import models
 from src.routers import statistics
 from tests.sqlite_db import make_session
+from tests import clock
 
-YEAR = datetime.date.today().year
+YEAR = clock.YEAR
 
 
 class RankingsFromTheDatabaseTests(unittest.TestCase):

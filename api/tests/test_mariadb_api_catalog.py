@@ -11,10 +11,8 @@ from PIL import Image
 from src.database import database
 from src.utils import images, messages, my_utils, push, seasons, settings
 from tests.api_support import ApiTestCase
-
-
-def ago(**delta) -> datetime.datetime:
-    return datetime.datetime.now().replace(microsecond=0) - timedelta(**delta)
+from tests import clock
+from tests.clock import ago
 
 
 class Response:
