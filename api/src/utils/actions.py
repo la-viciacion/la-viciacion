@@ -308,8 +308,8 @@ def push_has_devices(user_id: int) -> bool:
 def ranking_snapshot(db: Session) -> dict:
     """Order of the players (by hours) and of the games (by hours) right now."""
     return {
-        "players": [row["user_id"] for row in rankings.user_hours_players(db)],
-        "games": [row["game_id"] for row in time_entries.games_played_time(db)],
+        "players": [row["user_id"] for row in rankings.user_hours_players(db, is_active=True)],
+        "games": [row["game_id"] for row in time_entries.games_played_time(db, is_active=True)],
     }
 
 
@@ -387,11 +387,11 @@ async def announce_ranking_changes(db: Session, before: dict, silent: bool):
     if silent:
         return
     try:
-        message = games_ranking_message(before["games"], time_entries.games_played_time(db))
+        message = games_ranking_message(before["games"], time_entries.games_played_time(db, is_active=True))
         if message:
             logger.info(message)
             await utils.send_message(message, silent, ai_use="ranking_games")
-        message = players_ranking_message(before["players"], rankings.user_hours_players(db))
+        message = players_ranking_message(before["players"], rankings.user_hours_players(db, is_active=True))
         if message:
             logger.info(message)
             await utils.send_message(message, silent, ai_use="ranking_players")
