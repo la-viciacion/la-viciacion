@@ -356,6 +356,12 @@ class Achievements:
         msg = utils.get_ach_message(ach, user=user.name, db=db, game_id=game_id)
         await self._announce(db, ach, [user], msg, silent, self.get_image(db, ach.name)[0])
 
+    async def announce_added(self, db: Session, user: models.User, key: str, game_id: str | None = None):
+        """Announce an achievement that is already stored (a recalculation added it), as `_award` would have."""
+        ach = AchievementsElems[key]
+        msg = utils.get_ach_message(ach, user=user.name, db=db, game_id=game_id)
+        await self._announce(db, ach, [user], msg, False, self.get_image(db, ach.name)[0])
+
     def _flags(self, db: Session, key: str) -> tuple[bool, int]:
         """(secret, special level) of an achievement."""
         secret, special = db.query(models.Achievement.is_secret, models.Achievement.special).filter(models.Achievement.key == key).one()

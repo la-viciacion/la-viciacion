@@ -6,9 +6,10 @@ checks (`Achievements` in `collected` mode), and brings what is stored to that: 
 corrects the date and game of what differs and revokes what no longer holds. Everybody counts, active or
 not (they may have been in a past season). The emergency account never does.
 
-It never notifies anybody: it neither goes through `send_message` nor can be asked to (see
-`Achievements.collected`). A preview (`plan`) lists the changes without making them; applying them is a
-second step.
+The recalculation of the admin panel never notifies anybody: the working out itself neither goes through
+`send_message` nor can be asked to (see `Achievements.collected`). Only the follow-up of a player's own session
+(`recalculate_user` with `notify`) announces what it added, once the changes are stored. A preview (`plan`) lists
+the changes without making them; applying them is a second step.
 """
 import asyncio
 import datetime
@@ -26,6 +27,8 @@ from .achievements import ALL_TOGETHER_PLAYERS, Achievements, Award
 logger = LogManager().get_logger()
 
 TEAMWORK_PLAYERS = 4
+# judged on the timers running together, one message naming everybody: only a timer that starts can announce them
+MULTIPLAYER_KEYS = {"TEAMWORK", "ALL_TOGETHER"}
 
 
 class Change(NamedTuple):
@@ -204,12 +207,23 @@ def plan(
     return asyncio.run(_plan(db, user_ids, None if season_list is None else set(season_list), achievement_keys))
 
 
-async def recalculate_user(db: Session, user_id: int, season_list: list[int]) -> list[Change]:
-    """Work out again the achievements of one user in some seasons and apply it, in silence. It is what
-    follows a session that was edited or deleted: what it earned and no longer holds is revoked. The
-    caller is already in an event loop and holds the lock of the checks."""
+async def recalculate_user(db: Session, user_id: int, season_list: list[int], notify: bool = False) -> list[Change]:
+    """Work out again the achievements of one user in some seasons and apply it. It is what follows a session
+    that was added, edited or deleted: what it earns is added and what it earned and no longer holds is revoked.
+    Silent unless `notify`, which announces what was added (the same notice a timer gives); a revocation, a
+    corrected date and the two that need several players at once are never announced. The caller is already in an
+    event loop and holds the lock of the checks."""
     changes = await _plan(db, [user_id], set(season_list))
     apply(db, changes)
+    if notify:
+        user = db.get(models.User, user_id)
+        for change in changes:
+            if change.action != "add" or change.key in MULTIPLAYER_KEYS or user is None:
+                continue
+            try:
+                await actions.achievements.announce_added(db, user, change.key, change.game_after)
+            except Exception as e:  # a notice must not stop the rest
+                logger.error(f"Error announcing {change.key} to {user.username}: {e}")
     return changes
 
 

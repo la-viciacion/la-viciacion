@@ -414,6 +414,11 @@ def delete_session(db: Session, current_user: User, timer_id: int) -> None:
     db.commit()
 
 
+def _by_admin(current_user: User, user_id: int) -> bool:
+    """True when an admin changes somebody else's sessions: their changes check the player silently."""
+    return current_user.id != user_id
+
+
 # FastAPI Router
 router = APIRouter(
     prefix="/timers",
@@ -451,8 +456,11 @@ def create_manual_session_endpoint(
 ):
     """Add a finished session by hand: game, platform, start and end."""
     timer = create_manual_session(db, current_user, body)
-    # silent: retroactive entries do not announce rankings/achievements to the group
-    background_tasks.add_task(actions.after_session_change, timer.user_id, True)
+    # what it earns is announced and what it cannot hold is revoked; the rankings are not (it is a retroactive entry)
+    background_tasks.add_task(
+        actions.after_session_change, timer.user_id, _by_admin(current_user, timer.user_id),
+        recalculate=[seasons.of(timer.start_time)],
+    )
     return timer
 
 
@@ -469,7 +477,7 @@ def update_session_endpoint(
     timer = update_session(db, current_user, timer_id, body)
     # the achievements of the seasons it was in and is in now are worked out again: it may no longer earn what it did
     changed = sorted({seasons.of(old_start), seasons.of(timer.start_time)}) if old_start else [seasons.of(timer.start_time)]
-    background_tasks.add_task(actions.after_session_change, timer.user_id, True, recalculate=changed)
+    background_tasks.add_task(actions.after_session_change, timer.user_id, _by_admin(current_user, timer.user_id), recalculate=changed)
     return timer
 
 
@@ -483,7 +491,7 @@ def delete_session_endpoint(
     """Remove a finished session (entered by mistake)."""
     owner, start = db.query(GameTimer.user_id, GameTimer.start_time).filter(GameTimer.id == timer_id).first() or (None, None)
     delete_session(db, current_user, timer_id)
-    background_tasks.add_task(actions.after_session_change, owner, True, recalculate=[seasons.of(start)])
+    background_tasks.add_task(actions.after_session_change, owner, _by_admin(current_user, owner), recalculate=[seasons.of(start)])
     return {"message": "Sesión eliminada"}
 
 
