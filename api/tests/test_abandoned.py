@@ -8,8 +8,9 @@ from src.database import models, schemas
 from src.routers import users as users_router
 from src.utils import messages as msg
 from tests.sqlite_db import make_session
+from tests import clock
 
-NOW = datetime.datetime.now().replace(microsecond=0)
+NOW = clock.PIN
 YEAR = NOW.year
 
 

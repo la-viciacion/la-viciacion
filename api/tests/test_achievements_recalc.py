@@ -8,8 +8,9 @@ from src.crud import achievements_recalc as recalc
 from src.crud.achievements import Achievements, Award
 from src.database import models
 from tests.sqlite_db import make_session
+from tests import clock
 
-YEAR = datetime.date.today().year
+YEAR = clock.YEAR
 PAST = YEAR - 1
 D = datetime.date
 

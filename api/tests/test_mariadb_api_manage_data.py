@@ -8,12 +8,10 @@ from sqlalchemy import text
 
 from src.utils import seasons
 from tests.api_support import PASSWORD, ApiTestCase
+from tests import clock
+from tests.clock import ago
 
 NEW_PASSWORD = "An0ther-secret!pw"
-
-
-def ago(**delta) -> datetime.datetime:
-    return datetime.datetime.now().replace(microsecond=0) - timedelta(**delta)
 
 
 class ManageTestCase(ApiTestCase):

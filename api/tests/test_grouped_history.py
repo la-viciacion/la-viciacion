@@ -6,8 +6,9 @@ from sqlalchemy import event
 from src.database import models
 from src.routers import timers
 from tests.sqlite_db import make_session
+from tests import clock
 
-YEAR = datetime.date.today().year
+YEAR = clock.YEAR
 
 
 def session(db, game, day, hours=1, platform="pc", user=1, active=False):

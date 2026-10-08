@@ -33,12 +33,10 @@ import utils.messages as bot_messages  # noqa: E402  (the bot's own package, not
 from routes.my_routes import MyRoutes  # noqa: E402
 from routes.ranking_routes import RankingRoutes  # noqa: E402
 from utils.my_utils import ApiError, MyUtils  # noqa: E402
+from tests import clock
+from tests.clock import ago
 
 GROUP = -1001234567890
-
-
-def ago(**delta) -> datetime.datetime:
-    return datetime.datetime.now().replace(microsecond=0) - timedelta(**delta)
 
 
 def callback_update(sender_id=111):

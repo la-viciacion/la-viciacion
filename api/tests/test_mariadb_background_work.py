@@ -13,8 +13,9 @@ from src.database import database, models
 from src.utils import actions, my_utils, seasons
 from src.utils.achievements import AchievementsElems as E
 from tests.api_support import ApiTestCase
+from tests import clock
 
-YEAR = datetime.date.today().year
+YEAR = clock.YEAR
 
 
 def at(month: int, day: int, hour: int = 20, minute: int = 0) -> datetime.datetime:

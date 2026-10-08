@@ -4,8 +4,9 @@ import unittest
 from src.crud import time_entries
 from src.database import models
 from tests.sqlite_db import make_session
+from tests import clock
 
-NOW = datetime.datetime.now()
+NOW = clock.PIN
 
 
 def running(db, hours_ago, user_id=1, game_id="g"):

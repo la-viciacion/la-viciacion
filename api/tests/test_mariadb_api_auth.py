@@ -11,6 +11,7 @@ from src.database import database, models
 from src.routers import basic
 from src.utils import messages, password_reset
 from tests.api_support import PASSWORD, ApiTestCase
+from tests import clock
 
 NEW_PASSWORD = "An0ther-secret!pw"
 
@@ -87,7 +88,7 @@ class SessionTests(ApiTestCase):
         with database.SessionLocal() as db:
             user = db.query(models.User).filter_by(username=username).one()
             return {"username": username, "pwv": auth.password_fingerprint(user),
-                    "exp": datetime.datetime.now(datetime.timezone.utc) + timedelta(minutes=5), **extra}
+                    "exp": clock.real_now() + timedelta(minutes=5), **extra}
 
     def test_every_protected_route_refuses_a_missing_token(self):
         self.assertEqual(self.api("GET", "/auth/active_user").status_code, 401)
@@ -100,7 +101,7 @@ class SessionTests(ApiTestCase):
     def test_an_expired_token_is_refused(self):
         self.user("ana")
         payload = self.valid_payload()
-        payload["exp"] = datetime.datetime.now(datetime.timezone.utc) - timedelta(seconds=1)
+        payload["exp"] = clock.real_now() - timedelta(seconds=1)
         self.assertEqual(self.api("GET", "/auth/active_user", headers=self.token(payload)).status_code, 401)
 
     def test_a_token_without_a_username_is_refused(self):
