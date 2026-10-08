@@ -26,6 +26,8 @@ BIRTH_DATE_INVALID = "La fecha de nacimiento no es válida"
 PLACES_UNAVAILABLE = "No se pueden buscar ciudades ahora mismo, inténtalo más tarde"
 USER_NOT_ADMIN ="You are not allowed to do this action"
 
+GAME_ALREADY_IN_CATALOGUE = "Ese juego ya está en el catálogo"
+GAME_NAME_EMPTY = "El nombre del juego no puede estar vacío"
 GAME_ALREADY_COMPLETED = "Game is already completed"
 
 FILE_TYPE_NOT_ALLOWED = "Archivo no admitido. Solo se aceptan imágenes JPG o PNG"

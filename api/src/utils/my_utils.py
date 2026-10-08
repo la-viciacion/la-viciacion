@@ -302,20 +302,14 @@ async def get_game_info(game: str):
 
 
 async def get_new_game_info(game) -> schemas.NewGame:
-    """Resolve and build schemas.NewGame using rawg_id if provided, or by searching RAWG."""
+    """Build schemas.NewGame from the RAWG entry named by `rawg_id`. Without one (or when RAWG has nothing
+    for it) the game is the one typed by hand: RAWG is never searched by name here, because its best
+    match for a game it does not know is a different game."""
     game_data = game if isinstance(game, dict) else (game.dict() if hasattr(game, "dict") else vars(game))
     game_name = game_data.get("name", "")
     rawg_id = game_data.get("rawg_id")
 
-    details = None
-    if rawg_id:
-        details = await get_game_details_by_rawg_id(rawg_id)
-
-    if not details and game_name:
-        candidates = await search_rawg_games(game_name)
-        if candidates:
-            top_candidate = candidates[0]
-            details = await get_game_details_by_rawg_id(top_candidate.rawg_id)
+    details = await get_game_details_by_rawg_id(rawg_id) if rawg_id else None
 
     if details:
         return schemas.NewGame(
@@ -331,15 +325,14 @@ async def get_new_game_info(game) -> schemas.NewGame:
             rawg_id=details["rawg_id"],
         )
 
-    # Safe fallback if RAWG finds nothing
-    logger.warning(f"No RAWG details found for game: {game_name}. Using fallback.")
+    logger.info(f"Adding '{game_name}' as typed (no RAWG entry)")
     return schemas.NewGame(
         name=game_name,
-        dev="-",
-        release_date=None,
+        dev=(game_data.get("dev") or "").strip() or "-",
+        release_date=game_data.get("release_date"),
         steam_id="",
-        image_url="",
-        genres="",
+        image_url=(game_data.get("image_url") or "").strip(),
+        genres=(game_data.get("genres") or "").strip(),
         tags="",
         avg_time=0,
         slug="",

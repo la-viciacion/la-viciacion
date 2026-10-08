@@ -81,8 +81,53 @@ export function openAddGame(onPick) {
   const modal = openStep(html`
     ${modalHeader('Añadir juego nuevo')}
     <input type="text" id="addGameSearch" class="modal-search-input" placeholder="Buscar en RAWG..." autocomplete="off" />
-    <div class="modal-results-list" id="addGameResults">${hint('Escribe el nombre del juego')}</div>`);
+    <div class="modal-results-list" id="addGameResults">${hint('Escribe el nombre del juego')}</div>
+    <div class="modal-footer">
+      <button class="btn-modal-secondary" id="manualGameBtn">${iconPlus()} ¿No aparece? Crearlo a mano</button>
+    </div>`);
+  const input = modal.el.querySelector('#addGameSearch');
+  modal.el.querySelector('#manualGameBtn').addEventListener('click', () => openManualGame(onPick, input.value.trim()));
   bindSearch(modal, 'addGameSearch', (query) => searchRawg(modal, query, onPick), 300);
+}
+
+// ── Step 1c: create a game RAWG does not have ───────────────
+// Only the name is required (it is all a session needs); the rest can be edited later from the admin panel.
+function openManualGame(onPick, name = '') {
+  const modal = openStep(html`
+    ${modalHeader('Crear juego a mano')}
+    <form class="sess-form" novalidate>
+      <label>Nombre <input class="sess-input" name="game" value="${name}" maxlength="255" autocomplete="off" required /></label>
+      <label>Lanzamiento (opcional) <input class="sess-input" type="date" name="release_date" /></label>
+      <label>Desarrolladora (opcional) <input class="sess-input" name="dev" maxlength="255" autocomplete="off" /></label>
+      <div class="sess-hint">Quedará disponible para todos. Comprueba antes que el juego no esté ya en el catálogo.</div>
+      <div class="sess-error" role="alert"></div>
+      <div class="sess-actions">
+        <span class="sess-spacer"></span>
+        <button type="button" class="sess-btn" data-back>Volver</button>
+        <button type="submit" class="sess-btn primary">Crear juego</button>
+      </div>
+    </form>`);
+  const form = modal.el.querySelector('form');
+  const error = form.querySelector('.sess-error');
+  form.querySelector('[data-back]').addEventListener('click', () => openAddGame(onPick));
+  form.elements.game.focus();
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const typed = form.elements.game.value.trim();
+    if (!typed) { error.textContent = 'Escribe el nombre del juego'; return; }
+    error.textContent = '';
+    try {
+      const game = await api('/games/', jsonRequest('POST', {
+        name: typed,
+        release_date: form.elements.release_date.value || null,
+        dev: form.elements.dev.value.trim() || null,
+      }));
+      closeAllModals();
+      onPick(game.id, game.name);
+    } catch (err) {
+      if (form.isConnected) error.textContent = `Error: ${err.message}`;
+    }
+  });
 }
 
 async function searchRawg(modal, query, onPick) {

@@ -138,6 +138,42 @@ test('a failure while adding the game stays in the window', async () => {
   assert.equal(text('#addGameResults')[0], 'Error: Ya existe');
 });
 
+test('a game RAWG does not have is created by hand with only the name required', async () => {
+  openGamePicker((id, name) => (picked = [id, name]));
+  document.querySelector('#modalAddGameBtn').click();
+  installApi({ 'GET /games/search-rawg?query=fortune': [] });
+  await search('#addGameSearch', 'Fortune', 300);
+  document.querySelector('#manualGameBtn').click();
+  const form = document.querySelector('.sess-form');
+  assert.equal(form.elements.game.value, 'Fortune'); // the typed search is the starting name
+
+  form.elements.game.value = '  ';
+  form.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+  await settle();
+  assert.equal(text('.sess-error')[0], 'Escribe el nombre del juego');
+
+  calls = installApi({ 'POST /games/': { id: 'weave', name: "Fortune's Weave" } });
+  form.elements.game.value = " Fortune's Weave ";
+  form.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+  await settle();
+  assert.deepEqual(calls.at(-1).body, { name: "Fortune's Weave", release_date: null, dev: null });
+  assert.deepEqual(picked, ['weave', "Fortune's Weave"]);
+  assert.equal(document.querySelector('.modal-overlay'), null);
+});
+
+test('a failure while creating a game by hand stays in the form, and "Volver" goes back to the search', async () => {
+  openGamePicker(() => {});
+  document.querySelector('#modalAddGameBtn').click();
+  document.querySelector('#manualGameBtn').click();
+  installApi({ 'POST /games/': json({ detail: 'Ese juego ya está en el catálogo' }, 400) });
+  document.querySelector('.sess-form').elements.game.value = 'Celeste';
+  document.querySelector('.sess-form').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+  await settle();
+  assert.equal(text('.sess-error')[0], 'Error: Ese juego ya está en el catálogo');
+  document.querySelector('[data-back]').click();
+  assert.ok(document.querySelector('#addGameSearch'));
+});
+
 test('"Nuevo timer" on a game never played asks the platform and starts the timer on it', async () => {
   startTimerFlow();
   installApi({
