@@ -178,25 +178,28 @@ def _needs_steam(game: models.Game, overwrite: bool) -> bool:
     return overwrite or _blank(game.steam_id)
 
 
-def _pending_query(db, overwrite: bool):
-    """Games worth a call: no rawg_id, or a rawg_id with basic info missing (or all, on overwrite).
+def pending_condition():
+    """SQL condition of a game worth a call: no rawg_id, or a rawg_id with basic info missing.
 
     Basic info is what RAWG gives nearly every game: slug, image and genres, and the tags once (NULL = never asked;
     an empty string = RAWG has none, which `_apply` records so the game is not asked again). Not basic: the Steam id
     (most games are not on Steam), the developer and the release date (RAWG often has neither, and a game it
     cannot fill would keep coming back at one or two calls each time). They are still filled in when the game is
     processed for another reason."""
-    q = db.query(models.Game)
-    if overwrite:
-        return q
     blank = lambda column: column.is_(None) | (column == "")  # noqa: E731
-    return q.filter(or_(
+    return or_(
         models.Game.rawg_id.is_(None),
         blank(models.Game.slug),
         blank(models.Game.image_url),
         blank(models.Game.genres),
         models.Game.tags.is_(None),
-    ))
+    )
+
+
+def _pending_query(db, overwrite: bool):
+    """Games worth a call (see `pending_condition`), or all of them on overwrite."""
+    q = db.query(models.Game)
+    return q if overwrite else q.filter(pending_condition())
 
 
 def _alphabetical_first(games: list[models.Game], limit: int) -> list[models.Game]:

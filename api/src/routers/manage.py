@@ -426,13 +426,15 @@ def _game_out(g: models.Game, sessions: int = 0, players: int = 0, played_second
 @router.get("/games")
 def list_games(
     search: Optional[str] = None,
+    rawg: Optional[str] = Query(None, pattern="^(unlinked|pending)$"),
     sort: str = Query("name", pattern="^(name|release_date|played|players)$"),
     order: str = Query("asc", pattern="^(asc|desc)$"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
-    """Games with their usage (sessions, time played and players)."""
+    """Games with their usage (sessions, time played and players). `rawg=unlinked`: no RAWG id;
+    `rawg=pending`: what the RAWG sync would try (no id, or basic info missing)."""
     session_counts = (
         db.query(
             models.GameTimer.game_id.label("gid"),
@@ -457,6 +459,10 @@ def list_games(
     )
     if search:
         q = q.filter(models.Game.name.like(_like(search)))
+    if rawg == "unlinked":
+        q = q.filter(models.Game.rawg_id.is_(None))
+    elif rawg == "pending":
+        q = q.filter(rawg_sync.pending_condition())
     total = q.count()
     column = {"name": models.Game.name, "release_date": models.Game.release_date, "played": played, "players": players}[sort]
     direction = column.desc() if order == "desc" else column.asc()
