@@ -98,6 +98,7 @@ export const ENTITIES = {
       { key: 'dev', label: 'Desarrolladora', type: 'text' },
       { key: 'release_date', label: 'Lanzamiento', type: 'date' },
       { key: 'genres', label: 'Géneros (coma)', type: 'text' },
+      { key: 'tags', label: 'Etiquetas (coma)', type: 'text' },
       { key: 'avg_time', label: 'Tiempo medio (s)', type: 'number' },
       { key: 'image_url', label: 'Imagen (URL)', type: 'text' },
       { key: 'steam_id', label: 'Steam ID', type: 'text' },

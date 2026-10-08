@@ -19,7 +19,7 @@ class GameOverviewTests(ApiTestCase):
         self.bea = self.user("bea")
         self.cai = self.user("cai")
         self.gone = self.user("gone", active=False)
-        self.game("celeste", "Celeste", genres="Platformer, Indie", dev="Maddy", avg_time=30000)
+        self.game("celeste", "Celeste", genres="Platformer, Indie", tags="Singleplayer,Difficult", dev="Maddy", avg_time=30000)
         self.game("hades", "Hades")
 
     def overview(self, game="celeste", as_user="ana"):
@@ -38,6 +38,8 @@ class GameOverviewTests(ApiTestCase):
             (body["game"]["id"], body["game"]["name"], body["game"]["genres"], body["game"]["dev"], body["game"]["avg_time"]),
             ("celeste", "Celeste", ["Platformer", "Indie"], "Maddy", 30000),
         )
+        self.assertEqual(body["game"]["tags"], ["Singleplayer", "Difficult"])
+        self.assertEqual(self.overview(game="hades").json()["game"]["tags"], [])  # none known: an empty list, not null
         self.assertEqual(body["players"], [])
         self.assertEqual(body["summary"], {"players": 0, "played_seconds": 0, "completed_by": 0, "score_count": 0, "score_mean": None})
 
