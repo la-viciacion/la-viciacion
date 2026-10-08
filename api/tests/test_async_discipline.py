@@ -11,6 +11,7 @@ ROUTERS = Path(__file__).resolve().parent.parent / "src" / "routers"
 ALLOWED_ASYNC_ROUTES = {
     "games.py": {"search_rawg", "create_game"},
     "manage.py": {"send_announcement", "send_telegram_announcement", "send_test_message"},
+    "users.py": {"test_telegram_id"},
 }
 
 

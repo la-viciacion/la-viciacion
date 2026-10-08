@@ -466,6 +466,14 @@ async def send_announcement_to_chat(chat_id, title: str, body: str | None = None
         return await _telegram_send(bot, chat_id, announcement_text(title, body))
 
 
+async def send_test_message_to_user(chat_id) -> bool:
+    """Private test message so a player can check their Telegram id; True if Telegram took it.
+    Ignores the notification switches: it is an explicit request, like the admin's test message."""
+    bot = telegram.Bot(settings.get("telegram.token"))
+    async with bot:
+        return await _telegram_send(bot, chat_id, "✅ Mensaje de prueba de La Viciación: tu Telegram ID es correcto")
+
+
 async def send_message_to_admins(db: Session, msg):
     if not settings.get("notifications.admin_alerts") or not settings.get("telegram.token"):
         logger.info("Admin alerts are disabled or the bot is not configured. Message not sent.")

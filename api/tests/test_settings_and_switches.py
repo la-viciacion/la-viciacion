@@ -137,6 +137,11 @@ class SwitchTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(ValueError):
                 await my_utils.send_test_message("admin")
 
+    async def test_user_test_message_goes_to_that_chat_even_with_notifications_off(self):
+        with fake_settings({**self.base, "notifications.enabled": False}):
+            self.assertTrue(await my_utils.send_test_message_to_user(42))
+        self.assertEqual([m["chat_id"] for m in FakeBot.sent], [42])
+
     async def test_missing_token_does_not_raise(self):
         with fake_settings({"notifications.enabled": True}):
             await my_utils.send_message("hola", False)

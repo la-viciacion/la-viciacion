@@ -28,6 +28,23 @@ export function initAccount(main, { user, userPath, about = () => null }) {
     }
   });
 
+  // Tries the saved id (not what is typed), so a success proves what the bot will really use.
+  main.querySelector('#pfTelegramTest').addEventListener('click', async (e) => {
+    const button = e.currentTarget;
+    const msg = main.querySelector('#pfDataMsg');
+    const typed = main.querySelector('#pfData').telegram_id.value.trim();
+    if (typed !== String(user.telegram_id ?? '')) return flash(msg, 'Guarda los datos antes de probar el Telegram ID');
+    button.disabled = true;
+    try {
+      await api(userPath('telegram-test'), { method: 'POST' });
+      flash(msg, 'Mensaje enviado: mira tu Telegram', true);
+    } catch (err) {
+      flash(msg, err.message);
+    } finally {
+      button.disabled = false;
+    }
+  });
+
   main.querySelector('#pfPass').addEventListener('submit', async (e) => {
     e.preventDefault();
     const form = e.currentTarget;
