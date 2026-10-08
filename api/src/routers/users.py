@@ -13,6 +13,7 @@ from fastapi import (
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
+from starlette.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
 from .. import auth
@@ -23,7 +24,7 @@ from ..utils import actions, images, places
 from ..utils import messages as msg
 from ..utils import my_utils as utils
 from ..utils.logger import LogManager
-from ..utils import seasons, user_settings
+from ..utils import seasons, settings, user_settings
 
 log_manager = LogManager()
 logger = log_manager.get_logger()
@@ -146,6 +147,22 @@ def update_profile(
         "email": user.email,
         "telegram_id": user.telegram_id,
     }
+
+
+@router.post("/{username}/telegram-test")
+async def test_telegram_id(
+    username: str,
+    active_user: models.User = Depends(auth.get_current_active_user),
+):
+    """Send a private test message to the caller's saved Telegram id, to check it is the right one"""
+    auth.ensure_self(active_user, username)
+    if active_user.telegram_id is None:
+        raise HTTPException(status_code=409, detail=msg.TELEGRAM_ID_MISSING)
+    if not await run_in_threadpool(settings.get, "telegram.token"):  # a cache miss reads the database
+        raise HTTPException(status_code=409, detail=msg.TELEGRAM_NOT_CONFIGURED)
+    if not await utils.send_test_message_to_user(active_user.telegram_id):
+        raise HTTPException(status_code=502, detail=msg.TELEGRAM_TEST_FAILED)
+    return {"message": "Mensaje enviado"}
 
 
 @router.get("/{username}/settings")

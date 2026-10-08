@@ -195,6 +195,7 @@ function draw(d) {
       <label>Email (con el que inicias sesión)<input class="adm-input" type="email" name="email" value="${d.user.email || ''}" autocomplete="email" /></label>
       <label>Telegram ID<input class="adm-input" type="number" name="telegram_id" value="${d.user.telegram_id ?? ''}" /></label>
       <div class="pf-sub">Solo cámbialo si sabes lo que haces: es el número con el que el bot te reconoce y te escribe. Uno incorrecto puede dejarte sin avisos o enviárselos a otra persona.</div>
+      <div><button class="pf-btn" type="button" id="pfTelegramTest">Enviar mensaje de prueba</button></div>
       <div id="pfAbout" class="pf-form"></div>
       <div class="pf-msg" id="pfDataMsg" role="status"></div>
       <div><button class="pf-btn primary" type="submit">Guardar datos</button></div>
