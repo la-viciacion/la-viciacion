@@ -6,12 +6,10 @@ from sqlalchemy import text
 
 from src.database import database, models
 from tests.api_support import ApiTestCase
+from tests import clock
+from tests.clock import ago
 
-TODAY = datetime.date.today
-
-
-def ago(**delta) -> datetime.datetime:
-    return datetime.datetime.now().replace(microsecond=0) - timedelta(**delta)
+TODAY = clock.today
 
 
 class ActivityTests(ApiTestCase):

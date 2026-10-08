@@ -5,10 +5,11 @@ import unittest
 from src.database import models
 from src.database.schemas import SessionUpdate
 from src.routers import timers
+from tests import clock
 from tests.sqlite_db import make_session
 
 ADMIN = types.SimpleNamespace(id=99, is_admin=1)
-START = (datetime.datetime.now() - datetime.timedelta(hours=3)).replace(microsecond=0)
+START = clock.PIN - datetime.timedelta(hours=3)
 END = START + datetime.timedelta(hours=1)
 
 

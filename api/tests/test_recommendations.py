@@ -8,8 +8,9 @@ from src.crud import games
 from src.database import models
 from src.utils import my_utils
 from tests.sqlite_db import make_session
+from tests import clock
 
-DAY = datetime.date(datetime.date.today().year, 1, 10)
+DAY = datetime.date(clock.YEAR, 1, 10)
 
 
 def add_library(db, rows):

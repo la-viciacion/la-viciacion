@@ -87,6 +87,7 @@ Full details in [docs/development.md](docs/development.md).
 - Match the surrounding code style; comments explain *why*, not *what*. No dead code, no commented-out blocks.
 - Keep changes focused; do not refactor unrelated code in the same change.
 - Before finishing a change: run the API and front tests, lint the front, and if you touched behaviour described in `docs/`, update those docs in the same change.
+- Tests never depend on the real clock: the suite runs on a pinned one (`api/tests/clock.py`, see [docs/development.md](docs/development.md)); do not read `now()`/`today()` at import time in a test module.
 - Add or update tests for any pure/business logic you touch (see existing examples in `api/tests/` and `front/tests/`).
 - Ask before anything destructive or hard to reverse (dropping data, touching applied migrations, running migrations against real data, force-pushing).
 - **Git workflow** ([docs/workflow.md](docs/workflow.md)): trunk-based. Never commit to `main`; work on a short-lived branch `<type>/<description>` and open a PR (squash-merged, title in Conventional Commits style: `feat:`, `fix:`, `refactor:`, `docs:`, `style:`, `test:`, `chore:`). The `CI` check must be green. Do not create tags or releases (versioning is still open, see [docs/roadmap.md](docs/roadmap.md)).
