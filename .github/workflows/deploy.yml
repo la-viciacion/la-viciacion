@@ -7,7 +7,8 @@ name: Deploy
 #         whose "Release images" run (every check) did not pass on the commit the tag points to.
 #   dev   needs no such check: main only receives pull requests whose CI was green (branch protection).
 # Each target has its own key (DEPLOY_SSH_KEY_DEV / DEPLOY_SSH_KEY_PROD); the host, the user and the host key are
-# shared. They are repository secrets, not environment secrets, on purpose: GitHub Free ignores environments
+# shared. A last job (notify) checks that the API answers and reports the result to Telegram.
+# They are repository secrets, not environment secrets, on purpose: GitHub Free ignores environments
 # (and their secrets) in a private repository, so this keeps working if the repository is ever made private.
 on:
   workflow_dispatch:
@@ -59,9 +60,12 @@ jobs:
     permissions:
       contents: read
       actions: read
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
     steps:
       # The server builds the tag itself, so nothing else would notice a release whose checks failed (or never ran).
       - name: The release passed every check
+        id: release
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
@@ -84,6 +88,7 @@ jobs:
             exit 1
           fi
           echo "$tag passed every check ($sha)"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
       - name: Run the prod deploy script on the server
         env:
@@ -101,3 +106,70 @@ jobs:
           ssh -T -i ~/.ssh/deploy_key \
             -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
             "$SSH_USER@$HOST" "$VERSION"
+
+  # Tells the group how the deploy ended. It runs after whichever deploy job was chosen (the other one is skipped) and
+  # holds only the Telegram secrets, never the SSH keys. A deploy whose script succeeded still counts as failed here
+  # if the public keepalive does not answer within a minute: the script only knows that the containers were started.
+  notify:
+    needs: [deploy-dev, deploy-prod]
+    if: ${{ always() && (needs.deploy-dev.result != 'skipped' || needs.deploy-prod.result != 'skipped') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Check the API and notify Telegram
+        env:
+          TARGET: ${{ inputs.target }}
+          DEV_RESULT: ${{ needs.deploy-dev.result }}
+          PROD_RESULT: ${{ needs.deploy-prod.result }}
+          PROD_TAG: ${{ needs.deploy-prod.outputs.tag }}
+          URL_DEV: ${{ vars.DEPLOY_URL_DEV }}
+          URL_PROD: ${{ vars.DEPLOY_URL_PROD }}
+          INPUT_VERSION: ${{ inputs.version }}
+          ACTOR: ${{ github.actor }}
+          SHA: ${{ github.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          TELEGRAM_TOKEN: ${{ secrets.NOTIFY_TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.NOTIFY_TELEGRAM_CHAT_ID }}
+        run: |
+          if [ "$TARGET" = prod ]; then
+            result=$PROD_RESULT
+            base=$URL_PROD
+            version=${PROD_TAG:-$INPUT_VERSION}
+          else
+            result=$DEV_RESULT
+            base=$URL_DEV
+            version="main@${SHA::7}"
+          fi
+          url="${base%/}/api/v1/keepalive"
+
+          # The API restarts at the end of the deploy (and applies migrations first), so give it a minute.
+          api=-
+          if [ "$result" = success ]; then
+            api=down
+            for _ in $(seq 1 12); do
+              if curl -fsS --max-time 10 "$url" | grep -q alive; then api=up; break; fi
+              sleep 5
+            done
+          fi
+
+          if [ "$result" != success ]; then
+            ok=false; text="❌ Despliegue en $TARGET fallido ($result)"
+          elif [ "$api" != up ]; then
+            ok=false; text="⚠️ Desplegado en $TARGET, pero la API no responde"
+          else
+            ok=true; text="✅ Desplegado en $TARGET, la API responde"
+          fi
+          text="$text
+          Versión: $version
+          Lanzado por: $ACTOR
+          $RUN_URL"
+
+          curl -fsS --max-time 20 -o /dev/null \
+            "https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=$TELEGRAM_CHAT_ID" \
+            --data-urlencode "text=$text" \
+            --data-urlencode "disable_web_page_preview=true"
+
+          # The deploy job is already red when it failed; this makes an unanswered API red too.
+          [ "$ok" = true ]
