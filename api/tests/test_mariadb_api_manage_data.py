@@ -172,6 +172,20 @@ class GamesAdminTests(ManageTestCase):
         self.assertEqual([g["id"] for g in self.games(search="tet")["items"]], ["tetris"])
         self.assertEqual(self.games(search="%")["total"], 0)
 
+    def test_the_rawg_filter_lists_games_without_id_or_with_incomplete_data(self):
+        self.game("done", "Done", rawg_id=505, slug="done", image_url="https://img/d.jpg", genres="Action", tags="")  # "" = RAWG has no tags
+        ids = lambda **params: sorted(g["id"] for g in self.games(**params)["items"])  # noqa: E731
+        self.assertEqual(ids(rawg="unlinked"), ["hades"])
+        self.assertEqual(ids(rawg="pending"), ["celeste", "hades", "tetris"])  # what the RAWG sync would try
+        self.assertEqual(self.games(rawg="pending")["total"], 3)
+        self.assertEqual(ids(rawg="pending", search="tet"), ["tetris"])  # combines with the search
+        self.assertEqual(len(ids()), 4)
+        self.admin("PATCH", "/games/celeste", json={"slug": "celeste", "image_url": "https://img/c.jpg", "genres": "Platformer", "tags": "Indie"})
+        self.assertEqual(ids(rawg="pending"), ["hades", "tetris"])  # completing a game takes it off the list
+
+    def test_an_unknown_rawg_filter_is_rejected(self):
+        self.assertEqual(self.admin("GET", "/games", params={"rawg": "all"}).status_code, 422)
+
     def test_sorting_and_paging(self):
         self.assertEqual([g["id"] for g in self.games(sort="played", order="desc")["items"]][0], "celeste")
         self.assertEqual([g["id"] for g in self.games(sort="release_date")["items"]][-1], "tetris")  # NULLs first when ascending
