@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { amountLabel, blocks, daysUntil, hoursLabel, launchMonths, partTarget, partValue, percent, resultLine, summaryLine, timeLeft, totalPart } from '../js/lib/challenges.js';
+import { amountLabel, blocks, daysUntil, debtPreview, hoursLabel, launchMonths, partTarget, partValue, percent, resultLine, summaryLine, timeLeft, totalPart } from '../js/lib/challenges.js';
 
 const TODAY = new Date(2026, 9, 15, 12, 0); // 15 October 2026
 
@@ -92,4 +92,26 @@ test('the group total is drawn in hours or in games, and not at all when there i
   assert.deepEqual(totalPart({ total_seconds: 3600, total_target_seconds: 7200, total_done: false }), { seconds: 3600, target_seconds: 7200, done: false });
   assert.deepEqual(totalPart({ total_count: 2, total_target_count: 5, total_done: false }), { count: 2, target_count: 5, done: false });
   assert.equal(totalPart({ players: [] }), null);
+});
+
+test('a debt challenge reads as a share of the debt paid', () => {
+  const part = { percent: 12.5, target_percent: 25, paid_seconds: 1, initial_seconds: 2, done: false };
+  assert.equal(amountLabel(part), '12,5 % / 25 %');
+  assert.equal(partValue(part), 12.5);
+  assert.equal(partTarget(part), 25);
+  assert.equal(percent(partValue(part), partTarget(part)), 50);
+  assert.match(summaryLine({ kind: 'debt_reduction', label: 'Bajar la deuda', params: { mode: 'percent', percent: 25 } }), /saldar el 25 % de lo que te quedaba por jugar al empezar/);
+  assert.match(summaryLine({ kind: 'debt_reduction', label: 'Bajar la deuda', params: { mode: 'games', games: 1 } }), /completar 1 juego de los que tenías empezados/);
+});
+
+test('the preview of a debt goal tells the hours of a percentage and checks the games', () => {
+  const debt = { seconds: 40 * 3600, games: 4, open_games: 5 };
+  assert.equal(debtPreview('percent', 25, debt), 'El 25 % de tu deuda son unas 10 h (tu deuda ahora: 40 h en 4 juegos).');
+  assert.equal(debtPreview('percent', 12.5, { ...debt, games: 1 }), 'El 12,5 % de tu deuda son unas 5 h (tu deuda ahora: 40 h en 1 juego).');
+  assert.match(debtPreview('percent', 0, debt), /Elige entre 1 y 100/);
+  assert.match(debtPreview('percent', 10, { seconds: 0, games: 0, open_games: 2 }), /ya pasan de su tiempo medio/);
+  assert.match(debtPreview('games', 2, debt), /Tienes 5 juegos sin terminar; cerrar 2 es completar 2/);
+  assert.match(debtPreview('games', 1, { ...debt, open_games: 1 }), /Tienes 1 juego sin terminar; cerrar 1 es completar uno/);
+  assert.match(debtPreview('games', 9, debt), /Solo tienes 5 juegos sin terminar/);
+  assert.match(debtPreview('percent', 10, { seconds: 0, games: 0, open_games: 0 }), /no hay deuda que saldar/);
 });

@@ -45,15 +45,34 @@ export function launchMonths(today = new Date(), count = 4) {
   });
 }
 
-/** A part of a challenge is counted in games ("complete") or in seconds ("play", the group's ones). */
+/** A part of a challenge is counted in games, in a share of the debt paid or in seconds. */
 export const isCount = (part) => 'target_count' in part;
-export const partValue = (part) => (isCount(part) ? part.count : part.seconds);
-export const partTarget = (part) => (isCount(part) ? part.target_count : part.target_seconds);
+export const isPercent = (part) => 'target_percent' in part;
+export const partValue = (part) => (isCount(part) ? part.count : isPercent(part) ? part.percent : part.seconds);
+export const partTarget = (part) => (isCount(part) ? part.target_count : isPercent(part) ? part.target_percent : part.target_seconds);
 
-/** "3 / 5 h" or "0 / 1 juego" */
+const number = (n) => n.toLocaleString('es-ES');
+
+/** "3 / 5 h", "0 / 1 juego" or "12,5 % / 25 %" */
 export function amountLabel(part) {
   if (isCount(part)) return `${part.count} / ${part.target_count} ${part.target_count === 1 ? 'juego' : 'juegos'}`;
+  if (isPercent(part)) return `${number(part.percent)} % / ${number(part.target_percent)} %`;
   return `${hoursLabel(part.seconds)} / ${hoursLabel(part.target_seconds)}`;
+}
+
+/** What a "reduce the debt" goal means for the player, said before they accept it. `debt` is GET /challenges/debt
+ * ({ seconds, games, open_games }): a percentage becomes the hours it is about, a number of games is checked against the
+ * ones they have open. */
+export function debtPreview(mode, value, debt) {
+  if (!debt.open_games) return 'No tienes juegos empezados y sin terminar: no hay deuda que saldar.';
+  if (mode === 'games') {
+    const open = debt.open_games === 1 ? '1 juego sin terminar' : `${debt.open_games} juegos sin terminar`;
+    return value > debt.open_games ? `Solo tienes ${open}.` : `Tienes ${open}; cerrar ${value} es completar ${value === 1 ? 'uno' : value}.`;
+  }
+  if (!debt.seconds) return 'Tus juegos empezados ya pasan de su tiempo medio: un porcentaje no tiene deuda que saldar. Prueba a cerrar juegos.';
+  const left = `${hoursLabel(debt.seconds)} en ${debt.games === 1 ? '1 juego' : `${debt.games} juegos`}`;
+  if (!(value >= 1 && value <= 100)) return `Tu deuda ahora: ${left}. Elige entre 1 y 100 %.`;
+  return `El ${number(value)} % de tu deuda son unas ${hoursLabel((debt.seconds * value) / 100)} (tu deuda ahora: ${left}).`;
 }
 
 /** What a challenge asks, in a line. */
@@ -69,6 +88,10 @@ export function summaryLine(challenge) {
     }
     const total = p.min_games_total ? `, ${p.min_games_total} entre todos` : '';
     return `${challenge.label} · completar un juego de ${p.tag} cada uno${total}`;
+  }
+  if (challenge.kind === 'debt_reduction') {
+    const what = p.mode === 'percent' ? `saldar el ${number(p.percent)} % de lo que te quedaba por jugar` : `completar ${p.games} ${p.games === 1 ? 'juego' : 'juegos'} de los que tenías empezados`;
+    return `${challenge.label} · ${what} al empezar`;
   }
   if (challenge.kind === 'new_genre') {
     const what = p.mode === 'play' ? `jugar ${hoursLabel(p.hours * 3600)} a` : 'completar';

@@ -3,7 +3,7 @@
 // player takes part (any may leave it) and an admin launches and deletes it from the admin panel (Gestión de datos →
 // Retos). From this page a player launches and deletes only their own, personal challenges.
 import { api, jsonRequest } from '../../lib/api.js';
-import { DURATIONS, amountLabel, blocks, partTarget, partValue, percent, periodLine, summaryLine, timeLeft, totalPart } from '../../lib/challenges.js';
+import { DURATIONS, amountLabel, blocks, debtPreview, partTarget, partValue, percent, periodLine, summaryLine, timeLeft, totalPart } from '../../lib/challenges.js';
 import { html, mount } from '../../lib/html.js';
 import { gameHref } from '../../lib/links.js';
 import { modalHeader, openModal } from '../../ui/modal.js';
@@ -80,31 +80,49 @@ async function change(id, path, options) {
   }
 }
 
-/** The form of a personal "try a genre" challenge. */
-async function launchGenre() {
+/** The form to launch a personal challenge: pick the kind, then its options. */
+async function launchChallenge() {
   let genres;
+  let debt;
   try {
-    genres = await api('/challenges/genres');
+    [genres, debt] = await Promise.all([api('/challenges/genres'), api('/challenges/debt')]);
   } catch (err) {
     toast(err.message, 'err');
     return;
   }
-  if (!genres?.length) {
-    toast('Todavía no hay géneros en la base de datos', 'err');
-    return;
-  }
   const m = openModal(html`
-    ${modalHeader('Probar un género')}
+    ${modalHeader('Nuevo reto')}
     <form class="adm-form" novalidate>
-      <p class="adm-sub">Elige un género y cuánto quieres jugarlo. Solo cuentan los juegos de ese género que no tuvieras antes de empezar el reto, desde hoy.</p>
-      <label>Género<select class="adm-input" name="genre">
-        ${genres.map((g) => html`<option value="${g.genre}">${g.genre} (${g.games})${g.played ? '' : ' · nuevo para ti'}</option>`)}
+      <label>Tipo de reto<select class="adm-input" name="kind">
+        <option value="new_genre">Probar un género</option>
+        <option value="debt_reduction">Bajar la deuda</option>
       </select></label>
-      <label>Objetivo<select class="adm-input" name="mode">
-        <option value="play">Jugar unas horas</option>
-        <option value="complete">Completar un juego</option>
-      </select></label>
-      <label data-for="play">Horas<input class="adm-input" type="number" name="hours" min="0.5" step="0.5" value="2" /></label>
+
+      <div data-kind="new_genre">
+        <p class="adm-sub">Elige un género y cuánto quieres jugarlo. Solo cuentan los juegos de ese género que no tuvieras antes de empezar el reto, desde hoy.</p>
+        ${genres?.length
+          ? html`
+            <label>Género<select class="adm-input" name="genre">
+              ${genres.map((g) => html`<option value="${g.genre}">${g.genre} (${g.games})${g.played ? '' : ' · nuevo para ti'}</option>`)}
+            </select></label>
+            <label>Objetivo<select class="adm-input" name="mode">
+              <option value="play">Jugar unas horas</option>
+              <option value="complete">Completar un juego</option>
+            </select></label>
+            <label data-for="play">Horas<input class="adm-input" type="number" name="hours" min="0.5" step="0.5" value="2" /></label>`
+          : html`<p class="adm-sub">Todavía no hay géneros en la base de datos.</p>`}
+      </div>
+
+      <div data-kind="debt_reduction" hidden>
+        <p class="adm-sub">Solo cuenta lo que juegues en los juegos que ya tenías empezados al lanzar el reto: los juegos nuevos ni suman ni restan. Completar un juego salda lo que te quedaba de él; abandonarlo, no.</p>
+        <label>Objetivo<select class="adm-input" name="debtMode">
+          <option value="percent">Saldar un porcentaje de mi deuda</option>
+          <option value="games">Cerrar juegos de mi deuda</option>
+        </select></label>
+        <label><span data-debt-label>Porcentaje de la deuda</span><input class="adm-input" type="number" name="debtValue" min="1" step="1" value="25" /></label>
+        <p class="adm-sub" id="chDebtPreview" aria-live="polite"></p>
+      </div>
+
       <label>Duración<select class="adm-input" name="duration">
         ${DURATIONS.map(([value, label]) => html`<option value="${value}" ${value === 'month' ? html`selected` : ''}>${label}</option>`)}
       </select></label>
@@ -115,14 +133,38 @@ async function launchGenre() {
       </div>
     </form>`);
   const form = m.el.querySelector('form');
-  const hoursField = form.querySelector('[data-for="play"]');
-  form.elements.mode.addEventListener('change', () => { hoursField.hidden = form.elements.mode.value !== 'play'; });
+  const el = form.elements;
+  const preview = form.querySelector('#chDebtPreview');
+
+  const refresh = () => {
+    const kind = el.kind.value;
+    form.querySelectorAll('[data-kind]').forEach((box) => { box.hidden = box.dataset.kind !== kind; });
+    const hoursField = form.querySelector('[data-for="play"]');
+    if (hoursField) hoursField.hidden = el.mode?.value !== 'play';
+    const percent = el.debtMode.value === 'percent';
+    form.querySelector('[data-debt-label]').textContent = percent ? 'Porcentaje de la deuda' : 'Juegos a cerrar';
+    el.debtValue.max = percent ? '100' : String(Math.max(1, debt.open_games));
+    preview.textContent = debtPreview(el.debtMode.value, Number(el.debtValue.value), debt);
+  };
+  form.addEventListener('input', refresh);
+  form.addEventListener('change', refresh);
+  refresh();
+
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const options = { genre: form.elements.genre.value, mode: form.elements.mode.value, duration: form.elements.duration.value };
-    if (options.mode === 'play') options.hours = Number(form.elements.hours.value);
+    const duration = el.duration.value;
+    let body;
+    if (el.kind.value === 'new_genre') {
+      const options = { genre: el.genre?.value, mode: el.mode?.value, duration };
+      if (options.mode === 'play') options.hours = Number(el.hours.value);
+      body = { kind: 'new_genre', options };
+    } else {
+      const options = { mode: el.debtMode.value, duration };
+      options[options.mode === 'percent' ? 'percent' : 'games'] = Number(el.debtValue.value);
+      body = { kind: 'debt_reduction', options };
+    }
     try {
-      await api('/challenges', jsonRequest('POST', { kind: 'new_genre', options }));
+      await api('/challenges', jsonRequest('POST', body));
       m.close();
       toast('Reto lanzado');
       await load();
@@ -142,7 +184,7 @@ export async function render(ctx) {
     </div>
     <p class="pf-sub cal-intro">Objetivos con fecha de fin. Los del grupo los lanza un administrador y cada uno puede salirse; los tuyos los lanzas tú y los ven los demás.</p>
     <div id="chLists"><div class="loading-spinner">Cargando los retos...</div></div>`);
-  main.querySelector('#chNew').addEventListener('click', launchGenre);
+  main.querySelector('#chNew').addEventListener('click', launchChallenge);
   main.querySelector('#chLists').addEventListener('click', (e) => {
     const id = e.target.closest('[data-challenge]')?.dataset.challenge;
     const part = e.target.closest('[data-part]');

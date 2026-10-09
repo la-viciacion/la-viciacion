@@ -45,7 +45,7 @@ class Built:
 class Template:
     label: str
     scope: str  # GROUP: launched by an admin for everybody; USER: by a player for themselves
-    build: Callable[[Session, dict, datetime.date], Built]
+    build: Callable[[Session, dict, datetime.date, int | None], Built]  # (db, options, today, whoever launches it)
     progress: Callable[[Session, models.Challenge, list[int]], dict]
     # the notices of a group challenge: what is asked when it is launched, and the group's total reached
     summary: Callable[[models.Challenge], str] | None = None
@@ -109,7 +109,7 @@ def fingerprint(kind: str, built: Built, owner_user_id: int | None) -> str:
 # ── Juego del mes ───────────────────────────────────────────────
 
 
-def build_game_of_month(db: Session, options: dict, today: datetime.date) -> Built:
+def build_game_of_month(db: Session, options: dict, today: datetime.date, user_id: int | None = None) -> Built:
     """Options: game_id, month ("YYYY-MM"), min_hours_each, min_hours_total."""
     game = db.get(models.Game, str(options.get("game_id") or ""))
     if game is None:
@@ -224,7 +224,7 @@ def available_tags(db: Session) -> dict[str, tuple[str, int]]:
     return _available(db, models.Game.tags)
 
 
-def build_new_genre(db: Session, options: dict, today: datetime.date) -> Built:
+def build_new_genre(db: Session, options: dict, today: datetime.date, user_id: int | None = None) -> Built:
     """Options: genre (one that exists and has games), mode ("play" hours or "complete" one game), hours (play only,
     2 by default) and duration ("week", "month" or "quarter"; the period starts today)."""
     genres = available_genres(db)
@@ -306,7 +306,7 @@ def progress_new_genre(db: Session, challenge: models.Challenge, participant_ids
 MAX_GAMES = 500
 
 
-def build_themed(db: Session, options: dict, today: datetime.date) -> Built:
+def build_themed(db: Session, options: dict, today: datetime.date, user_id: int | None = None) -> Built:
     """Options: tag (one that exists and has games), month ("YYYY-MM"), mode ("play" hours or "complete" a game),
     min_hours_each (play only) and, optionally, a total for the whole group: min_hours_total (play) or
     min_games_total (complete). Every game that has the tag counts."""
@@ -428,8 +428,108 @@ def reached_themed(challenge: models.Challenge, progress: dict) -> str:
     return f"Entre todos habéis llegado a {what} de {params['tag']}. {done} de {len(progress['players'])} ya habéis cumplido vuestra parte."
 
 
+# ── Bajar la deuda ──────────────────────────────────────────────
+
+
+def _between(value, name: str, low: float, high: float) -> float:
+    """A number within limits, to a tenth."""
+    try:
+        number = round(float(value), 1)
+    except (ValueError, TypeError):
+        raise ChallengeError(f"{name} no es un número")
+    if not low <= number <= high:
+        raise ChallengeError(f"{name} debe estar entre {low:g} y {high:g}")
+    return number
+
+
+def build_debt_reduction(db: Session, options: dict, today: datetime.date, user_id: int | None = None) -> Built:
+    """Options: mode ("percent" of the debt the player has when it starts, or "games" of those to close), percent
+    (1 to 100) or games (1 up to how many they have open), and duration ("week", "month" or "quarter"; it starts
+    today). Only the games the player already had open count, so playing new ones neither helps nor hurts."""
+    from ..crud import debt  # that module imports the ones that import this one
+
+    mode = options.get("mode")
+    if mode not in ("percent", "games"):
+        raise ChallengeError("Elige si quieres saldar un porcentaje de la deuda o cerrar juegos")
+    duration = options.get("duration") or "month"
+    if duration not in DURATIONS:
+        raise ChallengeError("Elige una duración: una semana, un mes o tres meses")
+    open_games = debt.games_in_debt_at(db, user_id, today) if user_id is not None else {}
+    if not open_games:
+        raise ChallengeError("No tienes juegos empezados y sin terminar: no hay deuda que saldar")
+    params: dict = {"mode": mode, "duration": duration}
+    if mode == "percent":
+        if not any(open_games.values()):
+            raise ChallengeError("Tus juegos empezados ya pasan de su tiempo medio: no te queda deuda que saldar")
+        params["percent"] = _between(options.get("percent"), "El porcentaje", 1, 100)
+        title = f"Bajar la deuda un {hours_text(params['percent'])} %"
+    else:
+        try:
+            games = int(options.get("games"))
+        except (ValueError, TypeError):
+            raise ChallengeError("El número de juegos no es un número")
+        if not 1 <= games <= len(open_games):
+            raise ChallengeError(f"Tienes {len(open_games)} {'juego' if len(open_games) == 1 else 'juegos'} sin terminar: elige entre 1 y {len(open_games)}")
+        params["games"] = games
+        title = f"Cerrar {games} {'juego' if games == 1 else 'juegos'} de la deuda"
+    return Built(title=title, params=params, starts_on=today, ends_on=today + datetime.timedelta(days=DURATIONS[duration] - 1))
+
+
+def debt_reduction_result(user_id: int | None, name: str, params: dict, start_debt: dict[str, int], played: dict[str, int], completed: set[str]) -> dict:
+    """The progress of a debt reduction (pure). `start_debt` is {game_id: seconds left} the player had when it began,
+    `played` the seconds they played each of those games since and `completed` the ones they completed since.
+    Percent: what was paid over what was owed, where a completed game pays all it had left and any other pays what
+    was played, up to what it had left. Games: how many of them were completed. Abandoning pays nothing."""
+    if user_id is None:
+        return {"players": []}
+    if params["mode"] == "percent":
+        owed = sum(start_debt.values())
+        paid = sum(left if game in completed else min(left, played.get(game, 0)) for game, left in start_debt.items())
+        share = 100 * paid / owed if owed else 0.0
+        player = {"user_id": user_id, "name": name, "percent": round(share, 1), "target_percent": params["percent"],
+                  "paid_seconds": paid, "initial_seconds": owed, "done": owed > 0 and share >= params["percent"]}
+    else:
+        closed = len(completed & start_debt.keys())
+        player = {"user_id": user_id, "name": name, "count": closed, "target_count": params["games"], "done": closed >= params["games"]}
+    return {"players": [player]}
+
+
+def progress_debt_reduction(db: Session, challenge: models.Challenge, participant_ids: list[int]) -> dict:
+    from ..crud import debt  # that module imports the ones that import this one
+
+    if not participant_ids:
+        return {"players": []}
+    user_id = participant_ids[0]
+    user = db.get(models.User, user_id)
+    start_debt = debt.games_in_debt_at(db, user_id, challenge.starts_on)
+    window_start = datetime.datetime.combine(challenge.starts_on, datetime.time.min)
+    window_end = datetime.datetime.combine(challenge.ends_on + datetime.timedelta(days=1), datetime.time.min)
+    played = {
+        game_id: int(seconds or 0)  # MariaDB returns SUM() as Decimal
+        for game_id, seconds in db.query(models.GameTimer.game_id, func.sum(models.GameTimer.duration_seconds))
+        .filter(
+            models.GameTimer.user_id == user_id,
+            models.GameTimer.game_id.in_(list(start_debt)),
+            models.GameTimer.is_active == False,  # noqa: E712
+            models.GameTimer.start_time >= window_start,
+            models.GameTimer.start_time < window_end,
+        )
+        .group_by(models.GameTimer.game_id)
+    } if start_debt else {}
+    completed = {
+        game_id for (game_id,) in db.query(models.UserGame.game_id).filter(
+            models.UserGame.user_id == user_id,
+            models.UserGame.completed == 1,
+            models.UserGame.completed_date >= challenge.starts_on,
+            models.UserGame.completed_date <= challenge.ends_on,
+        )
+    } & set(start_debt)
+    return debt_reduction_result(user_id, (user.name or user.username) if user else "", json.loads(challenge.params), start_debt, played, completed)
+
+
 TEMPLATES: dict[str, Template] = {
     "game_of_month": Template("Juego del mes", GROUP, build_game_of_month, progress_game_of_month, summary_game_of_month, reached_game_of_month),
     "themed": Template("Temático", GROUP, build_themed, progress_themed, summary_themed, reached_themed),
     "new_genre": Template("Probar un género", USER, build_new_genre, progress_new_genre),
+    "debt_reduction": Template("Bajar la deuda", USER, build_debt_reduction, progress_debt_reduction),
 }
