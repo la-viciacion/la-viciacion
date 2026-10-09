@@ -107,7 +107,7 @@ def visible(db: Session, viewer_id: int) -> list[models.Challenge]:
 def outcome(progress: dict, user_id: int) -> dict:
     """How a player did in a challenge (from its progress): whether they reached their part and whether the group did."""
     mine = next((p for p in progress["players"] if p["user_id"] == user_id), None)
-    return {"done": bool(mine and mine["done"]), "seconds": mine["seconds"] if mine else 0, "group_done": progress.get("total_done")}
+    return {"done": bool(mine and mine["done"]), "group_done": progress.get("total_done")}
 
 
 def history(db: Session, player_id: int, today: datetime.date) -> list[dict]:
@@ -128,6 +128,23 @@ def history(db: Session, player_id: int, today: datetime.date) -> list[dict]:
             **outcome(progress, player_id),
         })
     return found
+
+
+def genres(db: Session, viewer_id: int) -> list[dict]:
+    """The genres a personal challenge can be about (those of the games in the database), with how many games each has
+    and whether the viewer already has a game of it in their library."""
+    owned = set()
+    for (genre_text,) in (
+        db.query(models.Game.genres)
+        .join(models.UserGame, models.UserGame.game_id == models.Game.id)
+        .filter(models.UserGame.user_id == viewer_id, models.Game.genres.isnot(None))
+        .distinct()
+    ):
+        owned.update(genre.casefold() for genre in challenges.split_genres(genre_text))
+    return [
+        {"genre": name, "games": count, "played": key in owned}
+        for key, (name, count) in sorted(challenges.available_genres(db).items())
+    ]
 
 
 def reached_totals(db: Session, today: datetime.date) -> list[tuple[models.Challenge, dict]]:

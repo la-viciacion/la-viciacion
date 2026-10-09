@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { daysUntil, hoursLabel, launchMonths, percent, resultLine, timeLeft } from '../js/lib/challenges.js';
+import { amountLabel, blocks, daysUntil, hoursLabel, launchMonths, partTarget, partValue, percent, resultLine, summaryLine, timeLeft } from '../js/lib/challenges.js';
 
 const TODAY = new Date(2026, 9, 15, 12, 0); // 15 October 2026
 
@@ -45,4 +45,37 @@ test('a result is told from the player\'s part and the group\'s total', () => {
   assert.equal(resultLine({ done: true, group_done: false }), 'Cumpliste tu parte');
   assert.equal(resultLine({ done: false, group_done: true }), 'El grupo llegó al total');
   assert.equal(resultLine({ done: false, group_done: false }), 'No se cumplió');
+});
+
+test('a part is counted in games or in hours', () => {
+  assert.equal(amountLabel({ seconds: 3600, target_seconds: 7200 }), '1 h / 2 h');
+  assert.equal(amountLabel({ count: 0, target_count: 1 }), '0 / 1 juego');
+  assert.equal(amountLabel({ count: 1, target_count: 3 }), '1 / 3 juegos');
+  assert.equal(partValue({ count: 2, target_count: 3 }), 2);
+  assert.equal(partTarget({ seconds: 5, target_seconds: 9 }), 9);
+});
+
+test('a challenge is summarised by what it asks', () => {
+  const base = { label: 'Probar un género', kind: 'new_genre' };
+  assert.equal(summaryLine({ ...base, params: { genre: 'RPG', mode: 'play', hours: 2.5 } }), 'Probar un género · jugar 2,5 h a un juego de RPG que no tuvieras antes');
+  assert.equal(summaryLine({ ...base, params: { genre: 'RPG', mode: 'complete' } }), 'Probar un género · completar un juego de RPG que no tuvieras antes');
+  assert.match(summaryLine({ kind: 'game_of_month', label: 'Juego del mes', params: { min_hours_each: 5, min_hours_total: 20 } }), /mínimo 5 h cada uno y 20 h entre todos/);
+});
+
+test('the page is split into the group\'s, the viewer\'s and the others\', running ones first and few finished', () => {
+  const group = (id, status) => ({ id, scope: 'group', status });
+  const own = (id, owner, status = 'active') => ({ id, scope: 'user', owner: { id: owner }, status });
+  const finished = Array.from({ length: 8 }, (_, i) => group(100 + i, 'finished'));
+  const result = blocks([group(1, 'finished'), group(2, 'upcoming'), group(3, 'active'), own(4, 1), own(5, 2), ...finished], 1);
+  assert.deepEqual(result.map((b) => b.key), ['group', 'mine', 'others']);
+  assert.deepEqual(result[0].list.slice(0, 2).map((c) => c.id), [3, 2]);
+  assert.equal(result[0].list.length, 2 + 5); // the running ones and the latest five finished
+  assert.deepEqual(result[1].list.map((c) => c.id), [4]);
+  assert.deepEqual(result[2].list.map((c) => c.id), [5]);
+  assert.deepEqual(blocks([], 1).map((b) => b.key), ['group', 'mine']); // nobody else's: no block
+});
+
+test('a personal result says it was achieved and a group one how the group did', () => {
+  assert.equal(resultLine({ scope: 'user', done: true }), 'Lo conseguiste');
+  assert.equal(resultLine({ scope: 'user', done: false }), 'No se cumplió');
 });

@@ -43,6 +43,16 @@ def get_templates(current_user: models.User = Depends(auth.get_current_active_us
     ]
 
 
+@router.get("/genres")
+def get_genres(
+    current_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """The genres "try a genre" can be about: those that exist in the database and have games, with how many and
+    whether the caller already has one in their library."""
+    return crud.genres(db, current_user.id)
+
+
 @router.get("")
 def get_challenges(
     current_user: models.User = Depends(auth.get_current_active_user),

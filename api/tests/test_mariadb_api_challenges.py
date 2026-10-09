@@ -52,7 +52,7 @@ class LaunchTests(ChallengesTestCase):
     def test_the_templates_say_the_group_ones_are_not_launched_from_the_challenges_page(self):
         for user in ("root", "ana"):  # not even an admin
             body = self.api("GET", "/challenges/templates", as_user=user).json()
-            self.assertEqual([(t["kind"], t["scope"], t["can_launch"]) for t in body], [("game_of_month", "group", False)])
+            self.assertEqual([(t["scope"], t["can_launch"]) for t in body if t["kind"] == "game_of_month"], [("group", False)])
 
     def test_an_admin_launches_a_game_of_the_month_for_the_group(self):
         response = self.launch()
