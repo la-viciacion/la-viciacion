@@ -65,6 +65,10 @@ class PickTests(unittest.TestCase):
     def test_the_search_is_given_the_name_without_colons_and_slashes(self):
         self.assertEqual(hltb_sync.clean_name("Zelda: A/B"), "Zelda AB")
 
+    def test_the_search_is_given_plain_quotes_because_hltb_finds_nothing_with_typographic_ones(self):
+        self.assertEqual(hltb_sync.clean_name("Sid Meier’s Civilization VI"), "Sid Meier's Civilization VI")
+        self.assertEqual(hltb_sync.clean_name("‘Quoted’ “Game”"), "'Quoted' \"Game\"")
+
 
 if __name__ == "__main__":
     unittest.main()
