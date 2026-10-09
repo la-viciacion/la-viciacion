@@ -17,7 +17,7 @@ def create(db: Session, creator: models.User, kind: str, options: dict, today: d
     template = TEMPLATES.get(kind)
     if template is None:
         raise ChallengeError("Ese tipo de reto no existe")
-    built = template.build(db, options or {}, today)
+    built = template.build(db, options or {}, today, creator.id)
     owner_id = creator.id if template.scope == USER else None
     digest = challenges.fingerprint(kind, built, owner_id)
     if db.query(models.Challenge.id).filter(models.Challenge.fingerprint == digest).first() is not None:
@@ -145,6 +145,16 @@ def genres(db: Session, viewer_id: int) -> list[dict]:
         {"genre": name, "games": count, "played": key in owned}
         for key, (name, count) in sorted(challenges.available_genres(db).items())
     ]
+
+
+def debt_preview(db: Session, viewer_id: int, today: datetime.date) -> dict:
+    """What a "reduce the debt" challenge launched today would be about: the seconds the viewer has left to play of
+    the games they have open, how many of those games still owe time, and how many are open (the most they can ask
+    to close). The same figures the challenge starts from, so the form can say what a percentage means in hours."""
+    from . import debt  # that module imports the ones that import this one
+
+    open_games = debt.games_in_debt_at(db, viewer_id, today)
+    return {"seconds": sum(open_games.values()), "games": sum(1 for left in open_games.values() if left), "open_games": len(open_games)}
 
 
 def reached_totals(db: Session, today: datetime.date) -> list[tuple[models.Challenge, dict]]:

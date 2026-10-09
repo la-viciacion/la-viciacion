@@ -13,6 +13,7 @@ afterEach(() => closeAllModals());
 const main = () => document.getElementById('main');
 const ANA = { id: 1, username: 'ana', is_admin: false };
 const ROOT = { id: 9, username: 'root', is_admin: true };
+const DEBT = { seconds: 40 * 3600, games: 4, open_games: 5 };
 
 const challenge = (extra = {}) => ({
   id: 5, kind: 'game_of_month', label: 'Juego del mes', scope: 'group', title: 'Juego del mes: Hades <b>', status: 'active',
@@ -115,7 +116,7 @@ test('not even an admin launches or deletes a group challenge from this page: th
 
 test('the new challenge form asks for a genre, the goal and the duration, and sends them', async () => {
   const GENRES = [{ genre: 'Action', games: 3, played: true }, { genre: 'Metroidvania', games: 2, played: false }];
-  const calls = installApi({ 'GET /challenges/genres': GENRES, 'GET /challenges': [], 'POST /challenges': personal() });
+  const calls = installApi({ 'GET /challenges/debt': DEBT, 'GET /challenges/genres': GENRES, 'GET /challenges': [], 'POST /challenges': personal() });
   await page.render({ main: main(), user: ANA });
   await settle();
   document.querySelector('#chNew').click();
@@ -126,7 +127,7 @@ test('the new challenge form asks for a genre, the goal and the duration, and se
   assert.equal(form.elements.duration.value, 'month');
   form.elements.genre.value = 'Metroidvania';
   form.elements.mode.value = 'complete';
-  form.elements.mode.dispatchEvent(new window.Event('change'));
+  form.elements.mode.dispatchEvent(new window.Event('change', { bubbles: true }));
   assert.equal(document.querySelector('[data-for="play"]').hidden, true);
   form.requestSubmit();
   await settle();
@@ -135,7 +136,7 @@ test('the new challenge form asks for a genre, the goal and the duration, and se
 });
 
 test('playing sends the hours', async () => {
-  const calls = installApi({ 'GET /challenges/genres': [{ genre: 'RPG', games: 1, played: false }], 'GET /challenges': [], 'POST /challenges': personal() });
+  const calls = installApi({ 'GET /challenges/debt': DEBT, 'GET /challenges/genres': [{ genre: 'RPG', games: 1, played: false }], 'GET /challenges': [], 'POST /challenges': personal() });
   await page.render({ main: main(), user: ANA });
   await settle();
   document.querySelector('#chNew').click();
@@ -149,7 +150,7 @@ test('playing sends the hours', async () => {
 });
 
 test('an error from the API stays in the form', async () => {
-  installApi({ 'GET /challenges/genres': [{ genre: 'RPG', games: 1, played: false }], 'GET /challenges': [], 'POST /challenges': json({ detail: 'Ya existe un reto igual' }, 409) });
+  installApi({ 'GET /challenges/debt': DEBT, 'GET /challenges/genres': [{ genre: 'RPG', games: 1, played: false }], 'GET /challenges': [], 'POST /challenges': json({ detail: 'Ya existe un reto igual' }, 409) });
   await page.render({ main: main(), user: ANA });
   await settle();
   document.querySelector('#chNew').click();
@@ -194,4 +195,73 @@ test('the empty history is worded for whose it is', async () => {
   installApi({ 'GET /challenges/player/2': [] });
   await history.showChallengesHistory(document.getElementById('h'), 2, false);
   assert.match(document.getElementById('h').textContent, /Todavía no ha terminado ningún reto/);
+});
+
+test('the kind of challenge decides which options show and the form starts on trying a genre', async () => {
+  document.body.innerHTML = '<main id="main"></main>'; // the tests of the history above replaced it
+  installApi({ 'GET /challenges/debt': DEBT, 'GET /challenges/genres': [{ genre: 'RPG', games: 1, played: false }], 'GET /challenges': [] });
+  await page.render({ main: main(), user: ANA });
+  await settle();
+  document.querySelector('#chNew').click();
+  await settle();
+  const form = document.querySelector('.modal-content form');
+  assert.equal(form.querySelector('[data-kind="new_genre"]').hidden, false);
+  assert.equal(form.querySelector('[data-kind="debt_reduction"]').hidden, true);
+  form.elements.kind.value = 'debt_reduction';
+  form.elements.kind.dispatchEvent(new window.Event('change', { bubbles: true }));
+  assert.equal(form.querySelector('[data-kind="new_genre"]').hidden, true);
+  assert.equal(form.querySelector('[data-kind="debt_reduction"]').hidden, false);
+});
+
+test('before accepting a percentage of the debt the form says how many hours it is', async () => {
+  document.body.innerHTML = '<main id="main"></main>'; // the tests of the history above replaced it
+  installApi({ 'GET /challenges/debt': DEBT, 'GET /challenges/genres': [], 'GET /challenges': [] });
+  await page.render({ main: main(), user: ANA });
+  await settle();
+  document.querySelector('#chNew').click();
+  await settle();
+  const form = document.querySelector('.modal-content form');
+  form.elements.kind.value = 'debt_reduction';
+  form.elements.kind.dispatchEvent(new window.Event('change', { bubbles: true }));
+  assert.match(document.querySelector('#chDebtPreview').textContent, /El 25 % de tu deuda son unas 10 h \(tu deuda ahora: 40 h en 4 juegos\)/);
+  form.elements.debtValue.value = '12.5';
+  form.elements.debtValue.dispatchEvent(new window.Event('input', { bubbles: true }));
+  assert.match(document.querySelector('#chDebtPreview').textContent, /El 12,5 % de tu deuda son unas 5 h/);
+});
+
+test('launching a debt challenge sends the percentage or the games', async () => {
+  document.body.innerHTML = '<main id="main"></main>'; // the tests of the history above replaced it
+  const calls = installApi({ 'GET /challenges/debt': DEBT, 'GET /challenges/genres': [], 'GET /challenges': [], 'POST /challenges': personal() });
+  await page.render({ main: main(), user: ANA });
+  await settle();
+  document.querySelector('#chNew').click();
+  await settle();
+  const form = document.querySelector('.modal-content form');
+  form.elements.kind.value = 'debt_reduction';
+  form.elements.kind.dispatchEvent(new window.Event('change', { bubbles: true }));
+  form.elements.debtValue.value = '30';
+  form.requestSubmit();
+  await settle();
+  assert.deepEqual(calls.find((c) => c.method === 'POST').body, { kind: 'debt_reduction', options: { mode: 'percent', duration: 'month', percent: 30 } });
+  document.querySelector('#chNew').click();
+  await settle();
+  const second = document.querySelector('.modal-content form');
+  second.elements.kind.value = 'debt_reduction';
+  second.elements.debtMode.value = 'games';
+  second.elements.debtMode.dispatchEvent(new window.Event('change', { bubbles: true }));
+  assert.equal(second.elements.debtValue.max, '5'); // as many as are open
+  second.elements.debtValue.value = '2';
+  second.requestSubmit();
+  await settle();
+  assert.deepEqual(calls.filter((c) => c.method === 'POST').at(-1).body.options, { mode: 'games', duration: 'month', games: 2 });
+});
+
+test('a debt challenge shows its share of the debt paid', async () => {
+  document.body.innerHTML = '<main id="main"></main>'; // the tests of the history above replaced it
+  const progress = { players: [{ user_id: 1, name: 'Ana', percent: 12.5, target_percent: 25, paid_seconds: 18000, initial_seconds: 144000, done: false }] };
+  installApi({ 'GET /challenges': [personal({ kind: 'debt_reduction', label: 'Bajar la deuda', title: 'Bajar la deuda un 25 %', params: { mode: 'percent', percent: 25, duration: 'month' }, progress })] });
+  await page.render({ main: main(), user: ANA });
+  await settle();
+  assert.match(text('.ch-row')[0], /12,5 % \/ 25 %/);
+  assert.match(main().textContent, /saldar el 25 % de lo que te quedaba por jugar al empezar/);
 });

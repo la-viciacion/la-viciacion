@@ -53,6 +53,16 @@ def get_genres(
     return crud.genres(db, current_user.id)
 
 
+@router.get("/debt")
+def get_debt(
+    current_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """The caller's debt as a "reduce the debt" challenge launched today would start from it: seconds left to play,
+    games that owe time and games open. Derived, so the form can say how many hours a percentage is."""
+    return crud.debt_preview(db, current_user.id, datetime.date.today())
+
+
 @router.get("")
 def get_challenges(
     current_user: models.User = Depends(auth.get_current_active_user),
