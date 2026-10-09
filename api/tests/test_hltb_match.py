@@ -29,6 +29,9 @@ class PickTests(unittest.TestCase):
         self.assertEqual(pick("Hades 2", [result("Hades"), result("Hades II")]), ("match", ["Hades II"]))  # roman numerals read as digits
         self.assertEqual(pick("Hades 2", [result("Hades")])[0], "ambiguous")
 
+    def test_an_online_only_game_is_still_the_game(self):
+        self.assertEqual(pick("Helldivers II", [result("Helldivers 2", kind="multi")]), ("match", ["Helldivers 2"]))
+
     def test_dlcs_never_match(self):
         self.assertEqual(pick("Hades", [result("Hades", kind="dlc")]), ("not_found", []))
         self.assertEqual(pick("Hades", [result("Hades", kind="dlc", game_id=1), result("Hades", game_id=2)])[0], "match")

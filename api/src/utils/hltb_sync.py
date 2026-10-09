@@ -31,6 +31,7 @@ MIN_CONFIDENT = 0.9              # similarity a name must reach to be matched wi
 MIN_LEAD = 0.05                  # ...and how far ahead of the runner-up it has to be
 MIN_CANDIDATE = 0.6              # below this a result is not worth showing as a candidate
 MAX_CANDIDATES = 5
+GAME_TYPES = ("game", "multi")    # HLTB files online-only games (Helldivers 2) as "multi": still the game, unlike a "dlc" or a "mod"
 
 _lock = threading.Lock()
 _cancel = threading.Event()
@@ -94,11 +95,11 @@ def candidates(entries) -> list[dict]:
 
 def pick(name: str, year: int | None, found: list[dict]) -> tuple[str, list[dict]]:
     """('match', [the one]) when the result is clear, ('ambiguous', [candidates]) when a person should decide,
-    ('not_found', []) when nothing looks like the game. DLCs and the like are never the game.
+    ('not_found', []) when nothing looks like the game. DLCs, mods and the like are never the game.
 
     An exact name (accents, case, punctuation and a leading "The" aside) wins; several of them are told apart by
     the release year. Without one, the closest name wins only if it is very close and clearly ahead of the next."""
-    games = [c for c in found if c["type"] in (None, "game")]
+    games = [c for c in found if c["type"] in (None, *GAME_TYPES)]
     scored = sorted(((_similarity(name, c), c) for c in games), key=lambda pair: -pair[0])
     exact = [c for score, c in scored if score == 1.0]
     if len(exact) > 1 and year:
