@@ -23,7 +23,7 @@ from ..auth import get_db
 from ..crud import achievements_recalc
 from ..crud import users as users_crud
 from ..database import models
-from ..utils import actions, ai, audit, my_utils, push, rawg_sync, seasons, settings, sql_dump
+from ..utils import actions, ai, audit, hltb_sync, my_utils, push, rawg_sync, seasons, settings, sql_dump
 from ..utils.achievements import is_lifetime
 from ..utils import email as mail
 from ..database.schemas import NOTES_MAX
@@ -570,6 +570,38 @@ def rawg_sync_apply(body: RawgApplyBody, db: Session = Depends(get_db)):
         raise HTTPException(status_code=409, detail=str(e))
     except (ConnectionError, rawg_sync.RawgFatal) as e:
         raise HTTPException(status_code=502, detail=str(e))
+
+
+# ── HLTB sync (average time to complete; replaces the stored times) ──
+
+
+class HltbSyncBody(BaseModel):
+    confirm: str                       # must equal RAWG_SYNC_PHRASE too: it replaces the time of every game
+
+
+@router.get("/hltb-sync/estimate")
+def hltb_sync_estimate(db: Session = Depends(get_db)):
+    """How many games and how long a sync would take. Makes no HLTB request."""
+    return hltb_sync.estimate(db)
+
+
+@router.get("/hltb-sync/status")
+def hltb_sync_status():
+    return hltb_sync.status()
+
+
+@router.post("/hltb-sync/start", status_code=202)
+def hltb_sync_start(body: HltbSyncBody):
+    if body.confirm != RAWG_SYNC_PHRASE:
+        raise HTTPException(status_code=400, detail="Confirmación incorrecta")
+    if not hltb_sync.start():
+        raise HTTPException(status_code=409, detail="Ya hay una sincronización en curso")
+    return hltb_sync.status()
+
+
+@router.post("/hltb-sync/cancel")
+def hltb_sync_cancel():
+    return {"cancelling": hltb_sync.cancel()}
 
 
 # ── Sessions (game_timers) ──────────────────────────────────────

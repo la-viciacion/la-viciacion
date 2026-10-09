@@ -52,6 +52,10 @@ RANKING_MENU = [
         InlineKeyboardButton("🏟️ Más jugados", callback_data="games_most_played"),
     ],
     [
+        InlineKeyboardButton("💸 Deuda", callback_data="user_debt"),
+        InlineKeyboardButton("🧾 Deuda total", callback_data="user_debt_total"),
+    ],
+    [
         InlineKeyboardButton("🔙 Atrás", callback_data="back"),
         InlineKeyboardButton(EXIT, callback_data="cancel"),
     ],

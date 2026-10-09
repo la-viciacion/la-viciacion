@@ -14,7 +14,7 @@ from ..config import Config
 from ..crud import games, time_entries, users
 from ..database import models, schemas
 from .achievements import AchievementsElems
-from . import ai, push, settings
+from . import ai, hltb_sync, push, settings
 from .redaction import redact_rawg_key
 from ..utils.logger import LogManager
 
@@ -237,18 +237,19 @@ async def get_game_details_by_rawg_id(rawg_id: int) -> dict | None:
 
     # HLTB for estimated playtime (and fallback for dev/steam_id)
     avg_time = 0
-    clean_name = re.sub(r"[:/]", "", name)
     try:
-        hltb_results = await HowLongToBeat().async_search(clean_name)
+        hltb_results = await HowLongToBeat().async_search(hltb_sync.clean_name(name))
         if hltb_results and len(hltb_results) > 0:
             best_hltb = max(hltb_results, key=lambda x: x.similarity)
-            avg_time = getattr(best_hltb, "gameplay_main", 0) or 0
+            # the time only from a clear match (seconds, like the rest of `games.avg_time`), the fallbacks below from the closest
+            matched = hltb_sync.best_entry(name, int(released[:4]) if released and released[:4].isdigit() else None, hltb_results)
+            avg_time = ((matched.json_content or {}).get("comp_main") or 0) if matched else 0
             if dev == "-" and hasattr(best_hltb, "profile_dev") and best_hltb.profile_dev:
                 dev = best_hltb.profile_dev
             if not steam_id and hasattr(best_hltb, "profile_steam") and best_hltb.profile_steam:
                 steam_id = str(best_hltb.profile_steam)
     except Exception as e:
-        logger.warning(f"HLTB search failed for '{clean_name}': {e}")
+        logger.warning(f"HLTB search failed for '{name}': {e}")
 
     release_date = None
     if released:
@@ -288,12 +289,12 @@ async def get_game_info(game: str):
             logger.warning(f"Error fetching RAWG for {game}: {redact_rawg_key(e)}")
 
     # HLTB
-    clean_game = re.sub(r"[:/]", "", game)
     hltb_content = None
     try:
-        results_list = await HowLongToBeat().async_search(clean_game)
-        if results_list and len(results_list) > 0:
-            best_element = max(results_list, key=lambda element: element.similarity)
+        results_list = await HowLongToBeat().async_search(hltb_sync.clean_name(game))
+        # only a clear match: a doubtful one would replace the stored time with another game's
+        best_element = hltb_sync.best_entry(game, None, results_list)
+        if best_element is not None:
             hltb_content = best_element.json_content
     except Exception:
         hltb_content = None

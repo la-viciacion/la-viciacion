@@ -6,9 +6,10 @@ from sqlalchemy.orm import Session
 
 from .. import auth
 from ..auth import get_db
-from ..crud import rankings, users
+from ..crud import debt, rankings, users
 from ..database import models, schemas
 from ..utils import actions as actions
+from ..utils import seasons
 from ..utils.logger import LogManager
 
 log_manager = LogManager()
@@ -65,6 +66,7 @@ class RankingStatisticsTypes(str, Enum):
     games_most_played = "games_most_played"
     platform_played = "platform_played"
     debt = "debt"
+    debt_total = "debt_total"
     games_last_played = "games_last_played"
 
 
@@ -75,6 +77,7 @@ class RankingStatisticsTypes(str, Enum):
 def get_ranking_statistics(
     ranking: str = None,
     only_active: bool = False,
+    season: int = None,
     db: Session = Depends(get_db),
 ):
     """
@@ -83,7 +86,10 @@ def get_ranking_statistics(
 
     Allowed values: 'user_hours', 'user_days', 'user_played_games',
     'user_completed_games', 'achievements', 'user_ratio', 'user_current_streak',
-    'user_best_streak', 'games_most_played', 'platform_played', 'debt', 'games_last_played'
+    'user_best_streak', 'games_most_played', 'platform_played', 'debt', 'debt_total', 'games_last_played'
+
+    `debt` is the debt of a season (`season`, the running one by default) and `debt_total` the one over every
+    season: the time still to play, by the average time to complete, in the games started and not finished.
     """
     if ranking is not None:
         rankings_list = ranking.split(",")
@@ -115,7 +121,9 @@ def get_ranking_statistics(
         elif ranking_type == RankingStatisticsTypes.platform_played:
             data = rankings.platform_played_games(db, is_active=is_active)
         elif ranking_type == RankingStatisticsTypes.debt:
-            data = [{"message": "Debt is not implemented yet"}]
+            data = debt.user_debt(db, season, is_active)
+        elif ranking_type == RankingStatisticsTypes.debt_total:
+            data = debt.user_debt(db, seasons.ALL, is_active)
         elif ranking_type == RankingStatisticsTypes.games_last_played:
             data = rankings.games_last_played(db, is_active=is_active)
         else:

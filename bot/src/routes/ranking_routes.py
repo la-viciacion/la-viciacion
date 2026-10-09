@@ -225,3 +225,35 @@ class RankingRoutes:
                 + "\n"
             )
         await utils.response_conversation(update, context, msg)
+
+    async def _debt(self, update: Update, context: ContextTypes.DEFAULT_TYPE, ranking: str, title: str) -> None:
+        ranking = utils.fetch_json(
+            "GET", config.API_URL + f"/statistics/rankings?ranking={ranking}&only_active=true"
+        )
+        ranking = utils.load_json_response(ranking[0])
+        msg = title + "\n"
+        for i, elem in enumerate(ranking["data"]):
+            msg = (
+                msg
+                + str(i + 1)
+                + ". "
+                + str(elem["name"])
+                + ": "
+                + str(format_duration(elem["debt_time"]))
+                + " en "
+                + str(elem["games"])
+                + " juegos\n"
+            )
+        await utils.response_conversation(update, context, msg)
+
+    async def user_debt(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ) -> None:
+        logger.info("Ranking debt")
+        await self._debt(update, context, "debt", "Lo que le queda a cada uno por jugar esta temporada (según HLTB):")
+
+    async def user_debt_total(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ) -> None:
+        logger.info("Ranking debt total")
+        await self._debt(update, context, "debt_total", "Lo que le queda a cada uno por jugar en total (según HLTB):")

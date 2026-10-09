@@ -383,6 +383,10 @@ async function onClick(e) {
         const { rawgSyncFlow } = await import('./rawg-sync.js');
         return rawgSyncFlow({ onDone: admin.reload });
       }
+      case 'hltb-sync': {
+        const { hltbSyncFlow } = await import('./hltb-sync.js');
+        return hltbSyncFlow({ onDone: admin.reload });
+      }
       case 'award-edit': return openForm(ENTITIES.awards, awardRows.get(Number(button.dataset.award)), admin);
       case 'award-revoke': return deleteRow(ENTITIES.awards, awardRows.get(Number(button.dataset.award)), admin);
       case 'create': return openForm(entity, null, admin);
