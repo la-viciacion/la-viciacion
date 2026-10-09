@@ -24,9 +24,9 @@ class ActivityTests(ApiTestCase):
     def feed(self, as_user="ana", **params):
         return self.api("GET", "/activity", as_user=as_user, params=params).json()
 
-    def rate(self, user_id, game_id, score):
+    def rate(self, user_id, game_id, score, at=None):
         with database.SessionLocal() as db:
-            db.add(models.GameScore(user_id=user_id, game_id=game_id, score=score))
+            db.add(models.GameScore(user_id=user_id, game_id=game_id, score=score, **({"updated_at": at} if at else {})))
             db.commit()
 
     def award(self, user_id, day, game_id=None):
@@ -40,20 +40,36 @@ class ActivityTests(ApiTestCase):
         self.assertEqual(self.api("GET", "/activity").status_code, 401)
         self.assertEqual(self.feed(), {"items": [], "has_more": False})
 
-    def test_it_tells_what_each_player_did_with_the_most_notable_first_within_a_day(self):
+    def at(self, hour, minute=0):
+        return datetime.datetime.combine(TODAY(), datetime.time(hour, minute))
+
+    def test_it_tells_what_each_player_did_newest_first_within_a_day(self):
         self.library_entry(self.ana, "celeste", TODAY(), "pc", completed=1, completed_date=TODAY())
-        self.session(self.ana, "celeste", datetime.datetime.combine(TODAY(), datetime.time(0, 10)), 60)  # early: always today
-        self.session(self.ana, "celeste", datetime.datetime.combine(TODAY(), datetime.time(2, 0)), 30)
-        self.rate(self.ana, "celeste", 88)
+        self.session(self.ana, "celeste", self.at(0, 10), 60)  # early: always today
+        self.session(self.ana, "celeste", self.at(2, 0), 30)
+        self.rate(self.ana, "celeste", 88, at=self.at(3))
         title = self.award(self.ana, TODAY(), "celeste")
         items = self.feed()["items"]
-        self.assertEqual([i["type"] for i in items], ["completed", "achievement", "rated", "started", "played"])
+        # the rating came last, then the completion and the achievement (right after the last session), then the
+        # two sessions, and the start before the first one
+        self.assertEqual([i["type"] for i in items], ["rated", "completed", "achievement", "played", "played", "started"])
         by_type = {i["type"]: i for i in items}
         self.assertEqual((by_type["completed"]["score"], by_type["completed"]["game_name"], by_type["completed"]["name"]), (88, "Celeste", "Ana"))
-        self.assertEqual(by_type["played"]["seconds"], 5400)  # the two sessions of the day, added up
+        self.assertEqual([i["seconds"] for i in items if i["type"] == "played"], [1800, 3600])  # one line per session
         self.assertEqual(by_type["rated"]["score"], 88)
         self.assertEqual((by_type["achievement"]["title"], by_type["achievement"]["game_id"]), (title, "celeste"))
         self.assertTrue(all(i["day"] == TODAY().isoformat() for i in items))
+
+    def test_the_order_of_a_day_follows_the_clock_not_the_kind_of_event(self):
+        self.library_entry(self.ana, "celeste", TODAY(), "pc")
+        self.library_entry(self.ana, "hades", TODAY(), "pc")
+        self.session(self.ana, "celeste", self.at(1, 0), 30)
+        self.session(self.ana, "hades", self.at(2, 0), 30)
+        self.rate(self.ana, "celeste", 90, at=self.at(1, 45))  # rated after celeste, before hades
+        items = self.feed()["items"]
+        self.assertEqual([(i["type"], i["game_id"]) for i in items], [
+            ("played", "hades"), ("started", "hades"), ("rated", "celeste"), ("played", "celeste"), ("started", "celeste"),
+        ])
 
     def test_a_secret_achievement_the_viewer_lacks_is_announced_without_saying_which(self):
         self.award(self.ana, TODAY(), "celeste")
