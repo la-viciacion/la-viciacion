@@ -18,8 +18,9 @@ def is_lifetime(key: str) -> bool:
 
 
 # The season an achievement starts to count in when the code creates it: "since", which every definition has (a
-# test fails if one does not). Every one says 2023, the first season of the app: the ones added later are
-# retroactive and count the history since the start. An admin can change it afterwards: the database is the truth.
+# test fails if one does not). The first ones say 2023, the first season of the app, and count the history since the
+# start; every one added from now on says 2027, so it is not retroactive (tests/test_achievement_checks.py pins the
+# list of the 2023 ones). An admin can change it afterwards: the database is the truth.
 def first_season(achievement) -> int:
     return achievement.value["since"]
 
@@ -375,6 +376,20 @@ class AchievementsElems(Enum):
         "since": 2023,
         "title": "El hijo pródigo",
         "message": "*{}* vuelve a jugar tras 30 días (o más) sin tocar un mando. Se le echaba de menos, aunque algunos ni lo habían notado.",
+    }
+
+    RESCUE_LIFETIME = {
+        "since": 2027,
+        "special": 2,
+        "title": "Rescate",
+        "message": "*{}* ha rescatado _{}_ del olvido: llevaba 90 días (o más) sin tocarlo y por fin lo ha terminado.",
+    }
+
+    FINISHING_TOUCH_LIFETIME = {
+        "since": 2027,
+        "special": 3,
+        "title": "Remate",
+        "message": "*{}* ha rematado _{}_ tras 90 días (o más) olvidado, cuando ya llevaba más de un 80 % del juego. A un paso de la meta y aun así tardó en volver.",
     }
 
     WORK_WEEK = {
