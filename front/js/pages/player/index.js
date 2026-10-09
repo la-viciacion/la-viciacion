@@ -14,6 +14,19 @@ let main;
 let playerId;
 let shown = null; // the season asked for: a year, seasons.ALL, or null = the running one
 
+/** "Afinidad contigo": the taste in common, over every season; nothing on your own page. */
+export function affinityView(a) {
+  if (!a) return '';
+  const shared = a.shared_games === 1 ? '1 juego en común' : `${a.shared_games} juegos en común`;
+  return html`
+    ${sectionTitle('Afinidad contigo')}
+    <div class="pf-card" id="plAffinity">
+      ${a.percent == null
+        ? html`<div class="pf-sub">Todavía hay pocos datos: ${shared}. Hacen falta al menos 3.</div>`
+        : html`<strong class="pf-stat-value">${a.percent} %</strong> <span class="pf-sub">${shared}${a.shared_rated ? `, ${a.shared_rated} puntuados por los dos` : ''}</span>`}
+    </div>`;
+}
+
 const back = () => (history.length > 1 ? history.back() : (location.hash = '#/players'));
 
 function draw(d) {
@@ -31,6 +44,8 @@ function draw(d) {
 
     <div class="pf-season" id="plSeasons" role="group" aria-label="Temporada">${seasonPills(d)}</div>
     <section class="pf-stats" aria-label="Estadísticas: ${seasonName(d)}">${statsView(d)}</section>
+
+    ${affinityView(d.affinity)}
 
     <div class="pf-cols">
       <div>

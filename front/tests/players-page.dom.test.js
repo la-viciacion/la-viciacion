@@ -69,6 +69,18 @@ test('a player page reuses the summary: figures, most played with ratings, achie
   assert.equal(document.querySelector('#pfAvatarInput'), null); // nothing of the owner's tools
 });
 
+test('the page of another player shows the affinity, or says there is too little to tell', async () => {
+  window.location.hash = '#/player/2';
+  const shown = (affinity) => {
+    installApi({ 'GET /group/players/2': { ...PROFILE, affinity }, 'GET /users/photo/': json({ detail: 'no' }, 404) });
+    return player.render({ main: main() }).then(settle).then(() => text('#plAffinity')[0] || null);
+  };
+  assert.match(await shown({ percent: 72, shared_games: 5, shared_rated: 2 }), /72 %.*5 juegos en común, 2 puntuados por los dos/);
+  assert.match(await shown({ percent: 40, shared_games: 3, shared_rated: 0 }), /40 %.*3 juegos en común$/);
+  assert.match(await shown({ percent: null, shared_games: 1, shared_rated: 0 }), /pocos datos: 1 juego en común.*al menos 3/);
+  assert.equal(await shown(null), null); // your own page has none
+});
+
 test('an inactive player is marked on their page', async () => {
   window.location.hash = '#/player/2';
   installApi({ 'GET /group/players/2': { ...PROFILE, is_active: false }, 'GET /users/photo/': json({ detail: 'no' }, 404) });
