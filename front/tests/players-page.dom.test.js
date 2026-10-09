@@ -96,9 +96,10 @@ test('the season pills ask for that season again', async () => {
   await settle();
   document.querySelector('[data-season="2025"]').click();
   await settle();
-  assert.equal(calls.at(-1).path, '/group/players/2?season=2025');
+  const lastPlayer = () => calls.filter((c) => c.path.startsWith('/group/players/')).at(-1).path;
+  assert.equal(lastPlayer(), '/group/players/2?season=2025');
   document.querySelector('[data-season="all"]').click();
-  assert.equal(calls.at(-1).path, '/group/players/2?season=all');
+  assert.equal(lastPlayer(), '/group/players/2?season=all');
 });
 
 test('an unknown player says so', async () => {

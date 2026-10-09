@@ -85,7 +85,7 @@ The same panel section also offers the admin's full database copy, see [deployme
 
 ## Side menu
 
-The button at the left of the top bar opens the menu, a panel that slides in from the left (on a phone and on a wide screen alike; the admin panel keeps its own sidebar). It lists **Principal** (Inicio, Actividad), **Explorar** (Juegos, Deseados, Calendario, Recomendados, Logros, Jugadores and Estadísticas, marked WIP: a placeholder until the statistics are ready), **Tú** (Mi perfil, Ajustes: tabs of the profile), **Administración** (admins only) and, at the foot, **Cerrar sesión**. It highlights the page you are on, closes with Escape, a tap outside, the close button or choosing a page, and its structure is in `front/js/lib/menu.js`. The top bar keeps only Inicio, the profile and, for admins, the admin panel.
+The button at the left of the top bar opens the menu, a panel that slides in from the left (on a phone and on a wide screen alike; the admin panel keeps its own sidebar). It lists **Principal** (Inicio, Actividad), **Explorar** (Juegos, Deseados, Retos, Calendario, Recomendados, Logros, Jugadores and Estadísticas, marked WIP: a placeholder until the statistics are ready), **Tú** (Mi perfil, Ajustes: tabs of the profile), **Administración** (admins only) and, at the foot, **Cerrar sesión**. It highlights the page you are on, closes with Escape, a tap outside, the close button or choosing a page, and its structure is in `front/js/lib/menu.js`. The top bar keeps only Inicio, the profile and, for admins, the admin panel.
 
 ## Players pages
 
@@ -158,6 +158,19 @@ Teamwork and "Todos a una" only count timers (never manual sessions) while they 
 ## Release calendar
 
 **Calendario** (menu → Explorar, `#/calendar`) lays out on a month grid (Monday first) the games the **whole group** is waiting for, not only yours: every wished game that is not out yet and that the player does not have in their library. A day with one release shows the game and **is a link to its page** (hovering shows who wants it); a day with several shows how many and opens the list below, each game a link with everybody who wants it ("Lo quieren tú y Bea"); the first day with several games is selected on opening. The arrows move between months from the running one on (what is out is not a release any more; a game that comes out today is listed), and the games with no confirmed date are listed apart under **Sin fecha confirmada**. `GET /group/releases?month=YYYY-MM` (default: the running month; a past month is a 400), readable by any logged-in user on purpose, like the players pages; only active players' wishes count, never the emergency account. Derived from the wishes and the release dates that the daily refresh keeps up to date ([Wishlist](#wishlist-and-upcoming-releases)); nothing is stored. A phone calendar feed (`.ics`) is not built.
+
+## Challenges
+
+**Retos** (menu → Explorar, `#/challenges`) are goals with a start and an end, unlike the achievements: they are **launched** by someone, about something **specific** and **shared**. Plain accumulation (hours, days, games, completions) stays an achievement. Each kind of challenge is a **template written in code** (`utils/challenges.py`, `TEMPLATES`); whoever launches one only fills in its options, so a new challenge needs no deployment. **Only the definition is stored** (`challenges`, and `challenge_optouts` for who left): progress and whether it is met are derived from the sessions and the library when asked, so they follow any correction to them (AGENTS.md rule 2).
+
+- **Juego del mes** (`game_of_month`, launched by an **admin** for the group): a game, a month, a minimum of hours **per player** and a minimum **in total**. Each participant's hours are the finished sessions of that game that **began** within the month. The page shows a bar per player (green once their minimum is reached) and one for the total.
+- **Who takes part**: in a group challenge every active player does, and each one can **leave** (and come back) while it is not over (`PUT /challenges/{id}/participation?joined=`); a player who left is not counted in the bars or the total, nor in their history. The challenge has a `participation` mode ready for opting in instead (`opt_in`), not used yet. Personal challenges (a player for themselves) are prepared in the model (`scope`, owner) and have no template yet; visibility is `public` for everything (the column exists so a challenge can be private later).
+- **No duplicates**: each challenge has a fingerprint (template, options, game, period and owner) that is unique in the database; launching an equal one answers 409 "Ya existe un reto igual".
+- **Notices** (never per player): when a group challenge is **launched** (a switch in the launch form, on by default) and **once** when the group's **total is reached** (checked after each stopped timer or session change that is not silent, recorded in `total_notified_at`; an admin's changes do not announce). Telegram and push, like the other group notices.
+- **History**: a player's finished challenges, with how they did, are in **Perfil → Resumen → Retos** and on their public page (`GET /challenges/player/{id}`, readable by any logged-in user on purpose since the challenges are public). The admin panel (**Gestión de datos → Retos**, `GET /manage/challenges`) lists all of them and can delete one.
+- Only an admin launches or deletes a group challenge (`POST /challenges`, `DELETE /challenges/{id}`); the API enforces it.
+
+More templates are planned in [#115](https://github.com/la-viciacion/la-viciacion/issues/115): a themed one (play X hours or complete one game with a tag, admin) and "try a genre" (personal). Paying down the debt is parked in #120.
 
 ## Playing now
 

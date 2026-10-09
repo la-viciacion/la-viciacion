@@ -296,3 +296,19 @@
   .cal-thumb, .cal-count { display: none; }
   .cal-cell.has::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--accent-teal); margin: auto 0 2px 2px; }
 }
+
+/* Challenges page */
+.ch-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; margin-bottom: 14px; }
+.ch-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.ch-title { font-weight: 700; min-width: 0; }
+.ch-players { display: flex; flex-direction: column; gap: 6px; }
+.ch-row { display: grid; grid-template-columns: 84px minmax(0, 1fr) 92px; gap: 10px; align-items: center; font-size: 0.85rem; }
+.ch-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ch-total { padding-top: 8px; border-top: 1px solid var(--border); font-weight: 600; }
+.ch-bar { height: 8px; border-radius: 4px; background: var(--bg-surface); overflow: hidden; }
+.ch-bar > i { display: block; height: 100%; background: var(--accent-teal); }
+.ch-bar.ok > i { background: #4ade80; }
+.ch-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.ch-actions:empty { display: none; }
+.ch-history { display: flex; flex-direction: column; gap: 8px; }
+.ch-history-item { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
