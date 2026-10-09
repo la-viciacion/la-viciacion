@@ -11,6 +11,7 @@ export function menuSections(user) {
     { label: 'Explorar', items: [
       { id: 'games', label: 'Juegos', href: '#/games', icon: 'iconGamepad' },
       { id: 'wishlist', label: 'Deseados', href: '#/wishlist', icon: 'iconHeart' },
+      { id: 'calendar', label: 'Calendario', href: '#/calendar', icon: 'iconCalendar' },
       { id: 'recommendations', label: 'Recomendados', href: '#/recommendations', icon: 'iconDice' },
       { id: 'achievements', label: 'Logros', href: '#/achievements', icon: 'iconTrophy' },
       { id: 'players', label: 'Jugadores', href: '#/players', icon: 'iconPerson' },
@@ -35,6 +36,7 @@ const PAGES = [
   ['#/stats', 'stats'],
   ['#/games', 'games'],
   ['#/wishlist', 'wishlist'],
+  ['#/calendar', 'calendar'],
   ['#/recommendations', 'recommendations'],
   ['#/achievements', 'achievements'],
   ['#/players', 'players'],

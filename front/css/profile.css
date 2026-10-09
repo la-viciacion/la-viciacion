@@ -269,3 +269,30 @@
 .wl-card .gc-name { padding-right: 22px; }
 .wl-empty { margin-bottom: 16px; }
 .pg-title { margin-bottom: 18px; }
+
+/* Release calendar page */
+.cal-intro { margin: -8px 0 14px; }
+.cal-nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.cal-month { font-size: 1.15rem; font-weight: 700; margin: 0; }
+.cal-nav .pf-btn { min-width: 40px; font-size: 1.2rem; line-height: 1; }
+.cal-nav .pf-btn:disabled { opacity: 0.35; cursor: default; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; margin-bottom: 14px; }
+.cal-weekday { text-align: center; color: var(--text-secondary); font-size: 0.75rem; font-weight: 600; padding: 4px 0; }
+.cal-cell { position: relative; min-height: 64px; padding: 4px 5px; display: flex; flex-direction: column; gap: 3px; overflow: hidden; text-align: left; font: inherit; color: inherit;
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.cal-cell { text-decoration: none; }
+.cal-cell.blank { background: transparent; border-color: transparent; }
+.cal-cell.today { border-color: var(--text-muted); }
+.cal-cell.has { cursor: pointer; border-color: var(--accent-teal); }
+.cal-cell.has:hover, .cal-cell.picked { background: var(--bg-card-hover); }
+.cal-cell.picked { box-shadow: 0 0 0 1px var(--accent-teal); }
+.cal-day { font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); }
+.cal-cell.has .cal-day { color: var(--accent-teal); }
+.cal-thumb { width: 100%; height: 26px; object-fit: cover; border-radius: 3px; }
+.cal-count { font-size: 0.68rem; line-height: 1.2; color: var(--text-secondary); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.cal-empty { margin-bottom: 16px; }
+@media (max-width: 640px) {
+  .cal-cell { min-height: 44px; padding: 3px; }
+  .cal-thumb, .cal-count { display: none; }
+  .cal-cell.has::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--accent-teal); margin: auto 0 2px 2px; }
+}

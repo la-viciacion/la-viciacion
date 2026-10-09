@@ -203,6 +203,75 @@ class AchievementsCatalogTests(ApiTestCase):
         self.assertEqual([a["hidden"] for a in shown], [False, False])  # nothing is hidden when nothing is secret or special
 
 
+class ReleasesTests(ApiTestCase):
+    def setUp(self):
+        super().setUp()
+        self.ana = self.user("ana")
+        self.bea = self.user("bea")
+        self.gone = self.user("gone", active=False)
+        self.today = TODAY()
+        self.soon = self.today + timedelta(days=3)
+        self.month = f"{self.soon.year:04d}-{self.soon.month:02d}"
+
+    def wish(self, user, game_id):
+        with database.SessionLocal() as db:
+            db.add(models.UserWishlist(user_id=user, game_id=game_id))
+            db.commit()
+
+    def releases(self, as_user="ana", **params):
+        return self.api("GET", "/group/releases", as_user=as_user, params=params)
+
+    def test_it_needs_a_login(self):
+        self.assertEqual(self.api("GET", "/group/releases").status_code, 401)
+
+    def test_the_month_lists_every_players_wishes_not_only_the_viewers(self):
+        self.game("hades2", "Hades II", release_date=self.soon)
+        self.game("silk", "Silksong", release_date=self.soon)
+        self.wish(self.ana, "hades2")
+        self.wish(self.bea, "hades2")
+        self.wish(self.bea, "silk")
+        self.wish(self.gone, "silk")  # an inactive player's wish does not count
+        body = self.releases(as_user="ana", month=self.month).json()
+        listed = {g["id"]: g for g in body["releases"]}
+        self.assertEqual(body["month"], self.month)
+        self.assertEqual([(w["name"], w["is_me"]) for w in listed["hades2"]["wanted_by"]], [("Ana", True), ("Bea", False)])
+        self.assertEqual([(w["name"], w["is_me"]) for w in listed["silk"]["wanted_by"]], [("Bea", False)])  # a game Ana did not wish
+
+    def test_the_games_come_by_date_and_the_ones_without_a_date_apart(self):
+        later = self.today + timedelta(days=40)
+        self.game("late", "Late", release_date=later)
+        self.game("tba", "Tba", release_date=None)
+        self.wish(self.ana, "late")
+        self.wish(self.bea, "tba")
+        body = self.releases(month=f"{later.year:04d}-{later.month:02d}").json()
+        self.assertEqual([g["id"] for g in body["releases"]], ["late"])
+        self.assertEqual([g["id"] for g in body["undated"]], ["tba"])
+        self.assertEqual(body["releases"][0]["days_until"], 40)
+
+    def test_a_game_already_out_or_already_in_the_library_is_not_a_release(self):
+        self.game("out", "Out", release_date=self.today - timedelta(days=1))
+        self.game("owned", "Owned", release_date=self.soon)
+        self.wish(self.ana, "out")
+        self.wish(self.ana, "owned")
+        self.library_entry(self.ana, "owned", self.today, "pc")  # played: the wish is gone
+        ids = [g["id"] for g in self.releases(month=self.month).json()["releases"]]
+        self.assertNotIn("out", ids)
+        self.assertNotIn("owned", ids)
+
+    def test_a_game_that_comes_out_today_is_listed(self):
+        self.game("today", "Today", release_date=self.today)
+        self.wish(self.ana, "today")
+        month = f"{self.today.year:04d}-{self.today.month:02d}"
+        self.assertEqual([g["id"] for g in self.releases(month=month).json()["releases"]], ["today"])
+
+    def test_the_default_is_the_running_month_and_a_past_or_bad_month_is_refused(self):
+        month = f"{self.today.year:04d}-{self.today.month:02d}"
+        self.assertEqual(self.releases().json()["month"], month)
+        self.assertEqual(self.releases(month="2020-01").status_code, 400)
+        for bad in ("2026-13", "2026-1", "nope"):
+            self.assertEqual(self.releases(month=bad).status_code, 422, bad)
+
+
 class PlayersTests(ApiTestCase):
     def setUp(self):
         super().setUp()
