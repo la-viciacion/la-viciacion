@@ -204,14 +204,24 @@ def split_genres(genres: str | None) -> list[str]:
     return [genre.strip() for genre in (genres or "").split(",") if genre.strip()]
 
 
+def _available(db: Session, column) -> dict[str, tuple[str, int]]:
+    """The words of a comma separated column of the games: {lower-cased: (as written, how many games have it)}."""
+    found: dict[str, tuple[str, int]] = {}
+    for (text,) in db.query(column).filter(column.isnot(None)):
+        for word in {w.casefold(): w for w in split_genres(text)}.values():
+            name, count = found.get(word.casefold(), (word, 0))
+            found[word.casefold()] = (name, count + 1)
+    return found
+
+
 def available_genres(db: Session) -> dict[str, tuple[str, int]]:
     """The genres of the games in the database: {lower-cased: (name as written, how many games have it)}."""
-    found: dict[str, tuple[str, int]] = {}
-    for (genres,) in db.query(models.Game.genres).filter(models.Game.genres.isnot(None)):
-        for genre in {g.casefold(): g for g in split_genres(genres)}.values():
-            name, count = found.get(genre.casefold(), (genre, 0))
-            found[genre.casefold()] = (name, count + 1)
-    return found
+    return _available(db, models.Game.genres)
+
+
+def available_tags(db: Session) -> dict[str, tuple[str, int]]:
+    """The tags of the games in the database (RAWG's: Horror, Singleplayer...), like `available_genres`."""
+    return _available(db, models.Game.tags)
 
 
 def build_new_genre(db: Session, options: dict, today: datetime.date) -> Built:
@@ -291,7 +301,135 @@ def progress_new_genre(db: Session, challenge: models.Challenge, participant_ids
     return new_genre_result(user_id, (user.name or user.username) if user else "", params["mode"], amount, params.get("hours"))
 
 
+# ── Temático ────────────────────────────────────────────────────
+
+MAX_GAMES = 500
+
+
+def build_themed(db: Session, options: dict, today: datetime.date) -> Built:
+    """Options: tag (one that exists and has games), month ("YYYY-MM"), mode ("play" hours or "complete" a game),
+    min_hours_each (play only) and, optionally, a total for the whole group: min_hours_total (play) or
+    min_games_total (complete). Every game that has the tag counts."""
+    tags = available_tags(db)
+    wanted = str(options.get("tag") or "").strip().casefold()
+    if wanted not in tags:
+        raise ChallengeError("Elige una temática que exista")
+    name = tags[wanted][0]
+    starts_on, ends_on = month_period(options.get("month"))
+    if ends_on < today:
+        raise ChallengeError("Ese mes ya ha pasado")
+    mode = options.get("mode")
+    if mode not in ("play", "complete"):
+        raise ChallengeError("Elige si hay que jugar o completar")
+    params: dict = {"tag": name, "mode": mode}
+    if mode == "play":
+        each = hours(options.get("min_hours_each"), "El mínimo por jugador")
+        params["min_hours_each"] = each
+        if options.get("min_hours_total") not in (None, ""):
+            total = hours(options["min_hours_total"], "El mínimo total")
+            if total < each:
+                raise ChallengeError("El mínimo total no puede ser menor que el de cada jugador")
+            params["min_hours_total"] = total
+    elif options.get("min_games_total") not in (None, ""):
+        try:
+            games = int(options["min_games_total"])
+        except (ValueError, TypeError):
+            raise ChallengeError("El total de juegos no es un número")
+        if not 1 <= games <= MAX_GAMES:
+            raise ChallengeError(f"El total de juegos debe estar entre 1 y {MAX_GAMES}")
+        params["min_games_total"] = games
+    return Built(title=f"Temático: {name}"[:MAX_TITLE], params=params, starts_on=starts_on, ends_on=ends_on)
+
+
+def themed_result(names: dict[int, str], mode: str, amounts: dict[int, int], params: dict) -> dict:
+    """The progress of a themed challenge from what each participant did in games with the tag (pure): seconds
+    played ("play") or games completed ("complete"). The group's total is there only if the challenge has one."""
+    if mode == "play":
+        each = round(params["min_hours_each"] * 3600)
+        players = [
+            {"user_id": u, "name": n, "seconds": amounts.get(u, 0), "target_seconds": each, "done": amounts.get(u, 0) >= each}
+            for u, n in names.items()
+        ]
+        players.sort(key=lambda p: (-p["seconds"], p["name"].lower()))
+        result = {"players": players}
+        if "min_hours_total" in params:
+            target, seconds = round(params["min_hours_total"] * 3600), sum(p["seconds"] for p in players)
+            result.update(total_seconds=seconds, total_target_seconds=target, total_done=bool(players) and seconds >= target)
+    else:
+        players = [
+            {"user_id": u, "name": n, "count": amounts.get(u, 0), "target_count": 1, "done": amounts.get(u, 0) >= 1}
+            for u, n in names.items()
+        ]
+        players.sort(key=lambda p: (-p["count"], p["name"].lower()))
+        result = {"players": players}
+        if "min_games_total" in params:
+            count, target = sum(p["count"] for p in players), params["min_games_total"]
+            result.update(total_count=count, total_target_count=target, total_done=bool(players) and count >= target)
+    return result
+
+
+def progress_themed(db: Session, challenge: models.Challenge, participant_ids: list[int]) -> dict:
+    params = json.loads(challenge.params)
+    names = {
+        user_id: name or username
+        for user_id, username, name in db.query(models.User.id, models.User.username, models.User.name).filter(models.User.id.in_(participant_ids))
+    }
+    tag = params["tag"].casefold()
+    has_tag = lambda tags: tag in {t.casefold() for t in split_genres(tags)}  # noqa: E731
+    amounts: dict[int, int] = {}
+    if participant_ids and params["mode"] == "play":
+        rows = (
+            db.query(models.GameTimer.user_id, models.Game.tags, func.sum(models.GameTimer.duration_seconds))
+            .join(models.Game, models.Game.id == models.GameTimer.game_id)
+            .filter(
+                models.GameTimer.user_id.in_(participant_ids),
+                models.GameTimer.is_active == False,  # noqa: E712
+                models.GameTimer.start_time >= datetime.datetime.combine(challenge.starts_on, datetime.time.min),
+                models.GameTimer.start_time < datetime.datetime.combine(challenge.ends_on + datetime.timedelta(days=1), datetime.time.min),
+            )
+            .group_by(models.GameTimer.user_id, models.Game.tags)
+        )
+        for user_id, tags, seconds in rows:
+            if has_tag(tags):
+                amounts[user_id] = amounts.get(user_id, 0) + int(seconds or 0)  # MariaDB returns SUM() as Decimal
+    elif participant_ids:
+        rows = (
+            db.query(models.UserGame.user_id, models.UserGame.game_id, models.Game.tags)
+            .join(models.Game, models.Game.id == models.UserGame.game_id)
+            .filter(
+                models.UserGame.user_id.in_(participant_ids),
+                models.UserGame.completed == 1,
+                models.UserGame.completed_date >= challenge.starts_on,
+                models.UserGame.completed_date <= challenge.ends_on,
+            )
+        )
+        done: dict[int, set] = {}
+        for user_id, game_id, tags in rows:
+            if has_tag(tags):
+                done.setdefault(user_id, set()).add(game_id)
+        amounts = {user_id: len(games) for user_id, games in done.items()}
+    return themed_result(names, params["mode"], amounts, params)
+
+
+def summary_themed(challenge: models.Challenge) -> str:
+    params = json.loads(challenge.params)
+    period = f"del {spanish_date(challenge.starts_on)} al {spanish_date(challenge.ends_on)}"
+    if params["mode"] == "play":
+        total = f" y {hours_text(params['min_hours_total'])} h entre todos" if "min_hours_total" in params else ""
+        return f"Jugar al menos {hours_text(params['min_hours_each'])} h a juegos de {params['tag']}, cada uno{total}, {period}."
+    total = f" (y {params['min_games_total']} entre todos)" if "min_games_total" in params else ""
+    return f"Completar al menos un juego de {params['tag']}{total}, {period}."
+
+
+def reached_themed(challenge: models.Challenge, progress: dict) -> str:
+    params = json.loads(challenge.params)
+    done = sum(1 for p in progress["players"] if p["done"])
+    what = f"las {hours_text(params['min_hours_total'])} h" if params["mode"] == "play" else f"los {params['min_games_total']} juegos completados"
+    return f"Entre todos habéis llegado a {what} de {params['tag']}. {done} de {len(progress['players'])} ya habéis cumplido vuestra parte."
+
+
 TEMPLATES: dict[str, Template] = {
     "game_of_month": Template("Juego del mes", GROUP, build_game_of_month, progress_game_of_month, summary_game_of_month, reached_game_of_month),
+    "themed": Template("Temático", GROUP, build_themed, progress_themed, summary_themed, reached_themed),
     "new_genre": Template("Probar un género", USER, build_new_genre, progress_new_genre),
 }

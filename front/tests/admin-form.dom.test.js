@@ -41,3 +41,26 @@ test('a month field offers the running month and the next ones as text values', 
   assert.equal(values[0], `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
   assert.match(values[3], /^\d{4}-\d{2}$/);
 });
+
+test('a choice field keeps its value as text', () => {
+  openForm({ createLabel: 'Lanzar', name: (r) => r.title, createFields: [] }, null, null, {
+    label: 'Lanzar reto temático',
+    fields: [{ key: 'mode', label: 'Objetivo', type: 'choice', default: 'complete', options: [['play', 'Jugar'], ['complete', 'Completar']] }],
+  });
+  assert.equal(document.querySelector('.modal-header h3').textContent, 'Lanzar reto temático');
+  assert.equal(document.getElementById('f_mode').value, 'complete'); // the default is the one selected
+});
+
+test('what a way to create always sends goes with the form', async () => {
+  const sent = [];
+  globalThis.fetch = async (url, options) => { sent.push({ url: String(url), body: JSON.parse(options.body) }); return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }); };
+  const reload = async () => {};
+  openForm({ createLabel: 'x', name: (r) => r.title, endpoint: '/manage/challenges', createFields: [] }, null, { reload }, {
+    label: 'Lanzar',
+    body: { kind: 'themed' },
+    fields: [{ key: 'tag', label: 'Temática', type: 'choice', options: [['Horror', 'Horror (2)']] }],
+  });
+  document.querySelector('.modal-content form').requestSubmit();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(sent.map((s) => [s.url, s.body]), [['/api/v1/manage/challenges', { tag: 'Horror', kind: 'themed' }]]);
+});

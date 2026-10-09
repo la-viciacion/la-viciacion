@@ -62,6 +62,14 @@ export function summaryLine(challenge) {
   if (challenge.kind === 'game_of_month') {
     return `${challenge.label} · mínimo ${hoursLabel(p.min_hours_each * 3600)} cada uno y ${hoursLabel(p.min_hours_total * 3600)} entre todos`;
   }
+  if (challenge.kind === 'themed') {
+    if (p.mode === 'play') {
+      const total = p.min_hours_total ? ` y ${hoursLabel(p.min_hours_total * 3600)} entre todos` : '';
+      return `${challenge.label} · jugar ${hoursLabel(p.min_hours_each * 3600)} cada uno a juegos de ${p.tag}${total}`;
+    }
+    const total = p.min_games_total ? `, ${p.min_games_total} entre todos` : '';
+    return `${challenge.label} · completar un juego de ${p.tag} cada uno${total}`;
+  }
   if (challenge.kind === 'new_genre') {
     const what = p.mode === 'play' ? `jugar ${hoursLabel(p.hours * 3600)} a` : 'completar';
     return `${challenge.label} · ${what} un juego de ${p.genre} que no tuvieras antes`;
@@ -69,7 +77,18 @@ export function summaryLine(challenge) {
   return challenge.label;
 }
 
-const ORDER = { active: 0, upcoming: 1, finished: 2 };
+/** The group's total of a challenge as a part to draw (hours or games), or null when the challenge has none. */
+export function totalPart(progress) {
+  if (progress.total_target_count !== undefined) {
+    return { count: progress.total_count, target_count: progress.total_target_count, done: progress.total_done };
+  }
+  if (progress.total_target_seconds !== undefined) {
+    return { seconds: progress.total_seconds, target_seconds: progress.total_target_seconds, done: progress.total_done };
+  }
+  return null;
+}
+
+const ORDER ={ active: 0, upcoming: 1, finished: 2 };
 const FINISHED_SHOWN = 5;
 
 /** The page's blocks: the group's challenges, the viewer's own and the other players', each with the running ones

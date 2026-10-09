@@ -3,7 +3,7 @@
 // player takes part (any may leave it) and an admin launches and deletes it from the admin panel (Gestión de datos →
 // Retos). From this page a player launches and deletes only their own, personal challenges.
 import { api, jsonRequest } from '../../lib/api.js';
-import { DURATIONS, amountLabel, blocks, partTarget, partValue, percent, periodLine, summaryLine, timeLeft } from '../../lib/challenges.js';
+import { DURATIONS, amountLabel, blocks, partTarget, partValue, percent, periodLine, summaryLine, timeLeft, totalPart } from '../../lib/challenges.js';
 import { html, mount } from '../../lib/html.js';
 import { gameHref } from '../../lib/links.js';
 import { modalHeader, openModal } from '../../ui/modal.js';
@@ -23,17 +23,17 @@ const partRow = (p, me) => html`
     <span class="pf-sub">${amountLabel(p)}${p.done ? ' ✓' : ''}</span>
   </div>`;
 
-const totalRow = (c) => html`
+const totalRow = (part) => html`
   <div class="ch-row ch-total">
     <span class="ch-name">Total</span>
-    <div class="ch-bar${c.progress.total_done ? ' ok' : ''}"><i style="width:${percent(c.progress.total_seconds, c.progress.total_target_seconds)}%"></i></div>
-    <span class="pf-sub">${amountLabel({ seconds: c.progress.total_seconds, target_seconds: c.progress.total_target_seconds })}${c.progress.total_done ? ' ✓' : ''}</span>
+    ${bar(part)}
+    <span class="pf-sub">${amountLabel(part)}${part.done ? ' ✓' : ''}</span>
   </div>`;
 
 function card(c) {
   const mine = c.scope === 'user' && c.owner?.id === user.id;
-  const hasTotal = c.progress.total_target_seconds !== undefined;
-  const parts = html`<div class="ch-players">${c.progress.players.map((p) => partRow(p, user.id))}</div>${hasTotal ? totalRow(c) : ''}`;
+  const total = totalPart(c.progress);
+  const parts = html`<div class="ch-players">${c.progress.players.map((p) => partRow(p, user.id))}</div>${total ? totalRow(total) : ''}`;
   return html`
     <article class="pf-card ch-card" data-challenge="${c.id}">
       <div class="ch-head">

@@ -1095,6 +1095,12 @@ def list_challenges(db: Session = Depends(get_db)):
     return rows
 
 
+@router.get("/challenges/tags")
+def list_challenge_tags(db: Session = Depends(get_db)):
+    """The tags a themed challenge can be about: those of the games in the database, with how many games have each."""
+    return [{"tag": name, "games": count} for _, (name, count) in sorted(challenges_utils.available_tags(db).items())]
+
+
 class NewGroupChallenge(BaseModel):
     kind: str = "game_of_month"
     # the options of the templates, flat (the panel's form posts them as they are); each template reads its own
@@ -1102,6 +1108,9 @@ class NewGroupChallenge(BaseModel):
     month: Optional[str] = None
     min_hours_each: Optional[float] = None
     min_hours_total: Optional[float] = None
+    tag: Optional[str] = None
+    mode: Optional[str] = None
+    min_games_total: Optional[int] = None
     announce: bool = True  # tell the group (Telegram and push) that it was launched
 
 

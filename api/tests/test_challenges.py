@@ -127,5 +127,42 @@ class NewGenreTests(unittest.TestCase):
         self.assertEqual(challenges.new_genre_result(None, "", "play", 0, 2), {"players": []})
 
 
+class ThemedTests(unittest.TestCase):
+    NAMES = {1: "Ana", 2: "Bea", 3: "Cai"}
+
+    def test_playing_is_each_players_hours_with_an_optional_group_total(self):
+        params = {"min_hours_each": 2, "min_hours_total": 5}
+        result = challenges.themed_result(self.NAMES, "play", {1: 3 * 3600, 2: 3600}, params)
+        self.assertEqual([(p["name"], p["seconds"], p["done"]) for p in result["players"]], [("Ana", 10800, True), ("Bea", 3600, False), ("Cai", 0, False)])
+        self.assertEqual((result["total_seconds"], result["total_target_seconds"], result["total_done"]), (14400, 18000, False))
+        self.assertTrue(challenges.themed_result(self.NAMES, "play", {1: 5 * 3600}, params)["total_done"])
+
+    def test_without_a_total_there_is_none_to_reach(self):
+        for mode, params in (("play", {"min_hours_each": 2}), ("complete", {})):
+            result = challenges.themed_result(self.NAMES, mode, {1: 99}, params)
+            self.assertFalse({"total_done", "total_seconds", "total_count"} & set(result), mode)
+
+    def test_completing_asks_one_game_each_and_a_count_between_everybody(self):
+        result = challenges.themed_result(self.NAMES, "complete", {1: 2, 2: 1}, {"min_games_total": 4})
+        self.assertEqual([(p["name"], p["count"], p["target_count"], p["done"]) for p in result["players"]], [("Ana", 2, 1, True), ("Bea", 1, 1, True), ("Cai", 0, 1, False)])
+        self.assertEqual((result["total_count"], result["total_target_count"], result["total_done"]), (3, 4, False))
+        self.assertTrue(challenges.themed_result(self.NAMES, "complete", {1: 2, 2: 2}, {"min_games_total": 4})["total_done"])
+
+    def test_nobody_taking_part_never_reaches_a_total(self):
+        self.assertFalse(challenges.themed_result({}, "play", {}, {"min_hours_each": 1, "min_hours_total": 1})["total_done"])
+
+    def test_the_notices(self):
+        challenge = types.SimpleNamespace(starts_on=datetime.date(2026, 10, 1), ends_on=datetime.date(2026, 10, 31))
+        template = challenges.TEMPLATES["themed"]
+        play = types.SimpleNamespace(**vars(challenge), params=json.dumps({"tag": "Horror", "mode": "play", "min_hours_each": 2, "min_hours_total": 10}))
+        self.assertEqual(template.summary(play), "Jugar al menos 2 h a juegos de Horror, cada uno y 10 h entre todos, del 1 de octubre al 31 de octubre.")
+        done = types.SimpleNamespace(**vars(challenge), params=json.dumps({"tag": "Horror", "mode": "complete"}))
+        self.assertEqual(template.summary(done), "Completar al menos un juego de Horror, del 1 de octubre al 31 de octubre.")
+        with_total = types.SimpleNamespace(**vars(challenge), params=json.dumps({"tag": "Horror", "mode": "complete", "min_games_total": 5}))
+        self.assertIn("(y 5 entre todos)", template.summary(with_total))
+        progress = challenges.themed_result({1: "Ana", 2: "Bea"}, "complete", {1: 3, 2: 2}, {"min_games_total": 5})
+        self.assertEqual(template.reached(with_total, progress), "Entre todos habéis llegado a los 5 juegos completados de Horror. 2 de 2 ya habéis cumplido vuestra parte.")
+
+
 if __name__ == "__main__":
     unittest.main()

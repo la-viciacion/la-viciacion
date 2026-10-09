@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { amountLabel, blocks, daysUntil, hoursLabel, launchMonths, partTarget, partValue, percent, resultLine, summaryLine, timeLeft } from '../js/lib/challenges.js';
+import { amountLabel, blocks, daysUntil, hoursLabel, launchMonths, partTarget, partValue, percent, resultLine, summaryLine, timeLeft, totalPart } from '../js/lib/challenges.js';
 
 const TODAY = new Date(2026, 9, 15, 12, 0); // 15 October 2026
 
@@ -78,4 +78,18 @@ test('the page is split into the group\'s, the viewer\'s and the others\', runni
 test('a personal result says it was achieved and a group one how the group did', () => {
   assert.equal(resultLine({ scope: 'user', done: true }), 'Lo conseguiste');
   assert.equal(resultLine({ scope: 'user', done: false }), 'No se cumplió');
+});
+
+test('a themed challenge is summarised by its mode and its optional total', () => {
+  const themed = (params) => summaryLine({ kind: 'themed', label: 'Temático', params });
+  assert.equal(themed({ tag: 'Horror', mode: 'play', min_hours_each: 2 }), 'Temático · jugar 2 h cada uno a juegos de Horror');
+  assert.equal(themed({ tag: 'Horror', mode: 'play', min_hours_each: 2, min_hours_total: 10 }), 'Temático · jugar 2 h cada uno a juegos de Horror y 10 h entre todos');
+  assert.equal(themed({ tag: 'Horror', mode: 'complete' }), 'Temático · completar un juego de Horror cada uno');
+  assert.equal(themed({ tag: 'Horror', mode: 'complete', min_games_total: 5 }), 'Temático · completar un juego de Horror cada uno, 5 entre todos');
+});
+
+test('the group total is drawn in hours or in games, and not at all when there is none', () => {
+  assert.deepEqual(totalPart({ total_seconds: 3600, total_target_seconds: 7200, total_done: false }), { seconds: 3600, target_seconds: 7200, done: false });
+  assert.deepEqual(totalPart({ total_count: 2, total_target_count: 5, total_done: false }), { count: 2, target_count: 5, done: false });
+  assert.equal(totalPart({ players: [] }), null);
 });
