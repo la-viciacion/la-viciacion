@@ -32,3 +32,12 @@ test('with no rows given it still has a few', () => {
   openForm({ ...entity, fields: [{ key: 'message', label: 'Mensaje', type: 'textarea' }] }, { title: 'T', message: '' }, null);
   assert.equal(document.getElementById('f_message').getAttribute('rows'), '4');
 });
+
+test('a month field offers the running month and the next ones as text values', () => {
+  openForm({ createLabel: 'Lanzar', name: (r) => r.title, createFields: [{ key: 'month', label: 'Mes', type: 'month', required: true }] }, null, null);
+  const values = [...document.querySelectorAll('#f_month option')].map((o) => o.value);
+  const now = new Date();
+  assert.equal(values.length, 4);
+  assert.equal(values[0], `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
+  assert.match(values[3], /^\d{4}-\d{2}$/);
+});

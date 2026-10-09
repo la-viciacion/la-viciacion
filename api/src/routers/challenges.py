@@ -1,6 +1,6 @@
 import datetime
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -8,7 +8,6 @@ from .. import auth
 from ..auth import get_db
 from ..crud import challenges as crud
 from ..database import models
-from ..utils import actions
 from ..utils.challenges import GROUP, TEMPLATES, ChallengeError
 
 router = APIRouter(
@@ -24,7 +23,6 @@ NOT_FOUND = "Reto no encontrado"
 class NewChallenge(BaseModel):
     kind: str
     options: dict = Field(default_factory=dict)
-    announce: bool = True  # a group challenge: tell the group (Telegram and push) that it was launched
 
 
 def _challenge(db: Session, challenge_id: int, viewer: models.User) -> models.Challenge:
@@ -37,9 +35,10 @@ def _challenge(db: Session, challenge_id: int, viewer: models.User) -> models.Ch
 
 @router.get("/templates")
 def get_templates(current_user: models.User = Depends(auth.get_current_active_user)):
-    """The kinds of challenge that exist and whether the caller may launch each one (a group one only an admin)."""
+    """The kinds of challenge that exist and whether the caller may launch each one from the challenges page: only the
+    personal ones. The group's are launched by an admin from the admin panel (`POST /manage/challenges`)."""
     return [
-        {"kind": kind, "label": template.label, "scope": template.scope, "can_launch": template.scope != GROUP or bool(current_user.is_admin)}
+        {"kind": kind, "label": template.label, "scope": template.scope, "can_launch": template.scope != GROUP}
         for kind, template in TEMPLATES.items()
     ]
 
@@ -79,24 +78,22 @@ def get_challenge(
 @router.post("", status_code=201)
 def launch_challenge(
     body: NewChallenge,
-    background_tasks: BackgroundTasks,
     current_user: models.User = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    """Launch a challenge from a template: a group one only an admin (for everybody), a personal one anybody (for
-    themselves)."""
+    """Launch a **personal** challenge from a template, for the caller. The group's challenges are the app's, not a
+    player's: an admin launches them from the admin panel (`POST /manage/challenges`), and this refuses them for
+    everybody, admins included."""
     template = TEMPLATES.get(body.kind)
     if template is None:
         raise HTTPException(status_code=400, detail="Ese tipo de reto no existe")
-    if template.scope == GROUP and not current_user.is_admin:
-        raise HTTPException(status_code=403, detail="Solo un administrador puede lanzar retos de grupo")
+    if template.scope == GROUP:
+        raise HTTPException(status_code=403, detail="Los retos de grupo los lanza un administrador desde el panel de administración")
     today = datetime.date.today()
     try:
         challenge = crud.create(db, current_user, body.kind, body.options, today)
     except ChallengeError as e:
         raise HTTPException(status_code=409 if "Ya existe" in str(e) else 400, detail=str(e))
-    if body.announce and template.scope == GROUP:
-        background_tasks.add_task(actions.after_challenge_launch, challenge.id)
     return crud.view(db, challenge, current_user.id, today)
 
 
@@ -122,9 +119,9 @@ def delete_challenge(
     current_user: models.User = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    """Delete a challenge: a group one only an admin, a personal one its owner (or an admin)."""
+    """Delete a personal challenge of your own. The group's are deleted by an admin from the admin panel."""
     challenge = _challenge(db, challenge_id, current_user)
-    if not current_user.is_admin and (challenge.scope == GROUP or challenge.owner_user_id != current_user.id):
+    if challenge.scope == GROUP or challenge.owner_user_id != current_user.id:
         raise HTTPException(status_code=403, detail="No puedes borrar este reto")
     crud.delete(db, challenge)
     return {"message": "Reto borrado"}

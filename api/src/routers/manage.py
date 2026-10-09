@@ -26,6 +26,7 @@ from ..crud import users as users_crud
 from ..database import models
 from ..utils import actions, ai, audit, hltb_sync, my_utils, push, rawg_sync, seasons, settings, sql_dump
 from ..utils.achievements import is_lifetime
+from ..utils import challenges as challenges_utils
 from ..utils import email as mail
 from ..database.schemas import NOTES_MAX
 from ..utils.logger import LogManager
@@ -1092,6 +1093,34 @@ def list_challenges(db: Session = Depends(get_db)):
             "notified": challenge.total_notified_at is not None,
         })
     return rows
+
+
+class NewGroupChallenge(BaseModel):
+    kind: str = "game_of_month"
+    # the options of the templates, flat (the panel's form posts them as they are); each template reads its own
+    game_id: Optional[str] = None
+    month: Optional[str] = None
+    min_hours_each: Optional[float] = None
+    min_hours_total: Optional[float] = None
+    announce: bool = True  # tell the group (Telegram and push) that it was launched
+
+
+@router.post("/challenges", status_code=201)
+def launch_group_challenge(body: NewGroupChallenge, background_tasks: BackgroundTasks, admin: models.User = Depends(auth.require_admin), db: Session = Depends(get_db)):
+    """Launch a challenge for the whole group. They are the app's, so only here (the audit log records who) and
+    never from the challenges page, where players launch their own."""
+    template = challenges_utils.TEMPLATES.get(body.kind)
+    if template is None or template.scope != challenges_utils.GROUP:
+        raise HTTPException(status_code=400, detail="Ese tipo de reto de grupo no existe")
+    options = body.model_dump(exclude={"kind", "announce"}, exclude_none=True)
+    today = datetime.date.today()
+    try:
+        challenge = challenges_crud.create(db, admin, body.kind, options, today)
+    except challenges_utils.ChallengeError as e:
+        raise HTTPException(status_code=409 if "Ya existe" in str(e) else 400, detail=str(e))
+    if body.announce:
+        background_tasks.add_task(actions.after_challenge_launch, challenge.id)
+    return challenges_crud.view(db, challenge, admin.id, today)
 
 
 @router.delete("/challenges/{challenge_id}")

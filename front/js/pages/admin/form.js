@@ -1,10 +1,12 @@
 // Generic create/edit form driven by the entity field definitions.
 //
 // Field: { key, label, type, required?, omitEmpty?, step?, nameKey? (game: the row's key holding the game's name) }
-// Types: text | textarea (rows?) | number | date | datetime | checkbox | select | platform | user | game | password | image
+// Types: text | textarea (rows?) | number | date | datetime | checkbox | select | month | platform | user | game | password | image
 // select: { options: [[number, label], ...] }
+// month: the running month and the next ones, as a "YYYY-MM" text (the challenges are launched for a month)
 // image (editing only): { current: (row) => url of the picture or null, upload: (row) => route that takes the new file }
 import { api, jsonRequest } from '../../lib/api.js';
+import { launchMonths } from '../../lib/challenges.js';
 import { html } from '../../lib/html.js';
 import { PASSWORD_HINT, generatePassword, isValidPassword } from '../../lib/password.js';
 import { platformList } from '../../lib/platforms.js';
@@ -24,6 +26,10 @@ function fieldHtml(f, value, row) {
     case 'select':
       return html`<label>${f.label}<select class="adm-input" id="${id}">
         ${f.options.map(([value, name]) => html`<option value="${value}" ${String(value) === String(v) ? html`selected` : ''}>${name}</option>`)}
+      </select></label>`;
+    case 'month':
+      return html`<label>${f.label}<select class="adm-input" id="${id}">
+        ${launchMonths().map((m) => html`<option value="${m.value}">${m.label}</option>`)}
       </select></label>`;
     case 'platform': {
       const known = platformList();
@@ -76,6 +82,7 @@ function readField(f) {
     case 'datetime': return el.value ? (el.value.length === 16 ? `${el.value}:00` : el.value) : null;
     case 'user': return el.value ? Number(el.value) : null;
     case 'date':
+    case 'month':
     case 'platform':
     case 'game': return el.value || null;
     default: return el.value === '' ? null : el.value;

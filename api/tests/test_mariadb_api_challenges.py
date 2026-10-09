@@ -34,7 +34,8 @@ class ChallengesTestCase(ApiTestCase):
         return {"game_id": "hades", "month": this_month(), "min_hours_each": 5, "min_hours_total": 12, **changes}
 
     def launch(self, as_user="root", kind="game_of_month", announce=False, **changes):
-        return self.api("POST", "/challenges", as_user=as_user, json={"kind": kind, "options": self.options(**changes), "announce": announce})
+        """A group challenge, launched from the admin panel's route (the only one that makes them)."""
+        return self.api("POST", "/manage/challenges", as_user=as_user, json={"kind": kind, **self.options(**changes), "announce": announce})
 
     def played(self, user, hours, game="hades", days_ago=0):
         start = clock.now() - timedelta(days=days_ago, hours=hours + 1)
@@ -48,10 +49,10 @@ class LaunchTests(ChallengesTestCase):
         for method, path in (("GET", "/challenges"), ("GET", "/challenges/1"), ("POST", "/challenges"), ("GET", "/challenges/templates"), ("DELETE", "/challenges/1")):
             self.assertEqual(self.api(method, path).status_code, 401, path)
 
-    def test_the_templates_say_whether_the_caller_may_launch_each(self):
-        for user, can in (("root", True), ("ana", False)):
+    def test_the_templates_say_the_group_ones_are_not_launched_from_the_challenges_page(self):
+        for user in ("root", "ana"):  # not even an admin
             body = self.api("GET", "/challenges/templates", as_user=user).json()
-            self.assertEqual([(t["kind"], t["scope"], t["can_launch"]) for t in body], [("game_of_month", "group", can)])
+            self.assertEqual([(t["kind"], t["scope"], t["can_launch"]) for t in body], [("game_of_month", "group", False)])
 
     def test_an_admin_launches_a_game_of_the_month_for_the_group(self):
         response = self.launch()
@@ -65,6 +66,17 @@ class LaunchTests(ChallengesTestCase):
         self.assertEqual(self.launch(as_user="ana").status_code, 403)
         self.assertEqual(self.scalar("SELECT COUNT(*) FROM challenges"), 0)
 
+    def test_the_challenges_route_never_makes_a_group_challenge_not_even_for_an_admin(self):
+        for user in ("root", "ana"):
+            response = self.api("POST", "/challenges", as_user=user, json={"kind": "game_of_month", "options": self.options()})
+            self.assertEqual(response.status_code, 403, user)
+            self.assertIn("panel de administración", response.json()["detail"])
+        self.assertEqual(self.scalar("SELECT COUNT(*) FROM challenges"), 0)
+
+    def test_a_group_template_is_the_only_kind_the_panel_launches(self):
+        self.assertEqual(self.launch(kind="nope").status_code, 400)
+        self.assertEqual(self.api("POST", "/manage/challenges", as_user="root", json={}).status_code, 400)  # no game: the options are checked
+
     def test_the_options_are_checked(self):
         past = f"{TODAY().year - 1:04d}-01"
         for changes, fragment in (
@@ -72,14 +84,19 @@ class LaunchTests(ChallengesTestCase):
             ({"month": "2026-13"}, "mes"),
             ({"month": past}, "ya ha pasado"),
             ({"min_hours_each": 0}, "mínimo"),
-            ({"min_hours_each": "abc"}, "número"),
             ({"min_hours_total": 3, "min_hours_each": 5}, "no puede ser menor"),
         ):
             response = self.launch(**changes)
             self.assertEqual(response.status_code, 400, changes)
             self.assertIn(fragment, response.json()["detail"].lower(), changes)
+        self.assertEqual(self.launch(min_hours_each="abc").status_code, 422)  # not even a number
         self.assertEqual(self.api("POST", "/challenges", as_user="root", json={"kind": "nope", "options": {}}).status_code, 400)
         self.assertEqual(self.scalar("SELECT COUNT(*) FROM challenges"), 0)
+
+    def test_what_the_panel_launches_is_in_the_audit_log(self):
+        challenge = self.launch().json()["id"]
+        rows = self.api("GET", "/manage/audit", as_user="root", params={"entity": "challenges"}).json()["items"]
+        self.assertEqual([(r["method"], r["username"]) for r in rows], [("POST", "root")])
 
     def test_an_equal_challenge_is_refused_but_a_different_one_is_not(self):
         self.assertEqual(self.launch().status_code, 201)
@@ -155,10 +172,12 @@ class ProgressTests(ChallengesTestCase):
 
 
 class DeleteTests(ChallengesTestCase):
-    def test_only_an_admin_deletes_a_group_challenge(self):
+    def test_a_group_challenge_is_deleted_from_the_panel_only(self):
         challenge = self.launch().json()["id"]
-        self.assertEqual(self.api("DELETE", f"/challenges/{challenge}", as_user="ana").status_code, 403)
-        self.assertEqual(self.api("DELETE", f"/challenges/{challenge}", as_user="root").status_code, 200)
+        for user in ("ana", "root"):  # the challenges route is for one's own, personal challenges
+            self.assertEqual(self.api("DELETE", f"/challenges/{challenge}", as_user=user).status_code, 403, user)
+        self.assertEqual(self.scalar("SELECT COUNT(*) FROM challenges"), 1)
+        self.assertEqual(self.api("DELETE", f"/manage/challenges/{challenge}", as_user="root").status_code, 200)
         self.assertEqual(self.scalar("SELECT COUNT(*) FROM challenges"), 0)
 
     def test_deleting_the_game_or_the_challenge_takes_the_rest_with_it(self):
