@@ -384,6 +384,69 @@ class AchievementCheckTests(unittest.IsolatedAsyncioTestCase):
         await self.ach.completed_in_a_day(self.db, USER)
         self.assertEqual(self.awarded(), {})
 
+    def returned_game(self, avg_time, before_minutes, completed=datetime.date(YEAR, 6, 12)):
+        """A game played `before_minutes` in January, left alone until June and finished then."""
+        self.db.query(models.Game).filter_by(id="g1").update({"avg_time": avg_time})
+        self.library_entry("g1", datetime.date(YEAR, 1, 10), completed=completed)
+        self.db.commit()
+        self.session_of(datetime.datetime(YEAR, 1, 10, 20), before_minutes)
+        self.session_of(datetime.datetime(YEAR, 6, 10, 20), 120)
+
+    async def test_a_game_finished_after_ninety_days_alone_is_a_rescue(self):
+        self.returned_game(avg_time=100 * 3600, before_minutes=60)  # 1 % of the game: not a finishing touch
+        await self.ach.rescued_games(self.db, USER)
+        self.assertEqual(self.awarded(), {"RESCUE": (datetime.date(YEAR, 6, 12), "g1")})  # dated the completion, naming the game
+        self.assertIn("Doom", self.message())
+
+    async def test_coming_back_when_it_was_past_eighty_percent_is_also_a_finishing_touch(self):
+        self.returned_game(avg_time=10 * 3600, before_minutes=8 * 60)  # exactly 80 %
+        await self.ach.rescued_games(self.db, USER)
+        self.assertEqual(set(self.awarded()), {"RESCUE", "FINISHING_TOUCH"})
+        self.assertEqual(self.sent.await_count, 2)
+
+    async def test_a_game_with_no_average_time_is_a_rescue_never_a_finishing_touch(self):
+        self.returned_game(avg_time=0, before_minutes=600)
+        await self.ach.rescued_games(self.db, USER)
+        self.assertEqual(set(self.awarded()), {"RESCUE"})
+
+    async def test_a_game_left_alone_for_less_than_ninety_days_is_neither(self):
+        self.library_entry("g1", datetime.date(YEAR, 1, 10), completed=datetime.date(YEAR, 4, 12))
+        self.db.commit()
+        self.session_of(datetime.datetime(YEAR, 1, 10, 20), 120)
+        self.session_of(datetime.datetime(YEAR, 4, 10, 20), 120)  # 89 days without a session
+        await self.ach.rescued_games(self.db, USER)
+        self.assertEqual(self.awarded(), {})
+
+    async def test_it_has_to_be_finished_after_coming_back(self):
+        self.returned_game(avg_time=3600, before_minutes=60, completed=datetime.date(YEAR, 3, 1))  # completed before the comeback
+        await self.ach.rescued_games(self.db, USER)
+        self.assertEqual(self.awarded(), {})
+
+    async def test_the_time_alone_counts_across_the_year_change(self):
+        self.library_entry("g1", datetime.date(YEAR - 1, 9, 1))
+        self.library_entry("g1", datetime.date(YEAR, 2, 1), completed=datetime.date(YEAR, 2, 3))
+        self.db.commit()
+        self.session_of(datetime.datetime(YEAR - 1, 9, 1, 20), 120)
+        self.session_of(datetime.datetime(YEAR, 2, 1, 20), 120)  # 153 days later, in the next season
+        await self.ach.rescued_games(self.db, USER)
+        self.assertEqual(set(self.awarded()), {"RESCUE"})
+
+    async def test_each_is_earned_once_and_nothing_is_checked_again_when_both_are_had(self):
+        self.returned_game(avg_time=10 * 3600, before_minutes=9 * 60)
+        await self.ach.rescued_games(self.db, USER)
+        await self.ach.rescued_games(self.db, USER)
+        self.assertEqual(sorted(self.awarded()), ["FINISHING_TOUCH", "RESCUE"])
+        self.assertEqual(self.sent.await_count, 2)
+
+    async def test_the_pure_rule_reads_the_gap_in_days_without_a_session(self):
+        def sessions(*days):
+            return [(datetime.datetime(YEAR, 1, 1) + datetime.timedelta(days=d), datetime.datetime(YEAR, 1, 1, 1) + datetime.timedelta(days=d), 3600) for d in days]
+        self.assertEqual(ach_module.rescue_of(sessions(0, 91), 3600), (True, True))  # 90 days between them
+        self.assertEqual(ach_module.rescue_of(sessions(0, 90), 3600), (False, False))  # 89
+        self.assertEqual(ach_module.rescue_of(sessions(0), 3600), (False, False))
+        self.assertEqual(ach_module.rescue_of([], 3600), (False, False))
+        self.assertEqual(ach_module.rescue_of(sessions(0, 200), 100 * 3600), (True, False))  # 1 hour of 100
+
     async def test_playing_a_game_the_day_it_came_out(self):
         self.db.query(models.Game).filter_by(id="g1").update({"release_date": datetime.date(YEAR, 3, 5)})
         self.db.commit()

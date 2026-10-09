@@ -63,6 +63,7 @@ async def check_user(
     await checks.early_riser(db, user, silent)
     await checks.nocturnal(db, user, silent)
     await checks.completed_in_a_day(db, user, silent)
+    await checks.rescued_games(db, user, silent)
     await checks.prodigal_son(db, user, played_days, silent)
     await checks.work_week(db, user, silent)
     await checks.saved_by_the_bell(db, user, silent)
