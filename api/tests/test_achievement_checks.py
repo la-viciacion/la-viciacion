@@ -1189,14 +1189,36 @@ class OutsideWorldTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("STORM_LIFETIME", undecided)  # so the recalculation leaves it alone instead of revoking it
 
 
+LEGACY_2023 = {  # the achievements that existed before the rule 'every new one starts in 2027'
+    "ALL_TOGETHER", "COMPLETED_1000_GAMES_LIFETIME", "COMPLETED_100_GAMES", "COMPLETED_100_GAMES_LIFETIME",
+    "COMPLETED_10_GAMES", "COMPLETED_1_GAME", "COMPLETED_200_GAMES_LIFETIME", "COMPLETED_25_GAMES",
+    "COMPLETED_42_GAMES", "COMPLETED_500_GAMES_LIFETIME", "COMPLETED_5_GAMES", "COMPLETED_IN_A_DAY", "EARLY_RISER",
+    "HAPPY_NEW_YEAR", "JUST_IN_TIME", "NOCTURNAL", "PLAYED_10000_HOURS_LIFETIME", "PLAYED_1000_DAYS_LIFETIME",
+    "PLAYED_1000_GAMES_LIFETIME", "PLAYED_1000_HOURS", "PLAYED_1000_HOURS_GAME", "PLAYED_1000_HOURS_GAME_LIFETIME",
+    "PLAYED_1000_HOURS_LIFETIME", "PLAYED_100_DAYS", "PLAYED_100_DAYS_LIFETIME", "PLAYED_100_GAMES",
+    "PLAYED_100_GAMES_LIFETIME", "PLAYED_100_HOURS", "PLAYED_100_HOURS_GAME", "PLAYED_10_GAMES",
+    "PLAYED_10_GAMES_DAY", "PLAYED_12_HOURS_DAY", "PLAYED_15_DAYS", "PLAYED_16_HOURS_DAY",
+    "PLAYED_2000_DAYS_LIFETIME", "PLAYED_2000_HOURS_LIFETIME", "PLAYED_200_DAYS", "PLAYED_200_DAYS_LIFETIME",
+    "PLAYED_200_GAMES_LIFETIME", "PLAYED_200_HOURS", "PLAYED_300_DAYS", "PLAYED_30_DAYS", "PLAYED_365_DAYS",
+    "PLAYED_42_GAMES", "PLAYED_4_HOURS_DAY", "PLAYED_4_HOURS_SESSION", "PLAYED_5000_DAYS_LIFETIME",
+    "PLAYED_5000_HOURS_LIFETIME", "PLAYED_500_DAYS_LIFETIME", "PLAYED_500_GAMES_LIFETIME", "PLAYED_500_HOURS",
+    "PLAYED_500_HOURS_GAME", "PLAYED_500_HOURS_LIFETIME", "PLAYED_50_GAMES", "PLAYED_5_GAMES_DAY", "PLAYED_60_DAYS",
+    "PLAYED_7_DAYS", "PLAYED_8_HOURS_DAY", "PLAYED_8_HOURS_GAME_DAY", "PLAYED_8_HOURS_SESSION",
+    "PLAYED_LESS_5_MIN_SESSION", "PRODIGAL_SON", "RELEASE_DAY", "SAVED_BY_THE_BELL", "STREAK_100_DAYS",
+    "STREAK_15_DAYS", "STREAK_200_DAYS", "STREAK_300_DAYS", "STREAK_30_DAYS", "STREAK_365_DAYS", "STREAK_60_DAYS",
+    "STREAK_7_DAYS", "TEAMWORK", "WORK_WEEK",
+}
+
+
 class CatalogueTests(unittest.TestCase):
     def test_every_achievement_says_the_season_it_starts_in(self):
         without = [ach.name for ach in ach_module.AchievementsElems if "since" not in ach.value]
         self.assertEqual(without, [])  # one added without it would not be created at all
-        outside_world = {ach.name for ach in ach_module.EXTERNAL_LIFETIME}
         for ach in ach_module.AchievementsElems:
-            # retroactive: the history counts since the first season; the ones about the world outside the app begin in 2027
-            self.assertEqual(first_season(ach), 2027 if ach.name in outside_world else 2023, ach.name)
+            # the first ones count the history since the first season; every one added since starts in 2027 (a new
+            # achievement is not retroactive, and the day there is a reason for it to be, this list is where it is said)
+            self.assertEqual(first_season(ach), 2023 if ach.name in LEGACY_2023 else 2027, ach.name)
+        self.assertEqual(LEGACY_2023 - {ach.name for ach in ach_module.AchievementsElems}, set())
 
     def test_the_ones_about_the_world_outside_the_app_are_all_hidden_and_without_a_season_limit(self):
         for ach in ach_module.EXTERNAL_LIFETIME:
