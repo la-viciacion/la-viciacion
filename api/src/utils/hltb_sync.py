@@ -40,6 +40,7 @@ _status: dict = {"state": "idle"}
 # ── matching (pure) ─────────────────────────────────────────────
 
 
+TYPOGRAPHIC_QUOTES = str.maketrans({"’": "'", "‘": "'", "`": "'", "´": "'", "“": '"', "”": '"'})
 ROMAN = {"ii": "2", "iii": "3", "iv": "4", "v": "5", "vi": "6", "vii": "7", "viii": "8", "ix": "9"}
 
 
@@ -118,8 +119,9 @@ def pick(name: str, year: int | None, found: list[dict]) -> tuple[str, list[dict
 
 
 def clean_name(name: str) -> str:
-    """What HLTB's search is given: it chokes on colons and slashes."""
-    return re.sub(r"[:/]", "", name)
+    """What HLTB's search is given: it chokes on colons and slashes, and finds nothing with typographic quotes
+    (Sid Meier’s Civilization VI) while the plain ones find it."""
+    return re.sub(r"[:/]", "", name.translate(TYPOGRAPHIC_QUOTES))
 
 
 def best_entry(name: str, year: int | None, entries):
