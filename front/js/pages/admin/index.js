@@ -228,10 +228,12 @@ function toolbarView(entity, st) {
           ${(typeof s.options === 'function' ? s.options() : s.options).map(([value, label]) => html`<option value="${value}" ${(f[s.key] || '') === value ? html`selected` : ''}>${label}</option>`)}
         </select>`)}
       <span class="adm-spacer"></span>
-      ${(entity.toolbarActions || []).map((a) => html`<button class="adm-btn" data-act="${a.act}">${a.label}</button>`)}
-      ${entity.creates
-        ? entity.creates.map((c, i) => html`<button class="adm-btn primary" data-act="create" data-create="${i}">+ ${c.label}</button>`)
-        : (entity.createFields ? html`<button class="adm-btn primary" data-act="create">+ ${entity.createLabel}</button>` : '')}
+      ${entity.toolbarActions?.length || entity.creates || entity.createFields ? html`<div class="adm-toolbar-actions">
+        ${(entity.toolbarActions || []).map((a) => html`<button class="adm-btn" data-act="${a.act}">${a.label}</button>`)}
+        ${entity.creates
+          ? entity.creates.map((c, i) => html`<button class="adm-btn primary" data-act="create" data-create="${i}">+ ${c.label}</button>`)
+          : (entity.createFields ? html`<button class="adm-btn primary" data-act="create">+ ${entity.createLabel}</button>` : '')}
+      </div>` : ''}
     </div>`;
 }
 

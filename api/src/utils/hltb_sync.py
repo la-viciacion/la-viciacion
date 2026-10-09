@@ -24,6 +24,7 @@ from .logger import LogManager
 logger = LogManager().get_logger()
 
 THROTTLE_SECONDS = 1.0           # HLTB has no published quota; be gentle with it
+SEARCH_SECONDS = 5               # what one search takes: the library makes about four requests to HLTB's site (measured: 4 to 5 s)
 MAX_CONSECUTIVE_ERRORS = 5
 MAX_REPORTED = 200               # cap list sizes kept in memory / sent to the panel
 MIN_CONFIDENT = 0.9              # similarity a name must reach to be matched without an exact match
@@ -132,7 +133,7 @@ def best_entry(name: str, year: int | None, entries):
 
 def estimate(db) -> dict:
     total = db.query(func.count(models.Game.id)).scalar()
-    return {"total_games": total, "estimated_seconds": int(total * (THROTTLE_SECONDS + 1))}
+    return {"total_games": total, "estimated_seconds": int(total * (THROTTLE_SECONDS + SEARCH_SECONDS))}
 
 
 def status() -> dict:
