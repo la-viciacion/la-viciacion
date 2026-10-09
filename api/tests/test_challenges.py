@@ -102,5 +102,30 @@ class NoticeTests(unittest.TestCase):
         self.assertEqual(text, "Entre todos habéis llegado a las 30 h. 2 de 3 ya habéis cumplido vuestro mínimo.")
 
 
+class NewGenreTests(unittest.TestCase):
+    def test_the_genres_of_a_game_are_split_whatever_the_spacing(self):
+        self.assertEqual(challenges.split_genres("Action, RPG,Indie"), ["Action", "RPG", "Indie"])
+        for nothing in (None, "", " , "):
+            self.assertEqual(challenges.split_genres(nothing), [], repr(nothing))
+
+    def test_the_durations_count_the_day_it_starts(self):
+        self.assertEqual(challenges.DURATIONS, {"week": 7, "month": 30, "quarter": 90})
+        self.assertEqual(challenges.DEFAULT_HOURS, 2)
+
+    def test_playing_is_done_at_the_hours_asked_and_not_before(self):
+        below = challenges.new_genre_result(1, "Ana", "play", 7199, 2)["players"][0]
+        self.assertEqual((below["seconds"], below["target_seconds"], below["done"]), (7199, 7200, False))
+        self.assertTrue(challenges.new_genre_result(1, "Ana", "play", 7200, 2)["players"][0]["done"])
+
+    def test_completing_asks_for_one_game(self):
+        none = challenges.new_genre_result(1, "Ana", "complete", 0, None)["players"][0]
+        one = challenges.new_genre_result(1, "Ana", "complete", 1, None)["players"][0]
+        self.assertEqual((none["count"], none["target_count"], none["done"], one["done"]), (0, 1, False, True))
+
+    def test_a_personal_challenge_has_no_group_total(self):
+        self.assertNotIn("total_done", challenges.new_genre_result(1, "Ana", "play", 0, 2))
+        self.assertEqual(challenges.new_genre_result(None, "", "play", 0, 2), {"players": []})
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -45,8 +45,54 @@ export function launchMonths(today = new Date(), count = 4) {
   });
 }
 
+/** A part of a challenge is counted in games ("complete") or in seconds ("play", the group's ones). */
+export const isCount = (part) => 'target_count' in part;
+export const partValue = (part) => (isCount(part) ? part.count : part.seconds);
+export const partTarget = (part) => (isCount(part) ? part.target_count : part.target_seconds);
+
+/** "3 / 5 h" or "0 / 1 juego" */
+export function amountLabel(part) {
+  if (isCount(part)) return `${part.count} / ${part.target_count} ${part.target_count === 1 ? 'juego' : 'juegos'}`;
+  return `${hoursLabel(part.seconds)} / ${hoursLabel(part.target_seconds)}`;
+}
+
+/** What a challenge asks, in a line. */
+export function summaryLine(challenge) {
+  const p = challenge.params;
+  if (challenge.kind === 'game_of_month') {
+    return `${challenge.label} · mínimo ${hoursLabel(p.min_hours_each * 3600)} cada uno y ${hoursLabel(p.min_hours_total * 3600)} entre todos`;
+  }
+  if (challenge.kind === 'new_genre') {
+    const what = p.mode === 'play' ? `jugar ${hoursLabel(p.hours * 3600)} a` : 'completar';
+    return `${challenge.label} · ${what} un juego de ${p.genre} que no tuvieras antes`;
+  }
+  return challenge.label;
+}
+
+const ORDER = { active: 0, upcoming: 1, finished: 2 };
+const FINISHED_SHOWN = 5;
+
+/** The page's blocks: the group's challenges, the viewer's own and the other players', each with the running ones
+ * first and only the latest finished ones. [{ key, title, list, empty }] (the others' block only when there is one). */
+export function blocks(challenges, meId) {
+  const sorted = (list) => [...list].sort((a, b) => ORDER[a.status] - ORDER[b.status]);
+  const cut = (list) => [...sorted(list).filter((c) => c.status !== 'finished'), ...sorted(list).filter((c) => c.status === 'finished').slice(0, FINISHED_SHOWN)];
+  const group = challenges.filter((c) => c.scope === 'group');
+  const mine = challenges.filter((c) => c.scope === 'user' && c.owner?.id === meId);
+  const others = challenges.filter((c) => c.scope === 'user' && c.owner?.id !== meId);
+  return [
+    { key: 'group', title: 'Del grupo', list: cut(group), empty: 'No hay ningún reto del grupo.' },
+    { key: 'mine', title: 'Tuyos', list: cut(mine), empty: 'No tienes ningún reto. Lanza uno con «Nuevo reto».' },
+    ...(others.length ? [{ key: 'others', title: 'De otros jugadores', list: cut(others), empty: '' }] : []),
+  ];
+}
+
+/** How long a personal challenge lasts, to choose from. */
+export const DURATIONS = [['week', 'Una semana'], ['month', 'Un mes'], ['quarter', 'Tres meses']];
+
 /** The line a finished challenge gets in a player's history. */
 export function resultLine(entry) {
+  if (entry.scope === 'user') return entry.done ? 'Lo conseguiste' : 'No se cumplió';
   if (entry.done) return entry.group_done ? 'Cumpliste tu parte y el grupo llegó al total' : 'Cumpliste tu parte';
   return entry.group_done ? 'El grupo llegó al total' : 'No se cumplió';
 }

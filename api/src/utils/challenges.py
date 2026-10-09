@@ -47,8 +47,9 @@ class Template:
     scope: str  # GROUP: launched by an admin for everybody; USER: by a player for themselves
     build: Callable[[Session, dict, datetime.date], Built]
     progress: Callable[[Session, models.Challenge, list[int]], dict]
-    summary: Callable[[models.Challenge], str]  # what is asked, for the notice that launches it
-    reached: Callable[[models.Challenge, dict], str]  # the notice when the group's total is reached
+    # the notices of a group challenge: what is asked when it is launched, and the group's total reached
+    summary: Callable[[models.Challenge], str] | None = None
+    reached: Callable[[models.Challenge, dict], str] | None = None
 
 
 # ── period and numbers ──────────────────────────────────────────
@@ -191,6 +192,106 @@ def reached_game_of_month(challenge: models.Challenge, progress: dict) -> str:
     )
 
 
+# ── Probar un género ────────────────────────────────────────────
+
+# How long a personal challenge lasts, counting the day it is launched
+DURATIONS = {"week": 7, "month": 30, "quarter": 90}
+DEFAULT_HOURS = 2
+
+
+def split_genres(genres: str | None) -> list[str]:
+    """`games.genres` is one comma separated string."""
+    return [genre.strip() for genre in (genres or "").split(",") if genre.strip()]
+
+
+def available_genres(db: Session) -> dict[str, tuple[str, int]]:
+    """The genres of the games in the database: {lower-cased: (name as written, how many games have it)}."""
+    found: dict[str, tuple[str, int]] = {}
+    for (genres,) in db.query(models.Game.genres).filter(models.Game.genres.isnot(None)):
+        for genre in {g.casefold(): g for g in split_genres(genres)}.values():
+            name, count = found.get(genre.casefold(), (genre, 0))
+            found[genre.casefold()] = (name, count + 1)
+    return found
+
+
+def build_new_genre(db: Session, options: dict, today: datetime.date) -> Built:
+    """Options: genre (one that exists and has games), mode ("play" hours or "complete" one game), hours (play only,
+    2 by default) and duration ("week", "month" or "quarter"; the period starts today)."""
+    genres = available_genres(db)
+    wanted = str(options.get("genre") or "").strip().casefold()
+    if wanted not in genres:
+        raise ChallengeError("Elige un género que exista")
+    name = genres[wanted][0]
+    mode = options.get("mode")
+    if mode not in ("play", "complete"):
+        raise ChallengeError("Elige si quieres jugar o completar")
+    duration = options.get("duration") or "month"
+    if duration not in DURATIONS:
+        raise ChallengeError("Elige una duración: una semana, un mes o tres meses")
+    params = {"genre": name, "mode": mode, "duration": duration}
+    if mode == "play":
+        params["hours"] = hours(DEFAULT_HOURS if options.get("hours") in (None, "") else options["hours"], "Las horas")
+    return Built(
+        title=f"Probar un género: {name}"[:MAX_TITLE],
+        params=params,
+        starts_on=today,
+        ends_on=today + datetime.timedelta(days=DURATIONS[duration] - 1),
+    )
+
+
+def new_genre_result(user_id: int, name: str, mode: str, amount: int, target_hours: float | None) -> dict:
+    """The progress of a "try a genre" from what the player did in new games of that genre (pure): the seconds
+    played ("play") or the games completed ("complete")."""
+    if mode == "play":
+        target = round(target_hours * 3600)
+        player = {"user_id": user_id, "name": name, "seconds": amount, "target_seconds": target, "done": amount >= target}
+    else:
+        player = {"user_id": user_id, "name": name, "count": amount, "target_count": 1, "done": amount >= 1}
+    return {"players": [player] if user_id is not None else []}
+
+
+def progress_new_genre(db: Session, challenge: models.Challenge, participant_ids: list[int]) -> dict:
+    """Only games of the genre the player did not have in their library before the challenge began count: a game
+    that was already there is not something new to try."""
+    if not participant_ids:
+        return {"players": []}
+    params = json.loads(challenge.params)
+    user_id = participant_ids[0]
+    user = db.get(models.User, user_id)
+    genre = params["genre"].casefold()
+    in_genre = lambda genres: genre in {g.casefold() for g in split_genres(genres)}  # noqa: E731
+    had_before = {
+        game_id for (game_id,) in db.query(models.UserGame.game_id).filter(models.UserGame.user_id == user_id, models.UserGame.started_date < challenge.starts_on)
+    }
+    if params["mode"] == "play":
+        rows = (
+            db.query(models.GameTimer.game_id, models.Game.genres, func.sum(models.GameTimer.duration_seconds))
+            .join(models.Game, models.Game.id == models.GameTimer.game_id)
+            .filter(
+                models.GameTimer.user_id == user_id,
+                models.GameTimer.is_active == False,  # noqa: E712
+                models.GameTimer.start_time >= datetime.datetime.combine(challenge.starts_on, datetime.time.min),
+                models.GameTimer.start_time < datetime.datetime.combine(challenge.ends_on + datetime.timedelta(days=1), datetime.time.min),
+            )
+            .group_by(models.GameTimer.game_id, models.Game.genres)
+        )
+        amount = sum(int(seconds or 0) for game_id, genres, seconds in rows if game_id not in had_before and in_genre(genres))
+    else:
+        rows = (
+            db.query(models.UserGame.game_id, models.Game.genres)
+            .join(models.Game, models.Game.id == models.UserGame.game_id)
+            .filter(
+                models.UserGame.user_id == user_id,
+                models.UserGame.completed == 1,
+                models.UserGame.completed_date >= challenge.starts_on,
+                models.UserGame.completed_date <= challenge.ends_on,
+            )
+        )
+        amount = len({game_id for game_id, genres in rows if game_id not in had_before and in_genre(genres)})
+    return new_genre_result(user_id, (user.name or user.username) if user else "", params["mode"], amount, params.get("hours"))
+
+
 TEMPLATES: dict[str, Template] = {
     "game_of_month": Template("Juego del mes", GROUP, build_game_of_month, progress_game_of_month, summary_game_of_month, reached_game_of_month),
+    "new_genre": Template("Probar un género", USER, build_new_genre, progress_new_genre),
 }
