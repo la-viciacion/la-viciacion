@@ -11,10 +11,11 @@ from sqlalchemy import asc, create_engine, desc, func, select, text, update
 from sqlalchemy.orm import Session
 
 from ..config import Config
+from ..crud import challenges as challenges_crud
 from ..crud import games, rankings, time_entries, users, wishlist
 from ..crud.achievements import Achievements, Played
 from ..database import models, schemas
-from . import my_utils as utils
+from . import challenges, my_utils as utils
 from . import push, rawg_sync
 from ..utils import seasons, streaks, user_settings
 from .logger import LogManager
@@ -182,6 +183,8 @@ def after_session_change(
                     await achievements.opened_by_mistake(db, user, *stopped, silent=silent)
             if ranking_before is not None:
                 await announce_ranking_changes(db, ranking_before, silent)
+            if not silent:
+                await announce_challenge_totals(db)
         finally:
             db.close()
 
@@ -483,6 +486,45 @@ async def announce_wishlist_eve(db: Session, tomorrow: datetime.date) -> str:
     if releases:
         await utils.send_message(wishlist_eve_message(releases), False, ai_use="wishlist_release")
     return f"{len(releases)} games"
+
+
+async def announce_challenge_launch(db: Session, challenge_id: int) -> str:
+    """Tell the group a challenge has been launched (the admin chose to)."""
+    challenge = db.get(models.Challenge, challenge_id)
+    if challenge is None:
+        return "gone"
+    template = challenges.TEMPLATES[challenge.kind]
+    title = utils.escape_markdown(challenge.title)
+    await utils.send_message(f"🎯 *Nuevo reto del grupo*\n*{title}*\n{template.summary(challenge)}", False)
+    return "sent"
+
+
+async def announce_challenge_totals(db: Session, today: datetime.date | None = None) -> int:
+    """Tell the group which running challenges have just reached their total. Said once per challenge: the moment is
+    recorded (`total_notified_at`) before the next check can say it again."""
+    sent = 0
+    for challenge, progress in challenges_crud.reached_totals(db, today or datetime.date.today()):
+        challenge.total_notified_at = datetime.datetime.now()
+        db.commit()
+        template = challenges.TEMPLATES[challenge.kind]
+        title = utils.escape_markdown(challenge.title)
+        await utils.send_message(f"🏆 *¡Reto cumplido!*\n*{title}*\n{template.reached(challenge, progress)}", False)
+        sent += 1
+    return sent
+
+
+def after_challenge_launch(challenge_id: int):
+    """Background-task entrypoint for a challenge that has just been launched."""
+    from ..database.database import SessionLocal
+
+    async def _run():
+        with SessionLocal() as db:
+            await announce_challenge_launch(db, challenge_id)
+
+    try:
+        asyncio.run(_run())
+    except Exception as e:
+        logger.error("Error announcing a challenge: " + str(e))
 
 
 async def send_timer_notice(db: Session, timer: models.GameTimer | None):

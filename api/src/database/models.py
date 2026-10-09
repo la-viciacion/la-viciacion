@@ -299,6 +299,44 @@ class PushSubscription(Base):
     __table_args__ = (UniqueConstraint("endpoint", name="uq_push_subscriptions_endpoint"),)
 
 
+class Challenge(Base):
+    """A time-boxed goal made from a template in code (utils/challenges.py): only the definition is stored.
+    Progress and completion are derived from the sessions and the library when asked."""
+
+    __tablename__ = "challenges"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    kind = Column(String(32), nullable=False)  # the template
+    scope = Column(String(8), nullable=False)  # 'group' or 'user'
+    owner_user_id = Column(Integer, ForeignKey("users.id", name="fk_challenges_owner", ondelete="CASCADE"), nullable=True)
+    created_by = Column(Integer, ForeignKey("users.id", name="fk_challenges_creator", ondelete="SET NULL"), nullable=True)
+    visibility = Column(String(8), nullable=False, server_default=text("'public'"))
+    # 'auto': every active player takes part and may opt out; 'opt_in' is prepared and not used yet
+    participation = Column(String(8), nullable=False, server_default=text("'auto'"))
+    title = Column(String(120), nullable=False)
+    params = Column(Text, nullable=False)  # the template's options, JSON
+    game_id = Column(String(255), ForeignKey("games.id", name="fk_challenges_game", ondelete="CASCADE"), nullable=True)
+    starts_on = Column(Date, nullable=False)
+    ends_on = Column(Date, nullable=False)
+    # a hash of kind, options, period and owner: an equal challenge is refused
+    fingerprint = Column(String(64), nullable=False)
+    # when the group was told its total was reached (said once)
+    total_notified_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP"))
+
+    __table_args__ = (UniqueConstraint("fingerprint", name="uq_challenges_fingerprint"),)
+
+
+class ChallengeOptOut(Base):
+    """A player who chose not to take part in a challenge."""
+
+    __tablename__ = "challenge_optouts"
+
+    challenge_id = Column(Integer, ForeignKey("challenges.id", name="fk_challenge_optouts_challenge", ondelete="CASCADE"), primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", name="fk_challenge_optouts_user", ondelete="CASCADE"), primary_key=True)
+    created_at = Column(DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP"))
+
+
 class AuditLog(Base):
     """What an admin changed from the admin panel (see utils/audit.py): one row per successful write."""
 

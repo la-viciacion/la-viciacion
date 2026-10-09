@@ -8,6 +8,7 @@ const ENTITY = {
   timers: 'sesión',
   library: 'entrada de biblioteca',
   scores: 'puntuación',
+  challenges: 'reto',
   achievements: 'logro',
   'user-achievements': 'logro concedido',
 };

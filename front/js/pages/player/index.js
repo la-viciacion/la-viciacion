@@ -6,6 +6,7 @@ import { html, mount } from '../../lib/html.js';
 import { gameHref } from '../../lib/links.js';
 import * as seasons from '../../lib/seasons.js';
 import { hydratePhotos, playerAvatar } from '../../ui/avatar.js';
+import { showChallengesHistory } from '../../ui/challenges-history.js';
 import { achievementsView, sectionTitle, seasonName, seasonPills, seasonSuffix, statsView, topView } from '../../ui/profile-summary.js';
 
 export const active = null; // it belongs to no item of the top bar
@@ -56,8 +57,12 @@ function draw(d) {
         ${sectionTitle(`Logros ${seasonSuffix(d)}`)}
         <div class="pf-card">${achievementsView(d, d.is_me)}</div>
       </div>
-    </div>`);
+    </div>
+
+    ${sectionTitle('Retos')}
+    <div class="pf-card" id="plChallenges"></div>`);
   hydratePhotos(main);
+  showChallengesHistory(main.querySelector('#plChallenges'), d.user.id, d.is_me);
   main.querySelector('#plBack').addEventListener('click', back);
   main.querySelector('#plSeasons').addEventListener('click', (e) => {
     const pill = e.target.closest('[data-season]');

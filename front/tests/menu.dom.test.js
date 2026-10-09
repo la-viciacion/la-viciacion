@@ -19,7 +19,7 @@ test('the button opens the panel with the sections and tells the state', () => {
   assert.ok(panel());
   assert.equal(button().getAttribute('aria-expanded'), 'true');
   assert.deepEqual([...document.querySelectorAll('.menu-section')].map((e) => e.textContent), ['Principal', 'Explorar', 'Tú', 'Administración']);
-  assert.equal(document.querySelectorAll('a.menu-item').length, 12);
+  assert.equal(document.querySelectorAll('a.menu-item').length, 13);
   assert.equal(document.querySelector('.menu-wip').textContent, 'WIP');
 });
 

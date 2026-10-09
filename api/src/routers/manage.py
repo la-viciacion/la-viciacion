@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 from .. import auth
 from ..auth import get_db
 from ..crud import achievements_recalc
+from ..crud import challenges as challenges_crud
 from ..crud import users as users_crud
 from ..database import models
 from ..utils import actions, ai, audit, hltb_sync, my_utils, push, rawg_sync, seasons, settings, sql_dump
@@ -1067,6 +1068,37 @@ def delete_platform(platform_id: str, db: Session = Depends(get_db)):
     db.delete(platform)
     db.commit()
     return {"message": "Plataforma eliminada"}
+
+
+# ── Challenges ──────────────────────────────────────────────────
+
+
+@router.get("/challenges")
+def list_challenges(db: Session = Depends(get_db)):
+    """Every challenge, the latest period first, with how many take part and whether the total is reached."""
+    today = datetime.date.today()
+    rows = []
+    for challenge in db.query(models.Challenge).order_by(models.Challenge.starts_on.desc(), models.Challenge.id.desc()):
+        shown = challenges_crud.view(db, challenge, 0, today)
+        owner = db.get(models.User, challenge.created_by) if challenge.created_by else None
+        rows.append({
+            "id": challenge.id, "title": shown["title"], "label": shown["label"], "scope": shown["scope"], "status": shown["status"],
+            "starts_on": challenge.starts_on, "ends_on": challenge.ends_on, "visibility": challenge.visibility,
+            "created_by": owner.username if owner else None,
+            "owner": shown["owner"]["name"] if shown["owner"] else None,
+            "players": len(shown["progress"]["players"]),
+            "done_players": sum(1 for p in shown["progress"]["players"] if p["done"]),
+            "total_done": shown["progress"].get("total_done"),
+            "notified": challenge.total_notified_at is not None,
+        })
+    return rows
+
+
+@router.delete("/challenges/{challenge_id}")
+def delete_challenge(challenge_id: int, db: Session = Depends(get_db)):
+    """Delete a challenge (its opt-outs go with it)."""
+    challenges_crud.delete(db, _get_or_404(db, models.Challenge, challenge_id, "Reto"))
+    return {"message": "Reto eliminado"}
 
 
 # ── Achievements ────────────────────────────────────────────────

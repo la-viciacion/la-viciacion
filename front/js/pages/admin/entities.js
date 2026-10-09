@@ -9,7 +9,7 @@
 // Select: { key, label, options: [[value, label], ...] | () => [...] }   sent to the API as ?key=value
 // Orders: [['key:dir', label], ...]   a dropdown that sets the sort (key and dir are the API's sort and order)
 // Action: { label, show?(row), run(row, admin) }   admin = { jumpTo, open, reload }
-import { formatDuration, formatTimestamp } from '../../lib/format.js';
+import { formatDate, formatDuration, formatTimestamp } from '../../lib/format.js';
 import { html } from '../../lib/html.js';
 import { gameHref } from '../../lib/links.js';
 import { platformList, platformName } from '../../lib/platforms.js';
@@ -237,6 +237,25 @@ export const ENTITIES = {
     createLabel: 'Nueva puntuación',
     name: (r) => `${r.user} · ${r.game}`,
     canDelete: true,
+  },
+
+  challenges: {
+    label: 'Retos',
+    description: 'Todos los retos, de grupo y personales. Los lanzan los administradores desde la página Retos (los de grupo) o cada jugador (los personales); aquí se ven todos y se pueden borrar, con sus datos de participación.',
+    endpoint: '/manage/challenges',
+    paged: false,
+    readOnly: true,
+    columns: [
+      { label: 'Reto', render: (r) => html`<strong>${r.title}</strong><div class="adm-sub">${r.label} · ${r.scope === 'group' ? 'de grupo' : `de ${r.owner ?? '—'}`}</div>` },
+      { label: 'Periodo', render: (r) => html`${formatDate(r.starts_on)} – ${formatDate(r.ends_on)}` },
+      { label: 'Estado', render: (r) => ({ active: badge('En marcha', 'green'), upcoming: badge('Próximo', 'orange'), finished: badge('Terminado', 'gray') })[r.status] },
+      { label: 'Participan', render: (r) => `${r.players} (${r.done_players} cumplen)` },
+      { label: 'Total', render: (r) => (r.total_done ? badge(r.notified ? 'Alcanzado, avisado' : 'Alcanzado', 'green') : '—') },
+      { label: 'Lanzado por', render: (r) => r.created_by ?? '—' },
+    ],
+    name: (r) => r.title,
+    canDelete: true,
+    deleteNote: 'Se borra el reto y quién se salió de él. Los resultados dejan de salir en los perfiles.',
   },
 
   achievements: {

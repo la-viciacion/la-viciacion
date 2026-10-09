@@ -12,7 +12,7 @@ from .crud import users as users_crud
 from .crud.achievements import Achievements
 from .utils import push as push_utils
 from .utils import achievement_images, scheduler, settings
-from .routers import activity, basic, games, group, manage, push, statistics, timers, users, utils
+from .routers import activity, basic, challenges, games, group, manage, push, statistics, timers, users, utils
 from .utils.logger import LogManager
 from .utils.request_log import RequestLogMiddleware
 
@@ -84,7 +84,7 @@ app = FastAPI(
 
 # A new incompatible version (/api/v2) is one more router with its own prefix, built the same way
 api_v1 = APIRouter(prefix=API_PREFIX)
-for router in (basic, users, games, statistics, timers, activity, group, manage, push, utils):
+for router in (basic, users, games, statistics, timers, activity, group, challenges, manage, push, utils):
     api_v1.include_router(router.router)
 app.include_router(api_v1)
 

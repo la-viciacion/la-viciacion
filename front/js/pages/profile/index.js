@@ -9,6 +9,7 @@ import { api } from '../../lib/api.js';
 import { html, mount } from '../../lib/html.js';
 import { PASSWORD_HINT } from '../../lib/password.js';
 import * as seasons from '../../lib/seasons.js';
+import { showChallengesHistory } from '../../ui/challenges-history.js';
 import { achievementsView, sectionTitle, seasonName, seasonPills, seasonSuffix, statsView, titleView, topView } from '../../ui/profile-summary.js';
 import { initAbout } from './about.js';
 import { initAccount } from './account.js';
@@ -80,6 +81,7 @@ function showTab(id) {
   history.replaceState(null, '', `#/profile/${id}`);
   if (opened.has(id)) return;
   opened.add(id);
+  if (id === 'resumen') showChallengesHistory(main.querySelector('#pfChallenges'), user.id, true);
   if (id === 'resumen') initLibrary(main.querySelector('#pfLibrary'), { username: user.username, userId: user.id, season: onScreen, onChange: refreshSummary });
   if (id === 'ajustes') {
     initNotifications(main.querySelector('#pfNotifs'), { path: userPath('settings') }).catch(() => {});
@@ -185,6 +187,8 @@ function draw(d) {
       </div>
       ${sectionTitle(`Juegos ${seasonSuffix(d)}`, 'pfGamesTitle')}
       <div id="pfLibrary"></div>
+      ${sectionTitle('Retos')}
+      <div class="pf-card" id="pfChallenges"></div>
     </section>
 
     <section class="pf-panel" role="tabpanel" id="pfPanel-ajustes" aria-labelledby="pfTab-ajustes" hidden>

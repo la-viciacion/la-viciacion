@@ -6,10 +6,10 @@ between versions, while what a client can request is the contract.
 """
 import re
 
-from src.routers import activity, basic, games, group, manage, push, statistics, timers, users, utils
+from src.routers import activity, basic, challenges, games, group, manage, push, statistics, timers, users, utils
 
 BASE = "/api/v1"
-ROUTERS = (activity, basic, games, group, manage, push, statistics, timers, users, utils)
+ROUTERS = (activity, basic, challenges, games, group, manage, push, statistics, timers, users, utils)
 
 
 def declared_routes() -> list[tuple[str, str]]:
