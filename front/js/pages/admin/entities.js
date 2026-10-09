@@ -2,13 +2,14 @@
 // index.js renders the toolbar, table, pager, forms and delete flow from this.
 //
 // Entity: { label, nav? (shorter name for its tab), description? (line under the title), endpoint, search?, filters?, columns, fields, createFields?,
-//           createLabel?, name(row), actions?, toolbarActions?, canDelete, deleteLabel?, deleteNote?,
+//           createLabel?, creates? (several ways to create: [{ label, fields | async () => fields, body }]), name(row), actions?, toolbarActions?, canDelete, deleteLabel?, deleteNote?,
 //           selects?, orders?, defaultSort?, readOnly? (no edit button) }
 //         or a custom page: { label, custom (module in this folder exporting render(panel, { entity, admin })) }
 // Column: { label, render(row) -> html``, filter?(row) -> filters to apply on click, sort? (API sort key) }
 // Select: { key, label, options: [[value, label], ...] | () => [...] }   sent to the API as ?key=value
 // Orders: [['key:dir', label], ...]   a dropdown that sets the sort (key and dir are the API's sort and order)
 // Action: { label, show?(row), run(row, admin) }   admin = { jumpTo, open, reload }
+import { api } from '../../lib/api.js';
 import { formatDate, formatDuration, formatTimestamp } from '../../lib/format.js';
 import { html } from '../../lib/html.js';
 import { gameHref } from '../../lib/links.js';
@@ -253,14 +254,37 @@ export const ENTITIES = {
       { label: 'Total', render: (r) => (r.total_done ? badge(r.notified ? 'Alcanzado, avisado' : 'Alcanzado', 'green') : '—') },
       { label: 'Lanzado por', render: (r) => r.created_by ?? '—' },
     ],
-    createFields: [
-      { key: 'game_id', label: 'Juego', type: 'game', required: true },
-      { key: 'month', label: 'Mes', type: 'month', required: true },
-      { key: 'min_hours_each', label: 'Horas mínimas por jugador', type: 'number', step: '0.5', default: 5, required: true },
-      { key: 'min_hours_total', label: 'Horas mínimas entre todos', type: 'number', step: '0.5', default: 20, required: true },
-      { key: 'announce', label: 'Avisar al grupo (Telegram y notificaciones)', type: 'checkbox', default: true },
+    // one way to launch per template of the group (the personal ones are the players')
+    creates: [
+      {
+        label: 'Lanzar juego del mes',
+        body: { kind: 'game_of_month' },
+        fields: [
+          { key: 'game_id', label: 'Juego', type: 'game', required: true },
+          { key: 'month', label: 'Mes', type: 'month', required: true },
+          { key: 'min_hours_each', label: 'Horas mínimas por jugador', type: 'number', step: '0.5', default: 5, required: true },
+          { key: 'min_hours_total', label: 'Horas mínimas entre todos', type: 'number', step: '0.5', default: 20, required: true },
+          { key: 'announce', label: 'Avisar al grupo (Telegram y notificaciones)', type: 'checkbox', default: true },
+        ],
+      },
+      {
+        label: 'Lanzar reto temático',
+        body: { kind: 'themed' },
+        // the tags are those of the games in the database: loaded when the form opens
+        fields: async () => {
+          const tags = await api('/manage/challenges/tags');
+          return [
+            { key: 'tag', label: 'Temática (etiqueta de los juegos)', type: 'choice', required: true, options: tags.length ? tags.map((t) => [t.tag, `${t.tag} (${t.games})`]) : [['', 'No hay etiquetas']] },
+            { key: 'month', label: 'Mes', type: 'month', required: true },
+            { key: 'mode', label: 'Objetivo de cada jugador', type: 'choice', required: true, default: 'play', options: [['play', 'Jugar unas horas'], ['complete', 'Completar al menos un juego']] },
+            { key: 'min_hours_each', label: 'Horas mínimas por jugador (si hay que jugar)', type: 'number', step: '0.5', default: 2 },
+            { key: 'min_hours_total', label: 'Horas entre todos (opcional, si hay que jugar)', type: 'number', step: '0.5' },
+            { key: 'min_games_total', label: 'Juegos completados entre todos (opcional, si hay que completar)', type: 'number', step: '1' },
+            { key: 'announce', label: 'Avisar al grupo (Telegram y notificaciones)', type: 'checkbox', default: true },
+          ];
+        },
+      },
     ],
-    createLabel: 'Lanzar juego del mes',
     name: (r) => r.title,
     canDelete: true,
     deleteNote: 'Se borra el reto y quién se salió de él. Los resultados dejan de salir en los perfiles.',

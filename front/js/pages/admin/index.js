@@ -229,7 +229,9 @@ function toolbarView(entity, st) {
         </select>`)}
       <span class="adm-spacer"></span>
       ${(entity.toolbarActions || []).map((a) => html`<button class="adm-btn" data-act="${a.act}">${a.label}</button>`)}
-      ${entity.createFields ? html`<button class="adm-btn primary" data-act="create">+ ${entity.createLabel}</button>` : ''}
+      ${entity.creates
+        ? entity.creates.map((c, i) => html`<button class="adm-btn primary" data-act="create" data-create="${i}">+ ${c.label}</button>`)
+        : (entity.createFields ? html`<button class="adm-btn primary" data-act="create">+ ${entity.createLabel}</button>` : '')}
     </div>`;
 }
 
@@ -389,7 +391,11 @@ async function onClick(e) {
       }
       case 'award-edit': return openForm(ENTITIES.awards, awardRows.get(Number(button.dataset.award)), admin);
       case 'award-revoke': return deleteRow(ENTITIES.awards, awardRows.get(Number(button.dataset.award)), admin);
-      case 'create': return openForm(entity, null, admin);
+      case 'create': {
+        const variant = entity.creates?.[Number(button.dataset.create)];
+        // the fields of a variant may need data from the API (the tags of the games): they are loaded when it is opened
+        return openForm(entity, null, admin, variant ? { ...variant, fields: typeof variant.fields === 'function' ? await variant.fields() : variant.fields } : null);
+      }
       case 'edit': return openForm(entity, row, admin);
       case 'delete': return deleteRow(entity, row, admin);
       case 'row-action': return entity.actions[Number(button.dataset.a)].run(row, admin);

@@ -4,6 +4,9 @@
 // Types: text | textarea (rows?) | number | date | datetime | checkbox | select | month | platform | user | game | password | image
 // select: { options: [[number, label], ...] }
 // month: the running month and the next ones, as a "YYYY-MM" text (the challenges are launched for a month)
+// choice: { options: [[text, label], ...], default? } a select whose value stays text (select reads it as a number)
+// An entity may have several ways to create a row (`creates`: [{ label, fields, body }]): `fields` is the form and
+// `body` what is always sent with it (the kind of challenge, for instance); openForm takes the chosen one as `variant`.
 // image (editing only): { current: (row) => url of the picture or null, upload: (row) => route that takes the new file }
 import { api, jsonRequest } from '../../lib/api.js';
 import { launchMonths } from '../../lib/challenges.js';
@@ -30,6 +33,10 @@ function fieldHtml(f, value, row) {
     case 'month':
       return html`<label>${f.label}<select class="adm-input" id="${id}">
         ${launchMonths().map((m) => html`<option value="${m.value}">${m.label}</option>`)}
+      </select></label>`;
+    case 'choice':
+      return html`<label>${f.label}<select class="adm-input" id="${id}">
+        ${f.options.map(([value, name]) => html`<option value="${value}" ${value === (f.default ?? '') ? html`selected` : ''}>${name}</option>`)}
       </select></label>`;
     case 'platform': {
       const known = platformList();
@@ -83,6 +90,7 @@ function readField(f) {
     case 'user': return el.value ? Number(el.value) : null;
     case 'date':
     case 'month':
+    case 'choice':
     case 'platform':
     case 'game': return el.value || null;
     default: return el.value === '' ? null : el.value;
@@ -118,11 +126,11 @@ async function onFormClick(e, modal) {
 }
 
 /** Open the create (row = null) or edit form of an entity. */
-export function openForm(entity, row, admin) {
+export function openForm(entity, row, admin, variant = null) {
   const creating = !row;
-  const fields = creating ? entity.createFields : entity.fields;
+  const fields = creating ? (variant?.fields ?? entity.createFields) : entity.fields;
   const modal = openModal(html`
-    ${modalHeader(creating ? entity.createLabel : `Editar · ${entity.name(row)}`)}
+    ${modalHeader(creating ? (variant?.label ?? entity.createLabel) : `Editar · ${entity.name(row)}`)}
     <form class="adm-form" novalidate>
       ${fields.map((f) => fieldHtml(f, row ? row[f.key] : undefined, row))}
       <div class="adm-error" role="alert"></div>
@@ -135,11 +143,11 @@ export function openForm(entity, row, admin) {
   modal.el.addEventListener('click', (e) => onFormClick(e, modal));
   modal.el.querySelector('form').addEventListener('submit', (e) => {
     e.preventDefault();
-    submit(entity, row, fields, modal, admin);
+    submit(entity, row, fields, modal, admin, variant?.body);
   });
 }
 
-async function submit(entity, row, fields, modal, admin) {
+async function submit(entity, row, fields, modal, admin, extra = {}) {
   const errorEl = modal.el.querySelector('.adm-error');
   errorEl.textContent = '';
   const body = {};
@@ -177,7 +185,7 @@ async function submit(entity, row, fields, modal, admin) {
 
   try {
     if (!row) {
-      await api(entity.endpoint, jsonRequest('POST', body));
+      await api(entity.endpoint, jsonRequest('POST', { ...body, ...extra }));
     } else {
       await api(`${entity.endpoint}/${row.id}`, jsonRequest('PATCH', body));
       if (newPassword !== null) await api(`${entity.endpoint}/${row.id}/password`, jsonRequest('POST', { password: newPassword }));
