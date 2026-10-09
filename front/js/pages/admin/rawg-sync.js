@@ -134,7 +134,8 @@ const details = (title, items, row) => (items.length
   ? html`<details class="adm-details"><summary>${title} (${items.length})</summary>${items.map(row)}</details>`
   : '');
 
-function progressView(s) {
+/** The figures of the run: always refreshed, whatever the admin is doing. */
+function headView(s) {
   const running = s.state === 'running';
   const pct = s.total ? Math.round((s.processed / s.total) * 100) : 0;
   return html`
@@ -146,30 +147,47 @@ function progressView(s) {
       ${statTile('sin resultado', s.not_found.length)}
       ${statTile('errores', s.errors.length)}
     </div>
-    ${running ? '' : html`<p class="adm-sub">${STOP_REASONS[s.stop_reason] || s.stop_reason || ''}</p>`}
-    ${details('Ambiguos: elige la coincidencia correcta', s.ambiguous, (a) => html`
-      <div class="adm-amb" data-game="${a.game_id}"><strong>${a.name}</strong>
-        ${a.candidates.map((c) => html`<button class="adm-btn sm" data-use="${c.rawg_id}" title="${(c.platforms || []).join(', ')}">${c.name}${c.released ? ` (${c.released.slice(0, 4)})` : ''}</button>`)}
-      </div>`)}
-    ${details('Duplicados (mismo ID de RAWG en otro juego: fusiónalos)', s.duplicates, (d) => html`<div class="adm-sub">«${d.name}» ↔ «${d.other_name}» (RAWG ${d.rawg_id})</div>`)}
-    ${details('Sin resultado en RAWG', s.not_found, (n) => html`<div class="adm-sub">${n.name}</div>`)}
-    ${details('Errores', s.errors, (e) => html`<div class="adm-sub">${e.name}: ${e.error}</div>`)}
-    <div class="adm-actions">
-      ${running ? html`<button class="adm-btn danger" id="rgCancel">Cancelar sincronización</button>` : ''}
-      <button class="adm-btn" id="rgClose">${running ? 'Ocultar' : 'Cerrar'}</button>
-      ${running ? '' : html`<button class="adm-btn primary" id="rgAgain">Nueva sincronización</button>`}
-    </div>`;
+    ${running ? '' : html`<p class="adm-sub">${STOP_REASONS[s.stop_reason] || s.stop_reason || ''}</p>`}`;
 }
+
+/** What the run could not decide: redrawn only when it changes and never under an admin who has one open. */
+const listsView = (s) => html`
+  ${details('Ambiguos: elige la coincidencia correcta', s.ambiguous, (a) => html`
+    <div class="adm-amb" data-game="${a.game_id}"><strong>${a.name}</strong>
+      ${a.candidates.map((c) => html`<button class="adm-btn sm" data-use="${c.rawg_id}" title="${(c.platforms || []).join(', ')}">${c.name}${c.released ? ` (${c.released.slice(0, 4)})` : ''}</button>`)}
+    </div>`)}
+  ${details('Duplicados (mismo ID de RAWG en otro juego: fusiónalos)', s.duplicates, (d) => html`<div class="adm-sub">«${d.name}» ↔ «${d.other_name}» (RAWG ${d.rawg_id})</div>`)}
+  ${details('Sin resultado en RAWG', s.not_found, (n) => html`<div class="adm-sub">${n.name}</div>`)}
+  ${details('Errores', s.errors, (e) => html`<div class="adm-sub">${e.name}: ${e.error}</div>`)}`;
+
+const actionsView = (s) => html`
+  <div class="adm-actions">
+    ${s.state === 'running' ? html`<button class="adm-btn danger" id="rgCancel">Cancelar sincronización</button>` : ''}
+    <button class="adm-btn" id="rgClose">${s.state === 'running' ? 'Ocultar' : 'Cerrar'}</button>
+    ${s.state === 'running' ? '' : html`<button class="adm-btn primary" id="rgAgain">Nueva sincronización</button>`}
+  </div>`;
 
 function progress(onDone) {
   let timer = null;
+  let drawnLists = null; // the sizes of the lists on screen: they are redrawn only when one grows
   const m = openModal(html`
     ${modalHeader('Sincronización con RAWG')}
-    <div class="adm-body"><div class="loading-spinner">Cargando…</div></div>`, { wide: true, onClose: () => clearTimeout(timer) });
+    <div class="adm-body">
+      <div id="rgHead"><div class="loading-spinner">Cargando…</div></div>
+      <div id="rgLists"></div>
+      <div id="rgActions"></div>
+    </div>`, { wide: true, onClose: () => clearTimeout(timer) });
   const body = m.el.querySelector('.adm-body');
+  const part = (id) => body.querySelector(`#${id}`);
 
-  const draw = (s) => {
-    mount(body, progressView(s));
+  const draw = (s, { lists }) => {
+    mount(part('rgHead'), headView(s));
+    mount(part('rgActions'), actionsView(s));
+    const sizes = [s.ambiguous, s.duplicates, s.not_found, s.errors].map((list) => list.length).join();
+    if (lists && sizes !== drawnLists) {
+      mount(part('rgLists'), listsView(s));
+      drawnLists = sizes;
+    }
     body.querySelector('#rgClose').addEventListener('click', () => m.close());
     // The last run stays on screen after it ends (its ambiguous games are still to be resolved), so a new one starts from here.
     body.querySelector('#rgAgain')?.addEventListener('click', () => {
@@ -202,9 +220,10 @@ function progress(onDone) {
     try {
       const s = await api('/manage/rawg-sync/status');
       if (!m.el.isConnected) return;
-      // don't re-render under the admin while they are picking among candidates
-      const picking = body.querySelector('.adm-details[open]');
-      if (!picking || s.state !== 'running') draw(s);
+      // The figures move every time; a list is not redrawn under the admin who is picking among candidates (it would
+      // close it), but that must not stop the bar: a run looked stuck until it was cancelled.
+      const picking = part('rgLists').querySelector('.adm-details[open]');
+      draw(s, { lists: !picking || s.state !== 'running' });
       if (s.state === 'running') {
         timer = setTimeout(tick, 2000);
       } else {

@@ -65,12 +65,23 @@ const details = (title, items, row) => (items.length
   ? html`<details class="adm-details"><summary>${title} (${items.length})</summary>${items.map(row)}</details>`
   : '');
 
-function progressView(s) {
+/** Minutes the run still needs at the pace seen since the first poll, or null until two games give a pace.
+ * `first` is { at: ms, done: games processed } taken at the first poll (the browser's own clock: the server's is not
+ * the same one), `now` in ms. */
+export function minutesLeft(first, s, now) {
+  const done = s.processed - first.done;
+  const seconds = (now - first.at) / 1000;
+  if (done < 2 || seconds <= 0) return null;
+  return Math.max(1, Math.ceil(((s.total - s.processed) * seconds) / done / 60));
+}
+
+/** The figures of the run: always refreshed, whatever the admin is doing. */
+function headView(s, left = null) {
   const running = s.state === 'running';
   const pct = s.total ? Math.round((s.processed / s.total) * 100) : 0;
   return html`
     <div class="adm-progress"><div style="width:${pct}%"></div></div>
-    <div class="adm-progress-txt">${s.processed} / ${s.total} juegos${running && s.current ? ` · ${s.current}` : ''}</div>
+    <div class="adm-progress-txt">${s.processed} / ${s.total} juegos${running && s.current ? ` · ${s.current}` : ''}${running && left ? ` · quedan unos ${left} min` : ''}</div>
     <div class="adm-stats adm-stats-sm">
       ${statTile('actualizados', s.updated)}
       ${statTile('sin cambios', s.unchanged)}
@@ -79,30 +90,49 @@ function progressView(s) {
       ${statTile('sin tiempo', s.no_time.length)}
       ${statTile('errores', s.errors.length)}
     </div>
-    ${running ? '' : html`<p class="adm-sub">${STOP_REASONS[s.stop_reason] || s.stop_reason || ''}</p>`}
-    ${details('Ambiguos: ponles el tiempo a mano en Juegos → Editar (segundos)', s.ambiguous, (a) => html`
-      <div class="adm-amb"><strong>${a.name}</strong>
-        ${a.candidates.map((c) => html`<div class="adm-sub">${c.name}${c.year ? ` (${c.year})` : ''}: ${c.hours} h</div>`)}
-      </div>`)}
-    ${details('Sin resultado en HowLongToBeat', s.not_found, (n) => html`<div class="adm-sub">${n.name}</div>`)}
-    ${details('Encontrados, pero sin tiempo de historia principal', s.no_time, (n) => html`<div class="adm-sub">${n.name}</div>`)}
-    ${details('Errores', s.errors, (e) => html`<div class="adm-sub">${e.name}: ${e.error}</div>`)}
-    <div class="adm-actions">
-      ${running ? html`<button class="adm-btn danger" id="hlCancel">Cancelar sincronización</button>` : ''}
-      <button class="adm-btn" id="hlClose">${running ? 'Ocultar' : 'Cerrar'}</button>
-      ${running ? '' : html`<button class="adm-btn primary" id="hlAgain">Nueva sincronización</button>`}
-    </div>`;
+    ${running ? '' : html`<p class="adm-sub">${STOP_REASONS[s.stop_reason] || s.stop_reason || ''}</p>`}`;
 }
+
+/** What the run could not decide: redrawn only when it changes and never under an admin who has one open. */
+const listsView = (s) => html`
+  ${details('Ambiguos: ponles el tiempo a mano en Juegos → Editar (segundos)', s.ambiguous, (a) => html`
+    <div class="adm-amb"><strong>${a.name}</strong>
+      ${a.candidates.map((c) => html`<div class="adm-sub">${c.name}${c.year ? ` (${c.year})` : ''}: ${c.hours} h</div>`)}
+    </div>`)}
+  ${details('Sin resultado en HowLongToBeat', s.not_found, (n) => html`<div class="adm-sub">${n.name}</div>`)}
+  ${details('Encontrados, pero sin tiempo de historia principal', s.no_time, (n) => html`<div class="adm-sub">${n.name}</div>`)}
+  ${details('Errores', s.errors, (e) => html`<div class="adm-sub">${e.name}: ${e.error}</div>`)}`;
+
+const actionsView = (s) => html`
+  <div class="adm-actions">
+    ${s.state === 'running' ? html`<button class="adm-btn danger" id="hlCancel">Cancelar sincronización</button>` : ''}
+    <button class="adm-btn" id="hlClose">${s.state === 'running' ? 'Ocultar' : 'Cerrar'}</button>
+    ${s.state === 'running' ? '' : html`<button class="adm-btn primary" id="hlAgain">Nueva sincronización</button>`}
+  </div>`;
 
 function progress(onDone) {
   let timer = null;
+  let drawnLists = null; // the sizes of the lists on screen: they are redrawn only when one grows
+  let first = null; // where the run was at the first poll, to tell how fast it goes
   const m = openModal(html`
     ${modalHeader('Sincronización con HowLongToBeat')}
-    <div class="adm-body"><div class="loading-spinner">Cargando…</div></div>`, { wide: true, onClose: () => clearTimeout(timer) });
+    <div class="adm-body">
+      <div id="hlHead"><div class="loading-spinner">Cargando…</div></div>
+      <div id="hlLists"></div>
+      <div id="hlActions"></div>
+    </div>`, { wide: true, onClose: () => clearTimeout(timer) });
   const body = m.el.querySelector('.adm-body');
+  const part = (id) => body.querySelector(`#${id}`);
 
-  const draw = (s) => {
-    mount(body, progressView(s));
+  const draw = (s, { lists }) => {
+    first ||= { at: Date.now(), done: s.processed };
+    mount(part('hlHead'), headView(s, minutesLeft(first, s, Date.now())));
+    mount(part('hlActions'), actionsView(s));
+    const sizes = [s.ambiguous, s.not_found, s.no_time, s.errors].map((list) => list.length).join();
+    if (lists && sizes !== drawnLists) {
+      mount(part('hlLists'), listsView(s));
+      drawnLists = sizes;
+    }
     body.querySelector('#hlClose').addEventListener('click', () => m.close());
     // The last run stays on screen after it ends (its ambiguous games are still to be looked at), so a new one starts from here.
     body.querySelector('#hlAgain')?.addEventListener('click', () => {
@@ -120,9 +150,10 @@ function progress(onDone) {
     try {
       const s = await api('/manage/hltb-sync/status');
       if (!m.el.isConnected) return;
-      // don't re-render under the admin while they are reading the candidates
-      const reading = body.querySelector('.adm-details[open]');
-      if (!reading || s.state !== 'running') draw(s);
+      // The figures move every time; a list is not redrawn under the admin who is reading it (it would close it),
+      // but that must not stop the bar: it used to, and a run looked stuck until it was cancelled.
+      const reading = part('hlLists').querySelector('.adm-details[open]');
+      draw(s, { lists: !reading || s.state !== 'running' });
       if (s.state === 'running') {
         timer = setTimeout(tick, 2000);
       } else {
