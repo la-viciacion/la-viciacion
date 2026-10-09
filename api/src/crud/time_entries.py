@@ -385,15 +385,16 @@ def get_game_session_days(db: Session, user_id: int, game_id: str, season: int =
     ]
 
 
-def get_game_sessions(db: Session, user_id: int, game_id: str, until: datetime.date) -> list:
-    """The user's finished sessions of a game, of any season, that began on `until` or before, oldest first, as
-    (start, end, seconds) rows. What tells how long a game was left alone before being finished."""
+def get_game_sessions(db: Session, user_id: int, game_id: str, until: datetime.date, since: int | None = None) -> list:
+    """The user's finished sessions of a game that began on `until` or before (and, with `since`, in that season or
+    later), oldest first, as (start, end, seconds) rows. What tells how long a game was left alone before being finished."""
     sessions = sessions_subquery()
     return (
         db.query(sessions.c.start, sessions.c.end, sessions.c.duration)
         .filter(
             sessions.c.user_id == user_id,
             sessions.c.game_id == game_id,
+            sessions.c.season >= (since or 0),
             sessions.c.start < datetime.datetime.combine(until + datetime.timedelta(days=1), datetime.time.min),
         )
         .order_by(sessions.c.start)

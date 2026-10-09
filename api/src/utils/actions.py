@@ -63,7 +63,6 @@ async def check_user(
     await checks.early_riser(db, user, silent)
     await checks.nocturnal(db, user, silent)
     await checks.completed_in_a_day(db, user, silent)
-    await checks.rescued_games(db, user, silent)
     await checks.prodigal_son(db, user, played_days, silent)
     await checks.work_week(db, user, silent)
     await checks.saved_by_the_bell(db, user, silent)
@@ -93,6 +92,7 @@ async def check_user_lifetime(
         await view.weather(db, user, silent=silent)
         await view.archaeologist(db, user, silent=silent)
         await view.birth_year_game(db, user, silent=silent)
+        await view.rescued_games(db, user, silent=silent)
 
 
 async def check_users(

@@ -124,8 +124,9 @@ JUST_IN_TIME_TOLERANCE = 0.05
 ######################
 
 
-# "Rescate" and "Remate": days left alone before a game is picked up and finished, and the share of its average time
-# that the game had to be at (before coming back) for the second
+# "Rescate" and "Remate" (no season limit, like the others that end in _LIFETIME): days left alone before a game is
+# picked up and finished, and the share of its average time that the game had to be at (before coming back) for the second
+RESCUES_LIFETIME = (E.RESCUE_LIFETIME, E.FINISHING_TOUCH_LIFETIME)
 RESCUE_GAP_DAYS = 90
 FINISHING_TOUCH_SHARE = 0.8
 
@@ -601,21 +602,22 @@ class Achievements:
                 return
 
     async def rescued_games(self, db: Session, user: models.User, silent: bool = False):
-        """"Rescate": a game completed in the season after being left alone for 90 days or more, and "Remate": the
-        same when, before coming back, it was already past 80 % of its average time to complete. Each is dated the
+        """"Rescate": a game completed after being left alone for 90 days or more, and "Remate": the same when, before
+        coming back, it was already past 80 % of its average time to complete. They have no season limit: they look at
+        the whole history, but only from the season they start to count in (`since`), so neither the completions nor
+        the sessions that show the time alone and the progress before the comeback go further back. Each is dated the
         day of the earliest completion that deserves it, and names that game."""
-        mine = (AchievementsElems.RESCUE, AchievementsElems.FINISHING_TOUCH)
-        have = self.achieved_keys(db, user.id, [ach.name for ach in mine])
-        if len(have) == len(mine):
+        have = self.achieved_keys(db, user.id, [ach.name for ach in RESCUES_LIFETIME])
+        if len(have) == len(RESCUES_LIFETIME):
             return  # the common case costs one query
-        for day, game_id in users.completed_entries(db, user.id, self.season):
+        for day, game_id in users.completed_entries(db, user.id, self.season, self.since):
             game = games.get_game_by_id(db, game_id)
-            rescued, finishing = rescue_of(time_entries.get_game_sessions(db, user.id, game_id, day), game.avg_time if game else None)
-            for earned, ach in zip((rescued, finishing), mine):
+            rescued, finishing = rescue_of(time_entries.get_game_sessions(db, user.id, game_id, day, self.since), game.avg_time if game else None)
+            for earned, ach in zip((rescued, finishing), RESCUES_LIFETIME):
                 if earned and ach.name not in have:
                     await self._award(db, user, ach, silent, date=str(day), game_id=game_id)
                     have.add(ach.name)
-            if len(have) == len(mine):
+            if len(have) == len(RESCUES_LIFETIME):
                 return
 
     async def release_day(self, db: Session, user: models.User, silent: bool = False):

@@ -378,14 +378,14 @@ class AchievementsElems(Enum):
         "message": "*{}* vuelve a jugar tras 30 días (o más) sin tocar un mando. Se le echaba de menos, aunque algunos ni lo habían notado.",
     }
 
-    RESCUE = {
+    RESCUE_LIFETIME = {
         "since": 2027,
         "special": 2,
         "title": "Rescate",
         "message": "*{}* ha rescatado _{}_ del olvido: llevaba 90 días (o más) sin tocarlo y por fin lo ha terminado.",
     }
 
-    FINISHING_TOUCH = {
+    FINISHING_TOUCH_LIFETIME = {
         "since": 2027,
         "special": 3,
         "title": "Remate",

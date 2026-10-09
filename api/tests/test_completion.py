@@ -37,7 +37,7 @@ class AfterCompletionAvgTimeTests(unittest.IsolatedAsyncioTestCase):
         entry = types.SimpleNamespace(game_id="g", user_id=1, season=2026)
         update = mock.MagicMock()
         ach = mock.MagicMock(
-            just_in_time=mock.AsyncMock(), user_completed_total_games=mock.AsyncMock(), completed_in_a_day=mock.AsyncMock(), rescued_games=mock.AsyncMock(),
+            just_in_time=mock.AsyncMock(), user_completed_total_games=mock.AsyncMock(), completed_in_a_day=mock.AsyncMock(),
             lifetime_views=mock.MagicMock(return_value=[]),
         )
         with mock.patch.object(users.games, "get_game_by_id", return_value=game), \

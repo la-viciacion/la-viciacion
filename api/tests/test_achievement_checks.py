@@ -384,6 +384,9 @@ class AchievementCheckTests(unittest.IsolatedAsyncioTestCase):
         await self.ach.completed_in_a_day(self.db, USER)
         self.assertEqual(self.awarded(), {})
 
+    def lifetime_view(self):
+        return Achievements(season=seasons.ALL, since=2023)
+
     def returned_game(self, avg_time, before_minutes, completed=datetime.date(YEAR, 6, 12)):
         """A game played `before_minutes` in January, left alone until June and finished then."""
         self.db.query(models.Game).filter_by(id="g1").update({"avg_time": avg_time})
@@ -394,32 +397,32 @@ class AchievementCheckTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_a_game_finished_after_ninety_days_alone_is_a_rescue(self):
         self.returned_game(avg_time=100 * 3600, before_minutes=60)  # 1 % of the game: not a finishing touch
-        await self.ach.rescued_games(self.db, USER)
-        self.assertEqual(self.awarded(), {"RESCUE": (datetime.date(YEAR, 6, 12), "g1")})  # dated the completion, naming the game
+        await self.lifetime_view().rescued_games(self.db, USER)
+        self.assertEqual(self.awarded(), {"RESCUE_LIFETIME": (datetime.date(YEAR, 6, 12), "g1")})  # dated the completion, naming the game
         self.assertIn("Doom", self.message())
 
     async def test_coming_back_when_it_was_past_eighty_percent_is_also_a_finishing_touch(self):
         self.returned_game(avg_time=10 * 3600, before_minutes=8 * 60)  # exactly 80 %
-        await self.ach.rescued_games(self.db, USER)
-        self.assertEqual(set(self.awarded()), {"RESCUE", "FINISHING_TOUCH"})
+        await self.lifetime_view().rescued_games(self.db, USER)
+        self.assertEqual(set(self.awarded()), {"RESCUE_LIFETIME", "FINISHING_TOUCH_LIFETIME"})
         self.assertEqual(self.sent.await_count, 2)
 
     async def test_a_game_with_no_average_time_is_a_rescue_never_a_finishing_touch(self):
         self.returned_game(avg_time=0, before_minutes=600)
-        await self.ach.rescued_games(self.db, USER)
-        self.assertEqual(set(self.awarded()), {"RESCUE"})
+        await self.lifetime_view().rescued_games(self.db, USER)
+        self.assertEqual(set(self.awarded()), {"RESCUE_LIFETIME"})
 
     async def test_a_game_left_alone_for_less_than_ninety_days_is_neither(self):
         self.library_entry("g1", datetime.date(YEAR, 1, 10), completed=datetime.date(YEAR, 4, 12))
         self.db.commit()
         self.session_of(datetime.datetime(YEAR, 1, 10, 20), 120)
         self.session_of(datetime.datetime(YEAR, 4, 10, 20), 120)  # 89 days without a session
-        await self.ach.rescued_games(self.db, USER)
+        await self.lifetime_view().rescued_games(self.db, USER)
         self.assertEqual(self.awarded(), {})
 
     async def test_it_has_to_be_finished_after_coming_back(self):
         self.returned_game(avg_time=3600, before_minutes=60, completed=datetime.date(YEAR, 3, 1))  # completed before the comeback
-        await self.ach.rescued_games(self.db, USER)
+        await self.lifetime_view().rescued_games(self.db, USER)
         self.assertEqual(self.awarded(), {})
 
     async def test_the_time_alone_counts_across_the_year_change(self):
@@ -428,14 +431,14 @@ class AchievementCheckTests(unittest.IsolatedAsyncioTestCase):
         self.db.commit()
         self.session_of(datetime.datetime(YEAR - 1, 9, 1, 20), 120)
         self.session_of(datetime.datetime(YEAR, 2, 1, 20), 120)  # 153 days later, in the next season
-        await self.ach.rescued_games(self.db, USER)
-        self.assertEqual(set(self.awarded()), {"RESCUE"})
+        await self.lifetime_view().rescued_games(self.db, USER)
+        self.assertEqual(set(self.awarded()), {"RESCUE_LIFETIME"})
 
     async def test_each_is_earned_once_and_nothing_is_checked_again_when_both_are_had(self):
         self.returned_game(avg_time=10 * 3600, before_minutes=9 * 60)
-        await self.ach.rescued_games(self.db, USER)
-        await self.ach.rescued_games(self.db, USER)
-        self.assertEqual(sorted(self.awarded()), ["FINISHING_TOUCH", "RESCUE"])
+        await self.lifetime_view().rescued_games(self.db, USER)
+        await self.lifetime_view().rescued_games(self.db, USER)
+        self.assertEqual(sorted(self.awarded()), ["FINISHING_TOUCH_LIFETIME", "RESCUE_LIFETIME"])
         self.assertEqual(self.sent.await_count, 2)
 
     async def test_the_pure_rule_reads_the_gap_in_days_without_a_session(self):
@@ -763,10 +766,11 @@ class LifetimeTests(unittest.IsolatedAsyncioTestCase):
         )
         in_tables = {ach.name for table in tables for ach, _ in table}
         outside_world = {ach.name for ach in ach_module.EXTERNAL_LIFETIME}  # about when and what, not how much: no tables
+        rescues = {ach.name for ach in ach_module.RESCUES_LIFETIME}  # about what happened to a game, not how much: no tables
         by_name = {ach.name for ach in ach_module.AchievementsElems if is_lifetime(ach.name)}
-        self.assertEqual(in_tables | outside_world, by_name)  # a typo in the suffix would turn one into a seasonal one without a word
-        self.assertTrue(in_tables.isdisjoint(outside_world))
-        self.assertEqual((len(in_tables), len(outside_world)), (20, 15))
+        self.assertEqual(in_tables | outside_world | rescues, by_name)  # a typo in the suffix would turn one into a seasonal one without a word
+        self.assertTrue(in_tables.isdisjoint(outside_world | rescues) and outside_world.isdisjoint(rescues))
+        self.assertEqual((len(in_tables), len(outside_world), len(rescues)), (20, 15, 2))
         for table in tables:
             self.assertTrue(all(is_lifetime(ach.name) for ach, _ in table))
         for table in (ach_module.TOTAL_HOURS, ach_module.TOTAL_DAYS, ach_module.PLAYED_GAMES, ach_module.COMPLETED_GAMES, ach_module.HOURS_IN_A_GAME):
@@ -897,6 +901,59 @@ class LifetimeTests(unittest.IsolatedAsyncioTestCase):
         self.play(datetime.datetime(YEAR, 3, 1, 10), hours=600)
         await Achievements().user_played_total_time(self.db, USER)
         self.assertEqual(set(self.awarded()), {"PLAYED_100_HOURS", "PLAYED_200_HOURS", "PLAYED_500_HOURS"})
+
+    def long_history(self, year):
+        """A year of play that, read whole, would earn most of the lifetime ones: 130 days of 12 hours (hours, days and
+        1000 hours in a game, over the equinox and full moons), 105 games started and completed, a Star Wars game played
+        on the 4th of May and a game from 1995, all of it in `year`, and a game left alone and finished after 90 days."""
+        self.db.add_all([models.Game(id=f"x{n}", name=f"Game {n}") for n in range(105)])
+        self.db.add_all([
+            models.Game(id="jedi", name="Star Wars Jedi", release_date=datetime.date(1995, 1, 1), avg_time=10 * 3600),
+        ])
+        self.db.commit()
+        for day in range(130):
+            self.play(datetime.datetime(year, 1, 1, 8) + datetime.timedelta(days=day), hours=12)
+        self.play(datetime.datetime(year, 5, 4, 21), hours=1, game="jedi")
+        self.play(datetime.datetime(year, 9, 1, 10), hours=9, game="jedi")  # 9 of its 10 hours, then left alone
+        self.play(datetime.datetime(year, 12, 20, 10), hours=2, game="jedi")  # 108 days later
+        for n in range(105):
+            self.db.add(models.UserGame(user_id=1, game_id=f"x{n}", started_date=datetime.date(year, 1, 1), completed=1, completed_date=datetime.date(year, 1, 2)))
+        self.db.add(models.UserGame(user_id=1, game_id="jedi", started_date=datetime.date(year, 5, 4), completed=1, completed_date=datetime.date(year, 12, 21)))
+        self.db.commit()
+
+    async def test_nothing_older_than_the_season_each_one_starts_in_is_read(self):
+        """The rule for every achievement that collects history: if it starts in a season, what happened before is not
+        counted, whatever the family (hours, days, games, completions, a game's hours, the dates and the games of the
+        outside world, the rescues). The control, the same history with the achievements starting earlier, earns them."""
+        self.long_history(YEAR - 1)
+        self.db.query(models.Achievement).filter(models.Achievement.key.like("%\\_LIFETIME", escape="\\")).update({"valid_from_season": YEAR}, synchronize_session=False)
+        self.db.commit()
+        await actions.check_user_lifetime(self.db, USER)
+        self.assertEqual(self.awarded(), {})  # a year of history, none of it counts
+        self.db.query(models.Achievement).filter(models.Achievement.key.like("%\\_LIFETIME", escape="\\")).update({"valid_from_season": YEAR - 1}, synchronize_session=False)
+        self.db.commit()
+        await actions.check_user_lifetime(self.db, USER)
+        earned = set(self.awarded())
+        for key in ("PLAYED_100_DAYS_LIFETIME", "PLAYED_1000_HOURS_LIFETIME", "PLAYED_1000_HOURS_GAME_LIFETIME", "PLAYED_100_GAMES_LIFETIME",
+                    "COMPLETED_100_GAMES_LIFETIME", "STAR_WARS_DAY_LIFETIME", "ARCHAEOLOGIST_LIFETIME", "RESCUE_LIFETIME", "FINISHING_TOUCH_LIFETIME"):
+            self.assertIn(key, earned)
+
+    async def test_a_game_left_alone_and_finished_is_a_rescue_only_with_the_sessions_of_the_seasons_that_count(self):
+        # played in September last year, finished 5 months later: the gap is read only if last year counts
+        self.db.add(models.UserGame(user_id=1, game_id="g1", started_date=datetime.date(YEAR - 1, 9, 1)))
+        self.db.add(models.UserGame(user_id=1, game_id="g1", started_date=datetime.date(YEAR, 2, 1), completed=1, completed_date=datetime.date(YEAR, 2, 3)))
+        self.db.commit()
+        self.play(datetime.datetime(YEAR - 1, 9, 1, 20), hours=2)
+        self.play(datetime.datetime(YEAR, 2, 1, 20), hours=2)
+        rows = lambda season: self.db.query(models.Achievement).filter(models.Achievement.key.in_(("RESCUE_LIFETIME", "FINISHING_TOUCH_LIFETIME"))).update({"valid_from_season": season}, synchronize_session=False)  # noqa: E731
+        rows(YEAR)
+        self.db.commit()
+        await Achievements(season=seasons.ALL, since=YEAR).rescued_games(self.db, USER)
+        self.assertEqual(self.awarded(), {})  # last year's session is not read, so there is no gap to see
+        rows(YEAR - 1)
+        self.db.commit()
+        await Achievements(season=seasons.ALL, since=YEAR - 1).rescued_games(self.db, USER)
+        self.assertEqual(set(self.awarded()), {"RESCUE_LIFETIME"})
 
     async def test_the_orchestration_runs_the_lifetime_checks_too(self):
         self.play(datetime.datetime(YEAR - 1, 3, 1, 10), hours=400)

@@ -804,8 +804,8 @@ async def after_completion(db: Session, entry: models.UserGame, silent: bool):
     await achievements.user_completed_total_games(db, user, silent=silent)
     for view in achievements.lifetime_views(db):
         await view.user_completed_total_games(db, user, silent=silent)
+        await view.rescued_games(db, user, silent=silent)
     await achievements.completed_in_a_day(db, user, silent=silent)
-    await achievements.rescued_games(db, user, silent=silent)
 
     message = completion_message(user.name, count_completed_games(db, user.id, entry.season), game.name, completion_time, avg_time)
     logger.info(message)
