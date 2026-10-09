@@ -55,6 +55,22 @@ def get_player(
     return found
 
 
+@router.get("/releases")
+def get_releases(
+    month: str | None = Query(None, pattern=r"^\d{4}-(0[1-9]|1[0-2])$", description="A month, YYYY-MM; default: the running one"),
+    current_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """The release calendar: the games the group wants that come out in the month, from every player's wishlist
+    (readable by every logged-in user on purpose: it is what the group is waiting for), and the ones with no date.
+    A month already over is a 400. Derived; only the wishes are stored."""
+    today = datetime.date.today()
+    year, number = (today.year, today.month) if month is None else (int(month[:4]), int(month[5:]))
+    if (year, number) < (today.year, today.month):
+        raise HTTPException(status_code=400, detail="Ese mes ya ha pasado")
+    return wishlist.releases(db, current_user.id, year, number, today)
+
+
 @router.get("/wishlist")
 def get_wishlist(
     current_user: models.User = Depends(auth.get_current_active_user),

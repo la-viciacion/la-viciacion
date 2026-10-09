@@ -103,6 +103,53 @@ def wishlist(db: Session, viewer_id: int, today: datetime.date) -> dict:
     return {"upcoming": upcoming, "wanted": wanted}
 
 
+def month_bounds(year: int, month: int) -> tuple[datetime.date, datetime.date]:
+    """First and last day of a month."""
+    first = datetime.date(year, month, 1)
+    following = datetime.date(year + (month == 12), month % 12 + 1, 1)
+    return first, following - datetime.timedelta(days=1)
+
+
+def releases(db: Session, viewer_id: int, year: int, month: int, today: datetime.date) -> dict:
+    """The release calendar of the group: the games anybody wants and does not have yet that come out in the month
+    (from today on: what is out is not a release any more), by date, and apart the ones with no date yet. Each
+    comes with everybody who wants it, the viewer included (`is_me`). Derived; only the wishes are stored."""
+    first, last = month_bounds(year, month)
+    first = max(first, today)
+    wished = (
+        db.query(models.UserWishlist.game_id)
+        .join(models.User, models.UserWishlist.user_id == models.User.id)
+        .filter(models.User.is_active == 1, models.not_god(), _pending())
+    )
+    rows = (
+        db.query(models.Game)
+        .filter(
+            models.Game.id.in_(wished),
+            (models.Game.release_date.is_(None)) | models.Game.release_date.between(first, last),
+        )
+        .all()
+    )
+    everyone = wanters(db, [game.id for game in rows])
+    items = [
+        {
+            "id": game.id,
+            "name": game.name,
+            "image_url": game.image_url,
+            "genres": games.genre_list(game.genres),
+            "release_date": game.release_date,
+            "days_until": days_until(game.release_date, today),
+            "wanted_by": [{**w, "is_me": w["user_id"] == viewer_id} for w in everyone.get(game.id, [])],
+        }
+        for game in rows
+    ]
+    items.sort(key=lambda g: (g["release_date"] or datetime.date.max, (g["name"] or "").lower()))
+    return {
+        "month": f"{year:04d}-{month:02d}",
+        "releases": [g for g in items if g["release_date"]],
+        "undated": [g for g in items if not g["release_date"]],
+    }
+
+
 def to_refresh(db: Session, today: datetime.date) -> list[models.Game]:
     """Games somebody is waiting for whose release date may still change: not released (or releasing today) and
     known to RAWG, which is where a date is refreshed from."""
