@@ -1,6 +1,7 @@
-// HowLongToBeat sync UI: the average time to complete of every game.
-// It replaces the stored times, so launching it takes an explicit step with a typed phrase
-// (the API enforces the phrase too). It spends no quota, so there are no options.
+// HowLongToBeat sync UI: the average time to complete of the games.
+// It replaces the stored times of the games it goes through, so launching it takes an explicit step with a typed phrase
+// (the API enforces the phrase too). It spends no quota, but each game takes about 5 s, so the admin chooses which
+// games to go through: all of them, the ones with no time, the ones whose time is not believable, or the most recent.
 import { api, jsonRequest } from '../../lib/api.js';
 import { html, mount } from '../../lib/html.js';
 import { modalHeader, openModal } from '../../ui/modal.js';
@@ -13,6 +14,19 @@ const STOP_REASONS = {
   cancelled: 'Cancelada manualmente.',
   errors: 'Detenida por errores consecutivos de HowLongToBeat. Prueba de nuevo más tarde.',
 };
+export const SCOPES = [
+  ['all', 'Todos los juegos'],
+  ['missing', 'Solo los que no tienen tiempo'],
+  ['suspicious', 'Solo los que tienen un tiempo dudoso (más de 1.000 h)'],
+  ['recent', 'Los jugados más recientemente'],
+];
+const DEFAULT_RECENT = 50;
+const OVERWRITES = {
+  all: 'Pisa los tiempos que ya hay, también los editados a mano: HowLongToBeat manda.',
+  missing: 'Solo rellena juegos sin tiempo: no pisa ninguno.',
+  suspicious: 'Pisa esos tiempos tan grandes con los de HowLongToBeat (si lo encuentra con claridad).',
+  recent: 'Pisa los tiempos de esos juegos, también los editados a mano: HowLongToBeat manda.',
+};
 
 /** Entry point. onDone() runs when a sync finishes so the admin can refresh its data. */
 export async function hltbSyncFlow({ onDone }) {
@@ -22,17 +36,28 @@ export async function hltbSyncFlow({ onDone }) {
   return confirmStep(onDone);
 }
 
+const estimateStats = (est) => html`
+  ${statTile('juegos a procesar', est.total_games)}
+  ${statTile('duración aproximada (min)', Math.max(1, Math.ceil(est.estimated_seconds / 60)))}`;
+
+/** What the form asks for, as the API takes it ({ scope, limit? }), or null while the number of recent games is not valid. */
+export function scopeOf(scope, limitText) {
+  if (scope !== 'recent') return { scope };
+  const limit = Number(limitText);
+  return Number.isInteger(limit) && limit >= 1 ? { scope, limit } : null;
+}
+
 async function confirmStep(onDone) {
-  const est = await api('/manage/hltb-sync/estimate');
   const m = openModal(html`
     ${modalHeader('Sincronizar tiempos con HowLongToBeat')}
     <form class="adm-form" novalidate>
-      <p class="adm-sub">Busca cada juego en HowLongToBeat y guarda el tiempo medio para completarlo (la historia principal). Solo se aceptan coincidencias claras por nombre; las dudosas se listan al terminar, con sus horas, y no se tocan.</p>
-      <div class="adm-stats adm-stats-sm">
-        ${statTile('juegos a procesar', est.total_games)}
-        ${statTile('duración aproximada (min)', Math.max(1, Math.ceil(est.estimated_seconds / 60)))}
-      </div>
-      <div class="adm-warn"><strong>Pisa los tiempos que ya hay</strong>, también los editados a mano: HowLongToBeat manda. Un juego sin tiempo allí conserva el suyo. La deuda y «Justo a tiempo» se calculan con estos tiempos.</div>
+      <p class="adm-sub">Busca cada juego en HowLongToBeat y guarda el tiempo medio para completarlo (la historia principal). Solo se aceptan coincidencias claras por nombre; las dudosas se listan al terminar, con sus horas, y no se tocan. Cada juego tarda unos 5 segundos: elige qué juegos revisar.</p>
+      <label>Juegos<select class="adm-input" name="scope">
+        ${SCOPES.map(([value, label]) => html`<option value="${value}">${label}</option>`)}
+      </select></label>
+      <label data-for="recent" hidden>¿Cuántos?<input class="adm-input" type="number" name="limit" min="1" step="1" value="${DEFAULT_RECENT}" /></label>
+      <div class="adm-stats adm-stats-sm" id="hlEstimate"></div>
+      <div class="adm-warn"><strong id="hlWarn"></strong> Un juego sin tiempo allí conserva el suyo. La deuda y «Justo a tiempo» se calculan con estos tiempos.</div>
       <label>Escribe <strong>${SYNC_PHRASE}</strong> para habilitar el botón<input class="adm-input" name="phrase" autocomplete="off" /></label>
       <div class="adm-error" role="alert"></div>
       <div class="adm-actions">
@@ -42,23 +67,50 @@ async function confirmStep(onDone) {
     </form>`, { wide: true });
 
   const form = m.el.querySelector('form');
+  const el = form.elements;
   const go = form.querySelector('button[type=submit]');
-  const typedOk = () => form.phrase.value.trim() === SYNC_PHRASE;
-  form.phrase.addEventListener('input', () => { go.disabled = !typedOk(); });
+  const error = form.querySelector('.adm-error');
+  const typedOk = () => el.phrase.value.trim() === SYNC_PHRASE;
+  const chosen = () => scopeOf(el.scope.value, el.limit.value);
+
+  // The figures follow the choice: how many games it is and how long it takes (the API answers without asking HLTB).
+  const refresh = async () => {
+    form.querySelector('[data-for="recent"]').hidden = el.scope.value !== 'recent';
+    form.querySelector('#hlWarn').textContent = OVERWRITES[el.scope.value];
+    const picked = chosen();
+    if (!picked) {
+      error.textContent = 'El número de juegos debe ser un entero de 1 en adelante';
+      go.disabled = true;
+      return;
+    }
+    error.textContent = '';
+    go.disabled = !typedOk();
+    try {
+      const params = new URLSearchParams(Object.entries(picked).map(([key, value]) => [key, String(value)]));
+      mount(form.querySelector('#hlEstimate'), estimateStats(await api(`/manage/hltb-sync/estimate?${params}`)));
+    } catch (err) {
+      error.textContent = err.message;
+    }
+  };
+  el.scope.addEventListener('change', refresh);
+  el.limit.addEventListener('change', refresh);
+  el.phrase.addEventListener('input', () => { go.disabled = !typedOk() || !chosen(); });
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    if (!typedOk()) return;
+    const picked = chosen();
+    if (!typedOk() || !picked) return;
     go.disabled = true;
     try {
-      await api('/manage/hltb-sync/start', jsonRequest('POST', { confirm: SYNC_PHRASE }));
+      await api('/manage/hltb-sync/start', jsonRequest('POST', { confirm: SYNC_PHRASE, ...picked }));
       m.close();
       progress(onDone);
     } catch (err) {
-      form.querySelector('.adm-error').textContent = err.message;
+      error.textContent = err.message;
       go.disabled = false;
     }
   });
-  form.phrase.focus();
+  await refresh();
+  el.phrase.focus();
 }
 
 const details = (title, items, row) => (items.length
