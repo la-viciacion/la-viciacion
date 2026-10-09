@@ -8,7 +8,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..database import models
-from . import time_entries, users
+from . import affinity, time_entries, users
 from .achievement_progress import Progress
 from ..utils.achievements import is_lifetime  # after the crud modules: they import each other
 from ..utils import seasons
@@ -197,4 +197,6 @@ def player_profile(db: Session, viewer_id: int, player_id: int, season=None) -> 
         "playing": _playing_now(db, viewer_id).get(user.id),
         "is_active": bool(user.is_active),
         "is_me": user.id == viewer_id,
+        # how alike your taste and theirs are (every season, whatever the one on screen); none for yourself
+        "affinity": None if user.id == viewer_id else affinity.between(db, viewer_id, user.id),
     }

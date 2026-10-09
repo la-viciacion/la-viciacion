@@ -328,9 +328,23 @@ class PlayersTests(ApiTestCase):
         self.assertEqual(body["stats"]["played_time"], 5400)
         self.assertEqual([(g["game_name"], g["score"]) for g in body["top_games"]], [("Celeste", 77)])
         self.assertEqual(body["is_me"], False)
-        self.assertEqual(set(body), {"user", "season", "seasons", "stats", "top_games", "achievements", "playing", "is_active", "is_me"})
+        self.assertEqual(set(body), {"user", "season", "seasons", "stats", "top_games", "achievements", "playing", "is_active", "is_me", "affinity"})
         self.assertNotIn("111", str(body))  # the Telegram id
         self.assertNotIn("example.com", str(body))  # the email
+
+    def test_the_page_of_another_player_says_how_alike_the_taste_is_and_your_own_does_not(self):
+        self.game("tetris", "Tetris")
+        for game in ("celeste", "hades", "tetris"):
+            for user in (self.ana, self.bea):
+                self.library_entry(user, game, TODAY(), "pc")
+        with database.SessionLocal() as db:
+            db.add_all([models.GameScore(user_id=self.ana, game_id="hades", score=80), models.GameScore(user_id=self.bea, game_id="hades", score=80)])
+            db.commit()
+        mine = self.api("GET", f"/group/players/{self.bea}", as_user="ana").json()["affinity"]
+        self.assertEqual((mine["shared_games"], mine["shared_rated"], mine["percent"]), (3, 1, 100))  # the same library and the same rating
+        self.assertEqual(self.api("GET", f"/group/players/{self.bea}", as_user="bea").json()["affinity"], None)
+        few = self.api("GET", f"/group/players/{self.gone}", as_user="ana").json()["affinity"]
+        self.assertEqual((few["percent"], few["shared_games"]), (None, 0))  # not enough in common
 
     def test_a_season_or_all_of_them_and_the_limits_of_the_parameter(self):
         self.session(self.ana, "celeste", datetime.datetime.now() - timedelta(hours=3), 60)
