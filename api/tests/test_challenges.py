@@ -164,5 +164,37 @@ class ThemedTests(unittest.TestCase):
         self.assertEqual(template.reached(with_total, progress), "Entre todos habéis llegado a los 5 juegos completados de Horror. 2 de 2 ya habéis cumplido vuestra parte.")
 
 
+class DebtReductionTests(unittest.TestCase):
+    START = {"a": 10 * 3600, "b": 5 * 3600, "c": 0}  # what was left of each open game when it began
+
+    def result(self, params, played=None, completed=()):
+        return challenges.debt_reduction_result(1, "Ana", params, self.START, played or {}, set(completed))["players"][0]
+
+    def test_playing_pays_what_was_played_up_to_what_was_left(self):
+        part = self.result({"mode": "percent", "percent": 50}, {"a": 3 * 3600, "b": 9 * 3600})
+        self.assertEqual((part["paid_seconds"], part["initial_seconds"], part["percent"], part["done"]), (8 * 3600, 15 * 3600, 53.3, True))
+
+    def test_completing_pays_all_that_was_left_and_a_game_played_but_not_in_the_debt_pays_nothing(self):
+        part = self.result({"mode": "percent", "percent": 10}, {"zzz": 99 * 3600}, completed={"a"})
+        self.assertEqual((part["paid_seconds"], part["done"]), (10 * 3600, True))
+        self.assertEqual(self.result({"mode": "percent", "percent": 10}, {"zzz": 99 * 3600})["paid_seconds"], 0)
+
+    def test_the_target_is_reached_exactly_at_the_percentage(self):
+        self.assertTrue(self.result({"mode": "percent", "percent": 20}, {"a": 3 * 3600})["done"])  # 3 of 15 h
+        self.assertFalse(self.result({"mode": "percent", "percent": 20}, {"a": 3 * 3600 - 1})["done"])
+
+    def test_nothing_owed_is_never_done(self):
+        part = challenges.debt_reduction_result(1, "Ana", {"mode": "percent", "percent": 1}, {"a": 0}, {}, set())["players"][0]
+        self.assertEqual((part["percent"], part["done"]), (0.0, False))
+
+    def test_closing_counts_the_completed_games_that_were_open(self):
+        part = self.result({"mode": "games", "games": 2}, completed={"a", "c", "new"})
+        self.assertEqual((part["count"], part["target_count"], part["done"]), (2, 2, True))
+        self.assertFalse(self.result({"mode": "games", "games": 2}, completed={"a", "new"})["done"])
+
+    def test_nobody_taking_part_has_no_progress(self):
+        self.assertEqual(challenges.debt_reduction_result(None, "", {"mode": "games", "games": 1}, {}, {}, set()), {"players": []})
+
+
 if __name__ == "__main__":
     unittest.main()
