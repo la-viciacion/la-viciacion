@@ -15,7 +15,7 @@ import unicodedata
 from difflib import SequenceMatcher
 
 from howlongtobeatpy import HowLongToBeat
-from sqlalchemy import func
+from sqlalchemy import func, or_
 
 from ..database import models
 from ..database.database import SessionLocal
@@ -131,8 +131,42 @@ def best_entry(name: str, year: int | None, entries):
 # ── public API ──────────────────────────────────────────────────
 
 
-def estimate(db) -> dict:
-    total = db.query(func.count(models.Game.id)).scalar()
+# Which games a run goes through. "all"; "missing": the ones with no time (none stored, or 0); "suspicious": the ones
+# whose time is not believable (more than IMPLAUSIBLE_SECONDS: a time stored 3600 times too big is far above it);
+# "recent": the `limit` games played most recently by anybody.
+SCOPES = ("all", "missing", "suspicious", "recent")
+IMPLAUSIBLE_SECONDS = 1000 * 3600
+MAX_LIMIT = 5000
+
+
+def check_scope(scope: str, limit: int | None) -> None:
+    """Raises ValueError (a message for the admin) if the scope or the limit make no sense."""
+    if scope not in SCOPES:
+        raise ValueError("Elige qué juegos sincronizar")
+    if scope == "recent" and not (limit is not None and 1 <= limit <= MAX_LIMIT):
+        raise ValueError(f"Los juegos más recientes deben ser entre 1 y {MAX_LIMIT}")
+
+
+def select_games(db, scope: str = "all", limit: int | None = None) -> list[models.Game]:
+    """The games of a run in the order it goes through them: the most played first (so a cancelled run covers what
+    matters), or the most recently played first for "recent"."""
+    check_scope(scope, limit)
+    query = db.query(models.Game)
+    if scope == "missing":
+        query = query.filter(or_(models.Game.avg_time.is_(None), models.Game.avg_time == 0))
+    elif scope == "suspicious":
+        query = query.filter(models.Game.avg_time > IMPLAUSIBLE_SECONDS)
+    games = query.all()
+    if scope == "recent":
+        last = dict(db.query(models.GameTimer.game_id, func.max(models.GameTimer.start_time)).group_by(models.GameTimer.game_id).all())
+        played = [game for game in games if game.id in last]  # a game nobody has played is not among the recent ones
+        return sorted(played, key=lambda g: (last[g.id], g.id), reverse=True)[:limit]
+    sessions = dict(db.query(models.GameTimer.game_id, func.count(models.GameTimer.id)).group_by(models.GameTimer.game_id).all())
+    return sorted(games, key=lambda g: (-sessions.get(g.id, 0), g.name.casefold()))
+
+
+def estimate(db, scope: str = "all", limit: int | None = None) -> dict:
+    total = len(select_games(db, scope, limit))
     return {"total_games": total, "estimated_seconds": int(total * (THROTTLE_SECONDS + SEARCH_SECONDS))}
 
 
@@ -149,8 +183,10 @@ def cancel() -> bool:
     return running
 
 
-def start() -> bool:
-    """Launch the background run. False if one is already running."""
+def start(scope: str = "all", limit: int | None = None) -> bool:
+    """Launch the background run over the games of `scope` (see `select_games`). False if one is already running;
+    ValueError if the scope or the limit are not valid."""
+    check_scope(scope, limit)
     with _lock:
         if _status.get("state") == "running":
             return False
@@ -160,6 +196,8 @@ def start() -> bool:
             state="running",
             started_at=datetime.datetime.now().isoformat(timespec="seconds"),
             finished_at=None,
+            scope=scope,
+            limit=limit,
             total=0,
             processed=0,
             current=None,
@@ -171,7 +209,7 @@ def start() -> bool:
             no_time=[],
             errors=[],
         )
-    threading.Thread(target=_run, daemon=True).start()
+    threading.Thread(target=_run, args=(scope, limit), daemon=True).start()
     return True
 
 
@@ -202,15 +240,11 @@ def _search(game: models.Game):
     return results
 
 
-def _run():
+def _run(scope: str = "all", limit: int | None = None):
     db = SessionLocal()
     reason = "completed"
     try:
-        # Most-played games first, so a cancelled run still covers what matters.
-        sessions = dict(
-            db.query(models.GameTimer.game_id, func.count(models.GameTimer.id)).group_by(models.GameTimer.game_id).all()
-        )
-        games = sorted(db.query(models.Game).all(), key=lambda g: (-sessions.get(g.id, 0), g.name.casefold()))
+        games = select_games(db, scope, limit)
         _set(total=len(games))
         consecutive_errors = 0
         for game in games:

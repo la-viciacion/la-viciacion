@@ -1,6 +1,7 @@
 """The bulk sync of the average times against HowLongToBeat (MariaDB required, see api_support.py). HowLongToBeat is a
 fake, the throttling sleeps are skipped and the background thread runs in the test, so a whole sync is one call to
 `start()` followed by a look at `status()`."""
+import datetime
 from types import SimpleNamespace
 from unittest import mock
 
@@ -32,11 +33,11 @@ class FakeHowLongToBeat:
 class SameThread:
     """Runs the sync inside `start()`, so the test sees the finished status."""
 
-    def __init__(self, target, daemon):
-        self.target = target
+    def __init__(self, target, args=(), daemon=None):
+        self.target, self.args = target, args
 
     def start(self):
-        self.target()
+        self.target(*self.args)
 
 
 class HltbSyncTestCase(ApiTestCase):
@@ -53,8 +54,8 @@ class HltbSyncTestCase(ApiTestCase):
             patcher.start()
             self.addCleanup(patcher.stop)
 
-    def sync(self):
-        self.assertTrue(hltb_sync.start())
+    def sync(self, scope="all", limit=None):
+        self.assertTrue(hltb_sync.start(scope, limit))
         return hltb_sync.status()
 
     def avg_time(self, game_id):
@@ -169,9 +170,96 @@ class SyncRoutesTests(HltbSyncTestCase):
         with mock.patch.object(hltb_sync, "start", return_value=False):
             self.assertEqual(self.admin("POST", "/hltb-sync/start", json={"confirm": "SINCRONIZAR"}).status_code, 409)
 
+    def test_the_scope_and_the_limit_reach_the_run_and_a_bad_one_is_refused(self):
+        with mock.patch.object(hltb_sync, "start", return_value=True) as start, mock.patch.object(hltb_sync, "status", return_value={"state": "running"}):
+            self.admin("POST", "/hltb-sync/start", json={"confirm": "SINCRONIZAR", "scope": "recent", "limit": 25})
+            start.assert_called_once_with("recent", 25)
+            start.reset_mock()
+            self.admin("POST", "/hltb-sync/start", json={"confirm": "SINCRONIZAR"})
+            start.assert_called_once_with("all", None)
+        for body in ({"scope": "some"}, {"scope": "recent"}, {"scope": "recent", "limit": 0}):
+            response = self.admin("POST", "/hltb-sync/start", json={"confirm": "SINCRONIZAR", **body})
+            self.assertEqual(response.status_code, 400, body)
+        self.assertEqual(hltb_sync.status()["state"], "idle")
+
+    def test_the_estimate_follows_the_scope(self):
+        self.game("a", "A", avg_time=0)
+        self.game("b", "B", avg_time=36000)
+        self.assertEqual(self.admin("GET", "/hltb-sync/estimate").json()["total_games"], 2)
+        self.assertEqual(self.admin("GET", "/hltb-sync/estimate", params={"scope": "missing"}).json()["total_games"], 1)
+        self.assertEqual(self.admin("GET", "/hltb-sync/estimate", params={"scope": "recent", "limit": 5}).json()["total_games"], 0)
+        self.assertEqual(self.admin("GET", "/hltb-sync/estimate", params={"scope": "recent"}).status_code, 400)
+
     def test_a_started_run_returns_its_status_and_can_be_cancelled(self):
         with mock.patch.object(hltb_sync, "start", return_value=True), mock.patch.object(hltb_sync, "status", return_value={"state": "running"}):
             response = self.admin("POST", "/hltb-sync/start", json={"confirm": "SINCRONIZAR"})
         self.assertEqual((response.status_code, response.json()), (202, {"state": "running"}))
         with mock.patch.object(hltb_sync, "cancel", return_value=True):
             self.assertEqual(self.admin("POST", "/hltb-sync/cancel").json(), {"cancelling": True})
+
+
+class ScopeTests(HltbSyncTestCase):
+    def setUp(self):
+        super().setUp()
+        patcher = mock.patch.object(hltb_sync.threading, "Thread", new=SameThread)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.ana = self.user("ana")
+        self.game("none", "No time", avg_time=None)
+        self.game("zero", "Zero time", avg_time=0)
+        self.game("fine", "Fine time", avg_time=36000)
+        self.game("huge", "Huge time", avg_time=1210233600)  # a time stored 3600 times too big
+        self.game("wow", "World of Warcraft", avg_time=1760987)  # 489 hours: big, but believable
+        for name in ("none", "zero", "fine", "huge", "wow"):
+            FakeHowLongToBeat.answers[game_name(name)] = [entry(game_name(name), 7200)]
+
+    def searched(self):
+        return [name.lower() for name in FakeHowLongToBeat.searched]
+
+    def test_only_the_games_with_no_time_when_asked(self):
+        status = self.sync("missing")
+        self.assertEqual(sorted(self.searched()), ["no time", "zero time"])
+        self.assertEqual((status["total"], status["scope"], status["updated"]), (2, "missing", 2))
+        self.assertEqual((self.avg_time("fine"), self.avg_time("huge")), (36000, 1210233600))  # the others are left alone
+
+    def test_only_the_times_that_are_not_believable_when_asked(self):
+        self.sync("suspicious")
+        self.assertEqual(self.searched(), ["huge time"])  # 489 hours is not suspicious: HLTB does have such games
+        self.assertEqual(self.avg_time("huge"), 7200)
+
+    def test_the_games_played_most_recently_first_and_only_the_limit_of_them(self):
+        now = datetime.datetime(2026, 6, 17, 12)
+        self.session(self.ana, "fine", now - datetime.timedelta(days=9), 30)
+        self.session(self.ana, "huge", now - datetime.timedelta(days=1), 30)
+        self.session(self.ana, "wow", now - datetime.timedelta(days=5), 30)
+        status = self.sync("recent", 2)
+        self.assertEqual(self.searched(), ["huge time", "world of warcraft"])  # the latest first; "none" and "zero" were never played
+        self.assertEqual((status["total"], status["limit"]), (2, 2))
+
+    def test_the_latest_session_of_anybody_counts_for_a_game(self):
+        bea = self.user("bea")
+        now = datetime.datetime(2026, 6, 17, 12)
+        self.session(self.ana, "fine", now - datetime.timedelta(days=30), 30)
+        self.session(bea, "fine", now - datetime.timedelta(days=1), 30)
+        self.session(self.ana, "wow", now - datetime.timedelta(days=5), 30)
+        self.sync("recent", 1)
+        self.assertEqual(self.searched(), ["fine time"])
+
+    def test_the_default_is_every_game(self):
+        self.sync()
+        self.assertEqual(len(self.searched()), 5)
+
+    def test_a_scope_that_does_not_exist_or_a_limit_that_makes_no_sense_is_refused(self):
+        for scope, limit in (("some", None), ("recent", None), ("recent", 0), ("recent", hltb_sync.MAX_LIMIT + 1)):
+            with self.assertRaises(ValueError, msg=(scope, limit)):
+                hltb_sync.start(scope, limit)
+        self.assertEqual(hltb_sync.status()["state"], "idle")
+
+    def test_the_estimate_counts_the_games_of_the_scope(self):
+        with database.SessionLocal() as db:
+            counts = {scope: hltb_sync.estimate(db, scope, 3)["total_games"] for scope in hltb_sync.SCOPES}
+        self.assertEqual(counts, {"all": 5, "missing": 2, "suspicious": 1, "recent": 0})  # nothing has been played yet
+
+
+def game_name(game_id):
+    return {"none": "No time", "zero": "Zero time", "fine": "Fine time", "huge": "Huge time", "wow": "World of Warcraft"}[game_id].lower()

@@ -578,13 +578,18 @@ def rawg_sync_apply(body: RawgApplyBody, db: Session = Depends(get_db)):
 
 
 class HltbSyncBody(BaseModel):
-    confirm: str                       # must equal RAWG_SYNC_PHRASE too: it replaces the time of every game
+    confirm: str                       # must equal RAWG_SYNC_PHRASE too: it replaces the time of every game it goes through
+    scope: str = "all"                 # "all", "missing", "suspicious" or "recent" (see utils/hltb_sync.py)
+    limit: Optional[int] = None        # "recent": how many of the games played most recently
 
 
 @router.get("/hltb-sync/estimate")
-def hltb_sync_estimate(db: Session = Depends(get_db)):
-    """How many games and how long a sync would take. Makes no HLTB request."""
-    return hltb_sync.estimate(db)
+def hltb_sync_estimate(scope: str = "all", limit: Optional[int] = None, db: Session = Depends(get_db)):
+    """How many games and how long a sync of those would take. Makes no HLTB request."""
+    try:
+        return hltb_sync.estimate(db, scope, limit)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/hltb-sync/status")
@@ -596,7 +601,11 @@ def hltb_sync_status():
 def hltb_sync_start(body: HltbSyncBody):
     if body.confirm != RAWG_SYNC_PHRASE:
         raise HTTPException(status_code=400, detail="Confirmación incorrecta")
-    if not hltb_sync.start():
+    try:
+        started = hltb_sync.start(body.scope, body.limit)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    if not started:
         raise HTTPException(status_code=409, detail="Ya hay una sincronización en curso")
     return hltb_sync.status()
 
