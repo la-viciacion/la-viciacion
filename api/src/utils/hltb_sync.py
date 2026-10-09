@@ -31,9 +31,10 @@ MIN_CONFIDENT = 0.9              # similarity a name must reach to be matched wi
 MIN_LEAD = 0.05                  # ...and how far ahead of the runner-up it has to be
 MIN_CANDIDATE = 0.6              # below this a result is not worth showing as a candidate
 MAX_CANDIDATES = 5
-# HLTB files online-only games (Helldivers 2) as "multi" and games without an end (The Sims 4) as "endless":
-# they are still the game, unlike a "dlc" or a "mod"
-GAME_TYPES = ("game", "multi", "endless")
+# What HLTB's entries are besides a game: expansions, fan mods and ROM hacks share (or contain) the name of the game
+# they hang from, and their times are not its own. Anything else is the game: "multi" (online only, Helldivers 2),
+# "endless" (The Sims 4), "compil"... so a type HLTB makes up tomorrow does not leave games out.
+NOT_THE_GAME = ("dlc", "mod", "hack")
 
 _lock = threading.Lock()
 _cancel = threading.Event()
@@ -111,15 +112,17 @@ def candidates(entries) -> list[dict]:
 
 def pick(name: str, year: int | None, found: list[dict]) -> tuple[str, list[dict]]:
     """('match', [the one]) when the result is clear, ('ambiguous', [candidates]) when a person should decide,
-    ('not_found', []) when nothing looks like the game. DLCs, mods and the like are never the game.
+    ('not_found', []) when nothing looks like the game. DLCs, mods and ROM hacks are never the game.
 
     An exact name (accents, case, punctuation and a leading "The" aside) wins; several of them are told apart by
     the release year. Without one, the closest name wins only if it is very close and clearly ahead of the next."""
-    games = [c for c in found if c["type"] in (None, *GAME_TYPES)]
+    games = [c for c in found if c["type"] not in NOT_THE_GAME]
     scored = sorted(((_similarity(name, c), c) for c in games), key=lambda pair: -pair[0])
     exact = [c for score, c in scored if score == 1.0]
     if len(exact) > 1 and year:
         exact = [c for c in exact if c["year"] == year] or exact
+    if len(exact) > 1:
+        exact = [c for c in exact if c["type"] == "game"] or exact  # a plain game before a compilation or a port of the same name
     if len(exact) == 1:
         return "match", exact
     if exact:

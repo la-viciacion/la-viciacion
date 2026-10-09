@@ -45,6 +45,18 @@ class PickTests(unittest.TestCase):
         self.assertNotEqual(pick("UFC 5", [result("EA Sports UFC 4")])[0], "match")
         self.assertNotEqual(pick("UFC 5", [result("EA Sports UFC 5"), result("Fight UFC 5")])[0], "match")  # two to choose from
 
+    def test_any_type_but_the_ones_that_hang_from_a_game_is_the_game(self):
+        for kind in ("multi", "endless", "compil", "a-type-hltb-has-not-invented-yet"):
+            self.assertEqual(pick("Some Game", [result("Some Game", kind=kind)]), ("match", ["Some Game"]), kind)
+
+    def test_mods_and_hacks_never_match(self):
+        for kind in ("mod", "hack"):
+            self.assertEqual(pick("Super Mario 64", [result("Super Mario 64", kind=kind)]), ("not_found", []), kind)
+
+    def test_a_plain_game_comes_before_a_compilation_of_the_same_name(self):
+        self.assertEqual(pick("Portal", [result("Portal", kind="compil", game_id=1), result("Portal", game_id=2)]), ("match", ["Portal"]))
+        self.assertEqual(pick("Portal", [result("Portal", kind="compil", game_id=1), result("Portal", kind="endless", game_id=2)])[0], "ambiguous")
+
     def test_dlcs_never_match(self):
         self.assertEqual(pick("Hades", [result("Hades", kind="dlc")]), ("not_found", []))
         self.assertEqual(pick("Hades", [result("Hades", kind="dlc", game_id=1), result("Hades", game_id=2)])[0], "match")
