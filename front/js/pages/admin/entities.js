@@ -241,7 +241,7 @@ export const ENTITIES = {
 
   challenges: {
     label: 'Retos',
-    description: 'Todos los retos, de grupo y personales. Los lanzan los administradores desde la página Retos (los de grupo) o cada jugador (los personales); aquí se ven todos y se pueden borrar, con sus datos de participación.',
+    description: 'Los retos del grupo se lanzan y se borran aquí, y solo aquí: son de la app, no de un jugador. Los jugadores lanzan los suyos, personales, desde la página Retos; aquí se ven todos.',
     endpoint: '/manage/challenges',
     paged: false,
     readOnly: true,
@@ -253,6 +253,14 @@ export const ENTITIES = {
       { label: 'Total', render: (r) => (r.total_done ? badge(r.notified ? 'Alcanzado, avisado' : 'Alcanzado', 'green') : '—') },
       { label: 'Lanzado por', render: (r) => r.created_by ?? '—' },
     ],
+    createFields: [
+      { key: 'game_id', label: 'Juego', type: 'game', required: true },
+      { key: 'month', label: 'Mes', type: 'month', required: true },
+      { key: 'min_hours_each', label: 'Horas mínimas por jugador', type: 'number', step: '0.5', default: 5, required: true },
+      { key: 'min_hours_total', label: 'Horas mínimas entre todos', type: 'number', step: '0.5', default: 20, required: true },
+      { key: 'announce', label: 'Avisar al grupo (Telegram y notificaciones)', type: 'checkbox', default: true },
+    ],
+    createLabel: 'Lanzar juego del mes',
     name: (r) => r.title,
     canDelete: true,
     deleteNote: 'Se borra el reto y quién se salió de él. Los resultados dejan de salir en los perfiles.',

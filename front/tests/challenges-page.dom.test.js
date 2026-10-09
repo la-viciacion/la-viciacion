@@ -65,29 +65,20 @@ test('a challenge you left says so and offers to join again', async () => {
   assert.equal(document.querySelector('.ch-players'), null);
 });
 
-test('an admin can launch and delete; deleting needs a second press', async () => {
-  const calls = installApi({ 'GET /challenges': [challenge()], 'DELETE /challenges/5': { message: 'ok' } });
+test('not even an admin launches or deletes a group challenge from this page: that is the admin panel', async () => {
+  installApi({ 'GET /challenges': [challenge()] });
   await page.render({ main: main(), user: ROOT });
   await settle();
-  assert.ok(document.querySelector('#chLaunch'));
-  const button = document.querySelector('[data-delete]');
-  button.click();
-  assert.equal(calls.filter((c) => c.method === 'DELETE').length, 0);
-  assert.match(button.textContent, /¿Seguro\?/);
-  button.click();
-  await settle();
-  assert.equal(calls.filter((c) => c.method === 'DELETE').length, 1);
+  assert.equal(document.querySelector('#chLaunch'), null);
+  assert.equal(document.querySelector('[data-delete]'), null);
+  assert.ok(document.querySelector('[data-part]')); // but an admin takes part like anybody
 });
 
-test('without challenges the page says who can start one', async () => {
+test('without challenges the page says so', async () => {
   installApi({ 'GET /challenges': [] });
   await page.render({ main: main(), user: ANA });
   await settle();
-  assert.match(main().textContent, /Cuando un administrador lance uno/);
-  installApi({ 'GET /challenges': [] });
-  await page.render({ main: main(), user: ROOT });
-  await settle();
-  assert.match(main().textContent, /Lanza el primero/);
+  assert.match(main().textContent, /Todavía no hay retos/);
 });
 
 test('an error loading is shown', async () => {
