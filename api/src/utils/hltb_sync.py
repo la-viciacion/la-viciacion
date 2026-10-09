@@ -31,6 +31,10 @@ MIN_CONFIDENT = 0.9              # similarity a name must reach to be matched wi
 MIN_LEAD = 0.05                  # ...and how far ahead of the runner-up it has to be
 MIN_CANDIDATE = 0.6              # below this a result is not worth showing as a candidate
 MAX_CANDIDATES = 5
+# What HLTB's entries are besides a game: expansions, fan mods and ROM hacks share (or contain) the name of the game
+# they hang from, and their times are not its own. Anything else is the game: "multi" (online only, Helldivers 2),
+# "endless" (The Sims 4), "compil"... so a type HLTB makes up tomorrow does not leave games out.
+NOT_THE_GAME = ("dlc", "mod", "hack")
 
 _lock = threading.Lock()
 _cancel = threading.Event()
@@ -71,6 +75,20 @@ def _similarity(wanted: str, candidate: dict) -> float:
     )
 
 
+def _branded(wanted: str, candidate: dict) -> bool:
+    """One name is the other with words added in front ("UFC 5" is "EA Sports UFC 5", "Civilization VI" is
+    "Sid Meier's Civilization VI"). Added at the end it is another game (Doom, Doom Eternal), so that is not it.
+    The shorter one needs two words at least: a single one ("Portal") is too common to be the tail of anything."""
+    want = _tokens(wanted)
+    for text in (candidate["name"], candidate["alias"]):
+        for alias in (text or "").split(","):
+            other = _tokens(alias)
+            short, long = sorted((want, other), key=len)
+            if len(short) >= 2 and len(long) > len(short) and long[-len(short):] == short:
+                return True
+    return False
+
+
 def _same_numbers(wanted: str, candidate: dict) -> bool:
     """A sequel is not the game: the numbers in the names have to agree for a match that is not exact."""
     return any(_numbers(wanted) == _numbers(text) for text in (candidate["name"], candidate["alias"]) if text)
@@ -94,15 +112,17 @@ def candidates(entries) -> list[dict]:
 
 def pick(name: str, year: int | None, found: list[dict]) -> tuple[str, list[dict]]:
     """('match', [the one]) when the result is clear, ('ambiguous', [candidates]) when a person should decide,
-    ('not_found', []) when nothing looks like the game. DLCs and the like are never the game.
+    ('not_found', []) when nothing looks like the game. DLCs, mods and ROM hacks are never the game.
 
     An exact name (accents, case, punctuation and a leading "The" aside) wins; several of them are told apart by
     the release year. Without one, the closest name wins only if it is very close and clearly ahead of the next."""
-    games = [c for c in found if c["type"] in (None, "game")]
+    games = [c for c in found if c["type"] not in NOT_THE_GAME]
     scored = sorted(((_similarity(name, c), c) for c in games), key=lambda pair: -pair[0])
     exact = [c for score, c in scored if score == 1.0]
     if len(exact) > 1 and year:
         exact = [c for c in exact if c["year"] == year] or exact
+    if len(exact) > 1:
+        exact = [c for c in exact if c["type"] == "game"] or exact  # a plain game before a compilation or a port of the same name
     if len(exact) == 1:
         return "match", exact
     if exact:
@@ -114,14 +134,18 @@ def pick(name: str, year: int | None, found: list[dict]) -> tuple[str, list[dict
         and (len(scored) == 1 or scored[0][0] - scored[1][0] >= MIN_LEAD)
     ):
         return "match", [scored[0][1]]
+    branded = [c for score, c in scored if _branded(name, c) and _same_numbers(name, c)]
+    if len(branded) == 1:
+        return "match", branded
     near = [c for score, c in scored if score >= MIN_CANDIDATE][:MAX_CANDIDATES]
     return ("ambiguous", near) if near else ("not_found", [])
 
 
 def clean_name(name: str) -> str:
-    """What HLTB's search is given: it chokes on colons and slashes, and finds nothing with typographic quotes
+    """What HLTB's search is given: it chokes on colons and slashes (they become a space:
+    NieR:Automata is not NieRAutomata) and finds nothing with typographic quotes
     (Sid Meier’s Civilization VI) while the plain ones find it."""
-    return re.sub(r"[:/]", "", name.translate(TYPOGRAPHIC_QUOTES))
+    return re.sub(r"\s+", " ", re.sub(r"[:/]", " ", name.translate(TYPOGRAPHIC_QUOTES))).strip()
 
 
 def best_entry(name: str, year: int | None, entries):
