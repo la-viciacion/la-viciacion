@@ -32,6 +32,19 @@ class PickTests(unittest.TestCase):
     def test_an_online_only_game_is_still_the_game(self):
         self.assertEqual(pick("Helldivers II", [result("Helldivers 2", kind="multi")]), ("match", ["Helldivers 2"]))
 
+    def test_a_game_without_an_end_is_still_the_game(self):
+        self.assertEqual(pick("The Sims 4", [result("The Sims 4", kind="endless"), result("The Sims 4: Get to Work", kind="dlc")]), ("match", ["The Sims 4"]))
+
+    def test_a_publisher_in_front_of_the_name_is_the_same_game(self):
+        self.assertEqual(pick("UFC 5", [result("EA Sports UFC 5")]), ("match", ["EA Sports UFC 5"]))
+        self.assertEqual(pick("Sid Meier's Civilization VI", [result("Civilization VI")]), ("match", ["Civilization VI"]))
+
+    def test_words_added_at_the_end_or_other_numbers_are_another_game(self):
+        self.assertNotEqual(pick("Doom", [result("Doom Eternal")])[0], "match")
+        self.assertNotEqual(pick("Portal", [result("Aperture Portal")])[0], "match")  # one word is too little to go by
+        self.assertNotEqual(pick("UFC 5", [result("EA Sports UFC 4")])[0], "match")
+        self.assertNotEqual(pick("UFC 5", [result("EA Sports UFC 5"), result("Fight UFC 5")])[0], "match")  # two to choose from
+
     def test_dlcs_never_match(self):
         self.assertEqual(pick("Hades", [result("Hades", kind="dlc")]), ("not_found", []))
         self.assertEqual(pick("Hades", [result("Hades", kind="dlc", game_id=1), result("Hades", game_id=2)])[0], "match")
@@ -66,7 +79,8 @@ class PickTests(unittest.TestCase):
         self.assertEqual(hltb_sync.candidates([result("Hades", seconds=None)])[0]["seconds"], 0)
 
     def test_the_search_is_given_the_name_without_colons_and_slashes(self):
-        self.assertEqual(hltb_sync.clean_name("Zelda: A/B"), "Zelda AB")
+        self.assertEqual(hltb_sync.clean_name("Zelda: A/B"), "Zelda A B")
+        self.assertEqual(hltb_sync.clean_name("NieR:Automata"), "NieR Automata")  # joined, HLTB finds nothing
 
     def test_the_search_is_given_plain_quotes_because_hltb_finds_nothing_with_typographic_ones(self):
         self.assertEqual(hltb_sync.clean_name("Sid Meier’s Civilization VI"), "Sid Meier's Civilization VI")

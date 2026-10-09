@@ -31,7 +31,9 @@ MIN_CONFIDENT = 0.9              # similarity a name must reach to be matched wi
 MIN_LEAD = 0.05                  # ...and how far ahead of the runner-up it has to be
 MIN_CANDIDATE = 0.6              # below this a result is not worth showing as a candidate
 MAX_CANDIDATES = 5
-GAME_TYPES = ("game", "multi")    # HLTB files online-only games (Helldivers 2) as "multi": still the game, unlike a "dlc" or a "mod"
+# HLTB files online-only games (Helldivers 2) as "multi" and games without an end (The Sims 4) as "endless":
+# they are still the game, unlike a "dlc" or a "mod"
+GAME_TYPES = ("game", "multi", "endless")
 
 _lock = threading.Lock()
 _cancel = threading.Event()
@@ -70,6 +72,20 @@ def _similarity(wanted: str, candidate: dict) -> float:
         (SequenceMatcher(None, want, _norm(text)).ratio() for text in (candidate["name"], candidate["alias"]) if text),
         default=0.0,
     )
+
+
+def _branded(wanted: str, candidate: dict) -> bool:
+    """One name is the other with words added in front ("UFC 5" is "EA Sports UFC 5", "Civilization VI" is
+    "Sid Meier's Civilization VI"). Added at the end it is another game (Doom, Doom Eternal), so that is not it.
+    The shorter one needs two words at least: a single one ("Portal") is too common to be the tail of anything."""
+    want = _tokens(wanted)
+    for text in (candidate["name"], candidate["alias"]):
+        for alias in (text or "").split(","):
+            other = _tokens(alias)
+            short, long = sorted((want, other), key=len)
+            if len(short) >= 2 and len(long) > len(short) and long[-len(short):] == short:
+                return True
+    return False
 
 
 def _same_numbers(wanted: str, candidate: dict) -> bool:
@@ -115,14 +131,18 @@ def pick(name: str, year: int | None, found: list[dict]) -> tuple[str, list[dict
         and (len(scored) == 1 or scored[0][0] - scored[1][0] >= MIN_LEAD)
     ):
         return "match", [scored[0][1]]
+    branded = [c for score, c in scored if _branded(name, c) and _same_numbers(name, c)]
+    if len(branded) == 1:
+        return "match", branded
     near = [c for score, c in scored if score >= MIN_CANDIDATE][:MAX_CANDIDATES]
     return ("ambiguous", near) if near else ("not_found", [])
 
 
 def clean_name(name: str) -> str:
-    """What HLTB's search is given: it chokes on colons and slashes, and finds nothing with typographic quotes
+    """What HLTB's search is given: it chokes on colons and slashes (they become a space:
+    NieR:Automata is not NieRAutomata) and finds nothing with typographic quotes
     (Sid Meier’s Civilization VI) while the plain ones find it."""
-    return re.sub(r"[:/]", "", name.translate(TYPOGRAPHIC_QUOTES))
+    return re.sub(r"\s+", " ", re.sub(r"[:/]", " ", name.translate(TYPOGRAPHIC_QUOTES))).strip()
 
 
 def best_entry(name: str, year: int | None, entries):
