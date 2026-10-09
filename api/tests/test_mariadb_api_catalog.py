@@ -56,8 +56,12 @@ def hltb(*results, fail=False):
     return Fake
 
 
-def hltb_hit(main=12.4, dev="HLTB Studio", steam=None, similarity=0.9):
-    return SimpleNamespace(similarity=similarity, gameplay_main=main, profile_dev=dev, profile_steam=steam, json_content={"x": 1})
+def hltb_hit(main=12.4, dev="HLTB Studio", steam=None, similarity=0.9, name="Celeste"):
+    """A HowLongToBeat result: `main` hours of main story, which HLTB gives in seconds."""
+    return SimpleNamespace(
+        similarity=similarity, game_id=1, game_name=name, game_alias=None, game_type="game", release_world=2018,
+        profile_dev=dev, profile_steam=steam, json_content={"comp_main": int(main * 3600)},
+    )
 
 
 CELESTE = {"id": 101, "name": "Celeste", "slug": "celeste", "released": "2018-01-25", "background_image": "https://img/celeste.jpg",
@@ -162,7 +166,7 @@ class CreateGameTests(CatalogTestCase):
         self.assertEqual(response.status_code, 201)
         game = response.json()
         self.assertEqual((game["name"], game["dev"], game["slug"], game["rawg_id"]), ("Celeste", "Maddy Makes Games", "celeste", 101))
-        self.assertEqual((game["genres"], game["steam_id"], game["avg_time"], game["release_date"]), ("Platformer,Indie", "504230", 12, "2018-01-25"))
+        self.assertEqual((game["genres"], game["steam_id"], game["avg_time"], game["release_date"]), ("Platformer,Indie", "504230", 44640, "2018-01-25"))
         self.assertEqual(len(game["id"]), 36)  # a generated uuid
         self.assertEqual(self.scalar("SELECT COUNT(*) FROM games"), 1)
 
@@ -175,6 +179,10 @@ class CreateGameTests(CatalogTestCase):
         self.with_rawg(Rawg(details={202: nobody}), hltb(hltb_hit(dev="HLTB Studio", steam=777)))
         other = self.create(name="Other", rawg_id=202).json()
         self.assertEqual((other["dev"], other["steam_id"]), ("HLTB Studio", "777"))
+
+    def test_the_time_comes_only_from_a_clear_match_in_howlongtobeat(self):
+        self.with_rawg(Rawg(details={101: CELESTE}), hltb(hltb_hit(name="Celeste Farewell")))
+        self.assertEqual(self.create(rawg_id=101).json()["avg_time"], 0)
 
     def test_a_failing_howlongtobeat_does_not_stop_the_game_from_being_added(self):
         self.with_rawg(Rawg(details={101: CELESTE}), hltb(fail=True))
@@ -290,7 +298,7 @@ class RankingsTests(CatalogTestCase):
         super().setUp()
         self.bea = self.user("bea")
         self.game("celeste", "Celeste")
-        self.game("hades", "Hades")
+        self.game("hades", "Hades", avg_time=5 * 3600)
         today = datetime.date.today()
         for days in (0, 1, 2):
             self.session(self.ana, "celeste", ago(days=days, hours=2), 60)
@@ -307,7 +315,7 @@ class RankingsTests(CatalogTestCase):
         self.assertEqual(
             list(self.rankings()),
             ["user_hours", "user_days", "user_played_games", "user_completed_games", "achievements", "user_ratio",
-             "user_current_streak", "user_best_streak", "games_most_played", "platform_played", "debt", "games_last_played"],
+             "user_current_streak", "user_best_streak", "games_most_played", "platform_played", "debt", "debt_total", "games_last_played"],
         )
 
     def test_the_players_are_ranked_by_hours_days_and_streaks(self):
@@ -327,7 +335,22 @@ class RankingsTests(CatalogTestCase):
         data = self.rankings()
         self.assertEqual(data["user_completed_games"][0]["completed_games"], 1)
         self.assertEqual(data["user_ratio"][0]["ratio"], 1.0)
-        self.assertEqual(data["debt"], [{"message": "Debt is not implemented yet"}])
+
+    def test_the_debt_is_what_is_left_to_play_of_the_games_started_and_not_finished(self):
+        for ranking in ("debt", "debt_total"):
+            data = self.rankings(ranking=ranking)[ranking]
+            # Bea has played 30 minutes of a 5 hour game; Ana's only game is completed, so it owes nothing
+            self.assertEqual(
+                [(r["name"], r["debt_time"], r["games"]) for r in data][:2], [("Bea", 4 * 3600 + 1800, 1), ("Ana", 0, 0)], ranking
+            )
+
+    def test_the_debt_of_another_season_is_empty_and_the_bot_can_leave_out_the_inactive(self):
+        self.assertEqual({r["debt_time"] for r in self.rankings(ranking="debt", season=2000)["debt"]}, {0})
+        self.user("cai", active=False)
+        every = [r["name"] for r in self.rankings(ranking="debt")["debt"]]
+        active = [r["name"] for r in self.rankings(ranking="debt", only_active="true")["debt"]]
+        self.assertIn("Cai", every)
+        self.assertNotIn("Cai", active)
 
     def test_a_subset_can_be_asked_for_and_an_unknown_one_is_answered_politely(self):
         data = self.rankings(ranking="user_hours,nope")

@@ -23,6 +23,7 @@ const ACTIONS = [
   ['POST', /^check-achievements$/, 'Pidió comprobar los logros'],
   ['POST', /^recalculate-achievements$/, 'Pidió recalcular todos los logros'],
   ['POST', /^rawg-sync\//, 'Usó la sincronización con RAWG'],
+  ['POST', /^hltb-sync\//, 'Usó la sincronización de tiempos con HowLongToBeat'],
 ];
 
 const VERB = { POST: 'Creó', PUT: 'Cambió', PATCH: 'Editó', DELETE: 'Borró' };

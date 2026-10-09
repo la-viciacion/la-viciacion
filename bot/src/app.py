@@ -162,6 +162,12 @@ def main() -> None:
                     pattern="^" + "games_most_played" + "$",
                 ),
                 CallbackQueryHandler(
+                    ranking_routes.user_debt, pattern="^" + "user_debt" + "$"
+                ),
+                CallbackQueryHandler(
+                    ranking_routes.user_debt_total, pattern="^" + "user_debt_total" + "$"
+                ),
+                CallbackQueryHandler(
                     ranking_routes.user_current_streak,
                     pattern="^" + "user_current_streak" + "$",
                 ),

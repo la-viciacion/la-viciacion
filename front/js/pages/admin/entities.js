@@ -112,7 +112,7 @@ export const ENTITIES = {
     actions: [
       { label: 'Sesiones', run: (r, admin) => admin.jumpTo('timers', { game_id: r.id, game_name: r.name }) },
     ],
-    toolbarActions: [{ act: 'rawg-sync', label: 'Sincronizar con RAWG…' }],
+    toolbarActions: [{ act: 'rawg-sync', label: 'Sincronizar con RAWG…' }, { act: 'hltb-sync', label: 'Sincronizar tiempos (HLTB)…' }],
     canDelete: true,
     deleteNote: 'Se borrarán también sus sesiones, entradas de biblioteca y logros.',
   },

@@ -199,7 +199,8 @@ class RankingsAgainstTheApiTests(BotContractTestCase):
         self.play()
         routes = RankingRoutes()
         handlers = [routes.user_hours, routes.user_days, routes.user_played_games, routes.user_achievements, routes.user_best_streak,
-                    routes.user_current_streak, routes.user_ratio, routes.user_completed_games, routes.games_most_played]
+                    routes.user_current_streak, routes.user_ratio, routes.user_completed_games, routes.games_most_played, routes.user_debt,
+                    routes.user_debt_total]
         for handler in handlers:
             with self.subTest(handler=handler.__name__):
                 text = await self.answer(handler)
@@ -227,6 +228,7 @@ class RankingsAgainstTheApiTests(BotContractTestCase):
             "achievements": ("name", "achievements"), "user_best_streak": ("name", "best_streak"),
             "user_current_streak": ("name", "current_streak"), "user_ratio": ("name", "ratio"),
             "user_completed_games": ("name", "completed_games"), "games_most_played": ("name", "played_time"),
+            "debt": ("name", "debt_time", "games"), "debt_total": ("name", "debt_time", "games"),
         }
         for key, fields in reads.items():
             with self.subTest(ranking=key):
