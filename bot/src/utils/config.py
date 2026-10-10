@@ -41,8 +41,12 @@ class Config:
             self.SENTRY_URL = os.environ["SENTRY_URL_BOT"]
             self.ENVIRONMENT = os.environ["ENVIRONMENT"]
 
-            self.TELEGRAM_TOKEN = os.environ["TELEGRAM_TOKEN"]
-            self.TELEGRAM_GROUP_ID = os.environ["TELEGRAM_GROUP_ID"]
+            self.TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+            self.TELEGRAM_GROUP_ID = os.getenv("TELEGRAM_GROUP_ID")
+            missing = [name for name in ("TELEGRAM_TOKEN", "TELEGRAM_GROUP_ID") if not os.getenv(name)]
+            if missing:
+                # the API does not need them to run (its panel says Telegram is not configured); the bot cannot
+                raise SystemExit(f"The bot cannot start: {' and '.join(missing)} missing from the .env")
             self.TELEGRAM_ADMIN_CHAT_ID = os.getenv("TELEGRAM_ADMIN_CHAT_ID") or None
             self._ready = True
 

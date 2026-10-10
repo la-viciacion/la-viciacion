@@ -12,8 +12,8 @@ import { toast } from '../../ui/toast.js';
 import { errorState } from './components.js';
 import { confirmDialog } from './dialogs.js';
 
-const SECRETS = ['ai.api_key']; // never loaded back: sent only when something is typed
-const LOCKED = ['telegram.token', 'telegram.group_id', 'telegram.admin_chat_id']; // shown only as set or not, never editable
+const SECRETS = []; // never loaded back: sent only when something is typed (the keys of outside services are not: they are in the server's .env)
+const LOCKED = ['telegram.token', 'telegram.group_id', 'telegram.admin_chat_id', 'ai.api_key']; // shown only as set or not, never editable
 const READ_ONLY = ['mail', 'backup']; // cards with nothing to save
 const AI_PROVIDERS = [['google', 'Google (Gemini)'], ['openai', 'OpenAI']];
 
@@ -85,6 +85,7 @@ function view(values, jobs, pushDevices, mail, aiUses) {
         <label>Token del bot <input class="adm-input" type="text" value="${state('telegram.token')}" disabled /></label>
         <label>ID del canal o grupo <input class="adm-input" type="text" value="${state('telegram.group_id')}" disabled /></label>
         <label>ID del chat de administración <input class="adm-input" type="text" value="${state('telegram.admin_chat_id')}" disabled /></label>
+        ${values['telegram.token'].is_set && values['telegram.group_id'].is_set ? '' : html`<div class="adm-warn">Telegram no está configurado: faltan ${[['telegram.token', 'TELEGRAM_TOKEN'], ['telegram.group_id', 'TELEGRAM_GROUP_ID']].filter(([key]) => !values[key].is_set).map(([, name]) => name).join(' y ')} en el .env del servidor. La aplicación funciona, pero no envía nada por Telegram y el bot no arranca.</div>`}
         <div class="adm-sub">Se configuran en el .env del servidor: desde el panel solo se ve si están definidos.</div>
         <div><button type="button" class="adm-btn" data-set-act="test">Enviar mensaje de prueba al grupo</button></div>
       </section>`,
@@ -96,12 +97,9 @@ function view(values, jobs, pushDevices, mail, aiUses) {
         <label>Proveedor
           <select class="adm-input" name="ai.provider">${AI_PROVIDERS.map(([id, label]) => html`<option value="${id}">${label}</option>`)}</select>
         </label>
-        <label>Clave de la API
-          <input class="adm-input" type="password" name="ai.api_key" autocomplete="new-password"
-                 placeholder="${aiKey.is_set ? `Configurada (${aiKey.hint}). Escribe una nueva para cambiarla` : 'Sin configurar'}" />
-        </label>
+        <label>Clave de la API <input class="adm-input" type="text" value="${state('ai.api_key')}" disabled /></label>
         <label>Modelo <input class="adm-input" type="text" name="ai.model" placeholder="Vacío: el modelo por defecto del proveedor" /></label>
-        <div class="adm-sub">Se aplica al momento, sin reiniciar. La clave se guarda cifrada y no se vuelve a mostrar. Por defecto: Google <code>gemini-2.5-flash</code>, OpenAI <code>gpt-4o-mini</code>.</div>
+        <div class="adm-sub">El proveedor y el modelo se aplican al momento, sin reiniciar. La clave (<code>AI_API_KEY</code>) está en el .env del servidor: desde el panel solo se ve si está definida. Por defecto: Google <code>gemini-2.5-flash</code>, OpenAI <code>gpt-4o-mini</code>.</div>
         <div><button type="button" class="adm-btn" data-set-act="test-ai" ${aiKey.is_set ? '' : html`disabled`}>Probar la IA</button></div>
       </section>`,
 

@@ -253,9 +253,16 @@ class SettingsTests(OpsTestCase):
         self.assertEqual(self.admin("GET", "/settings/telegram").status_code, 404)
 
     def test_a_secret_is_stored_encrypted(self):
+        self.set_settings(**{"push.vapid_private": "private-key-1234567890"})
+        stored = self.scalar("SELECT value FROM app_settings WHERE `key` = 'push.vapid_private'")
+        self.assertNotIn("private-key-1234567890", stored)
+
+    def test_the_ai_key_is_never_stored_and_the_panel_refuses_it(self):
         self.set_settings(**{"ai.api_key": "sk-test-1234567890"})
-        stored = self.scalar("SELECT value FROM app_settings WHERE `key` = 'ai.api_key'")
-        self.assertNotIn("sk-test-1234567890", stored)
+        self.assertEqual(settings.get("ai.api_key"), "sk-test-1234567890")
+        self.assertEqual(self.scalar("SELECT COUNT(*) FROM app_settings WHERE `key` = 'ai.api_key'"), 0)
+        self.assertEqual(self.admin("PUT", "/settings", json={"values": {"ai.api_key": "sk-other"}}).status_code, 400)
+        self.assertEqual(self.admin("GET", "/settings").json()["values"]["ai.api_key"], {"is_set": True, "hint": None})
 
     def test_a_resettable_prompt_goes_back_to_its_default_with_null(self):
         key = "ai.prompt." + self.admin("GET", "/settings").json()["ai_uses"][0]["id"]

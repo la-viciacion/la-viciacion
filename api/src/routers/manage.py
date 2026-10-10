@@ -1322,7 +1322,7 @@ def put_settings(body: SettingsBody, admin: models.User = Depends(auth.require_a
     if any(key.startswith("push.vapid") for key in body.values):
         raise HTTPException(status_code=400, detail="Las claves VAPID se generan con «Generar claves», no se escriben")
     if any(settings.REGISTRY[key].env_only for key in body.values if key in settings.REGISTRY):
-        raise HTTPException(status_code=400, detail="El token y los IDs de Telegram se configuran en el .env del servidor, no desde el panel")
+        raise HTTPException(status_code=400, detail="El token y los IDs de Telegram y la clave de la IA se configuran en el .env del servidor, no desde el panel")
     try:
         changed = settings.set_values(db, body.values, user_id=admin.id)
     except ValueError as e:
@@ -1452,10 +1452,10 @@ async def send_test_message(admin: models.User = Depends(auth.require_admin)):
 
 @router.post("/settings/test-ai")
 def test_ai(admin: models.User = Depends(auth.require_admin)):
-    """Ask the AI for one short sentence with the saved provider, key and model (blocking network call:
+    """Ask the AI for one short sentence with the saved provider and model and the key of the environment (blocking network call:
     a plain def, so it runs in a worker thread). Works with the AI switched off, to try a key before using it."""
     if not settings.get("ai.api_key"):
-        raise HTTPException(status_code=409, detail="No hay ninguna clave de IA guardada")
+        raise HTTPException(status_code=409, detail="No hay ninguna clave de IA: falta AI_API_KEY en el .env del servidor")
     provider, model = ai.current()
     try:
         reply = ai.complete(

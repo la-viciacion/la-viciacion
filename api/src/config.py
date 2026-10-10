@@ -11,10 +11,10 @@ class Config:
         # fall back to the shared .env at the repo root (never overrides os.environ).
         load_dotenv(find_dotenv(usecwd=True))
 
-        # The Telegram token and chats (TELEGRAM_TOKEN / TELEGRAM_GROUP_ID / TELEGRAM_ADMIN_CHAT_ID) are read from
-        # the environment every time and never stored (see utils/settings.py, `env_only`). The AI provider, key
-        # and model (AI_PROVIDER / AI_API_KEY / AI_MODEL, or the old OPENAI_API_KEY / OPENAI_MODEL) only seed
-        # the app_settings table the first time.
+        # The keys of outside services are read from the environment every time and never stored (see
+        # utils/settings.py, `env_only`): the Telegram token and chats (TELEGRAM_TOKEN / TELEGRAM_GROUP_ID /
+        # TELEGRAM_ADMIN_CHAT_ID) and the AI key (AI_API_KEY, or the old OPENAI_API_KEY). The AI provider and model
+        # (AI_PROVIDER / AI_MODEL, or the old OPENAI_MODEL) only seed the app_settings table the first time.
 
         # Admin
         self.GOD_ADMIN_PASS = self._get_env("GOD_ADMIN_PASS")

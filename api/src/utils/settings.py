@@ -1,16 +1,16 @@
 """Runtime settings edited from the admin panel (table `app_settings`).
 
 Every setting is declared once in REGISTRY (type, default, validation, whether
-it is a secret). The table stores values as text; secrets (the AI key, the push private key)
+it is a secret). The table stores values as text; secrets (the push private key)
 are encrypted with a key derived from SECRET_KEY and are never returned by the
 API, only a hint of their last characters.
 
 The .env values named in `env` only seed the table the first time (see
 seed_from_env): from then on the database is the source of truth.
 
-The exception is `env_only`: the Telegram token and chats. They are read from the environment every time and
-never stored, so a copy of the database (a backup, a dump loaded on a laptop) cannot run the bot of the
-group, which is a thing only whoever holds the .env should be able to do.
+The exception is `env_only`: the keys of outside services (the Telegram token and chats, the AI key). They are
+read from the environment every time and never stored, so a copy of the database (a backup, a dump loaded on a
+laptop) cannot use them, which only whoever holds the .env should be able to do.
 """
 import base64
 import hashlib
@@ -44,7 +44,8 @@ class Spec:
     default: Any = None
     secret: bool = False
     hint: bool = True  # a secret shows its last characters in the panel unless this is False
-    env: str | None = None  # variable that seeds the value the first time
+    env: str | None = None  # variable that seeds the value the first time (the one it is read from, if env_only)
+    legacy_env: str | None = None  # an older variable an env_only setting falls back to
     check: Callable[[Any], str | None] | None = None  # error message or None
     blank_ok: bool = False  # an empty text is a valid value (it means "the default")
     resettable: bool = False  # `None` deletes the stored value, so the default applies again
@@ -105,10 +106,11 @@ REGISTRY: dict[str, Spec] = {
     "push.contact": Spec("str", None, check=_contact),
     "push.vapid_public": Spec("str", None, check=_vapid_public),
     "push.vapid_private": Spec("str", None, secret=True, hint=False),
-    # AI text for the notices (utils/ai.py). The key is typed in the panel; AI_* (or the old OPENAI_*) only seed it.
+    # AI text for the notices (utils/ai.py). The key is AI_API_KEY (or the old OPENAI_API_KEY) and is never stored;
+    # the provider and the model are edited in the panel, and AI_PROVIDER / AI_MODEL only seed them.
     "ai.enabled": Spec("bool", True),
     "ai.provider": Spec("str", "google", env="AI_PROVIDER", check=_ai_provider),
-    "ai.api_key": Spec("str", None, secret=True, env="AI_API_KEY"),
+    "ai.api_key": Spec("str", None, secret=True, env_only=True, env="AI_API_KEY", legacy_env="OPENAI_API_KEY"),
     "ai.model": Spec("str", None, env="AI_MODEL", check=_ai_model, blank_ok=True),  # empty: the provider's default
     "telegram.token": Spec("str", None, secret=True, env_only=True, env="TELEGRAM_TOKEN", check=_token),
     "telegram.group_id": Spec("str", None, env_only=True, env="TELEGRAM_GROUP_ID", check=_chat_id),
@@ -185,7 +187,8 @@ _lock = threading.Lock()
 
 
 def _from_env(spec: Spec) -> str | None:
-    return (os.getenv(spec.env) or "").strip() or None
+    value = os.getenv(spec.env) or (os.getenv(spec.legacy_env) if spec.legacy_env else None)
+    return (value or "").strip() or None
 
 
 def get(key: str) -> Any:
@@ -312,14 +315,11 @@ def seed_from_env(db: Session) -> list[str]:
 
 def _seed_legacy_openai(db: Session, seeded: list[str]) -> list[str]:
     """Installations from before the AI settings have OPENAI_API_KEY (and OPENAI_MODEL): they keep
-    working as the "openai" provider unless AI_* says otherwise."""
-    legacy = {
-        "ai.api_key": os.getenv("OPENAI_API_KEY"),
-        "ai.provider": "openai",
-        "ai.model": os.getenv("OPENAI_MODEL"),
-    }
-    if not legacy["ai.api_key"] or "ai.api_key" in seeded or db.get(models.AppSetting, "ai.api_key") is not None:
+    working as the "openai" provider unless AI_* says otherwise. The key itself is read from the environment
+    (`ai.api_key` is env_only); what is seeded is the provider and the model."""
+    if not os.getenv("OPENAI_API_KEY") or os.getenv("AI_API_KEY"):
         return []
+    legacy = {"ai.provider": "openai", "ai.model": os.getenv("OPENAI_MODEL")}
     added = []
     for key, raw in legacy.items():
         if not raw or key in seeded or db.get(models.AppSetting, key) is not None:

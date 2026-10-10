@@ -110,9 +110,11 @@ class TelegramSettingsTests(unittest.TestCase):
         self.assertIsNone(config.TELEGRAM_ADMIN_CHAT_ID)
 
     def test_without_a_token_or_a_group_it_does_not_start(self):
-        for env in ({"TELEGRAM_GROUP_ID": "-100222"}, {"TELEGRAM_TOKEN": "env-token"}):
-            with self.assertRaises(KeyError):
+        for env, name in (({"TELEGRAM_GROUP_ID": "-100222"}, "TELEGRAM_TOKEN"), ({"TELEGRAM_TOKEN": "env-token"}, "TELEGRAM_GROUP_ID"),
+                          ({"TELEGRAM_TOKEN": "", "TELEGRAM_GROUP_ID": "-100222"}, "TELEGRAM_TOKEN")):
+            with self.assertRaises(SystemExit) as stopped:
                 self.start(env)
+            self.assertIn(name, str(stopped.exception))
 
 
 class SingletonTests(unittest.TestCase):
