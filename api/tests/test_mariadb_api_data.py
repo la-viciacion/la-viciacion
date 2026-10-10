@@ -185,11 +185,12 @@ class AuditTests(ApiTestCase):
 
     def test_passwords_and_secrets_never_reach_the_log(self):
         self.admin("POST", f"/users/{self.ana}/password", json={"password": "N3w-secret!password"})
-        self.admin("PUT", "/settings", json={"values": {"ai.api_key": "sk-very-secret"}})
+        refused = self.admin("PUT", "/settings", json={"values": {"ai.api_key": "sk-very-secret"}})  # keys live in the .env
+        self.assertEqual(refused.status_code, 400)
         everything = str(self.rows("SELECT path, detail FROM audit_log"))
         self.assertNotIn("N3w-secret!password", everything)
         self.assertNotIn("sk-very-secret", everything)
-        self.assertEqual(self.scalar("SELECT COUNT(*) FROM audit_log"), 2)
+        self.assertEqual(self.scalar("SELECT COUNT(*) FROM audit_log"), 1)
 
     def test_a_user_and_their_hash_are_not_copied_when_they_are_deleted(self):
         self.admin("DELETE", f"/users/{self.ana}", params={"force": "true"})

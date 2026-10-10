@@ -40,10 +40,11 @@ function attentionItems(att) {
 function integrations(cfg) {
   const v = cfg.values;
   const telegram = !v['telegram.token'].is_set
-    ? ['red', 'Sin configurar', 'Falta el token del bot']
+    ? ['red', 'Sin configurar', 'Falta TELEGRAM_TOKEN en el .env del servidor: no se envía nada por Telegram']
+    : !v['telegram.group_id'].is_set ? ['orange', 'Sin grupo', 'Falta TELEGRAM_GROUP_ID en el .env del servidor: los avisos del grupo no salen']
     : v['notifications.enabled'] ? ['green', 'Activo', 'Bot configurado y notificaciones activadas'] : ['orange', 'Notificaciones apagadas', 'El bot está configurado, pero no se envía nada'];
   const ai = !v['ai.enabled'] ? ['gray', 'Apagada', 'Los avisos salen con el texto original']
-    : v['ai.api_key'].is_set ? ['green', 'Activa', `${v['ai.provider']}${v['ai.model'] ? ` (${v['ai.model']})` : ''}`] : ['orange', 'Sin clave', 'Está activada, pero no hay clave guardada'];
+    : v['ai.api_key'].is_set ? ['green', 'Activa', `${v['ai.provider']}${v['ai.model'] ? ` (${v['ai.model']})` : ''}`] : ['orange', 'Sin clave', 'Está activada, pero falta AI_API_KEY en el .env del servidor'];
   const push = v['push.enabled']
     ? ['green', 'Activos', `${plural(cfg.push_devices.devices, 'dispositivo suscrito', 'dispositivos suscritos')}`] : ['gray', 'Apagados', 'Nadie recibe avisos en la app'];
   const mail = cfg.mail.configured ? ['green', 'Configurado', `Envía como ${cfg.mail.from}`] : ['gray', 'Sin configurar', 'Nadie puede recuperar su contraseña por correo'];

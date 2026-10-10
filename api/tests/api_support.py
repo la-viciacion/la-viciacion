@@ -100,6 +100,11 @@ class ApiTestCase(MariaDBTestCase):
         if inspect.iscoroutinefunction(test) and not isinstance(self, unittest.IsolatedAsyncioTestCase):
             # a plain TestCase "passes" an async test without ever running it
             self.fail(f"{self._testMethodName} is async: derive from unittest.IsolatedAsyncioTestCase as well")
+        # the Telegram token and chats come from the environment, and the developer's .env may have the real ones:
+        # a test starts with none, and says what it needs with `set_settings`
+        telegram_env = mock.patch.dict("os.environ", {spec.env: "" for spec in settings.REGISTRY.values() if spec.env_only})
+        telegram_env.start()
+        self.addCleanup(telegram_env.stop)
         with self.engine.begin() as conn:
             conn.execute(text("SET FOREIGN_KEY_CHECKS = 0"))
             for table in DATA_TABLES:
@@ -198,9 +203,15 @@ class ApiTestCase(MariaDBTestCase):
             return row.id
 
     def set_settings(self, **values) -> None:
-        """Stores admin settings (`self.set_settings(**{"telegram.token": "..."})`) and drops the in-process cache."""
+        """Stores admin settings (`self.set_settings(**{"weekly.time": "10:30"})`) and drops the in-process cache.
+        The ones that live in the environment (the Telegram token and chats) are set there for the length of the test."""
+        in_env = {key: value for key, value in values.items() if settings.REGISTRY[key].env_only}
+        if in_env:
+            patch = mock.patch.dict("os.environ", {settings.REGISTRY[key].env: "" if value is None else str(value) for key, value in in_env.items()})
+            patch.start()
+            self.addCleanup(patch.stop)
         with database.SessionLocal() as db:
-            settings.set_values(db, values)
+            settings.set_values(db, {key: value for key, value in values.items() if key not in in_env})
         settings._cache.clear()
 
     def rows(self, sql: str, **params) -> list:

@@ -33,12 +33,23 @@ class SettingsTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             settings.coerce("ai.model", "models/x?key=1")
 
-    def test_the_key_is_encrypted_and_never_shown(self):
-        self.assertNotIn(KEY, settings._encode("ai.api_key", KEY))
+    def test_the_key_comes_from_the_environment_is_never_stored_and_never_shown(self):
         db = make_session()
-        settings.set_values(db, {"ai.api_key": KEY})
-        shown = settings.public_view(db)["ai.api_key"]
-        self.assertEqual(shown, {"is_set": True, "hint": "…" + KEY[-4:]})
+        with mock.patch.dict(os.environ, {"AI_API_KEY": KEY}):
+            self.assertEqual(settings.get("ai.api_key"), KEY)
+            self.assertEqual(settings.public_view(db)["ai.api_key"], {"is_set": True, "hint": None})
+            self.assertNotIn(KEY, str(settings.public_view(db)))
+            with self.assertRaises(ValueError):
+                settings.set_values(db, {"ai.api_key": OTHER_KEY})  # not from the panel
+        self.assertEqual(db.query(models.AppSetting).filter_by(key="ai.api_key").count(), 0)
+        with mock.patch.dict(os.environ, {"AI_API_KEY": "", "OPENAI_API_KEY": ""}):
+            self.assertEqual(settings.public_view(db)["ai.api_key"], {"is_set": False, "hint": None})
+
+    def test_the_old_openai_variable_still_gives_the_key(self):
+        with mock.patch.dict(os.environ, {"AI_API_KEY": "", "OPENAI_API_KEY": "sk-old"}):
+            self.assertEqual(settings.get("ai.api_key"), "sk-old")
+        with mock.patch.dict(os.environ, {"AI_API_KEY": KEY, "OPENAI_API_KEY": "sk-old"}):
+            self.assertEqual(settings.get("ai.api_key"), KEY)  # the new one wins
 
 
 class SeedingTests(unittest.TestCase):
@@ -49,7 +60,7 @@ class SeedingTests(unittest.TestCase):
         clean = {k: v for k, v in os.environ.items() if k not in self.NAMES}
         with mock.patch.dict(os.environ, {**clean, **env}, clear=True):
             settings.seed_from_env(db)
-        stored = settings.get_all(db)
+            stored = settings.get_all(db)
         return db, {k: stored[k] for k in ("ai.enabled", "ai.provider", "ai.api_key", "ai.model")}
 
     def test_ai_variables_seed_the_settings(self):
@@ -70,11 +81,11 @@ class SeedingTests(unittest.TestCase):
         self.assertIsNone(got["ai.api_key"])
         self.assertEqual(db.query(models.AppSetting).filter(models.AppSetting.key.like("ai.%")).count(), 0)
 
-    def test_the_database_is_the_source_of_truth_after_the_first_time(self):
-        db, _ = self.seed({"AI_API_KEY": KEY})
-        settings.set_values(db, {"ai.api_key": OTHER_KEY})
-        _, got = self.seed({"AI_API_KEY": KEY, "OPENAI_API_KEY": "sk-old"}, db)
-        self.assertEqual((got["ai.provider"], got["ai.api_key"]), ("google", OTHER_KEY))
+    def test_the_database_is_the_source_of_truth_for_the_provider_after_the_first_time(self):
+        db, _ = self.seed({"AI_PROVIDER": "google"})
+        settings.set_values(db, {"ai.provider": "openai"})
+        _, got = self.seed({"AI_PROVIDER": "google", "AI_API_KEY": KEY}, db)
+        self.assertEqual((got["ai.provider"], got["ai.api_key"]), ("openai", KEY))  # the key never was in the database
 
 
 class CompleteTests(unittest.TestCase):

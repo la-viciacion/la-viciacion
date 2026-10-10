@@ -202,6 +202,35 @@ class AchievementReviewTests(MariaDBTestCase):
             self.assertEqual(conn.execute(text("SELECT COUNT(*) FROM achievements")).scalar(), 7)
 
 
+class SecretsEnvOnlyTests(MariaDBTestCase):
+    """035 deletes the stored Telegram token and chats and the AI key (they are read from the environment now) and
+    nothing else."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.migrate("034_challenges")
+        with cls.engine.begin() as conn:
+            conn.execute(text(
+                "INSERT INTO app_settings (`key`, value) VALUES "
+                "('telegram.token', 'gAAAA-encrypted'), ('telegram.group_id', '-100123'), ('telegram.admin_chat_id', '42'), "
+                "('weekly.time', '10:30'), ('ai.api_key', 'gAAAA-other-secret'), ('ai.provider', 'openai'), "
+                "('push.vapid_private', 'gAAAA-push')"
+            ))
+        cls.migrate()
+
+    def keys(self):
+        with self.engine.connect() as conn:
+            return sorted(row[0] for row in conn.execute(text("SELECT `key` FROM app_settings")))
+
+    def test_the_four_rows_are_gone_and_the_rest_of_the_settings_stay(self):
+        self.assertEqual(self.keys(), ["ai.provider", "push.vapid_private", "weekly.time"])
+
+    def test_running_it_again_does_nothing(self):
+        self.migrate()
+        self.assertEqual(self.keys(), ["ai.provider", "push.vapid_private", "weekly.time"])
+
+
 class UpgradeFromAnOlderRevisionTests(MariaDBTestCase):
     """A database that already has data (what production is) must survive the migrations after it."""
 

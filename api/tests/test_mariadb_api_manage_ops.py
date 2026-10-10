@@ -218,13 +218,6 @@ class SettingsTests(OpsTestCase):
         self.assertEqual(body["mail"]["test_recipient"], "root@example.com")
         self.assertTrue(body["ai_uses"])
 
-    def test_the_telegram_settings_for_the_bot_include_the_token_and_a_version_that_follows_changes(self):
-        self.set_settings(**{"telegram.token": TOKEN, "telegram.group_id": "-100123", "telegram.admin_chat_id": "42"})
-        first = self.admin("GET", "/settings/telegram").json()
-        self.assertEqual((first["token"], first["group_id"], first["admin_chat_id"]), (TOKEN, "-100123", "42"))
-        self.set_settings(**{"telegram.group_id": "-100999"})
-        self.assertNotEqual(self.admin("GET", "/settings/telegram").json()["version"], first["version"])
-
     def test_several_settings_change_at_once_and_only_the_changed_ones_are_reported(self):
         response = self.admin("PUT", "/settings", json={"values": {"weekly.weekday": 3, "weekly.time": "10:30", "weekly.enabled": True}})
         self.assertEqual(response.status_code, 200)
@@ -249,10 +242,27 @@ class SettingsTests(OpsTestCase):
             self.assertEqual(refused.status_code, 400, key)
         self.assertEqual(self.admin("GET", "/settings").json()["values"]["weekly.time"], "09:00")
 
+    def test_the_telegram_token_and_ids_are_never_stored_in_the_database(self):
+        self.set_settings(**{"telegram.token": TOKEN, "telegram.group_id": "-100123", "telegram.admin_chat_id": "42"})
+        self.assertEqual(settings.get("telegram.token"), TOKEN)  # they are there, in the environment
+        self.assertEqual(self.scalar("SELECT COUNT(*) FROM app_settings WHERE `key` LIKE 'telegram.%'"), 0)
+        self.admin("PUT", "/settings", json={"values": {"weekly.time": "10:30"}})  # saving other settings does not store them either
+        self.assertEqual(self.scalar("SELECT COUNT(*) FROM app_settings WHERE `key` LIKE 'telegram.%'"), 0)
+
+    def test_the_bot_has_no_endpoint_to_ask_the_api_for_the_token(self):
+        self.assertEqual(self.admin("GET", "/settings/telegram").status_code, 404)
+
     def test_a_secret_is_stored_encrypted(self):
-        self.set_settings(**{"telegram.token": TOKEN})
-        stored = self.scalar("SELECT value FROM app_settings WHERE `key` = 'telegram.token'")
-        self.assertNotIn(TOKEN, stored)
+        self.set_settings(**{"push.vapid_private": "private-key-1234567890"})
+        stored = self.scalar("SELECT value FROM app_settings WHERE `key` = 'push.vapid_private'")
+        self.assertNotIn("private-key-1234567890", stored)
+
+    def test_the_ai_key_is_never_stored_and_the_panel_refuses_it(self):
+        self.set_settings(**{"ai.api_key": "sk-test-1234567890"})
+        self.assertEqual(settings.get("ai.api_key"), "sk-test-1234567890")
+        self.assertEqual(self.scalar("SELECT COUNT(*) FROM app_settings WHERE `key` = 'ai.api_key'"), 0)
+        self.assertEqual(self.admin("PUT", "/settings", json={"values": {"ai.api_key": "sk-other"}}).status_code, 400)
+        self.assertEqual(self.admin("GET", "/settings").json()["values"]["ai.api_key"], {"is_set": True, "hint": None})
 
     def test_a_resettable_prompt_goes_back_to_its_default_with_null(self):
         key = "ai.prompt." + self.admin("GET", "/settings").json()["ai_uses"][0]["id"]

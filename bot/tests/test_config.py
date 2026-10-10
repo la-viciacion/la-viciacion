@@ -1,5 +1,5 @@
 """How the bot talks to the API and picks up its Telegram settings: the superadmin login, the retry with a fresh
-token, the settings served by the API with the environment as a fallback, and the restart when they change."""
+token, and the Telegram token and chats, which come from the environment only."""
 import os
 import unittest
 from unittest import mock
@@ -87,81 +87,34 @@ class LoginAndRequestTests(unittest.TestCase):
 
 
 class TelegramSettingsTests(unittest.TestCase):
-    def load(self, api_values=None, api_error=None, env=None):
-        config = new_config()
-        fetch = mock.patch.object(Config, "_fetch", side_effect=api_error, return_value=api_values)
-        environment = mock.patch.dict(os.environ, env or {}, clear=False)
-        with fetch, environment:
-            config._load_telegram()
-        return config
+    """The token and the chats come from the environment and nowhere else: the API does not keep them."""
 
-    def test_what_the_api_serves_wins_over_the_environment(self):
-        config = self.load({"token": "api-token", "group_id": "-100111", "admin_chat_id": "42", "version": "v1"},
-                           env={"TELEGRAM_TOKEN": "env-token", "TELEGRAM_GROUP_ID": "-100222"})
-        self.assertEqual((config.TELEGRAM_TOKEN, config.TELEGRAM_GROUP_ID, config.TELEGRAM_ADMIN_CHAT_ID, config._version), ("api-token", "-100111", "42", "v1"))
+    def start(self, env):
+        instance = object.__new__(Config)
+        instance._ready = False
+        keys = ("TELEGRAM_TOKEN", "TELEGRAM_GROUP_ID", "TELEGRAM_ADMIN_CHAT_ID")
+        with mock.patch.dict(os.environ, env), mock.patch.object(config_module, "load_dotenv"),              mock.patch.object(config_module.requests, "request") as request:
+            for key in keys:
+                if key not in env:
+                    os.environ.pop(key, None)
+            instance.__init__()
+        request.assert_not_called()  # nothing is asked of the API
+        return instance
 
-    def test_without_the_api_the_environment_is_the_fallback(self):
-        config = self.load(api_error=requests.ConnectionError("api down"), env={"TELEGRAM_TOKEN": "env-token", "TELEGRAM_GROUP_ID": "-100222"})
-        self.assertEqual((config.TELEGRAM_TOKEN, config.TELEGRAM_GROUP_ID), ("env-token", "-100222"))
+    def test_the_token_and_the_chats_are_the_ones_of_the_environment(self):
+        config = self.start({"TELEGRAM_TOKEN": "env-token", "TELEGRAM_GROUP_ID": "-100222", "TELEGRAM_ADMIN_CHAT_ID": "42"})
+        self.assertEqual((config.TELEGRAM_TOKEN, config.TELEGRAM_GROUP_ID, config.TELEGRAM_ADMIN_CHAT_ID), ("env-token", "-100222", "42"))
 
-    def test_it_waits_and_asks_again_until_there_is_a_token_and_a_group(self):
-        config = new_config()
-        answers = iter([{"token": None, "group_id": None}, {"token": "t", "group_id": "-1", "version": "v2"}])
-        with mock.patch.object(Config, "_fetch", side_effect=lambda: next(answers)), mock.patch.object(config_module.time, "sleep") as sleep, \
-             mock.patch.dict(os.environ, {"TELEGRAM_TOKEN": "", "TELEGRAM_GROUP_ID": ""}):
-            config._load_telegram()
-        sleep.assert_called_once_with(15)
-        self.assertEqual((config.TELEGRAM_TOKEN, config._version), ("t", "v2"))
+    def test_the_admin_chat_is_optional(self):
+        config = self.start({"TELEGRAM_TOKEN": "env-token", "TELEGRAM_GROUP_ID": "-100222"})
+        self.assertIsNone(config.TELEGRAM_ADMIN_CHAT_ID)
 
-    def test_the_settings_are_fetched_from_the_admin_endpoint_and_a_failure_raises(self):
-        config = new_config(_token="x")
-        with mock.patch.object(config_module.requests, "request", return_value=response(payload={"token": "t"})) as request:
-            self.assertEqual(config._fetch(), {"token": "t"})
-        self.assertEqual(request.call_args.args[:2], ("GET", "http://api/api/v1/manage/settings/telegram"))
-        with mock.patch.object(config_module.requests, "request", return_value=response(status=403)):
-            with self.assertRaises(requests.HTTPError):
-                config._fetch()
-
-
-class WatcherTests(unittest.TestCase):
-    class Stop(Exception):
-        pass
-
-    def watch(self, versions, current="v1"):
-        config = new_config(_version=current)
-        answers = iter(versions)
-
-        def fetch():
-            answer = next(answers)
-            if isinstance(answer, Exception):
-                raise answer
-            return {"version": answer}
-
-        sleeps = []
-
-        def sleep(seconds):
-            sleeps.append(seconds)
-            if len(sleeps) > len(versions):
-                raise self.Stop()  # the loop never ends by itself
-
-        with mock.patch.object(Config, "_fetch", side_effect=fetch), mock.patch.object(config_module.time, "sleep", side_effect=sleep), \
-             mock.patch.object(config_module.os, "_exit", side_effect=self.Stop) as exit_:
-            with self.assertRaises(self.Stop):
-                config._watch()
-        return exit_, sleeps
-
-    def test_it_checks_every_minute_and_leaves_things_alone_while_nothing_changes(self):
-        exit_, sleeps = self.watch(["v1", "v1", "v1"])
-        exit_.assert_not_called()
-        self.assertEqual(set(sleeps), {config_module.WATCH_SECONDS})
-
-    def test_a_change_of_the_telegram_settings_restarts_the_process_so_it_picks_them_up(self):
-        exit_, _ = self.watch(["v1", "v2"])
-        exit_.assert_called_once_with(0)
-
-    def test_an_api_that_is_restarting_does_not_restart_the_bot(self):
-        exit_, _ = self.watch([requests.ConnectionError("api restarting"), "v1"])
-        exit_.assert_not_called()
+    def test_without_a_token_or_a_group_it_does_not_start(self):
+        for env, name in (({"TELEGRAM_GROUP_ID": "-100222"}, "TELEGRAM_TOKEN"), ({"TELEGRAM_TOKEN": "env-token"}, "TELEGRAM_GROUP_ID"),
+                          ({"TELEGRAM_TOKEN": "", "TELEGRAM_GROUP_ID": "-100222"}, "TELEGRAM_TOKEN")):
+            with self.assertRaises(SystemExit) as stopped:
+                self.start(env)
+            self.assertIn(name, str(stopped.exception))
 
 
 class SingletonTests(unittest.TestCase):

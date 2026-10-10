@@ -1,15 +1,20 @@
 """Runtime settings edited from the admin panel (table `app_settings`).
 
 Every setting is declared once in REGISTRY (type, default, validation, whether
-it is a secret). The table stores values as text; secrets (the Telegram token, the AI key)
+it is a secret). The table stores values as text; secrets (the push private key)
 are encrypted with a key derived from SECRET_KEY and are never returned by the
 API, only a hint of their last characters.
 
 The .env values named in `env` only seed the table the first time (see
 seed_from_env): from then on the database is the source of truth.
+
+The exception is `env_only`: the keys of outside services (the Telegram token and chats, the AI key). They are
+read from the environment every time and never stored, so a copy of the database (a backup, a dump loaded on a
+laptop) cannot use them, which only whoever holds the .env should be able to do.
 """
 import base64
 import hashlib
+import os
 import re
 import threading
 import time
@@ -39,11 +44,12 @@ class Spec:
     default: Any = None
     secret: bool = False
     hint: bool = True  # a secret shows its last characters in the panel unless this is False
-    env: str | None = None  # variable that seeds the value the first time
+    env: str | None = None  # variable that seeds the value the first time (the one it is read from, if env_only)
+    legacy_env: str | None = None  # an older variable an env_only setting falls back to
     check: Callable[[Any], str | None] | None = None  # error message or None
     blank_ok: bool = False  # an empty text is a valid value (it means "the default")
     resettable: bool = False  # `None` deletes the stored value, so the default applies again
-    locked: bool = False  # the panel shows only whether it is set and cannot change it (the seed and the bot still use it)
+    env_only: bool = False  # read from the environment (`env`) every time, never stored: the panel shows whether it is set and cannot change it
 
 
 def _chat_id(value: str) -> str | None:
@@ -100,14 +106,15 @@ REGISTRY: dict[str, Spec] = {
     "push.contact": Spec("str", None, check=_contact),
     "push.vapid_public": Spec("str", None, check=_vapid_public),
     "push.vapid_private": Spec("str", None, secret=True, hint=False),
-    # AI text for the notices (utils/ai.py). The key is typed in the panel; AI_* (or the old OPENAI_*) only seed it.
+    # AI text for the notices (utils/ai.py). The key is AI_API_KEY (or the old OPENAI_API_KEY) and is never stored;
+    # the provider and the model are edited in the panel, and AI_PROVIDER / AI_MODEL only seed them.
     "ai.enabled": Spec("bool", True),
     "ai.provider": Spec("str", "google", env="AI_PROVIDER", check=_ai_provider),
-    "ai.api_key": Spec("str", None, secret=True, env="AI_API_KEY"),
+    "ai.api_key": Spec("str", None, secret=True, env_only=True, env="AI_API_KEY", legacy_env="OPENAI_API_KEY"),
     "ai.model": Spec("str", None, env="AI_MODEL", check=_ai_model, blank_ok=True),  # empty: the provider's default
-    "telegram.token": Spec("str", None, secret=True, locked=True, env="TELEGRAM_TOKEN", check=_token),
-    "telegram.group_id": Spec("str", None, locked=True, env="TELEGRAM_GROUP_ID", check=_chat_id),
-    "telegram.admin_chat_id": Spec("str", None, locked=True, env="TELEGRAM_ADMIN_CHAT_ID", check=_chat_id),
+    "telegram.token": Spec("str", None, secret=True, env_only=True, env="TELEGRAM_TOKEN", check=_token),
+    "telegram.group_id": Spec("str", None, env_only=True, env="TELEGRAM_GROUP_ID", check=_chat_id),
+    "telegram.admin_chat_id": Spec("str", None, env_only=True, env="TELEGRAM_ADMIN_CHAT_ID", check=_chat_id),
 }
 
 # One prompt (default: the one in the code) and one switch per place the AI writes (utils/ai_prompts.py).
@@ -179,7 +186,15 @@ _cache: dict[str, tuple[float, Any]] = {}
 _lock = threading.Lock()
 
 
+def _from_env(spec: Spec) -> str | None:
+    value = os.getenv(spec.env) or (os.getenv(spec.legacy_env) if spec.legacy_env else None)
+    return (value or "").strip() or None
+
+
 def get(key: str) -> Any:
+    spec = REGISTRY[key]
+    if spec.env_only:
+        return _from_env(spec)  # the environment is not worth caching, and a test or an operator may change it
     now = time.monotonic()
     with _lock:
         hit = _cache.get(key)
@@ -195,7 +210,7 @@ def get(key: str) -> Any:
 
 def get_all(db: Session) -> dict[str, Any]:
     rows = {r.key: r.value for r in db.query(models.AppSetting).all()}
-    return {key: _decode(key, rows.get(key)) for key in REGISTRY}
+    return {key: _from_env(spec) if spec.env_only else _decode(key, rows.get(key)) for key, spec in REGISTRY.items()}
 
 
 def customized(db: Session) -> set[str]:
@@ -226,9 +241,9 @@ def public_view(db: Session) -> dict[str, Any]:
     values = get_all(db)
     out = {}
     for key, spec in REGISTRY.items():
-        if spec.secret or spec.locked:
+        if spec.secret or spec.env_only:
             secret = values[key]
-            show_hint = spec.secret and spec.hint and not spec.locked
+            show_hint = spec.secret and spec.hint and not spec.env_only
             out[key] = {"is_set": bool(secret), "hint": ("…" + secret[-4:]) if secret and show_hint else None}
         else:
             out[key] = values[key]
@@ -242,6 +257,8 @@ def set_values(db: Session, values: dict[str, Any], user_id: int | None = None) 
     for key, value in values.items():
         if key not in REGISTRY:
             raise ValueError(f"Ajuste desconocido: {key}")
+        if REGISTRY[key].env_only:
+            raise ValueError(f"{key}: se configura en el .env del servidor, no se guarda en la base de datos")
         if value is None and REGISTRY[key].resettable:
             clean[key] = None
             continue
@@ -275,11 +292,9 @@ def set_values(db: Session, values: dict[str, Any], user_id: int | None = None) 
 
 def seed_from_env(db: Session) -> list[str]:
     """Copy the .env values into settings that do not exist yet (first start only)."""
-    import os
-
     seeded: list[str] = []
     for key, spec in REGISTRY.items():
-        if not spec.env or db.get(models.AppSetting, key) is not None:
+        if not spec.env or spec.env_only or db.get(models.AppSetting, key) is not None:
             continue
         raw = os.getenv(spec.env)
         if not raw:
@@ -300,16 +315,11 @@ def seed_from_env(db: Session) -> list[str]:
 
 def _seed_legacy_openai(db: Session, seeded: list[str]) -> list[str]:
     """Installations from before the AI settings have OPENAI_API_KEY (and OPENAI_MODEL): they keep
-    working as the "openai" provider unless AI_* says otherwise."""
-    import os
-
-    legacy = {
-        "ai.api_key": os.getenv("OPENAI_API_KEY"),
-        "ai.provider": "openai",
-        "ai.model": os.getenv("OPENAI_MODEL"),
-    }
-    if not legacy["ai.api_key"] or "ai.api_key" in seeded or db.get(models.AppSetting, "ai.api_key") is not None:
+    working as the "openai" provider unless AI_* says otherwise. The key itself is read from the environment
+    (`ai.api_key` is env_only); what is seeded is the provider and the model."""
+    if not os.getenv("OPENAI_API_KEY") or os.getenv("AI_API_KEY"):
         return []
+    legacy = {"ai.provider": "openai", "ai.model": os.getenv("OPENAI_MODEL")}
     added = []
     for key, raw in legacy.items():
         if not raw or key in seeded or db.get(models.AppSetting, key) is not None:
@@ -321,10 +331,3 @@ def _seed_legacy_openai(db: Session, seeded: list[str]) -> list[str]:
             continue
         added.append(key)
     return added
-
-
-def telegram_version(db: Session) -> str:
-    """Changes whenever the token or a chat id changes (the bot restarts on it)."""
-    values = get_all(db)
-    raw = "|".join(str(values[k]) for k in ("telegram.token", "telegram.group_id", "telegram.admin_chat_id"))
-    return hashlib.sha256(raw.encode()).hexdigest()[:16]

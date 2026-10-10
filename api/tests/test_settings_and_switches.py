@@ -39,11 +39,11 @@ class CoerceTests(unittest.TestCase):
 
 class EncryptionTests(unittest.TestCase):
     def test_secret_is_encrypted_and_round_trips(self):
-        token = "123456789:AAE_abcdefghijklmnopqrstuvwxyz012345"
-        stored = settings._encode("telegram.token", token)
-        self.assertNotIn(token, stored)
+        key = "sk-AAE_abcdefghijklmnopqrstuvwxyz012345"
+        stored = settings._encode("ai.api_key", key)
+        self.assertNotIn(key, stored)
         self.assertNotIn("AAE_", stored)
-        self.assertEqual(settings._decode("telegram.token", stored), token)
+        self.assertEqual(settings._decode("ai.api_key", stored), key)
 
     def test_plain_values_are_not_encrypted(self):
         self.assertEqual(settings._encode("weekly.time", "09:00"), "09:00")
@@ -53,7 +53,44 @@ class EncryptionTests(unittest.TestCase):
 
     def test_missing_value_uses_the_default(self):
         self.assertEqual(settings._decode("weekly.time", None), "09:00")
-        self.assertIsNone(settings._decode("telegram.token", None))
+        self.assertIsNone(settings._decode("ai.api_key", None))
+
+
+class EnvOnlyTests(unittest.TestCase):
+    """The keys of outside services (the Telegram token and chats, the AI key) live in the environment: a copy of the
+    database must not carry them."""
+
+    KEYS = ("telegram.token", "telegram.group_id", "telegram.admin_chat_id", "ai.api_key")
+
+    def test_the_keys_of_outside_services_are_the_ones_that_are_env_only(self):
+        self.assertEqual({key for key, spec in settings.REGISTRY.items() if spec.env_only}, set(self.KEYS))
+
+    def test_they_are_read_from_the_environment_every_time(self):
+        with mock.patch.dict("os.environ", {"TELEGRAM_TOKEN": " 123456789:abc ", "TELEGRAM_GROUP_ID": "-100"}):
+            self.assertEqual(settings.get("telegram.token"), "123456789:abc")
+            self.assertEqual(settings.get("telegram.group_id"), "-100")
+        with mock.patch.dict("os.environ", {"TELEGRAM_TOKEN": "", "TELEGRAM_GROUP_ID": "-200"}):
+            self.assertIsNone(settings.get("telegram.token"))  # blank is not set
+            self.assertEqual(settings.get("telegram.group_id"), "-200")  # no stale copy
+
+    def test_they_never_touch_the_database(self):
+        with mock.patch.object(settings, "SessionLocal", side_effect=AssertionError("the database was asked")),              mock.patch.dict("os.environ", {"TELEGRAM_TOKEN": "123456789:abc"}):
+            settings.get("telegram.token")
+
+    def test_they_cannot_be_written(self):
+        for key in self.KEYS:
+            with self.assertRaises(ValueError) as error:
+                settings.set_values(mock.Mock(), {key: "1"})
+            self.assertIn(".env", str(error.exception))
+
+    def test_the_seed_skips_them(self):
+        db = mock.Mock()
+        db.get.return_value = None
+        env = {"TELEGRAM_TOKEN": "123456789:" + "a" * 30, "TELEGRAM_GROUP_ID": "-100", "TELEGRAM_ADMIN_CHAT_ID": "42", "AI_PROVIDER": "openai"}
+        with mock.patch.dict("os.environ", env):
+            seeded = settings.seed_from_env(db)
+        self.assertEqual([key for key in seeded if key.startswith("telegram.")], [])
+        self.assertIn("ai.provider", seeded)  # the ones that are stored still are
 
 
 class FakeBot:

@@ -49,7 +49,7 @@ Docker Compose, four containers on the `la-viciacion` network:
 |---|---|---|---|
 | `laviciacion-front` | `ghcr.io/la-viciacion/laviciacion-front` (built from `front/Dockerfile`: `nginx:1.31-alpine`, static files copied in) | `3000` | Proxies `/api/` to `API_UPSTREAM`; gzip for text and JSON; `no-cache` on html/js/css, one day for `/assets/`; SPA fallback to `index.html` |
 | `laviciacion-api` | `ghcr.io/la-viciacion/laviciacion-api` (`api/Dockerfile`: `python:3.14-slim-trixie`) | `127.0.0.1:5000` | `entrypoint.sh`: wait for DB → `alembic upgrade head` → `uvicorn` (`--proxy-headers`) |
-| `laviciacion-bot` | `ghcr.io/la-viciacion/laviciacion-bot` (`bot/Dockerfile`: `python:3.14-slim-trixie`) | none | Depends on the API; restarts itself when Telegram settings change |
+| `laviciacion-bot` | `ghcr.io/la-viciacion/laviciacion-bot` (`bot/Dockerfile`: `python:3.14-slim-trixie`) | none | Depends on the API; reads the Telegram token and chats from its `.env` |
 | `laviciacion-db` | `mariadb:12.3.3` (official, pinned) | `127.0.0.1:3307` | Healthcheck gates the API start; data in `./db/data` (or a named volume, see [Database storage](#database-storage-linux-vs-windows)) |
 
 All use `restart: unless-stopped`. API, bot and db read `.env` through `env_file`; the front gets only `API_UPSTREAM` and `DNS_RESOLVER` through `environment:` (it must not see the secrets in `.env`). Logs of api/bot are bind-mounted to `./api/logs` and `./bot/logs`.
@@ -70,7 +70,8 @@ Single `.env` (template: `.env.template`; every variable and what it does: [conf
 - `ENVIRONMENT=production`; Sentry DSNs if wanted.
 - Password recovery (optional) needs `PUBLIC_URL` (the public address of the app, e.g. `https://lavi.example.com`) and an SMTP server: `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURITY`, `SMTP_EMAIL` (From), `SMTP_USER`/`SMTP_PASS`. Without them the feature answers "not configured". Migration `017_password_resets` adds its table. Try it once after deploying: the **Correo** card of the admin panel (Sistema) shows the state and sends a test email to your own account (your admin user needs an email); then ask for a link from the login page. Check the spam folder of a new sender.
 - Push notifications (optional) need HTTPS in front of the app; their VAPID keys are generated from the panel, not set in `.env`.
-- `SECRET_KEY` also derives the key that encrypts the Telegram token: rotate it only if you can re-enter the token (the panel cannot, it is locked: delete the `telegram.token` row of `app_settings` and put `TELEGRAM_TOKEN` in `.env`, which seeds it again on the next start) (it invalidates all sessions too).
+- `TELEGRAM_TOKEN`, `TELEGRAM_GROUP_ID`, (optional) `TELEGRAM_ADMIN_CHAT_ID` and `AI_API_KEY` are read from `.env` by the API and the bot every time and are **never stored in the database**, so a dump or a backup of it cannot run the bot or spend the AI quota. The bot does not start without the token and the group; the API does, and its panel says what is missing. Each environment has its own bot (two bots with one token fight over the updates). **Before deploying migration 035** (which deletes the rows that used to hold them) check that the `.env` of the environment has the right token and AI key: it is the only place left.
+- `SECRET_KEY` also derives the key that encrypts the secrets stored in the database (the Web Push private key): rotate it only if you can enter them again from the panel (it invalidates all sessions too).
 
 ## Database storage (Linux vs Windows)
 
