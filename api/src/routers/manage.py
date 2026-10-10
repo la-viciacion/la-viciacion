@@ -1316,26 +1316,13 @@ class SettingsBody(BaseModel):
     values: dict
 
 
-@router.get("/settings/telegram")
-def get_telegram_settings(db: Session = Depends(get_db)):
-    """Telegram token and chats for the bot process (the token is returned here on purpose).
-    `version` changes when any of them does, so the bot knows when to restart."""
-    values = settings.get_all(db)
-    return {
-        "token": values["telegram.token"],
-        "group_id": values["telegram.group_id"],
-        "admin_chat_id": values["telegram.admin_chat_id"],
-        "version": settings.telegram_version(db),
-    }
-
-
 @router.put("/settings")
 def put_settings(body: SettingsBody, admin: models.User = Depends(auth.require_admin), db: Session = Depends(get_db)):
     """Change several settings at once; nothing is stored if one of them is invalid."""
     if any(key.startswith("push.vapid") for key in body.values):
         raise HTTPException(status_code=400, detail="Las claves VAPID se generan con «Generar claves», no se escriben")
-    if any(settings.REGISTRY[key].locked for key in body.values if key in settings.REGISTRY):
-        raise HTTPException(status_code=400, detail="El token y los IDs de Telegram no se pueden cambiar desde el panel")
+    if any(settings.REGISTRY[key].env_only for key in body.values if key in settings.REGISTRY):
+        raise HTTPException(status_code=400, detail="El token y los IDs de Telegram se configuran en el .env del servidor, no desde el panel")
     try:
         changed = settings.set_values(db, body.values, user_id=admin.id)
     except ValueError as e:

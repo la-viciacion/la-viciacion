@@ -10,8 +10,8 @@ Telegram bot (bot) ── HTTP, superadmin token ────────┘   �
 
 - The **API is the only component that touches the DB** and holds all business rules.
 - The **front** is a static SPA served by nginx; nginx proxies `/api/` to `API_UPSTREAM` (default `laviciacion-api:5000`; `front/nginx.conf.template`, rendered at container start), so the browser only talks to one origin.
-- The **bot** is a read-only client (its one write is `/activate`, below): it logs in as the superadmin `admin` (password `GOD_ADMIN_PASS`) and uses generic endpoints (`/manage/...`, `/statistics/...`). It re-logs in on 401 and restarts itself when Telegram settings change in the API.
-- The API sends notifications to Telegram itself (through `utils/my_utils.py`, using the token stored in `app_settings`); the bot handles interactive commands.
+- The **bot** is a read-only client (its one write is `/activate`, below): it logs in as the superadmin `admin` (password `GOD_ADMIN_PASS`) and uses generic endpoints (`/manage/...`, `/statistics/...`). It re-logs in on 401. Its Telegram token and chats come from its own environment, not from the API.
+- The API sends notifications to Telegram itself (through `utils/my_utils.py`, using the token of the environment, never stored); the bot handles interactive commands.
 - All services share one `.env` (`env_file`); nothing secret or environment-specific is baked into images (they are built by CI, see [deployment](deployment.md#images)).
 
 ## API (`api/src/`)
@@ -97,7 +97,7 @@ Runs inside the API process (thread ticking every 30 s). Jobs: `weekly_summary`,
 
 ## Runtime settings (`utils/settings.py`)
 
-Table `app_settings` (global, admin-edited); keys are validated/coerced by `settings.coerce`. The Telegram token is stored encrypted (key derived from `SECRET_KEY`; rotating `SECRET_KEY` requires re-entering it) and is never returned to the panel. The token and the two chat ids are locked: the panel only shows whether they are set and cannot change them. `.env` values (`TELEGRAM_*`) only seed the table the first time.
+Table `app_settings` (global, admin-edited); keys are validated/coerced by `settings.coerce`. Secrets in it (the AI key, the Web Push private key) are stored encrypted (key derived from `SECRET_KEY`; rotating `SECRET_KEY` requires re-entering them) and are never returned to the panel. The Telegram token and the two chat ids are **not stored**: they are `env_only` settings, read from `TELEGRAM_*` in the environment every time, and the panel only shows whether they are set (migration 035 deleted the rows that used to hold them). A database copy therefore cannot run the group's bot.
 
 ## Personal settings (`utils/user_settings.py`)
 
@@ -121,7 +121,7 @@ Page module contract (documented at the top of `main.js`): exports `active`, opt
 
 ## Bot (`bot/src/`)
 
-`app.py` wires handlers; `routes/` holds the conversation flows (`basic_routes`, `my_routes`, `ranking_routes`); `utils/config.py` is a singleton that logs in to the API, fetches Telegram settings (`GET /manage/settings/telegram`) and watches them every 60 s (exits to be restarted by Docker if they change); `utils/my_utils.py` wraps sending messages and API requests; `utils/messages.py` holds the texts.
+`app.py` wires handlers; `routes/` holds the conversation flows (`basic_routes`, `my_routes`, `ranking_routes`); `utils/config.py` is a singleton that logs in to the API and reads the Telegram token and chats from the environment (the bot does not start without `TELEGRAM_TOKEN` and `TELEGRAM_GROUP_ID`); `utils/my_utils.py` wraps sending messages and API requests; `utils/messages.py` holds the texts.
 
 **Access control** (`utils/access.py` + `MyUtils.gate`, a `TypeHandler` in group -1 that runs before every handler): an update is served only if the chat is private or the group configured in the app (`telegram.group_id`) **and** the sender's Telegram id is the `telegram_id` of an active account (looked up with `GET /users/`). Identity is never the Telegram `@username`. Other groups and channels get no answer at all; handlers read the account from `context.user_data["app_user"]`. `/start` (a welcome that points to `/activate`) and `/activate` are the only commands for people not linked yet, and they work only inside the app's group; `/activate`: it links the sender's Telegram id to the account whose app username equals their Telegram `@username` (case-insensitively; the account must be active and have no id yet, an existing id is never overwritten, so changing one needs an admin) through `PATCH /manage/users/{id}`; afterwards the `@username` no longer matters. It is listed in the command menu only for the group (`set_my_commands` with a chat scope); the gate is what enforces it.
 

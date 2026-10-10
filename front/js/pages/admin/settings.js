@@ -2,8 +2,8 @@
 // (token, group, admin chat), the AI that writes the notices (provider, key, model), push and mail.
 // They are all one form split in cards; each page (see entities.js) shows the cards listed in its
 // `sections`, and saving sends only the fields on screen that changed.
-// Values live in the app_settings table; the API never returns a secret (the Telegram
-// token, the AI key), only whether it is set.
+// Values live in the app_settings table; the API never returns a secret (the AI key), only whether it is set.
+// The Telegram token and chats are not in it: they come from the server's .env and only whether they are set is shown.
 import { api, jsonRequest } from '../../lib/api.js';
 import { saveFile } from '../../lib/download.js';
 import { formatDateTime } from '../../lib/format.js';
@@ -85,7 +85,7 @@ function view(values, jobs, pushDevices, mail, aiUses) {
         <label>Token del bot <input class="adm-input" type="text" value="${state('telegram.token')}" disabled /></label>
         <label>ID del canal o grupo <input class="adm-input" type="text" value="${state('telegram.group_id')}" disabled /></label>
         <label>ID del chat de administración <input class="adm-input" type="text" value="${state('telegram.admin_chat_id')}" disabled /></label>
-        <div class="adm-sub">Estos valores no se pueden ver ni cambiar desde el panel.</div>
+        <div class="adm-sub">Se configuran en el .env del servidor: desde el panel solo se ve si están definidos.</div>
         <div><button type="button" class="adm-btn" data-set-act="test">Enviar mensaje de prueba al grupo</button></div>
       </section>`,
 
