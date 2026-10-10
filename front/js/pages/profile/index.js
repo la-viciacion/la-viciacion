@@ -147,18 +147,6 @@ function avatar(d) {
 
 function draw(d) {
   mount(main, html`
-    <div class="pf-head">
-      ${avatar(d)}
-      <div class="pf-head-text">
-        <h1 class="pf-title">${d.user.name || d.user.username}</h1>
-        <div class="pf-sub">@${d.user.username}</div>
-        <div class="pf-avatar-actions">
-          <label class="pf-btn">Cambiar foto<input type="file" id="pfAvatarInput" accept="image/png,image/jpeg" hidden /></label>
-          <span class="pf-msg" id="pfAvatarMsg" role="status"></span>
-        </div>
-      </div>
-    </div>
-
     <div class="adm-shell pf-shell">
     <aside class="adm-side">
       <button class="adm-side-toggle" type="button" id="pfSideToggle" aria-expanded="false" aria-controls="pfNav">
@@ -173,6 +161,17 @@ function draw(d) {
 
     <div class="pf-content">
     <section class="pf-panel" role="tabpanel" id="pfPanel-resumen" aria-labelledby="pfTab-resumen">
+      <div class="pf-head">
+        ${avatar(d)}
+        <div class="pf-head-text">
+          <h1 class="pf-title">${d.user.name || d.user.username}</h1>
+          <div class="pf-sub">@${d.user.username}</div>
+          <div class="pf-avatar-actions">
+            <label class="pf-btn">Cambiar foto<input type="file" id="pfAvatarInput" accept="image/png,image/jpeg" hidden /></label>
+            <span class="pf-msg" id="pfAvatarMsg" role="status"></span>
+          </div>
+        </div>
+      </div>
       <div class="pf-season" id="pfSeasons" role="group" aria-label="Temporada">${seasonPills(d)}</div>
       <section class="pf-stats" id="pfStats" aria-label="Estadísticas: ${seasonName(d)}">${statsView(d)}</section>
       <div class="pf-cols">

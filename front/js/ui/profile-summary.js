@@ -8,7 +8,10 @@ import * as seasons from '../lib/seasons.js';
 import { scoreBadge } from './score-badge.js';
 
 export const statTile = (label, value) => html`
-  <div class="pf-stat"><div class="pf-stat-value">${value}</div><div class="pf-stat-label">${label}</div></div>`;
+  <div class="pf-stat"><div class="pf-stat-label">${label}</div><div class="pf-stat-value">${value}</div></div>`;
+
+// seconds -> hours with one decimal ("12,5"), enough for a tile
+const hours = (seconds) => (seconds / 3600).toLocaleString('es-ES', { maximumFractionDigits: 1 });
 
 export const titleView = (title) => html`<h2 class="section-title">${title}</h2><div class="section-line"></div>`;
 export const sectionTitle = (title, id) => html`<div class="section-header" ${id ? html`id="${id}"` : ''}>${titleView(title)}</div>`;
@@ -26,9 +29,9 @@ export function statsView(d) {
   // a streak that is still running only makes sense for the running season or the total
   const running = d.season === seasons.ALL || d.season === d.seasons[0];
   return html`
-    ${statTile('Tiempo jugado', formatDuration(s.played_time))}
-    ${statTile('Días jugados', s.played_days)}
-    ${statTile('Juegos jugados', s.played_games)}
+    ${statTile('Horas', hours(s.played_time))}
+    ${statTile('Días', s.played_days)}
+    ${statTile('Juegos', s.played_games)}
     ${statTile('Completados', s.completed_games)}
     ${running ? statTile('Racha actual', `${s.current_streak} d`) : ''}
     ${statTile('Mejor racha', `${s.best_streak} d`)}

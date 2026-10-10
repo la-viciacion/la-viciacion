@@ -21,11 +21,11 @@
 
 .pf-note { margin: 4px 0 10px; }
 
-.pf-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 8px; }
+.pf-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 10px; margin-bottom: 8px; }
 
-.pf-stat { background: var(--gradient-card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px 16px; }
+.pf-stat { background: var(--gradient-card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 10px 12px; }
 
-.pf-stat-value { font-size: 1.4rem; font-weight: 700; }
+.pf-stat-value { font-size: 1.25rem; font-weight: 700; }
 
 .pf-stat-label { color: var(--text-secondary); font-size: 0.8rem; }
 
@@ -48,7 +48,7 @@
 }
 
 /* Layout: the admin's side menu (css/admin.css), with the profile's sections */
-.pf-shell { margin-top: 22px; }
+.pf-shell { margin-top: 0; }
 
 .pf-panel[hidden] { display: none; }
 .pf-panel { animation: fadeIn 0.25s ease; }
@@ -230,7 +230,12 @@
   to { box-shadow: 0 0 24px rgba(var(--aura-rgb), 0.8), inset 0 0 24px rgba(var(--aura-rgb), 0.16); }
 }
 @media (prefers-reduced-motion: reduce) { .ach-card[class*="special-"] { animation: none; } }
-.pf-row[class*="special-"] { box-shadow: inset 3px 0 0 rgb(var(--aura-rgb)), inset 14px 0 18px -14px rgba(var(--aura-rgb), 0.6); }
+/* The aura sits in the card's padding (negative margin) so the text keeps its alignment and does not touch the bar */
+.pf-row[class*="special-"] {
+  margin: -4px -10px; padding: 4px 10px; border-radius: var(--radius-sm);
+  background: linear-gradient(90deg, rgba(var(--aura-rgb), 0.18), rgba(var(--aura-rgb), 0.04) 70%, transparent);
+  box-shadow: inset 3px 0 0 rgb(var(--aura-rgb));
+}
 .pf-tag[class*="special-"] { background: rgba(var(--aura-rgb), 0.16); color: rgb(var(--aura-rgb)); }
 .pf-tag.secret { background: rgba(255, 255, 255, 0.9); color: #0a0a14; }
 .ach-img { width: 56px; height: 56px; border-radius: var(--radius-sm); object-fit: cover; flex: none; }

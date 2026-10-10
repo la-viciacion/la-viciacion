@@ -88,7 +88,6 @@
 
 .navbar-link.active { color: var(--accent-teal); background: rgba(61,217,179,0.12); }
 
-.admin-main { max-width: 1360px; }
 
 .navbar-user {
   text-decoration: none; padding: 4px 12px 4px 5px; border-radius: var(--radius-pill);
@@ -99,7 +98,7 @@
 
 .navbar-user.active { border-color: var(--border-accent); }
 
-.profile-main { max-width: 900px; }
+.admin-main, .profile-main { max-width: 1200px; }
 
 /* Playing now: the chip with the avatars of who is playing, and the aura on an avatar that is playing */
 .playing-slot { display: flex; align-items: center; }
