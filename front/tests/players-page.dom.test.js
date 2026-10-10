@@ -61,7 +61,7 @@ test('a player page reuses the summary: figures, most played with ratings, achie
   assert.equal(calls[0].path, '/group/players/2');
   assert.equal(document.querySelector('h1').textContent, 'Bea');
   assert.match(text('.pf-sub')[0], /@bea/);
-  assert.ok(text('.pf-stat-label').includes('Tiempo jugado'));
+  assert.ok(text('.pf-stat-label').includes('Horas'));
   assert.equal(text('.pf-bar-label')[0].includes('Hades'), true);
   assert.equal(document.querySelectorAll('.pf-bar-label .score-badge').length, 1);
   assert.match(main().textContent, /Madrugador/);
