@@ -266,7 +266,7 @@ class ManualSessionTests(TimerTestCase):
         self.assertEqual((body["duration_seconds"], body["notes"], body["platform"]), (90 * 60, "speedrun", "pc"))
         self.assertEqual(self.library(self.ana), [("celeste", "pc", seasons.current())])
         # not silent: what it earns is announced, and its season is worked out again so what it cannot hold is revoked
-        self.background["after_session_change"].assert_called_once_with(self.ana, False, recalculate=[seasons.of(start)])
+        self.background["after_session_change"].assert_called_once_with(self.ana, False, recalculate=[seasons.of(start)], since=start.date())
         self.background["after_timer_start"].assert_not_called()
 
     def test_the_time_rules(self):
@@ -330,17 +330,17 @@ class ManualSessionTests(TimerTestCase):
         done = self.api("POST", "/timers/manual", as_user="root", json=body)
         self.assertEqual((done.status_code, done.json()["user_id"]), (201, self.bea))
         # an admin's change checks the player silently, like the ones of the admin panel
-        self.background["after_session_change"].assert_called_once_with(self.bea, True, recalculate=[seasons.of(start)])
+        self.background["after_session_change"].assert_called_once_with(self.bea, True, recalculate=[seasons.of(start)], since=start.date())
 
     def test_an_admin_editing_or_deleting_somebody_elses_session_stays_silent(self):
         start = ago(hours=6)
         session_id = self.manual(start=start, end=start + timedelta(hours=1)).json()["id"]
         self.background["after_session_change"].reset_mock()
         self.api("PATCH", f"/timers/{session_id}", as_user="root", json={"end_time": iso(start + timedelta(hours=2))})
-        self.background["after_session_change"].assert_called_once_with(self.ana, True, recalculate=[seasons.of(start)])
+        self.background["after_session_change"].assert_called_once_with(self.ana, True, recalculate=[seasons.of(start)], since=start.date())
         self.background["after_session_change"].reset_mock()
         self.api("DELETE", f"/timers/{session_id}", as_user="root")
-        self.background["after_session_change"].assert_called_once_with(self.ana, True, recalculate=[seasons.of(start)])
+        self.background["after_session_change"].assert_called_once_with(self.ana, True, recalculate=[seasons.of(start)], since=start.date())
 
 
 class EditSessionTests(TimerTestCase):
@@ -357,7 +357,7 @@ class EditSessionTests(TimerTestCase):
         response = self.patch(end_time=iso(self.start_at + timedelta(hours=2)))
         self.assertEqual((response.status_code, response.json()["duration_seconds"]), (200, 2 * 3600))
         # what it earned may no longer hold: the achievements of its season are worked out again
-        self.background["after_session_change"].assert_called_once_with(self.ana, False, recalculate=[seasons.of(self.start_at)])
+        self.background["after_session_change"].assert_called_once_with(self.ana, False, recalculate=[seasons.of(self.start_at)], since=self.start_at.date())
 
     def test_it_changes_the_notes_and_can_clear_them(self):
         self.assertEqual(self.patch(notes="first try").json()["notes"], "first try")
@@ -419,7 +419,7 @@ class DeleteSessionTests(TimerTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(self.scalar("SELECT COUNT(*) FROM game_timers"), 0)
         # the achievements of its season are worked out again: it may have earned some
-        self.background["after_session_change"].assert_called_once_with(self.ana, False, recalculate=[seasons.of(self.began)])
+        self.background["after_session_change"].assert_called_once_with(self.ana, False, recalculate=[seasons.of(self.began)], since=self.began.date())
 
     def test_only_the_owner_or_an_admin_can_delete(self):
         self.assertEqual(self.api("DELETE", f"/timers/{self.session_id}", as_user="bea").status_code, 403)
