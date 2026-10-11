@@ -8,7 +8,7 @@ not (they may have been in a past season). The emergency account never does.
 
 The recalculation of the admin panel never notifies anybody: the working out itself neither goes through
 `send_message` nor can be asked to (see `Achievements.collected`). Only the follow-up of a player's own session
-(`recalculate_user` with `notify`) announces what it added, once the changes are stored. A preview (`plan`) lists
+(`recalculate_user` with `notify`) announces what it added dated today, once the changes are stored. A preview (`plan`) lists
 the changes without making them; applying them is a second step.
 """
 import asyncio
@@ -29,6 +29,9 @@ logger = LogManager().get_logger()
 TEAMWORK_PLAYERS = 4
 # judged on the timers running together, one message naming everybody: only a timer that starts can announce them
 MULTIPLAYER_KEYS = {"TEAMWORK", "ALL_TOGETHER"}
+# judged once, at the moment it happens, against data that changes afterwards (the average time of HLTB): working
+# them out again would award or take away what the moment did not, so a recalculation leaves them exactly as they are
+MOMENT_KEYS = {"JUST_IN_TIME"}
 
 
 class Change(NamedTuple):
@@ -103,7 +106,6 @@ async def _expected(db: Session, user: models.User, season: int) -> dict[str, Aw
     checks = Achievements(silent=True, season=season, collected=collected)
     await actions.check_user(db, user, silent=True, checks=checks)
     await checks.opened_by_mistake_from_sessions(db, user)
-    await checks.just_in_time_of_the_season(db, user)
     return {award.key: award for award in collected}
 
 
@@ -159,7 +161,7 @@ async def _plan(
         query = query.filter(models.User.id.in_(user_ids))
     titles = {key: title for key, title in db.query(models.Achievement.key, models.Achievement.title).all()}
     switched_on = {key for (key,) in db.query(models.Achievement.key).filter(models.Achievement.active == True)}  # noqa: E712
-    allowed = switched_on if achievement_keys is None else switched_on & set(achievement_keys)
+    allowed = (switched_on if achievement_keys is None else switched_on & set(achievement_keys)) - MOMENT_KEYS
     valid_from = dict(db.query(models.Achievement.key, models.Achievement.valid_from_season).all())
     this_season = seasons.current()
     lifetime_keys = {key for key in allowed if is_lifetime(key)}
@@ -217,8 +219,10 @@ async def recalculate_user(db: Session, user_id: int, season_list: list[int], no
     apply(db, changes)
     if notify:
         user = db.get(models.User, user_id)
+        today = datetime.date.today()
         for change in changes:
-            if change.action != "add" or change.key in MULTIPLAYER_KEYS or user is None:
+            # what dates from before today was found by the recalculation, not earned by this session: it is stored, not announced
+            if change.action != "add" or change.key in MULTIPLAYER_KEYS or user is None or change.date_after < today:
                 continue
             try:
                 await actions.achievements.announce_added(db, user, change.key, change.game_after)
