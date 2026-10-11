@@ -317,3 +317,12 @@
 .ch-actions:empty { display: none; }
 .ch-history { display: flex; flex-direction: column; gap: 8px; }
 .ch-history-item { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+
+/* "Mis juegos": the filters above the list and the random rating */
+.pf-lib-bar { margin-bottom: 0; }
+.pf-lib-bar [data-filter="q"] { flex: 1 1 180px; }
+.pf-lib-bar .pf-btn { display: inline-flex; align-items: center; gap: 6px; }
+.rand-game { display: flex; gap: 14px; align-items: center; }
+.rand-cover { width: 96px; height: 96px; border-radius: var(--radius-sm); object-fit: cover; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 2rem; }
+.rand-name { font-size: 1.05rem; }
+.rand-done { padding: 12px 0; text-align: center; color: var(--text-secondary); }
