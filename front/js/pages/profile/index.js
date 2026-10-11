@@ -1,7 +1,8 @@
 // Profile page: a header (photo and name) and, below it, the layout of the admin panel: a side menu
-// (a collapsible bar on a phone) with two sections so nothing needs a long scroll. Resumen is the
+// (a collapsible bar on a phone) with three sections so nothing needs a long scroll. Resumen is the
 // default: the stats of a season (the running one, another one or the total of all, chosen with the
 // pills), top games, achievements and, below them, the games of the selected season (see library.js).
+// Mis juegos is the whole library with filters and a random rating; it loads the first time it is opened.
 // Ajustes (personal data, password, notifications, session) is the other; it loads the first time it is opened.
 // The layout classes (adm-shell, adm-side, adm-nav...) are the admin's, so both look the same.
 // All routes are /api/v1/users/{username}/...
@@ -16,7 +17,7 @@ import { initAccount } from './account.js';
 import { initAvatar } from './avatar.js';
 import { initData } from './data.js';
 import { flash } from './flash.js';
-import { initLibrary, showSeason } from './library.js';
+import { createLibrary } from './library.js';
 import { initNotifications } from './notifications.js';
 import { initPreferences } from './preferences.js';
 import { initPush } from './push.js';
@@ -30,6 +31,7 @@ const SHOW_PLAYING_OPTION = false;
 
 const TABS = [
   ['resumen', 'Resumen'],
+  ['juegos', 'Mis juegos'],
   ['ajustes', 'Ajustes'],
 ];
 
@@ -37,6 +39,8 @@ let main;
 let user;
 let avatarUrl;
 let opened; // tabs already initialised
+let summaryGames; // the list of Resumen (the season on screen)
+let myGames; // the list of Mis juegos (every season)
 let aboutYou; // the city and birth date inside "Mis datos" (about.js): saved with the rest of the form
 let onLogout;
 let shown; // season asked for: a year, or seasons.ALL; null = the running one
@@ -59,6 +63,8 @@ async function load() {
   onScreen = data.season;
   draw(data);
   opened = new Set();
+  summaryGames = null;
+  myGames = null;
   showTab(tabFromHash());
 }
 
@@ -82,7 +88,14 @@ function showTab(id) {
   if (opened.has(id)) return;
   opened.add(id);
   if (id === 'resumen') showChallengesHistory(main.querySelector('#pfChallenges'), user.id, true);
-  if (id === 'resumen') initLibrary(main.querySelector('#pfLibrary'), { username: user.username, userId: user.id, season: onScreen, onChange: refreshSummary });
+  if (id === 'resumen') {
+    summaryGames = createLibrary(main.querySelector('#pfLibrary'), { username: user.username, userId: user.id, season: onScreen, onChange: () => gamesChanged(summaryGames) });
+    summaryGames.init();
+  }
+  if (id === 'juegos') {
+    myGames = createLibrary(main.querySelector('#pfMyGames'), { username: user.username, userId: user.id, season: seasons.ALL, filterable: true, onChange: () => gamesChanged(myGames) });
+    myGames.init();
+  }
   if (id === 'ajustes') {
     initNotifications(main.querySelector('#pfNotifs'), { path: userPath('settings') }).catch(() => {});
     if (SHOW_PLAYING_OPTION) initPreferences(main.querySelector('#pfPrefs'), { path: userPath('settings') }).catch(() => {});
@@ -123,7 +136,14 @@ async function refreshSummary(season = shown) {
   mount(main.querySelector('#pfAchTitle'), titleView(`Logros ${seasonSuffix(data)}`));
   mount(main.querySelector('#pfAchievements'), achievementsView(data));
   mount(main.querySelector('#pfGamesTitle'), titleView(`Juegos ${seasonSuffix(data)}`));
-  if (changed && opened.has('resumen')) await showSeason(data.season);
+  if (changed && summaryGames) await summaryGames.showSeason(data.season);
+}
+
+// A game changed in one of the two lists: the numbers of the summary and the other list follow.
+async function gamesChanged(source) {
+  await refreshSummary();
+  const other = source === myGames ? summaryGames : myGames;
+  if (other) await other.reload();
 }
 
 async function onSeason(e) {
@@ -188,6 +208,11 @@ function draw(d) {
       <div id="pfLibrary"></div>
       ${sectionTitle('Retos')}
       <div class="pf-card" id="pfChallenges"></div>
+    </section>
+
+    <section class="pf-panel" role="tabpanel" id="pfPanel-juegos" aria-labelledby="pfTab-juegos" hidden>
+      ${sectionTitle('Mis juegos')}
+      <div id="pfMyGames"></div>
     </section>
 
     <section class="pf-panel" role="tabpanel" id="pfPanel-ajustes" aria-labelledby="pfTab-ajustes" hidden>
