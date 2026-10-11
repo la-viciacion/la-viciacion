@@ -173,15 +173,48 @@ class RecalculationTests(unittest.TestCase):
         self.assertIn(("revoke", 1, YEAR, "PLAYED_7_DAYS"), got)
         self.assertIn(("add", 1, PAST, "PLAYED_7_DAYS"), got)
 
-    def test_just_in_time_and_opened_by_mistake_are_worked_out_from_the_season(self):
+    def test_opened_by_mistake_is_worked_out_from_the_season_but_just_in_time_is_not(self):
         self.db.add(models.UserGame(user_id=1, game_id="g1", started_date=D(PAST, 3, 1), platform=None, completed=1, completed_date=D(PAST, 3, 3)))
         self.play(1, at(PAST, 3, 1, 12), minutes=120)  # the 2 h of the average time
         self.play(1, at(PAST, 3, 2, 12), minutes=3)  # and a session of 3 minutes: 2 h 3 min is within 5 %
         self.db.commit()
         got = self.changes()
-        self.assertEqual(got[("add", 1, PAST, "JUST_IN_TIME")].date_after, D(PAST, 3, 3))
-        self.assertEqual(got[("add", 1, PAST, "JUST_IN_TIME")].game_after, "g1")
         self.assertEqual(got[("add", 1, PAST, "PLAYED_LESS_5_MIN_SESSION")].date_after, D(PAST, 3, 2))
+        self.assertFalse([key for key in got if key[3] == "JUST_IN_TIME"])  # only the moment of completing the game awards it
+
+    def test_just_in_time_is_never_added_corrected_or_revoked(self):
+        self.award(1, "JUST_IN_TIME", D(PAST, 1, 5), "g1")  # earned then, whatever the sessions or the average say today
+        self.play(1, at(PAST, 3, 1, 12), minutes=10)
+        self.assertFalse([key for key in self.changes() if key[3] == "JUST_IN_TIME"])
+        self.assertFalse([key for key in self.changes(achievement_keys=["JUST_IN_TIME"])])
+        recalc.apply(self.db, recalc.plan(self.db))
+        self.assertIn(("JUST_IN_TIME", D(PAST, 1, 5), "g1"), self.stored())
+
+    def test_what_a_recalculation_finds_from_before_today_is_stored_but_not_announced(self):
+        import asyncio
+
+        self.play_days(1, PAST, 7)
+        with mock.patch.object(Achievements, "announce_added", new=mock.AsyncMock()) as announce:
+            asyncio.run(recalc.recalculate_user(self.db, 1, [PAST], notify=True))
+        self.assertIn(("PLAYED_7_DAYS", D(PAST, 3, 7), None), self.stored())
+        announce.assert_not_awaited()
+
+    def test_what_is_dated_on_or_after_the_day_of_the_session_is_announced_and_the_rest_is_not(self):
+        import asyncio
+
+        self.play_days(1, PAST, 7)  # the 7th day, 7 March
+        with mock.patch.object(Achievements, "announce_added", new=mock.AsyncMock()) as announce:
+            asyncio.run(recalc.recalculate_user(self.db, 1, [PAST], notify=True, since=D(PAST, 3, 7)))
+        self.assertEqual({call.args[2] for call in announce.await_args_list}, {"PLAYED_7_DAYS", "STREAK_7_DAYS"})
+
+    def test_what_a_recalculation_adds_dated_today_is_announced(self):
+        import asyncio
+
+        for offset in range(7):
+            self.play(1, datetime.datetime.combine(D.today() - datetime.timedelta(days=6 - offset), datetime.time(10)))
+        with mock.patch.object(Achievements, "announce_added", new=mock.AsyncMock()) as announce:
+            asyncio.run(recalc.recalculate_user(self.db, 1, [D.today().year], notify=True))
+        self.assertEqual({call.args[2] for call in announce.await_args_list}, {"PLAYED_7_DAYS", "STREAK_7_DAYS"})
 
     def test_a_session_that_was_deleted_takes_what_it_earned_with_it_in_that_season_only(self):
         import asyncio
@@ -216,10 +249,10 @@ class RecalculationTests(unittest.TestCase):
 
     def test_the_preview_names_the_games_instead_of_giving_their_ids(self):
         self.db.add(models.UserGame(user_id=1, game_id="g1", started_date=D(PAST, 3, 1), platform=None, completed=1, completed_date=D(PAST, 3, 3)))
-        self.play(1, at(PAST, 3, 1, 12), minutes=120)
+        self.play(1, at(PAST, 3, 1, 12), minutes=3)
         self.db.commit()
         got = {c["key"]: c for c in recalc.preview(self.db)["changes"]}
-        self.assertEqual((got["JUST_IN_TIME"]["game_after"], got["JUST_IN_TIME"]["game_after_name"]), ("g1", "Doom"))
+        self.assertEqual((got["PLAYED_LESS_5_MIN_SESSION"]["game_after"], got["PLAYED_LESS_5_MIN_SESSION"]["game_after_name"]), ("g1", "Doom"))
         self.assertIsNone(got["COMPLETED_1_GAME"]["game_after_name"])  # most have no game
 
     def play_a_day_each(self, user_id, first_day, days):

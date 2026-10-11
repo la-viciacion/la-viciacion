@@ -434,11 +434,20 @@ class EditedSessionTests(WorkTestCase):
         self.play_days(self.ana, 6)
         self.sent.clear()
         self.session(self.ana, "celeste", at(3, 7), 30)  # the seventh day: the session a player enters by hand
-        self.real_actions["after_session_change"](self.ana, False, recalculate=[YEAR])
+        self.real_actions["after_session_change"](self.ana, False, recalculate=[YEAR], since=at(3, 7).date())
         self.assertTrue({"PLAYED_7_DAYS", "STREAK_7_DAYS"} <= set(self.awarded()))
         told = [m["text"] for m in self.sent]
         self.assertTrue(any("Ana" in text for text in told), told)
         self.assertTrue(all(not m["silent"] for m in self.sent))
+
+    def test_what_the_recalculation_finds_from_before_the_session_is_stored_without_announcing_it(self):
+        self.play_days(self.ana, 6)
+        self.session(self.ana, "celeste", at(3, 7), 30)  # the seventh day was played, but nothing worked it out
+        self.sent.clear()
+        self.session(self.ana, "celeste", at(3, 25), 30)  # a session that earns nothing of its own
+        self.real_actions["after_session_change"](self.ana, False, recalculate=[YEAR], since=at(3, 25).date())
+        self.assertTrue({"PLAYED_7_DAYS", "STREAK_7_DAYS"} <= set(self.awarded()))
+        self.assertEqual(self.sent, [])
 
     def test_the_same_change_made_silently_announces_nothing_but_still_stores_it(self):
         self.play_days(self.ana, 7)

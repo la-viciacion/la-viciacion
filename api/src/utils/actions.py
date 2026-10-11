@@ -148,6 +148,7 @@ def after_session_change(
     ranking_before: dict | None = None,
     stopped: tuple | None = None,
     recalculate: list[int] | None = None,
+    since: datetime.date | None = None,
 ):
     """Background-task entrypoint for routers/timers.py and the admin panel.
 
@@ -165,7 +166,8 @@ def after_session_change(
     `recalculate` is the seasons of a session that was added, edited or deleted: instead of only adding what
     the user has earned, their achievements of those seasons are worked out again, so what the session
     earned and no longer holds is revoked (see crud/achievements_recalc.py). What it adds is announced unless
-    `silent` (an admin's changes are silent); a revocation never is.
+    `silent` (an admin's changes are silent); a revocation never is. `since` is the first day the session touches: only
+    what is dated then or later is announced, the rest the recalculation finds is stored in silence (today by default).
     """
     from ..database.database import SessionLocal
 
@@ -175,7 +177,7 @@ def after_session_change(
             if recalculate:
                 from ..crud import achievements_recalc  # imports this module too
 
-                await achievements_recalc.recalculate_user(db, user_id, recalculate, notify=not silent)
+                await achievements_recalc.recalculate_user(db, user_id, recalculate, notify=not silent, since=since)
             else:
                 await check_users(db, silent=silent, user_ids=None if user_id is None else [user_id])
             if stopped is not None:

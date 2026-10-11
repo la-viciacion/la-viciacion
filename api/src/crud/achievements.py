@@ -548,17 +548,6 @@ class Achievements:
                 date=str(entry.start), game_id=entry.game_id,
             )
 
-    async def just_in_time_of_the_season(self, db: Session, user: models.User, silent: bool = False):
-        """The games completed in the season, in order, against the average time stored for each game
-        (a recalculation does not ask HLTB again)."""
-        for day, game_id in users.completed_entries(db, user.id, self.season):
-            played = sum(
-                seconds or 0
-                for _, seconds in time_entries.get_user_games_played_time(db, user.id, game_id, self.season)
-            )
-            game = games.get_game_by_id(db, game_id)
-            await self.just_in_time(db, user, played, game.avg_time if game else None, game_id, date=str(day), silent=silent)
-
     async def prodigal_son(self, db: Session, user: models.User, played_days: list, silent: bool = False):
         """Back after 30 days or more without playing, inside the season. Dated the day they came back."""
         for before, after in zip(played_days, played_days[1:]):
