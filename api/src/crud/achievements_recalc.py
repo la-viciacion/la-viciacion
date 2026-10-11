@@ -8,7 +8,7 @@ not (they may have been in a past season). The emergency account never does.
 
 The recalculation of the admin panel never notifies anybody: the working out itself neither goes through
 `send_message` nor can be asked to (see `Achievements.collected`). Only the follow-up of a player's own session
-(`recalculate_user` with `notify`) announces what it added dated today, once the changes are stored. A preview (`plan`) lists
+(`recalculate_user` with `notify`) announces what it added from the day of the session on (today when no day is given), once the changes are stored. A preview (`plan`) lists
 the changes without making them; applying them is a second step.
 """
 import asyncio
@@ -209,20 +209,24 @@ def plan(
     return asyncio.run(_plan(db, user_ids, None if season_list is None else set(season_list), achievement_keys))
 
 
-async def recalculate_user(db: Session, user_id: int, season_list: list[int], notify: bool = False) -> list[Change]:
+async def recalculate_user(
+    db: Session, user_id: int, season_list: list[int], notify: bool = False, since: datetime.date | None = None
+) -> list[Change]:
     """Work out again the achievements of one user in some seasons and apply it. It is what follows a session
     that was added, edited or deleted: what it earns is added and what it earned and no longer holds is revoked.
-    Silent unless `notify`, which announces what was added (the same notice a timer gives); a revocation, a
+    Silent unless `notify`, which announces what was added (the same notice a timer gives) dated `since` or later, the
+    first day the session changed touches (today by default): an earlier one was not caused by it, it is stored in
+    silence; a revocation, a
     corrected date and the two that need several players at once are never announced. The caller is already in an
     event loop and holds the lock of the checks."""
     changes = await _plan(db, [user_id], set(season_list))
     apply(db, changes)
     if notify:
         user = db.get(models.User, user_id)
-        today = datetime.date.today()
+        since = since or datetime.date.today()
         for change in changes:
-            # what dates from before today was found by the recalculation, not earned by this session: it is stored, not announced
-            if change.action != "add" or change.key in MULTIPLAYER_KEYS or user is None or change.date_after < today:
+            # what dates from before the session changed was found by the recalculation, not earned by the session: it is stored, not announced
+            if change.action != "add" or change.key in MULTIPLAYER_KEYS or user is None or change.date_after < since:
                 continue
             try:
                 await actions.achievements.announce_added(db, user, change.key, change.game_after)

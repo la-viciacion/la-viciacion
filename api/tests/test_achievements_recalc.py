@@ -199,6 +199,14 @@ class RecalculationTests(unittest.TestCase):
         self.assertIn(("PLAYED_7_DAYS", D(PAST, 3, 7), None), self.stored())
         announce.assert_not_awaited()
 
+    def test_what_is_dated_on_or_after_the_day_of_the_session_is_announced_and_the_rest_is_not(self):
+        import asyncio
+
+        self.play_days(1, PAST, 7)  # the 7th day, 7 March
+        with mock.patch.object(Achievements, "announce_added", new=mock.AsyncMock()) as announce:
+            asyncio.run(recalc.recalculate_user(self.db, 1, [PAST], notify=True, since=D(PAST, 3, 7)))
+        self.assertEqual({call.args[2] for call in announce.await_args_list}, {"PLAYED_7_DAYS", "STREAK_7_DAYS"})
+
     def test_what_a_recalculation_adds_dated_today_is_announced(self):
         import asyncio
 

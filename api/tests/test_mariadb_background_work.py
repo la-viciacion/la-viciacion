@@ -431,22 +431,21 @@ class EditedSessionTests(WorkTestCase):
         self.assertEqual(self.sent, [])
 
     def test_a_session_added_by_hand_announces_what_it_earns(self):
-        today = clock.today()
-        for back in range(6, 0, -1):
-            self.session(self.ana, "celeste", datetime.datetime.combine(today - timedelta(days=back), datetime.time(20)), 30)
+        self.play_days(self.ana, 6)
         self.sent.clear()
-        self.session(self.ana, "celeste", datetime.datetime.combine(today, datetime.time(20)), 30)  # the seventh day: the session a player enters by hand
-        self.real_actions["after_session_change"](self.ana, False, recalculate=[YEAR])
+        self.session(self.ana, "celeste", at(3, 7), 30)  # the seventh day: the session a player enters by hand
+        self.real_actions["after_session_change"](self.ana, False, recalculate=[YEAR], since=at(3, 7).date())
         self.assertTrue({"PLAYED_7_DAYS", "STREAK_7_DAYS"} <= set(self.awarded()))
         told = [m["text"] for m in self.sent]
         self.assertTrue(any("Ana" in text for text in told), told)
         self.assertTrue(all(not m["silent"] for m in self.sent))
 
-    def test_a_session_added_by_hand_for_a_past_day_stores_what_it_earns_without_announcing_it(self):
+    def test_what_the_recalculation_finds_from_before_the_session_is_stored_without_announcing_it(self):
         self.play_days(self.ana, 6)
+        self.session(self.ana, "celeste", at(3, 7), 30)  # the seventh day was played, but nothing worked it out
         self.sent.clear()
-        self.session(self.ana, "celeste", at(3, 7), 30)
-        self.real_actions["after_session_change"](self.ana, False, recalculate=[YEAR])
+        self.session(self.ana, "celeste", at(3, 25), 30)  # a session that earns nothing of its own
+        self.real_actions["after_session_change"](self.ana, False, recalculate=[YEAR], since=at(3, 25).date())
         self.assertTrue({"PLAYED_7_DAYS", "STREAK_7_DAYS"} <= set(self.awarded()))
         self.assertEqual(self.sent, [])
 
