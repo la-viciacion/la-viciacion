@@ -176,7 +176,7 @@ class RecalculationTests(unittest.TestCase):
     def test_opened_by_mistake_is_worked_out_from_the_season_but_just_in_time_is_not(self):
         self.db.add(models.UserGame(user_id=1, game_id="g1", started_date=D(PAST, 3, 1), platform=None, completed=1, completed_date=D(PAST, 3, 3)))
         self.play(1, at(PAST, 3, 1, 12), minutes=120)  # the 2 h of the average time
-        self.play(1, at(PAST, 3, 2, 12), minutes=3)  # and a session of 3 minutes: 2 h 3 min is within 5 %
+        self.play(1, at(PAST, 3, 2, 12), minutes=1)  # and a session of 1 minute: 2 h 1 min is within the margin
         self.db.commit()
         got = self.changes()
         self.assertEqual(got[("add", 1, PAST, "PLAYED_LESS_5_MIN_SESSION")].date_after, D(PAST, 3, 2))

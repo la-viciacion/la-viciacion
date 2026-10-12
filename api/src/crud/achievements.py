@@ -116,8 +116,21 @@ HOURS_IN_A_GAME = (
 )
 # "Lo he abierto sin querer": a timer that was stopped within this many seconds
 OPENED_BY_MISTAKE_SECONDS = 5 * 60
-# "Justo a tiempo": the time played has to be this close (a fraction of it) to the HLTB average
-JUST_IN_TIME_TOLERANCE = 0.05
+# "Justo a tiempo": the time played has to be this close (a fraction of it) to the HLTB average. The margin grows with
+# the game: JUST_IN_TIME_MIN_TOLERANCE up to JUST_IN_TIME_SHORT_HOURS, JUST_IN_TIME_MAX_TOLERANCE from
+# JUST_IN_TIME_LONG_HOURS, in a straight line between them (a few minutes mean much more on a short game)
+JUST_IN_TIME_MIN_TOLERANCE = 0.01
+JUST_IN_TIME_MAX_TOLERANCE = 0.05
+JUST_IN_TIME_SHORT_HOURS = 2
+JUST_IN_TIME_LONG_HOURS = 40
+
+
+def just_in_time_tolerance(avg_time: int) -> float:
+    """The fraction of `avg_time` (seconds) the time played may differ from it to earn "Justo a tiempo"."""
+    hours = avg_time / 3600
+    share = (hours - JUST_IN_TIME_SHORT_HOURS) / (JUST_IN_TIME_LONG_HOURS - JUST_IN_TIME_SHORT_HOURS)
+    share = min(max(share, 0.0), 1.0)
+    return JUST_IN_TIME_MIN_TOLERANCE + (JUST_IN_TIME_MAX_TOLERANCE - JUST_IN_TIME_MIN_TOLERANCE) * share
 
 ######################
 #### ACHIEVEMENTS ####
@@ -955,7 +968,7 @@ class Achievements:
             return
         # Both played_time and avg_time (HLTB comp_main) are in seconds. An exact match is
         # unreachable, so it is enough to be within a few percent of the average.
-        if abs(played_time - avg_time) <= avg_time * JUST_IN_TIME_TOLERANCE:
+        if abs(played_time - avg_time) <= avg_time * just_in_time_tolerance(avg_time):
             await self._unlock_if_new(
                 db, user, AchievementsElems.JUST_IN_TIME, silent, date=date, game_id=game_id
             )
