@@ -627,7 +627,7 @@ class AchievementsElems(Enum):
         "message": "*{}*"
         + " acaba de terminar "
         + "_{}_"
-        + " en el tiempo medio según HLTB (con un margen del 5 %).",
+        + " en el tiempo medio según HLTB (con un margen que crece con la duración del juego).",
     }
 
     HAPPY_NEW_YEAR = {

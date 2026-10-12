@@ -248,17 +248,24 @@ class AchievementCheckTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.awarded()["PLAYED_8_HOURS_GAME_DAY"], (datetime.date(YEAR, 2, 2), "g1"))
         self.assertEqual(self.sent.await_count, 1)
 
-    async def test_just_in_time_needs_the_time_within_five_percent_of_the_average(self):
+    def test_the_just_in_time_margin_grows_with_the_game(self):
         hour = 3600
+        for hours, expected in ((0.5, 0.01), (2, 0.01), (5, 0.01 + 0.04 * 3 / 38), (20, 0.01 + 0.04 * 18 / 38), (40, 0.05), (100, 0.05)):
+            self.assertAlmostEqual(ach_module.just_in_time_tolerance(int(hours * hour)), expected, places=6, msg=hours)
+
+    async def test_just_in_time_needs_the_time_within_the_margin_of_the_average(self):
+        hour, minute = 3600, 60
         for played, avg, expected in (
             (10 * hour, 10 * hour, True),
-            (int(10.5 * hour), 10 * hour, True),  # +5 %
-            (int(9.5 * hour), 10 * hour, True),  # -5 %
-            (int(10.6 * hour), 10 * hour, False),
-            (int(9.4 * hour), 10 * hour, False),
-            (45 * 60, 3600, False),  # 25 % under: the hour rounding used to let this one in
-            (100 * hour + 30 * 60, 100 * hour, True),  # half an hour is nothing on a long game...
-            (30 * 60, 2 * hour, False),  # ...and everything on a short one
+            (10 * hour + 10 * minute, 10 * hour, True),  # ~1.8 % of 10 h is 11 min
+            (10 * hour - 10 * minute, 10 * hour, True),
+            (10 * hour + 12 * minute, 10 * hour, False),
+            (10 * hour - 12 * minute, 10 * hour, False),
+            (2 * hour + minute, 2 * hour, True),  # 1 % of 2 h is 72 s...
+            (2 * hour + 2 * minute, 2 * hour, False),  # ...so 5 % (6 min) no longer lets this in
+            (45 * minute, hour, False),  # 25 % under: the hour rounding used to let this one in
+            (100 * hour + 4 * hour, 100 * hour, True),  # 5 % of a long game: 5 h
+            (100 * hour + 6 * hour, 100 * hour, False),
         ):
             self.db.query(models.UserAchievement).delete()
             self.db.commit()

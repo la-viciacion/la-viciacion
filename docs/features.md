@@ -117,7 +117,7 @@ Every achievement is earned **once per season** and dated the day it was reached
 | Salvado por la campana | A session that was running when the year changed (31 December into 1 January); dated 1 January | general |
 | Madrugador / Plus por nocturnidad | A timer that starts between 5:00 and 5:59 / between 2:00 and 4:59 | when a timer starts, general |
 | Lo estaba esperando | A session of a game that began on the day the game came out (wished or not) | when a timer starts, general |
-| Justo a tiempo | The time played in this run of the game (since its previous completion, in any season; all of it the first time), within 5 % of the HLTB average of the game | when a game is completed |
+| Justo a tiempo | The time played in this run of the game (since its previous completion, in any season; all of it the first time), within a margin of the HLTB average of the game that grows with its length: 1 % up to 2 h, 5 % from 40 h, in a straight line between (about ±11 min on 10 h, ±35 min on 20 h) | when a game is completed |
 | **De por vida** (key ending in `_LIFETIME`): 1000 hours in a game; 500, 1000, 2000, 5000 and 10000 hours; 100, 200, 500, 1000, 2000 and 5000 days played; 100, 200, 500 and 1000 games played; 100, 200, 500 and 1000 games completed | The same, over **every season**: they count the whole history of a player and are earned **once** (completed and played games count each game once) | the same moments as their seasonal sisters, general |
 | Trabajo en equipo | 4 or more players with a timer running when someone starts theirs | when a timer starts |
 | Todos a una | 3 or more players with a timer running on the same game when someone starts theirs | when a timer starts |
