@@ -47,7 +47,7 @@ class AfterCompletionAvgTimeTests(unittest.IsolatedAsyncioTestCase):
                 mock.patch.object(users.games, "recommended_games", return_value=[]), \
                 mock.patch.object(users, "count_completed_games", return_value=1), \
                 mock.patch.object(users.utils, "send_message", new=mock.AsyncMock()), \
-                mock.patch("src.crud.time_entries.get_user_games_played_time", return_value=[]), \
+                mock.patch("src.crud.time_entries.played_time_of_run", return_value=0), \
                 mock.patch("src.crud.achievements.Achievements", return_value=ach):
             await users.after_completion(mock.MagicMock(), entry, silent=True)
         return update, ach

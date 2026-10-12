@@ -789,10 +789,8 @@ async def after_completion(db: Session, entry: models.UserGame, silent: bool):
         game = games.get_game_by_id(db, entry.game_id)
     from . import time_entries as time_entries_crud
 
-    completion_time = sum(
-        seconds or 0
-        for _, seconds in time_entries_crud.get_user_games_played_time(db, entry.user_id, entry.game_id, entry.season)
-    )
+    # the time of this run of the game: since its previous completion, whatever the season
+    completion_time = time_entries_crud.played_time_of_run(db, entry)
 
     # Local import to avoid a circular import (crud.achievements imports crud.users).
     from .achievements import Achievements
