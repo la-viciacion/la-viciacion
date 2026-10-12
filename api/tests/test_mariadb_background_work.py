@@ -358,15 +358,26 @@ class CompletionWorkTests(WorkTestCase):
         self.real_actions["after_completion"](entry, False)
         self.assertIn("JUST_IN_TIME", self.awarded())
 
-    def test_only_the_time_of_the_season_counts_towards_the_average(self):
+    def test_the_time_of_earlier_seasons_counts_towards_the_average(self):
         with self.engine.begin() as conn:
             conn.execute(text("UPDATE games SET avg_time = 7200 WHERE id = 'celeste'"))
         entry = self.library_entry(self.ana, "celeste", datetime.date(YEAR, 3, 1), completed=1, completed_date=datetime.date(YEAR, 3, 5))
         self.session(self.ana, "celeste", datetime.datetime(YEAR - 1, 11, 1, 20, 0), 60)  # last season's hour
         self.session(self.ana, "celeste", at(3, 1), 60)
         self.real_actions["after_completion"](entry, False)
-        self.assertNotIn("JUST_IN_TIME", self.awarded())
-        self.assertIn("*Celeste* en 01h00m", self.sent[-1]["text"])
+        self.assertIn("JUST_IN_TIME", self.awarded())
+        self.assertIn("*Celeste* en 02h00m", self.sent[-1]["text"])
+
+    def test_a_second_completion_only_counts_the_time_since_the_first(self):
+        with self.engine.begin() as conn:
+            conn.execute(text("UPDATE games SET avg_time = 7200 WHERE id = 'celeste'"))
+        self.library_entry(self.ana, "celeste", datetime.date(YEAR - 1, 11, 1), completed=1, completed_date=datetime.date(YEAR - 1, 11, 2))
+        self.session(self.ana, "celeste", datetime.datetime(YEAR - 1, 11, 1, 20, 0), 600)  # the first run
+        entry = self.library_entry(self.ana, "celeste", datetime.date(YEAR, 3, 1), completed=1, completed_date=datetime.date(YEAR, 3, 5))
+        self.session(self.ana, "celeste", at(3, 1), 120)
+        self.real_actions["after_completion"](entry, False)
+        self.assertIn("JUST_IN_TIME", self.awarded())
+        self.assertIn("*Celeste* en 02h00m", self.sent[-1]["text"])
 
     def test_a_game_far_from_the_average_does_not(self):
         with self.engine.begin() as conn:

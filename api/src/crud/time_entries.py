@@ -221,6 +221,30 @@ def get_user_games_played_time(
     return query.group_by(sessions.c.game_id).all()
 
 
+def played_time_of_run(db: Session, entry: models.UserGame) -> int:
+    """Seconds the user played the game of a completed library entry in the run that ended with it: every session
+    since the previous completion of that game (any season or platform), or all of them when it is the first.
+    The day of the previous completion is left out of the new run, a season does not cut it."""
+    previous = (
+        db.query(func.max(models.UserGame.completed_date))
+        .filter(
+            models.UserGame.user_id == entry.user_id,
+            models.UserGame.game_id == entry.game_id,
+            models.UserGame.completed == 1,
+            models.UserGame.id != entry.id,
+            models.UserGame.completed_date <= entry.completed_date,
+        )
+        .scalar()
+    )
+    sessions = sessions_subquery()
+    query = db.query(func.coalesce(func.sum(sessions.c.duration), 0)).filter(
+        sessions.c.user_id == entry.user_id, sessions.c.game_id == entry.game_id
+    )
+    if previous is not None:
+        query = query.filter(sessions.c.start >= datetime.datetime.combine(previous + datetime.timedelta(days=1), datetime.time.min))
+    return int(query.scalar() or 0)
+
+
 def get_played_days(db: Session, user_id: int, season: int = None, since: int | None = None) -> list[datetime.date]:
     """The days the user played in the season (see played_days_by_user), oldest first."""
     season = seasons.or_current(season)
