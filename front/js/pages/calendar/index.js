@@ -3,7 +3,7 @@
 // A day with one game links to its page; a day with several opens a list. The games with no confirmed date are listed apart. Nothing is stored here: the wishes are the only data.
 import { api } from '../../lib/api.js';
 import { byDay, monthLabel, monthOf, monthWeeks, shiftMonth, waiting } from '../../lib/calendar.js';
-import { formatDate, parseDay } from '../../lib/format.js';
+import { formatDate } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
 import { gameHref } from '../../lib/links.js';
 import { countdown } from '../../lib/wishlist.js';
@@ -19,8 +19,10 @@ let data = null; // the answer for `shown`
 let picked = null; // the day selected, "YYYY-MM-DD"
 let navigation = 0; // only the latest request may draw
 
-const card = (g) => html`
-  <a class="gc-card cal-game" href="${gameHref(g.id)}">
+const byRelease = (a, b) => a.release_date.localeCompare(b.release_date) || a.name.localeCompare(b.name);
+
+const card = (g, isPicked = false) => html`
+  <a class="gc-card cal-game${isPicked ? ' picked' : ''}" href="${gameHref(g.id)}">
     ${g.image_url
       ? html`<img src="${g.image_url}" alt="" class="gc-cover" loading="lazy" />`
       : html`<div class="gc-cover gc-cover-placeholder" aria-hidden="true">🎮</div>`}
@@ -60,23 +62,26 @@ function draw() {
   const days = byDay(data.releases);
   const today = new Date();
   const todayKey = monthOf(today) === shown ? `${shown}-${String(today.getDate()).padStart(2, '0')}` : null;
-  const chosen = picked && days[picked] ? days[picked] : null;
   mount(main.querySelector('#calBody'), html`
-    <div class="cal-nav">
-      <button class="pf-btn" type="button" data-step="-1" aria-label="Mes anterior" ${shown <= current ? html`disabled` : ''}>‹</button>
-      <h2 class="cal-month">${monthLabel(shown)}</h2>
-      <button class="pf-btn" type="button" data-step="1" aria-label="Mes siguiente">›</button>
+    <div class="cal-layout">
+      <div class="cal-side">
+        <div class="cal-nav">
+          <button class="pf-btn" type="button" data-step="-1" aria-label="Mes anterior" ${shown <= current ? html`disabled` : ''}>‹</button>
+          <h2 class="cal-month">${monthLabel(shown)}</h2>
+          <button class="pf-btn" type="button" data-step="1" aria-label="Mes siguiente">›</button>
+        </div>
+        <div class="cal-grid" role="grid" aria-label="${monthLabel(shown)}">
+          ${WEEKDAYS.map((d) => html`<div class="cal-weekday" aria-hidden="true">${d}</div>`)}
+          ${monthWeeks(shown).flat().map((day) => cell(day, day && days[day], todayKey))}
+        </div>
+      </div>
+      <div class="cal-list">
+        <h2 class="cal-list-title">Juegos del mes</h2>
+        ${data.releases.length
+          ? html`<div class="cal-games" id="calMonth">${[...data.releases].sort(byRelease).map((g) => card(g, g.release_date === picked))}</div>`
+          : html`<div class="cal-empty">Ningún lanzamiento deseado este mes.</div>`}
+      </div>
     </div>
-    <div class="cal-grid" role="grid" aria-label="${monthLabel(shown)}">
-      ${WEEKDAYS.map((d) => html`<div class="cal-weekday" aria-hidden="true">${d}</div>`)}
-      ${monthWeeks(shown).flat().map((day) => cell(day, day && days[day], todayKey))}
-    </div>
-    ${data.releases.length ? '' : html`<div class="pf-empty cal-empty">Ningún lanzamiento deseado este mes.</div>`}
-    ${chosen
-      ? html`
-        <div class="section-header"><h2 class="section-title">${parseDay(picked).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}</h2><div class="section-line"></div></div>
-        <div class="gc-grid" id="calDay">${chosen.map(card)}</div>`
-      : ''}
     ${data.undated.length
       ? html`
         <div class="section-header"><h2 class="section-title">Sin fecha confirmada</h2><div class="section-line"></div></div>

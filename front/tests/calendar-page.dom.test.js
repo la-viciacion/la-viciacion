@@ -39,16 +39,16 @@ test('a day with releases is marked and shows its games with everybody who waits
   await settle();
   assert.equal(document.querySelectorAll('.cal-cell.has').length, 2);
   assert.equal(document.querySelector(`[data-day="${NEXT}-05"]`).getAttribute('aria-pressed'), 'true'); // the first day with several games is selected
-  assert.deepEqual(text('#calDay .gc-name'), ['Alpha', 'Beta']);
-  assert.match(text('#calDay .pf-sub')[0], /Lo quieren tú y Bea <b>/);
-  assert.equal(document.querySelectorAll('#calDay b').length, 0); // escaped
+  assert.deepEqual(text('#calMonth .gc-name'), ['Alpha', 'Beta', 'Gamma']);
+  assert.match(text('#calMonth .pf-sub')[0], /Lo quieren tú y Bea <b>/);
+  assert.equal(document.querySelectorAll('#calMonth b').length, 0); // escaped
   // a day with one game is a link to its page, not a button
   const single = document.querySelector(`a.cal-cell[href="#/game/c"]`);
   assert.ok(single);
   assert.equal(document.querySelector(`[data-day="${NEXT}-20"]`), null);
   assert.match(single.getAttribute('title'), /Gamma · Lo quiere tú/);
-  assert.deepEqual(text('#calDay .gc-name'), ['Alpha', 'Beta']);
-  assert.equal(document.querySelector('#calDay a[href="#/game/a"]') !== null, true);
+  assert.deepEqual(text('#calMonth .gc-name'), ['Alpha', 'Beta', 'Gamma']);
+  assert.equal(document.querySelector('#calMonth a[href="#/game/a"]') !== null, true);
   assert.deepEqual(text('#calUndated .gc-name'), ['Delta']);
   assert.match(text('#calUndated .gc-meta')[0], /Sin fecha confirmada/);
 });
