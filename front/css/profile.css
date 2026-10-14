@@ -278,7 +278,9 @@
 /* Release calendar page */
 .cal-intro { margin: -8px 0 14px; }
 .cal-nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.cal-title { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 4px 10px; }
 .cal-month { font-size: 1.15rem; font-weight: 700; margin: 0; }
+.cal-nav .pf-btn.cal-today { min-width: 0; font-size: 0.85rem; padding: 4px 10px; }
 .cal-nav .pf-btn { min-width: 40px; font-size: 1.2rem; line-height: 1; }
 .cal-nav .pf-btn:disabled { opacity: 0.35; cursor: default; }
 .cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; margin-bottom: 14px; }

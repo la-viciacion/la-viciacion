@@ -30,6 +30,10 @@ test('the running month opens first and the months before it can be reached', as
   back.click();
   await settle();
   assert.deepEqual(text('#calMonth .gc-name'), ['Past']);
+  document.querySelector('[data-today]').click();
+  await settle();
+  assert.match(main().textContent, /Ningún lanzamiento este mes/);
+  assert.equal(document.querySelector('[data-today]'), null, 'no button once back on the running month');
 });
 
 test('a day with releases is marked and shows its games with everybody who waits for them', async () => {

@@ -66,7 +66,10 @@ function draw() {
       <div class="cal-side">
         <div class="cal-nav">
           <button class="pf-btn" type="button" data-step="-1" aria-label="Mes anterior">‹</button>
-          <h2 class="cal-month">${monthLabel(shown)}</h2>
+          <div class="cal-title">
+            <h2 class="cal-month">${monthLabel(shown)}</h2>
+            ${shown !== current ? html`<button class="pf-btn cal-today" type="button" data-today>Hoy</button>` : ''}
+          </div>
           <button class="pf-btn" type="button" data-step="1" aria-label="Mes siguiente">›</button>
         </div>
         <div class="cal-grid" role="grid" aria-label="${monthLabel(shown)}">
@@ -116,6 +119,10 @@ export async function render(ctx) {
     <p class="pf-sub cal-intro">Los lanzamientos de todos los juegos del catálogo, los quiera alguien o no.</p>
     <div id="calBody"><div class="loading-spinner">Cargando el calendario...</div></div>`);
   main.querySelector('#calBody').addEventListener('click', (e) => {
+    if (e.target.closest('[data-today]')) {
+      load(current);
+      return;
+    }
     const step = e.target.closest('[data-step]');
     if (step) {
       const month = shiftMonth(shown, Number(step.dataset.step));
