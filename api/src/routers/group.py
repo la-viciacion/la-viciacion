@@ -61,13 +61,11 @@ def get_releases(
     current_user: models.User = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    """The release calendar: the games the group wants that come out in the month, from every player's wishlist
-    (readable by every logged-in user on purpose: it is what the group is waiting for), and the ones with no date.
-    A month already over is a 400. Derived; only the wishes are stored."""
+    """The release calendar: every game of the catalogue that comes out in the month, wanted or not and in any
+    month, past ones included (readable by every logged-in user on purpose), and the wished ones with no date.
+    Derived; only the wishes are stored."""
     today = datetime.date.today()
     year, number = (today.year, today.month) if month is None else (int(month[:4]), int(month[5:]))
-    if (year, number) < (today.year, today.month):
-        raise HTTPException(status_code=400, detail="Ese mes ya ha pasado")
     return wishlist.releases(db, current_user.id, year, number, today)
 
 

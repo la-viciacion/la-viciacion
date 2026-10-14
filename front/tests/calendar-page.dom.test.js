@@ -14,14 +14,22 @@ const game = (id, name, day, wanted_by) => ({ id, name, image_url: null, genres:
 const ANA = { user_id: 1, name: 'Ana', is_me: true };
 const BEA = { user_id: 2, name: 'Bea <b>', is_me: false };
 
-test('the running month opens first and the month before it cannot be reached', async () => {
-  const calls = installApi({ [`GET /group/releases?month=${THIS}`]: { month: THIS, releases: [], undated: [] } });
+test('the running month opens first and the months before it can be reached', async () => {
+  const BEFORE = shiftMonth(THIS, -1);
+  const calls = installApi({
+    [`GET /group/releases?month=${THIS}`]: { month: THIS, releases: [], undated: [] },
+    [`GET /group/releases?month=${BEFORE}`]: { month: BEFORE, releases: [{ ...game('p', 'Past', '05', []), release_date: `${BEFORE}-05`, days_until: null }], undated: [] },
+  });
   await calendar.render({ main: main() });
   await settle();
   assert.equal(calls[0].path, `/group/releases?month=${THIS}`);
-  assert.equal(document.querySelector('[data-step="-1"]').disabled, true);
-  assert.match(main().textContent, /Ningún lanzamiento deseado este mes/);
+  assert.match(main().textContent, /Ningún lanzamiento este mes/);
   assert.equal(document.querySelectorAll('.cal-weekday').length, 7);
+  const back = document.querySelector('[data-step="-1"]');
+  assert.equal(back.disabled, false);
+  back.click();
+  await settle();
+  assert.deepEqual(text('#calMonth .gc-name'), ['Past']);
 });
 
 test('a day with releases is marked and shows its games with everybody who waits for them', async () => {

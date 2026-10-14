@@ -1,4 +1,4 @@
-// Release calendar (#/calendar): every game of the catalogue that is not out yet, by day, wanted by somebody or not. GET /group/releases?month=YYYY-MM; from the running month on, since what is out is not a release any more.
+// Release calendar (#/calendar): every game of the catalogue with a release date, by day, wanted by somebody or not. GET /group/releases?month=YYYY-MM; any month, past ones included.
 // A day with one game links to its page; a day with several opens a list. The games with no confirmed date are listed apart. Nothing is stored here: the wishes are the only data.
 import { api } from '../../lib/api.js';
 import { byDay, monthLabel, monthOf, monthWeeks, shiftMonth, waiting } from '../../lib/calendar.js';
@@ -65,7 +65,7 @@ function draw() {
     <div class="cal-layout">
       <div class="cal-side">
         <div class="cal-nav">
-          <button class="pf-btn" type="button" data-step="-1" aria-label="Mes anterior" ${shown <= current ? html`disabled` : ''}>‹</button>
+          <button class="pf-btn" type="button" data-step="-1" aria-label="Mes anterior">‹</button>
           <h2 class="cal-month">${monthLabel(shown)}</h2>
           <button class="pf-btn" type="button" data-step="1" aria-label="Mes siguiente">›</button>
         </div>
@@ -78,7 +78,7 @@ function draw() {
         <h2 class="cal-list-title">Juegos del mes</h2>
         ${data.releases.length
           ? html`<div class="cal-games" id="calMonth">${[...data.releases].sort(byRelease).map((g) => card(g, g.release_date === picked))}</div>`
-          : html`<div class="cal-empty">Ningún lanzamiento deseado este mes.</div>`}
+          : html`<div class="cal-empty">Ningún lanzamiento este mes.</div>`}
       </div>
     </div>
     ${data.undated.length
@@ -119,7 +119,7 @@ export async function render(ctx) {
     const step = e.target.closest('[data-step]');
     if (step) {
       const month = shiftMonth(shown, Number(step.dataset.step));
-      if (month >= current) load(month);
+      load(month);
       return;
     }
     const day = e.target.closest('[data-day]');
