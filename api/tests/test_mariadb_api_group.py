@@ -248,15 +248,14 @@ class ReleasesTests(ApiTestCase):
         self.assertEqual([g["id"] for g in body["undated"]], ["tba"])
         self.assertEqual(body["releases"][0]["days_until"], 40)
 
-    def test_a_game_already_out_or_already_in_the_library_is_not_a_release(self):
+    def test_a_game_already_out_is_not_a_release_and_a_game_nobody_wants_is(self):
         self.game("out", "Out", release_date=self.today - timedelta(days=1))
-        self.game("owned", "Owned", release_date=self.soon)
+        self.game("unwanted", "Unwanted", release_date=self.soon)
+        self.game("tba", "Tba", release_date=None)
         self.wish(self.ana, "out")
-        self.wish(self.ana, "owned")
-        self.library_entry(self.ana, "owned", self.today, "pc")  # played: the wish is gone
-        ids = [g["id"] for g in self.releases(month=self.month).json()["releases"]]
-        self.assertNotIn("out", ids)
-        self.assertNotIn("owned", ids)
+        body = self.releases(month=self.month).json()
+        self.assertEqual([(g["id"], g["wanted_by"]) for g in body["releases"]], [("unwanted", [])])
+        self.assertEqual(body["undated"], [])  # an undated game nobody wants is not upcoming
 
     def test_a_game_that_comes_out_today_is_listed(self):
         self.game("today", "Today", release_date=self.today)

@@ -111,9 +111,10 @@ def month_bounds(year: int, month: int) -> tuple[datetime.date, datetime.date]:
 
 
 def releases(db: Session, viewer_id: int, year: int, month: int, today: datetime.date) -> dict:
-    """The release calendar of the group: the games anybody wants and does not have yet that come out in the month
-    (from today on: what is out is not a release any more), by date, and apart the ones with no date yet. Each
-    comes with everybody who wants it, the viewer included (`is_me`). Derived; only the wishes are stored."""
+    """The release calendar of the group: every game of the catalogue that comes out in the month, wanted or not
+    (from today on: what is out is not a release any more), by date, and apart the games somebody wants that have
+    no date yet (the undated ones nobody wants are most of the catalogue, and not upcoming). Each comes with
+    everybody who wants it, the viewer included (`is_me`), and nobody if none does. Derived; only the wishes are stored."""
     first, last = month_bounds(year, month)
     first = max(first, today)
     wished = (
@@ -124,8 +125,8 @@ def releases(db: Session, viewer_id: int, year: int, month: int, today: datetime
     rows = (
         db.query(models.Game)
         .filter(
-            models.Game.id.in_(wished),
-            (models.Game.release_date.is_(None)) | models.Game.release_date.between(first, last),
+            models.Game.release_date.between(first, last)
+            | (models.Game.release_date.is_(None) & models.Game.id.in_(wished))
         )
         .all()
     )

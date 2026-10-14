@@ -92,6 +92,23 @@ class WishlistQueryTests(unittest.TestCase):
         self.db.commit()
         self.assertEqual(wishlist.to_refresh(self.db, TODAY), [])
 
+    def test_the_calendar_lists_every_game_of_the_month_wanted_or_not(self):
+        self.wish(1, "soon")
+        got = wishlist.releases(self.db, 1, 2026, 12, TODAY)
+        self.assertEqual([(g["id"], [w["name"] for w in g["wanted_by"]]) for g in got["releases"]], [("soon", ["Ana"])])
+        self.db.add(models.Game(id="nobody", name="Nobody", release_date=D(2026, 12, 15), rawg_id=9))
+        self.db.commit()
+        got = wishlist.releases(self.db, 1, 2026, 12, TODAY)
+        self.assertEqual([(g["id"], [w["name"] for w in g["wanted_by"]]) for g in got["releases"]], [("soon", ["Ana"]), ("nobody", [])])
+
+    def test_the_calendar_leaves_out_what_is_out_and_undated_games_nobody_wants(self):
+        self.db.add(models.Game(id="tba2", name="Tba2", release_date=None, rawg_id=8))
+        self.db.commit()
+        self.wish(2, "tba")
+        got = wishlist.releases(self.db, 1, 2026, 10, TODAY)
+        self.assertEqual([g["id"] for g in got["releases"]], ["today"])  # "out" is long gone
+        self.assertEqual([g["id"] for g in got["undated"]], ["tba"])
+
     def test_releases_on_a_day_name_who_waits_and_who_else_does(self):
         self.wish(1, "today")
         self.wish(2, "today")

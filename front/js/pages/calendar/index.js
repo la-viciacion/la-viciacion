@@ -1,5 +1,4 @@
-// Release calendar (#/calendar): the games the group is waiting for, by day, from every player's wishlist (not only
-// yours). GET /group/releases?month=YYYY-MM; from the running month on, since what is out is not a release any more.
+// Release calendar (#/calendar): every game of the catalogue that is not out yet, by day, wanted by somebody or not. GET /group/releases?month=YYYY-MM; from the running month on, since what is out is not a release any more.
 // A day with one game links to its page; a day with several opens a list. The games with no confirmed date are listed apart. Nothing is stored here: the wishes are the only data.
 import { api } from '../../lib/api.js';
 import { byDay, monthLabel, monthOf, monthWeeks, shiftMonth, waiting } from '../../lib/calendar.js';
@@ -114,7 +113,7 @@ export async function render(ctx) {
   picked = null;
   mount(main, html`
     <h1 class="pf-title pg-title">Calendario de lanzamientos</h1>
-    <p class="pf-sub cal-intro">Los juegos que está esperando el grupo, de las listas de deseados de todos.</p>
+    <p class="pf-sub cal-intro">Los lanzamientos de todos los juegos del catálogo, los quiera alguien o no.</p>
     <div id="calBody"><div class="loading-spinner">Cargando el calendario...</div></div>`);
   main.querySelector('#calBody').addEventListener('click', (e) => {
     const step = e.target.closest('[data-step]');
