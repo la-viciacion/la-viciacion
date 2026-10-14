@@ -3,7 +3,7 @@
 // #/admin/<section>; one generic controller renders the toolbar, table and pager of
 // a data section, described in entities.js, and custom sections draw themselves.
 import { api } from '../../lib/api.js';
-import { html, mount } from '../../lib/html.js';
+import { append, html, mount } from '../../lib/html.js';
 import { loadPlatforms } from '../../lib/platforms.js';
 import { toast } from '../../ui/toast.js';
 import { errorState, store } from './components.js';
@@ -178,6 +178,17 @@ function queryFor(entity, st) {
   return params;
 }
 
+// Draws the panel. While the search box has the focus only what is under the toolbar is redrawn: replacing the box
+// itself drops the focus (and folds the keyboard on a phone) every time the results of what was typed arrive.
+function paint(panel, entity, st, loading) {
+  const toolbar = panel.querySelector('.adm-toolbar');
+  if (toolbar && toolbar.contains(document.activeElement) && document.activeElement.id === 'admSearch') {
+    while (toolbar.nextSibling) toolbar.nextSibling.remove();
+    return append(panel, contentView(entity, st, loading));
+  }
+  mount(panel, panelView(entity, st, loading));
+}
+
 async function load() {
   const entity = ENTITIES[current];
   const st = state[current];
@@ -189,7 +200,7 @@ async function load() {
     if (tab === current) await renderCustom(panel, { entity, admin });
     return;
   }
-  mount(panel, panelView(entity, st, true));
+  paint(panel, entity, st, true);
   try {
     const result = await api(`${entity.endpoint}?${queryFor(entity, st)}`);
     if (tab !== current) return; // user switched tab meanwhile
@@ -200,7 +211,7 @@ async function load() {
     mount(panel, errorState(err.message));
     return;
   }
-  mount(panel, panelView(entity, st, false));
+  paint(panel, entity, st, false);
 }
 
 function toolbarView(entity, st) {
@@ -268,11 +279,15 @@ function headerView(column, st) {
 }
 
 function panelView(entity, st, loading) {
-  const toolbar = toolbarView(entity, st);
-  if (loading || !st.data) return html`${toolbar}<div class="loading-spinner">Cargando...</div>`;
+  return html`${toolbarView(entity, st)}${contentView(entity, st, loading)}`;
+}
+
+// What goes under the toolbar: the table with its pager, or a spinner / empty state.
+function contentView(entity, st, loading) {
+  if (loading || !st.data) return html`<div class="loading-spinner">Cargando...</div>`;
 
   const { items, total } = st.data;
-  if (!items.length) return html`${toolbar}<div class="empty-state"><span>🗂️</span>Sin resultados</div>`;
+  if (!items.length) return html`<div class="empty-state"><span>🗂️</span>Sin resultados</div>`;
 
   const to = st.offset + items.length;
   const pager = entity.paged !== false ? html`
@@ -282,7 +297,7 @@ function panelView(entity, st, loading) {
       <button class="adm-btn sm" data-act="next" ${to >= total ? html`disabled` : ''}>Siguiente →</button>
     </div>` : '';
 
-  return html`${toolbar}
+  return html`
     <div class="adm-table-wrap">
       <table class="adm-table">
         <thead><tr>${entity.columns.map((c) => headerView(c, st))}<th></th></tr></thead>
