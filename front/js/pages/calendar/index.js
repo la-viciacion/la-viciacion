@@ -1,5 +1,4 @@
-// Release calendar (#/calendar): the games the group is waiting for, by day, from every player's wishlist (not only
-// yours). GET /group/releases?month=YYYY-MM; from the running month on, since what is out is not a release any more.
+// Release calendar (#/calendar): every game of the catalogue with a release date, by day, wanted by somebody or not. GET /group/releases?month=YYYY-MM; any month, past ones included.
 // A day with one game links to its page; a day with several opens a list. The games with no confirmed date are listed apart. Nothing is stored here: the wishes are the only data.
 import { api } from '../../lib/api.js';
 import { byDay, monthLabel, monthOf, monthWeeks, shiftMonth, waiting } from '../../lib/calendar.js';
@@ -66,8 +65,11 @@ function draw() {
     <div class="cal-layout">
       <div class="cal-side">
         <div class="cal-nav">
-          <button class="pf-btn" type="button" data-step="-1" aria-label="Mes anterior" ${shown <= current ? html`disabled` : ''}>‹</button>
-          <h2 class="cal-month">${monthLabel(shown)}</h2>
+          <button class="pf-btn" type="button" data-step="-1" aria-label="Mes anterior">‹</button>
+          <div class="cal-title">
+            <h2 class="cal-month">${monthLabel(shown)}</h2>
+            ${shown !== current ? html`<button class="pf-btn cal-today" type="button" data-today>Hoy</button>` : ''}
+          </div>
           <button class="pf-btn" type="button" data-step="1" aria-label="Mes siguiente">›</button>
         </div>
         <div class="cal-grid" role="grid" aria-label="${monthLabel(shown)}">
@@ -79,7 +81,7 @@ function draw() {
         <h2 class="cal-list-title">Juegos del mes</h2>
         ${data.releases.length
           ? html`<div class="cal-games" id="calMonth">${[...data.releases].sort(byRelease).map((g) => card(g, g.release_date === picked))}</div>`
-          : html`<div class="cal-empty">Ningún lanzamiento deseado este mes.</div>`}
+          : html`<div class="cal-empty">Ningún lanzamiento este mes.</div>`}
       </div>
     </div>
     ${data.undated.length
@@ -114,13 +116,17 @@ export async function render(ctx) {
   picked = null;
   mount(main, html`
     <h1 class="pf-title pg-title">Calendario de lanzamientos</h1>
-    <p class="pf-sub cal-intro">Los juegos que está esperando el grupo, de las listas de deseados de todos.</p>
+    <p class="pf-sub cal-intro">Los lanzamientos de todos los juegos del catálogo, los quiera alguien o no.</p>
     <div id="calBody"><div class="loading-spinner">Cargando el calendario...</div></div>`);
   main.querySelector('#calBody').addEventListener('click', (e) => {
+    if (e.target.closest('[data-today]')) {
+      load(current);
+      return;
+    }
     const step = e.target.closest('[data-step]');
     if (step) {
       const month = shiftMonth(shown, Number(step.dataset.step));
-      if (month >= current) load(month);
+      load(month);
       return;
     }
     const day = e.target.closest('[data-day]');

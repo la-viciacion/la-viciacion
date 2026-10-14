@@ -318,3 +318,25 @@ def _run(scope: str = "all", limit: int | None = None):
             current=None,
         )
         logger.info(f"HLTB sync ended ({reason})")
+
+
+def resync_one(db, game_id: str) -> dict:
+    """Refresh the time of one game from HLTB on the admin's explicit request (a time HLTB gives replaces the stored
+    one, like in the bulk sync). A doubtful match comes back as `ambiguous` with its candidates and nothing changes."""
+    game = db.get(models.Game, game_id)
+    if game is None:
+        raise LookupError("Juego no encontrado")
+    year = game.release_date.year if game.release_date else None
+    outcome, chosen = pick(game.name, year, candidates(_search(game)))
+    if outcome == "not_found":
+        return {"status": "not_found"}
+    if outcome == "ambiguous":
+        return {"status": "ambiguous", "candidates": [_report(c) for c in chosen]}
+    seconds = chosen[0]["seconds"]
+    if not seconds:
+        return {"status": "no_time"}
+    if seconds == game.avg_time:
+        return {"status": "unchanged", "seconds": seconds}
+    game.avg_time = seconds
+    db.commit()
+    return {"status": "updated", "seconds": seconds}

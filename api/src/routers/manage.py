@@ -30,6 +30,7 @@ from ..utils import challenges as challenges_utils
 from ..utils import email as mail
 from ..database.schemas import NOTES_MAX
 from ..utils.logger import LogManager
+from ..utils.redaction import redact_rawg_key
 from ..utils.my_utils import normalize_email, validate_email_format, validate_password_requirements, validate_username
 
 logger = LogManager().get_logger()
@@ -482,6 +483,21 @@ def patch_game(game_id: str, body: GamePatch, db: Session = Depends(get_db)):
         setattr(game, k, v)
     _commit(db, "Juego")
     return _game_out(game)
+
+
+@router.post("/games/{game_id}/resync")
+def resync_game(game_id: str, db: Session = Depends(get_db)):
+    """Refresh one game from RAWG (metadata) and HLTB (average time). Each source reports on its own, so one
+    failing does not stop the other; RAWG goes first because HLTB tells same-named games apart by release year."""
+    _get_or_404(db, models.Game, game_id, "Juego")
+    out = {}
+    for source, sync in (("rawg", rawg_sync), ("hltb", hltb_sync)):
+        try:
+            out[source] = sync.resync_one(db, game_id)
+        except (ConnectionError, RuntimeError, rawg_sync.RawgFatal) as e:
+            db.rollback()
+            out[source] = {"status": "error", "error": redact_rawg_key(str(e))}
+    return out
 
 
 def _game_counts(db: Session, game_id: str) -> dict:

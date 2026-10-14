@@ -424,3 +424,30 @@ def apply_one(db, game_id: str, rawg_id: int, overwrite: bool = False) -> dict:
     changed = _apply(game, det, overwrite)
     db.commit()
     return {"changed": changed, "calls": client.calls}
+
+
+def resync_one(db, game_id: str) -> dict:
+    """Refresh one game from RAWG on the admin's explicit request: every field RAWG gives overwrites ours (a blank
+    one never does). Without a `rawg_id` the game is searched by name; a doubtful match comes back as `ambiguous`
+    with its candidates, to be chosen through `apply_one`. 1 to 3 RAWG calls."""
+    if not config.RAWG_API_KEY:
+        raise RuntimeError("No hay clave de RAWG configurada")
+    game = db.get(models.Game, game_id)
+    if game is None:
+        raise LookupError("Juego no encontrado")
+    client = _Client(max_calls=4)
+    rawg_id = game.rawg_id
+    if rawg_id is None:
+        results = _search(client, game.name)
+        if not results:
+            return {"status": "not_found", "calls": client.calls}
+        pick = _pick_confident(game, results)
+        if pick is None:
+            return {"status": "ambiguous", "candidates": [_candidate(r) for r in results], "calls": client.calls}
+        rawg_id = pick["id"]
+        taken = db.query(models.Game).filter(models.Game.rawg_id == rawg_id, models.Game.id != game.id).first()
+        if taken:
+            return {"status": "duplicate", "other_name": taken.name, "calls": client.calls}
+    changed = _apply(game, _details(client, rawg_id, need_steam=True), overwrite=True)
+    db.commit()
+    return {"status": "updated" if changed else "unchanged", "changed": changed, "calls": client.calls}

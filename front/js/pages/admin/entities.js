@@ -112,6 +112,7 @@ export const ENTITIES = {
     name: (r) => r.name,
     actions: [
       { label: 'Sesiones', run: (r, admin) => admin.jumpTo('timers', { game_id: r.id, game_name: r.name }) },
+      { label: 'Resincronizar (RAWG y HLTB)…', run: async (r, admin) => (await import('./resync.js')).resyncGame(r, admin) },
     ],
     toolbarActions: [{ act: 'rawg-sync', label: 'Sincronizar con RAWG…' }, { act: 'hltb-sync', label: 'Sincronizar tiempos (HLTB)…' }],
     canDelete: true,

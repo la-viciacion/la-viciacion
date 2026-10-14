@@ -248,15 +248,17 @@ class ReleasesTests(ApiTestCase):
         self.assertEqual([g["id"] for g in body["undated"]], ["tba"])
         self.assertEqual(body["releases"][0]["days_until"], 40)
 
-    def test_a_game_already_out_or_already_in_the_library_is_not_a_release(self):
-        self.game("out", "Out", release_date=self.today - timedelta(days=1))
-        self.game("owned", "Owned", release_date=self.soon)
+    def test_a_game_nobody_wants_is_listed_and_one_already_out_sits_on_its_day(self):
+        past = self.today - timedelta(days=40)
+        self.game("out", "Out", release_date=past)
+        self.game("unwanted", "Unwanted", release_date=self.soon)
+        self.game("tba", "Tba", release_date=None)
         self.wish(self.ana, "out")
-        self.wish(self.ana, "owned")
-        self.library_entry(self.ana, "owned", self.today, "pc")  # played: the wish is gone
-        ids = [g["id"] for g in self.releases(month=self.month).json()["releases"]]
-        self.assertNotIn("out", ids)
-        self.assertNotIn("owned", ids)
+        body = self.releases(month=self.month).json()
+        self.assertEqual([(g["id"], g["wanted_by"]) for g in body["releases"]], [("unwanted", [])])
+        before = self.releases(month=f"{past.year:04d}-{past.month:02d}").json()
+        self.assertIn("out", [g["id"] for g in before["releases"]])
+        self.assertEqual(body["undated"], [])  # an undated game nobody wants is not upcoming
 
     def test_a_game_that_comes_out_today_is_listed(self):
         self.game("today", "Today", release_date=self.today)
@@ -264,10 +266,10 @@ class ReleasesTests(ApiTestCase):
         month = f"{self.today.year:04d}-{self.today.month:02d}"
         self.assertEqual([g["id"] for g in self.releases(month=month).json()["releases"]], ["today"])
 
-    def test_the_default_is_the_running_month_and_a_past_or_bad_month_is_refused(self):
+    def test_the_default_is_the_running_month_and_a_bad_month_is_refused(self):
         month = f"{self.today.year:04d}-{self.today.month:02d}"
         self.assertEqual(self.releases().json()["month"], month)
-        self.assertEqual(self.releases(month="2020-01").status_code, 400)
+        self.assertEqual(self.releases(month="2020-01").status_code, 200)
         for bad in ("2026-13", "2026-1", "nope"):
             self.assertEqual(self.releases(month=bad).status_code, 422, bad)
 
