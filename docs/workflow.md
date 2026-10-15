@@ -7,7 +7,7 @@ Simplified trunk-based development for a team of 2-3. `main` is the trunk: alway
 1. **Nobody pushes to `main`.** Every change goes through a pull request (branch protection enforces it, also for admins).
 2. **Short-lived branches** off `main`, named `<type>/<short-description>` (`feat/ranking-filters`, `fix/timer-stop`, `docs/workflow`). Aim to merge within a day or two; if a feature is bigger, split it into steps that are each safe to merge (behind a setting or not yet reachable from the UI).
 3. **Small PRs.** One concern per PR; do not mix refactors with behaviour changes.
-4. **The PR title is the commit.** PRs are **squash-merged**, so the title must follow Conventional Commits (`feat(front): ...`, types in `AGENTS.md`); CI checks it. Commits inside the branch can be messy.
+4. **Every commit lands on `main`.** PRs are **rebase-merged** (a trial, see [roadmap.md](roadmap.md)): each commit of the branch is replayed on `main` as it is, so each one must be atomic, green on its own, and follow Conventional Commits (`feat(front): ...`, types in `AGENTS.md`). The PR title follows the same format and CI checks it; CI does not check the individual commits, so tidy the branch (`git rebase -i`, fixups) before merging. No "wip" or "fix typo" commits.
 5. **Merge when**: the `CI` check is green, the approvals the ruleset asks for are there (none while there is a single maintainer, one from the second person on), and the branch is up to date with `main`. Delete the branch after merging (GitHub does it automatically).
 6. **Review turnaround**: aim to review within a working day. With 2 people the reviewer is simply the other one; do not self-approve.
 7. **Releases** are tags `vX.Y.Z` cut from `main` (see [deployment.md](deployment.md#cicd)). There is no `develop` and no release branch; a hotfix is a normal PR to `main` followed by a new tag.
@@ -46,7 +46,7 @@ Three safeguards keep this honest. The default is to run everything: only the pa
 
 A check is worth running once per state of the code, so each one has one place:
 
-- **Pull request:** only what its files can affect (table above), plus the PR title. The branch must be up to date with `main` and the merge is a squash, so the tree that passed here is exactly the one that lands on `main`. That is why **`main` has no run of its own after a merge**: it would repeat the same checks on the same files.
+- **Pull request:** only what its files can affect (table above), plus the PR title. The branch must be up to date with `main` and the merge is a rebase, so the tree that passed here is exactly the one that lands on `main` (the commits get new hashes, the final tree is the same). That is why **`main` has no run of its own after a merge**: it would repeat the same checks on the same files.
 - **Tag `vX.Y.Z`** (`release.yml`): the one run of everything, whatever the PRs behind it touched. It is the gate for a release: `deploy.yml` refuses a `prod` deploy of a tag whose run did not pass on the commit the tag points to (if the run is older than GitHub keeps logs, 90 days, run **Release images** by hand on the tag again). The `dev` deploy needs no check of its own: `main` only receives PRs whose `CI` was green.
 - **Weekly:** the moving MariaDB tags, as an early warning that gates nothing.
 - **Inside the MariaDB tests**, a guarantee has one test. `test_mariadb_migration_chain.py` covers, for every migration, that it applies on data, that it converges when run again, that it can be undone, that both roads end in the same schema and that the schema matches the models; `test_mariadb_migrations.py` keeps what the chain does not (the rules the database enforces and an older revision with data taken to the head). Do not add a test that proves again what one of those already proves.
@@ -82,5 +82,5 @@ When a second person joins: give them the **Write** role (they can branch, open 
 
 Settings → General → Pull Requests:
 
-- Allow **squash merging** only, default message "Pull request title".
+- Allow **rebase merging** only (trial; squash was the previous setting). Merge commits and squash stay disabled.
 - Automatically delete head branches.

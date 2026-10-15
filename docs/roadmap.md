@@ -5,7 +5,7 @@
 These are deliberately **undefined for now**. Do not invent or enforce them; when 2.0.0 ships, decide and document them here and in `AGENTS.md`. (The branch workflow is decided: see [workflow.md](workflow.md).)
 
 - **Versioning and releases**: the version of the app is the `vX.Y.Z` tag, injected into the API image at build time (`APP_VERSION`, see [deployment.md](deployment.md)); no file holds it (`front/package.json` still says `2.0.0` but nothing reads it). Changelog format and release notes are still open.
-- **Commit conventions**: enforced only on the PR title (it becomes the squash commit); no changelog tooling yet.
+- **Commit conventions**: enforced only on the PR title; since the move to rebase-and-merge (a trial started 2026-10-15) every commit lands on `main`, so commit messages are unchecked. Decide after a few weeks whether to keep it and, if so, add a CI check of the commits; no changelog tooling yet.
 - **CI/CD**: checks run on every PR (not again on `main`) and in full on every tag, and the prod deploy requires that tag run to have passed (see [deployment.md](deployment.md#cicd)). Open: automatic deployment, `arm64` images, and the cost items below.
 
 Until then: no tags or releases.

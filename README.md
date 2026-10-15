@@ -62,7 +62,7 @@ Working on this repository with an AI assistant? Point it to [AGENTS.md](AGENTS.
 
 ## Contributing
 
-Short-lived branches and pull requests squash-merged into `main`, with the `CI` check green. See [CONTRIBUTING.md](CONTRIBUTING.md).
+Short-lived branches and pull requests rebase-merged into `main`, with the `CI` check green. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 

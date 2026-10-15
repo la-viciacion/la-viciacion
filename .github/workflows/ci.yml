@@ -1,7 +1,7 @@
 name: CI
 
 # Runs on every pull request to main. Branch protection requires the `CI` job below, and requires the
-# branch to be up to date with main, so what a PR tested is exactly what the squash merge puts on main:
+# branch to be up to date with main, so what a PR tested is exactly what the rebase merge puts on main:
 # main is not tested again after the merge. The one run of everything is release.yml, on the tag.
 on:
   pull_request:
@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Pull requests are squash-merged, so the title becomes the commit message on main.
+  # Pull requests are rebase-merged: the commits land on main as they are. Only the title is checked here.
   pr-title:
     runs-on: ubuntu-latest
     steps:
