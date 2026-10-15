@@ -30,9 +30,23 @@ class LoginTests(ApiTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["token_type"], "bearer")
         claims = jwt.decode(response.json()["access_token"], options={"verify_signature": False})
-        self.assertEqual((claims["username"], claims["is_admin"], claims["is_active"]), ("ana", 0, 1))
+        # it names the account and nothing personal: the rest is read from the database on every request
+        self.assertEqual(set(claims), {"id", "username", "pwv", "iat", "exp"})
+        self.assertEqual(claims["username"], "ana")
         me = self.api("GET", "/auth/active_user", headers={"Authorization": f"Bearer {response.json()['access_token']}"})
         self.assertEqual((me.status_code, me.json()["username"]), (200, "ana"))
+
+    def test_a_valid_session_gets_a_fresh_token_and_an_invalid_one_does_not(self):
+        self.user("ana")
+        old = self.login("ana").json()["access_token"]
+        refreshed = self.api("POST", "/auth/refresh", headers={"Authorization": f"Bearer {old}"})
+        self.assertEqual(refreshed.status_code, 200)
+        new = refreshed.json()["access_token"]
+        me = self.api("GET", "/auth/active_user", headers={"Authorization": f"Bearer {new}"})
+        self.assertEqual((me.status_code, me.json()["username"]), (200, "ana"))
+        expired = self.valid_payload()
+        expired["exp"] = clock.real_now() - timedelta(seconds=1)
+        self.assertEqual(self.api("POST", "/auth/refresh", headers=self.token(expired)).status_code, 401)
 
     def test_the_login_accepts_the_email_in_any_case(self):
         self.user("ana", email="ana@example.com")

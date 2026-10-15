@@ -81,6 +81,32 @@ export async function login(username, password) {
   session.setToken(data.access_token);
 }
 
+function claimsOf(token) {
+  try {
+    const part = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(atob(part.padEnd(Math.ceil(part.length / 4) * 4, '=')));
+  } catch {
+    return null;
+  }
+}
+
+/** Whether a token has lived half its life (or does not say when it was issued): time to swap it for a fresh one. */
+export function tokenNeedsRenewal(token, nowSeconds = Date.now() / 1000) {
+  const claims = claimsOf(token);
+  if (!claims?.exp) return false;
+  if (!claims.iat) return true; // issued before tokens said when: renewed once
+  return nowSeconds - claims.iat > (claims.exp - claims.iat) / 2;
+}
+
+/** Renew the session when it is due, so whoever keeps using the app is never sent back to the login. Best effort. */
+export async function renewSessionIfDue() {
+  const token = session.getToken();
+  if (!token || !tokenNeedsRenewal(token)) return;
+  const fresh = await api('/auth/refresh', { method: 'POST' }).catch(() => null);
+  // a logout or another login meanwhile wins
+  if (fresh?.access_token && session.getToken() === token) session.setToken(fresh.access_token);
+}
+
 /** Object URL of the user's avatar, or null when they have none. */
 export function loadAvatarUrl(username) {
   if (!avatars.has(username)) {

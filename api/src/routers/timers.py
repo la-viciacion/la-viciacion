@@ -28,6 +28,13 @@ from ..utils import seasons
 
 
 # Timer CRUD operations
+def lock_sessions(db: Session, user_id: int) -> None:
+    """Hold the user's row until the transaction ends, so the checks that keep one game at a time (no other
+    running timer, no overlap) and the write that follows cannot interleave with another request of the same
+    user: two taps or two devices would otherwise both pass the check and leave two running timers."""
+    db.query(User.id).filter(User.id == user_id).with_for_update().first()
+
+
 def check_new_timer(db: Session, timer: GameTimerCreate) -> None:
     """The game (and the platform, when given) of a new timer must exist: nothing in the
     schema enforces it and a timer of an unknown game breaks every page that lists it."""
@@ -43,7 +50,7 @@ def create_timer(db: Session, timer: GameTimerCreate) -> tuple[GameTimer, bool]:
     """Start the timer. Returns it and whether the group must be told about a new game
     (the announcement is slow, so the caller sends it in the background)."""
     check_new_timer(db, timer)
-    # Check if user already has an active timer
+    lock_sessions(db, timer.user_id)
     active_timer = db.query(GameTimer).filter(
         GameTimer.user_id == timer.user_id,
         GameTimer.is_active == True
@@ -126,6 +133,7 @@ def get_active_timer(db: Session, user_id: int) -> Optional[GameTimer]:
 
 
 def stop_timer(db: Session, timer_id: int, user_id: int) -> GameTimer:
+    lock_sessions(db, user_id)  # a second stop of the same timer waits, then finds it stopped
     timer = db.query(GameTimer).filter(
         GameTimer.id == timer_id,
         GameTimer.user_id == user_id,
@@ -151,6 +159,7 @@ def stop_timer(db: Session, timer_id: int, user_id: int) -> GameTimer:
 
 def cancel_timer(db: Session, timer_id: int, user_id: int) -> GameTimer:
     """Discard a running timer as if it had never started (nothing is recorded)."""
+    lock_sessions(db, user_id)
     timer = db.query(GameTimer).filter(
         GameTimer.id == timer_id,
         GameTimer.user_id == user_id,
@@ -350,6 +359,7 @@ def create_manual_session(db: Session, current_user: User, body: ManualSessionCr
     if db.query(Game.id).filter(Game.id == body.game_id).first() is None:
         _reject(404, "Juego no encontrado")
     platform = _valid_platform(db, body.platform)
+    lock_sessions(db, user_id)
     if db.query(GameTimer.id).filter(GameTimer.user_id == user_id, GameTimer.is_active == True).first() is not None:
         _reject(409, "Tienes un timer en curso: páralo o cancélalo antes de añadir una sesión manual")
     validate_session(db, current_user, user_id, body.start_time, body.end_time)
@@ -390,6 +400,7 @@ def update_session(db: Session, current_user: User, timer_id: int, body: Session
     end = data.get("end_time") or timer.end_time
     # a session of a closed season cannot be edited by its owner, nor moved out of the current one
     _check_season(current_user, timer.start_time)
+    lock_sessions(db, timer.user_id)
     validate_session(db, current_user, timer.user_id, start, end, exclude_id=timer.id)
     if "platform" in data:
         timer.platform = _valid_platform(db, data["platform"])

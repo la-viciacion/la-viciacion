@@ -6,7 +6,7 @@
 // Ajustes (personal data, password, notifications, session) is the other; it loads the first time it is opened.
 // The layout classes (adm-shell, adm-side, adm-nav...) are the admin's, so both look the same.
 // All routes are /api/v1/users/{username}/...
-import { api } from '../../lib/api.js';
+import { api, loadAvatarUrl } from '../../lib/api.js';
 import { html, mount } from '../../lib/html.js';
 import { PASSWORD_HINT } from '../../lib/password.js';
 import * as seasons from '../../lib/seasons.js';
@@ -51,13 +51,13 @@ const userPath = (suffix) => `/users/${encodeURIComponent(user.username)}/${suff
 export async function render(ctx) {
   main = ctx.main;
   user = ctx.user;
-  avatarUrl = ctx.avatarUrl;
   onLogout = ctx.onLogout;
   await load();
 }
 
 async function load() {
-  const data = await api(userPath('profile'));
+  let data;
+  [data, avatarUrl] = await Promise.all([api(userPath('profile')), loadAvatarUrl(user.username)]);
   if (!data) return;
   shown = null;
   onScreen = data.season;

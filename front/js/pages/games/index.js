@@ -93,8 +93,9 @@ async function load() {
 }
 
 async function loadMore() {
+  const mine = latest; // a change of filters meanwhile makes this page belong to the old list
   const page = await api(`/games/catalog?${catalogQuery(filters, items.length)}`);
-  if (!page) return;
+  if (!page || mine !== latest) return;
   items = items.concat(page.items);
   total = page.total;
   drawResults();

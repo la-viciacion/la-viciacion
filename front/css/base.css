@@ -115,6 +115,36 @@ body {
   background: var(--border);
 }
 
+/* A page that could not load (no connection, the server failing): the session is kept and it can be retried */
+.load-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  max-width: 420px;
+  margin: 15vh auto 0;
+  padding: 0 24px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.load-error-icon { font-size: 2.5rem; }
+
+.load-error-actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+
+.load-error button {
+  font: inherit;
+  font-weight: 600;
+  padding: 9px 18px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+.load-error button.primary { background: var(--gradient-brand); color: var(--bg-base); border-color: transparent; }
+
 .empty-state {
   text-align: center;
   padding: 48px 24px;

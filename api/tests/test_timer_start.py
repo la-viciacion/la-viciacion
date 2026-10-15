@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from fastapi import HTTPException
 
@@ -45,6 +45,25 @@ class CheckNewTimerTests(unittest.TestCase):
 
     def test_a_known_platform_passes(self):
         timers.check_new_timer(db_where_exist(timers.User, timers.Game, timers.PlatformTag), body(platform="pc"))
+
+
+class OneTimerAtATimeTests(unittest.TestCase):
+    """Two starts of the same user (two taps, two devices) must not both pass the "no running timer" check."""
+
+    def test_the_lock_is_a_locking_read_of_the_user_row(self):
+        db = MagicMock()
+        timers.lock_sessions(db, 7)
+        db.query.return_value.filter.return_value.with_for_update.assert_called_once_with()
+
+    def test_starting_locks_the_user_before_looking_for_a_running_timer(self):
+        calls = []
+        db = MagicMock()
+        db.query.side_effect = lambda *_: (calls.append("query"), MagicMock())[1]  # a running timer is found
+        with patch.object(timers, "check_new_timer"), \
+                patch.object(timers, "lock_sessions", side_effect=lambda *_: calls.append("lock")):
+            with self.assertRaises(HTTPException):
+                timers.create_timer(db, body())
+        self.assertEqual(calls[:2], ["lock", "query"])
 
 
 if __name__ == "__main__":
