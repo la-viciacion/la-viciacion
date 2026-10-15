@@ -48,7 +48,7 @@ class ListLimitTests(unittest.TestCase):
             self.assertEqual(self.client.get("/timers/history/1", params={"limit": limit}).status_code, 422, limit)
 
     def test_history_accepts_a_sane_limit(self):
-        with mock.patch.object(timers, "get_timer_history", return_value=[]) as history:
+        with mock.patch.object(timers.timers, "get_timer_history", return_value=[]) as history:
             self.assertEqual(self.client.get("/timers/history/1", params={"limit": "500"}).status_code, 200)
         self.assertEqual(history.call_args.args[3], 500)
 
