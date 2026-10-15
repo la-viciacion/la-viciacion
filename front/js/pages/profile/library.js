@@ -62,14 +62,15 @@ function scoreForm(g) {
 }
 
 // A row button: an icon plus its label. On a phone only the icon is shown (the label stays for screen readers and
-// as a tooltip); a button that asks "¿Seguro?" shows its label again (css: [data-armed]).
-function act(action, id, icon, label, { primary = false, title = label, extra = '' } = {}) {
-  return html`<button class="pf-btn ${primary ? 'primary' : ''}" data-action="${action}" data-id="${id}" data-label="${label}" title="${title}" aria-label="${title}" ${raw(extra)}>${icon()}<span class="pf-label">${label}</span></button>`;
+// as a tooltip); a button that asks to confirm shows its question again (css: [data-armed]), naming the action
+// because the icon alone does not say which of the buttons is asking.
+function act(action, id, icon, label, { primary = false, title = label, extra = '', confirm = '' } = {}) {
+  return html`<button class="pf-btn ${primary ? 'primary' : ''}" data-action="${action}" data-id="${id}" data-label="${label}" data-confirm="${confirm}" title="${title}" aria-label="${title}" ${raw(extra)}>${icon()}<span class="pf-label">${label}</span></button>`;
 }
 
 // Abandoning a game (or taking it back) is one more button of the row, with the others.
 function abandonButtons(g) {
-  return html`${g.can_abandon ? act('abandon', g.id, iconFlag, 'Abandonar') : ''}${g.can_resume ? act('resume', g.id, iconUndo, 'Retomar') : ''}`;
+  return html`${g.can_abandon ? act('abandon', g.id, iconFlag, 'Abandonar', { confirm: '¿Abandonar?' }) : ''}${g.can_resume ? act('resume', g.id, iconUndo, 'Retomar', { confirm: '¿Retomar?' }) : ''}`;
 }
 
 // Destructive/announcing buttons: first click asks, second (within 4s) confirms.
@@ -78,7 +79,7 @@ const setLabel = (button, text) => { (button.querySelector('.pf-label') || butto
 function armed(button, label) {
   if (button.dataset.armed) return true;
   button.dataset.armed = '1';
-  setLabel(button, '¿Seguro? Pulsa otra vez');
+  setLabel(button, button.dataset.confirm || '¿Seguro?');
   setTimeout(() => {
     if (button.isConnected && button.dataset.armed) {
       delete button.dataset.armed;
@@ -221,13 +222,13 @@ export function createLibrary(el, options) {
   function actions(g) {
     const sessionsButton = html`${act('sessions', g.id, iconClock, 'Sesiones', { extra: `aria-expanded="${sessions.has(g.id)}"` })}${act('rate', g.id, iconStar, g.score == null ? 'Puntuar' : 'Cambiar nota')}`;
     if (g.can_complete) {
-      return html`${sessionsButton}${act('complete', g.id, () => iconCircleCheck(18), 'Marcar completado')}${abandonButtons(g)}`;
+      return html`${sessionsButton}${act('complete', g.id, () => iconCircleCheck(18), 'Marcar completado', { confirm: '¿Completar?' })}${abandonButtons(g)}`;
     }
     if (!g.completed) {
       return html`${sessionsButton}<button class="pf-btn" disabled title="${blockedReason(g, season)}" aria-label="Marcar completado: ${blockedReason(g, season)}">${iconCircleCheck(18)}<span class="pf-label">Marcar completado</span></button>${abandonButtons(g)}`;
     }
     if (g.complete_blocked === 'closed_season') return sessionsButton;
-    return html`${sessionsButton}${act('edit-date', g.id, iconCalendar, 'Cambiar fecha')}${act('uncomplete', g.id, iconUndo, 'Desmarcar')}`;
+    return html`${sessionsButton}${act('edit-date', g.id, iconCalendar, 'Cambiar fecha')}${act('uncomplete', g.id, iconUndo, 'Desmarcar', { confirm: '¿Desmarcar?' })}`;
   }
 
   // The sessions of an entry; the API only lets you change those of the running season.

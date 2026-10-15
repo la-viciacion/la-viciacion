@@ -60,6 +60,14 @@ test('the rows have the buttons of the summary list', async () => {
   assert.deepEqual(text('.pf-game[data-id="2"] .pf-label'), ['Sesiones', 'Puntuar', 'Marcar completado', 'Abandonar']);
 });
 
+test('a button that asks to confirm names its action, since on a phone only the icon shows', async () => {
+  await open();
+  const row = '.pf-game[data-id="2"]';
+  document.querySelector(`${row} [data-action="complete"]`).click();
+  document.querySelector(`${row} [data-action="abandon"]`).click();
+  assert.deepEqual(text(`${row} [data-armed] .pf-label`), ['¿Completar?', '¿Abandonar?']);
+});
+
 test('the random rating asks for the unrated games, one after another, saving each', async () => {
   const calls = await open({ 'PUT /users/ana/games/g2/score': { score: 70 }, 'PUT /users/ana/games/g3/score': { score: 60 } });
   assert.match(document.querySelector('[data-action="random-rate"]').textContent, /\(2\)/);
