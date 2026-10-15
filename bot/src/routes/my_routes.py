@@ -1,14 +1,8 @@
-import datetime
+from urllib.parse import quote
 
 import utils.keyboard as kb
-from telegram import (
-    InlineKeyboardButton,
-    InlineKeyboardMarkup,
-    ReplyKeyboardMarkup,
-    ReplyKeyboardRemove,
-    Update,
-)
-from telegram.ext import ContextTypes, ConversationHandler
+from telegram import InlineKeyboardMarkup, Update
+from telegram.ext import ContextTypes
 from utils.config import Config
 from utils.duration import format_duration, format_players
 from utils.my_utils import MyUtils
@@ -18,146 +12,77 @@ log_manager = LogManager()
 logger = log_manager.get_logger()
 
 RECOMMENDATIONS = 10
+LATEST = 10  # how many games the lists of "your games" show
 
 utils = MyUtils()
 config = Config()
 
 
+async def _my_statistic(context: ContextTypes.DEFAULT_TYPE, ranking: str) -> list | dict:
+    """The `data` of one of the sender's own statistics (GET /statistics/users/{username}?ranking=...)."""
+    username = quote(context.user_data["app_user"]["username"])
+    answer = await utils.fetch_json("GET", f"{config.API_URL}/statistics/users/{username}?ranking={ranking}")
+    return answer[0]["data"]
+
+
+def _numbered(items, line) -> str:
+    return "".join(f"{i}. {line(elem)}\n" for i, elem in enumerate(items, start=1))
+
+
 class MyRoutes:
     async def my_data(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-        query = update.callback_query
         logger.info("My data")
-        # db.log(context.user_data["user"], ActionLogs.MY_DATA)
+        query = update.callback_query
         await query.answer()
-        keyboard = kb.MY_DATA
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(
-            text="¿Qué quieres consultar?", reply_markup=reply_markup
-        )
+        await query.edit_message_text(text="¿Qué quieres consultar?", reply_markup=InlineKeyboardMarkup(kb.MY_DATA))
         return utils.MY_ROUTES
 
-    async def my_games(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    async def my_games(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         logger.info("My games")
-        query = update.callback_query
-        username = context.user_data["app_user"]["username"]
-        ranking = utils.fetch_json(
-            "GET",
-            config.API_URL + "/statistics/users/" + username + "?ranking=played_games",
-        )
-        ranking = utils.load_json_response(ranking[0])
-        num_games = len(ranking["data"])
-        msg = f"Has jugado a {num_games} juegos. Estos son los 10 últimos:\n"
-        for i, elem in enumerate(ranking["data"]):
-            msg = (
-                msg
-                + str(i + 1)
-                + ". "
-                + str(elem["game_name"])
-                + " ("
-                + str(format_duration(elem["played_time"]))
-                + ")"
-                + "\n"
-            )
-            if i == 9:
-                break
+        games = await _my_statistic(context, "played_games")
+        msg = f"Has jugado a {len(games)} juegos. Estos son los 10 últimos:\n"
+        msg += _numbered(games[:LATEST], lambda e: f"{e['game_name']} ({format_duration(e['played_time'])})")
         await utils.response_conversation(update, context, msg)
 
-    async def my_top_games(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ) -> int:
+    async def my_top_games(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         logger.info("My top games")
-        query = update.callback_query
-        username = context.user_data["app_user"]["username"]
-        ranking = utils.fetch_json(
-            "GET",
-            config.API_URL + "/statistics/users/" + username + "?ranking=top_games",
+        games = await _my_statistic(context, "top_games")
+        msg = "Este es tu top de juegos:\n" + _numbered(
+            games[:LATEST], lambda e: f"{e['game_name']} - {format_duration(e['played_time'])}"
         )
-        ranking = utils.load_json_response(ranking[0])
-        msg = "Este es tu top de juegos:\n"
-        for i, elem in enumerate(ranking["data"]):
-            played_time = format_duration(elem["played_time"])
-            msg = (
-                msg
-                + str(i + 1)
-                + ". "
-                + str(elem["game_name"])
-                + " - "
-                + str(played_time)
-                + "\n"
-            )
-            if i == 9:
-                break
         await utils.response_conversation(update, context, msg)
 
-    async def my_completed_games(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ) -> None:
+    async def my_completed_games(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         logger.info("My completed games")
-        query = update.callback_query
-        username = context.user_data["app_user"]["username"]
-        ranking = utils.fetch_json(
-            "GET",
-            config.API_URL
-            + "/statistics/users/"
-            + username
-            + "?ranking=completed_games",
-        )
-        ranking = utils.load_json_response(ranking[0])
-        msg = "Estos son tus últimos juegos completados:\n"
-        for i, elem in enumerate(ranking["data"]):
-            msg = msg + str(i + 1) + ". " + str(elem["game_name"]) + "\n"
-
+        games = await _my_statistic(context, "completed_games")
+        msg = "Estos son tus últimos juegos completados:\n" + _numbered(games, lambda e: e["game_name"])
         await utils.response_conversation(update, context, msg)
 
-    async def my_achievements(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ) -> None:
+    async def my_achievements(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         logger.info("My achievements")
-        query = update.callback_query
-        username = context.user_data["app_user"]["username"]
-        ranking = utils.fetch_json(
-            "GET",
-            config.API_URL + "/statistics/users/" + username + "?ranking=achievements",
-        )
-        ranking = utils.load_json_response(ranking[0])
-        msg = "Estos son tus logros:\n"
-        for i, elem in enumerate(ranking["data"]):
-            msg = msg + str(i + 1) + ". " + str(elem["title"]) + "\n"
-
+        achievements = await _my_statistic(context, "achievements")
+        msg = "Estos son tus logros:\n" + _numbered(achievements, lambda e: e["title"])
         await utils.response_conversation(update, context, msg)
 
-    async def my_streak(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ) -> None:
+    async def my_streak(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         logger.info("My streak")
-        query = update.callback_query
-        username = context.user_data["app_user"]["username"]
-        ranking = utils.fetch_json(
-            "GET",
-            config.API_URL + "/statistics/users/" + username + "?ranking=streak",
+        data = await _my_statistic(context, "streak")
+        msg = (
+            "Estos son tus rachas:\n"
+            f"Racha actual: {data['current_streak']}\n"
+            f"Mejor racha: {data['best_streak']}\n"
+            f"Fin mejor racha: {data['best_streak_date']}"
         )
-        ranking = utils.load_json_response(ranking[0])
-        msg = "Estos son tus rachas:\n"
-        data = ranking["data"]
-        msg = msg + "Racha actual: " + str(data["current_streak"]) + "\n"
-        msg = msg + "Mejor racha: " + str(data["best_streak"]) + "\n"
-        msg = msg + "Fin mejor racha: " + str(data["best_streak_date"])
-
         await utils.response_conversation(update, context, msg)
 
-    async def recommendations(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ) -> None:
+    async def recommendations(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         logger.info("Recommendations")
-        username = context.user_data["app_user"]["username"]
-        games = utils.fetch_json(
-            "GET",
-            config.API_URL + "/users/" + username + "/recommendations?limit=" + str(RECOMMENDATIONS),
-        )
+        username = quote(context.user_data["app_user"]["username"])
+        games = await utils.fetch_json("GET", f"{config.API_URL}/users/{username}/recommendations?limit={RECOMMENDATIONS}")
         if not games:
             msg = "No hay nada que recomendarte: ya has probado todo lo que tienen los demás."
         else:
-            msg = "Juegos que tienen los demás y tú no has jugado:\n"
-            for i, elem in enumerate(games):
-                msg += f"{i + 1}. {elem['game_name']} ({format_players(elem['players'])})\n"
+            msg = "Juegos que tienen los demás y tú no has jugado:\n" + _numbered(
+                games, lambda e: f"{e['game_name']} ({format_players(e['players'])})"
+            )
         await utils.response_conversation(update, context, msg)
