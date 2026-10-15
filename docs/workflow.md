@@ -7,7 +7,7 @@ Simplified trunk-based development for a team of 2-3. `main` is the trunk: alway
 1. **Nobody pushes to `main`.** Every change goes through a pull request (branch protection enforces it, also for admins).
 2. **Short-lived branches** off `main`, named `<type>/<short-description>` (`feat/ranking-filters`, `fix/timer-stop`, `docs/workflow`). Aim to merge within a day or two; if a feature is bigger, split it into steps that are each safe to merge (behind a setting or not yet reachable from the UI).
 3. **Small PRs.** One concern per PR; do not mix refactors with behaviour changes.
-4. **Every commit lands on `main`.** PRs are **rebase-merged** (a trial, see [roadmap.md](roadmap.md)): each commit of the branch is replayed on `main` as it is, so each one must be atomic, green on its own, and follow Conventional Commits (`feat(front): ...`, types in `AGENTS.md`). The PR title follows the same format and CI checks it; CI does not check the individual commits, so tidy the branch (`git rebase -i`, fixups) before merging. No "wip" or "fix typo" commits.
+4. **Every commit lands on `main`.** PRs are **rebase-merged** (a trial, see [roadmap.md](roadmap.md)): each commit of the branch is replayed on `main` as it is, so each one must be atomic, green on its own, and follow Conventional Commits (`feat(front): ...`, types in `AGENTS.md`). The PR title follows the same format, and CI checks the title and the subject of every commit (merge commits are skipped). If it fails, fix the messages with `git rebase -i` and `git push --force-with-lease`; squash `fixup!` commits first. No "wip" or "fix typo" commits.
 5. **Merge when**: the `CI` check is green, the approvals the ruleset asks for are there (none while there is a single maintainer, one from the second person on), and the branch is up to date with `main`. Delete the branch after merging (GitHub does it automatically).
 6. **Review turnaround**: aim to review within a working day. With 2 people the reviewer is simply the other one; do not self-approve.
 7. **Releases** are tags `vX.Y.Z` cut from `main` (see [deployment.md](deployment.md#cicd)). There is no `develop` and no release branch; a hotfix is a normal PR to `main` followed by a new tag.
@@ -22,7 +22,7 @@ Simplified trunk-based development for a team of 2-3. `main` is the trunk: alway
 - Bot tests (Python 3.14).
 - Front tests and ESLint.
 - The three Docker images build and contain no secrets, data or baked-in credentials.
-- The PR title follows Conventional Commits.
+- The PR title and the subject of every commit follow Conventional Commits.
 
 ### Which checks run for a change
 

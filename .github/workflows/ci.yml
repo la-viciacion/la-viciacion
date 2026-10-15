@@ -15,18 +15,38 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Pull requests are rebase-merged: the commits land on main as they are. Only the title is checked here.
+  # Pull requests are rebase-merged: the commits land on main as they are, so the title and the subject
+  # of every commit must follow Conventional Commits (one job, so it is billed once).
   pr-title:
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
     steps:
-      - name: Title follows Conventional Commits
+      - name: Title and commits follow Conventional Commits
         env:
           TITLE: ${{ github.event.pull_request.title }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
         run: |
-          if ! printf '%s' "$TITLE" | grep -E -q '^(feat|fix|refactor|docs|style|test|chore|perf|build|ci|revert)(\([a-z0-9._-]+\))?!?: .+'; then
-            echo "::error::The PR title must look like 'feat(front): add X' (types: feat, fix, refactor, docs, style, test, chore, perf, build, ci, revert)"
-            exit 1
+          pattern='^(feat|fix|refactor|docs|style|test|chore|perf|build|ci|revert)(\([a-z0-9._-]+\))?!?: .+'
+          hint="must look like 'feat(front): add X' (types: feat, fix, refactor, docs, style, test, chore, perf, build, ci, revert)"
+          status=0
+          if ! printf '%s' "$TITLE" | grep -E -q "$pattern"; then
+            echo "::error::The PR title $hint"
+            status=1
           fi
+          # Merge commits are skipped: the rebase merge drops them. A fixup!/squash! subject fails on purpose.
+          subjects=$(gh api "repos/$REPO/pulls/$PR/commits" --paginate \
+            --jq '.[] | select((.parents | length) < 2) | "\(.sha[0:7]) \(.commit.message | split("\n")[0])"')
+          while IFS= read -r line; do
+            [ -z "$line" ] && continue
+            if ! printf '%s' "${line#* }" | grep -E -q "$pattern"; then
+              echo "::error::Commit $line: the subject $hint"
+              status=1
+            fi
+          done <<< "$subjects"
+          exit $status
 
   # What the pull request touches decides which checks run; anything unclassified runs them all
   # (the rules and the reasons are in .github/scripts/ci_scope.py, pinned by api/tests/test_ci_scope.py).
