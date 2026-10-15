@@ -1,6 +1,6 @@
 // Home: time tracking (timer card + latest games).
 import { html, mount } from '../../lib/html.js';
-import { loadPlatforms } from '../../lib/platforms.js';
+import { ensurePlatforms } from '../../lib/platforms.js';
 import { closeAllModals } from '../../ui/modal.js';
 import { openCompletion } from './completion.js';
 import { initGamePicker, startTimerFlow } from './game-picker.js';
@@ -21,9 +21,8 @@ function syncManualButton() {
 /** Re-render only the timer card and the history, keeping the page in place. */
 async function refresh() {
   stopClock();
-  await loadTimerCard();
-  syncManualButton();
-  await loadHistory(true);
+  const timer = loadTimerCard();
+  await Promise.all([timer.then(syncManualButton), loadHistory(true, timer)]);
 }
 
 export async function render({ user, main, isCurrent }) {
@@ -58,12 +57,11 @@ export async function render({ user, main, isCurrent }) {
   main.querySelector('#historyList').addEventListener('keydown', onHistoryKey);
   main.querySelector('#historyMore').addEventListener('click', onHistoryClick);
 
-  // Active timer first: it decides whether "Seguir" buttons are enabled. The platforms (the history names
-  // them) are fetched meanwhile.
-  await Promise.all([loadPlatforms(), loadTimerCard()]);
+  // Everything is asked at once; the history is drawn once the timer (it decides whether "Seguir" is enabled) and
+  // the platforms (it names them) are known.
+  const ready = Promise.all([ensurePlatforms(), loadTimerCard()]);
+  await Promise.all([ready.then(() => isCurrent() && syncManualButton()), loadHistory(true, ready)]);
   if (!isCurrent()) return;
-  syncManualButton();
-  await loadHistory(true);
 
   if (location.hash === '#/new') {
     // the shortcut of the installed app: pick a game, unless a timer is already running

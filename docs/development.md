@@ -45,6 +45,9 @@ python -m venv venv                        # once; venv/ is gitignored
 venv/Scripts/python.exe -m pip install -r requirements.txt   # Linux/macOS: venv/bin/python
 venv/Scripts/python.exe -m unittest discover -s tests -t .
 
+# Python lint of the API and the bot (from the root; ruff.toml says what it checks, CI pins the version)
+ruff check .
+
 # Front (from front/)
 cd front
 npm install

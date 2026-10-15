@@ -1,7 +1,6 @@
 import datetime
 import unittest
 
-from sqlalchemy import event
 
 from src.crud import time_entries, users
 from src.database import models

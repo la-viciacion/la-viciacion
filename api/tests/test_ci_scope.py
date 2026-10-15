@@ -42,6 +42,7 @@ class ScopeTests(unittest.TestCase):
         self.assertEqual(run(".env.template"), ({"api-tests"}, set()))
         self.assertEqual(run("docker-compose.yml"), ({"api-tests", "mariadb"}, set()))
         self.assertEqual(run("docker-compose.dev.yml"), ({"api-tests"}, set()))
+        self.assertEqual(run("ruff.toml"), ({"api-tests", "bot-tests"}, set()))
 
     def test_anything_unclassified_runs_everything(self):
         everything = (set(ci_scope.ALL_CHECKS), set(ci_scope.ALL_SERVICES))

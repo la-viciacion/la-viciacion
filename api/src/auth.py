@@ -69,14 +69,20 @@ def password_fingerprint(user) -> str:
 
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None):
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.now(timezone.utc) + expires_delta
-    else:
-        expire = datetime.now(timezone.utc) + timedelta(minutes=15)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, config.SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
+    issued = datetime.now(timezone.utc)
+    # `iat` lets the front tell how much of the token's life is left, and renew it in time (POST /auth/refresh)
+    to_encode = {**data, "iat": issued, "exp": issued + (expires_delta or timedelta(minutes=15))}
+    return jwt.encode(to_encode, config.SECRET_KEY, algorithm=ALGORITHM)
+
+
+def issue_token(user: models.User) -> dict:
+    """A session for `user`. The token only names the account: everything else about it is read from the
+    database on every request, so nothing personal sits in the browser and nothing in it goes stale."""
+    token = create_access_token(
+        {"id": user.id, "username": user.username, "pwv": password_fingerprint(user)},
+        timedelta(minutes=int(config.ACCESS_TOKEN_EXPIRE_MINUTES)),
+    )
+    return {"access_token": token, "token_type": "bearer"}
 
 
 # A plain `def`: it queries the database, so FastAPI runs it in a worker thread instead of on the event loop

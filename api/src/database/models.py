@@ -181,7 +181,8 @@ class Achievement(Base):
     key = Column(String(255))
     title = Column(String(255))
     message = Column(String(255))
-    image = Column(LargeBinary)
+    # not loaded with the achievement: only the image route reads it, and the lists of awards load many rows
+    image = deferred(Column(LargeBinary))
     # an achievement that is switched off is not earned, announced, recalculated or shown (see crud/achievements.py)
     active = Column(Boolean, nullable=False, server_default=text("1"))
     # a secret one is hidden from whoever has not unlocked it, and announced to the group without saying which

@@ -11,6 +11,7 @@ import { startTimer } from './timer.js';
 
 let userId = null;
 let searchTimer = null;
+let searchCount = 0; // only the answer to the latest search may be drawn: an older one can arrive after it
 
 export const initGamePicker = (id) => { userId = id; };
 
@@ -25,13 +26,17 @@ function openStep(content) {
   return openModal(content, { onClose: () => clearTimeout(searchTimer) });
 }
 
-// Debounced search box: calls search(query) 250ms after typing stops.
+// Debounced search box: calls search(query, isLatest) 250ms after typing stops; isLatest() turns false once
+// another search starts.
 function bindSearch(modal, inputId, search, delay = 250) {
   const input = modal.el.querySelector(`#${inputId}`);
   input.addEventListener('input', () => {
     clearTimeout(searchTimer);
     const query = input.value.trim();
-    searchTimer = setTimeout(() => search(query), delay);
+    searchTimer = setTimeout(() => {
+      const mine = ++searchCount;
+      search(query, () => mine === searchCount);
+    }, delay);
   });
   input.focus();
 }
@@ -46,19 +51,19 @@ export function openGamePicker(onPick) {
       <button class="btn-modal-secondary" id="modalAddGameBtn">${iconPlus()} ¿No está? Añadir nuevo juego</button>
     </div>`);
   modal.el.querySelector('#modalAddGameBtn').addEventListener('click', () => openAddGame(onPick));
-  bindSearch(modal, 'gamePickerSearch', (query) => searchCatalogue(modal, query, onPick));
+  bindSearch(modal, 'gamePickerSearch', (query, isLatest) => searchCatalogue(modal, query, onPick, isLatest));
 }
 
 /** "Nuevo timer": pick a game, then its platform, then start. */
 export const startTimerFlow = () => openGamePicker(chooseTimerPlatform);
 
-async function searchCatalogue(modal, query, onPick) {
+async function searchCatalogue(modal, query, onPick, isLatest = () => true) {
   const results = modal.el.querySelector('#gamePickerResults');
   if (query.length < 2) return mount(results, hint('Escribe al menos 2 caracteres'));
   mount(results, hint('Buscando...'));
   try {
     const games = await api(`/games/?name=${encodeURIComponent(query)}`);
-    if (!results.isConnected) return; // modal closed while awaiting
+    if (!results.isConnected || !isLatest()) return; // modal closed, or a newer search, while awaiting
     if (!games?.length) return mount(results, hint('Sin resultados en tu catálogo'));
     mount(results, html`${games.map((g) => html`
       <button class="modal-result-row" data-game-id="${g.id}">
@@ -72,7 +77,7 @@ async function searchCatalogue(modal, query, onPick) {
       onPick(row.dataset.gameId, game?.name);
     };
   } catch (err) {
-    if (results.isConnected) mount(results, hint(`Error buscando: ${err.message}`));
+    if (results.isConnected && isLatest()) mount(results, hint(`Error buscando: ${err.message}`));
   }
 }
 
@@ -87,7 +92,7 @@ export function openAddGame(onPick) {
     </div>`);
   const input = modal.el.querySelector('#addGameSearch');
   modal.el.querySelector('#manualGameBtn').addEventListener('click', () => openManualGame(onPick, input.value.trim()));
-  bindSearch(modal, 'addGameSearch', (query) => searchRawg(modal, query, onPick), 300);
+  bindSearch(modal, 'addGameSearch', (query, isLatest) => searchRawg(modal, query, onPick, isLatest), 300);
 }
 
 // ── Step 1c: create a game RAWG does not have ───────────────
@@ -130,13 +135,13 @@ function openManualGame(onPick, name = '') {
   });
 }
 
-async function searchRawg(modal, query, onPick) {
+async function searchRawg(modal, query, onPick, isLatest = () => true) {
   const results = modal.el.querySelector('#addGameResults');
   if (query.length < 2) return mount(results, hint('Escribe al menos 2 caracteres'));
   mount(results, hint('Buscando en RAWG...'));
   try {
     const candidates = await api(`/games/search-rawg?query=${encodeURIComponent(query)}`);
-    if (!results.isConnected) return;
+    if (!results.isConnected || !isLatest()) return;
     if (!candidates?.length) return mount(results, hint('Sin resultados'));
     const showList = () => {
       mount(results, html`${candidates.map((c, i) => html`
@@ -154,7 +159,7 @@ async function searchRawg(modal, query, onPick) {
     };
     showList();
   } catch (err) {
-    if (results.isConnected) mount(results, hint(`Error buscando: ${err.message}`));
+    if (results.isConnected && isLatest()) mount(results, hint(`Error buscando: ${err.message}`));
   }
 }
 

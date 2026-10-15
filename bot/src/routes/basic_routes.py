@@ -1,5 +1,5 @@
 import utils.keyboard as kb
-from telegram import InlineKeyboardMarkup, ReplyKeyboardRemove, Update
+from telegram import InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes, ConversationHandler
 from utils.config import Config
 from utils.my_utils import MyUtils

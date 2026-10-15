@@ -1,7 +1,6 @@
 """The game page through real requests: who of the group has a game, their hours, completions and ratings
 (MariaDB required, see api_support.py)."""
 import datetime
-from datetime import timedelta
 
 from src.database import models
 from src.utils import seasons

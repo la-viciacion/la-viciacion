@@ -1,13 +1,10 @@
 import datetime
-from typing import Union
 
-from sqlalchemy import and_, asc, case, create_engine, desc, func, select, text, update
+from sqlalchemy import and_, case, desc, func, select
 from sqlalchemy.orm import Session
 
-from ..crud import time_entries, users
-from ..database import models, schemas
-from ..utils import actions as actions
-from ..utils import my_utils as utils
+from ..crud import time_entries
+from ..database import models
 from ..utils.logger import LogManager
 from ..utils import seasons, streaks
 from ..config import Config
@@ -76,25 +73,21 @@ def user_ranking_achievements(
     is_active: bool | None = None,
 ):
     season = seasons.or_current(season)
-    try:
-        stmt = (
-            select(
-                models.UserAchievement.user_id,
-                func.count(models.UserAchievement.achievement_id).label("achievements"),
-                models.User.name,
-            )
-            .filter(models.UserAchievement.season == season, models.not_god())
-            .join(models.User, models.User.id == models.UserAchievement.user_id)
-            .group_by(models.UserAchievement.user_id, models.User.name)
-            .order_by(func.count(models.UserAchievement.achievement_id).desc(), models.UserAchievement.user_id)
-            .limit(limit)
+    stmt = (
+        select(
+            models.UserAchievement.user_id,
+            func.count(models.UserAchievement.achievement_id).label("achievements"),
+            models.User.name,
         )
-        if is_active is not None:
-            stmt = stmt.where(models.User.is_active == is_active)
-        return db.execute(stmt).fetchall()
-    except Exception as e:
-        logger.info(e)
-        raise e
+        .filter(models.UserAchievement.season == season, models.not_god())
+        .join(models.User, models.User.id == models.UserAchievement.user_id)
+        .group_by(models.UserAchievement.user_id, models.User.name)
+        .order_by(func.count(models.UserAchievement.achievement_id).desc(), models.UserAchievement.user_id)
+        .limit(limit)
+    )
+    if is_active is not None:
+        stmt = stmt.where(models.User.is_active == is_active)
+    return db.execute(stmt).fetchall()
 
 
 def user_played_games(
@@ -168,33 +161,29 @@ def user_completed_games(
 
 def games_last_played(db: Session, limit: int = 10, is_active: bool | None = None):
     """The games played most recently, each once, with the start of their latest session."""
-    try:
-        sessions = time_entries.sessions_subquery()
-        last = func.max(sessions.c.start).label("start")
-        # group and cut first (game ids only), then look the names up for the few that remain
-        users_filter = [models.not_god()]
-        if is_active is not None:
-            users_filter.append(models.User.is_active == is_active)
-        latest = (
-            select(sessions.c.game_id, last)
-            .join(models.User, models.User.id == sessions.c.user_id)
-            .where(*users_filter)
-            .group_by(sessions.c.game_id)
-            .order_by(desc(last))
-            .limit(limit)
-            .subquery("latest")
-        )
-        stmt = (
-            select(latest.c.game_id, models.Game.name, latest.c.start)
-            .join(models.Game, models.Game.id == latest.c.game_id)
-            .order_by(desc(latest.c.start))
-        )
-        # .mappings() so `item["name"]` string-key access works (SQLAlchemy
-        # 2.x plain Row no longer supports it, only via _mapping/.mappings()).
-        return db.execute(stmt).mappings().all()
-    except Exception as e:
-        logger.info(e)
-        raise e
+    sessions = time_entries.sessions_subquery()
+    last = func.max(sessions.c.start).label("start")
+    # group and cut first (game ids only), then look the names up for the few that remain
+    users_filter = [models.not_god()]
+    if is_active is not None:
+        users_filter.append(models.User.is_active == is_active)
+    latest = (
+        select(sessions.c.game_id, last)
+        .join(models.User, models.User.id == sessions.c.user_id)
+        .where(*users_filter)
+        .group_by(sessions.c.game_id)
+        .order_by(desc(last))
+        .limit(limit)
+        .subquery("latest")
+    )
+    stmt = (
+        select(latest.c.game_id, models.Game.name, latest.c.start)
+        .join(models.Game, models.Game.id == latest.c.game_id)
+        .order_by(desc(latest.c.start))
+    )
+    # .mappings() so `item["name"]` string-key access works (SQLAlchemy
+    # 2.x plain Row no longer supports it, only via _mapping/.mappings()).
+    return db.execute(stmt).mappings().all()
 
 
 def games_most_played(db: Session, limit: int = 10, is_active: bool | None = None) -> list[dict]:
@@ -202,27 +191,23 @@ def games_most_played(db: Session, limit: int = 10, is_active: bool | None = Non
 
 
 def platform_played_games(db: Session, limit: int = None, is_active: bool | None = None):
-    try:
-        stmt = (
-            select(
-                (models.UserGame.platform).label("tag_id"),
-                models.PlatformTag.name,
-                func.count(models.UserGame.platform),
-            )
-            .join(
-                models.PlatformTag,
-                models.UserGame.platform == models.PlatformTag.id,
-            )
-            .join(models.User, models.User.id == models.UserGame.user_id)
-            .where(models.not_god(), *([models.User.is_active == is_active] if is_active is not None else []))
-            .group_by(models.UserGame.platform)
-            .order_by(func.count(models.UserGame.platform).desc())
-            .limit(limit)
+    stmt = (
+        select(
+            (models.UserGame.platform).label("tag_id"),
+            models.PlatformTag.name,
+            func.count(models.UserGame.platform),
         )
-        return db.execute(stmt).fetchall()
-    except Exception as e:
-        logger.info(e)
-        raise e
+        .join(
+            models.PlatformTag,
+            models.UserGame.platform == models.PlatformTag.id,
+        )
+        .join(models.User, models.User.id == models.UserGame.user_id)
+        .where(models.not_god(), *([models.User.is_active == is_active] if is_active is not None else []))
+        .group_by(models.UserGame.platform)
+        .order_by(func.count(models.UserGame.platform).desc())
+        .limit(limit)
+    )
+    return db.execute(stmt).fetchall()
 
 
 def user_ratio(db: Session, season: int = None, is_active: bool | None = None, counts=None):

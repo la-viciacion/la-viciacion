@@ -1,5 +1,4 @@
 import ipaddress
-from datetime import timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Security, status
@@ -90,18 +89,7 @@ def login_for_access_token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
     db: Session = Depends(get_db),
 ):
-    """_summary_
-
-    Args:
-        form_data (Annotated[OAuth2PasswordRequestForm, Depends): _description_
-        db (Session, optional): _description_. Defaults to Depends(get_db).
-
-    Raises:
-        HTTPException: _description_
-
-    Returns:
-        _type_: _description_
-    """
+    """Log in with a username or email and a password: the only way to get a session."""
     account = form_data.username.strip().lower()[:255]
     client = _client(request)
     _block_if_limited(
@@ -121,33 +109,19 @@ def login_for_access_token(
     if not user.is_active:
         # only after a correct password, so this does not reveal which accounts exist
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=msg.ACCOUNT_DISABLED)
-    access_token_expires = timedelta(minutes=int(config.ACCESS_TOKEN_EXPIRE_MINUTES))
-    access_token = auth.create_access_token(
-        data={
-            "id": user.id,
-            "username": user.username,
-            "name": user.name,
-            "email": user.email,
-            "telegram_id": user.telegram_id,
-            "is_admin": user.is_admin,
-            "is_active": user.is_active,
-            "pwv": auth.password_fingerprint(user),
-        },
-        expires_delta=access_token_expires,
-    )
-    return {"access_token": access_token, "token_type": "bearer"}
+    return auth.issue_token(user)
+
+
+@router.post("/auth/refresh", response_model=auth.Token)
+def refresh_token(user: models.User = Security(auth.get_current_active_user)):
+    """A fresh token for a session that is still valid, so whoever keeps using the app is never sent back to the
+    login. A token that expired, was issued before a password change or belongs to a disabled account gets nothing."""
+    return auth.issue_token(user)
 
 
 @router.get("/auth/active_user", response_model=schemas.User)
 def active_user(user: models.User = Security(auth.get_current_active_user)):
-    """
-    Get active user info
-    """
-    """_summary_
-
-    Returns:
-        _type_: _description_
-    """
+    """The logged-in user."""
     return user
 
 

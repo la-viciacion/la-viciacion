@@ -1,0 +1,14 @@
+# Python lint of the API and the bot (CI: .github/workflows/checks.yml; locally: `ruff check .` from the root).
+# Only what points at a bug or at dead code: undefined or unused names, syntax errors and bugbear's likely mistakes.
+# Style is left to the reviewer.
+target-version = "py314"
+# applied migrations are immutable (docs/migrations.md): they are never edited, not even to drop an import
+extend-exclude = ["api/alembic/versions", "**/venv"]
+
+[lint]
+select = ["F", "E9", "B"]
+ignore = [
+  "B008",  # FastAPI's Depends()/Query() as defaults is how the framework declares parameters
+  "B904",  # an HTTPException raised while handling another error: the cause is logged where it is caught
+  "B905",  # zip() of sequences built to the same length
+]

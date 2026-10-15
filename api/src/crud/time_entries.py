@@ -1,26 +1,19 @@
 import datetime
-from typing import Union
 
 from sqlalchemy import (
     Integer,
-    asc,
     cast,
-    create_engine,
     desc,
     extract,
     func,
     select,
-    text,
     true,
-    update,
 )
 from sqlalchemy.orm import Session
 
 from ..config import Config
-from ..database import models, schemas
-from ..utils import actions
+from ..database import models
 from ..utils import my_utils as utils
-from . import games, users
 from ..utils.logger import LogManager
 from ..utils import seasons, user_settings
 
@@ -258,17 +251,8 @@ def get_time_entry_by_time(
     mode: int,
     season: int = None,
 ):
-    """_summary_
-
-    Args:
-        db (Session): _description_
-        user_id (int): _description_
-        duration (int): _description_
-        mode (int): 1==, 2<=, 3>=
-
-    Returns:
-        Row | None: row with (user_id, game_id, start, end, duration)
-    """
+    """The earliest session of the user in the season whose length is equal to (mode 1), at most (2) or at least (3)
+    `duration` seconds: a row (user_id, game_id, start, end, duration), or None."""
     season = seasons.or_current(season)
     sessions = sessions_subquery()
     # sessions of no duration never count; the earliest one that matches is the one that earned it
@@ -539,16 +523,7 @@ def get_forgotten_game_timers(
 
 
 def get_weekly_resume(db: Session, user: models.User, weeks_ago: int = 0):
-    """_summary_
-
-    Args:
-        db (Session): _description_
-        user (models.User): _description_
-        mode (int, optional): 0 = last week. 1 = current week. Defaults to 0.
-
-    Returns:
-        list[Row]: rows with (sum(duration), session count, distinct game count)
-    """
+    """(seconds played, sessions, distinct games) of the user in a week: the current one, or `weeks_ago` weeks before."""
     first_day, last_day = utils.get_week_range_dates(weeks_ago)
     sessions = sessions_subquery()
     weekly_hours = (

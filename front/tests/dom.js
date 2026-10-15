@@ -36,7 +36,7 @@ export function installApi(routes) {
     calls.push({ method, path, body });
     const key = Object.keys(routes).find((k) => `${method} ${path}`.startsWith(k));
     if (!key) throw new Error(`unexpected request: ${method} ${path}`);
-    const answer = typeof routes[key] === 'function' ? routes[key]({ method, path, body }) : routes[key];
+    const answer = await (typeof routes[key] === 'function' ? routes[key]({ method, path, body }) : routes[key]);
     return answer instanceof Response ? answer : json(answer);
   };
   return calls;

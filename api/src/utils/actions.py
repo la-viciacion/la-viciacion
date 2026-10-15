@@ -1,20 +1,15 @@
 import asyncio
 import datetime
-import json
-import re
 import threading
 import time
-from typing import Union
 
-import requests
-from sqlalchemy import asc, create_engine, desc, func, select, text, update
 from sqlalchemy.orm import Session
 
 from ..config import Config
 from ..crud import challenges as challenges_crud
 from ..crud import games, rankings, time_entries, users, wishlist
 from ..crud.achievements import Achievements, Played
-from ..database import models, schemas
+from ..database import models
 from . import challenges, my_utils as utils
 from . import push, rawg_sync
 from ..utils import seasons, streaks, user_settings
@@ -574,17 +569,7 @@ def signed_difference(difference: int, render=str) -> str:
 async def weekly_resume(
     db: Session, user: models.User, weeks_ago: int = 0, silent: bool = False
 ):
-    """_summary_
-
-    Args:
-        db (Session): _description_
-        user (models.User): _description_
-        mode (int, optional): 0 = last week. 1 = current week. Defaults to 0.
-        silent (bool, optional): _description_. Defaults to False.
-
-    Returns:
-        _type_: _description_
-    """
+    """Send the user their summary of a week: the current one, or `weeks_ago` weeks before (the scheduler sends the last one)."""
     try:
         logger.info("Check weekly resume for " + user.name + "...")
         resume = {}

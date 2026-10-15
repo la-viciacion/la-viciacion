@@ -2,7 +2,6 @@
 
 SQLite has no YEAR(): it is registered so the generated `season` columns work.
 """
-import datetime
 
 from sqlalchemy import create_engine, event
 from sqlalchemy.pool import StaticPool

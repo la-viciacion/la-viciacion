@@ -61,6 +61,21 @@ test('the search waits for the typing to stop, and asks at least two characters'
   assert.equal(document.querySelectorAll('#gamePickerResults i').length, 0);
 });
 
+test('an older answer that arrives after a newer one is not drawn', async () => {
+  openGamePicker(() => {});
+  let answerSlow;
+  installApi({ // the longer key first: routes match by prefix
+    'GET /games/?name=cel': [{ id: 'celeste', name: 'Celeste', image_url: null }],
+    'GET /games/?name=ce': () => new Promise((resolve) => { answerSlow = resolve; }),
+  });
+  type('#gamePickerSearch', 'ce');
+  mock.timers.tick(250);
+  await search('#gamePickerSearch', 'cel', 250);
+  answerSlow(json([{ id: 'ceres', name: 'Ceres', image_url: null }]));
+  await settle();
+  assert.deepEqual(results('gamePickerResults'), ['Celeste']);
+});
+
 test('choosing a result closes the picker and hands over the id and the name', async () => {
   openGamePicker((id, name) => (picked = [id, name]));
   installApi({ 'GET /games/?name=ce': [{ id: 'celeste', name: 'Celeste', image_url: null }] });

@@ -8,9 +8,8 @@ from unittest import mock
 
 from sqlalchemy import text
 
-from src.crud import users as users_crud
 from src.database import database, models
-from src.utils import actions, my_utils, seasons
+from src.utils import actions, my_utils
 from src.utils.achievements import AchievementsElems as E
 from tests.api_support import ApiTestCase
 from tests import clock

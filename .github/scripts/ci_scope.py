@@ -38,6 +38,8 @@ RULES = (
     (".env.template", {"api-tests"}, set()),
     ("docker-compose.yml", {"api-tests", "mariadb"}, set()),  # it pins the MariaDB version the tests run on
     ("docker-compose.dev.yml", {"api-tests"}, set()),
+    # the Python lint, run by the API and bot jobs
+    ("ruff.toml", {"api-tests", "bot-tests"}, set()),
 )
 
 

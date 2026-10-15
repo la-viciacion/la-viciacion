@@ -1,4 +1,5 @@
 """The access gate and /activate: who gets past, what each refusal says, and what /activate writes."""
+import threading
 import unittest
 from unittest import mock
 
@@ -16,6 +17,7 @@ USERS = [user(111, "ana", "Ana", user_id=1), user(None, "luis", "Luis", user_id=
 
 class GateTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
+        utils.forget_users()
         self.fetch = mock.patch.object(utils, "fetch_json", return_value=USERS)
         self.fetch.start()
         self.addCleanup(self.fetch.stop)
@@ -111,6 +113,14 @@ class GateTests(unittest.IsolatedAsyncioTestCase):
             await self.stops(update)
         update.message.reply_text.assert_awaited_once_with(msgs.api_error)
 
+    async def test_the_accounts_are_asked_for_once_a_minute_at_most(self):
+        await self.passes(make_update("/menu"))
+        await self.passes(make_update("/menu"))
+        self.assertEqual(utils.fetch_json.await_count, 1)
+        utils._users_at -= 61  # a minute later
+        await self.passes(make_update("/menu"))
+        self.assertEqual(utils.fetch_json.await_count, 2)
+
     async def test_a_failure_while_refusing_is_swallowed(self):
         update = make_update("/menu", sender_id=999)
         update.message.reply_text.side_effect = RuntimeError("telegram is down")
@@ -118,6 +128,9 @@ class GateTests(unittest.IsolatedAsyncioTestCase):
 
 
 class ActivateTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        utils.forget_users()
+
     async def activate(self, users, sender_id=222, username="luis"):
         update = make_update("/activate", chat_type="supergroup", chat_id=GROUP_ID, sender_id=sender_id, username=username)
         calls = []
@@ -136,6 +149,12 @@ class ActivateTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(calls[1][0:2], ("PATCH", mock.ANY))
         self.assertTrue(calls[1][1].endswith("/manage/users/2"))
         self.assertEqual(calls[1][2], {"telegram_id": 222})
+
+    async def test_a_new_link_is_let_in_at_once_and_the_accounts_are_read_fresh(self):
+        utils._users = [user(None, "luis", "Luis", user_id=2)]  # what the gate remembers: not linked yet
+        _, calls = await self.activate(USERS)
+        self.assertEqual(calls[0][0], "GET")  # never the remembered list
+        self.assertIsNone(utils._users)
 
     async def test_it_is_the_only_write_and_only_one_field_is_sent(self):
         _, calls = await self.activate(USERS)
@@ -181,7 +200,7 @@ class ActivateTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("/activate", text)
 
 
-class FetchJsonTests(unittest.TestCase):
+class FetchJsonTests(unittest.IsolatedAsyncioTestCase):
     def response(self, status=200, payload=None, text="body", json_error=False):
         response = mock.Mock(status_code=status, text=text)
         if json_error:
@@ -190,23 +209,28 @@ class FetchJsonTests(unittest.TestCase):
             response.json.return_value = payload
         return response
 
-    def test_a_200_with_json_is_returned_parsed(self):
+    async def test_a_200_with_json_is_returned_parsed(self):
         with mock.patch.object(utils, "make_request", return_value=self.response(payload=[{"a": 1}])) as request:
-            self.assertEqual(utils.fetch_json("GET", "http://api/x", json={"k": 1}), [{"a": 1}])
+            self.assertEqual(await utils.fetch_json("GET", "http://api/x", json={"k": 1}), [{"a": 1}])
         request.assert_called_once_with("GET", "http://api/x", json={"k": 1})
 
-    def test_any_other_status_is_an_api_error_carrying_the_status(self):
+    async def test_any_other_status_is_an_api_error_carrying_the_status(self):
         for status in (401, 404, 500, 502):
             with self.subTest(status=status), mock.patch.object(utils, "make_request", return_value=self.response(status=status)):
                 with self.assertRaises(ApiError) as caught:
-                    utils.fetch_json("GET", "http://api/x")
+                    await utils.fetch_json("GET", "http://api/x")
                 self.assertEqual(caught.exception.status_code, status)
 
-    def test_a_body_that_is_not_json_is_an_api_error_too(self):
+    async def test_a_body_that_is_not_json_is_an_api_error_too(self):
         with mock.patch.object(utils, "make_request", return_value=self.response(json_error=True)):
             with self.assertRaises(ApiError):
-                utils.fetch_json("GET", "http://api/x")
+                await utils.fetch_json("GET", "http://api/x")
+
+    async def test_the_request_does_not_block_the_event_loop(self):
+        seen = []
+        with mock.patch.object(utils, "make_request", side_effect=lambda *a, **k: seen.append(threading.current_thread()) or self.response(payload=[])):
+            await utils.fetch_json("GET", "http://api/x")
+        self.assertIsNot(seen[0], threading.main_thread())
 
     def test_the_conversation_states_are_distinct(self):
         self.assertEqual(len({utils.MAIN_MENU, utils.MY_ROUTES, utils.RANKING_ROUTES}), 3)
-        self.assertEqual(utils.load_json_response({"a": [1, 2]}), {"a": [1, 2]})

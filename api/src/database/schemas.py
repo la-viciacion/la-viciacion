@@ -1,5 +1,5 @@
 import datetime
-from typing import List, Optional, Union
+from typing import Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field, NaiveDatetime
 
@@ -233,6 +233,7 @@ class GameTimerGroupPage(BaseModel):
 class ActiveTimerResponse(BaseModel):
     is_active: bool
     timer: GameTimerResponse | None = None
+    game_name: str | None = None  # so the timer card needs no second request
     score: int | None = None  # the user's rating of the running game, 1-100
 
 

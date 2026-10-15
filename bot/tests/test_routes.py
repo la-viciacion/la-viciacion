@@ -100,7 +100,6 @@ class RankingTextTests(RouteTestCase):
 
     async def test_every_ranking_asks_for_its_own_key_and_prints_position_name_and_value(self):
         routes = RankingRoutes()
-        two = [{"name": "Ana", "{v}": None}, {"name": "Bea", "{v}": None}]
         cases = [
             (routes.user_hours, "user_hours", "played_time", [7200, 60], "Así está el ranking de horas de vicio:\n", "1. Ana: 02h00m\n2. Bea: 00h01m\n"),
             (routes.user_days, "user_days", "played_days", [12, 3], "Así está el ranking de días de vicio:\n", "1. Ana: 12\n2. Bea: 3\n"),

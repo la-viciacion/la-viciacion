@@ -1,17 +1,16 @@
 import asyncio
 import datetime
-import json
 import re
 
 import requests
 from starlette.concurrency import run_in_threadpool
 import telegram
 from howlongtobeatpy import HowLongToBeat
-from sqlalchemy import asc, create_engine, desc, func, or_, select, text, update
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from ..config import Config
-from ..crud import games, time_entries, users
+from ..crud import games, users
 from ..database import models, schemas
 from .achievements import AchievementsElems
 from . import ai, hltb_sync, push, settings
@@ -185,89 +184,86 @@ def mark_existing_games(db: Session, candidates: list[schemas.RawgGameCandidate]
                 break
 
 
+async def _steam_id_from_rawg_stores(rawg_id: int, params: dict) -> str:
+    """The Steam app id of a RAWG game, from the links of its stores ('' when it has none or RAWG fails)."""
+    try:
+        resp = await _http_get(f"https://api.rawg.io/api/games/{rawg_id}/stores", params, timeout=6)
+        if resp.ok:
+            for store in resp.json().get("results", []):
+                match = re.search(r"steampowered\.com/app/(\d+)", store.get("url", ""))
+                if match:
+                    return match.group(1)
+    except Exception as e:
+        logger.warning(f"Error fetching stores for RAWG game {rawg_id}: {redact_rawg_key(e)}")
+    return ""
+
+
+async def _hltb_details(name: str, released: str | None) -> tuple[int, str | None, str | None]:
+    """(average seconds, developer, Steam id) from HowLongToBeat. The time only from a clear match (seconds, like the
+    rest of `games.avg_time`); the developer and the Steam id, used only as fallbacks, from the closest result."""
+    try:
+        results = await HowLongToBeat().async_search(hltb_sync.clean_name(name))
+        if not results:
+            return 0, None, None
+        closest = max(results, key=lambda x: x.similarity)
+        year = int(released[:4]) if released and released[:4].isdigit() else None
+        matched = hltb_sync.best_entry(name, year, results)
+        avg_time = ((matched.json_content or {}).get("comp_main") or 0) if matched else 0
+        steam = getattr(closest, "profile_steam", None)
+        return avg_time, getattr(closest, "profile_dev", None) or None, str(steam) if steam else None
+    except Exception as e:  # HowLongToBeat is a bonus: the game is created without it
+        logger.warning(f"HLTB search failed for '{name}': {e}")
+        return 0, None, None
+
+
 async def get_game_details_by_rawg_id(rawg_id: int) -> dict | None:
-    """Fetch complete game details from RAWG.io by rawg_id, including developers and Steam ID."""
+    """Fetch complete game details from RAWG.io by rawg_id, including developers and Steam ID.
+
+    The game itself is asked first (HowLongToBeat needs its name); its stores and HowLongToBeat are then asked at the
+    same time, so creating a game waits for two round trips instead of three."""
     api_key = config.RAWG_API_KEY
     if not api_key:
         return None
 
-    url = f"https://api.rawg.io/api/games/{rawg_id}"
     params = {"key": api_key}
+    stores = asyncio.create_task(_steam_id_from_rawg_stores(rawg_id, params))
     try:
-        resp = await _http_get(url, params, timeout=10)
+        resp = await _http_get(f"https://api.rawg.io/api/games/{rawg_id}", params, timeout=10)
         if not resp.ok:
             logger.error(f"RAWG details error {resp.status_code}: {redact_rawg_key(resp.content)}")
+            stores.cancel()
             return None
         data = resp.json()
     except Exception as e:
         logger.error(f"Error fetching RAWG details for id {rawg_id}: {redact_rawg_key(e)}")
+        stores.cancel()
         return None
 
     name = data.get("name", "")
-    slug = data.get("slug", "")
     released = data.get("released")
-    image_url = data.get("background_image")
-    genres = ",".join([g["name"] for g in data.get("genres", []) if "name" in g])
-    # the tags RAWG has in other languages are the same ones again: only the English ones
-    tags = ",".join([t["name"] for t in data.get("tags") or [] if t.get("name") and t.get("language") == "eng"])
+    (avg_time, hltb_dev, hltb_steam), steam_id = await asyncio.gather(_hltb_details(name, released), stores)
 
-    # Developers and publishers from RAWG
-    dev_list = [d["name"] for d in data.get("developers", []) if "name" in d]
-    if not dev_list:
-        dev_list = [p["name"] for p in data.get("publishers", []) if "name" in p]
-    dev = ", ".join(dev_list) if dev_list else "-"
-
-    # Steam ID from stores endpoint
-    steam_id = ""
-    try:
-        stores_resp = await _http_get(
-            f"https://api.rawg.io/api/games/{rawg_id}/stores", params, timeout=6
-        )
-        if stores_resp.ok:
-            stores_data = stores_resp.json().get("results", [])
-            for s in stores_data:
-                u = s.get("url", "")
-                if "steampowered.com/app/" in u:
-                    match = re.search(r"app/(\d+)", u)
-                    if match:
-                        steam_id = match.group(1)
-                        break
-    except Exception as e:
-        logger.warning(f"Error fetching stores for RAWG game {rawg_id}: {redact_rawg_key(e)}")
-
-    # HLTB for estimated playtime (and fallback for dev/steam_id)
-    avg_time = 0
-    try:
-        hltb_results = await HowLongToBeat().async_search(hltb_sync.clean_name(name))
-        if hltb_results and len(hltb_results) > 0:
-            best_hltb = max(hltb_results, key=lambda x: x.similarity)
-            # the time only from a clear match (seconds, like the rest of `games.avg_time`), the fallbacks below from the closest
-            matched = hltb_sync.best_entry(name, int(released[:4]) if released and released[:4].isdigit() else None, hltb_results)
-            avg_time = ((matched.json_content or {}).get("comp_main") or 0) if matched else 0
-            if dev == "-" and hasattr(best_hltb, "profile_dev") and best_hltb.profile_dev:
-                dev = best_hltb.profile_dev
-            if not steam_id and hasattr(best_hltb, "profile_steam") and best_hltb.profile_steam:
-                steam_id = str(best_hltb.profile_steam)
-    except Exception as e:
-        logger.warning(f"HLTB search failed for '{name}': {e}")
-
+    dev_list = [d["name"] for d in data.get("developers", []) if "name" in d] or [
+        p["name"] for p in data.get("publishers", []) if "name" in p
+    ]
     release_date = None
     if released:
         try:
             release_date = datetime.datetime.strptime(released, "%Y-%m-%d").date()
-        except Exception:
-            release_date = None
+        except ValueError:
+            pass
 
     return {
         "rawg_id": rawg_id,
         "name": name,
-        "slug": slug,
-        "dev": dev,
+        "slug": data.get("slug", ""),
+        "dev": ", ".join(dev_list) or hltb_dev or "-",
         "release_date": release_date,
-        "steam_id": str(steam_id) if steam_id else "",
-        "image_url": image_url,
-        "genres": genres,
-        "tags": tags,
+        "steam_id": steam_id or hltb_steam or "",
+        "image_url": data.get("background_image"),
+        "genres": ",".join(g["name"] for g in data.get("genres", []) if "name" in g),
+        # the tags RAWG has in other languages are the same ones again: only the English ones
+        "tags": ",".join(t["name"] for t in data.get("tags") or [] if t.get("name") and t.get("language") == "eng"),
         "avg_time": int(avg_time) if avg_time else 0,
     }
 
@@ -481,8 +477,8 @@ async def send_message_to_admins(db: Session, msg):
                 async with bot:
                     if await _telegram_send(bot, user.telegram_id, msg):
                         logger.info("Message sent successfully!")
-    except Exception as e:
-        logger.info(e)
+    except Exception as e:  # a notice must never break what triggered it
+        logger.error(f"Error sending a message to the admins: {e}")
 
 
 async def send_test_message(sent_by: str) -> None:
@@ -512,12 +508,8 @@ def get_ach_message(
 
 
 def get_platforms(db: Session):
-    try:
-        stmt = select(
-            models.PlatformTag.id,
-            models.PlatformTag.name,
-        )
-        return db.execute(stmt).fetchall()
-    except Exception as e:
-        logger.info(e)
-        raise e
+    stmt = select(
+        models.PlatformTag.id,
+        models.PlatformTag.name,
+    )
+    return db.execute(stmt).fetchall()

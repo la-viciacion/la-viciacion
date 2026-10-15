@@ -36,6 +36,7 @@ A pull request only runs the checks its files can affect; the release workflow (
 | `bot/src/` | bot tests, bot image, API tests and MariaDB tests (the contract test and the `.env.template` check read the bot's code) |
 | `bot/` (tests, requirements...) | bot tests, bot image |
 | `.env.template`, `docker-compose.dev.yml` | API tests |
+| `ruff.toml` | API and bot tests (their jobs run the Python lint) |
 | `docker-compose.yml` | API tests and MariaDB tests (it pins the version they run on) |
 | anything else (`.github/workflows/`, `.github/scripts/`, a new top-level path...) | **everything** |
 

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, test } from 'node:test';
-import { API_BASE, api, forgetAvatars, jsonRequest, loadAvatarUrl, login, session, setUnauthorizedHandler } from '../js/lib/api.js';
+import { API_BASE, api, forgetAvatars, jsonRequest, loadAvatarUrl, login, renewSessionIfDue, session, setUnauthorizedHandler, tokenNeedsRenewal } from '../js/lib/api.js';
 
 // the browser's localStorage and fetch, as far as the client uses them
 const storage = new Map();
@@ -165,4 +165,36 @@ test('the username of the avatar request is encoded', async () => {
   answer = json({}, 404);
   await loadAvatarUrl('a/b c');
   assert.equal(calls[0].url, `${API_BASE}/users/a%2Fb%20c/avatar`);
+});
+
+// a token as the API signs it (the signature is not checked in the browser)
+const tokenWith = (claims) => `h.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.s`;
+
+test('a token is renewed once it has lived half its life, or when it does not say when it was issued', () => {
+  const week = 7 * 24 * 3600;
+  assert.equal(tokenNeedsRenewal(tokenWith({ iat: 1000, exp: 1000 + week }), 1000 + week / 2 - 1), false);
+  assert.equal(tokenNeedsRenewal(tokenWith({ iat: 1000, exp: 1000 + week }), 1000 + week / 2 + 1), true);
+  assert.equal(tokenNeedsRenewal(tokenWith({ exp: 1000 + week }), 1000), true);
+  assert.equal(tokenNeedsRenewal('not a token'), false);
+});
+
+test('a session due for renewal swaps its token for the fresh one', async () => {
+  session.setToken(tokenWith({ iat: 0, exp: 10 }));
+  answer = json({ access_token: 'fresh', token_type: 'bearer' });
+  await renewSessionIfDue();
+  assert.equal(calls[0].url, `${API_BASE}/auth/refresh`);
+  assert.equal(calls[0].options.method, 'POST');
+  assert.equal(session.getToken(), 'fresh');
+});
+
+test('a session that is not due asks nothing, and a failed renewal keeps the token it had', async () => {
+  const young = tokenWith({ iat: Date.now() / 1000, exp: Date.now() / 1000 + 3600 });
+  session.setToken(young);
+  await renewSessionIfDue();
+  assert.equal(calls.length, 0);
+  const old = tokenWith({ iat: 0, exp: 10 });
+  session.setToken(old);
+  answer = json({ detail: 'boom' }, 500);
+  await renewSessionIfDue();
+  assert.equal(session.getToken(), old);
 });

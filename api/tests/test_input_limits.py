@@ -48,9 +48,16 @@ class ListLimitTests(unittest.TestCase):
             self.assertEqual(self.client.get("/timers/history/1", params={"limit": limit}).status_code, 422, limit)
 
     def test_history_accepts_a_sane_limit(self):
-        with mock.patch.object(timers, "get_timer_history", return_value=[]) as history:
+        with mock.patch.object(timers.timers, "get_timer_history", return_value=[]) as history:
             self.assertEqual(self.client.get("/timers/history/1", params={"limit": "500"}).status_code, 200)
         self.assertEqual(history.call_args.args[3], 500)
+
+    def test_what_the_rules_refuse_is_answered_as_the_http_error_it_names(self):
+        # the router does it itself: tests mount the routers without main.py
+        refused = timers.timers.Refused(404, "Sesión no encontrada")
+        with mock.patch.object(timers.timers, "get_session", side_effect=refused):
+            response = self.client.delete("/timers/7")
+        self.assertEqual((response.status_code, response.json()), (404, {"detail": "Sesión no encontrada"}))
 
 
 if __name__ == "__main__":

@@ -1,11 +1,6 @@
-import datetime
 from enum import Enum
 
-from sqlalchemy import update
-from sqlalchemy.orm import Session
 
-from ..database import models
-from . import my_utils as utils
 
 
 # An achievement whose key ends like this has no season limit: it counts the whole history of a player and is

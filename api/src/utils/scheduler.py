@@ -32,7 +32,7 @@ from sqlalchemy.orm import Session
 from ..crud import users
 from ..database import models
 from ..database.database import SessionLocal
-from . import actions, push, seasons, settings
+from . import actions, push, settings
 from .logger import LogManager
 
 log_manager = LogManager()

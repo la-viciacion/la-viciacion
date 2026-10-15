@@ -1,4 +1,5 @@
-import json
+import asyncio
+import time
 
 import telegram
 import utils.access as access
@@ -12,6 +13,10 @@ log_manager = LogManager()
 logger = log_manager.get_logger()
 
 config = Config()
+
+# The gate needs the accounts for every update: they are asked for at most once in this many seconds. A Telegram id
+# an admin links in the panel works after it at the latest; /activate forgets them at once.
+USERS_TTL_SECONDS = 60
 
 
 class ApiError(Exception):
@@ -32,13 +37,17 @@ class MyUtils:
             self.MY_ROUTES,
             self.RANKING_ROUTES,
         ) = range(3)
+        self._users = None
+        self._users_at = 0.0
 
     def make_request(self, method, url, json=None):
         return config.request(method, url, json=json)
 
-    def fetch_json(self, method, url, json=None):
-        """Request the API and return the parsed body; raise ApiError if it did not answer 200 with JSON."""
-        response = self.make_request(method, url, json=json)
+    async def fetch_json(self, method, url, json=None):
+        """Request the API and return the parsed body; raise ApiError if it did not answer 200 with JSON.
+
+        The request runs in a thread: `requests` blocks, and one event loop serves every chat of the bot."""
+        response = await asyncio.to_thread(self.make_request, method, url, json=json)
         if response.status_code != 200:
             logger.error(f"API answered {response.status_code} to {method} {url}: {response.text[:200]}")
             raise ApiError(response.status_code)
@@ -47,6 +56,17 @@ class MyUtils:
         except ValueError:
             logger.error(f"API answered a non-JSON body to {method} {url}: {response.text[:200]}")
             raise ApiError(response.status_code)
+
+    async def app_users(self) -> list[dict]:
+        """The accounts of the app (GET /users/), asked again once they are USERS_TTL_SECONDS old."""
+        now = time.monotonic()
+        if self._users is None or now - self._users_at > USERS_TTL_SECONDS:
+            self._users = await self.fetch_json("GET", config.API_URL + "/users/")
+            self._users_at = now
+        return self._users
+
+    def forget_users(self) -> None:
+        self._users = None
 
     async def gate(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Runs before every handler: nothing gets past it unless the chat and the sender are the app's.
@@ -72,7 +92,7 @@ class MyUtils:
                 raise ApplicationHandlerStop
 
         try:
-            app_user = access.find_app_user(self.fetch_json("GET", config.API_URL + "/users/"), sender.id)
+            app_user = access.find_app_user(await self.app_users(), sender.id)
         except Exception as e:
             logger.error(f"Could not check user {sender.id}: {e}")
             await self._refuse(update, msgs.api_error)
@@ -124,10 +144,12 @@ class MyUtils:
         Only reached from the app's group: the gate lets /activate through nowhere else.
         """
         sender = update.message.from_user
-        users = self.fetch_json("GET", config.API_URL + "/users/")
+        # never the remembered accounts: whether the id or the account is already taken must be read now
+        users = await self.fetch_json("GET", config.API_URL + "/users/")
         outcome, account = access.plan_activation(users, sender.id, sender.username)
         if outcome == access.ACTIVATE_OK:
-            self.fetch_json("PATCH", f"{config.API_URL}/manage/users/{account['id']}", json={"telegram_id": sender.id})
+            await self.fetch_json("PATCH", f"{config.API_URL}/manage/users/{account['id']}", json={"telegram_id": sender.id})
+            self.forget_users()  # the gate lets them in from their next message
             logger.info(f"Linked telegram id {sender.id} to {account['username']}")
             text = msgs.activated.format(name=account.get("name") or account["username"])
         else:
@@ -143,6 +165,3 @@ class MyUtils:
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         in_group = update.message.chat.type != access.PRIVATE
         await update.message.reply_text(msgs.start(update.message.from_user.first_name, in_group))
-
-    def load_json_response(self, response):
-        return json.loads(json.dumps(response))

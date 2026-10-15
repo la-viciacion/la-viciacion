@@ -1,6 +1,7 @@
 // Profile picture: pick a file, crop and shrink it in the browser, upload it, and swap it in
 // the profile header and the navbar without reloading.
 import { api, forgetAvatars } from '../../lib/api.js';
+import { showAvatar } from '../../ui/layout.js';
 import { flash } from './flash.js';
 
 const AVATAR_SIZE = 256;
@@ -21,17 +22,6 @@ function resizeImage(file) {
     img.onerror = () => { URL.revokeObjectURL(src); reject(new Error('El archivo no es una imagen válida')); };
     img.src = src;
   });
-}
-
-// Swap a placeholder (or old image) for the new picture, keeping its classes.
-function showAvatar(el, url) {
-  if (!el) return;
-  const img = document.createElement('img');
-  img.src = url;
-  img.alt = '';
-  img.className = el.className.replace(/\s*(navbar|pf)-avatar-placeholder/, '').trim();
-  if (el.id) img.id = el.id;
-  el.replaceWith(img);
 }
 
 export function initAvatar(main, { path }) {

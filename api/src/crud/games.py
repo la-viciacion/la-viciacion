@@ -1,16 +1,12 @@
-import datetime
 import math
 import uuid
-from typing import Union
 import random
 
 from starlette.concurrency import run_in_threadpool
-from sqlalchemy import asc, create_engine, delete, desc, func, select, text, true, update, or_
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import func, select, true, update, or_
 from sqlalchemy.orm import Session
 
 from ..database import models, schemas
-from ..utils import actions
 from ..utils import my_utils as utils
 from ..utils.logger import LogManager
 
@@ -304,19 +300,15 @@ def _store_game(db: Session, game: schemas.NewGame, game_info: schemas.NewGame) 
 
 def update_avg_time_game(db: Session, game_id: str, avg_time: int):
     logger.info("Updating avg time for game...")
-    try:
-        stmt = (
-            update(models.Game)
-            .where(models.Game.id == game_id)
-            .values(
-                avg_time=avg_time,
-            )
+    stmt = (
+        update(models.Game)
+        .where(models.Game.id == game_id)
+        .values(
+            avg_time=avg_time,
         )
-        db.execute(stmt)
-        db.commit()
-    except Exception as e:
-        logger.info(e)
-        raise e
+    )
+    db.execute(stmt)
+    db.commit()
 
 
 def update_game(db: Session, game_id: int, game: schemas.UpdateGame):
