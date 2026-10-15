@@ -38,8 +38,8 @@ class DeferredAchievementImageTests(unittest.TestCase):
         db = make_session()
         db.add(models.Achievement(key="K", title="T", message="M"))
         db.commit()
-        Achievements().upload_image(db, "K", b"PNGdata")
-        self.assertEqual(bytes(Achievements().get_image(db, "K")[0]), b"PNGdata")
+        Achievements().upload_image(db, "K", b"\x89PNGdata")
+        self.assertEqual(bytes(Achievements().get_image(db, "K")[0]), b"\x89PNGdata")
 
 
 if __name__ == "__main__":
