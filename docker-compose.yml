@@ -3,6 +3,14 @@
 # `docker compose up -d --build` builds them from the Dockerfiles and tags them with the same names.
 # The images hold no configuration: it all arrives at run time (env_file / environment).
 
+# What Docker keeps of each container's output: the API logs every request, so without a cap its log file
+# grows for as long as the container lives. Three files of 10 MB each, the oldest dropped.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
 
   laviciacion-front:
@@ -10,6 +18,7 @@ services:
     image: ghcr.io/la-viciacion/laviciacion-front:${LAVI_VERSION:-latest}
     container_name: laviciacion-front
     restart: unless-stopped
+    logging: *logging
     # Where /api is proxied to: the one thing the front needs to know. The image does not get
     # the whole .env (it holds secrets the front must not see), only these.
     environment:
@@ -29,12 +38,14 @@ services:
     container_name: laviciacion-bot
     env_file: .env
     restart: unless-stopped
+    logging: *logging
     volumes:
       - ./bot/logs:/app/logs
     networks:
       - la-viciacion
     depends_on:
-      - laviciacion-api
+      laviciacion-api:
+        condition: service_healthy
 
   laviciacion-api:
     build: ./api
@@ -42,6 +53,7 @@ services:
     container_name: laviciacion-api
     env_file: .env
     restart: unless-stopped
+    logging: *logging
     volumes:
       - ./api/logs:/app/logs
     networks:
@@ -55,12 +67,22 @@ services:
     depends_on:
       laviciacion-db:
         condition: service_healthy
+    healthcheck:
+      # the image has no curl: Python asks the keepalive (not logged). The migrations run before uvicorn starts and
+      # may take minutes, hence the long start period
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/v1/keepalive', timeout=4)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 300s
+      start_interval: 5s
 
   laviciacion-db:
     image: mariadb:12.3.3
     container_name: laviciacion-db
     env_file: .env
     restart: unless-stopped
+    logging: *logging
     volumes:
       # Where MariaDB keeps its data. Default: the ./db/data folder (a bind mount: what a Linux
       # server should use). On Windows/Docker Desktop that folder is a network-like share on which

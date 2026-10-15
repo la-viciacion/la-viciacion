@@ -161,7 +161,7 @@ Code rollback: set `LAVI_VERSION` in `.env` to the previous release (e.g. `2.0.0
 
 ## Health
 
-`GET /api/v1/keepalive` is the lightweight liveness endpoint (excluded from request logs). The DB has a compose healthcheck. There is no external monitoring beyond optional Sentry.
+`GET /api/v1/keepalive` is the lightweight liveness endpoint (excluded from request logs). The DB and the API have a compose healthcheck (the API's asks the keepalive and allows 5 minutes for the migrations of a start; `start_interval` needs Docker Engine 25 or later), and the bot waits for the API to be healthy. Docker keeps at most three files of 10 MB of each container's output (`x-logging` in `docker-compose.yml`); the API's own log files under `api/logs` rotate daily and keep a week. There is no external monitoring beyond optional Sentry.
 
 ## CI/CD
 
