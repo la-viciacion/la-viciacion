@@ -10,7 +10,8 @@ from sqlalchemy.orm import sessionmaker
 
 from src.utils import actions  # first: it breaks an import cycle between crud and utils
 from src.database import models
-from src.routers import timers
+from src.crud import timers
+from src.routers import timers as timers_router
 from src.utils import my_utils, push
 from tests.sqlite_db import make_session
 
@@ -47,7 +48,7 @@ class StoppingATimerTests(unittest.TestCase):
         """Stop the running timer through the endpoint and run the background tasks it scheduled."""
         background = BackgroundTasks()
         user = self.db.get(models.User, owner)
-        timers.stop_timer_endpoint(self.running.id, owner, background, current_user=user, db=self.db)
+        timers_router.stop_timer_endpoint(self.running.id, owner, background, current_user=user, db=self.db)
         return background
 
     def run_background(self, background, settings=ON, push_ready=False, telegram_fails=False):

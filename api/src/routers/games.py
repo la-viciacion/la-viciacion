@@ -23,16 +23,7 @@ router = APIRouter(
 
 @router.get("/", response_model=list[schemas.Game])
 def get_games(name: str = None, limit: int = None, db: Session = Depends(get_db)):
-    """_summary_
-
-    Args:
-        name (str, optional): _description_. Defaults to None.
-        limit (int, optional): _description_. Defaults to None.
-        db (Session, optional): _description_. Defaults to Depends(get_db).
-
-    Returns:
-        _type_: _description_
-    """
+    """The catalogue: every game (up to `limit`), or those whose name contains `name`."""
     logger.info("Getting games...")
     if name is None:
         games_db = games.get_games(db, limit)
@@ -88,18 +79,7 @@ def get_game_overview(
 
 @router.get("/{game_id}", response_model=schemas.Game)
 def get_game_by_id(game_id: str, db: Session = Depends(get_db)):
-    """_summary_
-
-    Args:
-        game_id (str): _description_
-        db (Session, optional): _description_. Defaults to Depends(get_db).
-
-    Raises:
-        HTTPException: _description_
-
-    Returns:
-        _type_: _description_
-    """
+    """One game of the catalogue."""
     game_db = games.get_game_by_id(db, game_id)
     if game_db is None:
         raise HTTPException(status_code=404, detail="Game not exists")
@@ -141,19 +121,7 @@ def update_game(
     admin: models.User = Depends(auth.require_admin),
     db: Session = Depends(get_db),
 ):
-    """_summary_
-
-    Args:
-        game_id (str): _description_
-        game (schemas.UpdateGame): _description_
-        db (Session, optional): _description_. Defaults to Depends(get_db).
-
-    Raises:
-        HTTPException: _description_
-
-    Returns:
-        _type_: _description_
-    """
+    """Change a game of the catalogue (admins only)."""
     game_db = games.get_game_by_id(db, game_id)
     if game_db is None:
         raise HTTPException(status_code=404, detail="Game not exists")

@@ -54,14 +54,7 @@ def _target_user(db: Session, active_user: models.User, username: str) -> models
 def get_users(
     admin: models.User = Depends(auth.require_admin), db: Session = Depends(get_db)
 ):
-    """_summary_
-
-    Args:
-        db (Session, optional): _description_. Defaults to Depends(get_db).
-
-    Returns:
-        _type_: _description_
-    """
+    """Every account (admins only)."""
     users_db = users.get_users(db)
     return users_db
 
@@ -84,18 +77,7 @@ def get_user(
     active_user: models.User = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    """_summary_
-
-    Args:
-        username (str): _description_
-        db (Session, optional): _description_. Defaults to Depends(get_db).
-
-    Raises:
-        HTTPException: _description_
-
-    Returns:
-        _type_: _description_
-    """
+    """One account: the caller's own, or anybody's for an admin."""
     auth.ensure_self_or_admin(active_user, username=username)
     user_db = _target_user(db, active_user, username)
     return user_db

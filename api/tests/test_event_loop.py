@@ -8,7 +8,8 @@ from unittest import mock
 
 from src import auth
 from src.database.schemas import GameTimerCreate
-from src.routers import timers
+from src.crud import timers
+from src.routers import timers as timers_router
 from src.utils import actions, my_utils
 
 
@@ -66,7 +67,7 @@ class StartTimerTests(unittest.TestCase):
     def test_starting_a_timer_is_plain_database_work(self):
         # nothing in it waits for the network any more: the notice goes to a background task
         self.assertFalse(inspect.iscoroutinefunction(timers.create_timer))
-        self.assertFalse(inspect.iscoroutinefunction(timers.start_timer))
+        self.assertFalse(inspect.iscoroutinefunction(timers_router.start_timer))
 
     def test_the_first_time_in_a_season_is_announced_but_not_here(self):
         announce, add = self.start(self.db(entry_exists=False, season_entry_exists=False))

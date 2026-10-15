@@ -1,10 +1,8 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
-from fastapi import HTTPException
-
 from src.database.schemas import GameTimerCreate
-from src.routers import timers
+from src.crud import timers
 
 
 def db_where_exist(*models):
@@ -26,17 +24,17 @@ def body(**kw):
 
 class CheckNewTimerTests(unittest.TestCase):
     def test_an_unknown_game_is_refused(self):
-        with self.assertRaises(HTTPException) as ctx:
+        with self.assertRaises(timers.Refused) as ctx:
             timers.check_new_timer(db_where_exist(timers.User), body())
         self.assertEqual(ctx.exception.status_code, 404)
 
     def test_an_unknown_user_is_refused(self):
-        with self.assertRaises(HTTPException) as ctx:
+        with self.assertRaises(timers.Refused) as ctx:
             timers.check_new_timer(db_where_exist(timers.Game), body())
         self.assertEqual(ctx.exception.status_code, 404)
 
     def test_an_unknown_platform_is_refused(self):
-        with self.assertRaises(HTTPException) as ctx:
+        with self.assertRaises(timers.Refused) as ctx:
             timers.check_new_timer(db_where_exist(timers.User, timers.Game), body(platform="nope"))
         self.assertEqual(ctx.exception.status_code, 400)
 
@@ -61,7 +59,7 @@ class OneTimerAtATimeTests(unittest.TestCase):
         db.query.side_effect = lambda *_: (calls.append("query"), MagicMock())[1]  # a running timer is found
         with patch.object(timers, "check_new_timer"), \
                 patch.object(timers, "lock_sessions", side_effect=lambda *_: calls.append("lock")):
-            with self.assertRaises(HTTPException):
+            with self.assertRaises(timers.Refused):
                 timers.create_timer(db, body())
         self.assertEqual(calls[:2], ["lock", "query"])
 

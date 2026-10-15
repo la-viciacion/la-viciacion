@@ -4,7 +4,7 @@ import unittest
 
 from src.database import models
 from src.database.schemas import SessionUpdate
-from src.routers import timers
+from src.crud import timers
 from tests import clock
 from tests.sqlite_db import make_session
 
@@ -34,7 +34,7 @@ class UpdateSessionTests(unittest.TestCase):
         return sorted(e.platform for e in self.db.query(models.UserGame).all())
 
     def change_platform(self, platform="ps"):
-        timers.update_session(self.db, ADMIN, self.timer.id, SessionUpdate(platform=platform))
+        timers.update_session(self.db, ADMIN, self.timer, SessionUpdate(platform=platform))
 
     def test_moving_the_only_session_to_another_platform_moves_the_entry(self):
         self.change_platform()
@@ -52,7 +52,7 @@ class UpdateSessionTests(unittest.TestCase):
         self.assertEqual(self.entries(), ["pc", "ps"])
 
     def test_editing_only_the_notes_touches_no_entry(self):
-        timers.update_session(self.db, ADMIN, self.timer.id, SessionUpdate(notes="ok"))
+        timers.update_session(self.db, ADMIN, self.timer, SessionUpdate(notes="ok"))
         self.assertEqual(self.entries(), ["pc"])
 
 

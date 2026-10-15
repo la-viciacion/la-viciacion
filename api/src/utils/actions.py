@@ -574,17 +574,7 @@ def signed_difference(difference: int, render=str) -> str:
 async def weekly_resume(
     db: Session, user: models.User, weeks_ago: int = 0, silent: bool = False
 ):
-    """_summary_
-
-    Args:
-        db (Session): _description_
-        user (models.User): _description_
-        mode (int, optional): 0 = last week. 1 = current week. Defaults to 0.
-        silent (bool, optional): _description_. Defaults to False.
-
-    Returns:
-        _type_: _description_
-    """
+    """Send the user their summary of a week: the current one, or `weeks_ago` weeks before (the scheduler sends the last one)."""
     try:
         logger.info("Check weekly resume for " + user.name + "...")
         resume = {}

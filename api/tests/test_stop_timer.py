@@ -3,9 +3,7 @@ import types
 import unittest
 from unittest import mock
 
-from fastapi import HTTPException
-
-from src.routers import timers
+from src.crud import timers
 
 
 def db_with(timer):
@@ -48,7 +46,7 @@ class CancelTimerTests(unittest.TestCase):
         db.commit.assert_called_once()
 
     def test_cancelling_a_timer_that_is_not_running_is_a_404(self):
-        with self.assertRaises(HTTPException) as ctx:
+        with self.assertRaises(timers.Refused) as ctx:
             timers.cancel_timer(db_with(None), 1, 1)
         self.assertEqual(ctx.exception.status_code, 404)
 

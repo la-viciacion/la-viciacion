@@ -149,16 +149,7 @@ def get_user_statistics(
     active_user: models.User = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    """_summary_
-
-    Args:
-        username (str): _description_
-        ranking (str, optional): _description_. Defaults to None.
-        db (Session, optional): _description_. Defaults to Depends(get_db).
-
-    Returns:
-        _type_: _description_
-    """
+    """A player's own statistics of the running season: the ones named in `ranking` (comma separated), or all."""
     auth.ensure_self_or_admin(active_user, username=username)
     if ranking is not None:
         rankings_list = ranking.split(",")

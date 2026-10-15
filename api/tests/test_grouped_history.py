@@ -4,7 +4,7 @@ import unittest
 from sqlalchemy import event
 
 from src.database import models
-from src.routers import timers
+from src.crud import timers
 from tests.sqlite_db import make_session
 from tests import clock
 
