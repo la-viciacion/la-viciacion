@@ -4,7 +4,7 @@ from unittest import mock
 
 from fastapi import HTTPException
 
-from src.routers import manage
+from src.routers.manage import users
 
 
 def db_with_user():
@@ -15,7 +15,7 @@ def db_with_user():
 
 class PatchUserEmailTests(unittest.TestCase):
     def patch(self, **fields):
-        return manage.patch_user(2, manage.UserPatch(**fields), types.SimpleNamespace(id=1), db_with_user())
+        return users.patch_user(2, users.UserPatch(**fields), types.SimpleNamespace(id=1), db_with_user())
 
     def test_the_email_cannot_be_removed(self):
         for email in (None, "", "  "):
@@ -29,7 +29,7 @@ class PatchUserEmailTests(unittest.TestCase):
         self.assertEqual(ctx.exception.status_code, 400)
 
     def test_a_valid_email_is_normalized_and_saved(self):
-        with mock.patch.object(manage.users_crud, "email_in_use", return_value=False):
+        with mock.patch.object(users.users_crud, "email_in_use", return_value=False):
             result = self.patch(email=" Bob@X.es ")
         self.assertEqual(result["email"], "bob@x.es")
 

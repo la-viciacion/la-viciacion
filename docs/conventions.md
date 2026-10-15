@@ -68,7 +68,7 @@ Read-only (except `/activate`, see architecture), generic endpoints only. Texts 
 
 ### Add an admin panel section
 
-Backend under `routers/manage.py` (already admin-only). Front: the panel is a sidebar of sections (`front/js/pages/admin/nav.js`: Inicio, Gestión de datos, Notificaciones, Sistema), each with one or more tabs; the address of a tab is `#/admin/<id>`. A table section is only a declarative entry in `entities.js` (columns, fields, filters, row actions), rendered by the generic controller in `index.js`; anything else is a *custom* entry (`custom: '<module>'`) whose module in the same folder exports `render(panel, { entity, admin })` (`home.js`, `announce.js`, `settings.js`). Add its id to a section's `tabs` in `nav.js`. Reuse `components.js`, `form.js`, `dialogs.js`; styles in `css/admin.css`.
+Backend in the module of its area under `routers/manage/` (already admin-only and audited: decorate with the package's one `router`; a new area is a new module listed in `manage/__init__.py`). Front: the panel is a sidebar of sections (`front/js/pages/admin/nav.js`: Inicio, Gestión de datos, Notificaciones, Sistema), each with one or more tabs; the address of a tab is `#/admin/<id>`. A table section is only a declarative entry in `entities.js` (columns, fields, filters, row actions), rendered by the generic controller in `index.js`; anything else is a *custom* entry (`custom: '<module>'`) whose module in the same folder exports `render(panel, { entity, admin })` (`home.js`, `announce.js`, `settings.js`). Add its id to a section's `tabs` in `nav.js`. Reuse `components.js`, `form.js`, `dialogs.js`; styles in `css/admin.css`.
 
 ### Add a page to the front
 

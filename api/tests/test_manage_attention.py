@@ -2,7 +2,7 @@ import datetime
 import unittest
 
 from src.database import models
-from src.routers import manage
+from src.routers.manage import overview
 from tests.sqlite_db import make_session
 
 
@@ -26,12 +26,12 @@ class AttentionTests(unittest.TestCase):
         self.db.commit()
 
     def test_only_running_timers_older_than_the_threshold_count(self):
-        got = manage.attention(self.db)
+        got = overview.attention(self.db)
         self.assertEqual(got["stale_timers"], 1)
         self.assertEqual([(t["user"], t["game"]) for t in got["stale_timers_oldest"]], [("ana", "Doom")])
 
     def test_players_without_telegram_leave_out_inactive_users_and_the_god_account(self):
-        self.assertEqual(manage.attention(self.db)["users_without_telegram"], 1)
+        self.assertEqual(overview.attention(self.db)["users_without_telegram"], 1)
 
     def test_games_without_rawg(self):
-        self.assertEqual(manage.attention(self.db)["games_without_rawg"], 1)
+        self.assertEqual(overview.attention(self.db)["games_without_rawg"], 1)

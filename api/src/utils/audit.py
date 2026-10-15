@@ -1,6 +1,6 @@
 """Audit log of the admin panel: who changed what, and how it was before.
 
-Every write (POST, PUT, PATCH, DELETE) of `routers/manage.py` that succeeds leaves one row in `audit_log`. It
+Every write (POST, PUT, PATCH, DELETE) of the admin panel API (`routers/manage/`) that succeeds leaves one row in `audit_log`. It
 is done once, for the whole router, instead of in every handler: a handler added tomorrow is covered without
 anybody remembering to log it (tests/test_audit.py fails a /manage route that is not).
 

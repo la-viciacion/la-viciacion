@@ -4,7 +4,7 @@ import unittest
 from fastapi import BackgroundTasks, HTTPException
 
 from src.database import models
-from src.routers import manage
+from src.routers.manage import sessions
 from tests.sqlite_db import make_session
 
 START = datetime.datetime(2026, 3, 1, 10)
@@ -23,7 +23,7 @@ class ChangeSessionGameTests(unittest.TestCase):
         self.db.commit()
 
     def patch(self, **fields):
-        return manage.patch_timer(self.timer.id, manage.TimerPatch(**fields), BackgroundTasks(), self.db)
+        return sessions.patch_timer(self.timer.id, sessions.TimerPatch(**fields), BackgroundTasks(), self.db)
 
     def entries(self):
         return sorted((e.game_id, e.platform, e.season) for e in self.db.query(models.UserGame).filter_by(user_id=1))

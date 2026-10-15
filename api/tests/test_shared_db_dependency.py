@@ -7,7 +7,7 @@ from src.routers import activity, basic, games, group, manage, push, statistics,
 class SharedDbDependencyTests(unittest.TestCase):
     def test_every_router_uses_the_one_get_db(self):
         # one dependency means one place to change how sessions are opened (and to override in tests)
-        for module in (activity, basic, games, group, manage, push, statistics, timers, users, utils):
+        for module in (activity, basic, games, group, *manage.AREAS, push, statistics, timers, users, utils):
             self.assertIs(module.get_db, auth.get_db, module.__name__)
 
 

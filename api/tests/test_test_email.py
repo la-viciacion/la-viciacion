@@ -4,7 +4,7 @@ from unittest import mock
 
 from fastapi import HTTPException
 
-from src.routers import manage
+from src.routers.manage import system
 from src.utils import email
 
 
@@ -44,8 +44,8 @@ class SettingsViewTests(unittest.TestCase):
         db = mock.MagicMock()
         db.query.return_value.all.return_value = []
         db.query.return_value.scalar.return_value = 0
-        with mock.patch.object(manage.settings, "public_view", return_value={}):
-            result = manage.get_settings(ADMIN, db)
+        with mock.patch.object(system.settings, "public_view", return_value={}):
+            result = system.get_settings(ADMIN, db)
         self.assertEqual(result["mail"]["test_recipient"], "boss@x.es")
         self.assertTrue(result["mail"]["configured"])
         self.assertNotIn("secret-pw", str(result))
@@ -54,14 +54,14 @@ class SettingsViewTests(unittest.TestCase):
 class TestEmailRouteTests(unittest.TestCase):
     def refused(self, status):
         with self.assertRaises(HTTPException) as ctx:
-            manage.send_test_email(ADMIN)
+            system.send_test_email(ADMIN)
         self.assertEqual(ctx.exception.status_code, status, ctx.exception.detail)
         return ctx.exception.detail
 
     def test_it_is_a_plain_def_because_smtp_blocks(self):
         import inspect
 
-        self.assertFalse(inspect.iscoroutinefunction(manage.send_test_email))
+        self.assertFalse(inspect.iscoroutinefunction(system.send_test_email))
 
     def test_without_configuration_it_says_what_is_missing(self):
         configure(self, SMTP_HOST="")
@@ -73,14 +73,14 @@ class TestEmailRouteTests(unittest.TestCase):
         configure(self)
         admin = types.SimpleNamespace(id=1, username="admin", email=None)
         with self.assertRaises(HTTPException) as ctx:
-            manage.send_test_email(admin)
+            system.send_test_email(admin)
         self.assertEqual(ctx.exception.status_code, 400)
         self.assertIn("Usuarios", ctx.exception.detail)
 
     def test_the_test_goes_to_the_email_of_whoever_asks(self):
         configure(self)
         with mock.patch.object(email.smtplib, "SMTP") as smtp:
-            result = manage.send_test_email(ADMIN)
+            result = system.send_test_email(ADMIN)
         sent = smtp.return_value.send_message.call_args.args[0]
         self.assertEqual(sent["To"], "boss@x.es")
         self.assertIn("prueba", sent["Subject"])

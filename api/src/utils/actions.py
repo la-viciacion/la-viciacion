@@ -99,7 +99,7 @@ async def check_users(
     """Check the achievements of every user (or of `user_ids`).
 
     Event-driven: it runs after a timer stops or a session or library entry changes (routers/timers.py,
-    routers/manage.py, the import). Teamwork is not checked here: only a timer that starts can make it
+    routers/manage/, the import). Teamwork is not checked here: only a timer that starts can make it
     true (after_timer_start).
     """
     start_time = time.time()
