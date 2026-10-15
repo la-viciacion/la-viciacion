@@ -6,7 +6,7 @@ from unittest import mock
 from fastapi import HTTPException
 
 from src.database import models
-from src.routers import manage
+from src.routers.manage import notices
 from src.utils import my_utils
 from tests.sqlite_db import make_session
 
@@ -31,17 +31,17 @@ class EndpointTests(unittest.TestCase):
         ])
         self.db.commit()
         values = {"telegram.token": "tok", "telegram.group_id": "-100"}
-        patch = mock.patch.object(manage.settings, "get", side_effect=lambda key: values.get(key))
+        patch = mock.patch.object(notices.settings, "get", side_effect=lambda key: values.get(key))
         patch.start()
         self.addCleanup(patch.stop)
         self.values = values
-        send = mock.patch.object(manage.my_utils, "send_announcement_to_chat", mock.AsyncMock(return_value=True))
+        send = mock.patch.object(notices.my_utils, "send_announcement_to_chat", mock.AsyncMock(return_value=True))
         self.send = send.start()
         self.addCleanup(send.stop)
 
     def post(self, **body):
-        body = manage.TelegramAnnouncementBody(title="Hola", **body)
-        return asyncio.run(manage.send_telegram_announcement(body, ADMIN, self.db))
+        body = notices.TelegramAnnouncementBody(title="Hola", **body)
+        return asyncio.run(notices.send_telegram_announcement(body, ADMIN, self.db))
 
     def refused(self, status, **body):
         with self.assertRaises(HTTPException) as ctx:
@@ -80,7 +80,7 @@ class EndpointTests(unittest.TestCase):
 
     def test_the_composer_cannot_send_to_everybody_by_telegram(self):
         with self.assertRaises(ValueError):
-            manage.TelegramAnnouncementBody(title="x", audience="all")
+            notices.TelegramAnnouncementBody(title="x", audience="all")
 
 
 if __name__ == "__main__":

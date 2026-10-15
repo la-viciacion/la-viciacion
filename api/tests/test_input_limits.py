@@ -8,7 +8,8 @@ from pydantic import ValidationError
 
 from src import auth
 from src.database import schemas
-from src.routers import manage, timers
+from src.routers import timers
+from src.routers.manage import sessions
 from src.routers import users as users_router
 
 USER = types.SimpleNamespace(id=1, username="ana", is_admin=1, is_active=1)
@@ -23,8 +24,8 @@ class NotesLengthTests(unittest.TestCase):
             lambda: schemas.GameTimerCreate(user_id=1, game_id="g", notes=long),
             lambda: schemas.ManualSessionCreate(game_id="g", platform="pc", start_time=NOW, end_time=LATER, notes=long),
             lambda: schemas.SessionUpdate(notes=long),
-            lambda: manage.TimerCreate(user_id=1, game_id="g", start_time=NOW, end_time=LATER, notes=long),
-            lambda: manage.TimerPatch(notes=long),
+            lambda: sessions.TimerCreate(user_id=1, game_id="g", start_time=NOW, end_time=LATER, notes=long),
+            lambda: sessions.TimerPatch(notes=long),
         ):
             with self.assertRaises(ValidationError):
                 build()

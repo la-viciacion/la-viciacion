@@ -7,7 +7,7 @@ from src.clients.ai_error import AIError
 from sqlalchemy import text
 
 from src.database import database, models
-from src.routers import manage
+from src.routers.manage import achievements, overview
 from src.utils import ai, email as mail, my_utils, push, rawg_sync, seasons, settings
 from tests.api_support import ApiTestCase
 from tests.app_routes import declared_routes, requestable
@@ -68,7 +68,7 @@ class OverviewTests(OpsTestCase):
             db.add(models.GameTimer(user_id=self.ana, game_id="celeste", start_time=ago(hours=20), is_active=True, platform="pc"))
             db.commit()
         body = self.admin("GET", "/attention").json()
-        self.assertEqual((body["stale_timer_hours"], body["stale_timers"]), (manage.STALE_TIMER_HOURS, 1))
+        self.assertEqual((body["stale_timer_hours"], body["stale_timers"]), (overview.STALE_TIMER_HOURS, 1))
         self.assertEqual((body["stale_timers_oldest"][0]["user"], body["stale_timers_oldest"][0]["game"]), ("ana", "Celeste"))
         self.assertEqual(body["users_without_telegram"], 1)  # ana; root has one
         self.assertEqual(body["games_without_rawg"], 1)
@@ -80,7 +80,7 @@ class OverviewTests(OpsTestCase):
         self.assertEqual((body["stale_timers"], body["stale_timers_oldest"], body["users_without_telegram"]), (0, [], 1))
 
     def test_recalculating_the_achievements_needs_the_phrase_and_runs_in_the_background(self):
-        recalculate = mock.patch.object(manage.achievements_recalc, "recalculate")
+        recalculate = mock.patch.object(achievements.achievements_recalc, "recalculate")
         with recalculate as run:
             for body in ({}, {"confirm": "si"}, {"confirm": "recalcular"}):
                 self.assertIn(self.admin("POST", "/recalculate-achievements", json=body).status_code, (400, 422))

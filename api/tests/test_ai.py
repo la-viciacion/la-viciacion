@@ -8,7 +8,7 @@ from google.genai import errors, types
 from src.clients import google_ai
 from src.clients.ai_error import AIError
 from src.database import models
-from src.routers import manage
+from src.routers.manage import system
 from src.utils import ai, ai_prompts, my_utils, settings
 from tests.sqlite_db import make_session
 
@@ -299,12 +299,12 @@ class TestRouteTests(unittest.TestCase):
 
     def test_without_a_key_it_says_so(self):
         with values(**{"ai.api_key": None}), self.assertRaises(HTTPException) as caught:
-            manage.test_ai(self.admin)
+            system.test_ai(self.admin)
         self.assertEqual(caught.exception.status_code, 409)
 
     def test_it_works_with_the_switch_off_and_reports_what_was_used(self):
         with values(**{"ai.enabled": False}), mock.patch.dict(ai.PROVIDERS, {"google": mock.Mock(return_value="Hola")}):
-            result = manage.test_ai(self.admin)
+            result = system.test_ai(self.admin)
         self.assertEqual(result["reply"], "Hola")
         self.assertEqual((result["provider"], result["model"]), ("google", "gemini-2.5-flash"))
 
@@ -312,7 +312,7 @@ class TestRouteTests(unittest.TestCase):
         failing = mock.Mock(side_effect=AIError("Google respondio 403: no"))
         with values(), mock.patch.dict(ai.PROVIDERS, {"google": failing}):
             with self.assertRaises(HTTPException) as caught:
-                manage.test_ai(self.admin)
+                system.test_ai(self.admin)
         self.assertEqual(caught.exception.status_code, 502)
         self.assertIn("403", caught.exception.detail)
 

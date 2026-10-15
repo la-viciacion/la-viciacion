@@ -5,7 +5,7 @@ from unittest import mock
 from fastapi import HTTPException
 
 from src.database import models
-from src.routers import manage
+from src.routers.manage import games
 from src.utils import hltb_sync, rawg_sync
 from tests.sqlite_db import make_session
 
@@ -115,13 +115,13 @@ class ResyncEndpointTests(unittest.TestCase):
     def test_each_source_reports_on_its_own(self):
         with mock.patch.object(rawg_sync, "resync_one", side_effect=RuntimeError("No hay clave de RAWG configurada")), \
                 mock.patch.object(hltb_sync, "resync_one", return_value={"status": "updated", "seconds": 5}):
-            got = manage.resync_game("g", self.db)
+            got = games.resync_game("g", self.db)
         self.assertEqual(got["rawg"], {"status": "error", "error": "No hay clave de RAWG configurada"})
         self.assertEqual(got["hltb"]["status"], "updated")
 
     def test_an_unknown_game_is_a_404(self):
         with self.assertRaises(HTTPException) as ctx:
-            manage.resync_game("nope", self.db)
+            games.resync_game("nope", self.db)
         self.assertEqual(ctx.exception.status_code, 404)
 
 

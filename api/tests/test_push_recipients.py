@@ -6,7 +6,7 @@ from sqlalchemy.dialects import mysql
 from sqlalchemy.orm import Query
 
 from src.database import models
-from src.routers import manage
+from src.routers.manage import users
 from src.utils import push
 
 
@@ -23,7 +23,7 @@ class DeleteUserTests(unittest.TestCase):
         db = mock.MagicMock()
         db.get.return_value = types.SimpleNamespace(id=5)
         admin = types.SimpleNamespace(id=1)
-        manage.delete_user(5, force=True, admin=admin, db=db)
+        users.delete_user(5, force=True, admin=admin, db=db)
         queried = [c.args[0] for c in db.query.call_args_list]
         self.assertIn(models.PushSubscription, queried)
 
