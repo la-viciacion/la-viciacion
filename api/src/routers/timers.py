@@ -534,6 +534,7 @@ def get_active_timer_endpoint(
         return ActiveTimerResponse(
             is_active=True,
             timer=active_timer,
+            game_name=db.query(Game.name).filter(Game.id == active_timer.game_id).scalar(),
             score=scores_crud.user_scores(db, user_id).get(active_timer.game_id),
         )
     else:

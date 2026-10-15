@@ -233,6 +233,7 @@ class GameTimerGroupPage(BaseModel):
 class ActiveTimerResponse(BaseModel):
     is_active: bool
     timer: GameTimerResponse | None = None
+    game_name: str | None = None  # so the timer card needs no second request
     score: int | None = None  # the user's rating of the running game, 1-100
 
 

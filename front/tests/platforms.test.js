@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, test } from 'node:test';
-import { loadPlatforms, platformList, platformName } from '../js/lib/platforms.js';
+import { ensurePlatforms, loadPlatforms, platformList, platformName } from '../js/lib/platforms.js';
 
 const storage = new Map();
 globalThis.localStorage = {
@@ -57,4 +57,16 @@ test('a failing request keeps the previous catalogue and does not throw', async 
 test('a session that expired while loading leaves an empty catalogue instead of failing', async () => {
   answering(json({ detail: 'Could not validate credentials' }, 401));
   assert.deepEqual(await loadPlatforms(), []);
+});
+
+test('ensurePlatforms asks only until the catalogue was read once', async () => {
+  answering(json([{ id: 'pc', name: 'PC' }]));
+  await loadPlatforms();
+  asked = [];
+  assert.deepEqual(await ensurePlatforms(), [{ id: 'pc', name: 'PC' }]);
+  assert.equal(asked.length, 0);
+  answering(json({ detail: 'Could not validate credentials' }, 401)); // read nothing: asked again next time
+  await loadPlatforms();
+  answering(json([{ id: 'ps5', name: 'PS5' }]));
+  assert.deepEqual(await ensurePlatforms(), [{ id: 'ps5', name: 'PS5' }]);
 });

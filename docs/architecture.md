@@ -105,7 +105,7 @@ Table `user_settings`: one row per user, one typed nullable column per preferenc
 
 ## Front (`front/`)
 
-No framework/build step. ES modules loaded by `index.html` → `js/main.js`.
+No framework/build step. ES modules loaded by `index.html` → `js/main.js`. `index.html` preloads (`modulepreload`) every module of the first screen, so the browser fetches them in parallel instead of one level of imports at a time; the pages are imported on demand.
 
 ```
 js/main.js        hash router (#/, #/profile, #/admin), session handling, page lifecycle
@@ -114,6 +114,7 @@ js/ui/            layout (navbar shell), modal, toast, icons
 js/pages/         auth/ (login, recover), home/ (timer, history, completion, sessions, game-picker), wishlist/, profile/, admin/ (entities, form, dialogs, rawg-sync, settings)
 css/              one stylesheet per area
 assets/icons/     PWA icons (favicon, manifest, push notification icon and badge)
+assets/fonts/     Outfit, served by us (no third-party request; licence OFL.txt), declared in css/base.css
 sw.js             service worker: caches nothing (keeps the app installable) and shows push notifications
 ```
 

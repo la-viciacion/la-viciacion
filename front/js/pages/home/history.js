@@ -27,7 +27,9 @@ export function initHistory(options) {
   state.expanded = new Set();
 }
 
-export async function loadHistory(reset) {
+/** Ask for a page of the history and draw it. `ready` is what drawing it needs too (whether a timer is running, the
+ * names of the platforms): it is awaited alongside the request, not before it. */
+export async function loadHistory(reset, ready) {
   const list = document.getElementById('historyList');
   if (!list) return;
   const moreBtn = document.getElementById('historyMoreBtn');
@@ -35,7 +37,7 @@ export async function loadHistory(reset) {
 
   try {
     const offset = reset ? 0 : state.groups.length;
-    const page = await api(`/timers/history/${state.userId}/grouped?limit=${PAGE_SIZE}&offset=${offset}`);
+    const [page] = await Promise.all([api(`/timers/history/${state.userId}/grouped?limit=${PAGE_SIZE}&offset=${offset}`), ready]);
     if (!page) return;
     state.total = page.total_games;
     state.groups = reset ? page.groups : state.groups.concat(page.groups);

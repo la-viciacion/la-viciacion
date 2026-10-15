@@ -9,9 +9,8 @@
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" type="image/png" sizes="64x64" href="assets/icons/icon-64.png" />
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <!-- the font is ours (assets/fonts, base.css): no request to a third party before the first paint -->
+  <link rel="preload" href="assets/fonts/outfit-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="stylesheet" href="css/base.css" />
   <link rel="stylesheet" href="css/login.css" />
   <link rel="stylesheet" href="css/navbar.css" />
@@ -23,6 +22,40 @@
 </head>
 <body>
   <div id="app"></div>
+  <!-- every module of the first screen, so the browser asks for them all at once instead of one level of imports
+       at a time (tests/preload.test.js keeps the list equal to what js/main.js imports) -->
+  <link rel="modulepreload" href="js/lib/api.js" />
+  <link rel="modulepreload" href="js/lib/completion.js" />
+  <link rel="modulepreload" href="js/lib/format.js" />
+  <link rel="modulepreload" href="js/lib/html.js" />
+  <link rel="modulepreload" href="js/lib/links.js" />
+  <link rel="modulepreload" href="js/lib/menu.js" />
+  <link rel="modulepreload" href="js/lib/password.js" />
+  <link rel="modulepreload" href="js/lib/platforms.js" />
+  <link rel="modulepreload" href="js/lib/presence.js" />
+  <link rel="modulepreload" href="js/lib/push.js" />
+  <link rel="modulepreload" href="js/lib/recovery.js" />
+  <link rel="modulepreload" href="js/lib/score.js" />
+  <link rel="modulepreload" href="js/lib/seasons.js" />
+  <link rel="modulepreload" href="js/lib/version.js" />
+  <link rel="modulepreload" href="js/pages/auth/login.js" />
+  <link rel="modulepreload" href="js/pages/auth/recover.js" />
+  <link rel="modulepreload" href="js/pages/home/completion.js" />
+  <link rel="modulepreload" href="js/pages/home/game-picker.js" />
+  <link rel="modulepreload" href="js/pages/home/history.js" />
+  <link rel="modulepreload" href="js/pages/home/index.js" />
+  <link rel="modulepreload" href="js/pages/home/rating.js" />
+  <link rel="modulepreload" href="js/pages/home/sessions.js" />
+  <link rel="modulepreload" href="js/pages/home/timer.js" />
+  <link rel="modulepreload" href="js/ui/avatar.js" />
+  <link rel="modulepreload" href="js/ui/icons.js" />
+  <link rel="modulepreload" href="js/ui/layout.js" />
+  <link rel="modulepreload" href="js/ui/menu.js" />
+  <link rel="modulepreload" href="js/ui/modal.js" />
+  <link rel="modulepreload" href="js/ui/playing.js" />
+  <link rel="modulepreload" href="js/ui/push-invite.js" />
+  <link rel="modulepreload" href="js/ui/score-badge.js" />
+  <link rel="modulepreload" href="js/ui/toast.js" />
   <script src="js/main.js" type="module"></script>
 </body>
 </html>

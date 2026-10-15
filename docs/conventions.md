@@ -72,7 +72,7 @@ Backend under `routers/manage.py` (already admin-only). Front: the panel is a si
 
 ### Add a page to the front
 
-Create `js/pages/<name>/index.js` following the page contract (`active`, `render`, `dispose`), register the prefix in `ROUTES` in `js/main.js`, add the navbar item in `ui/layout.js`, and a stylesheet linked from `index.html` if needed.
+Create `js/pages/<name>/index.js` following the page contract (`active`, `render`, `dispose`), register the prefix in `ROUTES` in `js/main.js`, add the navbar item in `ui/layout.js`, and a stylesheet linked from `index.html` if needed. Pages are loaded on demand (`import()`); a module that the first screen imports statically (from `js/main.js`, the home page, the shell) must also be listed as a `<link rel="modulepreload">` in `index.html`, or `tests/preload.test.js` fails and says which.
 
 ### Add a scheduled job
 
