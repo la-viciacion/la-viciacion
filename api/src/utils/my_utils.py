@@ -477,8 +477,8 @@ async def send_message_to_admins(db: Session, msg):
                 async with bot:
                     if await _telegram_send(bot, user.telegram_id, msg):
                         logger.info("Message sent successfully!")
-    except Exception as e:
-        logger.info(e)
+    except Exception as e:  # a notice must never break what triggered it
+        logger.error(f"Error sending a message to the admins: {e}")
 
 
 async def send_test_message(sent_by: str) -> None:
@@ -508,12 +508,8 @@ def get_ach_message(
 
 
 def get_platforms(db: Session):
-    try:
-        stmt = select(
-            models.PlatformTag.id,
-            models.PlatformTag.name,
-        )
-        return db.execute(stmt).fetchall()
-    except Exception as e:
-        logger.info(e)
-        raise e
+    stmt = select(
+        models.PlatformTag.id,
+        models.PlatformTag.name,
+    )
+    return db.execute(stmt).fetchall()

@@ -893,35 +893,31 @@ def top_games(db: Session, username: str, limit: int = 10, season: int = None):
 
 def get_achievements(db: Session, username: str, season: int = None):
     season = seasons.or_current(season)
-    try:
-        user = get_user_by_username(db, username)
-        stmt = (
-            select(
-                models.UserAchievement.user_id,
-                models.UserAchievement.achievement_id,
-                models.UserAchievement.date,
-                models.Achievement.id,
-                models.Achievement.title,
-                models.Achievement.is_secret.label("secret"),
-                models.Achievement.special,
-            )
-            .join(models.User, models.User.id == models.UserAchievement.user_id)
-            .join(
-                models.Achievement,
-                models.Achievement.id == models.UserAchievement.achievement_id,
-            )
-            .where(
-                models.UserAchievement.user_id == user.id,
-                True if season == seasons.ALL else models.UserAchievement.season == season,
-            )
-            .group_by(
-                models.UserAchievement.user_id,
-                models.UserAchievement.achievement_id,
-                models.Achievement.id,
-            )
-            .order_by(asc(models.UserAchievement.date), asc(models.UserAchievement.id))
+    user = get_user_by_username(db, username)
+    stmt = (
+        select(
+            models.UserAchievement.user_id,
+            models.UserAchievement.achievement_id,
+            models.UserAchievement.date,
+            models.Achievement.id,
+            models.Achievement.title,
+            models.Achievement.is_secret.label("secret"),
+            models.Achievement.special,
         )
-        return db.execute(stmt).fetchall()
-    except Exception as e:
-        logger.info(e)
-        raise e
+        .join(models.User, models.User.id == models.UserAchievement.user_id)
+        .join(
+            models.Achievement,
+            models.Achievement.id == models.UserAchievement.achievement_id,
+        )
+        .where(
+            models.UserAchievement.user_id == user.id,
+            True if season == seasons.ALL else models.UserAchievement.season == season,
+        )
+        .group_by(
+            models.UserAchievement.user_id,
+            models.UserAchievement.achievement_id,
+            models.Achievement.id,
+        )
+        .order_by(asc(models.UserAchievement.date), asc(models.UserAchievement.id))
+    )
+    return db.execute(stmt).fetchall()
