@@ -36,18 +36,6 @@ class LoginTests(ApiTestCase):
         me = self.api("GET", "/auth/active_user", headers={"Authorization": f"Bearer {response.json()['access_token']}"})
         self.assertEqual((me.status_code, me.json()["username"]), (200, "ana"))
 
-    def test_a_valid_session_gets_a_fresh_token_and_an_invalid_one_does_not(self):
-        self.user("ana")
-        old = self.login("ana").json()["access_token"]
-        refreshed = self.api("POST", "/auth/refresh", headers={"Authorization": f"Bearer {old}"})
-        self.assertEqual(refreshed.status_code, 200)
-        new = refreshed.json()["access_token"]
-        me = self.api("GET", "/auth/active_user", headers={"Authorization": f"Bearer {new}"})
-        self.assertEqual((me.status_code, me.json()["username"]), (200, "ana"))
-        expired = self.valid_payload()
-        expired["exp"] = clock.real_now() - timedelta(seconds=1)
-        self.assertEqual(self.api("POST", "/auth/refresh", headers=self.token(expired)).status_code, 401)
-
     def test_the_login_accepts_the_email_in_any_case(self):
         self.user("ana", email="ana@example.com")
         self.assertEqual(self.login("ANA@Example.COM").status_code, 200)
@@ -103,6 +91,18 @@ class SessionTests(ApiTestCase):
             user = db.query(models.User).filter_by(username=username).one()
             return {"username": username, "pwv": auth.password_fingerprint(user),
                     "exp": clock.real_now() + timedelta(minutes=5), **extra}
+
+    def test_a_valid_session_gets_a_fresh_token_and_an_invalid_one_does_not(self):
+        self.user("ana")
+        old = self.api("POST", "/token", data={"username": "ana", "password": PASSWORD}).json()["access_token"]
+        refreshed = self.api("POST", "/auth/refresh", headers={"Authorization": f"Bearer {old}"})
+        self.assertEqual(refreshed.status_code, 200)
+        new = refreshed.json()["access_token"]
+        me = self.api("GET", "/auth/active_user", headers={"Authorization": f"Bearer {new}"})
+        self.assertEqual((me.status_code, me.json()["username"]), (200, "ana"))
+        expired = self.valid_payload()
+        expired["exp"] = clock.real_now() - timedelta(seconds=1)
+        self.assertEqual(self.api("POST", "/auth/refresh", headers=self.token(expired)).status_code, 401)
 
     def test_every_protected_route_refuses_a_missing_token(self):
         self.assertEqual(self.api("GET", "/auth/active_user").status_code, 401)

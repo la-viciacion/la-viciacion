@@ -17,6 +17,7 @@ from ..database.schemas import (
 )
 from ..utils import actions
 from ..utils import seasons
+from ..utils.refusal import RefusedRoute
 
 
 def _by_admin(current_user: User, user_id: int) -> bool:
@@ -27,6 +28,7 @@ def _by_admin(current_user: User, user_id: int) -> bool:
 router = APIRouter(
     prefix="/timers",
     tags=["timers"],
+    route_class=RefusedRoute,
     # Every route needs a logged-in user; each one also checks the data
     # belongs to them (or that they are an admin). The rules themselves are in crud/timers.py.
 )

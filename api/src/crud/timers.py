@@ -18,18 +18,10 @@ from ..database.schemas import (
     SessionUpdate,
 )
 from ..utils import seasons
+from ..utils.refusal import Refused
 
 MAX_SESSION = datetime.timedelta(hours=24)
 FUTURE_SLACK = datetime.timedelta(minutes=1)
-
-
-class Refused(Exception):
-    """A change the rules do not allow. main.py answers it as HTTP `status_code` with `detail`."""
-
-    def __init__(self, status_code: int, detail: str):
-        super().__init__(detail)
-        self.status_code = status_code
-        self.detail = detail
 
 
 def lock_sessions(db: Session, user_id: int) -> None:

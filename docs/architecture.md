@@ -35,7 +35,7 @@ Utils worth knowing: `audit.py` (the admin audit log, below), `sql_dump.py` (the
 
 ### Layering rule
 
-`router → crud / utils → models`. Routers do not build SQL; crud does not raise HTTP semantics beyond what it already does today; business rules that span entities go in `utils/` (or `crud/` when they are pure data operations). Put user-facing error text in `utils/messages.py`. `crud/` and `utils/` still import each other in places (the achievement checks and the notices); `tests/test_import_cycles.py` imports every module on its own, so a new cycle that only works in the app's import order fails there. A crud module that refuses a change raises its own exception (like `crud.timers.Refused`, answered by `main.py`), not `HTTPException`.
+`router → crud / utils → models`. Routers do not build SQL; crud does not raise HTTP semantics beyond what it already does today; business rules that span entities go in `utils/` (or `crud/` when they are pure data operations). Put user-facing error text in `utils/messages.py`. `crud/` and `utils/` still import each other in places (the achievement checks and the notices); `tests/test_import_cycles.py` imports every module on its own, so a new cycle that only works in the app's import order fails there. A crud module that refuses a change raises `utils.refusal.Refused`, answered as the HTTP error it names by routers built with `route_class=RefusedRoute`, not `HTTPException`.
 
 ### Sync vs async
 

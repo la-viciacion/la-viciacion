@@ -3,13 +3,11 @@ from contextlib import asynccontextmanager
 
 import sentry_sdk
 
-from fastapi import APIRouter, FastAPI, Request
+from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 
 from .config import Config
 from .database.database import SessionLocal
-from .crud import timers as timers_crud
 from .crud import users as users_crud
 from .crud.achievements import Achievements
 from .utils import push as push_utils
@@ -89,12 +87,6 @@ api_v1 = APIRouter(prefix=API_PREFIX)
 for router in (basic, users, games, statistics, timers, activity, group, challenges, manage, push, utils):
     api_v1.include_router(router.router)
 app.include_router(api_v1)
-
-
-@app.exception_handler(timers_crud.Refused)
-async def refused(_: Request, exc: timers_crud.Refused):
-    """What the rules of the sessions refuse answers like any HTTPException: the status and its `detail`."""
-    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
 
 app.add_middleware(
