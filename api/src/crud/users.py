@@ -1,19 +1,13 @@
 import datetime
-import json
 import random
-from typing import Union
 
 import bcrypt
 from sqlalchemy import (
     and_,
     asc,
-    create_engine,
     desc,
-    extract,
     func,
-    or_,
     select,
-    text,
     update,
 )
 from sqlalchemy.exc import SQLAlchemyError

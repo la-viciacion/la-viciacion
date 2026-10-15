@@ -1,26 +1,19 @@
 import datetime
-from typing import Union
 
 from sqlalchemy import (
     Integer,
-    asc,
     cast,
-    create_engine,
     desc,
     extract,
     func,
     select,
-    text,
     true,
-    update,
 )
 from sqlalchemy.orm import Session
 
 from ..config import Config
-from ..database import models, schemas
-from ..utils import actions
+from ..database import models
 from ..utils import my_utils as utils
-from . import games, users
 from ..utils.logger import LogManager
 from ..utils import seasons, user_settings
 

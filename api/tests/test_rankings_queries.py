@@ -77,8 +77,7 @@ class SharedDataTests(unittest.TestCase):
                 mock.patch.object(statistics.rankings, "library_counts", return_value=[]) as counts:
             shared = statistics._SharedRankingData(mock.MagicMock())
             for _ in range(3):
-                shared.players
-                shared.counts
+                _ = shared.players, shared.counts  # read three times, computed once
         days.assert_called_once()
         counts.assert_called_once()
 

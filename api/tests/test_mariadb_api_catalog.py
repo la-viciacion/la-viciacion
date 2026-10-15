@@ -2,7 +2,6 @@
 required, see api_support.py). RAWG and HowLongToBeat are replaced by fakes: nothing leaves the process."""
 import datetime
 import io
-from datetime import timedelta
 from types import SimpleNamespace
 from unittest import mock
 
@@ -11,7 +10,6 @@ from PIL import Image
 from src.database import database
 from src.utils import images, messages, my_utils, push, seasons, settings
 from tests.api_support import ApiTestCase
-from tests import clock
 from tests.clock import ago
 
 

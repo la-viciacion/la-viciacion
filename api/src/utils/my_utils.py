@@ -1,17 +1,16 @@
 import asyncio
 import datetime
-import json
 import re
 
 import requests
 from starlette.concurrency import run_in_threadpool
 import telegram
 from howlongtobeatpy import HowLongToBeat
-from sqlalchemy import asc, create_engine, desc, func, or_, select, text, update
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from ..config import Config
-from ..crud import games, time_entries, users
+from ..crud import games, users
 from ..database import models, schemas
 from .achievements import AchievementsElems
 from . import ai, hltb_sync, push, settings

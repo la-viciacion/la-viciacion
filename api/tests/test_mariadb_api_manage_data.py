@@ -8,7 +8,6 @@ from sqlalchemy import text
 
 from src.utils import seasons
 from tests.api_support import PASSWORD, ApiTestCase
-from tests import clock
 from tests.clock import ago
 
 NEW_PASSWORD = "An0ther-secret!pw"
@@ -437,7 +436,7 @@ class ScoresAdminTests(ManageTestCase):
 
     def test_deleting_a_user_or_a_game_takes_its_scores_after_the_confirmation(self):
         self.create(self.ana, "celeste", 90)
-        refused = self.admin("DELETE", f"/games/celeste")
+        refused = self.admin("DELETE", "/games/celeste")
         self.assertEqual(refused.status_code, 409)
         self.assertEqual(refused.json()["detail"]["counts"]["puntuaciones"], 1)
         self.assertEqual(self.admin("DELETE", "/games/celeste", params={"force": True}).status_code, 200)

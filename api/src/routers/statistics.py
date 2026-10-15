@@ -7,8 +7,7 @@ from sqlalchemy.orm import Session
 from .. import auth
 from ..auth import get_db
 from ..crud import debt, rankings, users
-from ..database import models, schemas
-from ..utils import actions as actions
+from ..database import models
 from ..utils import seasons
 from ..utils.logger import LogManager
 

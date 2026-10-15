@@ -1,20 +1,15 @@
 import asyncio
 import datetime
-import json
-import re
 import threading
 import time
-from typing import Union
 
-import requests
-from sqlalchemy import asc, create_engine, desc, func, select, text, update
 from sqlalchemy.orm import Session
 
 from ..config import Config
 from ..crud import challenges as challenges_crud
 from ..crud import games, rankings, time_entries, users, wishlist
 from ..crud.achievements import Achievements, Played
-from ..database import models, schemas
+from ..database import models
 from . import challenges, my_utils as utils
 from . import push, rawg_sync
 from ..utils import seasons, streaks, user_settings

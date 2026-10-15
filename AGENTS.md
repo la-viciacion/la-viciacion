@@ -74,6 +74,9 @@ cd api && python -m unittest discover -s tests -t .   # includes migration-histo
 cd api && python run_tests.py --no-db                  # the same in parallel, ~30 s without MariaDB
 cd api && python run_tests.py --db --skip-migrations   # with a MariaDB for tests (Docker), ~80 s; --db alone, ~4 min
 
+# Python lint of the API and the bot (from the root)
+ruff check .
+
 # Front tests + lint (from front/)
 cd front && npm test && npm run lint
 ```
@@ -86,7 +89,7 @@ Full details in [docs/development.md](docs/development.md).
 - **Database storage / MariaDB:** on Windows/Docker Desktop set `DB_DATA=laviciacion_db_data` in `.env` (a named volume); the default `./db/data` bind mount breaks table-rebuilding migrations on MariaDB 12+. Never change the MariaDB major version of a database that has data by editing the image. Details: [docs/deployment.md](docs/deployment.md#database-storage-linux-vs-windows).
 - Match the surrounding code style; comments explain *why*, not *what*. No dead code, no commented-out blocks.
 - Keep changes focused; do not refactor unrelated code in the same change.
-- Before finishing a change: run the API and front tests, lint the front, and if you touched behaviour described in `docs/`, update those docs in the same change.
+- Before finishing a change: run the API and front tests, lint the Python (`ruff check .`) and the front, and if you touched behaviour described in `docs/`, update those docs in the same change.
 - Tests never depend on the real clock: the suite runs on a pinned one (`api/tests/clock.py`, see [docs/development.md](docs/development.md)); do not read `now()`/`today()` at import time in a test module.
 - Add or update tests for any pure/business logic you touch (see existing examples in `api/tests/` and `front/tests/`).
 - Ask before anything destructive or hard to reverse (dropping data, touching applied migrations, running migrations against real data, force-pushing).

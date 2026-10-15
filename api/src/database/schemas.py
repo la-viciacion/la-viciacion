@@ -1,5 +1,5 @@
 import datetime
-from typing import List, Optional, Union
+from typing import Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field, NaiveDatetime
 

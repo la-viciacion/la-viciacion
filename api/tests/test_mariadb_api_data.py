@@ -3,14 +3,12 @@
 import datetime
 import gzip
 import re
-from datetime import timedelta
 from unittest import mock
 
 from sqlalchemy import text
 
 from src.routers import users as users_router
 from tests.api_support import ApiTestCase
-from tests import clock
 from tests.clock import ago
 
 

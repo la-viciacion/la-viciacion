@@ -1,13 +1,10 @@
 import datetime
-from typing import Union
 
-from sqlalchemy import and_, asc, case, create_engine, desc, func, select, text, update
+from sqlalchemy import and_, case, desc, func, select
 from sqlalchemy.orm import Session
 
-from ..crud import time_entries, users
-from ..database import models, schemas
-from ..utils import actions as actions
-from ..utils import my_utils as utils
+from ..crud import time_entries
+from ..database import models
 from ..utils.logger import LogManager
 from ..utils import seasons, streaks
 from ..config import Config

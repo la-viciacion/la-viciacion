@@ -7,7 +7,6 @@ from sqlalchemy import text
 from src.database import database, models
 from tests.api_support import ApiTestCase
 from tests import clock
-from tests.clock import ago
 
 TODAY = clock.today
 

@@ -113,7 +113,7 @@ def build_sessions() -> list[Session]:
     seen: set[tuple] = set()
 
     def add(user, game, year_start: datetime.date, count: int):
-        for n in range(count):
+        for _ in range(count):
             day = year_start + datetime.timedelta(days=rng.randint(0, 120))
             start = datetime.datetime.combine(day, datetime.time(rng.randint(8, 22), rng.choice([0, 15, 30, 45])))
             if (user, game, start) in seen:

@@ -1,7 +1,6 @@
 """The challenges through real requests (MariaDB required, see api_support.py): who may launch what, the options and
 duplicates, taking part, the progress and the history, and the notices of the launch and of the total reached."""
 import asyncio
-import datetime
 from datetime import timedelta
 from unittest import mock
 
@@ -94,7 +93,7 @@ class LaunchTests(ChallengesTestCase):
         self.assertEqual(self.scalar("SELECT COUNT(*) FROM challenges"), 0)
 
     def test_what_the_panel_launches_is_in_the_audit_log(self):
-        challenge = self.launch().json()["id"]
+        self.launch()
         rows = self.api("GET", "/manage/audit", as_user="root", params={"entity": "challenges"}).json()["items"]
         self.assertEqual([(r["method"], r["username"]) for r in rows], [("POST", "root")])
 

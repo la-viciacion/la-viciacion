@@ -1,17 +1,15 @@
 import datetime
-import json
-from typing import List, NamedTuple, Union
+from typing import List, NamedTuple
 
-from sqlalchemy import and_, asc, create_engine, desc, func, or_, select, text, update
+from sqlalchemy import and_, func, or_, update
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from ..config import Config
 from ..crud import time_entries, users, games
-from ..database import models, schemas
-from ..utils import actions as actions
+from ..database import models
 from ..utils import my_utils as utils
-from ..utils.achievements import AchievementsElems, first_season, is_lifetime
+from ..utils.achievements import AchievementsElems, first_season
 from ..utils.logger import LogManager
 from ..utils import external_events, seasons, streaks, user_settings, weather
 

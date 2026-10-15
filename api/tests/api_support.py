@@ -28,7 +28,6 @@ from src.crud.achievements import Achievements
 from src.database import database, models
 from src.routers import basic
 from src.utils import actions, my_utils, settings
-from tests import mariadb_db
 from tests.app_routes import BASE, ROUTERS
 from tests.mariadb_db import MariaDBTestCase
 

@@ -1,7 +1,6 @@
 """The admin panel's operations (overview, RAWG sync, settings, announcements, diagnostics) through real requests
 (MariaDB required, see api_support.py). Its data routes are in test_mariadb_api_manage_data.py."""
 import datetime
-from datetime import timedelta
 from unittest import mock
 
 from src.clients.ai_error import AIError
@@ -12,7 +11,6 @@ from src.routers import manage
 from src.utils import ai, email as mail, my_utils, push, rawg_sync, seasons, settings
 from tests.api_support import ApiTestCase
 from tests.app_routes import declared_routes, requestable
-from tests import clock
 from tests.clock import ago
 
 TOKEN = "123456789:" + "A" * 30

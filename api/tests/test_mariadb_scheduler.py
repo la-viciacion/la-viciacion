@@ -7,7 +7,6 @@ import datetime
 from datetime import timedelta
 from unittest import mock
 
-from sqlalchemy import text
 
 from src.database import database
 from src.utils import actions, push, scheduler

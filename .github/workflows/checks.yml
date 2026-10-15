@@ -43,6 +43,12 @@ jobs:
           python-version: "3.14"
           cache: pip
           cache-dependency-path: api/requirements.txt
+      # unused or undefined names and likely bugs (ruff.toml at the root says which); the version is pinned so
+      # a new release cannot turn a green check red on its own
+      - name: API lint
+        run: |
+          pip install ruff==0.16.3
+          ruff check api
       - name: API tests
         working-directory: api
         run: |
@@ -59,6 +65,10 @@ jobs:
           python-version: "3.14"
           cache: pip
           cache-dependency-path: bot/requirements.txt
+      - name: Bot lint
+        run: |
+          pip install ruff==0.16.3
+          ruff check bot
       - name: Bot tests
         working-directory: bot
         run: |
