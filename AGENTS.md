@@ -25,6 +25,7 @@ Four services, one `docker-compose.yml`:
 - [docs/configuration.md](docs/configuration.md): `.env`, accounts and login, password recovery, API docs.
 - [docs/features.md](docs/features.md): how the app behaves (seasons, notifications and jobs, push, sessions, achievements, recommendations, AI notices). The product rules live here; read it before changing behaviour.
 - [docs/workflow.md](docs/workflow.md): git workflow (trunk-based, PRs, required CI checks).
+- [docs/gitlab.md](docs/gitlab.md): prepared (unused) GitLab CI/CD, Renovate and the settings to move there if the repo has to be private.
 - [docs/roadmap.md](docs/roadmap.md): pending decisions (branching, versioning, CI) and known debt.
 - [README.md](README.md): project presentation only (what it is, quick start, links). Documentation goes in `docs/`, not in the README.
 - [CONTRIBUTING.md](CONTRIBUTING.md): short human-facing contribution guide.
