@@ -1,6 +1,6 @@
 ## What and why
 
-<!-- One or two sentences. The PR title is the squash commit: `feat(front): ...` -->
+<!-- One or two sentences. PR title in Conventional Commits: `feat(front): ...` -->
 
 ## Checklist
 
