@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { buildSlides, favoriteDayPart, favoriteWeekday, monthGrid, parseStoryHash, storyHref } from '../js/lib/story.js';
+import { bigDuration, buildSlides, favoriteDayPart, favoriteWeekday, monthGrid, parseStoryHash, storyHref } from '../js/lib/story.js';
 
 const HOUR = 3600;
 
@@ -88,4 +88,17 @@ test('the address goes there and back', () => {
   assert.deepEqual(parseStoryHash('#/story/2026-09/a%20b'), { period: '2026-09', username: 'a b' });
   assert.deepEqual(parseStoryHash('#/story'), { period: null, username: null });
   assert.deepEqual(parseStoryHash('#/story/2026-13'), { period: null, username: null });
+});
+
+test('a time is a big figure in hours, or in minutes under an hour, never zero', () => {
+  assert.deepEqual(bigDuration(61 * HOUR), { value: 61, unit: 'horas' });
+  assert.deepEqual(bigDuration(HOUR), { value: 1, unit: 'hora' });
+  assert.deepEqual(bigDuration(40 * 60), { value: 40, unit: 'minutos' });
+  assert.deepEqual(bigDuration(20), { value: 1, unit: 'minuto' });
+});
+
+test('a recap still running is marked on the introduction', () => {
+  assert.equal(buildSlides({ ...DATA, complete: false })[0].partial, true);
+  assert.equal(buildSlides({ ...DATA, complete: true })[0].partial, false);
+  assert.equal(buildSlides(DATA)[0].partial, false);
 });

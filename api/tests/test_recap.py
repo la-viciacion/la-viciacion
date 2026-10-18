@@ -191,6 +191,13 @@ class BuildRecapTests(unittest.TestCase):
         self.assertIsNone(self.build()["player"])
         self.assertEqual(self.build(1)["player"]["name"], "Ana")
 
+    def test_the_ranking_says_who_is_still_active(self):
+        self.db.add(models.User(id=4, name="Dani", username="dani", is_active=0))
+        self.timer(4, "doom", D(2026, 9, 12, 10), 1)
+        self.db.commit()
+        rows = {row["name"]: row["active"] for row in self.build()["group"]["ranking"]}
+        self.assertEqual(rows, {"Ana": True, "Biel": True, "Dani": False})
+
     def test_when_it_was_played_and_what_kind_of_games(self):
         # 2026-09-10 is a Thursday and the 11th a Friday
         group = self.build()["group"]

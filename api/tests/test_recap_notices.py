@@ -67,6 +67,17 @@ class NoticeTests(RecapData):
         for wanted in ("*Resumen de abril de 2026*", "04h00m", "+02h00m", "🥇 Ana\\_ — 03h00m", "🥈 Biel — 01h00m", "*Doom*", "10 abr"):
             self.assertIn(wanted, text)
 
+    def test_the_podium_leaves_out_inactive_players_but_the_hours_still_count_them(self):
+        self.db.add_all([models.User(id=4, name="Dani", username="dani", is_active=0), session(4, "doom", D(2026, 4, 11, 20), 9)])
+        self.db.commit()
+        data = recap.build_recap(self.db, APRIL)
+        self.assertEqual(data["group"]["ranking"][0]["name"], "Dani")
+        text = recap_notices.group_message(data, APRIL)
+        self.assertNotIn("Dani", text)
+        self.assertIn("🥇 Ana\_", text)
+        self.assertIn("🥈 Biel", text)
+        self.assertIn("13h00m", text)  # 4 h of the active players and 9 h of the inactive one
+
     def test_the_player_message_is_about_them(self):
         text = recap_notices.player_message(recap.build_recap(self.db, APRIL, 1), APRIL)
         for wanted in ("*Tu resumen de abril de 2026*", "Horas: 03h00m", "puesto 1º", "*Doom*", "Biel"):
