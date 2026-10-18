@@ -42,12 +42,26 @@ export function monthGrid(period, byDay) {
   return monthWeeks(period).map((week) => week.map((day) => (day ? { day, seconds: (byDay || {})[day] || 0, level: level((byDay || {})[day]) } : null)));
 }
 
+/** A time as a big figure: { value, unit }: 61 hours, or 40 minutes when it is under one hour. */
+export function bigDuration(seconds) {
+  const hours = seconds / 3600;
+  if (hours >= 1) return { value: Math.round(hours), unit: Math.round(hours) === 1 ? 'hora' : 'horas' };
+  const minutes = Math.round(seconds / 60);
+  return { value: minutes, unit: minutes === 1 ? 'minuto' : 'minutos' };
+}
+
+/** "2026-09-19" -> "19 de septiembre". */
+export function longDate(day) {
+  const [year, month, date] = day.split('-').map(Number);
+  return new Date(year, month - 1, date).toLocaleDateString('es-ES', { day: 'numeric', month: 'long' });
+}
+
 const percent = (share) => `${Math.round(share * 100)} %`;
 
 function playerSlides(period, p) {
   const total = p.seconds;
   const slides = [
-    { id: 'intro', kind: 'intro', theme: 'teal', label: periodLabel(period), name: p.name },
+    { id: 'intro', kind: 'intro', theme: 'teal', label: periodLabel(period), name: p.name, span: isMonth(period) ? 'mes' : 'temporada' },
     {
       id: 'hours', kind: 'hours', theme: 'gold', seconds: total, previous: p.previous_seconds,
       previousLabel: periodLabel(previousPeriod(period)), change: change(total, p.previous_seconds, formatDuration), position: p.position,
@@ -82,7 +96,7 @@ function playerSlides(period, p) {
 
 function groupSlide(period, g) {
   return {
-    id: 'group', kind: 'group', theme: 'purple', seconds: g.seconds, previous: g.previous_seconds, change: change(g.seconds, g.previous_seconds, formatDuration),
+    id: 'group', kind: 'group', theme: 'purple', seconds: g.seconds, previous: g.previous_seconds, previousLabel: periodLabel(previousPeriod(period)), change: change(g.seconds, g.previous_seconds, formatDuration),
     players: g.players, podium: g.ranking.slice(0, 3), game: g.top_games[0] || null,
   };
 }

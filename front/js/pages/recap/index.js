@@ -6,6 +6,7 @@ import { api } from '../../lib/api.js';
 import { formatDate, formatDuration } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
 import { gameHref } from '../../lib/links.js';
+import { storyHref } from '../../lib/story.js';
 import { change, lastMonth, parseHash, periodChoices, periodLabel, previousPeriod, recapHref } from '../../lib/recap.js';
 import { statTile } from '../../ui/profile-summary.js';
 
@@ -110,6 +111,7 @@ function header() {
         </select>
       </label>
     </div>
+    <a class="pf-btn rc-story" id="rcStory" href="${storyHref(period, otherPlayer() ? username : null)}">▶ Ver como historia</a>
     <div class="gc-toggles" role="tablist">
       <button type="button" class="gc-toggle" role="tab" data-view="player" aria-pressed="${String(view === 'player')}">${otherPlayer() ? username : 'Tú'}</button>
       <button type="button" class="gc-toggle" role="tab" data-view="group" aria-pressed="${String(view === 'group')}">El grupo</button>
