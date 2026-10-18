@@ -134,7 +134,8 @@ const KINDS = {
     <h2 class="st-title">Eso fue ${s.label}</h2>
     <div class="st-line">¡Nos vemos en el siguiente!</div>
     <div class="st-actions">
-      <button type="button" class="st-btn primary" data-act="replay">Volver a ver</button>
+      <button type="button" class="st-btn primary" data-act="share">Compartir mi resumen</button>
+      <button type="button" class="st-btn" data-act="replay">Volver a ver</button>
       <button type="button" class="st-btn" data-act="close">Cerrar</button>
     </div>`,
 

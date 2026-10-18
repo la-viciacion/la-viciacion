@@ -3,10 +3,13 @@
 // draws them and ui/story-player.js moves them. An admin can add a player's username to the address.
 import { api } from '../../lib/api.js';
 import { html, mount } from '../../lib/html.js';
-import { lastMonth, recapHref } from '../../lib/recap.js';
+import { lastMonth, periodLabel, recapHref } from '../../lib/recap.js';
 import { buildSlides, parseStoryHash } from '../../lib/story.js';
+import { SHARE_FILENAME, canShare, shareCard } from '../../lib/story-share.js';
+import { shareImage } from '../../ui/story-image.js';
 import { createStoryPlayer } from '../../ui/story-player.js';
 import { animateCounts, renderSlide } from '../../ui/story-slides.js';
+import { toast } from '../../ui/toast.js';
 
 export const active = null; // it belongs to no item of the top bar
 
@@ -15,6 +18,17 @@ let period;
 let other = null; // the player asked for, when it is not the user
 
 const leave = () => { location.hash = recapHref(period, other); };
+
+async function share(slide) {
+  try {
+    const card = shareCard(slide, `${periodLabel(period)} · La Viciación`);
+    const result = await shareImage(card, { filename: SHARE_FILENAME(slide, period), title: `Mi resumen de ${periodLabel(period)}` });
+    if (result === 'saved') toast('Imagen guardada');
+  } catch (err) {
+    console.error(err);
+    toast('No se ha podido crear la imagen', 'err');
+  }
+}
 
 export async function render({ user, main }) {
   dispose();
@@ -37,17 +51,21 @@ export async function render({ user, main }) {
     return;
   }
 
+  const slides = buildSlides(data);
   player = createStoryPlayer({
     container: root,
-    slides: buildSlides(data),
+    slides,
     render: renderSlide,
     onClose: leave,
     onChange: () => animateCounts(root.querySelector('.st-slide')),
+    onShare: share,
+    shareable: canShare,
   });
   root.onclick = (event) => {
     const act = event.target.closest('[data-act]')?.dataset.act;
     if (act === 'close') leave();
     else if (act === 'replay') player.go(0);
+    else if (act === 'share') share(slides.find((slide) => slide.id === 'hours') || slides[0]); // the goodbye has no picture: its button shares the hours
   };
 }
 

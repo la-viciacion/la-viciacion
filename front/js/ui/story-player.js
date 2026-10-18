@@ -13,7 +13,7 @@ const HOLD_MS = 180; // a press longer than this is a pause, not a tap
 const SWIPE_PX = 50;
 const LEFT_ZONE = 0.33;
 
-export function createStoryPlayer({ container, slides, render, duration = 6000, onClose, onChange }) {
+export function createStoryPlayer({ container, slides, render, duration = 6000, onClose, onChange, onShare, shareable = () => true }) {
   let index = 0;
   let held = false; // paused by a press
   let hovered = false; // paused by the pointer being over the story
@@ -25,11 +25,13 @@ export function createStoryPlayer({ container, slides, render, duration = 6000, 
     <div class="st-stage" style="--st-duration:${duration}ms" tabindex="-1">
       <div class="st-bars" aria-hidden="true">${slides.map(() => html`<div class="st-bar"><i></i></div>`)}</div>
       <button type="button" class="st-close" aria-label="Cerrar">×</button>
+      ${onShare ? html`<button type="button" class="st-share" aria-label="Compartir esta diapositiva como imagen">↗</button>` : ''}
       <div class="st-slide" aria-live="polite"></div>
     </div>`);
   const stage = container.querySelector('.st-stage');
   const bars = [...container.querySelectorAll('.st-bar')];
   const slot = container.querySelector('.st-slide');
+  const shareButton = container.querySelector('.st-share');
 
   const paused = () => held || hovered || hidden;
   const last = () => index === slides.length - 1;
@@ -47,6 +49,7 @@ export function createStoryPlayer({ container, slides, render, duration = 6000, 
         fill.style.animation = '';
       }
     });
+    if (shareButton) shareButton.hidden = !shareable(slides[index]);
     mount(slot, render(slides[index], index));
     onChange?.(index, slides[index]);
   }
@@ -116,6 +119,7 @@ export function createStoryPlayer({ container, slides, render, duration = 6000, 
     setPaused();
   });
   container.querySelector('.st-close').addEventListener('click', () => onClose?.());
+  shareButton?.addEventListener('click', () => onShare(slides[index]));
 
   const onKey = (event) => {
     if (event.key === 'ArrowRight' || event.key === ' ') {

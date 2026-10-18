@@ -144,3 +144,22 @@ test('go() jumps to a slide and ignores one that does not exist', () => {
   assert.equal(slideId(container), 'three');
   player.destroy();
 });
+
+test('the share button hands over the slide on screen and hides on slides that cannot be shared', () => {
+  const shared = [];
+  const { player, container } = start({ onShare: (slide) => shared.push(slide.id), shareable: (slide) => slide.id !== 'three' });
+  const button = container.querySelector('.st-share');
+  assert.equal(button.hidden, false);
+  player.go(1);
+  button.click();
+  assert.deepEqual(shared, ['two']);
+  player.go(2);
+  assert.equal(button.hidden, true);
+  player.destroy();
+});
+
+test('without a way to share there is no button', () => {
+  const { player, container } = start();
+  assert.equal(container.querySelector('.st-share'), null);
+  player.destroy();
+});
