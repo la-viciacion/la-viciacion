@@ -70,12 +70,12 @@ def build_payload(message: str, url: str = "/", tag: str | None = None) -> dict:
     return {"title": _shorten(title, TITLE_MAX), "body": _shorten(body, BODY_MAX), "url": url, "tag": tag}
 
 
-RECAP_TAG = "recap"  # the group's and the private notice of a recap replace each other: one on screen
+RECAP_TAG = "recap"  # + the period: the group's and the private notice of a recap replace each other (one on screen), a month and a season do not
 
 
 def build_recap_payload(label: str, period: str) -> dict:
     """"Your recap is ready": a tap opens the story of the period (the app resolves #/story/<period> for whoever taps)."""
-    return {"title": _shorten(f"🎬 Ya está disponible tu resumen de {label}", TITLE_MAX), "body": "Pulsa para verlo en historias", "url": f"#/story/{period}", "tag": RECAP_TAG}
+    return {"title": _shorten(f"🎬 Ya está disponible tu resumen de {label}", TITLE_MAX), "body": "Pulsa para verlo en historias", "url": f"#/story/{period}", "tag": f"{RECAP_TAG}-{period}"}
 
 
 def build_announcement(title: str, body: str | None = None, url: str | None = None, image: str | None = None) -> dict:

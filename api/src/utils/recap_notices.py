@@ -109,6 +109,13 @@ def previous_month(today: datetime.date) -> recap.Period:
     return recap.month_period(today.year, today.month).previous()
 
 
+def periods_due(day: datetime.date) -> list[recap.Period]:
+    """What the monthly job reports on when it runs on `day`: the month that has just ended and, when that month was
+    December, the season that ended with it (run in January: December and last year)."""
+    month = previous_month(day)
+    return [month, recap.year_period(month.start.year)] if month.start.month == 12 else [month]
+
+
 async def announce_recap(
     db: Session,
     period: recap.Period,
