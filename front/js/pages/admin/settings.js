@@ -79,6 +79,19 @@ function view(values, jobs, pushDevices, mail, aiUses) {
         <div class="adm-sub">Si el servidor está apagado a esa hora, se envía al volver siempre que no hayan pasado más de 6 horas. ${lastRun(jobs.weekly_summary)}</div>
       </section>`,
 
+    monthly: html`
+      <section class="adm-set-card">
+        <h3>Resumen mensual</h3>
+        ${check('monthly.enabled', 'Enviar el resumen del mes', 'Al grupo, el resumen del mes que acaba de terminar y, a cada jugador activo con Telegram o la app, el suyo en privado. Necesita las notificaciones activadas. Apagado hasta que lo actives: pruébalo antes en Notificaciones → Resumen mensual.')}
+        <div class="adm-set-row">
+          <label>Día del mes
+            <select class="adm-input" name="monthly.day">${Array.from({ length: 28 }, (_, i) => html`<option value="${i + 1}">${i + 1}</option>`)}</select>
+          </label>
+          <label>Hora <input class="adm-input" type="time" name="monthly.time" required /></label>
+        </div>
+        <div class="adm-sub">Hasta el 28, para que todos los meses lo tengan. Si el servidor está apagado a esa hora, se envía al volver siempre que no hayan pasado más de 12 horas. ${lastRun(jobs.monthly_recap)}</div>
+      </section>`,
+
     telegram: html`
       <section class="adm-set-card">
         <h3>Telegram</h3>

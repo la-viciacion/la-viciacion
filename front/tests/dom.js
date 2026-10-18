@@ -3,9 +3,10 @@
 // never leak between files.
 import { JSDOM } from 'jsdom';
 
-/** A fresh document with `body` inside; `document` and `window` become globals, as the modules expect. */
-export function installDom(body = '') {
-  const dom = new JSDOM(`<!doctype html><html><body>${body}</body></html>`);
+/** A fresh document with `body` inside; `document` and `window` become globals, as the modules expect.
+ * `url` gives it an address (about:blank has none, and `history.replaceState` needs one). */
+export function installDom(body = '', url) {
+  const dom = new JSDOM(`<!doctype html><html><body>${body}</body></html>`, { url });
   globalThis.window = dom.window;
   globalThis.document = dom.window.document;
   return dom.window;

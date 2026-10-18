@@ -1,4 +1,5 @@
 """Notices written by an admin: by push to the app's devices or by Telegram."""
+import datetime
 from typing import Optional
 
 from fastapi import Depends, HTTPException
@@ -8,8 +9,9 @@ from sqlalchemy.orm import Session
 
 from ... import auth
 from ...auth import get_db
+from ...crud import recap
 from ...database import models
-from ...utils import my_utils, push, settings
+from ...utils import actions, messages, my_utils, push, recap_notices, settings
 from ...utils.logger import LogManager
 from .common import get_or_404, router
 
@@ -109,3 +111,55 @@ async def send_telegram_announcement(
         raise HTTPException(status_code=502, detail="Telegram no ha aceptado el mensaje")
     logger.info(f"Telegram announcement by {admin.username} to {body.audience}")
     return {"message": f"Enviado a {who}"}
+
+
+def _recap_period(text: str) -> recap.Period:
+    try:
+        period = recap.parse_period(text)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=messages.RECAP_PERIOD_INVALID)
+    if period.start > datetime.date.today():
+        raise HTTPException(status_code=400, detail=messages.RECAP_PERIOD_FUTURE)
+    return period
+
+
+@router.get("/recap/preview")
+def recap_preview(period: str, user_id: Optional[int] = None, db: Session = Depends(get_db)):
+    """The texts the recap of a month or a season would send, without sending anything: the group's and, with
+    `user_id`, that player's. The AI is not asked: the group's goes out rewritten only when it is on for this notice."""
+    parsed = _recap_period(period)
+    if user_id is not None:
+        get_or_404(db, models.User, user_id, "Usuario")
+    data = recap.build_recap(db, parsed, user_id)
+    return {
+        "period": parsed.key,
+        "label": recap_notices.period_label(parsed),
+        "group_message": recap_notices.group_message(data, parsed),
+        "player_message": recap_notices.player_message(data, parsed) if user_id is not None else None,
+        "nobody_played": data["group"]["seconds"] == 0,
+    }
+
+
+class RecapSendBody(BaseModel):
+    period: str
+    audience: str = Field("me", pattern="^(me|group|all)$")
+
+
+@router.post("/recap/send")
+async def recap_send(
+    body: RecapSendBody,
+    admin: models.User = Depends(auth.require_admin),
+    db: Session = Depends(get_db),
+):
+    """Send a recap now, as the monthly job would: to the admin alone ("me", their private one), to the group
+    (the group's one only) or to everybody ("all": the group's and each player's own)."""
+    parsed = _recap_period(body.period)
+    if admin.telegram_id is None and body.audience == "me" and not actions.push_has_devices(admin.id):
+        raise HTTPException(status_code=409, detail="No tienes Telegram ID ni dispositivos con avisos para recibir la prueba")
+    result = await recap_notices.announce_recap(
+        db, parsed, group=body.audience in ("group", "all"), players=body.audience in ("me", "all"), only=admin if body.audience == "me" else None
+    )
+    if result["empty"]:
+        raise HTTPException(status_code=409, detail="Nadie jugó en ese periodo: no hay nada que enviar")
+    logger.info(f"Recap {parsed.key} sent by {admin.username} to {body.audience}: {recap_notices.describe(result)}")
+    return {"message": recap_notices.describe(result), **result}

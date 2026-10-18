@@ -1,3 +1,4 @@
+import datetime
 from enum import Enum
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -6,9 +7,9 @@ from sqlalchemy.orm import Session
 
 from .. import auth
 from ..auth import get_db
-from ..crud import debt, rankings, users
+from ..crud import debt, rankings, recap, users
 from ..database import models
-from ..utils import seasons
+from ..utils import messages, seasons
 from ..utils.logger import LogManager
 
 log_manager = LogManager()
@@ -179,3 +180,30 @@ def get_user_statistics(
         content["data"] = plain(data)
         response.append(content)
     return response
+
+
+@router.get("/recap/{period}")
+def get_recap(
+    period: str,
+    username: str = None,
+    active_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """The recap of a month (`2026-09`) or a season (`2026`): the group's, and with `username` that player's too.
+
+    A period still running gives what there is so far (`complete` is false). Only the player themselves or an
+    admin can ask for a player's recap."""
+    try:
+        parsed = recap.parse_period(period)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=messages.RECAP_PERIOD_INVALID)
+    if parsed.start > datetime.date.today():
+        raise HTTPException(status_code=400, detail=messages.RECAP_PERIOD_FUTURE)
+    user_id = None
+    if username is not None:
+        auth.ensure_self_or_admin(active_user, username=username)
+        user = users.get_user_by_username(db, username)
+        if user is None:
+            raise HTTPException(status_code=404, detail="User not found")
+        user_id = user.id
+    return recap.build_recap(db, parsed, user_id)

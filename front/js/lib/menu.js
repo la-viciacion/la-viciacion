@@ -16,6 +16,7 @@ export function menuSections(user) {
       { id: 'recommendations', label: 'Recomendados', href: '#/recommendations', icon: 'iconDice' },
       { id: 'achievements', label: 'Logros', href: '#/achievements', icon: 'iconTrophy' },
       { id: 'players', label: 'Jugadores', href: '#/players', icon: 'iconPerson' },
+      { id: 'recap', label: 'Resumen', href: '#/recap', icon: 'iconStar' },
       { id: 'stats', label: 'Estadísticas', href: '#/stats', icon: 'iconChart', wip: true },
     ] },
     { label: 'Tú', items: [
@@ -34,6 +35,7 @@ const PAGES = [
   ['#/profile', 'profile'],
   ['#/admin', 'admin'],
   ['#/activity', 'activity'],
+  ['#/recap', 'recap'],
   ['#/stats', 'stats'],
   ['#/games', 'games'],
   ['#/wishlist', 'wishlist'],

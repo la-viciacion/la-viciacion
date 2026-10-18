@@ -20,6 +20,16 @@ class SlotTests(unittest.TestCase):
         # Sunday (6) 20:30 seen from Monday morning
         self.assertEqual(scheduler.weekly_slot(D(2026, 9, 28, 7, 0), 6, "20:30"), D(2026, 9, 27, 20, 30))
 
+    def test_monthly_slot_is_the_latest_occurrence(self):
+        # the 1st at 10:00, seen from the 18th and from the very morning of the 1st
+        self.assertEqual(scheduler.monthly_slot(D(2026, 10, 18, 12, 0), 1, "10:00"), D(2026, 10, 1, 10, 0))
+        self.assertEqual(scheduler.monthly_slot(D(2026, 10, 1, 9, 59), 1, "10:00"), D(2026, 9, 1, 10, 0))
+        self.assertEqual(scheduler.monthly_slot(D(2026, 10, 1, 10, 0), 1, "10:00"), D(2026, 10, 1, 10, 0))
+
+    def test_monthly_slot_crosses_the_year_and_short_months(self):
+        self.assertEqual(scheduler.monthly_slot(D(2027, 1, 1, 9, 0), 1, "10:00"), D(2026, 12, 1, 10, 0))
+        self.assertEqual(scheduler.monthly_slot(D(2027, 3, 5, 9, 0), 28, "10:00"), D(2027, 2, 28, 10, 0))
+
     def test_daily_and_hourly_slots(self):
         self.assertEqual(scheduler.daily_slot(D(2026, 9, 29, 4, 59), 5), D(2026, 9, 28, 5, 0))
         self.assertEqual(scheduler.daily_slot(D(2026, 9, 29, 5, 0), 5), D(2026, 9, 29, 5, 0))
