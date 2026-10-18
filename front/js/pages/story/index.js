@@ -7,6 +7,7 @@ import { lastMonth, periodLabel, recapHref } from '../../lib/recap.js';
 import { buildSlides, parseStoryHash } from '../../lib/story.js';
 import { SHARE_FILENAME, canShare, shareCard } from '../../lib/story-share.js';
 import { shareImage } from '../../ui/story-image.js';
+import { dismissRecapInvite } from '../../ui/recap-invite.js';
 import { createStoryPlayer } from '../../ui/story-player.js';
 import { animateCounts, renderSlide } from '../../ui/story-slides.js';
 import { toast } from '../../ui/toast.js';
@@ -35,6 +36,7 @@ export async function render({ user, main }) {
   const asked = parseStoryHash(location.hash);
   period = asked.period || lastMonth();
   other = user.is_admin && asked.username && asked.username !== user.username ? asked.username : null;
+  if (!other) dismissRecapInvite(period); // the story is open: the notice of the first days of the month has done its job
   mount(main, html`<div class="st-overlay" id="stRoot"><div class="st-stage"><div class="st-slide"><div class="st-hint">Preparando tu resumen…</div></div></div></div>`);
   const root = main.querySelector('#stRoot');
 

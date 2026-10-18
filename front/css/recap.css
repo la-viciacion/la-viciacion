@@ -33,3 +33,19 @@
 .rc-preview { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: 0.88rem; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; margin: 6px 0 0; }
 
 .rc-story { display: inline-block; margin: 4px 0 10px; text-decoration: none; }
+
+/* the notice of the first days of the month, at the top of whatever page is open */
+.recap-invite {
+  position: fixed; top: 64px; left: 50%; transform: translateX(-50%); z-index: 1900; /* just under the top bar: it must not hide the way around */
+  width: min(620px, calc(100vw - 24px)); display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;
+  background: var(--gradient-hero); border: 1px solid var(--border-accent); border-radius: var(--radius-md);
+  padding: 12px 14px; box-shadow: var(--shadow-card); animation: recapDrop 0.3s ease;
+}
+.recap-invite-text { display: flex; flex-direction: column; gap: 2px; font-size: 0.82rem; color: var(--text-secondary); flex: 1 1 240px; }
+.recap-invite-text strong { color: var(--text-primary); font-size: 0.95rem; }
+.recap-invite-actions { display: flex; align-items: center; gap: 8px; }
+.recap-invite-actions .pf-btn { text-decoration: none; }
+.recap-invite-close { background: none; border: 0; color: var(--text-secondary); font-size: 1.5rem; line-height: 1; cursor: pointer; padding: 4px 8px; }
+@keyframes recapDrop { from { opacity: 0; transform: translate(-50%, -12px); } to { opacity: 1; transform: translateX(-50%); } }
+.recap-card { margin-bottom: 12px; border-color: var(--border-accent); background: var(--gradient-card); }
+@media (prefers-reduced-motion: reduce) { .recap-invite { animation: none; } }
