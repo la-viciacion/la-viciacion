@@ -372,10 +372,12 @@ async def send_message(
     image=None,
     ai_use: str | None = None,
     new_game_recommended: dict | None = None,
+    push_payload: dict | None = None,
 ):
     """`ai_use` (an id of utils/ai_prompts.USES) lets the AI rewrite the notice when it is on for that use.
     `new_game_recommended` ({"game", "user"}) is suggested at the end of the notice: by the AI when
-    it rewrites the message, as a plain line when it does not (off, no key, or it failed)."""
+    it rewrites the message, as a plain line when it does not (off, no key, or it failed).
+    `push_payload` is what the app's devices get instead of the text of the message (a short notice that opens a page)."""
     if not silent and not settings.get("notifications.enabled"):
         logger.info("Notifications are disabled. Message not sent.")
         return
@@ -401,7 +403,11 @@ async def send_message(
                 f"\n\n🎮 ¿Te apetece probar *{escape_markdown(new_game_recommended['game'])}*? "
                 f"Lo tiene {escape_markdown(new_game_recommended['user'])}."
             )
-        await push.notify_group(msg)  # never raises: it must not affect Telegram
+        # neither raises: a push must not affect Telegram
+        if push_payload:
+            await push.deliver(push_payload, "group")
+        else:
+            await push.notify_group(msg)
         if not telegram_ready:
             logger.info("Telegram is not configured. Message sent by push only.")
             return
@@ -417,14 +423,18 @@ async def send_message(
         logger.info("Silent mode. Message not sent.")
 
 
-async def send_message_to_user(user_telegram_id, msg, user_id=None, telegram_on=True, push_on=True):
+async def send_message_to_user(user_telegram_id, msg, user_id=None, telegram_on=True, push_on=True, push_payload=None):
     """Private notice: Telegram (if the user has an id) and, given `user_id`, their pushed devices.
-    `telegram_on` / `push_on` carry the user's choice of channel for this kind of notice."""
+    `telegram_on` / `push_on` carry the user's choice of channel for this kind of notice; `push_payload` is what the
+    devices get instead of the text of the message (a short notice that opens a page)."""
     if not settings.get("notifications.enabled"):
         logger.info("Notifications are disabled. Message to user not sent.")
         return
     if user_id is not None and push_on:
-        await push.notify_user(user_id, msg, tag="private")
+        if push_payload:
+            await push.deliver(push_payload, "user", user_id)
+        else:
+            await push.notify_user(user_id, msg, tag="private")
     if not telegram_on:
         return
     if user_telegram_id is None or not settings.get("telegram.token"):

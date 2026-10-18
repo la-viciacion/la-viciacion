@@ -83,11 +83,16 @@ class NoticeTests(RecapData):
         result = await recap_notices.announce_recap(self.db, APRIL)
         self.assertEqual(result, {"empty": False, "group": True, "players": 1})
         self.group.assert_awaited_once()
-        self.assertEqual(self.group.await_args.kwargs, {"silent": False, "ai_use": "monthly_recap"})
+        self.assertEqual(self.group.await_args.kwargs["ai_use"], "monthly_recap")
+        # the app's devices get a short "it is ready" notice that opens the story, not the long text
+        payload = self.group.await_args.kwargs["push_payload"]
+        self.assertEqual((payload["url"], payload["tag"]), ("#/story/2026-04", "recap"))
+        self.assertEqual(payload["title"], "🎬 Ya está disponible tu resumen de abril de 2026")
+        self.assertEqual(self.private.await_args.kwargs["push_payload"], payload)
         # Ana can be reached and played; Biel played but has no Telegram nor devices; Cris did not play
         self.private.assert_awaited_once()
         self.assertEqual(self.private.await_args.args[0], 11)
-        self.assertEqual(self.private.await_args.kwargs, {"user_id": 1})
+        self.assertEqual(self.private.await_args.kwargs["user_id"], 1)
 
     async def test_only_one_user_and_no_group_for_a_test_to_an_admin(self):
         user = self.db.get(models.User, 1)
