@@ -4,7 +4,7 @@
 import { api } from '../lib/api.js';
 import { html, mount } from '../lib/html.js';
 import { periodLabel, recapHref } from '../lib/recap.js';
-import { hasSeen, markSeen, windowPeriod } from '../lib/recap-window.js';
+import { hasSeen, markSeen, windowPeriods } from '../lib/recap-window.js';
 import { storyHref } from '../lib/story.js';
 
 const banner = () => document.querySelector('.recap-invite');
@@ -15,14 +15,22 @@ export function dismissRecapInvite(period) {
   banner()?.remove();
 }
 
-/** Show the bar if today is in the first days of a month, this device has not shown it yet and the player played. */
-export async function inviteToRecap(user, now = new Date()) {
-  const period = windowPeriod(now);
-  if (!period || hasSeen(period) || banner() || location.hash.startsWith('#/story')) return;
-  const data = await api(`/statistics/recap/${period}?username=${encodeURIComponent(user.username)}`);
-  // the answer takes a moment: the player may have opened the story meanwhile
-  if (!data?.player?.seconds || hasSeen(period) || banner() || location.hash.startsWith('#/story')) return;
+const busy = () => banner() || location.hash.startsWith('#/story');
 
+/** Show the bar for the first period on offer that this device has not shown yet and the player played in (in January there
+ * are two, the season and December: the second one comes the next time the app opens). */
+export async function inviteToRecap(user, now = new Date()) {
+  if (busy()) return;
+  for (const period of windowPeriods(now)) {
+    if (hasSeen(period)) continue;
+    const data = await api(`/statistics/recap/${period}?username=${encodeURIComponent(user.username)}`);
+    // the answer takes a moment: the player may have opened the story meanwhile
+    if (busy()) return;
+    if (data?.player?.seconds && !hasSeen(period)) return showBar(period);
+  }
+}
+
+function showBar(period) {
   const bar = document.createElement('div');
   bar.className = 'recap-invite';
   bar.setAttribute('role', 'status');
@@ -38,14 +46,16 @@ export async function inviteToRecap(user, now = new Date()) {
   });
 }
 
-/** The card of the profile while the days last, or nothing. Always there in those days: it is not the notice. */
+/** The cards of the profile while the days last, one per period on offer, or nothing. Always there in those days: it is not the notice. */
 export function recapCard(now = new Date()) {
-  const period = windowPeriod(now);
-  if (!period) return '';
+  return html`${windowPeriods(now).map(card)}`;
+}
+
+function card(period) {
   return html`
-    <div class="pf-card recap-card" id="pfRecap">
+    <div class="pf-card recap-card" data-period="${period}">
       <div class="pf-row">
-        <div class="pf-row-main"><strong>🎬 Tu resumen de ${periodLabel(period)} ya está disponible</strong><div class="pf-sub">Tu mes en historias: juegos, días, géneros y más.</div></div>
+        <div class="pf-row-main"><strong>🎬 Tu resumen de ${periodLabel(period)} ya está disponible</strong><div class="pf-sub">Tu resumen en historias: juegos, días, géneros y más.</div></div>
         <div class="pf-game-actions">
           <a class="pf-btn primary" href="${storyHref(period)}">Ver historia</a>
           <a class="pf-btn" href="${recapHref(period)}">Ver datos</a>

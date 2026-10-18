@@ -5,8 +5,13 @@ import { lastMonth } from './recap.js';
 /** How many days at the start of a month the recap is offered (the 1st to the 5th). */
 export const WINDOW_DAYS = 5;
 
-/** The period on offer today ("2026-09" on 3 October), or null outside the first days of the month. */
-export const windowPeriod = (now = new Date()) => (now.getDate() <= WINDOW_DAYS ? lastMonth(now) : null);
+/** The periods on offer today, the most special first: the month that ended ("2026-09" on 3 October) and, in January,
+ * the season that ended with it ("2026", then "2026-12"). Nothing outside the first days of the month. */
+export function windowPeriods(now = new Date()) {
+  if (now.getDate() > WINDOW_DAYS) return [];
+  const month = lastMonth(now);
+  return month.endsWith('-12') ? [month.slice(0, 4), month] : [month];
+}
 
 const key = (period) => `lv-recap-seen-${period}`;
 

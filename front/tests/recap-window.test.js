@@ -3,19 +3,19 @@ import { test } from 'node:test';
 import { installStorage } from './dom.js';
 
 installStorage();
-const { WINDOW_DAYS, hasSeen, markSeen, windowPeriod } = await import('../js/lib/recap-window.js');
+const { WINDOW_DAYS, hasSeen, markSeen, windowPeriods } = await import('../js/lib/recap-window.js');
 
 test('the recap is offered from the 1st to the 5th, for the month that ended', () => {
   assert.equal(WINDOW_DAYS, 5);
-  assert.equal(windowPeriod(new Date(2026, 9, 1)), '2026-09');
-  assert.equal(windowPeriod(new Date(2026, 9, 5, 23, 59)), '2026-09');
-  assert.equal(windowPeriod(new Date(2026, 9, 6)), null);
-  assert.equal(windowPeriod(new Date(2026, 9, 18)), null);
-  assert.equal(windowPeriod(new Date(2026, 9, 31)), null);
+  assert.deepEqual(windowPeriods(new Date(2026, 9, 1)), ['2026-09']);
+  assert.deepEqual(windowPeriods(new Date(2026, 9, 5, 23, 59)), ['2026-09']);
+  assert.deepEqual(windowPeriods(new Date(2026, 9, 6)), []);
+  assert.deepEqual(windowPeriods(new Date(2026, 9, 18)), []);
+  assert.deepEqual(windowPeriods(new Date(2026, 9, 31)), []);
 });
 
-test('in January it is the December of the year before', () => {
-  assert.equal(windowPeriod(new Date(2027, 0, 2)), '2026-12');
+test('in January the season that ended comes first, then December', () => {
+  assert.deepEqual(windowPeriods(new Date(2027, 0, 2)), ['2026', '2026-12']);
 });
 
 test('a period is seen once it has been marked, and only that period', () => {
