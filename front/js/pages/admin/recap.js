@@ -4,6 +4,7 @@
 import { api, jsonRequest } from '../../lib/api.js';
 import { html, mount } from '../../lib/html.js';
 import { lastMonth, periodChoices, recapHref } from '../../lib/recap.js';
+import { storyHref } from '../../lib/story.js';
 import { toast } from '../../ui/toast.js';
 import { errorState, store } from './components.js';
 import { confirmDialog } from './dialogs.js';
@@ -34,7 +35,10 @@ function view() {
           </label>
         </div>
         <div class="adm-sub">El periodo en curso enseña lo que hay hasta hoy. Es el mismo cálculo para meses y temporadas.</div>
-        <div><a class="adm-btn" id="rcaOpen" href="#">Abrir la página del resumen</a></div>
+        <div class="adm-actions">
+          <a class="adm-btn" id="rcaOpen" href="#">Abrir la página del resumen</a>
+          <a class="adm-btn" id="rcaStory" href="#">Abrir la historia</a>
+        </div>
       </section>
 
       <section class="adm-set-card">
@@ -66,7 +70,9 @@ async function refresh() {
   const id = ++navigation;
   const open = panel.querySelector('#rcaOpen');
   const target = userById(userId);
-  open.setAttribute('href', recapHref(period, target && target.id !== store.me ? target.username : null));
+  const username = target && target.id !== store.me ? target.username : null;
+  open.setAttribute('href', recapHref(period, username));
+  panel.querySelector('#rcaStory').setAttribute('href', storyHref(period, username));
   const group = panel.querySelector('#rcaGroup');
   const player = panel.querySelector('#rcaPlayer');
   group.textContent = player.textContent = 'Cargando…';

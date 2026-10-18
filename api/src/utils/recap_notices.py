@@ -31,10 +31,10 @@ def _short_date(day: datetime.date) -> str:
 
 
 def _link(period: recap.Period) -> str:
-    """A line with the link to the page of the recap, or nothing when the public address is not set."""
+    """A line with the link to the story of the period (whoever opens it sees their own), or nothing when the public address is not set."""
     if not config.PUBLIC_URL:
         return ""
-    return f"\n\n[Ver el resumen completo]({config.PUBLIC_URL}/#/recap/{period.key})"
+    return f"\n\n[Ver tu resumen en historias]({config.PUBLIC_URL}/#/story/{period.key})"
 
 
 def _plural(n: int, one: str, many: str) -> str:
