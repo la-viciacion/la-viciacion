@@ -75,7 +75,7 @@ class NoticeTests(RecapData):
     def test_the_link_is_there_only_with_a_public_address(self):
         data = recap.build_recap(self.db, APRIL)
         with mock.patch.object(recap_notices.config, "PUBLIC_URL", "https://viciacion.example"):
-            self.assertIn("[Ver el resumen completo](https://viciacion.example/#/recap/2026-04)", recap_notices.group_message(data, APRIL))
+            self.assertIn("[Ver tu resumen en historias](https://viciacion.example/#/story/2026-04)", recap_notices.group_message(data, APRIL))
         with mock.patch.object(recap_notices.config, "PUBLIC_URL", ""):
             self.assertNotIn("](", recap_notices.group_message(data, APRIL))
 
