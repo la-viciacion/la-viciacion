@@ -3,7 +3,7 @@
 //
 //   phone:    tap the right third (or anywhere but the left third) for the next one, the left third for the one before,
 //             hold to pause, swipe sideways to change slide
-//   desktop:  click the same zones, ← → or space to move, Esc to leave, the pointer over the story pauses it
+//   desktop:  click the same zones or the arrows at the sides of the card, ← → or space to move, Esc to leave
 //
 // The bar of the slide on screen fills with a CSS animation (--st-duration); when it ends the next slide comes up. The last
 // slide does not move on by itself.
@@ -16,24 +16,27 @@ const LEFT_ZONE = 0.33;
 export function createStoryPlayer({ container, slides, render, duration = 6000, onClose, onChange, onShare, shareable = () => true }) {
   let index = 0;
   let held = false; // paused by a press
-  let hovered = false; // paused by the pointer being over the story
   let hidden = false; // paused by the tab being in the background
   let pressedAt = null;
   let holdTimer = null;
 
   mount(container, html`
+    <button type="button" class="st-nav prev" aria-label="Anterior">‹</button>
     <div class="st-stage" style="--st-duration:${duration}ms" tabindex="-1">
       <div class="st-bars" aria-hidden="true">${slides.map(() => html`<div class="st-bar"><i></i></div>`)}</div>
       <button type="button" class="st-close" aria-label="Cerrar">×</button>
       ${onShare ? html`<button type="button" class="st-share" aria-label="Compartir esta diapositiva como imagen">↗</button>` : ''}
       <div class="st-slide" aria-live="polite"></div>
-    </div>`);
+    </div>
+    <button type="button" class="st-nav next" aria-label="Siguiente">›</button>`);
   const stage = container.querySelector('.st-stage');
   const bars = [...container.querySelectorAll('.st-bar')];
   const slot = container.querySelector('.st-slide');
   const shareButton = container.querySelector('.st-share');
+  const prevButton = container.querySelector('.st-nav.prev');
+  const nextButton = container.querySelector('.st-nav.next');
 
-  const paused = () => held || hovered || hidden;
+  const paused = () => held || hidden;
   const last = () => index === slides.length - 1;
 
   function paint() {
@@ -49,6 +52,8 @@ export function createStoryPlayer({ container, slides, render, duration = 6000, 
         fill.style.animation = '';
       }
     });
+    prevButton.disabled = index === 0;
+    nextButton.disabled = last();
     if (shareButton) shareButton.hidden = !shareable(slides[index]);
     mount(slot, render(slides[index], index));
     onChange?.(index, slides[index]);
@@ -107,18 +112,9 @@ export function createStoryPlayer({ container, slides, render, duration = 6000, 
     setPaused();
   });
 
-  // only a mouse pauses by hovering: on a touch screen the pointer "enters" with every tap and would never leave
-  stage.addEventListener('pointerenter', (event) => {
-    if (event.pointerType !== 'mouse') return;
-    hovered = true;
-    setPaused();
-  });
-  stage.addEventListener('pointerleave', (event) => {
-    if (event.pointerType !== 'mouse') return;
-    hovered = false;
-    setPaused();
-  });
   container.querySelector('.st-close').addEventListener('click', () => onClose?.());
+  prevButton.addEventListener('click', previous);
+  nextButton.addEventListener('click', next);
   shareButton?.addEventListener('click', () => onShare(slides[index]));
 
   const onKey = (event) => {
