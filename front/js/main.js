@@ -17,6 +17,7 @@ import { renderShell, showLoadError, showLoading } from './ui/layout.js';
 import { closeMenu } from './ui/menu.js';
 import { openPlayingSheet } from './ui/playing.js';
 import { inviteToPush } from './ui/push-invite.js';
+import { inviteToRecap } from './ui/recap-invite.js';
 
 const ROUTES = [
   { prefix: '#/admin', load: () => import('./pages/admin/index.js') },
@@ -132,6 +133,7 @@ async function route() {
     openPlayingSheet(user.id);
   }
   inviteToPush().catch(() => {}); // optional: never blocks or breaks a page
+  inviteToRecap(user).catch(() => {}); // the same
 }
 
 setUnauthorizedHandler(() => {

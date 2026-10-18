@@ -11,6 +11,7 @@ import { html, mount } from '../../lib/html.js';
 import { PASSWORD_HINT } from '../../lib/password.js';
 import * as seasons from '../../lib/seasons.js';
 import { showChallengesHistory } from '../../ui/challenges-history.js';
+import { recapCard } from '../../ui/recap-invite.js';
 import { achievementsView, sectionTitle, seasonName, seasonPills, seasonSuffix, statsView, titleView, topView } from '../../ui/profile-summary.js';
 import { initAbout } from './about.js';
 import { initAccount } from './account.js';
@@ -192,6 +193,7 @@ function draw(d) {
           </div>
         </div>
       </div>
+      ${recapCard()}
       <div class="pf-season" id="pfSeasons" role="group" aria-label="Temporada">${seasonPills(d)}</div>
       <section class="pf-stats" id="pfStats" aria-label="Estadísticas: ${seasonName(d)}">${statsView(d)}</section>
       <div class="pf-cols">

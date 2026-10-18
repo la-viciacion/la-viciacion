@@ -159,3 +159,13 @@ test('the figures count up from zero and end on their value', () => {
   assert.equal(el.textContent, '61');
   delete globalThis.requestAnimationFrame;
 });
+
+test('opening your own story clears the notice of the first days of the month; looking at another player does not', async () => {
+  localStorage.removeItem('lv-recap-seen-2026-09');
+  await open('#/story/2026-09/biel', { ...ME, is_admin: true });
+  assert.equal(localStorage.getItem('lv-recap-seen-2026-09'), null);
+  story.dispose();
+  await open();
+  assert.equal(localStorage.getItem('lv-recap-seen-2026-09'), '1');
+  story.dispose();
+});
