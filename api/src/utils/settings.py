@@ -68,6 +68,10 @@ def _weekday(value: int) -> str | None:
     return None if 0 <= value <= 6 else "El día debe estar entre 0 (lunes) y 6 (domingo)"
 
 
+def _month_day(value: int) -> str | None:
+    return None if 1 <= value <= 28 else "El día debe estar entre 1 y 28"
+
+
 def _contact(value: str) -> str | None:
     return None if re.fullmatch(r"(mailto:[^@\s]+@[^@\s]+|https://\S+)", value) else "Debe ser mailto:correo@dominio o una URL https"
 
@@ -101,6 +105,10 @@ REGISTRY: dict[str, Spec] = {
     "weekly.enabled": Spec("bool", True),
     "weekly.weekday": Spec("int", 0, check=_weekday),  # 0 = Monday
     "weekly.time": Spec("str", "09:00", check=_time),
+    # Off until an admin has seen it in the panel (Notificaciones → Resumen mensual)
+    "monthly.enabled": Spec("bool", False),
+    "monthly.day": Spec("int", 1, check=_month_day),  # day of the month; up to 28 so every month has it
+    "monthly.time": Spec("str", "10:00", check=_time),
     # Web Push (utils/push.py). The keys are generated from the panel, never typed.
     "push.enabled": Spec("bool", True),
     "push.contact": Spec("str", None, check=_contact),

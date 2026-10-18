@@ -7,6 +7,7 @@ sessions when asked for, so nothing has to be reset when the season changes. Onl
 what nothing else can trigger remains here:
 
   weekly_summary    once a week at the configured day/time (admin panel)
+  monthly_recap     once a month at the configured day/time (admin panel): the recap of the month that ended
   timer_notices     every minute, refreshes the pinned push notification of the running
                     timers that are due (each user chooses the interval, 10 minutes or more).
                     Switched off by TIMER_NOTICE_REFRESH: only the first notification is sent
@@ -32,7 +33,7 @@ from sqlalchemy.orm import Session
 from ..crud import users
 from ..database import models
 from ..database.database import SessionLocal
-from . import actions, push, settings
+from . import actions, push, recap_notices, settings
 from .logger import LogManager
 
 log_manager = LogManager()
@@ -42,6 +43,7 @@ TICK_SECONDS = 30
 STARTUP_DELAY_SECONDS = 5
 
 WEEKLY_GRACE = datetime.timedelta(hours=6)
+MONTHLY_GRACE = datetime.timedelta(hours=12)
 HOURLY_GRACE = datetime.timedelta(minutes=10)
 DAILY_GRACE = datetime.timedelta(hours=3)
 DAILY_STREAKS_HOUR = 5
@@ -62,6 +64,15 @@ def weekly_slot(now: datetime.datetime, weekday: int, hhmm: str) -> datetime.dat
     slot = (now - datetime.timedelta(days=days_back)).replace(hour=hour, minute=minute, second=0, microsecond=0)
     if slot > now:
         slot -= datetime.timedelta(days=7)
+    return slot
+
+
+def monthly_slot(now: datetime.datetime, day: int, hhmm: str) -> datetime.datetime:
+    """Latest occurrence (<= now) of `day` of the month (1-28, so every month has it) at HH:MM."""
+    hour, minute = (int(part) for part in hhmm.split(":"))
+    slot = now.replace(day=day, hour=hour, minute=minute, second=0, microsecond=0)
+    if slot > now:
+        slot = (slot.replace(day=1) - datetime.timedelta(days=1)).replace(day=day)
     return slot
 
 
@@ -134,6 +145,12 @@ async def _weekly_summary(db: Session) -> str:
     return f"{sent} users"
 
 
+async def _monthly_recap(db: Session, slot: datetime.datetime) -> str:
+    """The recap of the month before the slot's one (slot on 1 October: September)."""
+    period = recap_notices.previous_month(slot.date())
+    return f"{period.key}: " + recap_notices.describe(await recap_notices.announce_recap(db, period))
+
+
 async def _timer_notices(db: Session, slot: datetime.datetime) -> str:
     return await actions.refresh_timer_notices(db, slot)
 
@@ -168,6 +185,11 @@ def tick(now: datetime.datetime | None = None) -> None:
             slot = weekly_slot(now, settings.get("weekly.weekday"), settings.get("weekly.time"))
             if is_due(now, slot, _last_run(db, "weekly_summary"), WEEKLY_GRACE) and _claim(db, "weekly_summary", slot, now):
                 _run(db, "weekly_summary", lambda: _weekly_summary(db))
+
+        if notifications and settings.get("monthly.enabled"):
+            slot = monthly_slot(now, settings.get("monthly.day"), settings.get("monthly.time"))
+            if is_due(now, slot, _last_run(db, "monthly_recap"), MONTHLY_GRACE) and _claim(db, "monthly_recap", slot, now):
+                _run(db, "monthly_recap", lambda: _monthly_recap(db, slot))
 
         if TIMER_NOTICE_REFRESH and notifications and push.is_ready():
             slot = minute_slot(now)

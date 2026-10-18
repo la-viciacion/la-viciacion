@@ -1,0 +1,33 @@
+/* Recap (#/recap): the "Wrapped" of a month or a season */
+.rc-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
+.rc-head .pg-title { margin-bottom: 8px; }
+.rc-select { display: flex; flex-direction: column; gap: 4px; font-size: 0.8rem; color: var(--text-secondary); min-width: 200px; }
+.rc-running { margin: 0 0 10px; }
+
+.rc-hero {
+  background: var(--gradient-hero);
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-md);
+  padding: 22px 20px;
+  margin: 8px 0 14px;
+  text-align: center;
+}
+.rc-hero-label { color: var(--text-secondary); font-size: 0.9rem; }
+.rc-hero-value { font-size: 2.6rem; font-weight: 800; background: var(--gradient-brand); -webkit-background-clip: text; background-clip: text; color: transparent; line-height: 1.15; }
+.rc-hero-sub { color: var(--text-secondary); font-size: 0.85rem; margin-top: 4px; }
+
+.rc-trend { font-weight: 700; }
+.rc-trend.up { color: var(--live-green); }
+.rc-trend.down { color: var(--accent-pink); }
+.rc-trend.same { color: var(--text-muted); }
+
+.rc-moments { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; margin: 12px 0 16px; }
+.rc-moment { gap: 6px; }
+.rc-moment-title { color: var(--text-secondary); font-size: 0.8rem; font-weight: 700; }
+.rc-name { font-size: 1.05rem; font-weight: 700; overflow-wrap: anywhere; }
+.rc-game { display: flex; align-items: center; gap: 12px; }
+.rc-cover { width: 56px; height: 56px; border-radius: var(--radius-sm); object-fit: cover; flex: none; }
+.rc-cover-placeholder { display: flex; align-items: center; justify-content: center; background: var(--bg-surface); font-size: 1.4rem; }
+
+/* admin panel: the texts of the notices as they would go out */
+.rc-preview { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: 0.88rem; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; margin: 6px 0 0; }

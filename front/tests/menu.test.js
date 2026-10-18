@@ -5,7 +5,7 @@ import { activeItem, menuSections } from '../js/lib/menu.js';
 const ids = (user) => menuSections(user).flatMap((s) => s.items.map((i) => i.id));
 
 test('a player sees every section but the administration', () => {
-  assert.deepEqual(ids({ is_admin: false }), ['home', 'activity', 'games', 'wishlist', 'challenges', 'calendar', 'recommendations', 'achievements', 'players', 'stats', 'profile', 'settings']);
+  assert.deepEqual(ids({ is_admin: false }), ['home', 'activity', 'games', 'wishlist', 'challenges', 'calendar', 'recommendations', 'achievements', 'players', 'recap', 'stats', 'profile', 'settings']);
   assert.deepEqual(menuSections({ is_admin: false }).map((s) => s.label), ['Principal', 'Explorar', 'Tú']);
 });
 
@@ -30,6 +30,8 @@ test('an address highlights its item, the most specific one first', () => {
   assert.equal(activeItem('#'), 'home');
   assert.equal(activeItem('#/activity'), 'activity');
   assert.equal(activeItem('#/stats'), 'stats');
+  assert.equal(activeItem('#/recap'), 'recap');
+  assert.equal(activeItem('#/recap/2026-09/ana'), 'recap');
   assert.equal(activeItem('#/profile'), 'profile');
   assert.equal(activeItem('#/profile/resumen'), 'profile');
   assert.equal(activeItem('#/recommendations'), 'recommendations');

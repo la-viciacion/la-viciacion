@@ -379,11 +379,12 @@ ENTITIES.audit = {
 // Not tables: custom pages, each one a module exporting render(panel, { entity, admin }).
 ENTITIES.home = { label: 'Inicio', description: 'Resumen de la aplicación y lo que necesita atención.', custom: 'home' };
 ENTITIES.announce = { label: 'Redactar aviso', description: 'Escribe un aviso y envíalo a los dispositivos de la app.', custom: 'announce' };
+ENTITIES.recap = { label: 'Resumen mensual', description: 'Mira el resumen de cualquier mes o temporada, con los textos que se enviarían, y mándalo ahora.', custom: 'recap' };
 ENTITIES.notifications = {
   label: 'Ajustes',
-  description: 'Interruptor general de notificaciones, resumen semanal, bot de Telegram y avisos en la app.',
+  description: 'Interruptor general de notificaciones, resúmenes semanal y mensual, bot de Telegram y avisos en la app.',
   custom: 'settings',
-  sections: ['notifications', 'weekly', 'telegram', 'push'],
+  sections: ['notifications', 'weekly', 'monthly', 'telegram', 'push'],
 };
 ENTITIES.system = {
   label: 'Sistema',
