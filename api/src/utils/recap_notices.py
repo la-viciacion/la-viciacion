@@ -53,9 +53,11 @@ def group_message(data: dict, period: recap.Period) -> str:
         f"El grupo ha jugado {utils.format_duration(group['seconds'])} ({_change(group['seconds'], group['previous_seconds'])}) "
         f"en {_plural(group['sessions'], 'sesión', 'sesiones')}."
     )
+    # like the bot's rankings, the group's notice leaves out the players who are no longer active (the page counts everybody)
+    active = [row for row in group["ranking"] if row["active"]]
     podium = [
         f"{MEDALS[i]} {utils.escape_markdown(row['name'])} — {utils.format_duration(row['seconds'])}"
-        for i, row in enumerate(group["ranking"][: len(MEDALS)])
+        for i, row in enumerate(active[: len(MEDALS)])
     ]
     if podium:
         lines.append("\n".join(podium))

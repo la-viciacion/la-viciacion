@@ -266,7 +266,9 @@ def build_recap(db: Session, period: Period, user_id: int | None = None, today: 
     played = _played(db, period)
     seconds = _sum_by(played, lambda s: s.user_id)
     previous = _seconds_by_user(db, period.previous())
-    names = {user.id: user.name for user in db.query(models.User).filter(models.not_god())}
+    people = list(db.query(models.User).filter(models.not_god()))
+    names = {user.id: user.name for user in people}
+    active = {user.id: bool(user.is_active) for user in people}
     started, completed = _library(db, period)
     earned = _achievements(db, period)
     mates = playmates(played)
@@ -281,7 +283,8 @@ def build_recap(db: Session, period: Period, user_id: int | None = None, today: 
     group = group_stats(played)
     group["top_games"] = [{**g, **games.get(g["game_id"], {})} for g in group["top_games"]]
     group["ranking"] = [
-        {"user_id": uid, "name": names.get(uid), "seconds": seconds[uid], "previous_seconds": previous.get(uid, 0)} for uid in ranking
+        {"user_id": uid, "name": names.get(uid), "active": active.get(uid, False), "seconds": seconds[uid], "previous_seconds": previous.get(uid, 0)}
+        for uid in ranking
     ]
     group.update(activity_stats(played), genres=genre_stats(played, genres_by_game))
     group["previous_seconds"] = sum(previous.values())

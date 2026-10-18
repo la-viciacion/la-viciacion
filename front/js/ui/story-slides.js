@@ -9,7 +9,7 @@ const WEEKDAY_LETTERS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
 
 const kicker = (text) => html`<div class="st-kicker">${text}</div>`;
 const cover = (game, size = '') => (game.image_url
-  ? html`<img class="st-cover ${size}" src="${game.image_url}" alt="" crossorigin="anonymous" />`
+  ? html`<img class="st-cover ${size}" src="${game.image_url}" alt="" />`
   : html`<div class="st-cover ${size} st-cover-empty" aria-hidden="true">🎮</div>`);
 
 /** A figure that counts up when the slide appears (see animateCounts); it already holds the final value. */
@@ -28,7 +28,7 @@ const KINDS = {
     <div class="st-emoji">🎮</div>
     ${kicker(s.label)}
     <h1 class="st-title">${s.name}, así fue tu ${s.span} en La Viciación</h1>
-    <div class="st-hint">Toca para seguir</div>`,
+    <div class="st-hint">${s.partial ? `Con lo jugado hasta hoy · ` : ''}Toca para seguir</div>`,
 
   hours: (s) => {
     const big = bigDuration(s.seconds);

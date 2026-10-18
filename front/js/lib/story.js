@@ -46,7 +46,7 @@ export function monthGrid(period, byDay) {
 export function bigDuration(seconds) {
   const hours = seconds / 3600;
   if (hours >= 1) return { value: Math.round(hours), unit: Math.round(hours) === 1 ? 'hora' : 'horas' };
-  const minutes = Math.round(seconds / 60);
+  const minutes = Math.max(1, Math.round(seconds / 60)); // a few seconds are still "1 minuto", never "0 minutos"
   return { value: minutes, unit: minutes === 1 ? 'minuto' : 'minutos' };
 }
 
@@ -58,10 +58,10 @@ export function longDate(day) {
 
 const percent = (share) => `${Math.round(share * 100)} %`;
 
-function playerSlides(period, p) {
+function playerSlides(period, p, partial) {
   const total = p.seconds;
   const slides = [
-    { id: 'intro', kind: 'intro', theme: 'teal', label: periodLabel(period), name: p.name, span: isMonth(period) ? 'mes' : 'temporada' },
+    { id: 'intro', kind: 'intro', theme: 'teal', label: periodLabel(period), name: p.name, span: isMonth(period) ? 'mes' : 'temporada', partial },
     {
       id: 'hours', kind: 'hours', theme: 'gold', seconds: total, previous: p.previous_seconds,
       previousLabel: periodLabel(previousPeriod(period)), change: change(total, p.previous_seconds, formatDuration), position: p.position,
@@ -107,7 +107,7 @@ export function buildSlides(data) {
   if (!data.player?.seconds) {
     return [{ id: 'empty', kind: 'empty', theme: 'night', label: periodLabel(period), group: data.group.seconds > 0 }, ...(data.group.seconds ? [groupSlide(period, data.group)] : [])];
   }
-  return [...playerSlides(period, data.player), ...(data.group.seconds ? [groupSlide(period, data.group)] : []), { id: 'outro', kind: 'outro', theme: 'teal', label: periodLabel(period), name: data.player.name }];
+  return [...playerSlides(period, data.player, data.complete === false), ...(data.group.seconds ? [groupSlide(period, data.group)] : []), { id: 'outro', kind: 'outro', theme: 'teal', label: periodLabel(period), name: data.player.name }];
 }
 
 /** The address of a story; an admin can look at another player's with `username`. */
