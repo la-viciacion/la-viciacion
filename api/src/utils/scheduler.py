@@ -146,9 +146,11 @@ async def _weekly_summary(db: Session) -> str:
 
 
 async def _monthly_recap(db: Session, slot: datetime.datetime) -> str:
-    """The recap of the month before the slot's one (slot on 1 October: September)."""
-    period = recap_notices.previous_month(slot.date())
-    return f"{period.key}: " + recap_notices.describe(await recap_notices.announce_recap(db, period))
+    """The recap of the month before the slot's one (slot on 1 October: September) and, in January, also the season's."""
+    done = []
+    for period in recap_notices.periods_due(slot.date()):
+        done.append(f"{period.key}: " + recap_notices.describe(await recap_notices.announce_recap(db, period)))
+    return "; ".join(done)
 
 
 async def _timer_notices(db: Session, slot: datetime.datetime) -> str:

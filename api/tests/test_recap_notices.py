@@ -8,7 +8,7 @@ from fastapi import HTTPException
 from src.crud import recap
 from src.database import models
 from src.routers.manage import notices
-from src.utils import ai_prompts, recap_notices
+from src.utils import ai_prompts, recap_notices, scheduler
 from tests.sqlite_db import make_session
 
 HOUR = 3600
@@ -27,6 +27,13 @@ class LabelTests(unittest.TestCase):
     def test_a_month_and_a_season(self):
         self.assertEqual(recap_notices.period_label(APRIL), "abril de 2026")
         self.assertEqual(recap_notices.period_label(recap.parse_period("2026")), "la temporada 2026")
+
+    def test_in_january_the_job_also_reports_on_the_season_that_ended(self):
+        january = [p.key for p in recap_notices.periods_due(datetime.date(2027, 1, 1))]
+        self.assertEqual(january, ["2026-12", "2026"])
+        self.assertEqual([p.key for p in recap_notices.periods_due(datetime.date(2027, 1, 15))], ["2026-12", "2026"])
+        self.assertEqual([p.key for p in recap_notices.periods_due(datetime.date(2026, 10, 1))], ["2026-09"])
+        self.assertEqual([p.key for p in recap_notices.periods_due(datetime.date(2026, 12, 1))], ["2026-11"])
 
     def test_the_job_reports_on_the_month_before_its_slot(self):
         self.assertEqual(recap_notices.previous_month(datetime.date(2026, 10, 1)).key, "2026-09")
@@ -97,7 +104,7 @@ class NoticeTests(RecapData):
         self.assertEqual(self.group.await_args.kwargs["ai_use"], "monthly_recap")
         # the app's devices get a short "it is ready" notice that opens the story, not the long text
         payload = self.group.await_args.kwargs["push_payload"]
-        self.assertEqual((payload["url"], payload["tag"]), ("#/story/2026-04", "recap"))
+        self.assertEqual((payload["url"], payload["tag"]), ("#/story/2026-04", "recap-2026-04"))
         self.assertEqual(payload["title"], "🎬 Ya está disponible tu resumen de abril de 2026")
         self.assertEqual(self.private.await_args.kwargs["push_payload"], payload)
         # Ana can be reached and played; Biel played but has no Telegram nor devices; Cris did not play
@@ -179,6 +186,31 @@ class EndpointTests(RecapData):
     def test_the_audience_is_one_of_three(self):
         with self.assertRaises(ValueError):
             notices.RecapSendBody(period="2026-04", audience="everyone")
+
+
+class MonthlyJobTests(RecapData):
+    """What the scheduler's job sends, with the notices themselves replaced."""
+
+    async def run_job(self, slot):
+        sent = []
+
+        async def fake(db, period, **kwargs):
+            sent.append(period.key)
+            return {"empty": False, "group": True, "players": 2}
+
+        with mock.patch.object(scheduler.recap_notices, "announce_recap", fake):
+            status = await scheduler._monthly_recap(self.db, slot)
+        return sent, status
+
+    async def test_an_ordinary_month_sends_the_month_before(self):
+        sent, status = await self.run_job(D(2026, 10, 1, 10))
+        self.assertEqual(sent, ["2026-09"])
+        self.assertEqual(status, "2026-09: group and 2 users")
+
+    async def test_on_the_first_of_january_it_sends_december_and_then_the_season(self):
+        sent, status = await self.run_job(D(2027, 1, 1, 10))
+        self.assertEqual(sent, ["2026-12", "2026"])
+        self.assertEqual(status, "2026-12: group and 2 users; 2026: group and 2 users")
 
 
 class PromptTests(unittest.TestCase):

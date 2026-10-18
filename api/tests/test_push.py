@@ -13,7 +13,7 @@ class PayloadTests(unittest.TestCase):
         payload = push.build_recap_payload("septiembre de 2026", "2026-09")
         self.assertEqual(payload, {
             "title": "🎬 Ya está disponible tu resumen de septiembre de 2026", "body": "Pulsa para verlo en historias",
-            "url": "#/story/2026-09", "tag": "recap",
+            "url": "#/story/2026-09", "tag": "recap-2026-09",
         })
         self.assertLessEqual(len(payload["title"]), push.TITLE_MAX)
 
