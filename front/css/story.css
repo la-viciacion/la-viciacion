@@ -19,6 +19,15 @@
 .st-stage[data-theme="pink"] { --st-bg: linear-gradient(165deg, #8f1f5c 0%, #3d1233 55%, #0a0a14 100%); --st-accent: #f472b6; }
 .st-stage[data-theme="night"] { --st-bg: linear-gradient(165deg, #1b2450 0%, #0d1130 55%, #05050c 100%); --st-accent: #8ab4ff; }
 
+.st-nav {
+  display: none; width: 48px; height: 48px; margin: 0 14px; border: 0; border-radius: 50%; flex: none;
+  background: rgba(255, 255, 255, 0.12); color: #fff; font-size: 1.8rem; line-height: 1; cursor: pointer; transition: background 0.15s, opacity 0.15s;
+}
+.st-nav:hover:not(:disabled) { background: rgba(255, 255, 255, 0.25); }
+.st-nav:disabled { opacity: 0.25; cursor: default; }
+/* the arrows are for a wide screen with a mouse: a phone has the whole screen and its fingers */
+@media (min-width: 560px) and (hover: hover) { .st-nav { display: block; } }
+
 .st-bars { position: absolute; top: 10px; left: 10px; right: 10px; z-index: 3; display: flex; gap: 4px; pointer-events: none; }
 .st-bar { flex: 1; height: 3px; border-radius: 2px; background: rgba(255, 255, 255, 0.28); overflow: hidden; }
 .st-bar i { display: block; height: 100%; width: 0; background: #fff; }

@@ -99,13 +99,25 @@ test('a button inside a slide is not a tap', () => {
   player.destroy();
 });
 
-test('the mouse over the story pauses it and a finger does not', () => {
+test('the arrows at the sides move too, and the ones that lead nowhere are disabled', () => {
+  const { player, container } = start();
+  const prev = container.querySelector('.st-nav.prev');
+  const next = container.querySelector('.st-nav.next');
+  assert.equal(prev.disabled, true);
+  assert.equal(next.disabled, false);
+  next.click();
+  next.click();
+  assert.equal(player.index, 2);
+  assert.equal(next.disabled, true);
+  assert.equal(prev.disabled, false);
+  prev.click();
+  assert.equal(player.index, 1);
+  player.destroy();
+});
+
+test('the pointer over the story does not pause it', () => {
   const { player, stage } = start();
-  stage.dispatchEvent(event('pointerenter', { pointerType: 'touch' }));
-  assert.equal(stage.classList.contains('paused'), false);
   stage.dispatchEvent(event('pointerenter', { pointerType: 'mouse' }));
-  assert.equal(stage.classList.contains('paused'), true);
-  stage.dispatchEvent(event('pointerleave', { pointerType: 'mouse' }));
   assert.equal(stage.classList.contains('paused'), false);
   player.destroy();
 });
