@@ -36,6 +36,7 @@ const PAGES = [
   ['#/admin', 'admin'],
   ['#/activity', 'activity'],
   ['#/recap', 'recap'],
+  ['#/story', 'recap'],
   ['#/stats', 'stats'],
   ['#/games', 'games'],
   ['#/wishlist', 'wishlist'],

@@ -23,6 +23,7 @@ const ROUTES = [
   { prefix: '#/profile', load: () => import('./pages/profile/index.js') },
   { prefix: '#/game/', load: () => import('./pages/game/index.js') },
   { prefix: '#/activity', load: () => import('./pages/activity/index.js') },
+  { prefix: '#/story', load: () => import('./pages/story/index.js') },
   { prefix: '#/recap', load: () => import('./pages/recap/index.js') },
   { prefix: '#/stats', load: () => import('./pages/stats/index.js') },
   { prefix: '#/games', load: () => import('./pages/games/index.js') },

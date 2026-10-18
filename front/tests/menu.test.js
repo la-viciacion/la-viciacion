@@ -32,6 +32,7 @@ test('an address highlights its item, the most specific one first', () => {
   assert.equal(activeItem('#/stats'), 'stats');
   assert.equal(activeItem('#/recap'), 'recap');
   assert.equal(activeItem('#/recap/2026-09/ana'), 'recap');
+  assert.equal(activeItem('#/story/2026-09'), 'recap');
   assert.equal(activeItem('#/profile'), 'profile');
   assert.equal(activeItem('#/profile/resumen'), 'profile');
   assert.equal(activeItem('#/recommendations'), 'recommendations');
