@@ -55,12 +55,22 @@ self.addEventListener('push', (event) => {
   );
 });
 
+// a relative address must resolve against the app, not against /sw.js ("#/story/2026-09" is a page of the app)
+const where = (url) => {
+  try { return new URL(url, self.registration.scope).href; } catch { return url; }
+};
+
 self.addEventListener('notificationclick', (event) => {
   const { title, data = {} } = event.notification;
   const url = data.url || '/';
   const opening = clients.matchAll({ type: 'window', includeUncontrolled: true }).then((open) => {
+    const target = where(url);
     const existing = open.find((client) => 'focus' in client);
-    return existing ? existing.focus() : clients.openWindow(url);
+    if (!existing) return clients.openWindow(target);
+    // an app that is already open goes to the page too, not just to the front
+    return existing.focus()
+      .then((client) => (url !== '/' && client && 'navigate' in client ? client.navigate(target) : client))
+      .catch(() => clients.openWindow(target));
   });
   if (data.pinned) {
     // the browser dismisses a notification when it (or its button) is tapped: a pinned one must outlive the tap,

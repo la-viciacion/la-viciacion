@@ -10,16 +10,18 @@ function load() {
   const handlers = {};
   const shown = [];
   const opened = [];
-  const on = { screen: [] }; // notifications the fake browser is showing
+  const on = { screen: [], windows: [] }; // notifications the fake browser is showing, and the windows of the app that are open
   const scope = {
     addEventListener: (type, fn) => (handlers[type] = fn),
     skipWaiting: () => {},
     registration: {
+      scope: 'https://viciacion.example/',
       showNotification: async (title, options) => shown.push({ title, ...options }),
       getNotifications: async ({ tag }) => on.screen.filter((n) => n.tag === tag),
     },
-    clients: { claim: async () => {}, matchAll: async () => [], openWindow: async (url) => opened.push(url) },
+    clients: { claim: async () => {}, matchAll: async () => on.windows, openWindow: async (url) => opened.push(url) },
     caches: { keys: async () => [], delete: async () => true },
+    URL, // a real service worker has it; the bare vm context does not
   };
   scope.self = scope;
   vm.runInNewContext(source, scope);
@@ -93,7 +95,7 @@ test('tapping a pinned notification opens the app and shows it again', async () 
   const shown = sw.shown.pop();
   const notification = { title: shown.title, data: shown.data, close() { this.closed = true; } };
   await sw.run('notificationclick', { action: '', notification });
-  assert.deepEqual(JSON.parse(JSON.stringify(sw.opened)), ['/']);
+  assert.deepEqual(JSON.parse(JSON.stringify(sw.opened)), ['https://viciacion.example/']);
   assert.notEqual(notification.closed, true);
   const [again] = sw.shown;
   assert.deepEqual(JSON.parse(JSON.stringify({ ...again, data: undefined })), JSON.parse(JSON.stringify({ ...shown, data: undefined })));
@@ -115,7 +117,7 @@ test('tapping an ordinary notification closes it and opens its url', async () =>
   const notification = { data: { url: '#/profile' }, close() { this.closed = true; } };
   await sw.run('notificationclick', { notification });
   assert.equal(notification.closed, true);
-  assert.deepEqual(JSON.parse(JSON.stringify(sw.opened)), ['#/profile']);
+  assert.deepEqual(JSON.parse(JSON.stringify(sw.opened)), ['https://viciacion.example/#/profile']);
 });
 
 test('tapping the button opens the app like tapping the notification', async () => {
@@ -123,5 +125,32 @@ test('tapping the button opens the app like tapping the notification', async () 
   const notification = { data: { url: '/' }, close() {} };
   await sw.run('notificationclick', { action: 'open', notification });
   assert.equal(sw.shown.length, 0);
-  assert.deepEqual(JSON.parse(JSON.stringify(sw.opened)), ['/']);
+  assert.deepEqual(JSON.parse(JSON.stringify(sw.opened)), ['https://viciacion.example/']);
+});
+
+test('tapping a notice while the app is open takes that window to the page', async () => {
+  const sw = load();
+  const calls = [];
+  const client = { focus: async () => client, navigate: async (url) => calls.push(['navigate', url]) };
+  sw.on.windows.push(client);
+  await sw.run('notificationclick', { notification: { data: { url: '#/story/2026-09' }, close() {} } });
+  assert.deepEqual(calls, [['navigate', 'https://viciacion.example/#/story/2026-09']]);
+  assert.deepEqual(sw.opened, [], 'no second window');
+});
+
+test('an open app is only brought to the front when the notice has no page', async () => {
+  const sw = load();
+  const calls = [];
+  const client = { focus: async () => { calls.push('focus'); return client; }, navigate: async () => calls.push('navigate') };
+  sw.on.windows.push(client);
+  await sw.run('notificationclick', { notification: { data: { url: '/' }, close() {} } });
+  assert.deepEqual(calls, ['focus']);
+});
+
+test('if the open window cannot be taken to the page, a new one opens there', async () => {
+  const sw = load();
+  const client = { focus: async () => client, navigate: async () => { throw new Error('not controlled'); } };
+  sw.on.windows.push(client);
+  await sw.run('notificationclick', { notification: { data: { url: '#/story/2026-09' }, close() {} } });
+  assert.deepEqual(sw.opened, ['https://viciacion.example/#/story/2026-09']);
 });

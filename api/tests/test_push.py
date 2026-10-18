@@ -9,6 +9,14 @@ from src.utils import push
 
 
 class PayloadTests(unittest.TestCase):
+    def test_the_recap_notice_says_it_is_ready_and_opens_the_story(self):
+        payload = push.build_recap_payload("septiembre de 2026", "2026-09")
+        self.assertEqual(payload, {
+            "title": "🎬 Ya está disponible tu resumen de septiembre de 2026", "body": "Pulsa para verlo en historias",
+            "url": "#/story/2026-09", "tag": "recap",
+        })
+        self.assertLessEqual(len(payload["title"]), push.TITLE_MAX)
+
     def test_markdown_is_removed(self):
         self.assertEqual(push.plain_text("*Ana* ha subido \\(↑2\\) `x`_y_"), "Ana ha subido (↑2) xy")
 

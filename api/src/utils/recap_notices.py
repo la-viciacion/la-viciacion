@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from ..config import Config
 from ..crud import recap, users
 from ..database import models
-from . import actions, my_utils as utils
+from . import actions, push, my_utils as utils
 from .logger import LogManager
 
 logger = LogManager().get_logger()
@@ -120,11 +120,12 @@ async def announce_recap(
     sends nothing. The general notifications switch is respected by the senders. Returns what went out:
     {"empty": nobody played, "group": the group's was sent, "players": how many private ones}."""
     data = recap.build_recap(db, period)
+    payload = push.build_recap_payload(period_label(period), period.key)
     result = {"empty": data["group"]["seconds"] == 0, "group": False, "players": 0}
     if result["empty"]:
         return result
     if group:
-        await utils.send_message(group_message(data, period), silent=False, ai_use="monthly_recap")
+        await utils.send_message(group_message(data, period), silent=False, ai_use="monthly_recap", push_payload=payload)
         result["group"] = True
     if players:
         for user in [only] if only is not None else users.get_users(db):
@@ -133,7 +134,7 @@ async def announce_recap(
             own = recap.build_recap(db, period, user.id)
             if own["player"]["seconds"] == 0:
                 continue
-            await utils.send_message_to_user(user.telegram_id, player_message(own, period), user_id=user.id)
+            await utils.send_message_to_user(user.telegram_id, player_message(own, period), user_id=user.id, push_payload=payload)
             result["players"] += 1
     return result
 
