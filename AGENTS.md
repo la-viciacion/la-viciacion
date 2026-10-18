@@ -25,6 +25,7 @@ Four services, one `docker-compose.yml`:
 - [docs/configuration.md](docs/configuration.md): `.env`, accounts and login, password recovery, API docs.
 - [docs/features.md](docs/features.md): how the app behaves (seasons, notifications and jobs, push, sessions, achievements, recommendations, AI notices). The product rules live here; read it before changing behaviour.
 - [docs/workflow.md](docs/workflow.md): git workflow (trunk-based, PRs, required CI checks).
+- [docs/gitlab.md](docs/gitlab.md): prepared (unused) GitLab CI/CD, Renovate and the settings to move there if the repo has to be private.
 - [docs/roadmap.md](docs/roadmap.md): pending decisions (branching, versioning, CI) and known debt.
 - [README.md](README.md): project presentation only (what it is, quick start, links). Documentation goes in `docs/`, not in the README.
 - [CONTRIBUTING.md](CONTRIBUTING.md): short human-facing contribution guide.
@@ -93,4 +94,4 @@ Full details in [docs/development.md](docs/development.md).
 - Tests never depend on the real clock: the suite runs on a pinned one (`api/tests/clock.py`, see [docs/development.md](docs/development.md)); do not read `now()`/`today()` at import time in a test module.
 - Add or update tests for any pure/business logic you touch (see existing examples in `api/tests/` and `front/tests/`).
 - Ask before anything destructive or hard to reverse (dropping data, touching applied migrations, running migrations against real data, force-pushing).
-- **Git workflow** ([docs/workflow.md](docs/workflow.md)): trunk-based. Never commit to `main`; work on a short-lived branch `<type>/<description>` and open a PR (squash-merged, title in Conventional Commits style: `feat:`, `fix:`, `refactor:`, `docs:`, `style:`, `test:`, `chore:`). The `CI` check must be green. Do not create tags or releases (versioning is still open, see [docs/roadmap.md](docs/roadmap.md)).
+- **Git workflow** ([docs/workflow.md](docs/workflow.md)): trunk-based. Never commit to `main`; work on a short-lived branch `<type>/<description>` and open a PR (rebase-merged, so every commit and the PR title follow Conventional Commits: `feat:`, `fix:`, `refactor:`, `docs:`, `style:`, `test:`, `chore:`; keep commits atomic). The `CI` check must be green. Do not create tags or releases (versioning is still open, see [docs/roadmap.md](docs/roadmap.md)).

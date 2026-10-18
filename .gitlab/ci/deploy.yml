@@ -1,0 +1,59 @@
+# Deploys on demand (Build > Pipelines > Run pipeline, on main, choosing DEPLOY_TARGET and DEPLOY_VERSION). It connects
+# over SSH and the server holds the whole procedure; each key can run one script and nothing else (`command=` in its
+# authorized_keys entry), exactly as with the GitHub workflow.
+#   dev   builds main from the checkout of the dev stack (deploy.sh).
+#   prod  builds a release tag on the server (`latest` = the newest vX.Y.Z tag, or e.g. 2.0.0). It refuses a tag
+#         whose release pipeline (every check) did not pass on the commit the tag points to.
+# The secrets are CI/CD variables marked Protected, so only pipelines on main and on protected tags can read them
+# (a merge request cannot reach them by editing this file). See docs/gitlab.md for the list.
+
+.deploy:
+  stage: deploy
+  image: alpine:3
+  interruptible: false
+  timeout: 20 minutes
+  resource_group: deploy   # never two deploys at once; a second one waits for the first
+  variables:
+    GIT_DEPTH: "0"
+  artifacts:
+    when: always
+    paths: [deploy-result.env]
+    expire_in: 1 week
+
+deploy-dev:
+  extends: .deploy
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "web" && $DEPLOY_TARGET == "dev" && $CI_COMMIT_BRANCH == "main"
+  script:
+    - apk add --no-cache openssh-client
+    - sh .gitlab/scripts/deploy.sh dev
+
+deploy-prod:
+  extends: .deploy
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "web" && $DEPLOY_TARGET == "prod" && $CI_COMMIT_BRANCH == "main"
+  script:
+    - apk add --no-cache openssh-client git curl jq
+    - sh .gitlab/scripts/deploy.sh prod
+
+# Tells the group how the deploy ended. It runs after whichever deploy job was chosen and holds only the Telegram
+# variables, never the SSH keys. A deploy whose script succeeded still counts as failed here if the public keepalive
+# does not answer within a minute: the script only knows that the containers were started.
+notify:
+  stage: deploy
+  needs:
+    - job: deploy-dev
+      optional: true
+      artifacts: true
+    - job: deploy-prod
+      optional: true
+      artifacts: true
+  image: alpine:3
+  interruptible: false
+  timeout: 5 minutes
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "web" && ($DEPLOY_TARGET == "dev" || $DEPLOY_TARGET == "prod") && $CI_COMMIT_BRANCH == "main"
+      when: always
+  script:
+    - apk add --no-cache curl
+    - sh .gitlab/scripts/notify.sh
