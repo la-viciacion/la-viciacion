@@ -17,7 +17,7 @@ const bar = () => document.querySelector('.recap-invite');
 
 function reset() {
   document.querySelectorAll('.recap-invite').forEach((el) => el.remove());
-  localStorage.removeItem('lv-recap-seen-2026-09');
+  for (const period of ['2026-09', '2026', '2026-12']) localStorage.removeItem(`lv-recap-seen-${period}`);
   window.location.hash = '#/';
 }
 
@@ -85,8 +85,37 @@ test('the profile card is there during the first days, whatever was seen, and li
   reset();
   localStorage.setItem('lv-recap-seen-2026-09', '1');
   mount(document.getElementById('main'), html`${recapCard(EARLY)}`);
-  const card = document.getElementById('pfRecap');
+  const card = document.querySelector('.recap-card');
+  assert.equal(document.querySelectorAll('.recap-card').length, 1);
   assert.match(card.textContent, /Tu resumen de septiembre de 2026 ya está disponible/);
   assert.deepEqual([...card.querySelectorAll('a')].map((a) => a.getAttribute('href')), ['#/story/2026-09', '#/recap/2026-09']);
   assert.equal(String(recapCard(LATE)), '');
+});
+
+test('in January the season is offered first and December the next time, and the profile has both', async () => {
+  reset();
+  const JANUARY = new Date(2027, 0, 3);
+  const calls = installApi({
+    'GET /statistics/recap/2026?username=ana': { player: { seconds: 3600 } },
+    'GET /statistics/recap/2026-12?username=ana': { player: { seconds: 3600 } },
+  });
+  await inviteToRecap(ANA, JANUARY);
+  assert.match(bar().textContent, /resumen de temporada 2026/);
+  assert.equal(bar().querySelector('a').getAttribute('href'), '#/story/2026');
+  assert.deepEqual(calls.map((c) => c.path), ['/statistics/recap/2026?username=ana']);
+  bar().querySelector('a').click();
+  await inviteToRecap(ANA, JANUARY);
+  assert.match(bar().textContent, /resumen de diciembre de 2026/);
+  mount(document.getElementById('main'), html`${recapCard(JANUARY)}`);
+  assert.deepEqual([...document.querySelectorAll('.recap-card')].map((c) => c.dataset.period), ['2026', '2026-12']);
+});
+
+test('in January, if the season is not worth a notice (nothing played) December still is', async () => {
+  reset();
+  installApi({
+    'GET /statistics/recap/2026?username=ana': { player: { seconds: 0 } },
+    'GET /statistics/recap/2026-12?username=ana': { player: { seconds: 3600 } },
+  });
+  await inviteToRecap(ANA, new Date(2027, 0, 3));
+  assert.match(bar().textContent, /diciembre de 2026/);
 });
