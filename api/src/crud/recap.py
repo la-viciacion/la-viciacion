@@ -13,9 +13,12 @@ from sqlalchemy.orm import Session
 
 from ..database import models
 from ..utils import streaks
+from . import games as games_crud
 from . import time_entries
 
 TOP_GAMES = 3
+TOP_PLAYER_GAMES = 5
+TOP_GENRES = 5
 PERIOD_FORMAT = re.compile(r"^(\d{4})(?:-(\d{2}))?$")
 
 
@@ -102,6 +105,39 @@ def player_stats(played: list[Played], period: Period) -> dict:
         "best_streak": streaks.streak_summary(days, period.last_day, period.start.year)[1],
         "longest_session": max((s.seconds for s in played), default=0),
     }
+
+
+def activity_stats(played: list[Played]) -> dict:
+    """When the time was played: seconds by weekday (Monday first), by hour of the day a session started in, and by day.
+
+    A session counts wholly in the weekday, hour and day it started in, as everywhere else in the recap."""
+    by_weekday = [0] * 7
+    by_hour = [0] * 24
+    by_day: dict[str, int] = {}
+    for session in played:
+        by_weekday[session.start.weekday()] += session.seconds
+        by_hour[session.start.hour] += session.seconds
+        day = session.start.date().isoformat()
+        by_day[day] = by_day.get(day, 0) + session.seconds
+    return {"by_weekday": by_weekday, "by_hour": by_hour, "by_day": dict(sorted(by_day.items()))}
+
+
+def genre_stats(played: list[Played], genres_by_game: dict[str, list[str]]) -> list[dict]:
+    """The genres with the most time, most first. A game of several genres counts its time in each of them
+    (as the affinity does); a game without genres counts in none."""
+    totals: dict[str, int] = {}
+    for session in played:
+        for genre in genres_by_game.get(session.game_id, []):
+            totals[genre] = totals.get(genre, 0) + session.seconds
+    top = sorted(totals.items(), key=lambda item: (-item[1], item[0]))[:TOP_GENRES]
+    return [{"genre": genre, "seconds": seconds} for genre, seconds in top]
+
+
+def top_games(played: list[Played], games: dict[str, dict], limit: int = TOP_PLAYER_GAMES) -> list[dict]:
+    """The games with the most time, most first, with their cover and name; the smallest id wins a tie."""
+    totals = _sum_by(played, lambda s: s.game_id)
+    ranked = sorted(totals.items(), key=lambda item: (-item[1], item[0]))[:limit]
+    return [{**games.get(game_id, {"id": game_id, "name": game_id, "image_url": None}), "seconds": seconds} for game_id, seconds in ranked]
 
 
 def playmates(played: list[Played]) -> dict[int, tuple[int, int]]:
@@ -237,16 +273,17 @@ def build_recap(db: Session, period: Period, user_id: int | None = None, today: 
 
     ranking = sorted(seconds, key=lambda uid: (-seconds[uid], uid))
     game_ids = {s.game_id for s in played}
-    games = {
-        game.id: {"id": game.id, "name": game.name, "image_url": game.image_url}
-        for game in db.query(models.Game).filter(models.Game.id.in_(game_ids))
-    } if game_ids else {}
+    games, genres_by_game = {}, {}
+    for game in db.query(models.Game).filter(models.Game.id.in_(game_ids)) if game_ids else []:
+        games[game.id] = {"id": game.id, "name": game.name, "image_url": game.image_url}
+        genres_by_game[game.id] = games_crud.genre_list(game.genres)
 
     group = group_stats(played)
     group["top_games"] = [{**g, **games.get(g["game_id"], {})} for g in group["top_games"]]
     group["ranking"] = [
         {"user_id": uid, "name": names.get(uid), "seconds": seconds[uid], "previous_seconds": previous.get(uid, 0)} for uid in ranking
     ]
+    group.update(activity_stats(played), genres=genre_stats(played, genres_by_game))
     group["previous_seconds"] = sum(previous.values())
     group["achievements"] = sum(1 for a in earned if not a["secret"])
     group["rarest_achievement"] = rarest([a for a in earned if not a["secret"]])
@@ -259,6 +296,9 @@ def build_recap(db: Session, period: Period, user_id: int | None = None, today: 
         mate = mates.get(user_id)
         own_achievements = [a for a in earned if a["user_id"] == user_id]
         player.update(
+            activity_stats(mine),
+            genres=genre_stats(mine, genres_by_game),
+            top_games=top_games(mine, games),
             user_id=user_id,
             name=names.get(user_id),
             previous_seconds=previous.get(user_id, 0),

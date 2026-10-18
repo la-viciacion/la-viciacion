@@ -94,6 +94,41 @@ class PlaymatesTests(unittest.TestCase):
         self.assertEqual(recap.playmates(sessions)[1], (2, HOUR))
 
 
+class ActivityStatsTests(unittest.TestCase):
+    def test_nothing_played_is_all_zeros(self):
+        got = recap.activity_stats([])
+        self.assertEqual((got["by_weekday"], got["by_hour"], got["by_day"]), ([0] * 7, [0] * 24, {}))
+
+    def test_the_time_goes_to_the_weekday_hour_and_day_the_session_started_in(self):
+        # 2026-09-14 is a Monday; the second session ends after midnight but counts in the Monday
+        sessions = [played(1, "a", D(2026, 9, 14, 23), 2), played(1, "b", D(2026, 9, 14, 8), 1), played(1, "a", D(2026, 9, 20, 8), 3)]
+        got = recap.activity_stats(sessions)
+        self.assertEqual(got["by_weekday"], [3 * HOUR, 0, 0, 0, 0, 0, 3 * HOUR])
+        self.assertEqual((got["by_hour"][23], got["by_hour"][8]), (2 * HOUR, 4 * HOUR))
+        self.assertEqual(got["by_day"], {"2026-09-14": 3 * HOUR, "2026-09-20": 3 * HOUR})
+
+
+class GenreAndTopGameTests(unittest.TestCase):
+    sessions = [played(1, "a", D(2026, 9, 1, 10), 2), played(1, "b", D(2026, 9, 2, 10), 1), played(1, "c", D(2026, 9, 3, 10), 5)]
+
+    def test_a_game_of_several_genres_counts_in_each_and_one_without_genres_in_none(self):
+        genres = {"a": ["RPG", "Action"], "b": ["Action"]}
+        self.assertEqual(
+            recap.genre_stats(self.sessions, genres),
+            [{"genre": "Action", "seconds": 3 * HOUR}, {"genre": "RPG", "seconds": 2 * HOUR}],
+        )
+
+    def test_the_genres_are_the_top_five_and_a_tie_goes_by_name(self):
+        genres = {"a": ["B", "A", "C", "D", "E", "F"]}
+        got = recap.genre_stats([played(1, "a", D(2026, 9, 1, 10))], genres)
+        self.assertEqual([g["genre"] for g in got], ["A", "B", "C", "D", "E"])
+
+    def test_the_top_games_have_their_cover_and_the_smallest_id_wins_a_tie(self):
+        info = {"c": {"id": "c", "name": "Cee", "image_url": "x.png"}}
+        got = recap.top_games(self.sessions, info, limit=2)
+        self.assertEqual(got, [{"id": "c", "name": "Cee", "image_url": "x.png", "seconds": 5 * HOUR}, {"id": "a", "name": "a", "image_url": None, "seconds": 2 * HOUR}])
+
+
 class RarestTests(unittest.TestCase):
     def test_the_fewest_holders_wins_then_the_first_earned(self):
         early = {"id": 1, "title": "A", "holders": 3, "date": datetime.date(2026, 9, 1)}
@@ -112,8 +147,8 @@ class BuildRecapTests(unittest.TestCase):
             models.User(id=1, name="Ana", username="ana", is_active=1),
             models.User(id=2, name="Biel", username="biel", is_active=1),
             models.User(id=3, name="Admin", username=models.GOD_USERNAME, is_active=1),
-            models.Game(id="doom", name="Doom"),
-            models.Game(id="hades", name="Hades"),
+            models.Game(id="doom", name="Doom", genres="Action, Shooter"),
+            models.Game(id="hades", name="Hades", genres="Action"),
             models.PlatformTag(id="pc", name="PC"),
             models.Achievement(id=1, key="common", title="Común", message="", active=True, secret=False, special=0),
             models.Achievement(id=2, key="hidden", title="Oculto", message="", active=True, secret=True, special=0),
@@ -155,6 +190,18 @@ class BuildRecapTests(unittest.TestCase):
     def test_the_player_part_is_only_there_when_asked(self):
         self.assertIsNone(self.build()["player"])
         self.assertEqual(self.build(1)["player"]["name"], "Ana")
+
+    def test_when_it_was_played_and_what_kind_of_games(self):
+        # 2026-09-10 is a Thursday and the 11th a Friday
+        group = self.build()["group"]
+        self.assertEqual(group["by_weekday"], [0, 0, 0, 4 * HOUR, HOUR, 0, 0])
+        self.assertEqual((group["by_hour"][20], group["by_hour"][21]), (4 * HOUR, HOUR))
+        self.assertEqual(group["by_day"], {"2026-09-10": 4 * HOUR, "2026-09-11": HOUR})
+        self.assertEqual(group["genres"], [{"genre": "Action", "seconds": 5 * HOUR}, {"genre": "Shooter", "seconds": 4 * HOUR}])
+        player = self.build(1)["player"]
+        self.assertEqual(player["by_weekday"], [0, 0, 0, 3 * HOUR, HOUR, 0, 0])
+        self.assertEqual(player["genres"], [{"genre": "Action", "seconds": 4 * HOUR}, {"genre": "Shooter", "seconds": 3 * HOUR}])
+        self.assertEqual([(g["name"], g["seconds"]) for g in player["top_games"]], [("Doom", 3 * HOUR), ("Hades", HOUR)])
 
     def test_a_player_recap(self):
         player = self.build(1)["player"]
