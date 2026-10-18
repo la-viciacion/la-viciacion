@@ -95,6 +95,17 @@ test('the favourite day, the part of the day and the genres are told', async () 
   story.dispose();
 });
 
+test('every slide but the goodbye can be shared as a picture', async () => {
+  await open();
+  const button = main().querySelector('.st-share');
+  assert.equal(button.hidden, false);
+  const total = buildSlides(DATA).length;
+  for (let i = 0; i < total - 1; i += 1) key('ArrowRight');
+  assert.equal(button.hidden, true);
+  assert.notEqual(main().querySelector('[data-act="share"]'), null);
+  story.dispose();
+});
+
 test('the last slide can start over or close, back to the recap page', async () => {
   await open();
   const total = buildSlides(DATA).length;
