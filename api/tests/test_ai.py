@@ -268,9 +268,12 @@ class PerUseTests(unittest.TestCase):
     def test_the_prompt_is_the_stored_one_plus_the_recommendation_fragment(self):
         with self.stored(**{"ai.prompt.completed_game": "MI PROMPT", "ai.prompt.completed_game_recommendation": "MI RECOMENDACION"}):
             self.assertEqual(ai.prompt_for("completed_game"), "MI PROMPT")
-            text = ai.prompt_for("completed_game", {"game": "Hades", "user": "Bob"})
+            text = ai.prompt_for("completed_game", {"game": "Hades", "reasons": ["Comparte género: RPG", "Lo tienen 2 jugadores del grupo"]})
+            plain = ai.prompt_for("completed_game", {"game": "Hades", "reasons": []})
         self.assertEqual(text.splitlines()[:2], ["MI PROMPT", "MI RECOMENDACION"])
-        self.assertTrue(text.endswith("Juego recomendado: Hades\nJugado por: Bob"))
+        self.assertTrue(text.endswith("Juego recomendado: Hades\nMotivos:\n- Comparte género: RPG\n- Lo tienen 2 jugadores del grupo"))
+        self.assertTrue(plain.endswith("Juego recomendado: Hades"))  # no reasons, no heading
+        self.assertNotIn("Jugado por", text)  # who has the game is never told
 
 
 class NoticeSwitchTests(unittest.IsolatedAsyncioTestCase):
@@ -286,7 +289,7 @@ class NoticeSwitchTests(unittest.IsolatedAsyncioTestCase):
         with mock.patch.object(my_utils.telegram, "Bot", FakeBot), \
                 mock.patch.object(my_utils.settings, "get", side_effect=lambda k: {**base, **overrides}.get(k, settings.REGISTRY[k].default)), \
                 mock.patch.object(my_utils.ai, "complete", complete):
-            await my_utils.send_message("Ana completó Doom", False, ai_use="completed_game", new_game_recommended={"game": "Hades", "user": "Bob"})
+            await my_utils.send_message("Ana completó Doom", False, ai_use="completed_game", new_game_recommended={"game": "Hades", "reasons": []})
         return complete, FakeBot.sent[0]["text"]
 
     async def test_with_the_use_on_the_ai_writes_it(self):
@@ -298,7 +301,8 @@ class NoticeSwitchTests(unittest.IsolatedAsyncioTestCase):
         complete, text = await self.send(**{"ai.use.completed_game": False})
         complete.assert_not_called()
         self.assertTrue(text.startswith("Ana completó Doom"))
-        self.assertIn("Lo tiene Bob", text)
+        self.assertIn("¿Te apetece probar *Hades*?", text)
+        self.assertNotIn("Lo tiene", text)
 
     async def test_the_admin_prompt_is_what_reaches_the_ai(self):
         complete, _ = await self.send(**{"ai.prompt.completed_game": "SOLO UN EMOJI"})

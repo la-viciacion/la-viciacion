@@ -139,18 +139,18 @@ class GroupMessageTests(MessagingTestCase):
 
     def test_a_recommended_game_is_added_as_a_line_when_the_ai_does_not_rewrite(self):
         self.configure_telegram()
-        self.run_async(self.say("Ana completed it", new_game_recommended={"game": "Half_Life", "user": "Bea"}))
+        self.run_async(self.say("Ana completed it", new_game_recommended={"game": "Half_Life", "reasons": []}))
         text = FakeBot.sent[0]["text"]
         self.assertTrue(text.startswith("Ana completed it"))
-        self.assertIn("¿Te apetece probar *Half\\_Life*? Lo tiene Bea.", text)  # underscores escaped for Markdown
+        self.assertIn("¿Te apetece probar *Half\\_Life*?", text)  # underscores escaped for Markdown
 
     def test_the_ai_rewrites_the_notice_when_it_is_on_for_that_use_and_the_recommendation_goes_with_it(self):
         self.configure_telegram()
         with mock.patch.object(ai, "is_ready", return_value=True), mock.patch.object(ai, "prompt_for", return_value="prompt") as prompt, \
              mock.patch.object(ai, "complete", return_value="¡Rewritten!") as complete:
-            self.run_async(self.say("original", ai_use="completed_game", new_game_recommended={"game": "Hades", "user": "Bea"}))
+            self.run_async(self.say("original", ai_use="completed_game", new_game_recommended={"game": "Hades", "reasons": []}))
         self.assertEqual(FakeBot.sent[0]["text"], "¡Rewritten!")
-        prompt.assert_called_once_with("completed_game", {"game": "Hades", "user": "Bea"})
+        prompt.assert_called_once_with("completed_game", {"game": "Hades", "reasons": []})
         self.assertEqual(complete.call_args.args, ("prompt", "original"))
 
     def test_a_failing_ai_falls_back_to_the_original_text(self):

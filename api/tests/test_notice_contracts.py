@@ -109,10 +109,12 @@ class PromptsAskForWhatTheNoticesCarryTests(unittest.TestCase):
         for wanted in ("nombre de cada juego", "todas las personas", "mañana", "todos"):
             self.assertIn(wanted, text)
 
-    def test_the_recommendation_asks_for_the_game_and_the_person(self):
+    def test_the_recommendation_asks_for_the_game_alone_never_for_who_has_it(self):
         text = self.prompt("completed_game_recommendation")
         self.assertIn("nombre del juego", text)
-        self.assertIn("persona", text)
+        self.assertIn("no menciones a ningún jugador", text)
+        self.assertNotIn("Jugado por", text)
+        self.assertNotIn("la persona indicada", text)
 
 
 if __name__ == "__main__":

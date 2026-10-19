@@ -235,6 +235,56 @@ class FakeBot:
         FakeBot.sent.append(kwargs)
 
 
+class CompletionSuggestionTests(unittest.TestCase):
+    def setUp(self):
+        self.db = make_session()
+        self.db.add_all([
+            models.User(id=1, name="Ana", username="ana", is_active=1),
+            models.User(id=2, name="Bob", username="bob", is_active=1),
+            models.User(id=3, name="Cris", username="cris", is_active=1),
+            models.Game(id="doom", name="Doom", genres="Shooter, Action"),
+            models.Game(id="hades", name="Hades", genres="Action, Roguelike"),
+            models.Game(id="zelda", name="Zelda", genres="Adventure"),
+        ])
+        self.db.commit()
+
+    def test_it_picks_among_the_games_that_share_a_genre_with_the_completed_one(self):
+        add_library(self.db, [(2, "doom", 0), (2, "zelda", 0), (3, "zelda", 0)])  # zelda is the most shared, but not Action
+        for seed in range(20):
+            suggestion = games.completion_suggestion(self.db, 1, "Action", rng=random.Random(seed))
+            self.assertEqual(suggestion["game"], "Doom", seed)
+
+    def test_it_weighs_like_the_recommendations_page(self):
+        add_library(self.db, [(2, "doom", 1), (3, "doom", 1), (2, "hades", 0)])  # doom: 2 players and 2 completions
+        picked = [games.completion_suggestion(self.db, 1, "Action", rng=random.Random(seed))["game"] for seed in range(200)]
+        self.assertGreater(picked.count("Doom"), picked.count("Hades") * 2)
+        self.assertIn("Hades", picked)  # a weight, not a ranking: the others still come up
+
+    def test_a_completed_game_without_genres_may_suggest_any_and_nothing_to_suggest_is_none(self):
+        self.assertIsNone(games.completion_suggestion(self.db, 1, None))
+        add_library(self.db, [(2, "zelda", 0)])
+        self.assertEqual(games.completion_suggestion(self.db, 1, None)["game"], "Zelda")
+        self.assertIsNone(games.completion_suggestion(self.db, 1, "Action"))  # nobody has an Action game it lacks
+
+    def test_the_reasons_are_counts_and_never_name_who_has_the_game(self):
+        add_library(self.db, [(2, "doom", 1), (3, "doom", 0)])
+        suggestion = games.completion_suggestion(self.db, 1, "Action, Puzzle")
+        text = " ".join(suggestion["reasons"])
+        self.assertIn("Comparte género con el juego completado: Action", text)
+        self.assertIn("Lo tienen 2 jugadores del grupo", text)
+        self.assertIn("Lo ha completado 1 jugador", text)
+        for name in ("Bob", "Cris"):
+            self.assertNotIn(name, text)
+
+    def test_ratings_and_taste_are_reasons_only_when_they_are_backed(self):
+        item = {"players": ["Bob"], "completed_by": 0, "genres": ["Action"], "score_count": 2, "score_mean": 90.0}
+        self.assertEqual(games.suggestion_reasons(item, set(), {}), ["Lo tiene 1 jugador del grupo"])  # two votes are not enough
+        item.update(score_count=games.SCORE_DOUBT)
+        self.assertIn("Valoración media del grupo: 90 sobre 100", games.suggestion_reasons(item, set(), {}))
+        self.assertIn("Encaja con los géneros a los que más juega quien lo ha completado", games.suggestion_reasons(item, set(), {"action": 0.5}))
+        self.assertNotIn("Encaja con los géneros a los que más juega quien lo ha completado", games.suggestion_reasons(item, set(), {"action": 0.1}))
+
+
 class CompletionNoticeTests(unittest.IsolatedAsyncioTestCase):
     values = {
         "notifications.enabled": True,
@@ -253,17 +303,18 @@ class CompletionNoticeTests(unittest.IsolatedAsyncioTestCase):
         return chat, FakeBot.sent[0]["text"]
 
     async def test_without_ai_the_recommendation_is_a_plain_line(self):
-        _, text = await self.send({"game": "Half_Life", "user": "Bob"}, completion=None)
+        _, text = await self.send({"game": "Half_Life", "reasons": ["Lo tienen 3 jugadores del grupo"]}, completion=None)
         self.assertTrue(text.startswith("Ana completó Doom"))
         self.assertIn("Half\\_Life", text)  # escaped: a name must not break the Markdown
-        self.assertIn("Lo tiene Bob", text)
+        self.assertTrue(text.endswith("¿Te apetece probar *Half\\_Life*?"))  # the game and nothing about who has it
 
     async def test_the_ai_is_told_about_the_recommendation_and_the_line_is_not_added(self):
-        chat, text = await self.send({"game": "Hades", "user": "Bob"}, completion="Qué crack, Ana. Prueba Hades")
+        chat, text = await self.send({"game": "Hades", "reasons": ["Comparte género con el juego completado: Action"]}, completion="Qué crack, Ana. Prueba Hades")
         self.assertEqual(text, "Qué crack, Ana. Prueba Hades")
         prompt = chat.call_args.args[0]
         self.assertIn("Juego recomendado: Hades", prompt)
-        self.assertIn("Jugado por: Bob", prompt)
+        self.assertIn("- Comparte género con el juego completado: Action", prompt)
+        self.assertNotIn("Jugado por", prompt)
 
     async def test_nothing_to_recommend_leaves_the_notice_alone(self):
         for recommended in (None, {}):
