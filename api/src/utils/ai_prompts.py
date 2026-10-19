@@ -73,8 +73,10 @@ WISHLIST_RELEASE_PROMPT = """
 Reescribe el mensaje proporcionado, un aviso para un grupo de amigos que juegan a videojuegos: mañana sale a la
 venta un juego (o varios) que alguien tiene en su lista de deseados.
 
-Empieza por lo importante: di el nombre de cada juego, tal como aparece en el mensaje original, que sale mañana y el
-nombre de todas las personas que lo esperan. Si hay varios juegos, menciónalos todos, sin dejarte ninguno.
+Empieza por lo importante: di el nombre de cada juego, tal como aparece en el mensaje original, y que sale mañana.
+Si hay varios juegos, menciónalos todos, sin dejarte ninguno.
+Menciona también a todas las personas que lo esperan, pero de pasada y con naturalidad, dentro de la frase (por
+ejemplo, "Ana y Bea ya lo tienen apuntado"): sin repetir "para Fulano" ni hacer una lista aparte.
 Después, como mucho, una frase corta con un toque de humor (si conoces alguna broma de alguno de los juegos, puedes
 usarla).
 
