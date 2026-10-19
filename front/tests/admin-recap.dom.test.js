@@ -7,7 +7,8 @@ const window = installDom('<div id="panel"></div>', 'http://localhost/');
 globalThis.location = window.location;
 const { render } = await import('../js/pages/admin/recap.js');
 const { store } = await import('../js/pages/admin/components.js');
-const { ANNUAL_DAYS, syncAnnualDay } = await import('../js/pages/admin/settings.js');
+const settings = await import('../js/pages/admin/settings.js');
+const { ANNUAL_DAYS, syncAnnualDay } = settings;
 
 store.me = 1;
 store.users = [{ id: 1, username: 'ana' }, { id: 2, username: 'biel' }];
@@ -29,6 +30,7 @@ function routes(extra = {}) {
 }
 
 const panel = () => document.getElementById('panel');
+const renderSends = () => settings.render(panel(), { entity: { sections: ['monthly', 'annual'] } }); // the schedules live in the Envíos tab
 const field = (name) => panel().querySelector(`[name="${name}"]`);
 const lastMonthKey = () => { const d = new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
 const previewPaths = (calls) => calls.filter((c) => c.path.startsWith('/manage/recap/preview')).map((c) => c.path);
@@ -38,7 +40,7 @@ const change = (el, value) => {
   el.dispatchEvent(new window.Event('change', { bubbles: true }));
 };
 
-test('the Recap tab has the notice, the sending and the two schedules', async () => {
+test('the Probar resumen tab has the notice and the sending, and no schedules', async () => {
   const calls = installApi(routes());
   await render(panel());
   await settle();
@@ -47,10 +49,8 @@ test('the Recap tab has the notice, the sending and the two schedules', async ()
   assert.equal(panel().querySelector('#rcaPushBody').textContent, 'CUERPO');
   assert.match(calls.find((c) => c.path.startsWith('/manage/recap/preview')).path, /^\/manage\/recap\/preview\?period=\d{4}-\d{2}$/);
   assert.doesNotMatch(panel().textContent, /Texto para el jugador/);
-  assert.match(panel().textContent, /Envío automático/);
-  assert.match(panel().textContent, /Resumen mensual/);
-  assert.match(panel().textContent, /Resumen anual/);
-  assert.match(panel().textContent, /Último envío/); // the annual job ran
+  assert.doesNotMatch(panel().textContent, /Envío automático/);
+  assert.equal(panel().querySelector('#admSettings'), null);
   assert.deepEqual([...panel().querySelectorAll('[data-send]')].map((b) => b.dataset.send), ['me', 'group']);
 });
 
@@ -68,14 +68,14 @@ test('the player only changes where the buttons open, not the notice', async () 
 
 test('the monthly recap can go out from the 1st to the 5th', async () => {
   installApi(routes());
-  await render(panel());
+  await renderSends();
   await settle();
   assert.deepEqual([...field('monthly.day').options].map((o) => Number(o.value)), [1, 2, 3, 4, 5]);
 });
 
 test('the annual recap is in January by default, with January days, and December moves the days to 20-28', async () => {
   installApi(routes());
-  await render(panel());
+  await renderSends();
   await settle();
   assert.equal(field('annual.month').value, '1');
   assert.deepEqual(enabledDays(field('annual.day')), [1, 2, 3, 4, 5]);
@@ -85,6 +85,15 @@ test('the annual recap is in January by default, with January days, and December
   change(field('annual.day'), 25);
   change(field('annual.month'), 1);
   assert.equal(field('annual.day').value, '1');
+});
+
+test('the Envíos cards show when the last recap went out', async () => {
+  installApi(routes());
+  await renderSends();
+  await settle();
+  assert.match(panel().textContent, /Resumen mensual/);
+  assert.match(panel().textContent, /Resumen anual/);
+  assert.match(panel().textContent, /Último envío/); // the annual job ran
 });
 
 test('the months and days of the annual recap are the ones the API accepts', () => {
@@ -97,7 +106,7 @@ test('the months and days of the annual recap are the ones the API accepts', () 
 test('saving sends the month and the day together', async () => {
   let saved;
   installApi(routes({ 'PUT /manage/settings': ({ body }) => { saved = body; return { changed: Object.keys(body.values), values: VALUES }; } }));
-  await render(panel());
+  await renderSends();
   await settle();
   const enable = field('annual.enabled');
   enable.checked = true;
@@ -108,10 +117,10 @@ test('saving sends the month and the day together', async () => {
   assert.deepEqual(saved.values, { 'annual.enabled': true, 'annual.month': 12, 'annual.day': 24 });
 });
 
-test('the monthly settings are no longer among the notification settings', async () => {
+test('the schedules are with the other sends, and the recap tab only previews', async () => {
   const { ENTITIES } = await import('../js/pages/admin/entities.js');
-  assert.deepEqual(ENTITIES.notifications.sections, ['notifications', 'weekly', 'telegram', 'push']);
-  assert.equal(ENTITIES.recap.label, 'Recap');
+  assert.deepEqual(ENTITIES.sends.sections, ['notifications', 'weekly', 'monthly', 'annual']);
+  assert.equal(ENTITIES.recap.label, 'Probar resumen');
   assert.equal(ENTITIES.recap.custom, 'recap');
 });
 

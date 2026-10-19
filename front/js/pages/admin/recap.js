@@ -1,6 +1,5 @@
 // "Recap": look at the recap of any month or season before it goes out, see the notice that tells it is ready (the
-// same on Telegram and on the app's devices), send it now and set when the monthly and the annual ones go out (the same
-// settings form as the rest of the notifications, only its cards for the recap). The page itself (#/recap) opens from
+// same on Telegram and on the app's devices), send it now (when they go out is set in Envíos). The page itself (#/recap) opens from
 // here for any player. Sending goes through the same code as the jobs.
 import { api, jsonRequest } from '../../lib/api.js';
 import { html, mount } from '../../lib/html.js';
@@ -9,7 +8,6 @@ import { storyHref } from '../../lib/story.js';
 import { toast } from '../../ui/toast.js';
 import { errorState, store } from './components.js';
 import { confirmDialog } from './dialogs.js';
-import { render as renderSettings } from './settings.js';
 
 let panel;
 let pick = clampPick(pickOf(lastMonth())); // what is being looked at: monthly or annual, the year and, for a month, the month
@@ -72,9 +70,7 @@ function view() {
         </div>
         <div class="adm-error" role="alert"></div>
       </section>
-    </div>
-    <div class="section-header"><h2 class="section-title">Envío automático</h2><div class="section-line"></div></div>
-    <div id="rcaSettings"></div>`;
+    </div>`;
 }
 
 // Where the buttons open: the page and the story of the period, for the player chosen
@@ -152,7 +148,7 @@ export async function render(target) {
       const button = e.target.closest('[data-send]');
       if (button) send(button.dataset.send);
     };
-    await Promise.all([refresh(), renderSettings(panel.querySelector('#rcaSettings'), { entity: { sections: ['monthly', 'annual'] } })]);
+    await refresh();
   } catch (err) {
     mount(panel, errorState(err.message));
   }

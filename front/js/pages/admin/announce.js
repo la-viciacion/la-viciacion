@@ -44,18 +44,18 @@ function reach(form) {
   const kind = form.querySelector('#annAudience').value;
   const id = kind === 'me' ? store.me : form.querySelector('#annUser').value;
   if (channel === 'telegram') {
-    if (!audience.telegram.ready) return { ok: false, text: 'Telegram no está configurado: falta el token del bot (Notificaciones → Ajustes).' };
+    if (!audience.telegram.ready) return { ok: false, text: 'Telegram no está configurado: falta el token del bot (Notificaciones → Canales).' };
     if (kind === 'group') {
       return audience.telegram.group
         ? { ok: true, text: 'Llegará al grupo de Telegram.' }
-        : { ok: false, text: 'Falta el ID del grupo de Telegram (Notificaciones → Ajustes).' };
+        : { ok: false, text: 'Falta el ID del grupo de Telegram (Notificaciones → Canales).' };
     }
     const target = userById(id);
     return target?.telegram_id
       ? { ok: true, text: `Llegará por mensaje privado a ${target.username}.` }
       : { ok: false, text: `${target?.username || 'El usuario'} no tiene Telegram ID.` };
   }
-  if (!audience.ready) return { ok: false, text: 'Los avisos en la app no están activados (Notificaciones → Ajustes).' };
+  if (!audience.ready) return { ok: false, text: 'Los avisos en la app no están activados (Notificaciones → Canales).' };
   const { devices, users } = kind === 'all' ? audience.all : kind === 'group' ? audience.group : { devices: audience.users[id] || 0, users: audience.users[id] ? 1 : 0 };
   return devices
     ? { ok: true, text: `Llegará a ${plural(devices, 'dispositivo', 'dispositivos')}${users > 1 ? ` de ${users} usuarios` : ''}.`, devices, users }
