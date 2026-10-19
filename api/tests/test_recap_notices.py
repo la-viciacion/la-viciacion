@@ -8,7 +8,7 @@ from fastapi import HTTPException
 from src.crud import recap
 from src.database import models
 from src.routers.manage import notices
-from src.utils import messages, recap_notices, scheduler
+from src.utils import messages, recap_notices, scheduler, settings
 from tests.sqlite_db import make_session
 
 HOUR = 3600
@@ -110,6 +110,20 @@ class NoticeTests(RecapData):
         self.private.assert_awaited_once()
         self.assertEqual(self.private.await_args.args, (11, recap_notices.telegram_text(APRIL)))
         self.assertEqual(self.private.await_args.kwargs, {"user_id": 1, "push_payload": recap_notices.push_payload(APRIL)})
+
+    async def test_sending_the_seasons_notice_to_the_group_unlocks_it_for_that_year(self):
+        self.assertEqual(settings.get_all(self.db)["annual.unlocked_year"], 0)
+        await recap_notices.announce_recap(self.db, recap.parse_period("2026"))
+        self.assertEqual(settings.get_all(self.db)["annual.unlocked_year"], 2026)
+
+    async def test_a_test_to_the_admin_alone_does_not_unlock_the_season_for_everybody(self):
+        admin = self.db.get(models.User, 1)
+        await recap_notices.announce_recap(self.db, recap.parse_period("2026"), only=admin)
+        self.assertEqual(settings.get_all(self.db)["annual.unlocked_year"], 0)
+
+    async def test_sending_a_months_notice_does_not_touch_the_seasons_lock(self):
+        await recap_notices.announce_recap(self.db, APRIL)
+        self.assertEqual(settings.get_all(self.db)["annual.unlocked_year"], 0)
 
     async def test_a_period_nobody_played_sends_nothing(self):
         result = await recap_notices.announce_recap(self.db, recap.parse_period("2026-01"))

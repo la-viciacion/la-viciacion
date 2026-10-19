@@ -8,7 +8,7 @@ from .. import auth
 from ..auth import get_db
 from ..crud import debt, rankings, recap, users
 from ..database import models
-from ..utils import messages, seasons
+from ..utils import messages, seasons, settings
 from ..utils.logger import LogManager
 
 log_manager = LogManager()
@@ -190,8 +190,10 @@ def get_recap(
 ):
     """The recap of a month (`2026-09`) or a season (`2026`): the group's, and with `username` that player's too.
 
-    A season still running gives what there is so far (`complete` is false); a month still running is refused
-    (`period_problem`) until it ends. Only the player themselves or an admin can ask for a player's recap."""
+    A season still running gives what there is so far (`complete` is false), but stays locked (`season_locked`)
+    for anybody but an admin until it is unlocked (panel, or its notice reaching the group); a month still running
+    is refused outright (`period_problem`) until it ends. Only the player themselves or an admin can ask for a
+    player's recap."""
     try:
         parsed = recap.parse_period(period)
     except ValueError:
@@ -201,6 +203,8 @@ def get_recap(
         raise HTTPException(status_code=400, detail=messages.RECAP_PERIOD_FUTURE)
     if problem == "running":
         raise HTTPException(status_code=400, detail=messages.RECAP_PERIOD_RUNNING)
+    if not active_user.is_admin and recap.season_locked(parsed, settings.get("annual.unlocked_year")):
+        raise HTTPException(status_code=400, detail=messages.RECAP_SEASON_LOCKED)
     user_id = None
     if username is not None:
         auth.ensure_self_or_admin(active_user, username=username)

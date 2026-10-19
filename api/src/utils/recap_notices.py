@@ -10,7 +10,7 @@ from ..config import Config
 from ..crud import recap
 from ..database import models
 from . import my_utils as utils
-from . import push
+from . import push, settings
 from .logger import LogManager
 
 logger = LogManager().get_logger()
@@ -60,6 +60,8 @@ async def announce_recap(db: Session, period: recap.Period, only: models.User | 
     `only`, to that user alone (an admin trying it: their own Telegram chat and devices).
 
     A period in which nobody played sends nothing. The general notifications switch is respected by the senders.
+    Sending a season's notice to the group unlocks it (crud.recap.season_locked): the group is being told it is
+    there to see, so it has to actually be visible; a test sent to `only` the admin does not unlock it for everyone.
     Returns {"empty": nobody played}."""
     if not recap.anyone_played(db, period):
         return {"empty": True}
@@ -67,6 +69,8 @@ async def announce_recap(db: Session, period: recap.Period, only: models.User | 
         await utils.send_message_to_user(only.telegram_id, telegram_text(period), user_id=only.id, push_payload=push_payload(period))
     else:
         await utils.send_message(telegram_text(period), silent=False, push_payload=push_payload(period))
+        if period.kind == "year":
+            settings.set_values(db, {"annual.unlocked_year": period.start.year})
     return {"empty": False}
 
 

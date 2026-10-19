@@ -1,14 +1,17 @@
 """The recap of a month or a season (crud/recap): the periods, the pure figures and the whole thing over a database."""
 import datetime
 import unittest
+from unittest import mock
 
 from fastapi import HTTPException
 
 from src.crud import recap
 from src.database import models
-from src.routers.statistics import get_recap
+from src.routers import statistics
 from src.utils import messages
 from tests.sqlite_db import make_session
+
+get_recap = statistics.get_recap
 
 HOUR = 3600
 D = datetime.datetime
@@ -71,6 +74,29 @@ class PeriodProblemTests(unittest.TestCase):
 
     def test_a_past_season_has_no_problem(self):
         self.assertIsNone(recap.period_problem(recap.parse_period("2025"), self.today))
+
+
+class SeasonLockedTests(unittest.TestCase):
+    """Whether the still-running season's recap is locked (crud.recap.season_locked)."""
+
+    today = datetime.date(2026, 10, 19)
+
+    def test_the_running_season_is_locked_until_unlocked_for_exactly_this_year(self):
+        season = recap.parse_period("2026")
+        self.assertTrue(recap.season_locked(season, 0, self.today))
+        self.assertTrue(recap.season_locked(season, 2025, self.today))  # last year's unlock does not carry over
+        self.assertFalse(recap.season_locked(season, 2026, self.today))
+
+    def test_a_finished_season_is_never_locked_by_this_whatever_the_setting_says(self):
+        self.assertFalse(recap.season_locked(recap.parse_period("2025"), 0, self.today))
+
+    def test_a_month_is_never_locked_by_this_either(self):
+        self.assertFalse(recap.season_locked(recap.parse_period("2026-09"), 0, self.today))
+
+    def test_the_season_locks_itself_again_once_the_year_rolls_over(self):
+        # unlocked for 2026 in December; by the time 2027 is the running season, that unlock no longer applies to it
+        self.assertFalse(recap.season_locked(recap.parse_period("2026"), 2026, datetime.date(2026, 12, 24)))
+        self.assertTrue(recap.season_locked(recap.parse_period("2027"), 2026, datetime.date(2027, 3, 1)))
 
 
 class PlayerStatsTests(unittest.TestCase):
@@ -280,13 +306,17 @@ class BuildRecapTests(unittest.TestCase):
 
 
 class GetRecapEndpointTests(unittest.TestCase):
-    """GET /statistics/recap/{period} (called as a function): the running month is refused, the running season is not."""
+    """GET /statistics/recap/{period} (called as a function): the running month is refused outright; the running
+    season is locked unless unlocked for this year, or the caller is an admin."""
 
     def setUp(self):
         self.db = make_session()
+        self.player = models.User(id=1, username="ana", is_admin=False)
+        self.admin = models.User(id=2, username="god", is_admin=True)
 
-    def get(self, period):
-        return get_recap(period, username=None, active_user=None, db=self.db)
+    def get(self, period, user=None, unlocked_year=0):
+        with mock.patch.object(statistics.settings, "get", return_value=unlocked_year):
+            return get_recap(period, username=None, active_user=user or self.player, db=self.db)
 
     def test_a_finished_month_is_served(self):
         today = datetime.date.today()
@@ -304,9 +334,28 @@ class GetRecapEndpointTests(unittest.TestCase):
             self.get(future)
         self.assertEqual(refused.exception.detail, messages.RECAP_PERIOD_FUTURE)
 
-    def test_the_running_season_is_served_with_what_there_is_so_far(self):
-        got = self.get(str(datetime.date.today().year))
+    def test_a_finished_season_is_served_to_anybody(self):
+        got = self.get(str(datetime.date.today().year - 1))
+        self.assertTrue(got["complete"])
+
+    def test_the_running_season_is_locked_by_default_even_though_it_is_not_future_or_running(self):
+        year = str(datetime.date.today().year)
+        with self.assertRaises(HTTPException) as refused:
+            self.get(year)
+        self.assertEqual((refused.exception.status_code, refused.exception.detail), (400, messages.RECAP_SEASON_LOCKED))
+
+    def test_an_admin_sees_the_locked_season_anyway(self):
+        got = self.get(str(datetime.date.today().year), user=self.admin)
         self.assertFalse(got["complete"])
+
+    def test_unlocking_it_for_this_year_opens_it_to_everybody(self):
+        got = self.get(str(datetime.date.today().year), unlocked_year=datetime.date.today().year)
+        self.assertFalse(got["complete"])
+
+    def test_last_years_unlock_does_not_carry_over(self):
+        with self.assertRaises(HTTPException) as refused:
+            self.get(str(datetime.date.today().year), unlocked_year=datetime.date.today().year - 1)
+        self.assertEqual(refused.exception.detail, messages.RECAP_SEASON_LOCKED)
 
 
 if __name__ == "__main__":

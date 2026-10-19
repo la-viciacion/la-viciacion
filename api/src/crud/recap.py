@@ -55,13 +55,22 @@ def year_period(year: int) -> Period:
 
 def period_problem(period: Period, today: datetime.date | None = None) -> str | None:
     """Why `period` cannot be viewed yet, or None: "future" (it has not started) or, for a month only, "running"
-    (it has started but not finished). A season in progress is fine: it shows what there is so far."""
+    (it has started but not finished). A season in progress is a `period_problem` of its own, `season_locked`:
+    by default nobody sees it change day by day, only once it is unlocked."""
     today = today or datetime.date.today()
     if period.start > today:
         return "future"
     if period.kind == "month" and period.end > today:
         return "running"
     return None
+
+
+def season_locked(period: Period, unlocked_year: int, today: datetime.date | None = None) -> bool:
+    """Whether the still-running season's recap is locked: visible to nobody until an admin unlocks it (by hand, or
+    automatically when its notice reaches the group, see utils.recap_notices.announce_recap) for exactly this year.
+    A finished season, or a month, is never locked by this (`period_problem` covers those)."""
+    today = today or datetime.date.today()
+    return period.kind == "year" and period.end > today and unlocked_year != period.start.year
 
 
 def parse_period(text: str) -> Period:
