@@ -65,7 +65,7 @@ class NoticeTests(RecapData):
             text = recap_notices.telegram_text(APRIL)
         self.assertEqual(
             text,
-            "🎬 *Ya está disponible el resumen mensual*\n\n[Pulsa para verlo en historias](https://viciacion.example/#/story/2026-04)",
+            "🎬 *Ya está disponible el resumen mensual*\n\n[Descubre cómo ha ido el mes](https://viciacion.example/#/story/2026-04)",
         )
         self.assertNotRegex(text, r"\d\dh\d\d")  # no hours, no names, no podium
 
@@ -84,6 +84,9 @@ class NoticeTests(RecapData):
         season = recap.parse_period("2026")
         self.assertIn("resumen anual", recap_notices.telegram_text(season))
         self.assertIn("resumen anual", recap_notices.push_payload(season)["title"])
+        self.assertEqual(recap_notices.push_payload(season)["body"], "Descubre cómo ha ido el año")
+        with mock.patch.object(recap_notices.config, "PUBLIC_URL", "https://viciacion.example"):
+            self.assertIn("[Descubre cómo ha ido el año](https://viciacion.example/#/story/2026)", recap_notices.telegram_text(season))
         for period in (APRIL, season):
             for text in (recap_notices.telegram_text(period).split("\n")[0], recap_notices.push_payload(period)["title"]):
                 self.assertNotRegex(text, r"\d{4}|abril|temporada", period.key)
@@ -163,7 +166,7 @@ class EndpointTests(RecapData):
         self.assertEqual((got["period"], got["label"], got["nobody_played"]), ("2026-04", "abril de 2026", False))
         self.assertIn("Ya está disponible el resumen mensual", got["telegram"])
         self.assertEqual(got["push"]["url"], "#/story/2026-04")
-        self.assertEqual(got["push"]["body"], "Pulsa para verlo en historias")
+        self.assertEqual(got["push"]["body"], "Descubre cómo ha ido el mes")
         self.group.assert_not_awaited()
 
     def test_the_preview_of_a_quiet_period_says_so(self):

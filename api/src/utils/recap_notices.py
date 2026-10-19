@@ -52,7 +52,7 @@ def telegram_text(period: recap.Period) -> str:
     title = f"🎬 *Ya está disponible el resumen {kind_word(period)}*"
     if not config.PUBLIC_URL:
         return f"{title}\n\nMíralo en historias dentro de la app."
-    return f"{title}\n\n[Pulsa para verlo en historias]({config.PUBLIC_URL}/#/story/{period.key})"
+    return f"{title}\n\n[{push.RECAP_TEASERS[kind_word(period)]}]({config.PUBLIC_URL}/#/story/{period.key})"
 
 
 async def announce_recap(db: Session, period: recap.Period, only: models.User | None = None) -> dict:
