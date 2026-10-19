@@ -2,8 +2,12 @@
 import datetime
 import unittest
 
+from fastapi import HTTPException
+
 from src.crud import recap
 from src.database import models
+from src.routers.statistics import get_recap
+from src.utils import messages
 from tests.sqlite_db import make_session
 
 HOUR = 3600
@@ -35,6 +39,38 @@ class PeriodTests(unittest.TestCase):
         for text in ("", "26", "2026-13", "2026-00", "2026-9", "2026-09-01", "abc", "0000", None):
             with self.assertRaises(ValueError, msg=text):
                 recap.parse_period(text)
+
+
+class PeriodProblemTests(unittest.TestCase):
+    """What stops a period from being viewed: not started yet, or (a month only) not finished yet."""
+
+    today = datetime.date(2026, 10, 19)
+
+    def test_a_finished_month_has_no_problem(self):
+        self.assertIsNone(recap.period_problem(recap.parse_period("2026-09"), self.today))
+        self.assertIsNone(recap.period_problem(recap.parse_period("2023-01"), self.today))
+
+    def test_the_running_month_is_running_not_future(self):
+        self.assertEqual(recap.period_problem(recap.parse_period("2026-10"), self.today), "running")
+
+    def test_a_month_still_to_come_is_future(self):
+        self.assertEqual(recap.period_problem(recap.parse_period("2026-11"), self.today), "future")
+        self.assertEqual(recap.period_problem(recap.parse_period("2027-01"), self.today), "future")
+
+    def test_the_last_day_of_the_running_month_is_still_running(self):
+        self.assertEqual(recap.period_problem(recap.parse_period("2026-10"), datetime.date(2026, 10, 31)), "running")
+
+    def test_the_first_day_of_the_month_after_it_has_no_problem(self):
+        self.assertIsNone(recap.period_problem(recap.parse_period("2026-10"), datetime.date(2026, 11, 1)))
+
+    def test_a_season_in_progress_has_no_problem_it_shows_what_there_is_so_far(self):
+        self.assertIsNone(recap.period_problem(recap.parse_period("2026"), self.today))
+
+    def test_a_season_not_started_yet_is_future(self):
+        self.assertEqual(recap.period_problem(recap.parse_period("2027"), self.today), "future")
+
+    def test_a_past_season_has_no_problem(self):
+        self.assertIsNone(recap.period_problem(recap.parse_period("2025"), self.today))
 
 
 class PlayerStatsTests(unittest.TestCase):
@@ -241,6 +277,36 @@ class BuildRecapTests(unittest.TestCase):
     def test_an_empty_month_is_all_zeros(self):
         got = recap.build_recap(self.db, recap.parse_period("2026-01"), 1, datetime.date(2026, 10, 18))
         self.assertEqual((got["group"]["seconds"], got["group"]["ranking"], got["group"]["top_games"], got["group"]["rarest_achievement"]), (0, [], [], None))
+
+
+class GetRecapEndpointTests(unittest.TestCase):
+    """GET /statistics/recap/{period} (called as a function): the running month is refused, the running season is not."""
+
+    def setUp(self):
+        self.db = make_session()
+
+    def get(self, period):
+        return get_recap(period, username=None, active_user=None, db=self.db)
+
+    def test_a_finished_month_is_served(self):
+        today = datetime.date.today()
+        last_month = today.replace(day=1) - datetime.timedelta(days=1)
+        self.get(last_month.strftime("%Y-%m"))  # no HTTPException
+
+    def test_the_running_month_is_refused(self):
+        with self.assertRaises(HTTPException) as refused:
+            self.get(datetime.date.today().strftime("%Y-%m"))
+        self.assertEqual((refused.exception.status_code, refused.exception.detail), (400, messages.RECAP_PERIOD_RUNNING))
+
+    def test_a_future_month_is_refused_as_future_not_running(self):
+        future = (datetime.date.today().replace(day=1) + datetime.timedelta(days=32)).strftime("%Y-%m")
+        with self.assertRaises(HTTPException) as refused:
+            self.get(future)
+        self.assertEqual(refused.exception.detail, messages.RECAP_PERIOD_FUTURE)
+
+    def test_the_running_season_is_served_with_what_there_is_so_far(self):
+        got = self.get(str(datetime.date.today().year))
+        self.assertFalse(got["complete"])
 
 
 if __name__ == "__main__":
