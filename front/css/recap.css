@@ -34,6 +34,8 @@
 .rc-preview { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: 0.88rem; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; margin: 6px 0 0; }
 
 .rc-story { display: inline-block; margin: 4px 0 10px; text-decoration: none; }
+/* the group's recap is one click away but quieter than the player's own */
+.rc-group-toggle { font-weight: 400; opacity: 0.75; }
 
 /* the notice of the first days of the month, at the top of whatever page is open */
 .recap-invite {

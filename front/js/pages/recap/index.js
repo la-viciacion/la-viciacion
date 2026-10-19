@@ -125,10 +125,10 @@ function header() {
       <h1 class="pf-title pg-title">Resumen</h1>
       <div class="rc-picker">${picker()}</div>
     </div>
-    <a class="pf-btn rc-story" id="rcStory" href="${storyHref(period, otherPlayer() ? username : null)}">▶ Ver como historia</a>
+    <a class="pf-btn primary rc-story" id="rcStory" href="${storyHref(period, otherPlayer() ? username : null)}">▶ ${otherPlayer() ? `Ver la historia de ${username}` : 'Ver mi historia'}</a>
     <div class="gc-toggles" role="tablist">
       <button type="button" class="gc-toggle" role="tab" data-view="player" aria-pressed="${String(view === 'player')}">${otherPlayer() ? username : 'Tú'}</button>
-      <button type="button" class="gc-toggle" role="tab" data-view="group" aria-pressed="${String(view === 'group')}">El grupo</button>
+      <button type="button" class="gc-toggle rc-group-toggle" role="tab" data-view="group" aria-pressed="${String(view === 'group')}">El grupo</button>
     </div>`;
 }
 
