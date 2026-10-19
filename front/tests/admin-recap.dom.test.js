@@ -16,15 +16,15 @@ store.users = [{ id: 1, username: 'ana' }, { id: 2, username: 'biel' }];
 const VALUES = {
   'notifications.enabled': true, 'notifications.admin_alerts': true, 'weekly.enabled': true, 'weekly.weekday': 0, 'weekly.time': '09:00',
   'monthly.enabled': false, 'monthly.day': 1, 'monthly.time': '10:00',
-  'annual.enabled': false, 'annual.month': 1, 'annual.day': 1, 'annual.time': '10:00',
+  'annual.enabled': false, 'annual.month': 1, 'annual.day': 1, 'annual.time': '10:00', 'annual.unlocked_year': 0,
   'telegram.token': { is_set: false }, 'telegram.group_id': { is_set: false }, 'telegram.admin_chat_id': { is_set: false },
   'push.enabled': true, 'push.contact': '', 'push.vapid_private': { is_set: true }, 'ai.enabled': true, 'ai.provider': { is_set: true }, 'ai.api_key': { is_set: false }, 'ai.model': '',
 };
 
-function routes(extra = {}) {
+function routes(extra = {}, values = VALUES) {
   return {
     'GET /manage/recap/preview': { period: '2026-09', label: 'septiembre de 2026', nobody_played: false, telegram: 'TELEGRAM', push: { title: 'TITULO', body: 'CUERPO', url: '#/story/2026-09' } },
-    'GET /manage/settings': { values: VALUES, jobs: { annual_recap: { last_run_at: '2027-01-01T10:00:00', last_status: 'ok: 2026: group and 3 users' } }, push_devices: { devices: 0, users: 0 }, mail: { configured: false, missing: [] }, ai_uses: [], ai_model: { provider: 'google', model: 'gemini-test' } },
+    'GET /manage/settings': { values, jobs: { annual_recap: { last_run_at: '2027-01-01T10:00:00', last_status: 'ok: 2026: group and 3 users' } }, push_devices: { devices: 0, users: 0 }, mail: { configured: false, missing: [] }, ai_uses: [], ai_model: { provider: 'google', model: 'gemini-test' } },
     ...extra,
   };
 }
@@ -177,4 +177,58 @@ test('the notice and the sending are one card, and the first one is called Previ
   assert.deepEqual(titles, ['Previsualizar', 'El aviso']);
   const notice = [...panel().querySelectorAll('#rcAdmin section')].find((s) => s.querySelector('h3').textContent === 'El aviso');
   assert.ok(notice.querySelector('#rcaTelegram') && notice.querySelector('[data-send="me"]') && notice.querySelector('[data-send="group"]'));
+});
+
+test('the unlock checkbox is off by default: the running season is locked', async () => {
+  installApi(routes());
+  await renderSends();
+  await settle();
+  assert.equal(field('annualUnlock').checked, false);
+});
+
+test('it shows unlocked only when unlocked for exactly this year, not a season gone by', async () => {
+  const year = new Date().getFullYear();
+  installApi(routes({}, { ...VALUES, 'annual.unlocked_year': year }));
+  await renderSends();
+  await settle();
+  assert.equal(field('annualUnlock').checked, true);
+  installApi(routes({}, { ...VALUES, 'annual.unlocked_year': year - 1 }));
+  await renderSends();
+  await settle();
+  assert.equal(field('annualUnlock').checked, false);
+});
+
+test('ticking it saves this year as unlocked', async () => {
+  let saved;
+  installApi(routes({ 'PUT /manage/settings': ({ body }) => { saved = body; return { changed: Object.keys(body.values), values: VALUES }; } }));
+  await renderSends();
+  await settle();
+  field('annualUnlock').checked = true;
+  panel().querySelector('#admSettings').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+  await settle();
+  assert.deepEqual(saved.values, { 'annual.unlocked_year': new Date().getFullYear() });
+});
+
+test('unticking it locks the season again', async () => {
+  let saved;
+  const year = new Date().getFullYear();
+  installApi(routes({ 'PUT /manage/settings': ({ body }) => { saved = body; return { changed: Object.keys(body.values), values: VALUES }; } }, { ...VALUES, 'annual.unlocked_year': year }));
+  await renderSends();
+  await settle();
+  assert.equal(field('annualUnlock').checked, true);
+  field('annualUnlock').checked = false;
+  panel().querySelector('#admSettings').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+  await settle();
+  assert.deepEqual(saved.values, { 'annual.unlocked_year': 0 });
+});
+
+test('saving other fields leaves the lock untouched when the checkbox was not changed', async () => {
+  let saved;
+  installApi(routes({ 'PUT /manage/settings': ({ body }) => { saved = body; return { changed: Object.keys(body.values), values: VALUES }; } }));
+  await renderSends();
+  await settle();
+  field('annual.enabled').checked = true;
+  panel().querySelector('#admSettings').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+  await settle();
+  assert.deepEqual(saved.values, { 'annual.enabled': true });
 });
