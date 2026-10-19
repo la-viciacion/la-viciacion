@@ -102,6 +102,10 @@ function view(values, jobs, pushDevices, mail, aiUses, aiModel) {
       <section class="adm-set-card">
         <h3>Resumen anual</h3>
         ${check('annual.enabled', 'Enviar el resumen de la temporada', 'Aparte del mensual: el mismo aviso de que el resumen de la temporada ya está disponible, al grupo de Telegram y a las notificaciones de la app. En diciembre cuenta lo jugado hasta ese día; en enero, la temporada completa. Necesita las notificaciones activadas.')}
+        <label class="adm-check adm-set-check">
+          <input type="checkbox" id="annualUnlock" name="annualUnlock" />
+          <span><strong>Mostrar el resumen de la temporada en curso</strong><span class="adm-sub">Mientras esté apagado, nadie puede abrir ese resumen, ni por un enlace directo: así no se puede ir consultando día a día. Se enciende solo en cuanto el aviso llega al grupo (el envío automático o el manual); también lo puedes encender tú a mano. Como administrador, siempre puedes verlo esté como esté.</span></span>
+        </label>
         <div class="adm-set-row">
           <label>Mes
             <select class="adm-input" name="annual.month">${ANNUAL_MONTHS.map(([value, label]) => html`<option value="${value}">${label}</option>`)}</select>
@@ -193,6 +197,8 @@ function fill(form, values) {
     if (field.type === 'checkbox') field.checked = Boolean(value);
     else field.value = value ?? '';
   }
+  // not a plain bool setting: unlocked for THIS year, so a stale unlock from a season gone by reads as off
+  if (form.elements.annualUnlock) form.elements.annualUnlock.checked = values['annual.unlocked_year'] === new Date().getFullYear();
 }
 
 /** Only the days the chosen month allows can be picked; a day that does not fit is moved to the first one that does. */
@@ -239,6 +245,12 @@ function collect(form) {
     }
     if (now === '' && before == null) continue; // an optional text left empty
     if (now !== before) changes[key] = now;
+  }
+  // not among `loaded`'s own fields: turning it on or off means unlocking this year's season or locking it again
+  if (form.elements.annualUnlock) {
+    const year = new Date().getFullYear();
+    const wasUnlocked = loaded['annual.unlocked_year'] === year;
+    if (form.elements.annualUnlock.checked !== wasUnlocked) changes['annual.unlocked_year'] = form.elements.annualUnlock.checked ? year : 0;
   }
   return changes;
 }

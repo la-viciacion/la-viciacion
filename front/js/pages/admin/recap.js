@@ -45,7 +45,7 @@ function view() {
       <section class="adm-set-card">
         <h3>Previsualizar</h3>
         <div class="adm-set-row" id="rcaPicker">${pickerView()}</div>
-        <div class="adm-sub">Un mes solo se puede ver cuando ha terminado; la temporada en curso enseña lo que hay hasta hoy. El jugador solo cambia a quién abren los botones: el aviso es el mismo para todos.</div>
+        <div class="adm-sub">Un mes solo se puede ver cuando ha terminado; la temporada en curso enseña lo que hay hasta hoy, pero solo tú puedes abrirla hasta que la desbloquees (en Notificaciones → Envíos, o enviando el aviso) para que la vea todo el mundo. El jugador solo cambia a quién abren los botones: el aviso es el mismo para todos.</div>
         <div class="adm-actions">
           <a class="adm-btn" id="rcaOpen" href="#">Abrir la página del resumen</a>
           <a class="adm-btn" id="rcaStory" href="#">Abrir la historia</a>
