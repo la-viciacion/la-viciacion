@@ -16,6 +16,7 @@ let main;
 let me;
 let period;
 let pick; // the period as a choice: monthly or annual, the year and, for a month, the month
+let explicit = false; // the address names the period: because it came so or because it was chosen; #/recap stays #/recap until then
 let username; // whose recap: yours unless an admin asks for another player's
 let view = 'player'; // 'player' | 'group'
 let data = null;
@@ -141,7 +142,7 @@ function draw() {
 
 async function load() {
   const id = ++navigation;
-  history.replaceState(null, '', recapHref(period, otherPlayer() ? username : null));
+  if (explicit) history.replaceState(null, '', recapHref(period, otherPlayer() ? username : null));
   mount(main, html`${header()}<div id="rcBody" class="pf-sub">Cargando…</div>`);
   try {
     const result = await api(`/statistics/recap/${period}?username=${encodeURIComponent(username || me.username)}`);
@@ -159,6 +160,7 @@ export async function render({ user, main: target }) {
   main = target;
   me = user;
   const asked = parseHash(location.hash);
+  explicit = Boolean(asked.period);
   pick = clampPick(pickOf(asked.period || lastMonth()));
   period = periodKey(pick);
   username = user.is_admin ? asked.username : null;
@@ -171,6 +173,7 @@ export async function render({ user, main: target }) {
     else if (id === 'rcMonth') pick = { ...pick, month: Number(value) };
     else return;
     period = periodKey(pick);
+    explicit = true; // a period was chosen: now the address says which
     load();
   };
   main.onclick = (event) => {
