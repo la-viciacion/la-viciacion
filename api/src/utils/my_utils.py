@@ -379,7 +379,7 @@ async def send_message(
     push_payload: dict | None = None,
 ):
     """`ai_use` (an id of utils/ai_prompts.USES) lets the AI rewrite the notice when it is on for that use.
-    `new_game_recommended` ({"game", "user"}) is suggested at the end of the notice: by the AI when
+    `new_game_recommended` ({"game", "reasons"}) is suggested at the end of the notice: by the AI when
     it rewrites the message, as a plain line when it does not (off, no key, or it failed).
     `push_payload` is what the app's devices get instead of the text of the message (a short notice that opens a page)."""
     if not silent and not settings.get("notifications.enabled"):
@@ -403,10 +403,7 @@ async def send_message(
             except Exception as e:
                 logger.info("Error generating completion: " + str(e))
         if new_game_recommended and not rewritten:
-            msg += (
-                f"\n\n🎮 ¿Te apetece probar *{escape_markdown(new_game_recommended['game'])}*? "
-                f"Lo tiene {escape_markdown(new_game_recommended['user'])}."
-            )
+            msg += f"\n\n🎮 ¿Te apetece probar *{escape_markdown(new_game_recommended['game'])}*?"
         # neither raises: a push must not affect Telegram
         if push_payload:
             await push.deliver(push_payload, "group")

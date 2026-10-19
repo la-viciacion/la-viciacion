@@ -1,5 +1,4 @@
 import datetime
-import random
 
 import bcrypt
 from sqlalchemy import (
@@ -16,7 +15,7 @@ from sqlalchemy.orm import Session
 from ..config import Config
 from ..database import models, schemas
 from ..utils import my_utils as utils
-from ..utils import seasons, streaks
+from ..utils import seasons, settings, streaks
 from ..utils.logger import LogManager
 from . import games, scores
 
@@ -801,11 +800,7 @@ async def after_completion(db: Session, entry: models.UserGame, silent: bool):
 
     message = completion_message(user.name, count_completed_games(db, user.id, entry.season), game.name, completion_time, avg_time)
     logger.info(message)
-    new_game_info = None
-    suggestions = games.recommended_games(db, entry.user_id, genres=game.genres)
-    if suggestions:
-        new_game = random.choice(suggestions)
-        new_game_info = {"game": new_game[2], "user": new_game[4]}
+    new_game_info = games.completion_suggestion(db, entry.user_id, game.genres) if settings.get("completed_game.recommend") else None
     await utils.send_message(
         message,
         silent,

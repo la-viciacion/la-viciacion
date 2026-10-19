@@ -3,7 +3,7 @@ import uuid
 import random
 
 from starlette.concurrency import run_in_threadpool
-from sqlalchemy import func, select, true, update, or_
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from ..database import models, schemas
@@ -39,41 +39,6 @@ def genre_list(genres: str | list[str] | None) -> list[str]:
     if isinstance(genres, str):
         genres = genres.split(",")
     return [g.strip() for g in genres if g and g.strip()]
-
-
-def recommended_games(
-    db: Session, user_id: int, genres: str | list[str] | None = None, limit: int = None
-):
-    """Games (of those genres, if any) that other players have and `user_id` has never played."""
-    genres_filter = [models.Game.genres.ilike(f"%{genre}%") for genre in genre_list(genres)]
-    played_by_user = select(models.UserGame.game_id).where(models.UserGame.user_id == user_id)
-    unplayed_games = (
-        db.query(
-            models.UserGame.game_id,
-            models.UserGame.user_id,
-            models.Game.name,
-            models.Game.genres,
-            models.User.name,
-        )
-        .join(models.Game, models.UserGame.game_id == models.Game.id)
-        .join(models.User, models.UserGame.user_id == models.User.id)
-        .filter(models.UserGame.user_id != user_id, models.not_god())
-        .filter(models.UserGame.game_id.notin_(played_by_user))
-        .filter(or_(*genres_filter) if genres_filter else true())
-        .limit(limit)
-    )
-    recommended_games = []
-    for game in unplayed_games:
-        recommended_games.append(game)
-    random.shuffle(recommended_games)
-    unique_recommended_games = []
-    seen_game_ids = set()
-
-    for game in recommended_games:
-        if game[0] not in seen_game_ids:
-            unique_recommended_games.append(game)
-            seen_game_ids.add(game[0])
-    return unique_recommended_games
 
 
 def recommendation_candidates(db: Session, user_id: int) -> list[dict]:
@@ -236,6 +201,43 @@ def recommendations_for(db: Session, user_id: int, limit: int = 12, rng=random) 
     prior = rating_prior(db)
     chosen = weighted_sample([recommendation_weight(c, affinity, prior) for c in candidates], limit, rng)
     return [candidates[i] for i in chosen]
+
+
+AFFINITY_REASON = 0.3  # share of the user's playing time in a game's genres from which "it fits what they play" is a reason
+
+
+def suggestion_reasons(item: dict, shared: set[str], affinity: dict[str, float]) -> list[str]:
+    """Why a candidate was picked, for the notice to argue with. Counts, never names: who has the game is not said."""
+    reasons = []
+    common = [genre for genre in item["genres"] if genre.lower() in shared]
+    if common:
+        reasons.append("Comparte género con el juego completado: " + ", ".join(common))
+    players = len(item["players"])
+    reasons.append("Lo tiene 1 jugador del grupo" if players == 1 else f"Lo tienen {players} jugadores del grupo")
+    if item["completed_by"]:
+        reasons.append("Lo ha completado 1 jugador" if item["completed_by"] == 1 else f"Lo han completado {item['completed_by']} jugadores")
+    if item.get("score_count", 0) >= SCORE_DOUBT and item.get("score_mean") is not None:
+        reasons.append(f"Valoración media del grupo: {round(item['score_mean'])} sobre 100")
+    if sum(affinity.get(genre.lower(), 0) for genre in item["genres"]) >= AFFINITY_REASON:
+        reasons.append("Encaja con los géneros a los que más juega quien lo ha completado")
+    return reasons
+
+
+def completion_suggestion(db: Session, user_id: int, genres: str | list[str] | None, rng=random) -> dict | None:
+    """The game the notice of a completed game recommends: one other players have and `user_id` never had that
+    shares a genre with the completed one (any, if that has none), picked with the weights of the Recomendados page.
+    {"game", "reasons"}, or None when there is nothing to recommend."""
+    shared = {genre.lower() for genre in genre_list(genres)}
+    candidates = [
+        c for c in recommendation_candidates(db, user_id)
+        if not shared or shared & {genre.lower() for genre in c["genres"]}
+    ]
+    if not candidates:
+        return None
+    affinity = genre_affinity(db, user_id)
+    prior = rating_prior(db)
+    pick = candidates[weighted_sample([recommendation_weight(c, affinity, prior) for c in candidates], 1, rng)[0]]
+    return {"game": pick["game_name"], "reasons": suggestion_reasons(pick, shared, affinity)}
 
 
 async def new_game(db: Session, game: schemas.NewGame) -> models.Game:

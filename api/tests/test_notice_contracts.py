@@ -90,6 +90,21 @@ class PromptsAskForWhatTheNoticesCarryTests(unittest.TestCase):
         self.assertIn("sin dirigirte a él", self.prompt("completed_game"))
         self.assertIn("tercera persona", self.prompt("completed_game_recommendation"))
 
+    def test_every_prompt_asks_to_be_brief_and_to_start_with_the_message_itself(self):
+        for use in ("new_game", "completed_game", "completed_game_recommendation", "ranking_players", "ranking_games", "wishlist_release"):
+            text = self.prompt(use)
+            if use == "completed_game_recommendation":
+                self.assertIn("No te alargues", text, use)  # it only adds one last short sentence
+                continue
+            self.assertIn("Empieza por lo importante", text, use)
+            self.assertTrue("Sé breve" in text or "corta" in text, use)
+
+    def test_the_rankings_put_the_list_before_the_comment_and_keep_the_comment_to_one_sentence(self):
+        for use in ("ranking_players", "ranking_games"):
+            text = self.prompt(use)
+            self.assertLess(text.index("clasificación original sin modificar"), text.index("Después de la clasificación"), use)
+            self.assertIn("una sola frase corta", text, use)
+
     def test_completed_game_does_not_ask_for_an_average_that_may_not_be_there(self):
         self.assertNotIn("Debes añadir, además, la media", self.prompt("completed_game"))
 
@@ -101,7 +116,7 @@ class PromptsAskForWhatTheNoticesCarryTests(unittest.TestCase):
     def test_the_rankings_ask_to_keep_their_title_and_the_original_list(self):
         for use in ("ranking_players", "ranking_games"):
             text = self.prompt(use)
-            self.assertIn("Debes empezar el mensaje con '📣", text)
+            self.assertIn("debe empezar con '📣", text)
             self.assertIn("clasificación original sin modificar", text)
 
     def test_the_wishlist_asks_for_every_game_every_person_and_tomorrow(self):
@@ -109,10 +124,12 @@ class PromptsAskForWhatTheNoticesCarryTests(unittest.TestCase):
         for wanted in ("nombre de cada juego", "todas las personas", "mañana", "todos"):
             self.assertIn(wanted, text)
 
-    def test_the_recommendation_asks_for_the_game_and_the_person(self):
+    def test_the_recommendation_asks_for_the_game_alone_never_for_who_has_it(self):
         text = self.prompt("completed_game_recommendation")
         self.assertIn("nombre del juego", text)
-        self.assertIn("persona", text)
+        self.assertIn("no menciones a ningún jugador", text)
+        self.assertNotIn("Jugado por", text)
+        self.assertNotIn("la persona indicada", text)
 
 
 if __name__ == "__main__":

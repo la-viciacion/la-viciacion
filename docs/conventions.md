@@ -39,7 +39,7 @@ Read-only (except `/activate`, see architecture), generic endpoints only. Texts 
 ## Database and migrations
 
 - **All rules live in [migrations.md](migrations.md) and are mandatory.** In short: every schema change ships with a migration, applied migrations are immutable, history is linear, migrations are idempotent and abort on inconsistent data, and they are verified on an empty DB and on the previous revision with data.
-- Keep the emergency `admin` and `app_settings` seeding logic in code, not in migrations.
+- Keep the emergency `admin` and the VAPID keys seeding logic in code, not in migrations.
 
 ## Tests
 
@@ -68,7 +68,7 @@ Read-only (except `/activate`, see architecture), generic endpoints only. Texts 
 
 ### Add an admin panel section
 
-Backend in the module of its area under `routers/manage/` (already admin-only and audited: decorate with the package's one `router`; a new area is a new module listed in `manage/__init__.py`). Front: the panel is a sidebar of sections (`front/js/pages/admin/nav.js`: Inicio, Gestión de datos, Notificaciones, Sistema), each with one or more tabs; the address of a tab is `#/admin/<id>`. A table section is only a declarative entry in `entities.js` (columns, fields, filters, row actions), rendered by the generic controller in `index.js`; anything else is a *custom* entry (`custom: '<module>'`) whose module in the same folder exports `render(panel, { entity, admin })` (`home.js`, `announce.js`, `settings.js`). Add its id to a section's `tabs` in `nav.js`. Reuse `components.js`, `form.js`, `dialogs.js`; styles in `css/admin.css`.
+Backend in the module of its area under `routers/manage/` (already admin-only and audited: decorate with the package's one `router`; a new area is a new module listed in `manage/__init__.py`). Front: the panel is a sidebar of sections (`front/js/pages/admin/nav.js`: Inicio, Catálogo, Jugadores, Notificaciones, Sistema), each with one or more tabs; the address of a tab is `#/admin/<id>`. A table section is only a declarative entry in `entities.js` (columns, fields, filters, row actions), rendered by the generic controller in `index.js`; anything else is a *custom* entry (`custom: '<module>'`) whose module in the same folder exports `render(panel, { entity, admin })` (`home.js`, `announce.js`, `settings.js`). Add its id to a section's `tabs` in `nav.js`. Reuse `components.js`, `form.js`, `dialogs.js`; styles in `css/admin.css`.
 
 ### Add a page to the front
 
@@ -80,7 +80,7 @@ Write the async job in `utils/scheduler.py`, expose a pure slot function and add
 
 ### Add a runtime setting
 
-Define it in `utils/settings.py` (key, default, coercion/validation, secret or not), expose it via `GET/PUT /manage/settings`, add the field in a card of `front/js/pages/admin/settings.js` (the settings entries in `entities.js`, `notifications` and `system`, list the cards they show in `sections`), and cover `coerce` with a test. Secrets must be encrypted and write-only from the panel.
+Define it in `utils/settings.py` (key, default, coercion/validation, secret or not), expose it via `GET/PUT /manage/settings`, add the field in a card of `front/js/pages/admin/settings.js` (the settings entries in `entities.js`: `sends`, `channels`, `ai`, `mail` and `backup`, list the cards they show in `sections`), and cover `coerce` with a test. Secrets must be encrypted and write-only from the panel.
 
 ### Add an environment variable
 

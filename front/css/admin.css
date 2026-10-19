@@ -272,9 +272,14 @@
 .adm-set-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; }
 .adm-set-card h3 { font-size: 1rem; }
 .adm-set-card label { display: flex; flex-direction: column; gap: 6px; font-size: 0.85rem; color: var(--text-secondary); font-weight: 600; }
-.adm-set-check { flex-direction: row-reverse !important; align-items: center; justify-content: space-between; gap: 16px; cursor: pointer; }
+/* a switch before its text: the name and what it does stay next to the control that changes it */
+.adm-set-check { flex-direction: row !important; align-items: flex-start; justify-content: flex-start; gap: 12px; cursor: pointer; }
 .adm-set-check > span { display: flex; flex-direction: column; gap: 2px; color: var(--text-primary); }
-.adm-set-check input { flex: none; width: 20px; height: 20px; accent-color: var(--accent-teal); cursor: pointer; }
+.adm-set-check input { flex: none; appearance: none; position: relative; width: 36px; height: 20px; margin-top: 1px; border-radius: 999px; background: var(--bg-card-hover); border: 1px solid var(--border); cursor: pointer; transition: background 0.15s; }
+.adm-set-check input::after { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--text-secondary); transition: transform 0.15s, background 0.15s; }
+.adm-set-check input:checked { background: rgba(61, 217, 179, 0.25); border-color: var(--accent-teal); }
+.adm-set-check input:checked::after { transform: translateX(16px); background: var(--accent-teal); }
+.adm-set-check input:focus-visible { outline: 2px solid var(--accent-teal); outline-offset: 2px; }
 .adm-set-row { display: flex; gap: 12px; flex-wrap: wrap; }
 .adm-set-row label { flex: 1; min-width: 140px; }
 .adm-set-actions { padding: 0; }
@@ -286,5 +291,14 @@
 .adm-notif-body { font-size: 0.85rem; color: var(--text-secondary); white-space: pre-wrap; word-break: break-word; }
 .adm-notif-image { width: 100%; max-height: 180px; object-fit: cover; border-radius: 8px; margin-top: 6px; }
 textarea.adm-input { resize: vertical; min-height: 70px; font-family: inherit; }
-.adm-ai-use { border-top: 1px solid var(--border); padding-top: 12px; display: flex; flex-direction: column; gap: 4px; }
+.adm-ai-uses { display: flex; flex-direction: column; }
+/* the AI is off: what only the AI uses is dimmed (a fragment's own switch is not one of them) */
+.adm-ai-uses.off .adm-ai-use:not(.adm-ai-fragment) > :is(.adm-set-check, .adm-ai-prompt), .adm-ai-uses.off .adm-ai-fragment > .adm-ai-prompt { opacity: 0.55; }
+.adm-ai-use { border-top: 1px solid var(--border); padding: 12px 0; display: flex; flex-direction: column; gap: 6px; }
 .adm-ai-use textarea { width: 100%; margin-bottom: 8px; }
+.adm-ai-prompt { margin: 0 0 0 48px; } /* under the text, not under the switch */
+.adm-ai-prompt summary { display: inline-block; cursor: pointer; font-size: 0.8rem; font-weight: 600; }
+.adm-ai-prompt[open] summary { margin-bottom: 4px; }
+.adm-ai-fragment { margin: 0 0 0 48px; padding: 8px 0 0 12px; border-top: 0; border-left: 2px solid var(--border); }
+.adm-ai-fragment .adm-ai-prompt { margin-left: 48px; }
+.adm-tag { margin-left: 8px; padding: 1px 8px; border-radius: 999px; font-size: 0.7rem; font-weight: 600; color: var(--accent-teal); background: rgba(61, 217, 179, 0.12); vertical-align: middle; }

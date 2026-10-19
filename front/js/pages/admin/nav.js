@@ -6,9 +6,10 @@ export const HOME = 'home';
 
 export const SECTIONS = [
   { label: 'Inicio', tabs: [HOME] },
-  { label: 'Gestión de datos', tabs: ['users', 'games', 'platforms', 'timers', 'library', 'scores', 'achievements', 'challenges'] },
-  { label: 'Notificaciones', tabs: ['notifications', 'recap', 'announce'] },
-  { label: 'Sistema', tabs: ['system', 'audit'] },
+  { label: 'Catálogo', tabs: ['games', 'platforms', 'achievements'] },
+  { label: 'Jugadores', tabs: ['users', 'timers', 'library', 'scores', 'challenges'] },
+  { label: 'Notificaciones', tabs: ['sends', 'channels', 'ai', 'recap', 'announce'] },
+  { label: 'Sistema', tabs: ['mail', 'backup', 'audit'] },
 ];
 
 export const TAB_IDS = SECTIONS.flatMap((section) => section.tabs);

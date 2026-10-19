@@ -13,7 +13,7 @@ import { errorState } from './components.js';
 import { confirmDialog } from './dialogs.js';
 
 const SECRETS = []; // never loaded back: sent only when something is typed (the keys of outside services are not: they are in the server's .env)
-const LOCKED = ['telegram.token', 'telegram.group_id', 'telegram.admin_chat_id', 'ai.api_key']; // shown only as set or not, never editable
+const LOCKED = ['telegram.token', 'telegram.group_id', 'telegram.admin_chat_id', 'ai.api_key', 'ai.provider', 'ai.model']; // shown only as set or not, never editable
 const READ_ONLY = ['mail', 'backup']; // cards with nothing to save
 const AI_PROVIDERS = [['google', 'Google (Gemini)'], ['openai', 'OpenAI']];
 
@@ -28,8 +28,8 @@ let sections = []; // cards of the page on screen
 let loaded = {}; // values as the server has them
 let aiUses = []; // where the AI writes: label, original prompt and whether it was changed
 
-const check = (name, label, hint) => html`
-  <label class="adm-check adm-set-check"><input type="checkbox" name="${name}" /> <span><strong>${label}</strong><span class="adm-sub">${hint}</span></span></label>`;
+const check = (name, label, hint, tag = '') => html`
+  <label class="adm-check adm-set-check"><input type="checkbox" name="${name}" /> <span><strong>${label}${tag}</strong><span class="adm-sub">${hint}</span></span></label>`;
 
 function lastRun(job) {
   if (!job) return 'Todavía no se ha enviado ninguno.';
@@ -41,24 +41,26 @@ function mailStatus(mail) {
   return `Configurado: envía como ${mail.from} por ${mail.host}:${mail.port} (${mail.security}); los enlaces apuntan a ${mail.public_url}.`;
 }
 
-// One notice that can use the AI: its own switch (a fragment has none) and its editable instructions.
-function aiUse(use) {
+const customizedTag = (use) => (use.customized ? html`<span class="adm-tag">Personalizado</span>` : '');
+
+// One notice that can use the AI: its own switch, a "Personalizado" tag when its instructions were changed and the
+// instructions behind a button. The fragments of a notice are drawn inside it; their switch is not an AI one.
+function aiUse(use, fragments) {
   return html`
-    <div class="adm-ai-use">
-      ${use.switchable
-    ? check(`ai.use.${use.id}`, use.label, use.help)
-    : html`<div><strong>${use.label}</strong><span class="adm-sub">${use.help}</span></div>`}
-      <details class="adm-details">
-        <summary>Instrucciones${use.customized ? ' (modificadas)' : ''}</summary>
+    <div class="adm-ai-use ${use.parent ? 'adm-ai-fragment' : ''}">
+      ${check(use.switch, use.label, use.help, customizedTag(use))}
+      <details class="adm-details adm-ai-prompt">
+        <summary class="adm-btn sm">Instrucciones</summary>
         <div>
           <textarea class="adm-input" name="ai.prompt.${use.id}" rows="9" spellcheck="false"></textarea>
-          <button type="button" class="adm-btn" data-set-act="reset-prompt" data-use="${use.id}">Restaurar las originales</button>
+          ${use.customized ? html`<button type="button" class="adm-btn sm" data-set-act="reset-prompt" data-use="${use.id}">Restaurar las originales</button>` : ''}
         </div>
       </details>
+      ${fragments.map((fragment) => aiUse(fragment, []))}
     </div>`;
 }
 
-function view(values, jobs, pushDevices, mail, aiUses) {
+function view(values, jobs, pushDevices, mail, aiUses, aiModel) {
   const state = (key) => (values[key].is_set ? 'Configurado' : 'Sin configurar');
   const aiKey = values['ai.api_key'];
   const vapid = values['push.vapid_private'];
@@ -86,7 +88,7 @@ function view(values, jobs, pushDevices, mail, aiUses) {
     monthly: html`
       <section class="adm-set-card">
         <h3>Resumen mensual</h3>
-        ${check('monthly.enabled', 'Enviar el resumen del mes', 'Avisa de que el resumen del mes que acaba de terminar ya está disponible: un solo aviso, al grupo de Telegram y a las notificaciones de la app, con el enlace a la historia. Necesita las notificaciones activadas. Apagado hasta que lo actives: pruébalo antes con «Enviar ahora».')}
+        ${check('monthly.enabled', 'Enviar el resumen del mes', 'Avisa de que el resumen del mes que acaba de terminar ya está disponible: un solo aviso, al grupo de Telegram y a las notificaciones de la app, con el enlace a la historia. Necesita las notificaciones activadas. Apagado hasta que lo actives: pruébalo antes con «Probar resumen».')}
         <div class="adm-set-row">
           <label>Día del mes
             <select class="adm-input" name="monthly.day">${[1, 2, 3, 4, 5].map((day) => html`<option value="${day}">${day}</option>`)}</select>
@@ -127,20 +129,22 @@ function view(values, jobs, pushDevices, mail, aiUses) {
       <section class="adm-set-card">
         <h3>Inteligencia artificial</h3>
         ${check('ai.enabled', 'Usar IA en los avisos', 'Apagada, los avisos salen con el texto original. Necesita una clave guardada para funcionar.')}
-        <label>Proveedor
-          <select class="adm-input" name="ai.provider">${AI_PROVIDERS.map(([id, label]) => html`<option value="${id}">${label}</option>`)}</select>
-        </label>
+        <label>Proveedor <input class="adm-input adm-ai-provider" type="text" value="${AI_PROVIDERS.find(([id]) => id === aiModel.provider)?.[1] ?? aiModel.provider ?? 'Sin configurar'}" disabled /></label>
         <label>Clave de la API <input class="adm-input" type="text" value="${state('ai.api_key')}" disabled /></label>
-        <label>Modelo <input class="adm-input" type="text" name="ai.model" placeholder="Vacío: el modelo por defecto del proveedor" /></label>
-        <div class="adm-sub">El proveedor y el modelo se aplican al momento, sin reiniciar. La clave (<code>AI_API_KEY</code>) está en el .env del servidor: desde el panel solo se ve si está definida. Por defecto: Google <code>gemini-2.5-flash</code>, OpenAI <code>gpt-4o-mini</code>.</div>
+        <label>Modelo <input class="adm-input adm-ai-model" type="text" value="${aiModel.model || 'Sin configurar'}" disabled /></label>
+        ${aiModel.provider && aiModel.model ? '' : html`<div class="adm-warn">Falta <code>${[['AI_PROVIDER', aiModel.provider], ['AI_MODEL', aiModel.model]].filter(([, value]) => !value).map(([name]) => name).join(' y ')}</code> en el .env del servidor: la aplicación no tiene ningún proveedor ni modelo por defecto, así que la IA no escribe ningún aviso hasta que los definas (y reinicies la API).</div>`}
+        <div class="adm-sub">El proveedor (<code>AI_PROVIDER</code>), el modelo (<code>AI_MODEL</code>) y la clave (<code>AI_API_KEY</code>) están en el .env del servidor: desde el panel solo se ven. El modelo debe ser uno del proveedor.</div>
         <div><button type="button" class="adm-btn" data-set-act="test-ai" ${aiKey.is_set ? '' : html`disabled`}>Probar la IA</button></div>
       </section>`,
 
     aiuses: html`
       <section class="adm-set-card">
         <h3>Avisos que usan la IA</h3>
-        <div class="adm-sub">Cada aviso se puede activar o desactivar por separado (con la IA general apagada no se usa ninguno), y sus instrucciones se pueden cambiar. Mientras no las cambies, siguen las que trae la aplicación; al restaurarlas vuelven a seguirlas.</div>
-        ${aiUses.map((use) => aiUse(use))}
+        <div class="adm-sub">Activa o apaga la IA aviso a aviso. Sus instrucciones se pueden cambiar; mientras no lo hagas, siguen las de la aplicación.</div>
+        <div class="adm-sub adm-ai-off" hidden>La IA general está apagada: ningún aviso la usa, aunque su interruptor esté activado.</div>
+        <div class="adm-ai-uses">
+          ${aiUses.filter((use) => !use.parent).map((use) => aiUse(use, aiUses.filter((fragment) => fragment.parent === use.id)))}
+        </div>
       </section>`,
 
     push: html`
@@ -152,7 +156,7 @@ function view(values, jobs, pushDevices, mail, aiUses) {
         </label>
         <div class="adm-sub">${vapid.is_set ? 'Las claves del servidor se crearon solas al arrancar; son las mismas para todos los usuarios.' : 'Sin claves (se crean al arrancar la API).'}</div>
         <div class="adm-sub">${pushDevices.devices} dispositivo${pushDevices.devices === 1 ? '' : 's'} suscrito${pushDevices.devices === 1 ? '' : 's'} (${pushDevices.users} usuario${pushDevices.users === 1 ? '' : 's'}).</div>
-        <div class="adm-sub">Para redactar y enviar avisos (o probarlos en tus dispositivos) usa <strong>Redactar aviso</strong>.</div>
+        <div class="adm-sub">Para redactar y enviar avisos (o probarlos en tus dispositivos) usa la pestaña <strong>Redactar aviso</strong>.</div>
         <div><button type="button" class="adm-btn" data-set-act="push-keys">Regenerar claves…</button></div>
       </section>`,
 
@@ -201,6 +205,15 @@ export function syncAnnualDay(form) {
     option.hidden = option.disabled = Number(option.value) < from || Number(option.value) > to;
   }
   if (Number(day.value) < from || Number(day.value) > to) day.value = String(from);
+}
+
+/** The notices are dimmed, and the page says why, while the general AI switch is off. */
+export function syncAiOff(form) {
+  const general = form.elements['ai.enabled'];
+  const list = form.querySelector('.adm-ai-uses');
+  if (!general || !list) return;
+  list.classList.toggle('off', !general.checked);
+  form.querySelector('.adm-ai-off').hidden = general.checked;
 }
 
 function collect(form) {
@@ -320,15 +333,19 @@ export async function render(target, { entity }) {
   panel = target;
   sections = entity.sections;
   try {
-    const { values, jobs, push_devices: pushDevices, mail, ai_uses: uses } = await api('/manage/settings');
+    const { values, jobs, push_devices: pushDevices, mail, ai_uses: uses, ai_model: aiModel } = await api('/manage/settings');
     aiUses = uses;
     loaded = Object.fromEntries(Object.entries(values).filter(([key]) => !SECRETS.includes(key) && !LOCKED.includes(key) && !key.startsWith('push.vapid')));
     for (const key of SECRETS) loaded[key] = null;
-    mount(panel, view(values, jobs, pushDevices, mail, aiUses));
+    mount(panel, view(values, jobs, pushDevices, mail, aiUses, aiModel));
     const form = panel.querySelector('#admSettings');
     fill(form, values);
     syncAnnualDay(form);
-    form.addEventListener('change', (e) => { if (e.target.name === 'annual.month') syncAnnualDay(form); });
+    syncAiOff(form);
+    form.addEventListener('change', (e) => {
+      if (e.target.name === 'annual.month') syncAnnualDay(form);
+      if (e.target.name === 'ai.enabled') syncAiOff(form);
+    });
     form.addEventListener('submit', (e) => { e.preventDefault(); save(form); });
     form.addEventListener('click', (e) => {
       const act = e.target.closest('[data-set-act]')?.dataset.setAct;

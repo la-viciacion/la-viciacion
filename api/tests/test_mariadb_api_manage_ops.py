@@ -215,6 +215,9 @@ class SettingsTests(OpsTestCase):
         self.assertEqual(body["push_devices"], {"devices": 0, "users": 0})
         self.assertEqual(body["mail"]["test_recipient"], "root@example.com")
         self.assertTrue(body["ai_uses"])
+        self.assertEqual(set(body["ai_model"]), {"provider", "model"})  # the model is the environment's: never stored, no default
+        self.assertEqual(body["values"]["ai.model"], {"is_set": bool(body["ai_model"]["model"]), "hint": None})
+        self.assertEqual(body["values"]["ai.provider"], {"is_set": bool(body["ai_model"]["provider"]), "hint": None})
 
     def test_several_settings_change_at_once_and_only_the_changed_ones_are_reported(self):
         response = self.admin("PUT", "/settings", json={"values": {"weekly.weekday": 3, "weekly.time": "10:30", "weekly.enabled": True}})
@@ -402,9 +405,13 @@ class DiagnosticsTests(OpsTestCase):
         self.assertEqual(failed.status_code, 502)
         self.assertIn("chat not found", failed.json()["detail"])
 
-    def test_the_ai_test_needs_a_key_and_reports_what_the_ai_answers(self):
+    def test_the_ai_test_needs_a_key_a_provider_and_a_model_and_reports_what_the_ai_answers(self):
         self.assertEqual(self.admin("POST", "/settings/test-ai").status_code, 409)
         self.set_settings(**{"ai.api_key": "sk-test-key-1234"})
+        incomplete = self.admin("POST", "/settings/test-ai")  # the provider and the model come from the environment too
+        self.assertEqual(incomplete.status_code, 409)
+        self.assertIn("AI_PROVIDER", incomplete.json()["detail"])
+        self.set_settings(**{"ai.provider": "google", "ai.model": "gemini-x"})
         with mock.patch.object(ai, "complete", return_value="¡Hola, jugones!") as complete, mock.patch.object(ai, "current", return_value=("google", "gemini-x")):
             done = self.admin("POST", "/settings/test-ai")
         self.assertEqual(done.json(), {"message": "La IA ha respondido", "reply": "¡Hola, jugones!", "provider": "google", "model": "gemini-x"})

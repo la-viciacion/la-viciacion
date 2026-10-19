@@ -17,21 +17,35 @@ OTHER_KEY = "AIzaSyNEWKEY-0123456789-abcdef"
 
 
 def values(**overrides):
-    base = {"ai.enabled": True, "ai.provider": "google", "ai.api_key": KEY, "ai.model": None}
+    base = {"ai.enabled": True, "ai.provider": "google", "ai.api_key": KEY, "ai.model": "gemini-test"}
     return mock.patch.object(ai.settings, "get", side_effect=lambda k: {**base, **overrides}[k])
 
 
 class SettingsTests(unittest.TestCase):
-    def test_provider_is_one_of_the_known_ones(self):
-        self.assertEqual(settings.coerce("ai.provider", " openai "), "openai")
-        with self.assertRaises(ValueError):
-            settings.coerce("ai.provider", "claude")
+    def test_the_provider_comes_only_from_the_environment_and_has_no_default(self):
+        db = make_session()
+        with mock.patch.dict(os.environ, {"AI_PROVIDER": " openai "}):
+            self.assertEqual(settings.get("ai.provider"), "openai")
+            self.assertEqual(settings.public_view(db)["ai.provider"], {"is_set": True, "hint": None})
+            with self.assertRaises(ValueError):
+                settings.set_values(db, {"ai.provider": "google"})  # not from the panel
+        with mock.patch.dict(os.environ, {"AI_PROVIDER": ""}):
+            self.assertIsNone(settings.get("ai.provider"))
+        self.assertEqual(db.query(models.AppSetting).filter_by(key="ai.provider").count(), 0)
 
-    def test_model_may_be_blank_to_use_the_default_but_not_odd(self):
-        self.assertEqual(settings.coerce("ai.model", ""), "")
-        self.assertEqual(settings.coerce("ai.model", "gemini-2.5-flash"), "gemini-2.5-flash")
-        with self.assertRaises(ValueError):
-            settings.coerce("ai.model", "models/x?key=1")
+    def test_the_model_comes_only_from_the_environment_and_has_no_default(self):
+        db = make_session()
+        with mock.patch.dict(os.environ, {"AI_MODEL": "gemini-x", "OPENAI_MODEL": ""}):
+            self.assertEqual(settings.get("ai.model"), "gemini-x")
+            self.assertEqual(settings.public_view(db)["ai.model"], {"is_set": True, "hint": None})
+            with self.assertRaises(ValueError):
+                settings.set_values(db, {"ai.model": "other"})  # not from the panel
+        with mock.patch.dict(os.environ, {"AI_MODEL": "", "OPENAI_MODEL": ""}):
+            self.assertIsNone(settings.get("ai.model"))  # nothing in the code fills the gap
+            self.assertEqual(settings.public_view(db)["ai.model"], {"is_set": False, "hint": None})
+        with mock.patch.dict(os.environ, {"AI_MODEL": "", "OPENAI_MODEL": "gpt-old"}):
+            self.assertEqual(settings.get("ai.model"), "gpt-old")  # the old variable still gives it
+        self.assertEqual(db.query(models.AppSetting).filter_by(key="ai.model").count(), 0)
 
     def test_the_key_comes_from_the_environment_is_never_stored_and_never_shown(self):
         db = make_session()
@@ -52,42 +66,6 @@ class SettingsTests(unittest.TestCase):
             self.assertEqual(settings.get("ai.api_key"), KEY)  # the new one wins
 
 
-class SeedingTests(unittest.TestCase):
-    NAMES = ("AI_PROVIDER", "AI_API_KEY", "AI_MODEL", "OPENAI_API_KEY", "OPENAI_MODEL")
-
-    def seed(self, env, db=None):
-        db = db or make_session()
-        clean = {k: v for k, v in os.environ.items() if k not in self.NAMES}
-        with mock.patch.dict(os.environ, {**clean, **env}, clear=True):
-            settings.seed_from_env(db)
-            stored = settings.get_all(db)
-        return db, {k: stored[k] for k in ("ai.enabled", "ai.provider", "ai.api_key", "ai.model")}
-
-    def test_ai_variables_seed_the_settings(self):
-        _, got = self.seed({"AI_PROVIDER": "google", "AI_API_KEY": KEY, "AI_MODEL": "gemini-2.5-pro"})
-        self.assertEqual(got, {"ai.enabled": True, "ai.provider": "google", "ai.api_key": KEY, "ai.model": "gemini-2.5-pro"})
-
-    def test_the_old_openai_variables_keep_an_existing_installation_working(self):
-        _, got = self.seed({"OPENAI_API_KEY": "sk-old", "OPENAI_MODEL": "gpt-4o-mini"})
-        self.assertEqual((got["ai.provider"], got["ai.api_key"], got["ai.model"]), ("openai", "sk-old", "gpt-4o-mini"))
-        self.assertTrue(got["ai.enabled"])
-
-    def test_ai_variables_win_over_the_old_ones(self):
-        _, got = self.seed({"AI_API_KEY": KEY, "OPENAI_API_KEY": "sk-old"})
-        self.assertEqual((got["ai.provider"], got["ai.api_key"]), ("google", KEY))
-
-    def test_nothing_in_the_environment_seeds_nothing(self):
-        db, got = self.seed({})
-        self.assertIsNone(got["ai.api_key"])
-        self.assertEqual(db.query(models.AppSetting).filter(models.AppSetting.key.like("ai.%")).count(), 0)
-
-    def test_the_database_is_the_source_of_truth_for_the_provider_after_the_first_time(self):
-        db, _ = self.seed({"AI_PROVIDER": "google"})
-        settings.set_values(db, {"ai.provider": "openai"})
-        _, got = self.seed({"AI_PROVIDER": "google", "AI_API_KEY": KEY}, db)
-        self.assertEqual((got["ai.provider"], got["ai.api_key"]), ("openai", KEY))  # the key never was in the database
-
-
 class CompleteTests(unittest.TestCase):
     def test_off_or_without_a_key_it_answers_nothing_and_calls_nobody(self):
         provider = mock.Mock()
@@ -105,12 +83,30 @@ class CompleteTests(unittest.TestCase):
         with mock.patch.dict(ai.PROVIDERS, {"google": provider}), values(**{"ai.enabled": False}):
             self.assertEqual(ai.complete("s", "u", force=True), "hola")
 
+    def test_the_panel_is_told_the_provider_and_the_model_in_use(self):
+        with values():
+            self.assertEqual(ai.in_use(), {"provider": "google", "model": "gemini-test"})
+        with values(**{"ai.provider": "openai", "ai.model": "gpt-x"}):
+            self.assertEqual(ai.in_use(), {"provider": "openai", "model": "gpt-x"})
+        with values(**{"ai.model": None, "ai.provider": None}):
+            self.assertEqual(ai.in_use(), {"provider": None, "model": None})
+
+    def test_without_a_provider_or_a_model_the_ai_writes_nothing_and_calls_nobody(self):
+        provider = mock.Mock()
+        for missing in ({"ai.model": None}, {"ai.provider": None}, {"ai.provider": "claude"}):
+            with mock.patch.dict(ai.PROVIDERS, {"google": provider}), values(**missing):
+                self.assertFalse(ai.is_ready(), missing)
+                self.assertFalse(ai.is_ready("new_game"), missing)
+                self.assertIsNone(ai.complete("s", "u"), missing)
+                self.assertIsNone(ai.complete("s", "u", force=True), missing)
+        provider.assert_not_called()
+
     def test_the_provider_model_and_key_come_from_the_settings(self):
         google, openai = mock.Mock(return_value="g"), mock.Mock(return_value="o")
         with mock.patch.dict(ai.PROVIDERS, {"google": google, "openai": openai}):
             with values():
                 self.assertEqual(ai.complete("sys", "usr"), "g")
-            google.assert_called_once_with(KEY, "gemini-2.5-flash", "sys", "usr", 1.0)  # the provider's default model
+            google.assert_called_once_with(KEY, "gemini-test", "sys", "usr", 1.0)
             with values(**{"ai.provider": "openai", "ai.model": "gpt-x"}):
                 self.assertEqual(ai.complete("sys", "usr"), "o")
             openai.assert_called_once_with(KEY, "gpt-x", "sys", "usr", 1.0)
@@ -207,6 +203,17 @@ class PromptOverrideTests(unittest.TestCase):
         self.assertEqual(settings.get_all(self.db)["ai.prompt.new_game"], self.code)
         self.assertFalse(next(u for u in settings.ai_uses(self.db) if u["id"] == "new_game")["customized"])
 
+    def test_a_fragment_says_which_notice_it_belongs_to_and_the_notices_belong_to_none(self):
+        uses = {u["id"]: u for u in settings.ai_uses(self.db)}
+        self.assertEqual(uses["completed_game_recommendation"]["parent"], "completed_game")
+        self.assertFalse(uses["completed_game_recommendation"]["switchable"])
+        self.assertTrue(all(u["parent"] is None for u in uses.values() if u["switchable"]))
+
+    def test_every_use_names_the_setting_of_its_switch_and_it_exists(self):
+        for use in settings.ai_uses(self.db):
+            self.assertIn(use["switch"], settings.REGISTRY, use["id"])
+            self.assertEqual(use["switch"].startswith("ai.use."), use["switchable"], use["id"])
+
     def test_the_database_prompt_wins_over_the_code(self):
         settings.set_values(self.db, {"ai.prompt.new_game": "  Di algo corto.  "})
         self.assertEqual(settings.get_all(self.db)["ai.prompt.new_game"], "Di algo corto.")
@@ -223,7 +230,7 @@ class PromptOverrideTests(unittest.TestCase):
 
     def test_only_resettable_settings_accept_none(self):
         with self.assertRaises(ValueError):
-            settings.set_values(self.db, {"ai.provider": None})
+            settings.set_values(self.db, {"weekly.weekday": None})
 
     def test_prompts_cannot_be_empty_or_huge(self):
         for bad in ("", "   ", "x" * (settings.PROMPT_MAX + 1)):
@@ -239,7 +246,7 @@ class PromptOverrideTests(unittest.TestCase):
 class PerUseTests(unittest.TestCase):
     def stored(self, **overrides):
         """settings.get as production answers it: what is stored, else the default of the registry."""
-        base = {"ai.enabled": True, "ai.api_key": KEY}
+        base = {"ai.enabled": True, "ai.provider": "google", "ai.api_key": KEY, "ai.model": "gemini-test"}
         return mock.patch.object(
             ai.settings, "get", side_effect=lambda k: {**base, **overrides}.get(k, settings.REGISTRY[k].default)
         )
@@ -257,9 +264,12 @@ class PerUseTests(unittest.TestCase):
     def test_the_prompt_is_the_stored_one_plus_the_recommendation_fragment(self):
         with self.stored(**{"ai.prompt.completed_game": "MI PROMPT", "ai.prompt.completed_game_recommendation": "MI RECOMENDACION"}):
             self.assertEqual(ai.prompt_for("completed_game"), "MI PROMPT")
-            text = ai.prompt_for("completed_game", {"game": "Hades", "user": "Bob"})
+            text = ai.prompt_for("completed_game", {"game": "Hades", "reasons": ["Comparte género: RPG", "Lo tienen 2 jugadores del grupo"]})
+            plain = ai.prompt_for("completed_game", {"game": "Hades", "reasons": []})
         self.assertEqual(text.splitlines()[:2], ["MI PROMPT", "MI RECOMENDACION"])
-        self.assertTrue(text.endswith("Juego recomendado: Hades\nJugado por: Bob"))
+        self.assertTrue(text.endswith("Juego recomendado: Hades\nMotivos:\n- Comparte género: RPG\n- Lo tienen 2 jugadores del grupo"))
+        self.assertTrue(plain.endswith("Juego recomendado: Hades"))  # no reasons, no heading
+        self.assertNotIn("Jugado por", text)  # who has the game is never told
 
 
 class NoticeSwitchTests(unittest.IsolatedAsyncioTestCase):
@@ -269,13 +279,13 @@ class NoticeSwitchTests(unittest.IsolatedAsyncioTestCase):
         FakeBot.sent = []
         base = {
             "notifications.enabled": True, "telegram.token": "123456789:AAE_abcdefghijklmnopqrstuvwxyz012345",
-            "telegram.group_id": "-100", "ai.enabled": True, "ai.api_key": KEY,
+            "telegram.group_id": "-100", "ai.enabled": True, "ai.provider": "google", "ai.api_key": KEY, "ai.model": "gemini-test",
         }
         complete = mock.Mock(return_value="Reescrito por la IA")
         with mock.patch.object(my_utils.telegram, "Bot", FakeBot), \
                 mock.patch.object(my_utils.settings, "get", side_effect=lambda k: {**base, **overrides}.get(k, settings.REGISTRY[k].default)), \
                 mock.patch.object(my_utils.ai, "complete", complete):
-            await my_utils.send_message("Ana completó Doom", False, ai_use="completed_game", new_game_recommended={"game": "Hades", "user": "Bob"})
+            await my_utils.send_message("Ana completó Doom", False, ai_use="completed_game", new_game_recommended={"game": "Hades", "reasons": []})
         return complete, FakeBot.sent[0]["text"]
 
     async def test_with_the_use_on_the_ai_writes_it(self):
@@ -287,7 +297,8 @@ class NoticeSwitchTests(unittest.IsolatedAsyncioTestCase):
         complete, text = await self.send(**{"ai.use.completed_game": False})
         complete.assert_not_called()
         self.assertTrue(text.startswith("Ana completó Doom"))
-        self.assertIn("Lo tiene Bob", text)
+        self.assertIn("¿Te apetece probar *Hades*?", text)
+        self.assertNotIn("Lo tiene", text)
 
     async def test_the_admin_prompt_is_what_reaches_the_ai(self):
         complete, _ = await self.send(**{"ai.prompt.completed_game": "SOLO UN EMOJI"})
@@ -302,11 +313,19 @@ class TestRouteTests(unittest.TestCase):
             system.test_ai(self.admin)
         self.assertEqual(caught.exception.status_code, 409)
 
+    def test_without_a_provider_or_a_model_it_is_a_409_that_says_where_to_set_them(self):
+        for missing in ({"ai.model": None}, {"ai.provider": None}):
+            with values(**missing), self.assertRaises(HTTPException) as caught:
+                system.test_ai(self.admin)
+            self.assertEqual(caught.exception.status_code, 409)
+            self.assertIn("AI_MODEL", caught.exception.detail)
+            self.assertIn("AI_PROVIDER", caught.exception.detail)
+
     def test_it_works_with_the_switch_off_and_reports_what_was_used(self):
         with values(**{"ai.enabled": False}), mock.patch.dict(ai.PROVIDERS, {"google": mock.Mock(return_value="Hola")}):
             result = system.test_ai(self.admin)
         self.assertEqual(result["reply"], "Hola")
-        self.assertEqual((result["provider"], result["model"]), ("google", "gemini-2.5-flash"))
+        self.assertEqual((result["provider"], result["model"]), ("google", "gemini-test"))
 
     def test_a_provider_failure_is_a_502_with_the_reason(self):
         failing = mock.Mock(side_effect=AIError("Google respondio 403: no"))

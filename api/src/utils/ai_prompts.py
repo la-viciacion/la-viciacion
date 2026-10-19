@@ -7,85 +7,82 @@ was never edited follows this file, so improving it here reaches everybody who d
 from dataclasses import dataclass
 
 NEW_GAME_PROMPT = """
-Tu función es crear una frase divertida, partiendo del mensaje proporcionado.
-Este mensaje indica que alguien ha empezado a jugar a un nuevo juego.
+Reescribe el mensaje proporcionado, un aviso para un grupo de amigos que juegan a videojuegos: alguien ha empezado
+a jugar a un juego.
 
-No puedes hacer referencia a logros a menos que explícitamente se indique que se ha obtenido
-algún logro.
+Empieza por lo importante: la primera frase debe llevar el nombre del usuario, el nombre del juego (con su enlace,
+si lo hay, tal como viene: [Texto](enlace)) y la cantidad de juegos empezados que indica el mensaje original.
+Después, como mucho, una frase corta con un toque de humor.
 
-El mensaje debe estar preparado para poder ser interpretado en formato Markdown.
-Debes incluir siempre el nombre del usuario.
-Debes incluir siempre el nombre del juego.
-Debes incluir siempre, si lo hay, el enlace proporcionado, manteniendo el formato del mensaje original ([Texto](enlace)).
-Debes incluir siempre la cantidad de juegos empezados indicado en el mensaje original.
+Sé breve: dos frases como máximo y unos 200 caracteres. No expliques nada ni te alargues.
+No hables de logros, salvo que el mensaje diga que se ha obtenido alguno. No te inventes ninguna cifra.
+El texto debe ser Markdown válido.
 """
 
 COMPLETED_GAME_PROMPT = """
-Tu función es crear una frase divertida, partiendo del mensaje proporcionado.
-Este mensaje indica que alguien ha completado un juego.
+Reescribe el mensaje proporcionado, un aviso para un grupo de amigos que juegan a videojuegos: alguien ha completado
+un juego.
 
-El mensaje se envía al grupo, no al usuario: habla de él siempre en tercera persona (por ejemplo, "Toni ha
-completado..."), sin dirigirte a él con "tú", "has" ni "tu".
+Empieza por lo importante: la primera frase debe llevar el nombre del usuario, el nombre del juego, la
+cantidad de juegos completados que indica el mensaje original y el tiempo que le ha costado al usuario completarlo
+(el que aparece justo después del nombre del juego, tras la palabra "en"), tal como está escrito (por ejemplo, 12h30m).
+Si el mensaje original indica la media de tiempo, inclúyela también y puedes compararla con el tiempo del usuario
+(más rápido, más lento, parecido): es lo que se suele tardar en completar ese juego, no la media del usuario.
+Si el mensaje no indica la media, no la menciones.
+Después, como mucho, una frase corta con un toque de humor.
 
-No puedes hacer referencia a logros a menos que explícitamente se indique que se ha obtenido
-algún logro.
+El aviso va al grupo, no al usuario: habla de él siempre en tercera persona (por ejemplo, "Toni ha completado..."),
+sin dirigirte a él con "tú", "has" ni "tu".
 
-El mensaje debe estar preparado para poder ser interpretado en formato Markdown.
-Debes incluir siempre el nombre del usuario.
-Debes incluir siempre el nombre del juego.
-Debes incluir siempre la cantidad de juegos completados indicado en el mensaje original.
-Debes incluir siempre el tiempo que le ha costado al usuario completar el juego (el que aparece justo después del
-nombre del juego, tras la palabra "en"), tal como está escrito en el mensaje original (por ejemplo, 12h30m).
-Si el mensaje original indica la media de tiempo, debes incluirla también, y puedes compararla con el tiempo del
-usuario (más rápido, más lento, parecido). Esta media no es la media del usuario, sino la que se suele tardar en
-completar ese juego. Si el mensaje no indica la media, no la menciones.
+Sé breve: dos frases como máximo y unos 250 caracteres. No expliques nada ni te alargues.
+No hables de logros, salvo que el mensaje diga que se ha obtenido alguno.
 No te inventes ninguna cifra: usa solo las del mensaje original.
+El texto debe ser Markdown válido: deja los nombres con el formato del mensaje original (*así*).
 """
 
 NEW_GAME_RECOMMENDATION = """
-Al final del mensaje, añade una frase corta y divertida sugiriendo que el usuario pruebe el juego que se indica
-a continuación, hablando de él en tercera persona (el mensaje va al grupo) y diciendo que lo tiene o lo ha
-jugado la persona indicada. Debes incluir siempre el nombre del juego y el de esa persona.
+Al final del mensaje añade una última frase muy corta recomendando el juego que se indica a continuación a la persona
+que acaba de completar el anterior (nómbrala y habla de ella siempre en tercera persona, por ejemplo "A Toni le
+vendría bien...", sin "tú" ni "te": el mensaje va al grupo). Debes incluir siempre el
+nombre del juego. Recomienda solo el juego: no menciones a ningún jugador que lo tenga o lo haya jugado. Si se
+indican motivos, puedes apoyarte en uno, sin inventarte ningún dato ni cifra. No te alargues.
 """
 
 RANKING_USER_PROMPT = """
-Tu función es crear una frase divertida basándote
-en la clasificación proporcionada por el usuario, teniendo en cuenta que la temática debe ser de videojuegos.
+Reescribe el mensaje proporcionado, un aviso para un grupo de amigos que juegan a videojuegos: ha cambiado la
+clasificación de horas de los jugadores.
 
-En esta clasificación habrá una lista de usuarios, indicando junto a su nombre si ha habido algún
-cambio de posición. En ese caso, debes crear la frase únicamente teniendo en cuenta los usuarios
-que han sufrido algún cambio.
-
-Debes empezar el mensaje con '📣 Actualización del ránking de horas 📣', seguido de un salto de linea,
-a continuación debes añadir tu frase, y debes incluir al final del mensaje
-la clasificación original sin modificar en absoluto.
+Empieza por lo importante: el mensaje debe empezar con '📣 Actualización del ránking de horas 📣', seguido de un salto
+de linea y de la clasificación original sin modificar en absoluto.
+Después de la clasificación añade una sola frase corta y divertida (unas 20 palabras) sobre los usuarios que han
+cambiado de posición, que se indica junto a su nombre, y no sobre los demás. No repitas la lista ni expliques nada.
 """
 
 RANKING_GAMES_PROMPT = """
-Tu función es crear una frase divertida basándote
-en la clasificación proporcionada por el usuario, teniendo en cuenta que la temática debe ser de videojuegos.
+Reescribe el mensaje proporcionado, un aviso para un grupo de amigos que juegan a videojuegos: ha cambiado el top
+de juegos más jugados.
 
-En esta clasificación habrá una lista de juegos, indicando junto a su nombre si ha habido algún
-cambio de posición. En ese caso, debes crear la frase únicamente teniendo en cuenta los juegos
-que han sufrido algún cambio. Si conoces alguna broma relacionada con algunos de los juegos implicados, puedes incluirla.
-
-Debes empezar el mensaje con '📣 Actualización del ránking de juegos 📣', seguido de un salto de linea,
-a continuación debes añadir tu frase, y debes incluir al final del mensaje
-la clasificación original sin modificar en absoluto.
+Empieza por lo importante: el mensaje debe empezar con '📣 Actualización del ránking de juegos 📣', seguido de un salto
+de linea y de la clasificación original sin modificar en absoluto.
+Después de la clasificación añade una sola frase corta y divertida (unas 20 palabras) sobre los juegos que han
+cambiado de posición, que se indica junto a su nombre, y no sobre los demás. Si conoces alguna broma de alguno de
+esos juegos, puedes usarla. No repitas la lista ni expliques nada.
 """
 
 WISHLIST_RELEASE_PROMPT = """
-Tu función es crear una frase divertida, partiendo del mensaje proporcionado.
-Este mensaje avisa al grupo de que mañana sale a la venta un juego (o varios) que alguien tiene en su
-lista de deseados.
+Reescribe el mensaje proporcionado, un aviso para un grupo de amigos que juegan a videojuegos: mañana sale a la
+venta un juego (o varios) que alguien tiene en su lista de deseados.
 
-No puedes hacer referencia a logros ni a horas jugadas: solo se trata de un estreno.
-
-El mensaje debe estar preparado para poder ser interpretado en formato Markdown.
-Debes incluir siempre el nombre de cada juego, tal como aparece en el mensaje original.
-Debes incluir siempre el nombre de todas las personas que lo esperan, y dejar claro que es mañana cuando sale.
+Empieza por lo importante: di el nombre de cada juego, tal como aparece en el mensaje original, y que sale mañana.
 Si hay varios juegos, menciónalos todos, sin dejarte ninguno.
-Si conoces alguna broma relacionada con alguno de los juegos, puedes incluirla.
+Menciona también a todas las personas que lo esperan, pero de pasada y con naturalidad, dentro de la frase (por
+ejemplo, "Ana y Bea ya lo tienen apuntado"): sin repetir "para Fulano" ni hacer una lista aparte.
+Después, como mucho, una frase corta con un toque de humor (si conoces alguna broma de alguno de los juegos, puedes
+usarla).
+
+Sé breve: una frase por juego y la del humor. No expliques nada ni te alargues.
+No hables de logros ni de horas jugadas: solo se trata de un estreno.
+El texto debe ser Markdown válido: deja los nombres de los juegos con el formato del mensaje original (*así*).
 """
 
 
@@ -97,6 +94,8 @@ class Use:
     help: str
     default: str  # the prompt until the panel changes it
     switchable: bool = True  # has its own on/off switch (a fragment does not: it follows the notice it belongs to)
+    parent: str | None = None  # the notice a fragment is added to, so the panel can show it inside that notice
+    switch: str | None = None  # the setting a fragment's own switch is stored in (it is not an AI switch: see the recommendation)
 
 
 # The ids are stored in the settings (`ai.use.<id>`, `ai.prompt.<id>`) and passed to send_message(ai_use=...):
@@ -114,9 +113,11 @@ USES: dict[str, Use] = {
     ),
     "completed_game_recommendation": Use(
         "Recomendación al completar",
-        "Se añade a las instrucciones anteriores cuando hay otro juego que recomendar (sin interruptor propio).",
+        "Recomienda otro juego al final del aviso, elegido por afinidad. Si lo redacta la IA, usa estas instrucciones; si no, añade una línea fija.",
         NEW_GAME_RECOMMENDATION,
         switchable=False,
+        parent="completed_game",
+        switch="completed_game.recommend",
     ),
     "ranking_games": Use(
         "Cambio en el ranking de juegos",
