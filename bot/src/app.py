@@ -19,7 +19,6 @@ from utils.logger import LogManager
 log_manager = LogManager()
 logger = log_manager.get_logger()
 import sentry_sdk
-from sentry_sdk.types import Event, Hint
 
 ##########
 ## INIT ##
@@ -30,16 +29,6 @@ config = Config()
 my_routes = MyRoutes()
 basic_routes = BasicRoutes()
 ranking_routes = RankingRoutes()
-
-
-def before_send(event: Event, hint: Hint):
-    # modify event here
-    logger.info("------BEFORE SENTRY------")
-    logger.info("Hint:")
-    logger.info(hint)
-    # exc_info_str = str(hint.get("exc_info"))
-    # logger.info(exc_info_str)
-    return event
 
 
 if config.SENTRY_URL is not None and config.SENTRY_URL != "":
@@ -54,7 +43,6 @@ if config.SENTRY_URL is not None and config.SENTRY_URL != "":
         ignore_errors=[telegram.error.NetworkError],
         profiles_sample_rate=1.0,
         environment=config.ENVIRONMENT,
-        before_send=before_send,
     )
 
 
