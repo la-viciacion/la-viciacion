@@ -52,9 +52,9 @@ export async function render({ user, main }) {
     mount(root, html`
       <div class="st-stage" data-theme="night"><div class="st-slide">
         ${locked ? html`
-          <div class="st-emoji">🔒</div>
-          <h2 class="st-title">Todavía no</h2>
-          <div class="st-line">El resumen de esta temporada no está disponible: se abrirá cuando el grupo reciba el aviso.</div>
+          <div class="st-emoji">⏳</div>
+          <h2 class="st-title">Cargando…</h2>
+          <div class="st-line">No, en serio: no seas ansia y espera a que acabe el año.</div>
         ` : html`
           <h2 class="st-title">No se ha podido cargar</h2><div class="st-line">${err.message}</div>
         `}
