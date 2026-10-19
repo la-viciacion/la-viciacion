@@ -120,6 +120,8 @@ def _prompt(value: str) -> str | None:
 REGISTRY: dict[str, Spec] = {
     "notifications.enabled": Spec("bool", True),
     "notifications.admin_alerts": Spec("bool", True),
+    # Suggest another game at the end of the completion notice (by the AI or as a fixed line when it does not write it)
+    "completed_game.recommend": Spec("bool", True),
     "weekly.enabled": Spec("bool", True),
     "weekly.weekday": Spec("int", 0, check=_weekday),  # 0 = Monday
     "weekly.time": Spec("str", "09:00", check=_time),
@@ -260,6 +262,7 @@ def ai_uses(db: Session) -> list[dict]:
             "help": use.help,
             "switchable": use.switchable,
             "parent": use.parent,
+            "switch": f"ai.use.{use_id}" if use.switchable else use.switch,
             "default_prompt": REGISTRY[f"ai.prompt.{use_id}"].default,
             "customized": f"ai.prompt.{use_id}" in changed,
         }
