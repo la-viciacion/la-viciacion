@@ -34,14 +34,10 @@ ranking_routes = RankingRoutes()
 if config.SENTRY_URL is not None and config.SENTRY_URL != "":
     sentry_sdk.init(
         dsn=config.SENTRY_URL,
-        # Set traces_sample_rate to 1.0 to capture 100%
-        # of transactions for tracing.
-        traces_sample_rate=1.0,
-        # Set profiles_sample_rate to 1.0 to profile 100%
-        # of sampled transactions.
-        # We recommend adjusting this value in production.
+        # a sample is enough for a small private app; errors are always reported
+        traces_sample_rate=0.1,
         ignore_errors=[telegram.error.NetworkError],
-        profiles_sample_rate=1.0,
+        profiles_sample_rate=0.1,
         environment=config.ENVIRONMENT,
     )
 
