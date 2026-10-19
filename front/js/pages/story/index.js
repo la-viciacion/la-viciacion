@@ -14,6 +14,9 @@ import { toast } from '../../ui/toast.js';
 
 export const active = null; // it belongs to no item of the top bar
 
+// api/src/utils/messages.py RECAP_SEASON_LOCKED: told apart from any other failure to show a friendlier single slide
+const SEASON_LOCKED = 'El resumen de esta temporada todavía no está disponible';
+
 let player = null;
 let period;
 let other = null; // the player asked for, when it is not the user
@@ -45,9 +48,16 @@ export async function render({ user, main }) {
   try {
     data = await api(`/statistics/recap/${period}?username=${encodeURIComponent(other || user.username)}`);
   } catch (err) {
+    const locked = err.detail === SEASON_LOCKED;
     mount(root, html`
       <div class="st-stage" data-theme="night"><div class="st-slide">
-        <h2 class="st-title">No se ha podido cargar</h2><div class="st-line">${err.message}</div>
+        ${locked ? html`
+          <div class="st-emoji">🔒</div>
+          <h2 class="st-title">Todavía no</h2>
+          <div class="st-line">El resumen de esta temporada no está disponible: se abrirá cuando el grupo reciba el aviso.</div>
+        ` : html`
+          <h2 class="st-title">No se ha podido cargar</h2><div class="st-line">${err.message}</div>
+        `}
         <div class="st-actions"><button type="button" class="st-btn" data-act="close">Cerrar</button></div>
       </div></div>`);
     root.onclick = (event) => { if (event.target.closest('[data-act="close"]')) leave(); };

@@ -132,6 +132,18 @@ test('a player who did not play still gets a slide, and an error is shown', asyn
   assert.equal(window.location.hash, '#/recap/2026-09');
 });
 
+test('a locked season gets its own friendly single slide, not the generic error', async () => {
+  window.location.hash = '#/story/2026-09';
+  installApi({ 'GET /statistics/recap/': json({ detail: 'El resumen de esta temporada todavía no está disponible' }, 400) });
+  await story.render({ user: ME, main: main() });
+  await settle();
+  assert.match(main().textContent, /Todavía no/);
+  assert.doesNotMatch(main().textContent, /No se ha podido cargar/);
+  main().querySelector('[data-act="close"]').click();
+  assert.equal(window.location.hash, '#/recap/2026-09');
+  story.dispose();
+});
+
 test('only an admin can ask for another player', async () => {
   let calls = await open('#/story/2026-09/biel');
   assert.equal(calls[0].path, '/statistics/recap/2026-09?username=ana');
