@@ -123,7 +123,7 @@ REGISTRY: dict[str, Spec] = {
     "weekly.enabled": Spec("bool", True),
     "weekly.weekday": Spec("int", 0, check=_weekday),  # 0 = Monday
     "weekly.time": Spec("str", "09:00", check=_time),
-    # Off until an admin has seen it in the panel (Notificaciones → Recap)
+    # Off until an admin has seen it in the panel (Notificaciones → Probar resumen)
     "monthly.enabled": Spec("bool", False),
     "monthly.day": Spec("int", 1, check=_monthly_day),  # day of the month, in the first days: the app offers it from the 1st to the 5th
     "monthly.time": Spec("str", "10:00", check=_time),

@@ -379,18 +379,36 @@ ENTITIES.audit = {
 // Not tables: custom pages, each one a module exporting render(panel, { entity, admin }).
 ENTITIES.home = { label: 'Inicio', description: 'Resumen de la aplicación y lo que necesita atención.', custom: 'home' };
 ENTITIES.announce = { label: 'Redactar aviso', description: 'Escribe un aviso y envíalo a los dispositivos de la app.', custom: 'announce' };
-ENTITIES.recap = { label: 'Recap', description: 'Mira el resumen de cualquier mes o temporada, con el aviso que se enviaría, mándalo ahora y programa el envío mensual y el anual.', custom: 'recap' };
-ENTITIES.notifications = {
-  label: 'Ajustes',
-  description: 'Interruptor general de notificaciones, resumen semanal, bot de Telegram y avisos en la app.',
+ENTITIES.recap = { label: 'Probar resumen', description: 'Mira el resumen de cualquier mes o temporada, con el aviso que se enviaría, y mándalo ahora.', custom: 'recap' };
+ENTITIES.sends = {
+  label: 'Envíos',
+  description: 'Interruptor general de notificaciones y cuándo se envían el resumen semanal, el mensual y el anual.',
   custom: 'settings',
-  sections: ['notifications', 'weekly', 'telegram', 'push'],
+  sections: ['notifications', 'weekly', 'monthly', 'annual'],
 };
-ENTITIES.system = {
-  label: 'Sistema',
-  description: 'Inteligencia artificial que redacta algunos avisos, correo para recuperar la contraseña y copia de seguridad.',
+ENTITIES.channels = {
+  label: 'Canales',
+  description: 'Por dónde salen los avisos: el bot de Telegram y las notificaciones de la app.',
   custom: 'settings',
-  sections: ['ai', 'aiuses', 'mail', 'backup'],
+  sections: ['telegram', 'push'],
+};
+ENTITIES.ai = {
+  label: 'IA',
+  description: 'Inteligencia artificial que redacta algunos avisos: proveedor, modelo y cuáles la usan.',
+  custom: 'settings',
+  sections: ['ai', 'aiuses'],
+};
+ENTITIES.mail = {
+  label: 'Correo',
+  description: 'Correo con el que los jugadores recuperan su contraseña.',
+  custom: 'settings',
+  sections: ['mail'],
+};
+ENTITIES.backup = {
+  label: 'Copia de seguridad',
+  description: 'Descarga de toda la base de datos.',
+  custom: 'settings',
+  sections: ['backup'],
 };
 
 export const TABS = Object.keys(ENTITIES);
