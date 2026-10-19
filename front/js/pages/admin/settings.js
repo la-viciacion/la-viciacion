@@ -43,14 +43,12 @@ function mailStatus(mail) {
 
 const customizedTag = (use) => (use.customized ? html`<span class="adm-tag">Personalizado</span>` : '');
 
-// One notice that can use the AI: its own switch (a fragment has none), a "Personalizado" tag when its instructions
-// were changed and the instructions behind a button. The fragments of a notice are drawn inside it.
+// One notice that can use the AI: its own switch, a "Personalizado" tag when its instructions were changed and the
+// instructions behind a button. The fragments of a notice are drawn inside it; their switch is not an AI one.
 function aiUse(use, fragments) {
   return html`
     <div class="adm-ai-use ${use.parent ? 'adm-ai-fragment' : ''}">
-      ${use.switchable
-    ? check(`ai.use.${use.id}`, use.label, use.help, customizedTag(use))
-    : html`<div class="adm-ai-head"><strong>${use.label}${customizedTag(use)}</strong><span class="adm-sub">${use.help}</span></div>`}
+      ${check(use.switch, use.label, use.help, customizedTag(use))}
       <details class="adm-details adm-ai-prompt">
         <summary class="adm-btn sm">Instrucciones</summary>
         <div>

@@ -98,6 +98,7 @@ class Use:
     default: str  # the prompt until the panel changes it
     switchable: bool = True  # has its own on/off switch (a fragment does not: it follows the notice it belongs to)
     parent: str | None = None  # the notice a fragment is added to, so the panel can show it inside that notice
+    switch: str | None = None  # the setting a fragment's own switch is stored in (it is not an AI switch: see the recommendation)
 
 
 # The ids are stored in the settings (`ai.use.<id>`, `ai.prompt.<id>`) and passed to send_message(ai_use=...):
@@ -115,10 +116,11 @@ USES: dict[str, Use] = {
     ),
     "completed_game_recommendation": Use(
         "Recomendación al completar",
-        "Se añade a las instrucciones del aviso cuando hay otro juego que recomendar. Se activa o se apaga con él.",
+        "Sugiere otro juego al final del aviso. Si lo redacta la IA, usa estas instrucciones; si no, añade una línea fija.",
         NEW_GAME_RECOMMENDATION,
         switchable=False,
         parent="completed_game",
+        switch="completed_game.recommend",
     ),
     "ranking_games": Use(
         "Cambio en el ranking de juegos",

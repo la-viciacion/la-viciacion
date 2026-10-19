@@ -44,7 +44,7 @@ class AfterCompletionAvgTimeTests(unittest.IsolatedAsyncioTestCase):
                 mock.patch.object(users, "get_user_by_id", return_value=types.SimpleNamespace(id=1, name="Ana")), \
                 mock.patch.object(users.utils, "get_game_info", new=mock.AsyncMock(return_value={"rawg": None, "hltb": hltb})), \
                 mock.patch.object(users.games, "update_avg_time_game", update), \
-                mock.patch.object(users.games, "recommended_games", return_value=[]), \
+                mock.patch.object(users.games, "recommended_games", return_value=[]),                 mock.patch.object(users.settings, "get", return_value=True), \
                 mock.patch.object(users, "count_completed_games", return_value=1), \
                 mock.patch.object(users.utils, "send_message", new=mock.AsyncMock()), \
                 mock.patch("src.crud.time_entries.played_time_of_run", return_value=0), \
@@ -64,6 +64,40 @@ class AfterCompletionAvgTimeTests(unittest.IsolatedAsyncioTestCase):
     async def test_an_unchanged_value_is_not_written(self):
         update, _ = await self.run_completion(hltb={"comp_main": 36000}, stored_avg=36000)
         update.assert_not_called()
+
+
+class CompletionRecommendationSwitchTests(unittest.IsolatedAsyncioTestCase):
+    async def completion(self, recommend):
+        game = types.SimpleNamespace(id="g", name="Doom", genres="RPG", avg_time=3600)
+        entry = types.SimpleNamespace(game_id="g", user_id=1, season=2026)
+        ach = mock.MagicMock(
+            just_in_time=mock.AsyncMock(), user_completed_total_games=mock.AsyncMock(), completed_in_a_day=mock.AsyncMock(),
+            lifetime_views=mock.MagicMock(return_value=[]),
+        )
+        suggest = mock.MagicMock(return_value=[(1, 2, "Hades", 3, "Bea")])
+        send = mock.AsyncMock()
+        with mock.patch.object(users.games, "get_game_by_id", return_value=game), \
+                mock.patch.object(users, "get_user_by_id", return_value=types.SimpleNamespace(id=1, name="Ana")), \
+                mock.patch.object(users.utils, "get_game_info", new=mock.AsyncMock(return_value={"rawg": None, "hltb": None})), \
+                mock.patch.object(users.games, "recommended_games", suggest), \
+                mock.patch.object(users, "count_completed_games", return_value=1), \
+                mock.patch.object(users.utils, "send_message", new=send), \
+                mock.patch.object(users.settings, "get", side_effect=lambda key: {"completed_game.recommend": recommend}[key]), \
+                mock.patch("src.crud.time_entries.played_time_of_run", return_value=0), \
+                mock.patch("src.crud.achievements.Achievements", return_value=ach):
+            await users.after_completion(mock.MagicMock(), entry, silent=True)
+        return suggest, send
+
+    async def test_on_by_default_the_notice_carries_a_suggestion(self):
+        self.assertIs(users.settings.REGISTRY["completed_game.recommend"].default, True)
+        suggest, send = await self.completion(True)
+        suggest.assert_called_once()
+        self.assertEqual(send.await_args.kwargs["new_game_recommended"], {"game": "Hades", "user": "Bea"})
+
+    async def test_switched_off_no_game_is_looked_up_and_none_is_suggested(self):
+        suggest, send = await self.completion(False)
+        suggest.assert_not_called()
+        self.assertIsNone(send.await_args.kwargs["new_game_recommended"])
 
 
 if __name__ == "__main__":

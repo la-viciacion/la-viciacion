@@ -9,14 +9,14 @@ const { render } = await import('../js/pages/admin/settings.js');
 
 const VALUES = {
   'ai.enabled': true, 'ai.provider': 'google', 'ai.api_key': { is_set: true }, 'ai.model': '',
-  'ai.use.completed_game': true, 'ai.use.new_game': false,
+  'ai.use.completed_game': true, 'ai.use.new_game': false, 'completed_game.recommend': true,
   'telegram.token': { is_set: false }, 'telegram.group_id': { is_set: false }, 'telegram.admin_chat_id': { is_set: false }, 'push.vapid_private': { is_set: true },
   'ai.prompt.completed_game': 'a', 'ai.prompt.completed_game_recommendation': 'b', 'ai.prompt.new_game': 'c',
 };
 const USES = [
-  { id: 'new_game', label: 'Empieza un juego', help: 'h1', switchable: true, parent: null, default_prompt: 'c', customized: false },
-  { id: 'completed_game', label: 'Completa un juego', help: 'h2', switchable: true, parent: null, default_prompt: 'a', customized: true },
-  { id: 'completed_game_recommendation', label: 'Recomendación al completar', help: 'h3', switchable: false, parent: 'completed_game', default_prompt: 'b', customized: true },
+  { id: 'new_game', label: 'Empieza un juego', help: 'h1', switchable: true, switch: 'ai.use.new_game', parent: null, default_prompt: 'c', customized: false },
+  { id: 'completed_game', label: 'Completa un juego', help: 'h2', switchable: true, switch: 'ai.use.completed_game', parent: null, default_prompt: 'a', customized: true },
+  { id: 'completed_game_recommendation', label: 'Recomendación al completar', help: 'h3', switchable: false, switch: 'completed_game.recommend', parent: 'completed_game', default_prompt: 'b', customized: true },
 ];
 
 const panel = () => document.getElementById('panel');
@@ -26,15 +26,15 @@ const open = async (values = VALUES) => {
   await settle();
 };
 
-test('a fragment is drawn inside the notice it belongs to and has no switch of its own', async () => {
+test('a fragment is drawn inside the notice it belongs to, with its own switch', async () => {
   await open();
   const rows = [...panel().querySelectorAll('.adm-ai-uses > .adm-ai-use')];
   assert.equal(rows.length, 2, 'only the notices are top-level rows');
   const completed = rows[1];
   const fragment = completed.querySelector('.adm-ai-fragment');
   assert.match(fragment.textContent, /Recomendación al completar/);
-  assert.equal(fragment.querySelector('input[type="checkbox"]'), null);
-  assert.equal(panel().querySelectorAll('.adm-ai-uses input[type="checkbox"]').length, 2);
+  assert.equal(fragment.querySelector('input[type="checkbox"]').name, 'completed_game.recommend');
+  assert.equal(panel().querySelectorAll('.adm-ai-uses input[type="checkbox"]').length, 3);
 });
 
 test('a changed notice says so and offers the original; one that was not changed does not', async () => {

@@ -213,6 +213,11 @@ class PromptOverrideTests(unittest.TestCase):
         self.assertFalse(uses["completed_game_recommendation"]["switchable"])
         self.assertTrue(all(u["parent"] is None for u in uses.values() if u["switchable"]))
 
+    def test_every_use_names_the_setting_of_its_switch_and_it_exists(self):
+        for use in settings.ai_uses(self.db):
+            self.assertIn(use["switch"], settings.REGISTRY, use["id"])
+            self.assertEqual(use["switch"].startswith("ai.use."), use["switchable"], use["id"])
+
     def test_the_database_prompt_wins_over_the_code(self):
         settings.set_values(self.db, {"ai.prompt.new_game": "  Di algo corto.  "})
         self.assertEqual(settings.get_all(self.db)["ai.prompt.new_game"], "Di algo corto.")
