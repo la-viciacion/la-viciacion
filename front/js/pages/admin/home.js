@@ -44,7 +44,9 @@ function integrations(cfg) {
     : !v['telegram.group_id'].is_set ? ['orange', 'Sin grupo', 'Falta TELEGRAM_GROUP_ID en el .env del servidor: los avisos del grupo no salen']
     : v['notifications.enabled'] ? ['green', 'Activo', 'Bot configurado y notificaciones activadas'] : ['orange', 'Notificaciones apagadas', 'El bot está configurado, pero no se envía nada'];
   const ai = !v['ai.enabled'] ? ['gray', 'Apagada', 'Los avisos salen con el texto original']
-    : v['ai.api_key'].is_set ? ['green', 'Activa', `${v['ai.provider']}${v['ai.model'] ? ` (${v['ai.model']})` : ''}`] : ['orange', 'Sin clave', 'Está activada, pero falta AI_API_KEY en el .env del servidor'];
+    : !v['ai.api_key'].is_set ? ['orange', 'Sin clave', 'Está activada, pero falta AI_API_KEY en el .env del servidor']
+    : !cfg.ai_model.model ? ['orange', 'Sin modelo', 'Está activada, pero falta AI_MODEL en el .env del servidor']
+    : ['green', 'Activa', `${v['ai.provider']} (${cfg.ai_model.model})`];
   const push = v['push.enabled']
     ? ['green', 'Activos', `${plural(cfg.push_devices.devices, 'dispositivo suscrito', 'dispositivos suscritos')}`] : ['gray', 'Apagados', 'Nadie recibe avisos en la app'];
   const mail = cfg.mail.configured ? ['green', 'Configurado', `Envía como ${cfg.mail.from}`] : ['gray', 'Sin configurar', 'Nadie puede recuperar su contraseña por correo'];

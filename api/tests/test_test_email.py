@@ -44,7 +44,7 @@ class SettingsViewTests(unittest.TestCase):
         db = mock.MagicMock()
         db.query.return_value.all.return_value = []
         db.query.return_value.scalar.return_value = 0
-        with mock.patch.object(system.settings, "public_view", return_value={}):
+        with mock.patch.object(system.settings, "public_view", return_value={}), mock.patch.object(system.ai, "in_use", return_value={}):
             result = system.get_settings(ADMIN, db)
         self.assertEqual(result["mail"]["test_recipient"], "boss@x.es")
         self.assertTrue(result["mail"]["configured"])

@@ -121,9 +121,9 @@ class EncryptionTests(unittest.TestCase):
 
 class EnvOnlyTests(unittest.TestCase):
     """The keys of outside services (the Telegram token and chats, the AI key) live in the environment: a copy of the
-    database must not carry them."""
+    database must not carry them. The AI model is there too, with no default in the code (see utils/ai.py)."""
 
-    KEYS = ("telegram.token", "telegram.group_id", "telegram.admin_chat_id", "ai.api_key")
+    KEYS = ("telegram.token", "telegram.group_id", "telegram.admin_chat_id", "ai.api_key", "ai.model")
 
     def test_the_keys_of_outside_services_are_the_ones_that_are_env_only(self):
         self.assertEqual({key for key, spec in settings.REGISTRY.items() if spec.env_only}, set(self.KEYS))

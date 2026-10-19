@@ -24,7 +24,7 @@ const VALUES = {
 function routes(extra = {}) {
   return {
     'GET /manage/recap/preview': { period: '2026-09', label: 'septiembre de 2026', nobody_played: false, telegram: 'TELEGRAM', push: { title: 'TITULO', body: 'CUERPO', url: '#/story/2026-09' } },
-    'GET /manage/settings': { values: VALUES, jobs: { annual_recap: { last_run_at: '2027-01-01T10:00:00', last_status: 'ok: 2026: group and 3 users' } }, push_devices: { devices: 0, users: 0 }, mail: { configured: false, missing: [] }, ai_uses: [] },
+    'GET /manage/settings': { values: VALUES, jobs: { annual_recap: { last_run_at: '2027-01-01T10:00:00', last_status: 'ok: 2026: group and 3 users' } }, push_devices: { devices: 0, users: 0 }, mail: { configured: false, missing: [] }, ai_uses: [], ai_model: { provider: 'google', model: 'gemini-test' } },
     ...extra,
   };
 }

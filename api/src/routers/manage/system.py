@@ -38,6 +38,7 @@ def get_settings(admin: models.User = Depends(auth.require_admin), db: Session =
         "push_devices": push_devices,
         "mail": mail_info,
         "ai_uses": settings.ai_uses(db),
+        "ai_model": ai.in_use(),
     }
 
 
@@ -86,11 +87,13 @@ async def send_test_message(admin: models.User = Depends(auth.require_admin)):
 
 @router.post("/settings/test-ai")
 def test_ai(admin: models.User = Depends(auth.require_admin)):
-    """Ask the AI for one short sentence with the saved provider and model and the key of the environment (blocking network call:
+    """Ask the AI for one short sentence with the saved provider and the model and key of the environment (blocking network call:
     a plain def, so it runs in a worker thread). Works with the AI switched off, to try a key before using it."""
     if not settings.get("ai.api_key"):
         raise HTTPException(status_code=409, detail="No hay ninguna clave de IA: falta AI_API_KEY en el .env del servidor")
     provider, model = ai.current()
+    if not model:
+        raise HTTPException(status_code=409, detail="No hay ningún modelo de IA: falta AI_MODEL en el .env del servidor")
     try:
         reply = ai.complete(
             "Responde solo con una frase corta y divertida sobre videojuegos.", "Saluda al grupo.", force=True
