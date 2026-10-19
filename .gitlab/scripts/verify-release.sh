@@ -3,7 +3,7 @@
 # nothing else would notice a release whose checks failed (or never ran). Prints the tag on stdout.
 #
 # Reading the pipelines of the project needs a token: the job token is tried unless GITLAB_READ_TOKEN (a project
-# access token with the read_api scope, Protected) is set. See docs/gitlab.md.
+# access token with the read_api scope, Protected) is set. See docs/desarrollo/gitlab.md.
 set -eu
 
 fail() { echo "ERROR: $*" >&2; exit 1; }

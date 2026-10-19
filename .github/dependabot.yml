@@ -2,7 +2,7 @@ version: 2
 
 # Weekly, grouped so a week of updates is one PR per ecosystem instead of a dozen, and each ecosystem on
 # its own weekday so the PRs rarely coexist (main requires branches to be up to date: a PR that is
-# still open when another one merges has to be rebased, see docs/workflow.md). Every PR goes
+# still open when another one merges has to be rebased, see docs/desarrollo/workflow.md). Every PR goes
 # through the same CI as any other change. Titles use the Conventional Commits prefix the PR title
 # check requires.
 updates:
@@ -62,7 +62,7 @@ updates:
     commit-message: { prefix: "chore(front)" }
 
   # The MariaDB image in docker-compose.yml: only patch releases of the pinned series arrive on their own.
-  # Moving to another series is a data decision (docs/deployment.md#mariadb-version).
+  # Moving to another series is a data decision (docs/desarrollo/deployment.md#mariadb-version).
   - package-ecosystem: docker-compose
     directory: /
     schedule: { interval: weekly, day: friday, time: "07:00", timezone: Europe/Madrid }

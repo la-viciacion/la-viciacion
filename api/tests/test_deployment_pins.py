@@ -2,7 +2,7 @@
 
 A tag that moves (`mariadb`, `nginx:alpine`, `latest`) lets a pull change the database or the web server
 without any change in the repository. For MariaDB it is also dangerous: a data directory cannot be
-opened by an older server (docs/deployment.md#mariadb-version). CI reads the MariaDB tag from
+opened by an older server (docs/desarrollo/deployment.md#mariadb-version). CI reads the MariaDB tag from
 docker-compose.yml to decide which server to test on, so it has to be there and has to be explicit.
 """
 import re

@@ -30,33 +30,33 @@ Four services in one `docker-compose.yml`:
 | `bot` | Python, python-telegram-bot; a read-only client of the API |
 | `db` | MariaDB 12.3 LTS |
 
-Totals, rankings and streaks are never stored: they are computed from the sessions when requested. More in [docs/architecture.md](docs/architecture.md).
+Totals, rankings and streaks are never stored: they are computed from the sessions when requested. More in [docs/desarrollo/architecture.md](docs/desarrollo/architecture.md).
 
 ## Quick start
 
 You need Docker with Compose.
 
 ```bash
-cp .env.template .env      # fill in the passwords and keys (see docs/configuration.md)
+cp .env.template .env      # fill in the passwords and keys (see docs/desarrollo/configuration.md)
 docker compose up -d --build
 ```
 
-Then open http://localhost:3000 and log in as `admin` with the `GOD_ADMIN_PASS` you set. Create the players from the admin panel. On Windows, set `DB_DATA=laviciacion_db_data` in `.env` first ([why](docs/deployment.md#database-storage-linux-vs-windows)).
+Then open http://localhost:3000 and log in as `admin` with the `GOD_ADMIN_PASS` you set. Create the players from the admin panel. On Windows, set `DB_DATA=laviciacion_db_data` in `.env` first ([why](docs/desarrollo/deployment.md#database-storage-linux-vs-windows)).
 
-A server does not need to build anything: the images are published to GHCR on every release, and `docker compose pull && docker compose up -d` is the whole deploy ([deployment guide](docs/deployment.md)).
+A server does not need to build anything: the images are published to GHCR on every release, and `docker compose pull && docker compose up -d` is the whole deploy ([deployment guide](docs/desarrollo/deployment.md)).
 
 ## Documentation
 
-Everything lives in [`docs/`](docs/index.md):
+Everything lives in [`docs/`](docs/desarrollo/index.md):
 
 | If you want to... | Read |
 |---|---|
-| Install, update, back up or roll back | [Deployment](docs/deployment.md) |
-| Set up `.env`, logins, password recovery | [Configuration](docs/configuration.md) |
-| Know how the app behaves (seasons, notifications, sessions, AI...) | [Features](docs/features.md) |
-| Understand the code and the data model | [Architecture](docs/architecture.md) |
-| Run it locally, run the tests | [Development](docs/development.md) |
-| Change the code | [Conventions and recipes](docs/conventions.md), [Migrations](docs/migrations.md), [Git workflow](docs/workflow.md) |
+| Install, update, back up or roll back | [Deployment](docs/desarrollo/deployment.md) |
+| Set up `.env`, logins, password recovery | [Configuration](docs/desarrollo/configuration.md) |
+| Know how the app behaves (seasons, notifications, sessions, AI...) | [Features](docs/desarrollo/features.md) |
+| Understand the code and the data model | [Architecture](docs/desarrollo/architecture.md) |
+| Run it locally, run the tests | [Development](docs/desarrollo/development.md) |
+| Change the code | [Conventions and recipes](docs/desarrollo/conventions.md), [Migrations](docs/desarrollo/migrations.md), [Git workflow](docs/desarrollo/workflow.md) |
 
 Working on this repository with an AI assistant? Point it to [AGENTS.md](AGENTS.md).
 

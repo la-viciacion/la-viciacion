@@ -11,7 +11,7 @@ swallows its errors and only logs them.
   devices, refreshed every few minutes by the scheduler (same tag, so each one replaces the last).
 
 Payloads are short plain text (title, body, url, tag): how long messages and images
-fit into a push is still to be designed, see docs/roadmap.md.
+fit into a push is still to be designed, see docs/desarrollo/roadmap.md.
 """
 import asyncio
 import base64

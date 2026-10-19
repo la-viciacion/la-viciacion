@@ -8,4 +8,4 @@ from the admin panel is, and only when they differ from what the database has.
   the panel. An achievement without a file is left alone.
 - To change a picture, replace its file, run `python -m src.utils.achievement_images` (from `api/`) to shrink it (256 px at most, a
   palette of colours; the same an upload from the panel goes through) for the repository, and restart the API.
-- Do not put anything else here: unknown names are logged and skipped. Details in `docs/architecture.md`.
+- Do not put anything else here: unknown names are logged and skipped. Details in `docs/desarrollo/architecture.md`.

@@ -5,7 +5,7 @@ Simplified trunk-based development for a team of 2-3. `main` is the trunk: alway
 ## Rules
 
 1. **Nobody pushes to `main`.** Every change goes through a pull request (branch protection enforces it, also for admins).
-2. **Short-lived branches** off `main`, named `<type>/<short-description>` (`feat/ranking-filters`, `fix/timer-stop`, `docs/workflow`). Aim to merge within a day or two; if a feature is bigger, split it into steps that are each safe to merge (behind a setting or not yet reachable from the UI).
+2. **Short-lived branches** off `main`, named `<type>/<short-description>` (`feat/ranking-filters`, `fix/timer-stop`, `docs/desarrollo/workflow`). Aim to merge within a day or two; if a feature is bigger, split it into steps that are each safe to merge (behind a setting or not yet reachable from the UI).
 3. **Small PRs.** One concern per PR; do not mix refactors with behaviour changes.
 4. **Every commit lands on `main`.** PRs are **rebase-merged** (a trial, see [roadmap.md](roadmap.md)): each commit of the branch is replayed on `main` as it is, so each one must be atomic, green on its own, and follow Conventional Commits (`feat(front): ...`, types in `AGENTS.md`). The PR title follows the same format, and CI checks the title and the subject of every commit (merge commits are skipped). If it fails, fix the messages with `git rebase -i` and `git push --force-with-lease`; squash `fixup!` commits first. No "wip" or "fix typo" commits.
 5. **Merge when**: the `CI` check is green, the approvals the ruleset asks for are there (none while there is a single maintainer, one from the second person on), and the branch is up to date with `main`. Delete the branch after merging (GitHub does it automatically).

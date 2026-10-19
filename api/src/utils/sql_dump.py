@@ -4,7 +4,7 @@ It is what `mariadb-dump` would give for this schema, written with the SQL the s
 image needs no extra client: for every table `DROP TABLE IF EXISTS`, the server's own `SHOW CREATE TABLE` (keys,
 generated columns and all) and the rows as multi-row `INSERT`s. Generated columns (the `season` ones) are left out
 of the inserts, as the database computes them. It restores with a plain `mariadb < backup.sql` into the empty
-database of a new environment (or `db/init/`, see docs/deployment.md), `alembic_version` included.
+database of a new environment (or `db/init/`, see docs/desarrollo/deployment.md), `alembic_version` included.
 
 Everything is read in one transaction with a repeatable-read snapshot, so the tables agree with each other even
 while the app keeps working, and rows are streamed in batches: nothing is built in memory but one batch.

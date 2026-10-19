@@ -2,7 +2,7 @@
 (migrations, generated columns, CHECK/UNIQUE/foreign-key rules).
 
 The server comes from TEST_MARIADB_URL, a SQLAlchemy URL of an account that may create databases,
-e.g. `mysql+pymysql://root:testpw@127.0.0.1:3399` (see docs/development.md). Without it the tests
+e.g. `mysql+pymysql://root:testpw@127.0.0.1:3399` (see docs/desarrollo/development.md). Without it the tests
 are skipped, so `unittest discover` keeps working with no Docker around; CI sets
 REQUIRE_MARIADB_TESTS=1 so a missing server there is a failure, never a silent skip.
 
