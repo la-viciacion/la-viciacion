@@ -28,12 +28,10 @@ class LabelTests(unittest.TestCase):
         self.assertEqual(recap_notices.period_label(APRIL), "abril de 2026")
         self.assertEqual(recap_notices.period_label(recap.parse_period("2026")), "la temporada 2026")
 
-    def test_in_january_the_job_also_reports_on_the_season_that_ended(self):
-        january = [p.key for p in recap_notices.periods_due(datetime.date(2027, 1, 1))]
-        self.assertEqual(january, ["2026-12", "2026"])
-        self.assertEqual([p.key for p in recap_notices.periods_due(datetime.date(2027, 1, 15))], ["2026-12", "2026"])
-        self.assertEqual([p.key for p in recap_notices.periods_due(datetime.date(2026, 10, 1))], ["2026-09"])
-        self.assertEqual([p.key for p in recap_notices.periods_due(datetime.date(2026, 12, 1))], ["2026-11"])
+    def test_the_annual_job_reports_on_the_running_season_in_december_and_the_one_that_ended_in_january(self):
+        self.assertEqual(recap_notices.annual_period(datetime.date(2026, 12, 24)).key, "2026")
+        self.assertEqual(recap_notices.annual_period(datetime.date(2027, 1, 3)).key, "2026")
+        self.assertEqual(recap_notices.annual_period(datetime.date(2026, 12, 20)).kind, "year")
 
     def test_the_job_reports_on_the_month_before_its_slot(self):
         self.assertEqual(recap_notices.previous_month(datetime.date(2026, 10, 1)).key, "2026-09")
@@ -84,6 +82,14 @@ class NoticeTests(RecapData):
         self.assertIn("🥇 Ana\_", text)
         self.assertIn("🥈 Biel", text)
         self.assertIn("13h00m", text)  # 4 h of the active players and 9 h of the inactive one
+
+    def test_a_season_still_running_says_it_is_what_there_is_so_far(self):
+        season = recap.parse_period("2026")  # the pinned clock is in June 2026
+        data = recap.build_recap(self.db, season, 1, datetime.date(2026, 6, 17))
+        self.assertIn("Con lo jugado hasta hoy.", recap_notices.group_message(data, season))
+        self.assertIn("Con lo jugado hasta hoy.", recap_notices.player_message(data, season))
+        done = recap.build_recap(self.db, season, 1, datetime.date(2027, 1, 2))
+        self.assertNotIn("hasta hoy", recap_notices.group_message(done, season))
 
     def test_the_player_message_is_about_them(self):
         text = recap_notices.player_message(recap.build_recap(self.db, APRIL, 1), APRIL)
@@ -207,10 +213,22 @@ class MonthlyJobTests(RecapData):
         self.assertEqual(sent, ["2026-09"])
         self.assertEqual(status, "2026-09: group and 2 users")
 
-    async def test_on_the_first_of_january_it_sends_december_and_then_the_season(self):
-        sent, status = await self.run_job(D(2027, 1, 1, 10))
-        self.assertEqual(sent, ["2026-12", "2026"])
-        self.assertEqual(status, "2026-12: group and 2 users; 2026: group and 2 users")
+    async def test_in_january_the_monthly_job_sends_only_december(self):
+        sent, _ = await self.run_job(D(2027, 1, 1, 10))
+        self.assertEqual(sent, ["2026-12"])
+
+    async def test_the_annual_job_sends_the_season_apart(self):
+        sent = []
+
+        async def fake(db, period, **kwargs):
+            sent.append(period.key)
+            return {"empty": False, "group": True, "players": 3}
+
+        with mock.patch.object(scheduler.recap_notices, "announce_recap", fake):
+            december = await scheduler._annual_recap(self.db, D(2026, 12, 24, 10))
+            january = await scheduler._annual_recap(self.db, D(2027, 1, 2, 10))
+        self.assertEqual(sent, ["2026", "2026"])
+        self.assertEqual((december, january), ("2026: group and 3 users", "2026: group and 3 users"))
 
 
 class PromptTests(unittest.TestCase):

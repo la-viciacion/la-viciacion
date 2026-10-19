@@ -3,6 +3,7 @@ import unittest
 from unittest import mock
 
 from src.utils import my_utils, settings
+from tests.sqlite_db import make_session
 
 
 class CoerceTests(unittest.TestCase):
@@ -23,6 +24,35 @@ class CoerceTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 settings.coerce("weekly.time", bad)
 
+    def test_the_monthly_recap_goes_out_in_the_first_five_days(self):
+        for good in (1, "3", 5):
+            self.assertIn(settings.coerce("monthly.day", good), range(1, 6))
+        for bad in (0, 6, 28, "x"):
+            with self.assertRaises(ValueError):
+                settings.coerce("monthly.day", bad)
+
+    def test_the_annual_recap_is_off_and_in_january_by_default(self):
+        self.assertEqual(
+            [settings.REGISTRY[key].default for key in ("annual.enabled", "annual.month", "annual.day", "annual.time")],
+            [False, 1, 1, "10:00"],
+        )
+        self.assertIsNone(settings.check_annual(settings.REGISTRY["annual.month"].default, settings.REGISTRY["annual.day"].default))
+
+    def test_the_annual_month_is_december_or_january(self):
+        self.assertEqual((settings.coerce("annual.month", "12"), settings.coerce("annual.month", 1)), (12, 1))
+        for bad in (0, 2, 6, 11, 13):
+            with self.assertRaises(ValueError):
+                settings.coerce("annual.month", bad)
+
+    def test_the_annual_day_goes_with_its_month(self):
+        for month, good, bad in ((12, (20, 24, 28), (1, 19, 29)), (1, (1, 3, 5), (6, 20, 28))):
+            for day in good:
+                self.assertIsNone(settings.check_annual(month, day), (month, day))
+            for day in bad:
+                self.assertIsNotNone(settings.check_annual(month, day), (month, day))
+        self.assertIn("entre el 20 y el 28", settings.check_annual(12, 5))
+        self.assertIn("entre el 1 y el 5", settings.check_annual(1, 25))
+
     def test_telegram_values(self):
         self.assertEqual(settings.coerce("telegram.group_id", "-1001234567890"), "-1001234567890")
         with self.assertRaises(ValueError):
@@ -35,6 +65,39 @@ class CoerceTests(unittest.TestCase):
     def test_unknown_key(self):
         with self.assertRaises(KeyError):
             settings.coerce("nope", 1)
+
+
+class AnnualRecapStoreTests(unittest.TestCase):
+    """The month and the day of the annual recap are checked together, with what is stored."""
+
+    def setUp(self):
+        self.db = make_session()
+
+    def test_a_december_day_is_stored_with_its_month(self):
+        changed = settings.set_values(self.db, {"annual.month": 12, "annual.day": 25})
+        self.assertCountEqual(changed, ["annual.month", "annual.day"])
+
+    def test_a_day_that_does_not_fit_the_month_stores_nothing(self):
+        with self.assertRaises(ValueError):
+            settings.set_values(self.db, {"annual.month": 12, "annual.day": 3, "annual.enabled": True})
+        self.assertEqual(settings.get_all(self.db)["annual.enabled"], False)
+        self.assertEqual(settings.get_all(self.db)["annual.month"], 1)
+
+    def test_changing_only_the_month_must_still_fit_the_stored_day(self):
+        with self.assertRaises(ValueError):
+            settings.set_values(self.db, {"annual.month": 12})  # the day is the default, 1
+        settings.set_values(self.db, {"annual.month": 12, "annual.day": 22})
+        with self.assertRaises(ValueError):
+            settings.set_values(self.db, {"annual.month": 1})  # the day is 22 now
+
+    def test_changing_only_the_day_must_fit_the_stored_month(self):
+        settings.set_values(self.db, {"annual.month": 12, "annual.day": 22})
+        settings.set_values(self.db, {"annual.day": 27})
+        with self.assertRaises(ValueError):
+            settings.set_values(self.db, {"annual.day": 4})
+
+    def test_other_settings_do_not_trigger_the_check(self):
+        self.assertEqual(settings.set_values(self.db, {"monthly.day": 3}), ["monthly.day"])
 
 
 class EncryptionTests(unittest.TestCase):

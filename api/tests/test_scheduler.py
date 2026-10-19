@@ -30,6 +30,18 @@ class SlotTests(unittest.TestCase):
         self.assertEqual(scheduler.monthly_slot(D(2027, 1, 1, 9, 0), 1, "10:00"), D(2026, 12, 1, 10, 0))
         self.assertEqual(scheduler.monthly_slot(D(2027, 3, 5, 9, 0), 28, "10:00"), D(2027, 2, 28, 10, 0))
 
+    def test_annual_slot_is_the_latest_occurrence(self):
+        # the season's recap on 24 December at 10:00, seen from before and after
+        self.assertEqual(scheduler.annual_slot(D(2026, 12, 24, 10, 0), 12, 24, "10:00"), D(2026, 12, 24, 10, 0))
+        self.assertEqual(scheduler.annual_slot(D(2026, 12, 24, 9, 59), 12, 24, "10:00"), D(2025, 12, 24, 10, 0))
+        self.assertEqual(scheduler.annual_slot(D(2026, 10, 19, 12, 0), 12, 24, "10:00"), D(2025, 12, 24, 10, 0))
+        self.assertEqual(scheduler.annual_slot(D(2027, 3, 1, 12, 0), 12, 24, "10:00"), D(2026, 12, 24, 10, 0))
+
+    def test_annual_slot_in_january(self):
+        self.assertEqual(scheduler.annual_slot(D(2027, 1, 2, 12, 0), 1, 1, "10:00"), D(2027, 1, 1, 10, 0))
+        self.assertEqual(scheduler.annual_slot(D(2026, 10, 19, 12, 0), 1, 1, "10:00"), D(2026, 1, 1, 10, 0))
+        self.assertEqual(scheduler.annual_slot(D(2027, 1, 1, 9, 0), 1, 1, "10:00"), D(2026, 1, 1, 10, 0))
+
     def test_daily_and_hourly_slots(self):
         self.assertEqual(scheduler.daily_slot(D(2026, 9, 29, 4, 59), 5), D(2026, 9, 28, 5, 0))
         self.assertEqual(scheduler.daily_slot(D(2026, 9, 29, 5, 0), 5), D(2026, 9, 29, 5, 0))

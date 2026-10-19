@@ -8,6 +8,7 @@ what nothing else can trigger remains here:
 
   weekly_summary    once a week at the configured day/time (admin panel)
   monthly_recap     once a month at the configured day/time (admin panel): the recap of the month that ended
+  annual_recap      once a year, in December (20-28) or January (1-5) as configured: the recap of the season
   timer_notices     every minute, refreshes the pinned push notification of the running
                     timers that are due (each user chooses the interval, 10 minutes or more).
                     Switched off by TIMER_NOTICE_REFRESH: only the first notification is sent
@@ -44,6 +45,7 @@ STARTUP_DELAY_SECONDS = 5
 
 WEEKLY_GRACE = datetime.timedelta(hours=6)
 MONTHLY_GRACE = datetime.timedelta(hours=12)
+ANNUAL_GRACE = datetime.timedelta(hours=12)
 HOURLY_GRACE = datetime.timedelta(minutes=10)
 DAILY_GRACE = datetime.timedelta(hours=3)
 DAILY_STREAKS_HOUR = 5
@@ -74,6 +76,13 @@ def monthly_slot(now: datetime.datetime, day: int, hhmm: str) -> datetime.dateti
     if slot > now:
         slot = (slot.replace(day=1) - datetime.timedelta(days=1)).replace(day=day)
     return slot
+
+
+def annual_slot(now: datetime.datetime, month: int, day: int, hhmm: str) -> datetime.datetime:
+    """Latest occurrence (<= now) of `day` of `month` at HH:MM (the day is up to 28, so every year has it)."""
+    hour, minute = (int(part) for part in hhmm.split(":"))
+    slot = now.replace(month=month, day=day, hour=hour, minute=minute, second=0, microsecond=0)
+    return slot if slot <= now else slot.replace(year=slot.year - 1)
 
 
 def daily_slot(now: datetime.datetime, hour: int, minute: int = 0) -> datetime.datetime:
@@ -146,11 +155,15 @@ async def _weekly_summary(db: Session) -> str:
 
 
 async def _monthly_recap(db: Session, slot: datetime.datetime) -> str:
-    """The recap of the month before the slot's one (slot on 1 October: September) and, in January, also the season's."""
-    done = []
-    for period in recap_notices.periods_due(slot.date()):
-        done.append(f"{period.key}: " + recap_notices.describe(await recap_notices.announce_recap(db, period)))
-    return "; ".join(done)
+    """The recap of the month before the slot's one (slot on 1 October: September)."""
+    period = recap_notices.previous_month(slot.date())
+    return f"{period.key}: " + recap_notices.describe(await recap_notices.announce_recap(db, period))
+
+
+async def _annual_recap(db: Session, slot: datetime.datetime) -> str:
+    """The recap of the season: the running one for a December slot, the one that ended for a January slot."""
+    period = recap_notices.annual_period(slot.date())
+    return f"{period.key}: " + recap_notices.describe(await recap_notices.announce_recap(db, period))
 
 
 async def _timer_notices(db: Session, slot: datetime.datetime) -> str:
@@ -192,6 +205,11 @@ def tick(now: datetime.datetime | None = None) -> None:
             slot = monthly_slot(now, settings.get("monthly.day"), settings.get("monthly.time"))
             if is_due(now, slot, _last_run(db, "monthly_recap"), MONTHLY_GRACE) and _claim(db, "monthly_recap", slot, now):
                 _run(db, "monthly_recap", lambda: _monthly_recap(db, slot))
+
+        if notifications and settings.get("annual.enabled"):
+            slot = annual_slot(now, settings.get("annual.month"), settings.get("annual.day"), settings.get("annual.time"))
+            if is_due(now, slot, _last_run(db, "annual_recap"), ANNUAL_GRACE) and _claim(db, "annual_recap", slot, now):
+                _run(db, "annual_recap", lambda: _annual_recap(db, slot))
 
         if TIMER_NOTICE_REFRESH and notifications and push.is_ready():
             slot = minute_slot(now)
