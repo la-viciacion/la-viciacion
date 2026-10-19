@@ -153,7 +153,9 @@ test('a period that does not exist yet is moved to one that does', async () => {
   await recap.render({ user: ME, main: main() });
   await settle();
   assert.equal(calls[0].path.includes(String(new Date().getFullYear() + 1)), false);
-  assert.equal(document.getElementById('rcYear').value, String(new Date().getFullYear()));
+  // the running year, unless today is in January: March has not happened yet there either, so it falls back further
+  const year = new Date().getMonth() === 0 ? new Date().getFullYear() - 1 : new Date().getFullYear();
+  assert.equal(document.getElementById('rcYear').value, String(year));
 });
 
 test('without an address the recap is the one of the month that has just ended, and with one it is that one', async () => {
@@ -171,6 +173,18 @@ test('without an address the recap is the one of the month that has just ended, 
   await settle();
   assert.equal(calls[0].path, '/statistics/recap/2025-03?username=ana');
   assert.equal(window.location.hash, '#/recap/2025-03');
+});
+
+test('the running month cannot be seen: an address naming it falls back to the one before, in the address too', async () => {
+  const month = new Date().getMonth();
+  const running = `${new Date().getFullYear()}-${String(month + 1).padStart(2, '0')}`;
+  const last = `${month === 0 ? new Date().getFullYear() - 1 : new Date().getFullYear()}-${String(month === 0 ? 12 : month).padStart(2, '0')}`;
+  window.location.hash = `#/recap/${running}`;
+  const calls = installApi({ 'GET /statistics/recap/': DATA });
+  await recap.render({ user: ME, main: main() });
+  await settle();
+  assert.equal(calls[0].path, `/statistics/recap/${last}?username=ana`);
+  assert.equal(window.location.hash, `#/recap/${last}`);
 });
 
 test('choosing a period on the page is what puts it in the address', async () => {

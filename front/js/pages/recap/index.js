@@ -1,7 +1,7 @@
 // Recap (#/recap[/<period>[/<username>]]): "Wrapped" of a month or a season, yours and the group's.
 // GET /statistics/recap/{period}?username=. Nothing is stored: the API derives it from the sessions when asked.
-// The period opens on the month that has just ended; any past month or season can be chosen. An admin can add a
-// player's username to the address to see theirs.
+// The period opens on the month that has just ended; any finished month, or any season, can be chosen (the running
+// month cannot: it has not finished). An admin can add a player's username to the address to see theirs.
 import { api } from '../../lib/api.js';
 import { formatDate, formatDuration } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';

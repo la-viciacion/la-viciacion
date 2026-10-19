@@ -59,17 +59,20 @@ export function yearChoices(now = new Date()) {
   return Array.from({ length: now.getFullYear() - FIRST + 1 }, (_, i) => now.getFullYear() - i);
 }
 
-/** The months of a year as { value (1-12), label }: all of them, or up to the running month in the running year (nothing is there to see after it). */
+/** The months of a year as { value (1-12), label }: all of them, or up to the month before the running one in the
+ * running year (the running month cannot be seen yet: it has not finished). In January the running year has none. */
 export function monthChoices(year, now = new Date()) {
-  const last = year === now.getFullYear() ? now.getMonth() + 1 : 12;
+  const last = year === now.getFullYear() ? now.getMonth() : 12;
   return MONTHS.slice(0, last).map((label, i) => ({ value: i + 1, label: label[0].toUpperCase() + label.slice(1) }));
 }
 
-/** A choice made valid: a year that is not offered becomes the running one and a month that does not exist yet the last one that does. */
+/** A choice made valid: a year that is not offered becomes the running one, a month that does not exist yet (or
+ * whose year has none to offer, only the running year in January) falls back to December of the year before. */
 export function clampPick(pick, now = new Date()) {
   const year = Math.min(now.getFullYear(), Math.max(FIRST, pick.year));
   if (pick.kind === 'year') return { kind: 'year', year, month: null };
   const last = monthChoices(year, now).length;
+  if (last === 0) return { kind: 'month', year: year - 1, month: 12 };
   return { kind: 'month', year, month: Math.min(last, Math.max(1, pick.month ?? last)) };
 }
 
