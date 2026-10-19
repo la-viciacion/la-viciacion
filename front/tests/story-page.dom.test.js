@@ -137,7 +137,7 @@ test('a locked season gets its own friendly single slide, not the generic error'
   installApi({ 'GET /statistics/recap/': json({ detail: 'El resumen de esta temporada todavía no está disponible' }, 400) });
   await story.render({ user: ME, main: main() });
   await settle();
-  assert.match(main().textContent, /Todavía no/);
+  assert.match(main().textContent, /no seas ansia/);
   assert.doesNotMatch(main().textContent, /No se ha podido cargar/);
   main().querySelector('[data-act="close"]').click();
   assert.equal(window.location.hash, '#/recap/2026-09');
