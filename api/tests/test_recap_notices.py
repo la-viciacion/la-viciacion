@@ -1,4 +1,4 @@
-"""The notices of the recap: what they say, who they go to and the month the monthly job reports on."""
+"""The notice of the recap: what it says, where it goes, and the periods the jobs report on."""
 import datetime
 import unittest
 from unittest import mock
@@ -8,12 +8,12 @@ from fastapi import HTTPException
 from src.crud import recap
 from src.database import models
 from src.routers.manage import notices
-from src.utils import ai_prompts, recap_notices, scheduler
+from src.utils import recap_notices, scheduler
 from tests.sqlite_db import make_session
 
 HOUR = 3600
 D = datetime.datetime
-APRIL = recap.parse_period("2026-04")
+APRIL = recap.parse_period("2026-04")  # the pinned clock is in June 2026: April is over
 
 
 def session(user, game, start, hours):
@@ -23,19 +23,19 @@ def session(user, game, start, hours):
     )
 
 
-class LabelTests(unittest.TestCase):
-    def test_a_month_and_a_season(self):
+class PeriodTests(unittest.TestCase):
+    def test_a_month_and_a_season_are_named(self):
         self.assertEqual(recap_notices.period_label(APRIL), "abril de 2026")
-        self.assertEqual(recap_notices.period_label(recap.parse_period("2026")), "la temporada 2026")
+        self.assertEqual(recap_notices.period_label(recap.parse_period("2026")), "temporada 2026")
+
+    def test_the_monthly_job_reports_on_the_month_before_its_slot(self):
+        self.assertEqual(recap_notices.previous_month(datetime.date(2026, 10, 1)).key, "2026-09")
+        self.assertEqual(recap_notices.previous_month(datetime.date(2027, 1, 1)).key, "2026-12")
 
     def test_the_annual_job_reports_on_the_running_season_in_december_and_the_one_that_ended_in_january(self):
         self.assertEqual(recap_notices.annual_period(datetime.date(2026, 12, 24)).key, "2026")
         self.assertEqual(recap_notices.annual_period(datetime.date(2027, 1, 3)).key, "2026")
         self.assertEqual(recap_notices.annual_period(datetime.date(2026, 12, 20)).kind, "year")
-
-    def test_the_job_reports_on_the_month_before_its_slot(self):
-        self.assertEqual(recap_notices.previous_month(datetime.date(2026, 10, 1)).key, "2026-09")
-        self.assertEqual(recap_notices.previous_month(datetime.date(2027, 1, 1)).key, "2026-12")
 
 
 class RecapData(unittest.IsolatedAsyncioTestCase):
@@ -46,196 +46,159 @@ class RecapData(unittest.IsolatedAsyncioTestCase):
         self.db.add_all([
             models.User(id=1, name="Ana_", username="ana", is_active=1, telegram_id=11),
             models.User(id=2, name="Biel", username="biel", is_active=1, telegram_id=None),
-            models.User(id=3, name="Cris", username="cris", is_active=1, telegram_id=33),
             models.Game(id="doom", name="Doom"),
             session(1, "doom", D(2026, 4, 10, 20), 3),
             session(2, "doom", D(2026, 4, 10, 21), 1),
-            session(1, "doom", D(2026, 3, 5, 20), 2),
         ])
         self.db.commit()
         self.group = mock.AsyncMock()
         self.private = mock.AsyncMock()
-        for target, replacement in (
-            (recap_notices.utils, {"send_message": self.group, "send_message_to_user": self.private}),
-            (recap_notices.actions, {"push_has_devices": mock.Mock(return_value=False)}),
-        ):
-            for name, value in replacement.items():
-                patcher = mock.patch.object(target, name, value)
-                patcher.start()
-                self.addCleanup(patcher.stop)
-
+        for name, value in (("send_message", self.group), ("send_message_to_user", self.private)):
+            patcher = mock.patch.object(recap_notices.utils, name, value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
 
 
 class NoticeTests(RecapData):
-    def test_the_group_message_has_the_title_the_hours_the_podium_and_the_game(self):
-        text = recap_notices.group_message(recap.build_recap(self.db, APRIL), APRIL)
-        for wanted in ("*Resumen de abril de 2026*", "04h00m", "+02h00m", "🥇 Ana\\_ — 03h00m", "🥈 Biel — 01h00m", "*Doom*", "10 abr"):
-            self.assertIn(wanted, text)
-
-    def test_the_podium_leaves_out_inactive_players_but_the_hours_still_count_them(self):
-        self.db.add_all([models.User(id=4, name="Dani", username="dani", is_active=0), session(4, "doom", D(2026, 4, 11, 20), 9)])
-        self.db.commit()
-        data = recap.build_recap(self.db, APRIL)
-        self.assertEqual(data["group"]["ranking"][0]["name"], "Dani")
-        text = recap_notices.group_message(data, APRIL)
-        self.assertNotIn("Dani", text)
-        self.assertIn("🥇 Ana\_", text)
-        self.assertIn("🥈 Biel", text)
-        self.assertIn("13h00m", text)  # 4 h of the active players and 9 h of the inactive one
-
-    def test_a_season_still_running_says_it_is_what_there_is_so_far(self):
-        season = recap.parse_period("2026")  # the pinned clock is in June 2026
-        data = recap.build_recap(self.db, season, 1, datetime.date(2026, 6, 17))
-        self.assertIn("Con lo jugado hasta hoy.", recap_notices.group_message(data, season))
-        self.assertIn("Con lo jugado hasta hoy.", recap_notices.player_message(data, season))
-        done = recap.build_recap(self.db, season, 1, datetime.date(2027, 1, 2))
-        self.assertNotIn("hasta hoy", recap_notices.group_message(done, season))
-
-    def test_the_player_message_is_about_them(self):
-        text = recap_notices.player_message(recap.build_recap(self.db, APRIL, 1), APRIL)
-        for wanted in ("*Tu resumen de abril de 2026*", "Horas: 03h00m", "puesto 1º", "*Doom*", "Biel"):
-            self.assertIn(wanted, text)
-
-    def test_the_link_is_there_only_with_a_public_address(self):
-        data = recap.build_recap(self.db, APRIL)
+    def test_the_telegram_text_says_it_is_ready_and_links_to_the_story_without_any_figure(self):
         with mock.patch.object(recap_notices.config, "PUBLIC_URL", "https://viciacion.example"):
-            self.assertIn("[Ver tu resumen en historias](https://viciacion.example/#/story/2026-04)", recap_notices.group_message(data, APRIL))
+            text = recap_notices.telegram_text(APRIL)
+        self.assertEqual(
+            text,
+            "🎬 *Ya está disponible tu resumen de abril de 2026*\n\n[Pulsa para verlo en historias](https://viciacion.example/#/story/2026-04)",
+        )
+        self.assertNotRegex(text, r"\d\dh\d\d")  # no hours, no names, no podium
+
+    def test_without_a_public_address_there_is_no_link(self):
         with mock.patch.object(recap_notices.config, "PUBLIC_URL", ""):
-            self.assertNotIn("](", recap_notices.group_message(data, APRIL))
+            text = recap_notices.telegram_text(APRIL)
+        self.assertNotIn("](", text)
+        self.assertIn("Ya está disponible tu resumen de abril de 2026", text)
 
-    async def test_it_goes_to_the_group_with_the_ai_and_privately_to_who_played_and_can_be_reached(self):
-        result = await recap_notices.announce_recap(self.db, APRIL)
-        self.assertEqual(result, {"empty": False, "group": True, "players": 1})
-        self.group.assert_awaited_once()
-        self.assertEqual(self.group.await_args.kwargs["ai_use"], "monthly_recap")
-        # the app's devices get a short "it is ready" notice that opens the story, not the long text
-        payload = self.group.await_args.kwargs["push_payload"]
-        self.assertEqual((payload["url"], payload["tag"]), ("#/story/2026-04", "recap-2026-04"))
+    def test_the_push_is_the_same_notice_and_opens_the_story(self):
+        payload = recap_notices.push_payload(APRIL)
         self.assertEqual(payload["title"], "🎬 Ya está disponible tu resumen de abril de 2026")
-        self.assertEqual(self.private.await_args.kwargs["push_payload"], payload)
-        # Ana can be reached and played; Biel played but has no Telegram nor devices; Cris did not play
-        self.private.assert_awaited_once()
-        self.assertEqual(self.private.await_args.args[0], 11)
-        self.assertEqual(self.private.await_args.kwargs["user_id"], 1)
+        self.assertEqual((payload["url"], payload["tag"]), ("#/story/2026-04", "recap-2026-04"))
 
-    async def test_only_one_user_and_no_group_for_a_test_to_an_admin(self):
-        user = self.db.get(models.User, 1)
-        result = await recap_notices.announce_recap(self.db, APRIL, group=False, only=user)
-        self.assertEqual(result, {"empty": False, "group": False, "players": 1})
-        self.group.assert_not_awaited()
-        self.assertEqual(self.private.await_count, 1)
+    def test_a_season_is_named_as_such(self):
+        season = recap.parse_period("2026")
+        self.assertIn("temporada 2026", recap_notices.telegram_text(season))
+        self.assertIn("temporada 2026", recap_notices.push_payload(season)["title"])
 
-    async def test_only_the_group(self):
-        result = await recap_notices.announce_recap(self.db, APRIL, players=False)
-        self.assertEqual(result, {"empty": False, "group": True, "players": 0})
+    async def test_it_goes_once_to_the_group_with_the_push_notice_and_to_nobody_in_private(self):
+        result = await recap_notices.announce_recap(self.db, APRIL)
+        self.assertEqual(result, {"empty": False})
+        self.group.assert_awaited_once()
+        self.assertEqual(self.group.await_args.args[0], recap_notices.telegram_text(APRIL))
+        self.assertEqual(self.group.await_args.kwargs["push_payload"], recap_notices.push_payload(APRIL))
+        self.assertNotIn("ai_use", self.group.await_args.kwargs)  # the AI does not touch it: there is nothing to word
         self.private.assert_not_awaited()
 
-    async def test_a_month_nobody_played_sends_nothing(self):
+    async def test_a_test_goes_to_the_admin_alone_by_telegram_and_push(self):
+        admin = self.db.get(models.User, 1)
+        result = await recap_notices.announce_recap(self.db, APRIL, only=admin)
+        self.assertEqual(result, {"empty": False})
+        self.group.assert_not_awaited()
+        self.private.assert_awaited_once()
+        self.assertEqual(self.private.await_args.args, (11, recap_notices.telegram_text(APRIL)))
+        self.assertEqual(self.private.await_args.kwargs, {"user_id": 1, "push_payload": recap_notices.push_payload(APRIL)})
+
+    async def test_a_period_nobody_played_sends_nothing(self):
         result = await recap_notices.announce_recap(self.db, recap.parse_period("2026-01"))
-        self.assertEqual(result, {"empty": True, "group": False, "players": 0})
+        self.assertEqual(result, {"empty": True})
         self.group.assert_not_awaited()
         self.private.assert_not_awaited()
         self.assertEqual(recap_notices.describe(result), "nobody played")
 
+    async def test_only_the_emergency_accounts_sessions_are_not_somebody_playing(self):
+        self.db.add(models.User(id=9, name="Admin", username=models.GOD_USERNAME, is_active=1))
+        self.db.add(session(9, "doom", D(2026, 3, 5, 20), 5))
+        self.db.commit()
+        self.assertFalse(recap.anyone_played(self.db, recap.parse_period("2026-03")))
+        self.assertTrue(recap.anyone_played(self.db, APRIL))
+
     def test_the_status_of_a_run(self):
-        self.assertEqual(recap_notices.describe({"empty": False, "group": True, "players": 3}), "group and 3 users")
-        self.assertEqual(recap_notices.describe({"empty": False, "group": False, "players": 1}), "1 user")
+        self.assertEqual(recap_notices.describe({"empty": False}), "sent to the group")
+        self.assertEqual(recap_notices.describe({"empty": False}, only=True), "sent to the admin")
+
+
+class JobTests(RecapData):
+    """What the scheduler's jobs report on, with the notice itself replaced."""
+
+    async def run_job(self, job, slot):
+        sent = []
+
+        async def fake(db, period, **kwargs):
+            sent.append(period.key)
+            return {"empty": False}
+
+        with mock.patch.object(scheduler.recap_notices, "announce_recap", fake):
+            status = await job(self.db, slot)
+        return sent, status
+
+    async def test_the_monthly_job_sends_the_month_before_its_slot(self):
+        sent, status = await self.run_job(scheduler._monthly_recap, D(2026, 10, 1, 10))
+        self.assertEqual((sent, status), (["2026-09"], "2026-09: sent to the group"))
+
+    async def test_in_january_the_monthly_job_sends_only_december(self):
+        sent, _ = await self.run_job(scheduler._monthly_recap, D(2027, 1, 1, 10))
+        self.assertEqual(sent, ["2026-12"])
+
+    async def test_the_annual_job_sends_the_season_in_december_and_in_january(self):
+        december, _ = await self.run_job(scheduler._annual_recap, D(2026, 12, 24, 10))
+        january, status = await self.run_job(scheduler._annual_recap, D(2027, 1, 2, 10))
+        self.assertEqual((december, january), (["2026"], ["2026"]))
+        self.assertEqual(status, "2026: sent to the group")
 
 
 class EndpointTests(RecapData):
-    """The routes over the same data (called as functions: the router-level security is in test_endpoint_security)."""
+    """The admin routes over the same data (called as functions: the router-level security is in test_endpoint_security)."""
 
-    def test_the_preview_gives_the_texts_without_sending_anything(self):
-        got = notices.recap_preview("2026-04", 1, self.db)
+    def test_the_preview_gives_the_notice_without_sending_anything(self):
+        got = notices.recap_preview("2026-04", self.db)
         self.assertEqual((got["period"], got["label"], got["nobody_played"]), ("2026-04", "abril de 2026", False))
-        self.assertIn("Resumen de abril", got["group_message"])
-        self.assertIn("Tu resumen", got["player_message"])
+        self.assertIn("Ya está disponible tu resumen de abril de 2026", got["telegram"])
+        self.assertEqual(got["push"]["url"], "#/story/2026-04")
+        self.assertEqual(got["push"]["body"], "Pulsa para verlo en historias")
         self.group.assert_not_awaited()
 
-    def test_the_preview_of_a_quiet_month_says_so(self):
-        self.assertTrue(notices.recap_preview("2026-01", None, self.db)["nobody_played"])
-        self.assertIsNone(notices.recap_preview("2026-04", None, self.db)["player_message"])
+    def test_the_preview_of_a_quiet_period_says_so(self):
+        self.assertTrue(notices.recap_preview("2026-01", self.db)["nobody_played"])
 
     def test_a_wrong_or_future_period_is_refused(self):
         for period in ("2026-13", "x"):
             with self.assertRaises(HTTPException) as refused:
-                notices.recap_preview(period, None, self.db)
+                notices.recap_preview(period, self.db)
             self.assertEqual(refused.exception.status_code, 400)
         with self.assertRaises(HTTPException):
-            notices.recap_preview(str(datetime.date.today().year + 1), None, self.db)
-
-    def test_an_unknown_user_is_not_found(self):
-        with self.assertRaises(HTTPException) as refused:
-            notices.recap_preview("2026-04", 99, self.db)
-        self.assertEqual(refused.exception.status_code, 404)
+            notices.recap_preview(str(datetime.date.today().year + 1), self.db)
 
     async def test_sending_to_me_reaches_only_the_admin(self):
         admin = self.db.get(models.User, 1)
         got = await notices.recap_send(notices.RecapSendBody(period="2026-04", audience="me"), admin, self.db)
-        self.assertEqual((got["group"], got["players"]), (False, 1))
+        self.assertEqual(got["message"], "Enviado a ti")
         self.group.assert_not_awaited()
+        self.private.assert_awaited_once()
 
     async def test_sending_to_me_without_a_way_to_receive_it_is_a_conflict(self):
         admin = self.db.get(models.User, 2)
-        with self.assertRaises(HTTPException) as refused:
+        with mock.patch.object(notices.actions, "push_has_devices", return_value=False), self.assertRaises(HTTPException) as refused:
             await notices.recap_send(notices.RecapSendBody(period="2026-04", audience="me"), admin, self.db)
         self.assertEqual(refused.exception.status_code, 409)
 
-    async def test_sending_to_everybody_and_to_a_quiet_month(self):
+    async def test_sending_to_the_group_and_to_a_quiet_period(self):
         admin = self.db.get(models.User, 1)
-        got = await notices.recap_send(notices.RecapSendBody(period="2026-04", audience="all"), admin, self.db)
-        self.assertEqual((got["group"], got["players"]), (True, 1))
+        got = await notices.recap_send(notices.RecapSendBody(period="2026-04", audience="group"), admin, self.db)
+        self.assertEqual(got["message"], "Enviado al grupo")
+        self.group.assert_awaited_once()
         with self.assertRaises(HTTPException) as refused:
             await notices.recap_send(notices.RecapSendBody(period="2026-01", audience="group"), admin, self.db)
         self.assertEqual(refused.exception.status_code, 409)
 
-    def test_the_audience_is_one_of_three(self):
-        with self.assertRaises(ValueError):
-            notices.RecapSendBody(period="2026-04", audience="everyone")
-
-
-class MonthlyJobTests(RecapData):
-    """What the scheduler's job sends, with the notices themselves replaced."""
-
-    async def run_job(self, slot):
-        sent = []
-
-        async def fake(db, period, **kwargs):
-            sent.append(period.key)
-            return {"empty": False, "group": True, "players": 2}
-
-        with mock.patch.object(scheduler.recap_notices, "announce_recap", fake):
-            status = await scheduler._monthly_recap(self.db, slot)
-        return sent, status
-
-    async def test_an_ordinary_month_sends_the_month_before(self):
-        sent, status = await self.run_job(D(2026, 10, 1, 10))
-        self.assertEqual(sent, ["2026-09"])
-        self.assertEqual(status, "2026-09: group and 2 users")
-
-    async def test_in_january_the_monthly_job_sends_only_december(self):
-        sent, _ = await self.run_job(D(2027, 1, 1, 10))
-        self.assertEqual(sent, ["2026-12"])
-
-    async def test_the_annual_job_sends_the_season_apart(self):
-        sent = []
-
-        async def fake(db, period, **kwargs):
-            sent.append(period.key)
-            return {"empty": False, "group": True, "players": 3}
-
-        with mock.patch.object(scheduler.recap_notices, "announce_recap", fake):
-            december = await scheduler._annual_recap(self.db, D(2026, 12, 24, 10))
-            january = await scheduler._annual_recap(self.db, D(2027, 1, 2, 10))
-        self.assertEqual(sent, ["2026", "2026"])
-        self.assertEqual((december, january), ("2026: group and 3 users", "2026: group and 3 users"))
-
-
-class PromptTests(unittest.TestCase):
-    def test_it_asks_the_ai_to_keep_the_figures_the_names_and_the_link(self):
-        text = ai_prompts.USES["monthly_recap"].default
-        for wanted in ("tercera persona", "todas las cifras", "sin inventarte ninguna", "nombre de cada persona del podio", "enlace"):
-            self.assertIn(wanted, text)
+    def test_the_audience_is_me_or_the_group(self):
+        for audience in ("all", "everyone", ""):
+            with self.assertRaises(ValueError):
+                notices.RecapSendBody(period="2026-04", audience=audience)
 
 
 if __name__ == "__main__":
