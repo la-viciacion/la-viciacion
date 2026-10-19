@@ -18,8 +18,9 @@ def run(*paths):
 
 class ScopeTests(unittest.TestCase):
     def test_documentation_and_project_files_run_nothing(self):
-        for path in ("docs/features.md", "README.md", "CONTRIBUTING.md", "AGENTS.md", "LICENSE", ".gitignore",
-                     "design/laViciacionLogo.jpg", ".github/pull_request_template.md", ".github/dependabot.yml"):
+        for path in ("docs/desarrollo/features.md", "README.md", "CONTRIBUTING.md", "AGENTS.md", "LICENSE", ".gitignore",
+                     "design/laViciacionLogo.jpg", "docs-demo/demo.py", "mkdocs.yml", "requirements-docs.txt", ".github/workflows/docs.yml",
+                     ".github/pull_request_template.md", ".github/dependabot.yml"):
             self.assertEqual(run(path), (set(), set()), path)
 
     def test_the_front_runs_its_tests_and_the_api_test_that_reads_its_sources(self):

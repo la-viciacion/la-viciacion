@@ -1,0 +1,34 @@
+# Logros
+
+Los logros se desbloquean **solos** al jugar (nunca los pides tú) y se anuncian al grupo. La mayoría se consiguen **una vez por temporada** y se fechan el día en que los conseguiste.
+
+![La página de logros](../assets/screens/achievements.webp){ .screenshot }
+
+## La página de logros
+
+**Menú → Logros** tiene dos bloques, cada uno con su «Tienes X de Y»:
+
+- **De temporada**: se consiguen una vez al año y cuentan solo lo jugado en esa temporada. Hay una pastilla por temporada (la en curso por defecto) y cada una muestra quién del grupo lo consiguió *en ese año* y, en la temporada actual, cuánto te falta.
+- **Lifetime** («de por vida»): cuentan todo tu historial y se consiguen **una sola vez**.
+
+Cada tarjeta muestra el logro, su descripción y quién lo tiene. Los que aún no tienes aparecen **atenuados y solo con el nombre**: hay que averiguar de qué van. Si todavía no los has desbloqueado, no ves ni la descripción ni la imagen.
+
+### Barras de progreso
+
+Los que se acumulan (horas totales, días jugados, juegos jugados, juegos completados, horas en un solo juego y la racha actual) muestran una barra, por ejemplo «35 / 100». Los que dependen de un momento concreto (jugar a ciertas horas, una fecha…) no tienen barra.
+
+## Secretos y especiales
+
+- **Logro oculto**: algunos no enseñan nada hasta que los consigues, ni título, ni descripción, ni imagen. Cuando alguien desbloquea uno, al grupo solo le llega «Alguien ha desbloqueado un logro oculto»; el protagonista recibe el aviso completo en privado.
+- **Especiales**: brillan con un **aura de color** según lo difíciles o raros que son: **plateado** (nivel 1, un esfuerzo claro o una coincidencia poco común), **dorado** (nivel 2, meses de constancia o algo muy raro) y **morado** (nivel 3, casi inalcanzable). Los especiales también son secretos, pero se ve su aura aunque estén bloqueados, para que sepas que hay algo por lo que luchar.
+
+## Los del «mundo exterior»
+
+Un grupo de logros ocultos depende de **cuándo y a qué** juegas, no de cuánto: jugar bajo una tormenta, un día de luna llena, durante un eclipse, en tu cumpleaños, el 4 de mayo a un juego de Star Wars, el Día de Mario, un 29 de febrero… Algunos necesitan que hayas indicado tu **ciudad** y/o tu **fecha de nacimiento** en [Ajustes](perfil.md#ajustes).
+
+!!! note "Los nuevos logros empiezan en 2027"
+    Los logros añadidos de ahora en adelante empiezan a contar desde la temporada 2027: no son retroactivos y hasta entonces aparecen como ocultos.
+
+## Cuando algo no cuadra
+
+Los logros se reevalúan cada vez que paras un timer o cambias sesiones o biblioteca. Si corriges una sesión que te dio un logro por error, el logro se retira (sin avisar) si ya no cumples la condición. Si crees que falta alguno, pídele a un administrador que **recalcule los logros**.
