@@ -13,8 +13,9 @@ class PayloadTests(unittest.TestCase):
         payload = push.build_recap_payload("mensual", "2026-09")
         self.assertEqual(payload, {
             "title": "🎬 Ya está disponible el resumen mensual", "body": "Descubre cómo ha ido el mes",
-            "url": "#/story/2026-09", "tag": "recap-2026-09",
+            "url": "#/story", "tag": "recap-2026-09",
         })
+        self.assertEqual(push.build_recap_payload("anual", "2026")["url"], "#/story/2026")
         self.assertLessEqual(len(payload["title"]), push.TITLE_MAX)
 
     def test_markdown_is_removed(self):
