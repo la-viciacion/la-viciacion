@@ -27,11 +27,13 @@ def is_ready(use: str | None = None) -> bool:
 
 def prompt_for(use: str, recommended: dict | None = None) -> str:
     """The instructions for a notice: the admin's prompt if there is one, the code's otherwise.
-    `recommended` ({"game", "user"}) adds the suggestion of another game."""
+    `recommended` ({"game", "reasons"}) adds the suggestion of another game and why it was picked (never who has it)."""
     text = settings.get(f"ai.prompt.{use}")
     if recommended:
         text += "\n" + settings.get("ai.prompt.completed_game_recommendation") + "\n"
-        text += f"Juego recomendado: {recommended['game']}\nJugado por: {recommended['user']}"
+        text += f"Juego recomendado: {recommended['game']}"
+        if recommended.get("reasons"):
+            text += "\nMotivos:" + "".join(f"\n- {reason}" for reason in recommended["reasons"])
     return text
 
 

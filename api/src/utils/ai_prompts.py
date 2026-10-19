@@ -43,9 +43,10 @@ No te inventes ninguna cifra: usa solo las del mensaje original.
 """
 
 NEW_GAME_RECOMMENDATION = """
-Al final del mensaje, añade una frase corta y divertida sugiriendo que el usuario pruebe el juego que se indica
-a continuación, hablando de él en tercera persona (el mensaje va al grupo) y diciendo que lo tiene o lo ha
-jugado la persona indicada. Debes incluir siempre el nombre del juego y el de esa persona.
+Al final del mensaje, añade una frase corta y divertida recomendando que pruebe el juego que se indica a
+continuación quien acaba de completar el anterior, hablando de esa persona en tercera persona (el mensaje va al
+grupo). Debes incluir siempre el nombre del juego. Recomienda solo el juego: no menciones a ningún jugador que lo
+tenga o lo haya jugado. Si se indican motivos, puedes apoyarte en alguno, sin inventarte ningún dato ni cifra.
 """
 
 RANKING_USER_PROMPT = """
@@ -116,7 +117,7 @@ USES: dict[str, Use] = {
     ),
     "completed_game_recommendation": Use(
         "Recomendación al completar",
-        "Sugiere otro juego al final del aviso. Si lo redacta la IA, usa estas instrucciones; si no, añade una línea fija.",
+        "Recomienda otro juego al final del aviso, elegido por afinidad. Si lo redacta la IA, usa estas instrucciones; si no, añade una línea fija.",
         NEW_GAME_RECOMMENDATION,
         switchable=False,
         parent="completed_game",

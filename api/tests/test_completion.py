@@ -17,20 +17,6 @@ class GenreListTests(unittest.TestCase):
             self.assertEqual(games.genre_list(value), [], repr(value))
 
 
-class RecommendedGamesQueryTests(unittest.TestCase):
-    def test_genres_string_is_not_split_into_letters(self):
-        db = mock.MagicMock()
-        seen = []
-        real = games.models.Game.genres.ilike
-        with mock.patch.object(games.models.Game.genres.__class__, "ilike", autospec=True,
-                               side_effect=lambda self, pattern: seen.append(pattern) or real(pattern)):
-            games.recommended_games(db, 7, genres="Action,RPG")
-        self.assertEqual(seen, ["%Action%", "%RPG%"])
-
-    def test_a_game_without_genres_does_not_crash(self):
-        self.assertEqual(games.recommended_games(mock.MagicMock(), 7, genres=None), [])
-
-
 class AfterCompletionAvgTimeTests(unittest.IsolatedAsyncioTestCase):
     async def run_completion(self, hltb, stored_avg):
         game = types.SimpleNamespace(id="g", name="Doom", genres=None, avg_time=stored_avg)
@@ -44,7 +30,8 @@ class AfterCompletionAvgTimeTests(unittest.IsolatedAsyncioTestCase):
                 mock.patch.object(users, "get_user_by_id", return_value=types.SimpleNamespace(id=1, name="Ana")), \
                 mock.patch.object(users.utils, "get_game_info", new=mock.AsyncMock(return_value={"rawg": None, "hltb": hltb})), \
                 mock.patch.object(users.games, "update_avg_time_game", update), \
-                mock.patch.object(users.games, "recommended_games", return_value=[]),                 mock.patch.object(users.settings, "get", return_value=True), \
+                mock.patch.object(users.games, "completion_suggestion", return_value=None), \
+                mock.patch.object(users.settings, "get", return_value=True), \
                 mock.patch.object(users, "count_completed_games", return_value=1), \
                 mock.patch.object(users.utils, "send_message", new=mock.AsyncMock()), \
                 mock.patch("src.crud.time_entries.played_time_of_run", return_value=0), \
@@ -74,12 +61,12 @@ class CompletionRecommendationSwitchTests(unittest.IsolatedAsyncioTestCase):
             just_in_time=mock.AsyncMock(), user_completed_total_games=mock.AsyncMock(), completed_in_a_day=mock.AsyncMock(),
             lifetime_views=mock.MagicMock(return_value=[]),
         )
-        suggest = mock.MagicMock(return_value=[(1, 2, "Hades", 3, "Bea")])
+        suggest = mock.MagicMock(return_value={"game": "Hades", "reasons": ["Lo tiene 1 jugador del grupo"]})
         send = mock.AsyncMock()
         with mock.patch.object(users.games, "get_game_by_id", return_value=game), \
                 mock.patch.object(users, "get_user_by_id", return_value=types.SimpleNamespace(id=1, name="Ana")), \
                 mock.patch.object(users.utils, "get_game_info", new=mock.AsyncMock(return_value={"rawg": None, "hltb": None})), \
-                mock.patch.object(users.games, "recommended_games", suggest), \
+                mock.patch.object(users.games, "completion_suggestion", suggest), \
                 mock.patch.object(users, "count_completed_games", return_value=1), \
                 mock.patch.object(users.utils, "send_message", new=send), \
                 mock.patch.object(users.settings, "get", side_effect=lambda key: {"completed_game.recommend": recommend}[key]), \
@@ -92,7 +79,7 @@ class CompletionRecommendationSwitchTests(unittest.IsolatedAsyncioTestCase):
         self.assertIs(users.settings.REGISTRY["completed_game.recommend"].default, True)
         suggest, send = await self.completion(True)
         suggest.assert_called_once()
-        self.assertEqual(send.await_args.kwargs["new_game_recommended"], {"game": "Hades", "user": "Bea"})
+        self.assertEqual(send.await_args.kwargs["new_game_recommended"], {"game": "Hades", "reasons": ["Lo tiene 1 jugador del grupo"]})
 
     async def test_switched_off_no_game_is_looked_up_and_none_is_suggested(self):
         suggest, send = await self.completion(False)
