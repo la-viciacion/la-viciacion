@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { change, clampPick, isMonth, lastMonth, monthChoices, monthKey, parseHash, periodKey, periodLabel, pickOf, previousPeriod, recapHref, withKind, yearChoices } from '../js/lib/recap.js';
+import { change, clampPick, excludeRunningYear, finishedYearChoices, isMonth, lastMonth, monthChoices, monthKey, parseHash, periodKey, periodLabel, pickOf, previousPeriod, recapHref, withKind, yearChoices } from '../js/lib/recap.js';
 
 test('a month and a season are told apart and named', () => {
   assert.equal(isMonth('2026-09'), true);
@@ -47,6 +47,18 @@ test('a period is a kind, a year and, for a month, the month; and back', () => {
 test('the years on offer go from the running one to 2023', () => {
   assert.deepEqual(yearChoices(new Date(2026, 9, 18)), [2026, 2025, 2024, 2023]);
   assert.deepEqual(yearChoices(new Date(2027, 0, 2)), [2027, 2026, 2025, 2024, 2023]);
+});
+
+test('a season to pick from leaves out the running one: it has not finished either', () => {
+  assert.deepEqual(finishedYearChoices(new Date(2026, 9, 18)), [2025, 2024, 2023]);
+  assert.deepEqual(finishedYearChoices(new Date(2023, 5, 1)), []); // the very first season: nothing has finished yet
+});
+
+test('a year landed on through the picker is never the running one', () => {
+  const now = new Date(2026, 9, 18);
+  assert.deepEqual(excludeRunningYear({ kind: 'year', year: 2026, month: null }, now), { kind: 'year', year: 2025, month: null });
+  assert.deepEqual(excludeRunningYear({ kind: 'year', year: 2024, month: null }, now), { kind: 'year', year: 2024, month: null });
+  assert.deepEqual(excludeRunningYear({ kind: 'month', year: 2026, month: 9 }, now), { kind: 'month', year: 2026, month: 9 }); // a month is unaffected
 });
 
 test('a past year has its twelve months, the running one only up to the running month', () => {
