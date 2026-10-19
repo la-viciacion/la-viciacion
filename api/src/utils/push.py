@@ -75,7 +75,7 @@ RECAP_TAG = "recap"  # + the period: the group's and the private notice of a rec
 
 def build_recap_payload(label: str, period: str) -> dict:
     """"Your recap is ready": a tap opens the story of the period (the app resolves #/story/<period> for whoever taps)."""
-    return {"title": _shorten(f"🎬 Ya está disponible tu resumen de {label}", TITLE_MAX), "body": "Pulsa para verlo en historias", "url": f"#/story/{period}", "tag": f"{RECAP_TAG}-{period}"}
+    return {"title": _shorten(f"🎬 Ya está disponible el resumen de {label}", TITLE_MAX), "body": "Pulsa para verlo en historias", "url": f"#/story/{period}", "tag": f"{RECAP_TAG}-{period}"}
 
 
 def build_announcement(title: str, body: str | None = None, url: str | None = None, image: str | None = None) -> dict:
