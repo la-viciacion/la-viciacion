@@ -155,3 +155,19 @@ test('a period that does not exist yet is moved to one that does', async () => {
   assert.equal(calls[0].path.includes(String(new Date().getFullYear() + 1)), false);
   assert.equal(document.getElementById('rcYear').value, String(new Date().getFullYear()));
 });
+
+test('without an address the recap is the one of the month that has just ended, and with one it is that one', async () => {
+  const month = new Date().getMonth();
+  const last = `${month === 0 ? new Date().getFullYear() - 1 : new Date().getFullYear()}-${String(month === 0 ? 12 : month).padStart(2, '0')}`;
+  window.location.hash = '#/recap';
+  let calls = installApi({ 'GET /statistics/recap/': DATA });
+  await recap.render({ user: ME, main: main() });
+  await settle();
+  assert.equal(calls[0].path, `/statistics/recap/${last}?username=ana`);
+  assert.equal(window.location.hash, `#/recap/${last}`, 'the address says which month it is');
+  window.location.hash = '#/recap/2025-03';
+  calls = installApi({ 'GET /statistics/recap/': DATA });
+  await recap.render({ user: ME, main: main() });
+  await settle();
+  assert.equal(calls[0].path, '/statistics/recap/2025-03?username=ana');
+});

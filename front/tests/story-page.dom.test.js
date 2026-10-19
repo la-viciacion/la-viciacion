@@ -169,3 +169,31 @@ test('opening your own story clears the notice of the first days of the month; l
   assert.equal(localStorage.getItem('lv-recap-seen-2026-09'), '1');
   story.dispose();
 });
+
+// the month that has just ended, worked out here on its own (not with the code under test)
+const lastMonthKey = () => {
+  const now = new Date();
+  const month = now.getMonth() === 0 ? 12 : now.getMonth();
+  return `${now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear()}-${String(month).padStart(2, '0')}`;
+};
+
+test('without an address it tells the story of the month that has just ended, and with one it tells that one', async () => {
+  const last = lastMonthKey();
+  for (const hash of ['#/story', '#/story/']) {
+    const calls = await open(hash);
+    assert.equal(calls[0].path, `/statistics/recap/${last}?username=ana`, hash);
+    story.dispose();
+  }
+  const asked = await open('#/story/2025-03');
+  assert.equal(asked[0].path, '/statistics/recap/2025-03?username=ana');
+  story.dispose();
+  const season = await open('#/story/2025');
+  assert.equal(season[0].path, '/statistics/recap/2025?username=ana');
+  story.dispose();
+});
+
+test('a story address that is not a period falls back to the last month instead of asking for nonsense', async () => {
+  const calls = await open('#/story/2026-13');
+  assert.equal(calls[0].path, `/statistics/recap/${lastMonthKey()}?username=ana`);
+  story.dispose();
+});
