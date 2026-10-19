@@ -13,8 +13,8 @@ class Config:
 
         # The keys of outside services are read from the environment every time and never stored (see
         # utils/settings.py, `env_only`): the Telegram token and chats (TELEGRAM_TOKEN / TELEGRAM_GROUP_ID /
-        # TELEGRAM_ADMIN_CHAT_ID) and the AI key (AI_API_KEY, or the old OPENAI_API_KEY). The AI provider and model
-        # (AI_PROVIDER / AI_MODEL, or the old OPENAI_MODEL) only seed the app_settings table the first time.
+        # TELEGRAM_ADMIN_CHAT_ID), the AI key (AI_API_KEY, or the old OPENAI_API_KEY) and the AI model (AI_MODEL, or the
+        # old OPENAI_MODEL; there is no default in the code). The AI provider (AI_PROVIDER) only seeds the app_settings table the first time.
 
         # Admin
         self.GOD_ADMIN_PASS = self._get_env("GOD_ADMIN_PASS")

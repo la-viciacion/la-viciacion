@@ -105,11 +105,6 @@ def _ai_provider(value: str) -> str | None:
     return None if value in AI_PROVIDERS else "El proveedor debe ser " + " u ".join(AI_PROVIDERS)
 
 
-def _ai_model(value: str) -> str | None:
-    # it goes into the URL of the request, so only what model names are made of
-    return None if not value or re.fullmatch(r"[A-Za-z0-9._-]{1,100}", value) else "Nombre de modelo no válido"
-
-
 PROMPT_MAX = 4000
 
 
@@ -140,11 +135,11 @@ REGISTRY: dict[str, Spec] = {
     "push.vapid_public": Spec("str", None, check=_vapid_public),
     "push.vapid_private": Spec("str", None, secret=True, hint=False),
     # AI text for the notices (utils/ai.py). The key is AI_API_KEY (or the old OPENAI_API_KEY) and is never stored;
-    # the provider and the model are edited in the panel, and AI_PROVIDER / AI_MODEL only seed them.
+    # the provider is edited in the panel (AI_PROVIDER only seeds it); the model is read from AI_MODEL every time.
     "ai.enabled": Spec("bool", True),
     "ai.provider": Spec("str", "google", env="AI_PROVIDER", check=_ai_provider),
     "ai.api_key": Spec("str", None, secret=True, env_only=True, env="AI_API_KEY", legacy_env="OPENAI_API_KEY"),
-    "ai.model": Spec("str", None, env="AI_MODEL", check=_ai_model, blank_ok=True),  # empty: the provider's default
+    "ai.model": Spec("str", None, env="AI_MODEL", legacy_env="OPENAI_MODEL", env_only=True),  # no default in the code: without it the AI does not write
     "telegram.token": Spec("str", None, secret=True, env_only=True, env="TELEGRAM_TOKEN", check=_token),
     "telegram.group_id": Spec("str", None, env_only=True, env="TELEGRAM_GROUP_ID", check=_chat_id),
     "telegram.admin_chat_id": Spec("str", None, env_only=True, env="TELEGRAM_ADMIN_CHAT_ID", check=_chat_id),
@@ -355,11 +350,11 @@ def seed_from_env(db: Session) -> list[str]:
 
 def _seed_legacy_openai(db: Session, seeded: list[str]) -> list[str]:
     """Installations from before the AI settings have OPENAI_API_KEY (and OPENAI_MODEL): they keep
-    working as the "openai" provider unless AI_* says otherwise. The key itself is read from the environment
-    (`ai.api_key` is env_only); what is seeded is the provider and the model."""
+    working as the "openai" provider unless AI_* says otherwise. The key and the model are read from the
+    environment (`ai.api_key` and `ai.model` are env_only); what is seeded is the provider."""
     if not os.getenv("OPENAI_API_KEY") or os.getenv("AI_API_KEY"):
         return []
-    legacy = {"ai.provider": "openai", "ai.model": os.getenv("OPENAI_MODEL")}
+    legacy = {"ai.provider": "openai"}
     added = []
     for key, raw in legacy.items():
         if not raw or key in seeded or db.get(models.AppSetting, key) is not None:

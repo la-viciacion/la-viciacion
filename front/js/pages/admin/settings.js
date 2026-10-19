@@ -13,7 +13,7 @@ import { errorState } from './components.js';
 import { confirmDialog } from './dialogs.js';
 
 const SECRETS = []; // never loaded back: sent only when something is typed (the keys of outside services are not: they are in the server's .env)
-const LOCKED = ['telegram.token', 'telegram.group_id', 'telegram.admin_chat_id', 'ai.api_key']; // shown only as set or not, never editable
+const LOCKED = ['telegram.token', 'telegram.group_id', 'telegram.admin_chat_id', 'ai.api_key', 'ai.model']; // shown only as set or not, never editable
 const READ_ONLY = ['mail', 'backup']; // cards with nothing to save
 const AI_PROVIDERS = [['google', 'Google (Gemini)'], ['openai', 'OpenAI']];
 
@@ -60,7 +60,7 @@ function aiUse(use, fragments) {
     </div>`;
 }
 
-function view(values, jobs, pushDevices, mail, aiUses) {
+function view(values, jobs, pushDevices, mail, aiUses, aiModel) {
   const state = (key) => (values[key].is_set ? 'Configurado' : 'Sin configurar');
   const aiKey = values['ai.api_key'];
   const vapid = values['push.vapid_private'];
@@ -133,8 +133,9 @@ function view(values, jobs, pushDevices, mail, aiUses) {
           <select class="adm-input" name="ai.provider">${AI_PROVIDERS.map(([id, label]) => html`<option value="${id}">${label}</option>`)}</select>
         </label>
         <label>Clave de la API <input class="adm-input" type="text" value="${state('ai.api_key')}" disabled /></label>
-        <label>Modelo <input class="adm-input" type="text" name="ai.model" placeholder="Vacío: el modelo por defecto del proveedor" /></label>
-        <div class="adm-sub">El proveedor y el modelo se aplican al momento, sin reiniciar. La clave (<code>AI_API_KEY</code>) está en el .env del servidor: desde el panel solo se ve si está definida. Por defecto: Google <code>gemini-2.5-flash</code>, OpenAI <code>gpt-4o-mini</code>.</div>
+        <label>Modelo <input class="adm-input adm-ai-model" type="text" value="${aiModel.model || 'Sin configurar'}" disabled /></label>
+        ${aiModel.model ? '' : html`<div class="adm-warn">Falta <code>AI_MODEL</code> en el .env del servidor: la aplicación no tiene ningún modelo por defecto, así que la IA no escribe ningún aviso hasta que lo definas (y reinicies la API).</div>`}
+        <div class="adm-sub">El proveedor se aplica al momento, sin reiniciar. El modelo (<code>AI_MODEL</code>) y la clave (<code>AI_API_KEY</code>) están en el .env del servidor: desde el panel solo se ven. El modelo debe ser uno del proveedor elegido.</div>
         <div><button type="button" class="adm-btn" data-set-act="test-ai" ${aiKey.is_set ? '' : html`disabled`}>Probar la IA</button></div>
       </section>`,
 
@@ -334,11 +335,11 @@ export async function render(target, { entity }) {
   panel = target;
   sections = entity.sections;
   try {
-    const { values, jobs, push_devices: pushDevices, mail, ai_uses: uses } = await api('/manage/settings');
+    const { values, jobs, push_devices: pushDevices, mail, ai_uses: uses, ai_model: aiModel } = await api('/manage/settings');
     aiUses = uses;
     loaded = Object.fromEntries(Object.entries(values).filter(([key]) => !SECRETS.includes(key) && !LOCKED.includes(key) && !key.startsWith('push.vapid')));
     for (const key of SECRETS) loaded[key] = null;
-    mount(panel, view(values, jobs, pushDevices, mail, aiUses));
+    mount(panel, view(values, jobs, pushDevices, mail, aiUses, aiModel));
     const form = panel.querySelector('#admSettings');
     fill(form, values);
     syncAnnualDay(form);

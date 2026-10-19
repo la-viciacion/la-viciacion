@@ -8,7 +8,7 @@ globalThis.location = window.location;
 const { render } = await import('../js/pages/admin/settings.js');
 
 const VALUES = {
-  'ai.enabled': true, 'ai.provider': 'google', 'ai.api_key': { is_set: true }, 'ai.model': '',
+  'ai.enabled': true, 'ai.provider': 'google', 'ai.api_key': { is_set: true }, 'ai.model': { is_set: true },
   'ai.use.completed_game': true, 'ai.use.new_game': false, 'completed_game.recommend': true,
   'telegram.token': { is_set: false }, 'telegram.group_id': { is_set: false }, 'telegram.admin_chat_id': { is_set: false }, 'push.vapid_private': { is_set: true },
   'ai.prompt.completed_game': 'a', 'ai.prompt.completed_game_recommendation': 'b', 'ai.prompt.new_game': 'c',
@@ -20,8 +20,8 @@ const USES = [
 ];
 
 const panel = () => document.getElementById('panel');
-const open = async (values = VALUES) => {
-  installApi({ 'GET /manage/settings': { values, jobs: {}, push_devices: { devices: 0, users: 0 }, mail: { configured: false, missing: [] }, ai_uses: USES } });
+const open = async (values = VALUES, model = 'gemini-test') => {
+  installApi({ 'GET /manage/settings': { values, jobs: {}, push_devices: { devices: 0, users: 0 }, mail: { configured: false, missing: [] }, ai_uses: USES, ai_model: { provider: 'google', model } } });
   await render(panel(), { entity: { sections: ['ai', 'aiuses'] } });
   await settle();
 };
@@ -55,4 +55,29 @@ test('the notices are dimmed and the page says why while the general AI switch i
   general.dispatchEvent(new window.Event('change', { bubbles: true }));
   assert.equal(panel().querySelector('.adm-ai-uses').classList.contains('off'), false);
   assert.equal(panel().querySelector('.adm-ai-off').hidden, true);
+});
+
+test('the AI card shows the model of the environment, read only, and cannot change it', async () => {
+  await open();
+  const field = panel().querySelector('.adm-ai-model');
+  assert.equal(field.value, 'gemini-test');
+  assert.equal(field.disabled, true);
+  assert.equal(panel().querySelector('.adm-warn'), null);
+  const form = panel().querySelector('#admSettings');
+  form.querySelector('[name="ai.enabled"]').checked = false;
+  let saved = null;
+  installApi({
+    'GET /manage/settings': { values: VALUES, jobs: {}, push_devices: { devices: 0, users: 0 }, mail: { configured: false, missing: [] }, ai_uses: USES, ai_model: { provider: 'google', model: 'gemini-test' } },
+    'PUT /manage/settings': ({ body }) => { saved = body; return { changed: [], values: VALUES }; },
+  });
+  form.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+  await settle();
+  assert.equal(saved.values['ai.enabled'], false);
+  assert.equal('ai.model' in saved.values, false); // the model never travels back to the API
+});
+
+test('without AI_MODEL the card says the AI writes nothing and where to set it', async () => {
+  await open(VALUES, null);
+  assert.equal(panel().querySelector('.adm-ai-model').value, 'Sin configurar');
+  assert.match(panel().querySelector('.adm-warn').textContent, /Falta AI_MODEL en el \.env/);
 });
