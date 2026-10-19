@@ -18,10 +18,12 @@ __all__ = ["AIError", "complete", "current", "is_ready", "prompt_for"]
 
 
 def is_ready(use: str | None = None) -> bool:
-    """Switched on, with a key and a model; with `use` (a switchable id of ai_prompts.USES), also on for that notice."""
+    """Switched on, with a key, a known provider and a model; with `use` (a switchable id of ai_prompts.USES), also on
+    for that notice."""
     return bool(
         settings.get("ai.enabled")
         and settings.get("ai.api_key")
+        and settings.get("ai.provider") in PROVIDERS
         and settings.get("ai.model")
         and (use is None or settings.get(f"ai.use.{use}"))
     )
@@ -39,13 +41,13 @@ def prompt_for(use: str, recommended: dict | None = None) -> str:
     return text
 
 
-def current() -> tuple[str, str | None]:
-    """(provider, model) in use. The model comes only from AI_MODEL (None if it is not there): the code has no default."""
+def current() -> tuple[str | None, str | None]:
+    """(provider, model) in use. They come only from AI_PROVIDER and AI_MODEL (None if missing): the code has no default."""
     return settings.get("ai.provider"), settings.get("ai.model")
 
 
 def in_use() -> dict:
-    """For the panel: the provider and the model (None if AI_MODEL is missing) the notices will use now."""
+    """For the panel: the provider and the model (None if AI_PROVIDER or AI_MODEL is missing) the notices will use now."""
     provider, model = current()
     return {"provider": provider, "model": model}
 
@@ -55,7 +57,7 @@ def complete(system_prompt: str, user_prompt: str, *, temperature: float = 1.0, 
     for the test button). Raises AIError if the provider fails."""
     key = settings.get("ai.api_key")
     provider, model = current()
-    if not key or not model or not (force or settings.get("ai.enabled")):
+    if not key or provider not in PROVIDERS or not model or not (force or settings.get("ai.enabled")):
         return None
     try:
         return PROVIDERS[provider](key, model, system_prompt, user_prompt, temperature)

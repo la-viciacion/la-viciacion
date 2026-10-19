@@ -121,9 +121,9 @@ class EncryptionTests(unittest.TestCase):
 
 class EnvOnlyTests(unittest.TestCase):
     """The keys of outside services (the Telegram token and chats, the AI key) live in the environment: a copy of the
-    database must not carry them. The AI model is there too, with no default in the code (see utils/ai.py)."""
+    database must not carry them. The AI provider and model are there too, with no default in the code (see utils/ai.py)."""
 
-    KEYS = ("telegram.token", "telegram.group_id", "telegram.admin_chat_id", "ai.api_key", "ai.model")
+    KEYS = ("telegram.token", "telegram.group_id", "telegram.admin_chat_id", "ai.api_key", "ai.provider", "ai.model")
 
     def test_the_keys_of_outside_services_are_the_ones_that_are_env_only(self):
         self.assertEqual({key for key, spec in settings.REGISTRY.items() if spec.env_only}, set(self.KEYS))
@@ -145,15 +145,6 @@ class EnvOnlyTests(unittest.TestCase):
             with self.assertRaises(ValueError) as error:
                 settings.set_values(mock.Mock(), {key: "1"})
             self.assertIn(".env", str(error.exception))
-
-    def test_the_seed_skips_them(self):
-        db = mock.Mock()
-        db.get.return_value = None
-        env = {"TELEGRAM_TOKEN": "123456789:" + "a" * 30, "TELEGRAM_GROUP_ID": "-100", "TELEGRAM_ADMIN_CHAT_ID": "42", "AI_PROVIDER": "openai"}
-        with mock.patch.dict("os.environ", env):
-            seeded = settings.seed_from_env(db)
-        self.assertEqual([key for key in seeded if key.startswith("telegram.")], [])
-        self.assertIn("ai.provider", seeded)  # the ones that are stored still are
 
 
 class FakeBot:

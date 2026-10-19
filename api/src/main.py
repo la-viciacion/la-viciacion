@@ -11,7 +11,7 @@ from .database.database import SessionLocal
 from .crud import users as users_crud
 from .crud.achievements import Achievements
 from .utils import push as push_utils
-from .utils import achievement_images, scheduler, settings
+from .utils import achievement_images, scheduler
 from .routers import activity, basic, challenges, games, group, manage, push, statistics, timers, users, utils
 from .utils.logger import LogManager
 from .utils.request_log import RequestLogMiddleware
@@ -55,7 +55,6 @@ uvicorn_logger.addFilter(EndpointFilter(excluded_paths))
 
 with SessionLocal() as db:
     users_crud.ensure_god_user(db)
-    settings.seed_from_env(db)
     push_utils.ensure_vapid_keys(db)  # the routers' `push` module has the same name
     Achievements().populate_achievements(db)
     try:

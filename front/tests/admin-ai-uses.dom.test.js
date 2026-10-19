@@ -8,7 +8,7 @@ globalThis.location = window.location;
 const { render } = await import('../js/pages/admin/settings.js');
 
 const VALUES = {
-  'ai.enabled': true, 'ai.provider': 'google', 'ai.api_key': { is_set: true }, 'ai.model': { is_set: true },
+  'ai.enabled': true, 'ai.provider': { is_set: true }, 'ai.api_key': { is_set: true }, 'ai.model': { is_set: true },
   'ai.use.completed_game': true, 'ai.use.new_game': false, 'completed_game.recommend': true,
   'telegram.token': { is_set: false }, 'telegram.group_id': { is_set: false }, 'telegram.admin_chat_id': { is_set: false }, 'push.vapid_private': { is_set: true },
   'ai.prompt.completed_game': 'a', 'ai.prompt.completed_game_recommendation': 'b', 'ai.prompt.new_game': 'c',
@@ -76,8 +76,21 @@ test('the AI card shows the model of the environment, read only, and cannot chan
   assert.equal('ai.model' in saved.values, false); // the model never travels back to the API
 });
 
-test('without AI_MODEL the card says the AI writes nothing and where to set it', async () => {
+test('the provider is shown the same way: read only, from the environment', async () => {
+  await open();
+  const field = panel().querySelector('.adm-ai-provider');
+  assert.equal(field.value, 'Google (Gemini)');
+  assert.equal(field.disabled, true);
+  assert.equal(panel().querySelector('select[name="ai.provider"]'), null);
+});
+
+test('without AI_MODEL or AI_PROVIDER the card says the AI writes nothing and which one is missing', async () => {
   await open(VALUES, null);
   assert.equal(panel().querySelector('.adm-ai-model').value, 'Sin configurar');
   assert.match(panel().querySelector('.adm-warn').textContent, /Falta AI_MODEL en el \.env/);
+  installApi({ 'GET /manage/settings': { values: VALUES, jobs: {}, push_devices: { devices: 0, users: 0 }, mail: { configured: false, missing: [] }, ai_uses: USES, ai_model: { provider: null, model: null } } });
+  await render(panel(), { entity: { sections: ['ai', 'aiuses'] } });
+  await settle();
+  assert.equal(panel().querySelector('.adm-ai-provider').value, 'Sin configurar');
+  assert.match(panel().querySelector('.adm-warn').textContent, /Falta AI_PROVIDER y AI_MODEL en el \.env/);
 });

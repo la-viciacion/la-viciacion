@@ -13,7 +13,7 @@ import { errorState } from './components.js';
 import { confirmDialog } from './dialogs.js';
 
 const SECRETS = []; // never loaded back: sent only when something is typed (the keys of outside services are not: they are in the server's .env)
-const LOCKED = ['telegram.token', 'telegram.group_id', 'telegram.admin_chat_id', 'ai.api_key', 'ai.model']; // shown only as set or not, never editable
+const LOCKED = ['telegram.token', 'telegram.group_id', 'telegram.admin_chat_id', 'ai.api_key', 'ai.provider', 'ai.model']; // shown only as set or not, never editable
 const READ_ONLY = ['mail', 'backup']; // cards with nothing to save
 const AI_PROVIDERS = [['google', 'Google (Gemini)'], ['openai', 'OpenAI']];
 
@@ -129,13 +129,11 @@ function view(values, jobs, pushDevices, mail, aiUses, aiModel) {
       <section class="adm-set-card">
         <h3>Inteligencia artificial</h3>
         ${check('ai.enabled', 'Usar IA en los avisos', 'Apagada, los avisos salen con el texto original. Necesita una clave guardada para funcionar.')}
-        <label>Proveedor
-          <select class="adm-input" name="ai.provider">${AI_PROVIDERS.map(([id, label]) => html`<option value="${id}">${label}</option>`)}</select>
-        </label>
+        <label>Proveedor <input class="adm-input adm-ai-provider" type="text" value="${AI_PROVIDERS.find(([id]) => id === aiModel.provider)?.[1] ?? aiModel.provider ?? 'Sin configurar'}" disabled /></label>
         <label>Clave de la API <input class="adm-input" type="text" value="${state('ai.api_key')}" disabled /></label>
         <label>Modelo <input class="adm-input adm-ai-model" type="text" value="${aiModel.model || 'Sin configurar'}" disabled /></label>
-        ${aiModel.model ? '' : html`<div class="adm-warn">Falta <code>AI_MODEL</code> en el .env del servidor: la aplicación no tiene ningún modelo por defecto, así que la IA no escribe ningún aviso hasta que lo definas (y reinicies la API).</div>`}
-        <div class="adm-sub">El proveedor se aplica al momento, sin reiniciar. El modelo (<code>AI_MODEL</code>) y la clave (<code>AI_API_KEY</code>) están en el .env del servidor: desde el panel solo se ven. El modelo debe ser uno del proveedor elegido.</div>
+        ${aiModel.provider && aiModel.model ? '' : html`<div class="adm-warn">Falta <code>${[['AI_PROVIDER', aiModel.provider], ['AI_MODEL', aiModel.model]].filter(([, value]) => !value).map(([name]) => name).join(' y ')}</code> en el .env del servidor: la aplicación no tiene ningún proveedor ni modelo por defecto, así que la IA no escribe ningún aviso hasta que los definas (y reinicies la API).</div>`}
+        <div class="adm-sub">El proveedor (<code>AI_PROVIDER</code>), el modelo (<code>AI_MODEL</code>) y la clave (<code>AI_API_KEY</code>) están en el .env del servidor: desde el panel solo se ven. El modelo debe ser uno del proveedor.</div>
         <div><button type="button" class="adm-btn" data-set-act="test-ai" ${aiKey.is_set ? '' : html`disabled`}>Probar la IA</button></div>
       </section>`,
 

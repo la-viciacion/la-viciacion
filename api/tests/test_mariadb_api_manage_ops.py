@@ -217,6 +217,7 @@ class SettingsTests(OpsTestCase):
         self.assertTrue(body["ai_uses"])
         self.assertEqual(set(body["ai_model"]), {"provider", "model"})  # the model is the environment's: never stored, no default
         self.assertEqual(body["values"]["ai.model"], {"is_set": bool(body["ai_model"]["model"]), "hint": None})
+        self.assertEqual(body["values"]["ai.provider"], {"is_set": bool(body["ai_model"]["provider"]), "hint": None})
 
     def test_several_settings_change_at_once_and_only_the_changed_ones_are_reported(self):
         response = self.admin("PUT", "/settings", json={"values": {"weekly.weekday": 3, "weekly.time": "10:30", "weekly.enabled": True}})

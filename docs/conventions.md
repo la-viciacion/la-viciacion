@@ -39,7 +39,7 @@ Read-only (except `/activate`, see architecture), generic endpoints only. Texts 
 ## Database and migrations
 
 - **All rules live in [migrations.md](migrations.md) and are mandatory.** In short: every schema change ships with a migration, applied migrations are immutable, history is linear, migrations are idempotent and abort on inconsistent data, and they are verified on an empty DB and on the previous revision with data.
-- Keep the emergency `admin` and `app_settings` seeding logic in code, not in migrations.
+- Keep the emergency `admin` and the VAPID keys seeding logic in code, not in migrations.
 
 ## Tests
 
