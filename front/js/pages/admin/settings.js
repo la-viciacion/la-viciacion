@@ -17,6 +17,10 @@ const LOCKED = ['telegram.token', 'telegram.group_id', 'telegram.admin_chat_id',
 const READ_ONLY = ['mail', 'backup']; // cards with nothing to save
 const AI_PROVIDERS = [['google', 'Google (Gemini)'], ['openai', 'OpenAI']];
 
+const ANNUAL_MONTHS = [[12, 'Diciembre'], [1, 'Enero']];
+// the days the annual recap can go out on, by month (api/src/utils/settings.py ANNUAL_DAYS)
+export const ANNUAL_DAYS = { 12: [20, 28], 1: [1, 5] };
+
 const WEEKDAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
 let panel;
@@ -82,14 +86,30 @@ function view(values, jobs, pushDevices, mail, aiUses) {
     monthly: html`
       <section class="adm-set-card">
         <h3>Resumen mensual</h3>
-        ${check('monthly.enabled', 'Enviar el resumen del mes', 'Al grupo, el resumen del mes que acaba de terminar y, a cada jugador activo con Telegram o la app, el suyo en privado. Necesita las notificaciones activadas. Apagado hasta que lo actives: pruébalo antes en Notificaciones → Resumen mensual.')}
+        ${check('monthly.enabled', 'Enviar el resumen del mes', 'Al grupo, el resumen del mes que acaba de terminar y, a cada jugador activo con Telegram o la app, el suyo en privado. Necesita las notificaciones activadas. Apagado hasta que lo actives: pruébalo antes con «Enviar ahora».')}
         <div class="adm-set-row">
           <label>Día del mes
-            <select class="adm-input" name="monthly.day">${Array.from({ length: 28 }, (_, i) => html`<option value="${i + 1}">${i + 1}</option>`)}</select>
+            <select class="adm-input" name="monthly.day">${[1, 2, 3, 4, 5].map((day) => html`<option value="${day}">${day}</option>`)}</select>
           </label>
           <label>Hora <input class="adm-input" type="time" name="monthly.time" required /></label>
         </div>
-        <div class="adm-sub">Hasta el 28, para que todos los meses lo tengan. Si el servidor está apagado a esa hora, se envía al volver siempre que no hayan pasado más de 12 horas. ${lastRun(jobs.monthly_recap)}</div>
+        <div class="adm-sub">Entre el 1 y el 5, los días en que la app también lo ofrece a quien no tiene las notificaciones. Si el servidor está apagado a esa hora, se envía al volver siempre que no hayan pasado más de 12 horas. ${lastRun(jobs.monthly_recap)}</div>
+      </section>`,
+
+    annual: html`
+      <section class="adm-set-card">
+        <h3>Resumen anual</h3>
+        ${check('annual.enabled', 'Enviar el resumen de la temporada', 'Aparte del mensual: al grupo y, en privado, a cada jugador activo con Telegram o la app. En diciembre cuenta lo jugado hasta ese día; en enero, la temporada completa. Necesita las notificaciones activadas.')}
+        <div class="adm-set-row">
+          <label>Mes
+            <select class="adm-input" name="annual.month">${ANNUAL_MONTHS.map(([value, label]) => html`<option value="${value}">${label}</option>`)}</select>
+          </label>
+          <label>Día
+            <select class="adm-input" name="annual.day">${Array.from({ length: 28 }, (_, i) => html`<option value="${i + 1}">${i + 1}</option>`)}</select>
+          </label>
+          <label>Hora <input class="adm-input" type="time" name="annual.time" required /></label>
+        </div>
+        <div class="adm-sub">En diciembre, entre el 20 y el 28; en enero, entre el 1 y el 5. ${lastRun(jobs.annual_recap)}</div>
       </section>`,
 
     telegram: html`
@@ -169,6 +189,18 @@ function fill(form, values) {
     if (field.type === 'checkbox') field.checked = Boolean(value);
     else field.value = value ?? '';
   }
+}
+
+/** Only the days the chosen month allows can be picked; a day that does not fit is moved to the first one that does. */
+export function syncAnnualDay(form) {
+  const month = form.elements['annual.month'];
+  const day = form.elements['annual.day'];
+  if (!month || !day) return;
+  const [from, to] = ANNUAL_DAYS[Number(month.value)];
+  for (const option of day.options) {
+    option.hidden = option.disabled = Number(option.value) < from || Number(option.value) > to;
+  }
+  if (Number(day.value) < from || Number(day.value) > to) day.value = String(from);
 }
 
 function collect(form) {
@@ -295,6 +327,8 @@ export async function render(target, { entity }) {
     mount(panel, view(values, jobs, pushDevices, mail, aiUses));
     const form = panel.querySelector('#admSettings');
     fill(form, values);
+    syncAnnualDay(form);
+    form.addEventListener('change', (e) => { if (e.target.name === 'annual.month') syncAnnualDay(form); });
     form.addEventListener('submit', (e) => { e.preventDefault(); save(form); });
     form.addEventListener('click', (e) => {
       const act = e.target.closest('[data-set-act]')?.dataset.setAct;

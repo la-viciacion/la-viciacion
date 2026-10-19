@@ -1,6 +1,7 @@
-// "Resumen mensual": look at the recap of any month or season before it goes out, see the texts the notices
-// would carry (the group's and one player's) and send it now. The page itself (#/recap) opens from here for any
-// player. Sending goes through the same code as the monthly job; the schedule is in Ajustes.
+// "Recap": look at the recap of any month or season before it goes out, see the texts the notices would carry (the
+// group's and one player's), send it now and set when the monthly and the annual ones go out automatically (the same
+// settings form as the rest of the notifications, only its cards for the recap). The page itself (#/recap) opens from
+// here for any player. Sending goes through the same code as the jobs.
 import { api, jsonRequest } from '../../lib/api.js';
 import { html, mount } from '../../lib/html.js';
 import { lastMonth, periodChoices, recapHref } from '../../lib/recap.js';
@@ -8,6 +9,7 @@ import { storyHref } from '../../lib/story.js';
 import { toast } from '../../ui/toast.js';
 import { errorState, store } from './components.js';
 import { confirmDialog } from './dialogs.js';
+import { render as renderSettings } from './settings.js';
 
 let panel;
 let period = lastMonth();
@@ -55,7 +57,7 @@ function view() {
 
       <section class="adm-set-card">
         <h3>Enviar ahora</h3>
-        <div class="adm-sub">Lo mismo que hace el envío mensual, para el periodo elegido. Respeta el interruptor general de notificaciones.</div>
+        <div class="adm-sub">Lo mismo que hacen los envíos automáticos, para el periodo elegido (un mes o una temporada). Respeta el interruptor general de notificaciones.</div>
         <div class="adm-actions">
           <button type="button" class="adm-btn" data-send="me">Enviarme mi resumen (prueba)</button>
           <button type="button" class="adm-btn" data-send="group">Enviar al grupo…</button>
@@ -63,7 +65,9 @@ function view() {
         </div>
         <div class="adm-error" role="alert"></div>
       </section>
-    </div>`;
+    </div>
+    <div class="section-header"><h2 class="section-title">Envío automático</h2><div class="section-line"></div></div>
+    <div id="rcaSettings"></div>`;
 }
 
 async function refresh() {
@@ -116,7 +120,7 @@ export async function render(target) {
       const button = e.target.closest('[data-send]');
       if (button) send(button.dataset.send);
     };
-    await refresh();
+    await Promise.all([refresh(), renderSettings(panel.querySelector('#rcaSettings'), { entity: { sections: ['monthly', 'annual'] } })]);
   } catch (err) {
     mount(panel, errorState(err.message));
   }
