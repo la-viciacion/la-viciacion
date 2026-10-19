@@ -52,3 +52,39 @@ export function change(now, before, render) {
   if (difference === 0) return { text: 'igual', trend: 'same' };
   return { text: `${difference > 0 ? '+' : '−'}${render(Math.abs(difference))}`, trend: difference > 0 ? 'up' : 'down' };
 }
+
+// ── choosing a period without one long list: monthly or annual, a year and, for a month, the month ──
+
+/** "2026-09" -> { kind: "month", year: 2026, month: 9 }; "2026" -> { kind: "year", year: 2026, month: null }. */
+export function pickOf(period) {
+  return isMonth(period)
+    ? { kind: 'month', year: Number(period.slice(0, 4)), month: Number(period.slice(5)) }
+    : { kind: 'year', year: Number(period), month: null };
+}
+
+/** The period of a choice: the inverse of pickOf. */
+export const periodKey = ({ kind, year, month }) => (kind === 'year' ? String(year) : `${year}-${pad(month)}`);
+
+/** The years on offer, the running one first, down to the first season. */
+export function yearChoices(now = new Date()) {
+  return Array.from({ length: now.getFullYear() - FIRST + 1 }, (_, i) => now.getFullYear() - i);
+}
+
+/** The months of a year as { value (1-12), label }: all of them, or up to the running month in the running year (nothing is there to see after it). */
+export function monthChoices(year, now = new Date()) {
+  const last = year === now.getFullYear() ? now.getMonth() + 1 : 12;
+  return MONTHS.slice(0, last).map((label, i) => ({ value: i + 1, label: label[0].toUpperCase() + label.slice(1) }));
+}
+
+/** A choice made valid: a year that is not offered becomes the running one and a month that does not exist yet the last one that does. */
+export function clampPick(pick, now = new Date()) {
+  const year = Math.min(now.getFullYear(), Math.max(FIRST, pick.year));
+  if (pick.kind === 'year') return { kind: 'year', year, month: null };
+  const last = monthChoices(year, now).length;
+  return { kind: 'month', year, month: Math.min(last, Math.max(1, pick.month ?? last)) };
+}
+
+/** The same choice in the other kind: a year stays, a month starts at the last month there is. */
+export function withKind(pick, kind, now = new Date()) {
+  return clampPick({ kind, year: pick.year, month: kind === 'month' ? pick.month ?? 12 : null }, now);
+}

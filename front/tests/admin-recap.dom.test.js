@@ -30,6 +30,8 @@ function routes(extra = {}) {
 
 const panel = () => document.getElementById('panel');
 const field = (name) => panel().querySelector(`[name="${name}"]`);
+const lastMonthKey = () => { const d = new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
+const previewPaths = (calls) => calls.filter((c) => c.path.startsWith('/manage/recap/preview')).map((c) => c.path);
 const enabledDays = (select) => [...select.options].filter((o) => !o.disabled).map((o) => Number(o.value));
 const change = (el, value) => {
   el.value = String(value);
@@ -111,4 +113,57 @@ test('the monthly settings are no longer among the notification settings', async
   assert.deepEqual(ENTITIES.notifications.sections, ['notifications', 'weekly', 'telegram', 'push']);
   assert.equal(ENTITIES.recap.label, 'Recap');
   assert.equal(ENTITIES.recap.custom, 'recap');
+});
+
+test('it opens on the last month, monthly, with a year and a month to choose instead of one long list', async () => {
+  const calls = installApi(routes());
+  await render(panel());
+  await settle();
+  assert.equal(panel().querySelector('#rcaKind').value, 'month');
+  assert.deepEqual([...panel().querySelectorAll('#rcaKind option')].map((o) => o.textContent), ['Mensual', 'Anual']);
+  assert.equal(panel().querySelectorAll('#rcaYear option').length, new Date().getFullYear() - 2023 + 1);
+  assert.ok(panel().querySelector('#rcaMonth'));
+  assert.deepEqual(previewPaths(calls), [`/manage/recap/preview?period=${lastMonthKey()}`]);
+  assert.equal(panel().querySelector('#rcaPeriod'), null, 'the mixed list is gone');
+});
+
+test('choosing annual hides the month and previews the season', async () => {
+  const calls = installApi(routes());
+  await render(panel());
+  await settle();
+  change(panel().querySelector('#rcaKind'), 'year');
+  await settle();
+  assert.equal(panel().querySelector('#rcaMonth'), null);
+  const year = panel().querySelector('#rcaYear').value;
+  assert.equal(previewPaths(calls).at(-1), `/manage/recap/preview?period=${year}`);
+  assert.equal(panel().querySelector('#rcaStory').getAttribute('href'), `#/story/${year}`);
+  change(panel().querySelector('#rcaKind'), 'month');
+  await settle();
+  assert.ok(panel().querySelector('#rcaMonth'));
+});
+
+test('another year or month previews that one, and the months of the running year stop at the running month', async () => {
+  const calls = installApi(routes());
+  await render(panel());
+  await settle();
+  const thisYear = new Date().getFullYear();
+  change(panel().querySelector('#rcaYear'), thisYear - 1);
+  await settle();
+  assert.equal(panel().querySelectorAll('#rcaMonth option').length, 12);
+  change(panel().querySelector('#rcaMonth'), 3);
+  await settle();
+  assert.equal(previewPaths(calls).at(-1), `/manage/recap/preview?period=${thisYear - 1}-03`);
+  change(panel().querySelector('#rcaYear'), thisYear);
+  await settle();
+  assert.equal(panel().querySelectorAll('#rcaMonth option').length, new Date().getMonth() + 1);
+});
+
+test('the notice and the sending are one card, and the first one is called Previsualizar', async () => {
+  installApi(routes());
+  await render(panel());
+  await settle();
+  const titles = [...panel().querySelectorAll('#rcAdmin h3')].map((h) => h.textContent);
+  assert.deepEqual(titles, ['Previsualizar', 'El aviso']);
+  const notice = [...panel().querySelectorAll('#rcAdmin section')].find((s) => s.querySelector('h3').textContent === 'El aviso');
+  assert.ok(notice.querySelector('#rcaTelegram') && notice.querySelector('[data-send="me"]') && notice.querySelector('[data-send="group"]'));
 });
