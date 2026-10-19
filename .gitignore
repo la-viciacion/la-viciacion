@@ -376,3 +376,11 @@ db/init/*
 
 # Local test timings of api/run_tests.py
 api/.test_timings.json
+
+# MkDocs build output (mkdocs.yml)
+/site/
+
+# Throwaway demo stack for the documentation screenshots (docs-demo/)
+/docs-demo/.env
+/docs-demo/covers/
+/docs-demo/avatars/

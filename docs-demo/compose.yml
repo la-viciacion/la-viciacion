@@ -1,0 +1,47 @@
+# Override of docker-compose.yml for the throwaway demo stack that the documentation screenshots are taken
+# from (docs-demo/demo.py drives it). It shares nothing with the real stack: other project name, other
+# images, containers, ports and database volume, so it can run next to it and `down -v` destroys only itself.
+services:
+
+  laviciacion-front:
+    image: lavi-demo-front
+    container_name: lavi-demo-front
+    ports: !override
+      - target: 3000
+        published: 3100
+        host_ip: 127.0.0.1
+    volumes:
+      # generated covers, served by the front's own nginx
+      - ./docs-demo/covers:/usr/share/nginx/html/demo-covers:ro
+
+  laviciacion-bot:
+    image: lavi-demo-bot
+    container_name: lavi-demo-bot
+    env_file: !override
+      - docs-demo/.env
+    volumes: !reset []
+
+  laviciacion-api:
+    image: lavi-demo-api
+    container_name: lavi-demo-api
+    env_file: !override
+      - docs-demo/.env
+    volumes: !reset []
+    ports: !override
+      - target: 5000
+        published: 5100
+        host_ip: 127.0.0.1
+
+  laviciacion-db:
+    container_name: lavi-demo-db
+    env_file: !override
+      - docs-demo/.env
+    volumes: !override
+      - lavi_demo_db_data:/var/lib/mysql
+    ports: !override
+      - target: 3306
+        published: 3407
+        host_ip: 127.0.0.1
+
+volumes:
+  lavi_demo_db_data:
