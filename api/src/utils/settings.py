@@ -120,6 +120,10 @@ REGISTRY: dict[str, Spec] = {
     "annual.month": Spec("int", 1, check=_annual_month),
     "annual.day": Spec("int", 1, check=_annual_day),
     "annual.time": Spec("str", "10:00", check=_time),
+    # 0 = the running season's recap is locked (crud.recap.season_locked); any other value is the year it was
+    # unlocked for, so it locks itself again once that year is no longer the running one. Set by hand from the
+    # panel, or automatically the moment its notice reaches the group (utils/recap_notices.announce_recap).
+    "annual.unlocked_year": Spec("int", 0),
     # Web Push (utils/push.py). The keys are generated from the panel, never typed.
     "push.enabled": Spec("bool", True),
     "push.contact": Spec("str", None, check=_contact),
