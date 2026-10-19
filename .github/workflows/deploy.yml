@@ -1,10 +1,12 @@
 name: Deploy
 
-# Deploys on demand (Actions tab -> Deploy -> Run workflow). It connects over SSH and the server holds the
+# Deploys on demand (Actions tab -> Deploy -> Run workflow), and prod also by itself: release.yml calls this
+# workflow once the checks of a new vX.Y.Z tag have passed. It connects over SSH and the server holds the
 # whole procedure; each key can run one script and nothing else (`command=` in its authorized_keys entry).
 #   dev   builds main from the checkout of the dev stack (deploy.sh).
 #   prod  builds a release tag on the server (`latest` = the newest vX.Y.Z tag, or e.g. 2.0.0). It refuses a tag
-#         whose "Release images" run (every check) did not pass on the commit the tag points to.
+#         that is not on main, and, when started by hand, one whose "Release images" run (every check) did not
+#         pass on the commit the tag points to (called from that very run, the checks have just passed).
 #   dev   needs no such check: main only receives pull requests whose CI was green (branch protection).
 # Each target has its own key (DEPLOY_SSH_KEY_DEV / DEPLOY_SSH_KEY_PROD); the host, the user and the host key are
 # shared. A last job (notify) checks that the API answers and reports the result to Telegram.
@@ -22,6 +24,15 @@ on:
         description: "prod only: release to deploy, `latest` or X.Y.Z (also how you roll back)"
         type: string
         default: latest
+  # Only release.yml calls it, with the tag it has just checked. A manual run keeps its own inputs above.
+  workflow_call:
+    inputs:
+      target:
+        type: string
+        default: prod
+      version:
+        type: string
+        required: true
 
 permissions: {}
 
@@ -54,7 +65,8 @@ jobs:
             "$SSH_USER@$HOST"
 
   deploy-prod:
-    if: inputs.target == 'prod' && github.ref == 'refs/heads/main'
+    # From a release run, github.ref is the tag (the one place a run may start from anything but main).
+    if: inputs.target == 'prod' && (github.ref == 'refs/heads/main' || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')))
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -70,6 +82,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           VERSION: ${{ inputs.version }}
+          EVENT: ${{ github.event_name }}
         run: |
           if ! printf '%s' "$VERSION" | grep -E -q '^(latest|[0-9]+\.[0-9]+\.[0-9]+)$'; then
             echo "::error::version must be 'latest' or X.Y.Z"; exit 1
@@ -81,11 +94,20 @@ jobs:
           fi
           [ -n "$tag" ] || { echo "::error::there is no release tag"; exit 1; }
           sha=$(gh api "repos/$REPO/commits/$tag" --jq .sha) || { echo "::error::the tag $tag does not exist"; exit 1; }
-          passed=$(gh run list --repo "$REPO" --workflow release.yml --branch "$tag" --status success \
-            --json headSha --jq "[.[] | select(.headSha == \"$sha\")] | length")
-          if [ "$passed" = 0 ]; then
-            echo "::error::$tag has no passing 'Release images' run on its commit ($sha). Wait for it, or run that workflow by hand on the tag."
-            exit 1
+          # Only what is on main went through a pull request's CI: a tag pushed on any other branch is refused.
+          status=$(gh api "repos/$REPO/compare/main...$sha" --jq .status) || { echo "::error::could not compare $tag with main"; exit 1; }
+          case "$status" in
+            identical|behind) ;;
+            *) echo "::error::$tag ($sha) is not on main"; exit 1 ;;
+          esac
+          # Called from the release run, that run is still in progress and its checks have just passed.
+          if [ "$EVENT" = workflow_dispatch ]; then
+            passed=$(gh run list --repo "$REPO" --workflow release.yml --branch "$tag" --status success \
+              --json headSha --jq "[.[] | select(.headSha == \"$sha\")] | length")
+            if [ "$passed" = 0 ]; then
+              echo "::error::$tag has no passing 'Release images' run on its commit ($sha). Wait for it, or run that workflow by hand on the tag."
+              exit 1
+            fi
           fi
           echo "$tag passed every check ($sha)"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
