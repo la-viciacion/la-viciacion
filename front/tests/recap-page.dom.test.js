@@ -118,11 +118,12 @@ test('the period is chosen as monthly or annual, a year and a month, not from on
   assert.equal(document.querySelectorAll('#rcYear option').length, new Date().getFullYear() - 2023 + 1);
 });
 
-test('annual opens the season of the year, without a month, and monthly goes back to the last month of it', async () => {
-  window.location.hash = '#/recap/2026-09';
+test('annual opens the season of a finished year, without a month, and monthly goes back to the last month of it', async () => {
+  const pastYear = new Date().getFullYear() - 1; // never the running year, whatever day this runs on
+  window.location.hash = `#/recap/${pastYear}-09`;
   const calls = installApi({
-    'GET /statistics/recap/2026-09?': DATA,
-    'GET /statistics/recap/2026?': { ...DATA, period: '2026', kind: 'year' },
+    [`GET /statistics/recap/${pastYear}-09?`]: DATA,
+    [`GET /statistics/recap/${pastYear}?`]: { ...DATA, period: String(pastYear), kind: 'year' },
   });
   await recap.render({ user: ME, main: main() });
   await settle();
@@ -130,20 +131,59 @@ test('annual opens the season of the year, without a month, and monthly goes bac
   kind.value = 'year';
   kind.dispatchEvent(new window.Event('change', { bubbles: true }));
   await settle();
-  assert.equal(calls.at(-1).path, '/statistics/recap/2026?username=ana');
-  assert.equal(window.location.hash, '#/recap/2026');
+  assert.equal(calls.at(-1).path, `/statistics/recap/${pastYear}?username=ana`);
+  assert.equal(window.location.hash, `#/recap/${pastYear}`);
   assert.equal(document.getElementById('rcMonth'), null);
-  assert.match(main().textContent, /frente a temporada 2025/);
+  assert.match(main().textContent, new RegExp(`frente a temporada ${pastYear - 1}`));
 });
 
-test('an address with a season opens it as annual', async () => {
-  window.location.hash = '#/recap/2026';
-  const calls = installApi({ 'GET /statistics/recap/2026?': { ...DATA, period: '2026', kind: 'year' } });
+test('an address naming the running season still opens it as annual (the December group notice links to it)', async () => {
+  const year = new Date().getFullYear();
+  window.location.hash = `#/recap/${year}`;
+  const calls = installApi({ [`GET /statistics/recap/${year}?`]: { ...DATA, period: String(year), kind: 'year', complete: false } });
   await recap.render({ user: ME, main: main() });
   await settle();
-  assert.equal(calls[0].path, '/statistics/recap/2026?username=ana');
+  assert.equal(calls[0].path, `/statistics/recap/${year}?username=ana`);
   assert.equal(document.getElementById('rcKind').value, 'year');
   assert.equal(document.getElementById('rcMonth'), null);
+  assert.match(main().textContent, /todavía no ha terminado/);
+});
+
+test('the running season is not among the years the Anual select offers', async () => {
+  const pastYear = new Date().getFullYear() - 1;
+  window.location.hash = `#/recap/${pastYear}-09`;
+  installApi({
+    [`GET /statistics/recap/${pastYear}-09?`]: DATA,
+    [`GET /statistics/recap/${pastYear}?`]: { ...DATA, period: String(pastYear), kind: 'year' },
+  });
+  await recap.render({ user: ME, main: main() });
+  await settle();
+  document.getElementById('rcKind').value = 'year';
+  document.getElementById('rcKind').dispatchEvent(new window.Event('change', { bubbles: true }));
+  await settle();
+  const years = [...document.querySelectorAll('#rcYear option')].map((o) => o.value);
+  assert.equal(years.includes(String(new Date().getFullYear())), false);
+});
+
+test('switching to Anual while on a month of the running year falls back to the season before, not the running one', async () => {
+  const now = new Date();
+  const runningYear = now.getFullYear();
+  // the last finished month and the year it belongs to (December of the year before, if today is January)
+  const monthYear = now.getMonth() === 0 ? runningYear - 1 : runningYear;
+  const month = now.getMonth() === 0 ? 12 : now.getMonth();
+  const expectedYear = monthYear === runningYear ? runningYear - 1 : monthYear; // Anual never lands on the running year
+  window.location.hash = `#/recap/${monthYear}-${String(month).padStart(2, '0')}`;
+  const calls = installApi({
+    [`GET /statistics/recap/${monthYear}-${String(month).padStart(2, '0')}?`]: DATA,
+    [`GET /statistics/recap/${expectedYear}?`]: { ...DATA, period: String(expectedYear), kind: 'year' },
+  });
+  await recap.render({ user: ME, main: main() });
+  await settle();
+  document.getElementById('rcKind').value = 'year';
+  document.getElementById('rcKind').dispatchEvent(new window.Event('change', { bubbles: true }));
+  await settle();
+  assert.equal(calls.at(-1).path, `/statistics/recap/${expectedYear}?username=ana`);
+  assert.equal(document.getElementById('rcYear').value, String(expectedYear));
 });
 
 test('a period that does not exist yet is moved to one that does', async () => {

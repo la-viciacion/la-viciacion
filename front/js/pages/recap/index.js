@@ -1,13 +1,15 @@
 // Recap (#/recap[/<period>[/<username>]]): "Wrapped" of a month or a season, yours and the group's.
 // GET /statistics/recap/{period}?username=. Nothing is stored: the API derives it from the sessions when asked.
-// The period opens on the month that has just ended; any finished month, or any season, can be chosen (the running
-// month cannot: it has not finished). An admin can add a player's username to the address to see theirs.
+// The period opens on the month that has just ended; the picker only offers a finished month or a finished season
+// (the running one of either cannot be chosen there — it has not finished), but an address that already names the
+// running season still opens it (the December notice to the group links to it, "so far"). An admin can add a
+// player's username to the address to see theirs.
 import { api } from '../../lib/api.js';
 import { formatDate, formatDuration } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
 import { gameHref } from '../../lib/links.js';
 import { storyHref } from '../../lib/story.js';
-import { change, clampPick, lastMonth, monthChoices, parseHash, periodKey, periodLabel, pickOf, previousPeriod, recapHref, withKind, yearChoices } from '../../lib/recap.js';
+import { change, clampPick, excludeRunningYear, finishedYearChoices, lastMonth, monthChoices, parseHash, periodKey, periodLabel, pickOf, previousPeriod, recapHref, withKind, yearChoices } from '../../lib/recap.js';
 import { statTile } from '../../ui/profile-summary.js';
 
 export const active = null; // it belongs to no item of the top bar
@@ -100,6 +102,14 @@ export function groupView(g) {
 
 const otherPlayer = () => username && username !== me.username;
 
+// The year select of Anual: finished seasons, plus the one on screen if that is the running one reached by an
+// address (the December notice to the group links to the season still in progress) — never offered otherwise.
+function yearOptions() {
+  if (pick.kind !== 'year') return yearChoices();
+  const finished = finishedYearChoices();
+  return finished.includes(pick.year) ? finished : [pick.year, ...finished];
+}
+
 // Monthly or annual, then the year (and the month): a short list at each step instead of one that grows every month
 function picker() {
   const selected = (on) => (on ? 'selected' : '');
@@ -111,7 +121,7 @@ function picker() {
       </select>
     </label>
     <label class="rc-select">Año
-      <select class="adm-input" id="rcYear">${yearChoices().map((year) => html`<option value="${year}" ${selected(year === pick.year)}>${year}</option>`)}</select>
+      <select class="adm-input" id="rcYear">${yearOptions().map((year) => html`<option value="${year}" ${selected(year === pick.year)}>${year}</option>`)}</select>
     </label>
     ${pick.kind === 'month' ? html`
       <label class="rc-select">Mes
@@ -168,8 +178,9 @@ export async function render({ user, main: target }) {
   data = null;
   main.onchange = (event) => {
     const { id, value } = event.target;
-    if (id === 'rcKind') pick = withKind(pick, value);
-    else if (id === 'rcYear') pick = clampPick({ ...pick, year: Number(value) });
+    // picked, not addressed: a season still running is never reached this way, only by a link already pointing at it
+    if (id === 'rcKind') pick = excludeRunningYear(withKind(pick, value));
+    else if (id === 'rcYear') pick = excludeRunningYear(clampPick({ ...pick, year: Number(value) }));
     else if (id === 'rcMonth') pick = { ...pick, month: Number(value) };
     else return;
     period = periodKey(pick);

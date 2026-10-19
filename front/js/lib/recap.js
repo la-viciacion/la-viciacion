@@ -59,6 +59,19 @@ export function yearChoices(now = new Date()) {
   return Array.from({ length: now.getFullYear() - FIRST + 1 }, (_, i) => now.getFullYear() - i);
 }
 
+/** Like yearChoices, but for picking a season to look back on (#/recap's Año select in Anual mode): the running
+ * one is not finished yet, so it is not offered — same idea as a month that has not finished. It stays reachable
+ * by an explicit address (the December notice to the group links to the season still in progress, "so far"). */
+export function finishedYearChoices(now = new Date()) {
+  return yearChoices(now).filter((year) => year !== now.getFullYear());
+}
+
+/** A year choice landed on through the picker, never the running one (falls back to the year before): for the
+ * interactive Resumen/Año selects, not for an address someone followed to the season in progress. */
+export function excludeRunningYear(pick, now = new Date()) {
+  return pick.kind === 'year' && pick.year === now.getFullYear() ? { kind: 'year', year: pick.year - 1, month: null } : pick;
+}
+
 /** The months of a year as { value (1-12), label }: all of them, or up to the month before the running one in the
  * running year (the running month cannot be seen yet: it has not finished). In January the running year has none. */
 export function monthChoices(year, now = new Date()) {
