@@ -142,7 +142,7 @@ test('choosing annual hides the month and previews the season', async () => {
   assert.ok(panel().querySelector('#rcaMonth'));
 });
 
-test('another year or month previews that one, and the months of the running year stop at the running month', async () => {
+test('another year or month previews that one, and the months of the running year stop before the running one', async () => {
   const calls = installApi(routes());
   await render(panel());
   await settle();
@@ -155,7 +155,9 @@ test('another year or month previews that one, and the months of the running yea
   assert.equal(previewPaths(calls).at(-1), `/manage/recap/preview?period=${thisYear - 1}-03`);
   change(panel().querySelector('#rcaYear'), thisYear);
   await settle();
-  assert.equal(panel().querySelectorAll('#rcaMonth option').length, new Date().getMonth() + 1);
+  // the running month itself is not offered; in January the running year has none, so the picker falls back to December of the year before
+  if (new Date().getMonth() === 0) assert.equal(panel().querySelector('#rcaYear').value, String(thisYear - 1));
+  else assert.equal(panel().querySelectorAll('#rcaMonth option').length, new Date().getMonth());
 });
 
 test('the notice and the sending are one card, and the first one is called Previsualizar', async () => {

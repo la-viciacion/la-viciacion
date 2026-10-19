@@ -197,3 +197,11 @@ test('a story address that is not a period falls back to the last month instead 
   assert.equal(calls[0].path, `/statistics/recap/${lastMonthKey()}?username=ana`);
   story.dispose();
 });
+
+test('the running month cannot be told as a story: the address falls back to the one before', async () => {
+  const now = new Date();
+  const running = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const calls = await open(`#/story/${running}`);
+  assert.equal(calls[0].path, `/statistics/recap/${lastMonthKey()}?username=ana`);
+  story.dispose();
+});

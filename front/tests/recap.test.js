@@ -52,23 +52,38 @@ test('the years on offer go from the running one to 2023', () => {
 test('a past year has its twelve months, the running one only up to the running month', () => {
   const now = new Date(2026, 9, 18);
   assert.equal(monthChoices(2025, now).length, 12);
-  assert.deepEqual(monthChoices(2026, now).map((m) => m.value), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
-  assert.deepEqual([monthChoices(2026, now)[0].label, monthChoices(2026, now)[9].label], ['Enero', 'Octubre']);
+  assert.deepEqual(monthChoices(2026, now).map((m) => m.value), [1, 2, 3, 4, 5, 6, 7, 8, 9]); // October (the running month) is not there: it has not finished
+  assert.deepEqual([monthChoices(2026, now)[0].label, monthChoices(2026, now)[8].label], ['Enero', 'Septiembre']);
+});
+
+test('January of the running year has no finished month to offer', () => {
+  assert.deepEqual(monthChoices(2026, new Date(2026, 0, 15)), []);
 });
 
 test('a choice made invalid is moved to the nearest valid one', () => {
   const now = new Date(2026, 9, 18);
-  assert.deepEqual(clampPick({ kind: 'month', year: 2026, month: 12 }, now), { kind: 'month', year: 2026, month: 10 });
+  assert.deepEqual(clampPick({ kind: 'month', year: 2026, month: 12 }, now), { kind: 'month', year: 2026, month: 9 });
   assert.deepEqual(clampPick({ kind: 'month', year: 2027, month: 3 }, now), { kind: 'month', year: 2026, month: 3 }); // a year that does not exist yet becomes the running one
-  assert.deepEqual(clampPick({ kind: 'month', year: 2027, month: 12 }, now), { kind: 'month', year: 2026, month: 10 });
+  assert.deepEqual(clampPick({ kind: 'month', year: 2027, month: 12 }, now), { kind: 'month', year: 2026, month: 9 });
   assert.deepEqual(clampPick({ kind: 'month', year: 2020, month: 1 }, now), { kind: 'month', year: 2023, month: 1 });
   assert.deepEqual(clampPick({ kind: 'year', year: 2030, month: null }, now), { kind: 'year', year: 2026, month: null });
   assert.deepEqual(clampPick({ kind: 'month', year: 2025, month: 12 }, now), { kind: 'month', year: 2025, month: 12 });
 });
 
-test('moving from a year to a month starts at its last month; from a month to a year it keeps the year', () => {
+test('the running month itself is refused too, like a month still further ahead', () => {
+  const now = new Date(2026, 9, 18); // October 2026 is running
+  assert.deepEqual(clampPick({ kind: 'month', year: 2026, month: 10 }, now), { kind: 'month', year: 2026, month: 9 });
+});
+
+test('in January, picking the running year as monthly falls back to December of the year before', () => {
+  const now = new Date(2026, 0, 15);
+  assert.deepEqual(clampPick({ kind: 'month', year: 2026, month: 1 }, now), { kind: 'month', year: 2025, month: 12 });
+  assert.deepEqual(clampPick({ kind: 'month', year: 2026, month: 6 }, now), { kind: 'month', year: 2025, month: 12 });
+});
+
+test('moving from a year to a month starts at its last finished month; from a month to a year it keeps the year', () => {
   const now = new Date(2026, 9, 18);
   assert.deepEqual(withKind({ kind: 'year', year: 2025, month: null }, 'month', now), { kind: 'month', year: 2025, month: 12 });
-  assert.deepEqual(withKind({ kind: 'year', year: 2026, month: null }, 'month', now), { kind: 'month', year: 2026, month: 10 });
+  assert.deepEqual(withKind({ kind: 'year', year: 2026, month: null }, 'month', now), { kind: 'month', year: 2026, month: 9 });
   assert.deepEqual(withKind({ kind: 'month', year: 2025, month: 4 }, 'year', now), { kind: 'year', year: 2025, month: null });
 });

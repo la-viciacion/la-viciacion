@@ -3,7 +3,7 @@
 // draws them and ui/story-player.js moves them. An admin can add a player's username to the address.
 import { api } from '../../lib/api.js';
 import { html, mount } from '../../lib/html.js';
-import { lastMonth, periodLabel, recapHref } from '../../lib/recap.js';
+import { clampPick, lastMonth, periodKey, periodLabel, pickOf, recapHref } from '../../lib/recap.js';
 import { buildSlides, parseStoryHash } from '../../lib/story.js';
 import { SHARE_FILENAME, canShare, shareCard } from '../../lib/story-share.js';
 import { shareImage } from '../../ui/story-image.js';
@@ -34,7 +34,8 @@ async function share(slide) {
 export async function render({ user, main }) {
   dispose();
   const asked = parseStoryHash(location.hash);
-  period = asked.period || lastMonth();
+  // the same bounds as the recap page: a month that has not finished (the running one) falls back to the one before
+  period = periodKey(clampPick(pickOf(asked.period || lastMonth())));
   other = user.is_admin && asked.username && asked.username !== user.username ? asked.username : null;
   if (!other) dismissRecapInvite(period); // the story is open: the notice of the first days of the month has done its job
   mount(main, html`<div class="st-overlay" id="stRoot"><div class="st-stage"><div class="st-slide"><div class="st-hint">Preparando tu resumen…</div></div></div></div>`);
