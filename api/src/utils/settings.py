@@ -259,6 +259,7 @@ def ai_uses(db: Session) -> list[dict]:
             "label": use.label,
             "help": use.help,
             "switchable": use.switchable,
+            "parent": use.parent,
             "default_prompt": REGISTRY[f"ai.prompt.{use_id}"].default,
             "customized": f"ai.prompt.{use_id}" in changed,
         }

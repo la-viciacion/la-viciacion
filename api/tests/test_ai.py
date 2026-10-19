@@ -207,6 +207,12 @@ class PromptOverrideTests(unittest.TestCase):
         self.assertEqual(settings.get_all(self.db)["ai.prompt.new_game"], self.code)
         self.assertFalse(next(u for u in settings.ai_uses(self.db) if u["id"] == "new_game")["customized"])
 
+    def test_a_fragment_says_which_notice_it_belongs_to_and_the_notices_belong_to_none(self):
+        uses = {u["id"]: u for u in settings.ai_uses(self.db)}
+        self.assertEqual(uses["completed_game_recommendation"]["parent"], "completed_game")
+        self.assertFalse(uses["completed_game_recommendation"]["switchable"])
+        self.assertTrue(all(u["parent"] is None for u in uses.values() if u["switchable"]))
+
     def test_the_database_prompt_wins_over_the_code(self):
         settings.set_values(self.db, {"ai.prompt.new_game": "  Di algo corto.  "})
         self.assertEqual(settings.get_all(self.db)["ai.prompt.new_game"], "Di algo corto.")
