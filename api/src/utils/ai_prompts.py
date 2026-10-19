@@ -88,20 +88,6 @@ Si hay varios juegos, menciónalos todos, sin dejarte ninguno.
 Si conoces alguna broma relacionada con alguno de los juegos, puedes incluirla.
 """
 
-MONTHLY_RECAP_PROMPT = """
-Tu función es crear un mensaje divertido, partiendo del resumen proporcionado.
-Este mensaje es el resumen del mes (o de la temporada) del grupo y se envía al grupo: habla de las personas
-siempre en tercera persona, nunca te dirijas a ellas con "tú" ni "tu".
-
-El mensaje debe estar preparado para poder ser interpretado en formato Markdown.
-Debes empezar con el título del resumen tal como está en el mensaje original.
-Debes incluir siempre todas las cifras del mensaje original (horas, sesiones, comparación con el periodo anterior, el
-podio, el juego del periodo, el día más movido y los logros) tal como están escritas, sin inventarte ninguna.
-Debes incluir siempre el nombre de cada persona del podio y el del juego.
-Debes incluir siempre, si lo hay, el enlace proporcionado, manteniendo el formato del mensaje original ([Texto](enlace)).
-Puedes añadir una frase divertida sobre el periodo, con temática de videojuegos.
-"""
-
 
 @dataclass(frozen=True)
 class Use:
@@ -146,10 +132,5 @@ USES: dict[str, Use] = {
         "Sale un juego deseado",
         "Aviso al grupo, el día antes, cuando sale un juego que alguien tiene en su lista de deseados.",
         WISHLIST_RELEASE_PROMPT,
-    ),
-    "monthly_recap": Use(
-        "Resumen mensual y anual",
-        "Aviso al grupo con el resumen del mes que acaba de terminar o de la temporada (los resúmenes privados de cada jugador no pasan por la IA).",
-        MONTHLY_RECAP_PROMPT,
     ),
 }

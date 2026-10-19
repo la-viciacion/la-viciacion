@@ -124,25 +124,23 @@ def _recap_period(text: str) -> recap.Period:
 
 
 @router.get("/recap/preview")
-def recap_preview(period: str, user_id: Optional[int] = None, db: Session = Depends(get_db)):
-    """The texts the recap of a month or a season would send, without sending anything: the group's and, with
-    `user_id`, that player's. The AI is not asked: the group's goes out rewritten only when it is on for this notice."""
+def recap_preview(period: str, db: Session = Depends(get_db)):
+    """The notice of the recap of a month or a season as it would go out, without sending anything: the Telegram text and
+    what the app's devices show. Only that the recap is ready: the figures are in the page and the story."""
     parsed = _recap_period(period)
-    if user_id is not None:
-        get_or_404(db, models.User, user_id, "Usuario")
-    data = recap.build_recap(db, parsed, user_id)
+    payload = recap_notices.push_payload(parsed)
     return {
         "period": parsed.key,
         "label": recap_notices.period_label(parsed),
-        "group_message": recap_notices.group_message(data, parsed),
-        "player_message": recap_notices.player_message(data, parsed) if user_id is not None else None,
-        "nobody_played": data["group"]["seconds"] == 0,
+        "telegram": recap_notices.telegram_text(parsed),
+        "push": {"title": payload["title"], "body": payload["body"], "url": payload["url"]},
+        "nobody_played": not recap.anyone_played(db, parsed),
     }
 
 
 class RecapSendBody(BaseModel):
     period: str
-    audience: str = Field("me", pattern="^(me|group|all)$")
+    audience: str = Field("me", pattern="^(me|group)$")
 
 
 @router.post("/recap/send")
@@ -151,15 +149,13 @@ async def recap_send(
     admin: models.User = Depends(auth.require_admin),
     db: Session = Depends(get_db),
 ):
-    """Send a recap now, as the monthly job would: to the admin alone ("me", their private one), to the group
-    (the group's one only) or to everybody ("all": the group's and each player's own)."""
+    """Send the notice of a recap now, as the jobs do: to the Telegram group and the devices that want the group's notices
+    ("group"), or to the admin alone ("me": their own Telegram chat and devices, to try it)."""
     parsed = _recap_period(body.period)
-    if admin.telegram_id is None and body.audience == "me" and not actions.push_has_devices(admin.id):
+    if body.audience == "me" and admin.telegram_id is None and not actions.push_has_devices(admin.id):
         raise HTTPException(status_code=409, detail="No tienes Telegram ID ni dispositivos con avisos para recibir la prueba")
-    result = await recap_notices.announce_recap(
-        db, parsed, group=body.audience in ("group", "all"), players=body.audience in ("me", "all"), only=admin if body.audience == "me" else None
-    )
+    result = await recap_notices.announce_recap(db, parsed, only=admin if body.audience == "me" else None)
     if result["empty"]:
         raise HTTPException(status_code=409, detail="Nadie jugó en ese periodo: no hay nada que enviar")
-    logger.info(f"Recap {parsed.key} sent by {admin.username} to {body.audience}: {recap_notices.describe(result)}")
-    return {"message": recap_notices.describe(result), **result}
+    logger.info(f"Recap {parsed.key} sent by {admin.username} to {body.audience}: {recap_notices.describe(result, body.audience == 'me')}")
+    return {"message": "Enviado a ti" if body.audience == "me" else "Enviado al grupo", **result}

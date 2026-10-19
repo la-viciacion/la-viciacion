@@ -186,17 +186,27 @@ def group_stats(played: list[Played]) -> dict:
     }
 
 
-def _played(db: Session, period: Period) -> list[Played]:
-    """The finished sessions that started in the period, of every player."""
+def _period_sessions(db: Session, period: Period, *columns):
+    """The finished sessions that started in the period, of every player (never the emergency account's)."""
     sessions = time_entries.sessions_subquery()
-    rows = (
-        db.query(sessions.c.user_id, sessions.c.game_id, sessions.c.start, sessions.c.end, sessions.c.duration)
+    return (
+        db.query(*(getattr(sessions.c, name) for name in columns))
         .join(models.User, models.User.id == sessions.c.user_id)
         .filter(models.not_god(), sessions.c.duration > 0)
         .filter(sessions.c.start >= datetime.datetime.combine(period.start, datetime.time.min))
         .filter(sessions.c.start < datetime.datetime.combine(period.end, datetime.time.min))
     )
+
+
+def _played(db: Session, period: Period) -> list[Played]:
+    """The finished sessions that started in the period, of every player."""
+    rows = _period_sessions(db, period, "user_id", "game_id", "start", "end", "duration")
     return [Played(user_id, game_id, start, end, int(seconds)) for user_id, game_id, start, end, seconds in rows]
+
+
+def anyone_played(db: Session, period: Period) -> bool:
+    """Did anybody play in the period? (what decides whether there is anything to announce)"""
+    return _period_sessions(db, period, "user_id").first() is not None
 
 
 def _count_by_user(query) -> dict[int, int]:
