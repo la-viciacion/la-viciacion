@@ -164,10 +164,24 @@ test('without an address the recap is the one of the month that has just ended, 
   await recap.render({ user: ME, main: main() });
   await settle();
   assert.equal(calls[0].path, `/statistics/recap/${last}?username=ana`);
-  assert.equal(window.location.hash, `#/recap/${last}`, 'the address says which month it is');
+  assert.equal(window.location.hash, '#/recap', 'the address stays as it was: the month is the default, not a choice');
   window.location.hash = '#/recap/2025-03';
   calls = installApi({ 'GET /statistics/recap/': DATA });
   await recap.render({ user: ME, main: main() });
   await settle();
   assert.equal(calls[0].path, '/statistics/recap/2025-03?username=ana');
+  assert.equal(window.location.hash, '#/recap/2025-03');
+});
+
+test('choosing a period on the page is what puts it in the address', async () => {
+  window.location.hash = '#/recap';
+  installApi({ 'GET /statistics/recap/': DATA });
+  await recap.render({ user: ME, main: main() });
+  await settle();
+  assert.equal(window.location.hash, '#/recap');
+  const kind = document.getElementById('rcKind');
+  kind.value = 'year';
+  kind.dispatchEvent(new window.Event('change', { bubbles: true }));
+  await settle();
+  assert.equal(window.location.hash, `#/recap/${document.getElementById('rcYear').value}`);
 });
