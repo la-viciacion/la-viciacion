@@ -20,17 +20,6 @@ export function periodLabel(period) {
   return `temporada ${period}`;
 }
 
-/** What the selector offers: the months from the running one back to the first season, then the seasons. */
-export function periodChoices(now = new Date()) {
-  const months = [];
-  for (let date = new Date(now.getFullYear(), now.getMonth(), 1); date.getFullYear() >= FIRST; date = new Date(date.getFullYear(), date.getMonth() - 1, 1)) {
-    months.push({ value: monthKey(date), label: periodLabel(monthKey(date)) });
-  }
-  const seasons = [];
-  for (let year = now.getFullYear(); year >= FIRST; year -= 1) seasons.push({ value: String(year), label: `Temporada ${year}` });
-  return { months, seasons };
-}
-
 /** The address of a recap; an admin can look at another player's with `username`. */
 export const recapHref = (period, username) => `#/recap/${period}${username ? `/${encodeURIComponent(username)}` : ''}`;
 
