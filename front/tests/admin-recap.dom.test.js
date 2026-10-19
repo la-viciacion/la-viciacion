@@ -1,0 +1,99 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { installApi, installDom, installStorage, settle } from './dom.js';
+
+installStorage();
+const window = installDom('<div id="panel"></div>', 'http://localhost/');
+globalThis.location = window.location;
+const { render } = await import('../js/pages/admin/recap.js');
+const { store } = await import('../js/pages/admin/components.js');
+const { ANNUAL_DAYS, syncAnnualDay } = await import('../js/pages/admin/settings.js');
+
+store.me = 1;
+store.users = [{ id: 1, username: 'ana' }, { id: 2, username: 'biel' }];
+
+const VALUES = {
+  'notifications.enabled': true, 'notifications.admin_alerts': true, 'weekly.enabled': true, 'weekly.weekday': 0, 'weekly.time': '09:00',
+  'monthly.enabled': false, 'monthly.day': 1, 'monthly.time': '10:00',
+  'annual.enabled': false, 'annual.month': 1, 'annual.day': 1, 'annual.time': '10:00',
+  'telegram.token': { is_set: false }, 'telegram.group_id': { is_set: false }, 'telegram.admin_chat_id': { is_set: false },
+  'push.enabled': true, 'push.contact': '', 'push.vapid_private': { is_set: true }, 'ai.enabled': true, 'ai.provider': 'google', 'ai.api_key': { is_set: false }, 'ai.model': '',
+};
+
+function routes(extra = {}) {
+  return {
+    'GET /manage/recap/preview': { period: '2026-09', label: 'septiembre de 2026', nobody_played: false, group_message: 'GRUPO', player_message: 'JUGADOR' },
+    'GET /manage/settings': { values: VALUES, jobs: { annual_recap: { last_run_at: '2027-01-01T10:00:00', last_status: 'ok: 2026: group and 3 users' } }, push_devices: { devices: 0, users: 0 }, mail: { configured: false, missing: [] }, ai_uses: [] },
+    ...extra,
+  };
+}
+
+const panel = () => document.getElementById('panel');
+const field = (name) => panel().querySelector(`[name="${name}"]`);
+const enabledDays = (select) => [...select.options].filter((o) => !o.disabled).map((o) => Number(o.value));
+const change = (el, value) => {
+  el.value = String(value);
+  el.dispatchEvent(new window.Event('change', { bubbles: true }));
+};
+
+test('the Recap tab has the preview, the sending and the two schedules', async () => {
+  installApi(routes());
+  await render(panel());
+  await settle();
+  assert.equal(panel().querySelector('#rcaGroup').textContent, 'GRUPO');
+  assert.equal(panel().querySelector('#rcaPlayer').textContent, 'JUGADOR');
+  assert.match(panel().textContent, /Envío automático/);
+  assert.match(panel().textContent, /Resumen mensual/);
+  assert.match(panel().textContent, /Resumen anual/);
+  assert.match(panel().textContent, /Último envío/); // the annual job ran
+  assert.equal(panel().querySelectorAll('[data-send]').length, 3);
+});
+
+test('the monthly recap can go out from the 1st to the 5th', async () => {
+  installApi(routes());
+  await render(panel());
+  await settle();
+  assert.deepEqual([...field('monthly.day').options].map((o) => Number(o.value)), [1, 2, 3, 4, 5]);
+});
+
+test('the annual recap is in January by default, with January days, and December moves the days to 20-28', async () => {
+  installApi(routes());
+  await render(panel());
+  await settle();
+  assert.equal(field('annual.month').value, '1');
+  assert.deepEqual(enabledDays(field('annual.day')), [1, 2, 3, 4, 5]);
+  change(field('annual.month'), 12);
+  assert.deepEqual(enabledDays(field('annual.day')), [20, 21, 22, 23, 24, 25, 26, 27, 28]);
+  assert.equal(field('annual.day').value, '20', 'a day that no longer fits moves to the first one that does');
+  change(field('annual.day'), 25);
+  change(field('annual.month'), 1);
+  assert.equal(field('annual.day').value, '1');
+});
+
+test('the months and days of the annual recap are the ones the API accepts', () => {
+  assert.deepEqual(ANNUAL_DAYS, { 12: [20, 28], 1: [1, 5] });
+  const form = document.createElement('form');
+  form.innerHTML = '<select name="annual.month"><option value="12">D</option><option value="1">E</option></select><select name="annual.day"></select>';
+  assert.doesNotThrow(() => syncAnnualDay(form)); // a day select without options does nothing harmful
+});
+
+test('saving sends the month and the day together', async () => {
+  let saved;
+  installApi(routes({ 'PUT /manage/settings': ({ body }) => { saved = body; return { changed: Object.keys(body.values), values: VALUES }; } }));
+  await render(panel());
+  await settle();
+  const enable = field('annual.enabled');
+  enable.checked = true;
+  change(field('annual.month'), 12);
+  change(field('annual.day'), 24);
+  panel().querySelector('#admSettings').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+  await settle();
+  assert.deepEqual(saved.values, { 'annual.enabled': true, 'annual.month': 12, 'annual.day': 24 });
+});
+
+test('the monthly settings are no longer among the notification settings', async () => {
+  const { ENTITIES } = await import('../js/pages/admin/entities.js');
+  assert.deepEqual(ENTITIES.notifications.sections, ['notifications', 'weekly', 'telegram', 'push']);
+  assert.equal(ENTITIES.recap.label, 'Recap');
+  assert.equal(ENTITIES.recap.custom, 'recap');
+});
