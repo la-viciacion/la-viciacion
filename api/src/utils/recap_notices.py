@@ -37,14 +37,19 @@ def annual_period(day: datetime.date) -> recap.Period:
     return recap.year_period(day.year if day.month == 12 else day.year - 1)
 
 
+def kind_word(period: recap.Period) -> str:
+    """"mensual" or "anual": all the notice says about which recap it is (the period is in the link, not in the text)."""
+    return "mensual" if period.kind == "month" else "anual"
+
+
 def push_payload(period: recap.Period) -> dict:
     """The notice for the app's devices."""
-    return push.build_recap_payload(period_label(period), period.key)
+    return push.build_recap_payload(kind_word(period), period.key)
 
 
 def telegram_text(period: recap.Period) -> str:
     """The same notice for Telegram: the title and the link to the story (without a public address there is no link)."""
-    title = f"🎬 *Ya está disponible el resumen de {utils.escape_markdown(period_label(period))}*"
+    title = f"🎬 *Ya está disponible el resumen {kind_word(period)}*"
     if not config.PUBLIC_URL:
         return f"{title}\n\nMíralo en historias dentro de la app."
     return f"{title}\n\n[Pulsa para verlo en historias]({config.PUBLIC_URL}/#/story/{period.key})"
