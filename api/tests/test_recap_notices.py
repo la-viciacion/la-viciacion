@@ -8,7 +8,7 @@ from fastapi import HTTPException
 from src.crud import recap
 from src.database import models
 from src.routers.manage import notices
-from src.utils import recap_notices, scheduler
+from src.utils import messages, recap_notices, scheduler
 from tests.sqlite_db import make_session
 
 HOUR = 3600
@@ -179,6 +179,14 @@ class EndpointTests(RecapData):
             self.assertEqual(refused.exception.status_code, 400)
         with self.assertRaises(HTTPException):
             notices.recap_preview(str(datetime.date.today().year + 1), self.db)
+
+    def test_the_running_month_is_refused_but_not_the_running_season(self):
+        running_month = datetime.date.today().strftime("%Y-%m")
+        with self.assertRaises(HTTPException) as refused:
+            notices.recap_preview(running_month, self.db)
+        self.assertEqual((refused.exception.status_code, refused.exception.detail), (400, messages.RECAP_PERIOD_RUNNING))
+        # the season in progress is fine: it is not a HTTPException and shows what there is so far
+        notices.recap_preview(str(datetime.date.today().year), self.db)
 
     async def test_sending_to_me_reaches_only_the_admin(self):
         admin = self.db.get(models.User, 1)

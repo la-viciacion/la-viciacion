@@ -1,4 +1,3 @@
-import datetime
 from enum import Enum
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -191,14 +190,17 @@ def get_recap(
 ):
     """The recap of a month (`2026-09`) or a season (`2026`): the group's, and with `username` that player's too.
 
-    A period still running gives what there is so far (`complete` is false). Only the player themselves or an
-    admin can ask for a player's recap."""
+    A season still running gives what there is so far (`complete` is false); a month still running is refused
+    (`period_problem`) until it ends. Only the player themselves or an admin can ask for a player's recap."""
     try:
         parsed = recap.parse_period(period)
     except ValueError:
         raise HTTPException(status_code=400, detail=messages.RECAP_PERIOD_INVALID)
-    if parsed.start > datetime.date.today():
+    problem = recap.period_problem(parsed)
+    if problem == "future":
         raise HTTPException(status_code=400, detail=messages.RECAP_PERIOD_FUTURE)
+    if problem == "running":
+        raise HTTPException(status_code=400, detail=messages.RECAP_PERIOD_RUNNING)
     user_id = None
     if username is not None:
         auth.ensure_self_or_admin(active_user, username=username)

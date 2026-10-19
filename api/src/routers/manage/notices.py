@@ -1,5 +1,4 @@
 """Notices written by an admin: by push to the app's devices or by Telegram."""
-import datetime
 from typing import Optional
 
 from fastapi import Depends, HTTPException
@@ -118,8 +117,11 @@ def _recap_period(text: str) -> recap.Period:
         period = recap.parse_period(text)
     except ValueError:
         raise HTTPException(status_code=400, detail=messages.RECAP_PERIOD_INVALID)
-    if period.start > datetime.date.today():
+    problem = recap.period_problem(period)
+    if problem == "future":
         raise HTTPException(status_code=400, detail=messages.RECAP_PERIOD_FUTURE)
+    if problem == "running":
+        raise HTTPException(status_code=400, detail=messages.RECAP_PERIOD_RUNNING)
     return period
 
 

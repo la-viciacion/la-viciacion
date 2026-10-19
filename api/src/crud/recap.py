@@ -53,6 +53,17 @@ def year_period(year: int) -> Period:
     return Period("year", datetime.date(year, 1, 1), datetime.date(year + 1, 1, 1))
 
 
+def period_problem(period: Period, today: datetime.date | None = None) -> str | None:
+    """Why `period` cannot be viewed yet, or None: "future" (it has not started) or, for a month only, "running"
+    (it has started but not finished). A season in progress is fine: it shows what there is so far."""
+    today = today or datetime.date.today()
+    if period.start > today:
+        return "future"
+    if period.kind == "month" and period.end > today:
+        return "running"
+    return None
+
+
 def parse_period(text: str) -> Period:
     """"2026-09" is a month and "2026" a season. ValueError for anything else."""
     match = PERIOD_FORMAT.match(text or "")
