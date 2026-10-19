@@ -65,7 +65,7 @@ class NoticeTests(RecapData):
             text = recap_notices.telegram_text(APRIL)
         self.assertEqual(
             text,
-            "🎬 *Ya está disponible tu resumen de abril de 2026*\n\n[Pulsa para verlo en historias](https://viciacion.example/#/story/2026-04)",
+            "🎬 *Ya está disponible el resumen de abril de 2026*\n\n[Pulsa para verlo en historias](https://viciacion.example/#/story/2026-04)",
         )
         self.assertNotRegex(text, r"\d\dh\d\d")  # no hours, no names, no podium
 
@@ -73,11 +73,11 @@ class NoticeTests(RecapData):
         with mock.patch.object(recap_notices.config, "PUBLIC_URL", ""):
             text = recap_notices.telegram_text(APRIL)
         self.assertNotIn("](", text)
-        self.assertIn("Ya está disponible tu resumen de abril de 2026", text)
+        self.assertIn("Ya está disponible el resumen de abril de 2026", text)
 
     def test_the_push_is_the_same_notice_and_opens_the_story(self):
         payload = recap_notices.push_payload(APRIL)
-        self.assertEqual(payload["title"], "🎬 Ya está disponible tu resumen de abril de 2026")
+        self.assertEqual(payload["title"], "🎬 Ya está disponible el resumen de abril de 2026")
         self.assertEqual((payload["url"], payload["tag"]), ("#/story/2026-04", "recap-2026-04"))
 
     def test_a_season_is_named_as_such(self):
@@ -157,7 +157,7 @@ class EndpointTests(RecapData):
     def test_the_preview_gives_the_notice_without_sending_anything(self):
         got = notices.recap_preview("2026-04", self.db)
         self.assertEqual((got["period"], got["label"], got["nobody_played"]), ("2026-04", "abril de 2026", False))
-        self.assertIn("Ya está disponible tu resumen de abril de 2026", got["telegram"])
+        self.assertIn("Ya está disponible el resumen de abril de 2026", got["telegram"])
         self.assertEqual(got["push"]["url"], "#/story/2026-04")
         self.assertEqual(got["push"]["body"], "Pulsa para verlo en historias")
         self.group.assert_not_awaited()

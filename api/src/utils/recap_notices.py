@@ -44,7 +44,7 @@ def push_payload(period: recap.Period) -> dict:
 
 def telegram_text(period: recap.Period) -> str:
     """The same notice for Telegram: the title and the link to the story (without a public address there is no link)."""
-    title = f"🎬 *Ya está disponible tu resumen de {utils.escape_markdown(period_label(period))}*"
+    title = f"🎬 *Ya está disponible el resumen de {utils.escape_markdown(period_label(period))}*"
     if not config.PUBLIC_URL:
         return f"{title}\n\nMíralo en historias dentro de la app."
     return f"{title}\n\n[Pulsa para verlo en historias]({config.PUBLIC_URL}/#/story/{period.key})"
