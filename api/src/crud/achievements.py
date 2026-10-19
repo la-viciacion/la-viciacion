@@ -405,18 +405,16 @@ class Achievements:
     ):
         """Tell the group that `players` unlocked `ach`, with `message`. A special one says so, and its level, even
         if it is secret (the level is the interesting part and says nothing about what it is). A secret one does not
-        say which: the group only hears that they unlocked a hidden achievement (no picture), and each player gets
-        `message` privately, on every channel they have (Telegram if linked, push if they have a device)."""
+        say which, nor who: the group (Telegram and push) only hears that somebody unlocked a hidden achievement (no
+        picture), and each player gets `message` privately, on every channel they have (Telegram if linked, push if
+        they have a device)."""
         silent = silent or self.silent
         secret, special = self._flags(db, ach.name)
         level = f"Logro especial de nivel {special}\n" if special else ""
         if not secret:
             await utils.send_message(level + message, silent, image=image)
             return
-        names = [utils.escape_markdown(player.name) for player in players]
-        who = names[0] if len(names) == 1 else ", ".join(names[:-1]) + " y " + names[-1]  # "Ana, Bob y Cris"
-        verb = "ha" if len(names) == 1 else "han"
-        await utils.send_message(f"{level}🏆 Logro oculto 🏆\n*{who}* {verb} desbloqueado un logro oculto.", silent)
+        await utils.send_message(f"{level}🏆 Logro oculto 🏆\nAlguien ha desbloqueado un logro oculto.", silent)
         if not silent:
             for player in players:
                 await utils.send_message_to_user(player.telegram_id, level + message, user_id=player.id)
