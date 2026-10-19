@@ -5,12 +5,10 @@ it is a secret). The table stores values as text; secrets (the push private key)
 are encrypted with a key derived from SECRET_KEY and are never returned by the
 API, only a hint of their last characters.
 
-The .env values named in `env` only seed the table the first time (see
-seed_from_env): from then on the database is the source of truth.
-
-The exception is `env_only`: the keys of outside services (the Telegram token and chats, the AI key). They are
-read from the environment every time and never stored, so a copy of the database (a backup, a dump loaded on a
-laptop) cannot use them, which only whoever holds the .env should be able to do.
+A setting with `env_only` is not in the table: the keys of outside services (the Telegram token and chats, the AI key)
+and the AI provider and model. They are read from the environment every time and never stored, so a copy of the
+database (a backup, a dump loaded on a laptop) cannot use them, which only whoever holds the .env should be able to do,
+and the panel cannot change them.
 """
 import base64
 import hashlib
@@ -98,13 +96,6 @@ def _vapid_public(value: str) -> str | None:
     return None if re.fullmatch(r"[A-Za-z0-9_-]{80,100}", value) else "Clave pública VAPID no válida"
 
 
-AI_PROVIDERS = ("google", "openai")
-
-
-def _ai_provider(value: str) -> str | None:
-    return None if value in AI_PROVIDERS else "El proveedor debe ser " + " u ".join(AI_PROVIDERS)
-
-
 PROMPT_MAX = 4000
 
 
@@ -135,9 +126,9 @@ REGISTRY: dict[str, Spec] = {
     "push.vapid_public": Spec("str", None, check=_vapid_public),
     "push.vapid_private": Spec("str", None, secret=True, hint=False),
     # AI text for the notices (utils/ai.py). The key is AI_API_KEY (or the old OPENAI_API_KEY) and is never stored;
-    # the provider is edited in the panel (AI_PROVIDER only seeds it); the model is read from AI_MODEL every time.
+    # the provider and the model are read from AI_PROVIDER and AI_MODEL every time; there is no default for either.
     "ai.enabled": Spec("bool", True),
-    "ai.provider": Spec("str", "google", env="AI_PROVIDER", check=_ai_provider),
+    "ai.provider": Spec("str", None, env="AI_PROVIDER", env_only=True),  # "google" or "openai" (utils/ai.py PROVIDERS)
     "ai.api_key": Spec("str", None, secret=True, env_only=True, env="AI_API_KEY", legacy_env="OPENAI_API_KEY"),
     "ai.model": Spec("str", None, env="AI_MODEL", legacy_env="OPENAI_MODEL", env_only=True),  # no default in the code: without it the AI does not write
     "telegram.token": Spec("str", None, secret=True, env_only=True, env="TELEGRAM_TOKEN", check=_token),
@@ -323,46 +314,3 @@ def set_values(db: Session, values: dict[str, Any], user_id: int | None = None) 
         for key in changed:
             _cache.pop(key, None)
     return changed
-
-
-def seed_from_env(db: Session) -> list[str]:
-    """Copy the .env values into settings that do not exist yet (first start only)."""
-    seeded: list[str] = []
-    for key, spec in REGISTRY.items():
-        if not spec.env or spec.env_only or db.get(models.AppSetting, key) is not None:
-            continue
-        raw = os.getenv(spec.env)
-        if not raw:
-            continue
-        try:
-            value = coerce(key, raw)
-        except ValueError as e:
-            logger.warning(f"Not seeding {key} from {spec.env}: {e}")
-            continue
-        db.add(models.AppSetting(key=key, value=_encode(key, value)))
-        seeded.append(key)
-    seeded += _seed_legacy_openai(db, seeded)
-    db.commit()
-    if seeded:
-        logger.info("Settings seeded from environment: " + ", ".join(seeded))
-    return seeded
-
-
-def _seed_legacy_openai(db: Session, seeded: list[str]) -> list[str]:
-    """Installations from before the AI settings have OPENAI_API_KEY (and OPENAI_MODEL): they keep
-    working as the "openai" provider unless AI_* says otherwise. The key and the model are read from the
-    environment (`ai.api_key` and `ai.model` are env_only); what is seeded is the provider."""
-    if not os.getenv("OPENAI_API_KEY") or os.getenv("AI_API_KEY"):
-        return []
-    legacy = {"ai.provider": "openai"}
-    added = []
-    for key, raw in legacy.items():
-        if not raw or key in seeded or db.get(models.AppSetting, key) is not None:
-            continue
-        try:
-            db.add(models.AppSetting(key=key, value=_encode(key, coerce(key, raw))))
-        except ValueError as e:
-            logger.warning(f"Not seeding {key} from the OPENAI_* variables: {e}")
-            continue
-        added.append(key)
-    return added

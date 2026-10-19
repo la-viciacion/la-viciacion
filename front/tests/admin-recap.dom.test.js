@@ -18,7 +18,7 @@ const VALUES = {
   'monthly.enabled': false, 'monthly.day': 1, 'monthly.time': '10:00',
   'annual.enabled': false, 'annual.month': 1, 'annual.day': 1, 'annual.time': '10:00',
   'telegram.token': { is_set: false }, 'telegram.group_id': { is_set: false }, 'telegram.admin_chat_id': { is_set: false },
-  'push.enabled': true, 'push.contact': '', 'push.vapid_private': { is_set: true }, 'ai.enabled': true, 'ai.provider': 'google', 'ai.api_key': { is_set: false }, 'ai.model': '',
+  'push.enabled': true, 'push.contact': '', 'push.vapid_private': { is_set: true }, 'ai.enabled': true, 'ai.provider': { is_set: true }, 'ai.api_key': { is_set: false }, 'ai.model': '',
 };
 
 function routes(extra = {}) {
