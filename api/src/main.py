@@ -30,6 +30,8 @@ if config.SENTRY_URL is not None and config.SENTRY_URL != "":
         traces_sample_rate=0.1,
         profiles_sample_rate=0.1,
         environment=config.ENVIRONMENT,
+        # a checkout build has no release: Sentry would group its errors under a made-up version
+        release=None if config.APP_VERSION == "dev" else config.APP_VERSION,
     )
 
 
@@ -61,7 +63,7 @@ with SessionLocal() as db:
         logger.info(f"Achievement images from disk: {achievement_images.load_into_database(db)}")
     except Exception as e:  # a picture must never keep the API from starting
         db.rollback()
-        logger.error(f"Error loading the achievement images: {e}")
+        logger.error(f"Error loading the achievement images: {e}", exc_info=True)
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):

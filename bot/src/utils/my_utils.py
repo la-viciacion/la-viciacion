@@ -22,8 +22,8 @@ USERS_TTL_SECONDS = 60
 class ApiError(Exception):
     """The API did not give a usable answer."""
 
-    def __init__(self, status_code: int):
-        super().__init__(f"API error {status_code}")
+    def __init__(self, status_code: int, detail: str = ""):
+        super().__init__(f"API error {status_code}{': ' + detail if detail else ''}")
         self.status_code = status_code
 
 
@@ -46,16 +46,16 @@ class MyUtils:
     async def fetch_json(self, method, url, json=None):
         """Request the API and return the parsed body; raise ApiError if it did not answer 200 with JSON.
 
+        It does not log: the one report is the traceback the error handler writes, so a failure is not counted twice.
+
         The request runs in a thread: `requests` blocks, and one event loop serves every chat of the bot."""
         response = await asyncio.to_thread(self.make_request, method, url, json=json)
         if response.status_code != 200:
-            logger.error(f"API answered {response.status_code} to {method} {url}: {response.text[:200]}")
-            raise ApiError(response.status_code)
+            raise ApiError(response.status_code, f"{method} {url}: {response.text[:200]}")
         try:
             return response.json()
         except ValueError:
-            logger.error(f"API answered a non-JSON body to {method} {url}: {response.text[:200]}")
-            raise ApiError(response.status_code)
+            raise ApiError(response.status_code, f"non-JSON body to {method} {url}: {response.text[:200]}")
 
     async def app_users(self) -> list[dict]:
         """The accounts of the app (GET /users/), asked again once they are USERS_TTL_SECONDS old."""
@@ -94,7 +94,7 @@ class MyUtils:
         try:
             app_user = access.find_app_user(await self.app_users(), sender.id)
         except Exception as e:
-            logger.error(f"Could not check user {sender.id}: {e}")
+            logger.error(f"Could not check user {sender.id}: {e}", exc_info=True)
             await self._refuse(update, msgs.api_error)
             raise ApplicationHandlerStop
         if app_user is None:
@@ -115,7 +115,7 @@ class MyUtils:
             elif update.message:
                 await update.message.reply_text(text)
         except Exception as e:
-            logger.error(f"Could not answer a refused update: {e}")
+            logger.error(f"Could not answer a refused update: {e}", exc_info=True)
 
     async def reply_message(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE, msg

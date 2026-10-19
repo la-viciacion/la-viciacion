@@ -125,4 +125,4 @@ def send_recovery_email(to: str, name: str | None, token: str) -> None:
         email.send_email(to, subject, text, body)
         logger.info("Password recovery email sent")
     except Exception as e:
-        logger.error(f"Could not send the password recovery email: {e}")
+        logger.error(f"Could not send the password recovery email: {e}", exc_info=True)

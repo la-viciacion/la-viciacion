@@ -70,7 +70,7 @@ def upload_achievement_image(
         achievements.upload_image(db, achievement, data)
         return "Image uploaded"
     except Exception as e:
-        logger.error("Error saving achievement image: " + str(e))
+        logger.error("Error saving achievement image: " + str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=msg.INTERNAL_ERROR)
 
 
@@ -86,7 +86,7 @@ def get_achievement_image(
     try:
         data = achievements.get_image(db, achievement)  # None: no such achievement; (None,): it has no image
     except Exception as e:
-        logger.error("Error reading achievement image: " + str(e))
+        logger.error("Error reading achievement image: " + str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=msg.INTERNAL_ERROR)
     if data is None:
         logger.info(msg.ACHIEVEMENT_NOT_EXISTS)

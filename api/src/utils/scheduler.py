@@ -139,7 +139,7 @@ def _run(db: Session, job: str, coroutine_factory) -> None:
         status = asyncio.run(coroutine_factory())
         _finish(db, job, f"ok: {status}" if status else "ok")
     except Exception as e:
-        logger.error(f"Scheduled job {job} failed: {e}")
+        logger.error(f"Scheduled job {job} failed: {e}", exc_info=True)
         _finish(db, job, f"error: {e}")
 
 
@@ -251,7 +251,7 @@ def start() -> None:
             try:
                 tick()
             except Exception as e:
-                logger.error(f"Scheduler tick failed: {e}")
+                logger.error(f"Scheduler tick failed: {e}", exc_info=True)
             stop.wait(TICK_SECONDS)
 
     _thread = threading.Thread(target=loop, name="scheduler", daemon=True)

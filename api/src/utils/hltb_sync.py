@@ -307,7 +307,7 @@ def _run(scope: str = "all", limit: int | None = None):
                 _push("errors", {"game_id": game.id, "name": game.name, "error": str(e)})
             _bump("processed")
     except Exception as e:
-        logger.error("HLTB sync crashed: " + str(e))
+        logger.error("HLTB sync crashed: " + str(e), exc_info=True)
         reason = f"crash: {e}"
     finally:
         db.close()

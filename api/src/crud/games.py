@@ -288,7 +288,7 @@ def _store_game(db: Session, game: schemas.NewGame, game_info: schemas.NewGame) 
         logger.info(f"Game '{official_name}' successfully added to DB with id {game_added.id}")
         return game_added
     except Exception as e:
-        logger.error("Error adding new game: " + str(e))
+        logger.error("Error adding new game: " + str(e), exc_info=True)
         db.rollback()
         if "Duplicate" not in str(e):
             logger.warning("Error adding new game: " + str(e))

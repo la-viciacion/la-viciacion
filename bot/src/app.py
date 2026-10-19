@@ -39,6 +39,8 @@ if config.SENTRY_URL is not None and config.SENTRY_URL != "":
         ignore_errors=[telegram.error.NetworkError],
         profiles_sample_rate=0.1,
         environment=config.ENVIRONMENT,
+        # a checkout build has no release: Sentry would group its errors under a made-up version
+        release=None if config.APP_VERSION == "dev" else config.APP_VERSION,
     )
 
 
@@ -56,7 +58,7 @@ async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
         elif update.effective_message:
             await update.effective_message.reply_text(text)
     except Exception as e:
-        logger.error(f"Could not tell the user about the error: {e}")
+        logger.error(f"Could not tell the user about the error: {e}", exc_info=True)
 
 
 async def post_init(application: Application):

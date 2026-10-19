@@ -261,7 +261,7 @@ async def deliver(payload: dict, audience: str, user_id: int | None = None) -> t
         logger.info(f"Push announcement to {audience}: {sent} sent, {failed} failed")
         return sent, failed
     except Exception as e:
-        logger.error(f"Push announcement to {audience} failed: {e}")
+        logger.error(f"Push announcement to {audience} failed: {e}", exc_info=True)
         return 0, 0
 
 
@@ -276,7 +276,7 @@ async def notify_group(message: str, tag: str | None = "group") -> None:
         )
         logger.info(f"Push to group: {sent} sent, {failed} failed")
     except Exception as e:
-        logger.error(f"Push to group failed: {e}")
+        logger.error(f"Push to group failed: {e}", exc_info=True)
 
 
 async def notify_user(user_id: int, message: str, tag: str | None = None) -> tuple[int, int]:
@@ -291,7 +291,7 @@ async def notify_user(user_id: int, message: str, tag: str | None = None) -> tup
         logger.info(f"Push to user {user_id}: {sent} sent, {failed} failed")
         return sent, failed
     except Exception as e:
-        logger.error(f"Push to user {user_id} failed: {e}")
+        logger.error(f"Push to user {user_id} failed: {e}", exc_info=True)
         return 0, 0
 
 
@@ -303,7 +303,7 @@ async def notify_timer(user_id: int, game_name: str, start_time: datetime.dateti
         payload = build_timer_payload(game_name, start_time, datetime.datetime.now())
         await _send(lambda q: q.filter(models.PushSubscription.user_id == user_id), payload, TIMER_TTL_SECONDS)
     except Exception as e:
-        logger.error(f"Timer push to user {user_id} failed: {e}")
+        logger.error(f"Timer push to user {user_id} failed: {e}", exc_info=True)
 
 
 async def notify_timer_stopped(user_id: int, game_name: str, duration_seconds: int | None) -> None:
@@ -314,4 +314,4 @@ async def notify_timer_stopped(user_id: int, game_name: str, duration_seconds: i
         payload = build_timer_stopped_payload(game_name, duration_seconds)
         await _send(lambda q: q.filter(models.PushSubscription.user_id == user_id), payload)
     except Exception as e:
-        logger.error(f"Timer-stopped push to user {user_id} failed: {e}")
+        logger.error(f"Timer-stopped push to user {user_id} failed: {e}", exc_info=True)

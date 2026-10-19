@@ -40,6 +40,8 @@ class Config:
             self.API_PASSWORD = os.environ["GOD_ADMIN_PASS"]
             self.SENTRY_URL = os.environ["SENTRY_URL_BOT"]
             self.ENVIRONMENT = os.environ["ENVIRONMENT"]
+            # baked into the image at build time (release.yml); `dev` from a checkout
+            self.APP_VERSION = os.getenv("APP_VERSION", "").strip() or "dev"
 
             self.TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
             self.TELEGRAM_GROUP_ID = os.getenv("TELEGRAM_GROUP_ID")

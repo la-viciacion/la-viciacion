@@ -101,7 +101,7 @@ To inspect data: connect any MySQL client to `127.0.0.1:3307` with `MARIADB_USER
 
 - `API_LOG_LEVEL=DEBUG` / `BOT_LOG_LEVEL=DEBUG` in `.env`, then recreate the container.
 - Every request is logged with method, path, status and duration (except `/keepalive`).
-- Sentry is disabled when `SENTRY_URL_API` / `SENTRY_URL_BOT` are empty.
+- Sentry is disabled when `SENTRY_URL_API` / `SENTRY_URL_BOT` are empty. Errors and exceptions are always sent (the bot skips `telegram.error.NetworkError`, which includes timeouts); traces and profiles are sampled at 10 %. Its `release` is the image's `APP_VERSION` (the `vX.Y.Z` tag), left unset in a build from a checkout (`dev`).
 - The scheduler ticks every 30 s; to test a job, call the pure slot functions or `scheduler.tick(now)` with a chosen `now` rather than waiting.
 - Front changes are served with `Cache-Control: no-cache`, so a reload is enough; the service worker caches nothing.
 - If `Environment variable 'X' not found` appears on start, add `X` to `.env` (and to `.env.template`).
