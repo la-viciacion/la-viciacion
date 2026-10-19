@@ -28,8 +28,8 @@ let sections = []; // cards of the page on screen
 let loaded = {}; // values as the server has them
 let aiUses = []; // where the AI writes: label, original prompt and whether it was changed
 
-const check = (name, label, hint) => html`
-  <label class="adm-check adm-set-check"><input type="checkbox" name="${name}" /> <span><strong>${label}</strong><span class="adm-sub">${hint}</span></span></label>`;
+const check = (name, label, hint, tag = '') => html`
+  <label class="adm-check adm-set-check"><input type="checkbox" name="${name}" /> <span><strong>${label}${tag}</strong><span class="adm-sub">${hint}</span></span></label>`;
 
 function lastRun(job) {
   if (!job) return 'Todavía no se ha enviado ninguno.';
@@ -41,20 +41,24 @@ function mailStatus(mail) {
   return `Configurado: envía como ${mail.from} por ${mail.host}:${mail.port} (${mail.security}); los enlaces apuntan a ${mail.public_url}.`;
 }
 
-// One notice that can use the AI: its own switch (a fragment has none) and its editable instructions.
-function aiUse(use) {
+const customizedTag = (use) => (use.customized ? html`<span class="adm-tag">Personalizado</span>` : '');
+
+// One notice that can use the AI: its own switch (a fragment has none), a "Personalizado" tag when its instructions
+// were changed and the instructions behind a button. The fragments of a notice are drawn inside it.
+function aiUse(use, fragments) {
   return html`
-    <div class="adm-ai-use">
+    <div class="adm-ai-use ${use.parent ? 'adm-ai-fragment' : ''}">
       ${use.switchable
-    ? check(`ai.use.${use.id}`, use.label, use.help)
-    : html`<div><strong>${use.label}</strong><span class="adm-sub">${use.help}</span></div>`}
-      <details class="adm-details">
-        <summary>Instrucciones${use.customized ? ' (modificadas)' : ''}</summary>
+    ? check(`ai.use.${use.id}`, use.label, use.help, customizedTag(use))
+    : html`<div class="adm-ai-head"><strong>${use.label}${customizedTag(use)}</strong><span class="adm-sub">${use.help}</span></div>`}
+      <details class="adm-details adm-ai-prompt">
+        <summary class="adm-btn sm">Instrucciones</summary>
         <div>
           <textarea class="adm-input" name="ai.prompt.${use.id}" rows="9" spellcheck="false"></textarea>
-          <button type="button" class="adm-btn" data-set-act="reset-prompt" data-use="${use.id}">Restaurar las originales</button>
+          ${use.customized ? html`<button type="button" class="adm-btn sm" data-set-act="reset-prompt" data-use="${use.id}">Restaurar las originales</button>` : ''}
         </div>
       </details>
+      ${fragments.map((fragment) => aiUse(fragment, []))}
     </div>`;
 }
 
@@ -139,8 +143,11 @@ function view(values, jobs, pushDevices, mail, aiUses) {
     aiuses: html`
       <section class="adm-set-card">
         <h3>Avisos que usan la IA</h3>
-        <div class="adm-sub">Cada aviso se puede activar o desactivar por separado (con la IA general apagada no se usa ninguno), y sus instrucciones se pueden cambiar. Mientras no las cambies, siguen las que trae la aplicación; al restaurarlas vuelven a seguirlas.</div>
-        ${aiUses.map((use) => aiUse(use))}
+        <div class="adm-sub">Activa o apaga la IA aviso a aviso. Sus instrucciones se pueden cambiar; mientras no lo hagas, siguen las de la aplicación.</div>
+        <div class="adm-sub adm-ai-off" hidden>La IA general está apagada: ningún aviso la usa, aunque su interruptor esté activado.</div>
+        <div class="adm-ai-uses">
+          ${aiUses.filter((use) => !use.parent).map((use) => aiUse(use, aiUses.filter((fragment) => fragment.parent === use.id)))}
+        </div>
       </section>`,
 
     push: html`
@@ -201,6 +208,15 @@ export function syncAnnualDay(form) {
     option.hidden = option.disabled = Number(option.value) < from || Number(option.value) > to;
   }
   if (Number(day.value) < from || Number(day.value) > to) day.value = String(from);
+}
+
+/** The notices are dimmed, and the page says why, while the general AI switch is off. */
+export function syncAiOff(form) {
+  const general = form.elements['ai.enabled'];
+  const list = form.querySelector('.adm-ai-uses');
+  if (!general || !list) return;
+  list.classList.toggle('off', !general.checked);
+  form.querySelector('.adm-ai-off').hidden = general.checked;
 }
 
 function collect(form) {
@@ -328,7 +344,11 @@ export async function render(target, { entity }) {
     const form = panel.querySelector('#admSettings');
     fill(form, values);
     syncAnnualDay(form);
-    form.addEventListener('change', (e) => { if (e.target.name === 'annual.month') syncAnnualDay(form); });
+    syncAiOff(form);
+    form.addEventListener('change', (e) => {
+      if (e.target.name === 'annual.month') syncAnnualDay(form);
+      if (e.target.name === 'ai.enabled') syncAiOff(form);
+    });
     form.addEventListener('submit', (e) => { e.preventDefault(); save(form); });
     form.addEventListener('click', (e) => {
       const act = e.target.closest('[data-set-act]')?.dataset.setAct;
