@@ -82,7 +82,7 @@ def ensure_god_user(db: Session):
         db.commit()
     except SQLAlchemyError as e:
         db.rollback()
-        logger.error("Error ensuring god admin user: " + str(e))
+        logger.error("Error ensuring god admin user: " + str(e), exc_info=True)
         raise
 
 
@@ -97,7 +97,7 @@ def update_profile(db: Session, user: models.User, data: dict) -> models.User:
         return user
     except SQLAlchemyError as e:
         db.rollback()
-        logger.error("Error updating profile: " + str(e))
+        logger.error("Error updating profile: " + str(e), exc_info=True)
         raise
 
 
@@ -109,7 +109,7 @@ def change_password(db: Session, user: models.User, new_password: str):
         db.commit()
     except SQLAlchemyError as e:
         db.rollback()
-        logger.error("Error changing password: " + str(e))
+        logger.error("Error changing password: " + str(e), exc_info=True)
         raise
 
 
@@ -183,7 +183,7 @@ def get_users(db: Session, is_active: bool = True) -> list[models.User]:
             query = query.filter(models.User.is_active == is_active)
         return query.all()
     except SQLAlchemyError as e:
-        logger.error("Error getting users: " + str(e))
+        logger.error("Error getting users: " + str(e), exc_info=True)
         raise
 
 
@@ -191,7 +191,7 @@ def get_user_by_username(db: Session, username: str) -> models.User:
     try:
         return db.query(models.User).filter(models.User.username == username).first()
     except SQLAlchemyError as e:
-        logger.error("Error getting user by username: " + str(e))
+        logger.error("Error getting user by username: " + str(e), exc_info=True)
         raise
 
 
@@ -215,7 +215,7 @@ def get_user_by_login(db: Session, identifier: str) -> models.User | None:
             .all()
         )
     except SQLAlchemyError as e:
-        logger.error("Error getting user by email: " + str(e))
+        logger.error("Error getting user by email: " + str(e), exc_info=True)
         raise
     return matches[0] if len(matches) == 1 else None
 
@@ -281,7 +281,7 @@ def get_user_by_id(db: Session, id: int) -> models.User:
     try:
         return db.query(models.User).filter(models.User.id == id).first()
     except SQLAlchemyError as e:
-        logger.error("Error getting user by id: " + str(e))
+        logger.error("Error getting user by id: " + str(e), exc_info=True)
         raise
 
 
@@ -315,7 +315,7 @@ def insert_user(
         return db_user
     except SQLAlchemyError as e:
         db.rollback()
-        logger.error("Error inserting user: " + str(e))
+        logger.error("Error inserting user: " + str(e), exc_info=True)
         raise
 
 
@@ -330,7 +330,7 @@ def upload_avatar(db: Session, username: str, avatar: bytes):
         db.commit()
     except SQLAlchemyError as e:
         db.rollback()
-        logger.error("Error adding avatar: " + str(e))
+        logger.error("Error adding avatar: " + str(e), exc_info=True)
         raise
 
 
@@ -342,7 +342,7 @@ def get_avatar(db: Session, username: str):
             .first()
         )
     except SQLAlchemyError as e:
-        logger.error("Error getting avatar: " + str(e))
+        logger.error("Error getting avatar: " + str(e), exc_info=True)
         raise
 
 
@@ -382,7 +382,7 @@ async def announce_new_game(
             ai_use="new_game",
         )
     except Exception as e:
-        logger.error("Error announcing new game: " + str(e))
+        logger.error("Error announcing new game: " + str(e), exc_info=True)
 
 
 def add_new_game(
@@ -421,7 +421,7 @@ def add_new_game(
         return user_game
     except SQLAlchemyError as e:
         db.rollback()
-        logger.error("Error adding new game user: " + str(e))
+        logger.error("Error adding new game user: " + str(e), exc_info=True)
         raise
 
 
@@ -433,7 +433,7 @@ def count_played_games(db: Session, user_id: int, season: int = None):
             query = query.filter(models.UserGame.season == season)
         return query.scalar()
     except SQLAlchemyError as e:
-        logger.error("Error counting played games: " + str(e))
+        logger.error("Error counting played games: " + str(e), exc_info=True)
         raise e
 
 
@@ -445,7 +445,7 @@ def count_completed_games(db: Session, user_id: int, season: int = None):
             query = query.filter_by(season=season)
         return query.count()
     except SQLAlchemyError as e:
-        logger.error("Error counting completed games: " + str(e))
+        logger.error("Error counting completed games: " + str(e), exc_info=True)
         raise e
 
 
@@ -725,7 +725,7 @@ def uncomplete_entry(db: Session, entry: models.UserGame):
         db.commit()
     except SQLAlchemyError as e:
         db.rollback()
-        logger.error("Error unmarking completion: " + str(e))
+        logger.error("Error unmarking completion: " + str(e), exc_info=True)
         raise
 
 
@@ -736,7 +736,7 @@ def set_abandoned(db: Session, entry: models.UserGame, abandoned: bool, now: dat
         db.commit()
     except SQLAlchemyError as e:
         db.rollback()
-        logger.error("Error changing the abandoned mark: " + str(e))
+        logger.error("Error changing the abandoned mark: " + str(e), exc_info=True)
         raise
 
 
@@ -746,7 +746,7 @@ def set_completed_date(db: Session, entry: models.UserGame, completed_date: date
         db.commit()
     except SQLAlchemyError as e:
         db.rollback()
-        logger.error("Error changing completion date: " + str(e))
+        logger.error("Error changing completion date: " + str(e), exc_info=True)
         raise
 
 
@@ -765,7 +765,7 @@ def complete_entry(
         logger.info("Game completed")
     except SQLAlchemyError as e:
         db.rollback()
-        logger.error("Error completing game: " + str(e))
+        logger.error("Error completing game: " + str(e), exc_info=True)
         raise
     return entry
 
@@ -820,7 +820,7 @@ def get_streaks(db: Session, username: str):
         best_date, best, current = streaks.streak_summary(days, datetime.date.today(), season)[:3]
         return [{"current_streak": current, "best_streak": best, "best_streak_date": best_date}]
     except Exception as e:
-        logger.error(e)
+        logger.error("Error getting streaks: " + str(e), exc_info=True)
         raise e
 
 
@@ -882,7 +882,7 @@ def top_games(db: Session, username: str, limit: int = 10, season: int = None):
         )
         return db.execute(stmt).fetchall()
     except Exception as e:
-        logger.error(e)
+        logger.error("Error getting top games: " + str(e), exc_info=True)
         raise e
 
 

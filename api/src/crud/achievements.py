@@ -272,7 +272,7 @@ class Achievements:
             db.commit()
         except SQLAlchemyError as e:
             db.rollback()
-            logger.error("Error adding achievements: " + str(e))
+            logger.error("Error adding achievements: " + str(e), exc_info=True)
 
     def get_ach_by_key(self, db: Session, key: str):
         return (
@@ -292,7 +292,7 @@ class Achievements:
             db.commit()
         except SQLAlchemyError as e:
             db.rollback()
-            logger.error("Error adding image: " + str(e))
+            logger.error("Error adding image: " + str(e), exc_info=True)
             raise
 
     def get_image(self, db: Session, key: str):
@@ -303,7 +303,7 @@ class Achievements:
                 .first()
             )
         except SQLAlchemyError as e:
-            logger.error("Error getting image: " + str(e))
+            logger.error("Error getting image: " + str(e), exc_info=True)
             raise
 
     def achieved_keys(self, db: Session, user_id: int, keys, season: int = None) -> set[str]:

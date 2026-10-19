@@ -6,7 +6,7 @@
 - Comments say *why* (a non-obvious rule, a constraint, a trade-off), not what the code does. Docstrings at the top of a module are welcome when the module encodes a concept (see `seasons.py`, `scheduler.py`).
 - Prefer small pure functions for logic so it is testable without DB, clocks or network.
 - No dead code, no commented-out code, no TODOs without a home in [roadmap.md](roadmap.md).
-- Handle errors at the boundaries (routers, integrations); do not swallow exceptions silently. Log with the module logger (`LogManager().get_logger()`), never `print`.
+- Handle errors at the boundaries (routers, integrations); do not swallow exceptions silently. Log with the module logger (`LogManager().get_logger()`), never `print`. Inside an `except`, `logger.error(..., exc_info=True)`: Sentry turns every `logger.error` into an event, and without the traceback it is only a message that cannot be debugged (nor deduplicated against the same exception when it is re-raised). Log a failure once, where it is handled: re-raising after logging, as the CRUD does, is fine because the same exception is not reported twice. Never `exc_info` an exception whose text can hold a key (`redact_rawg_key`).
 - Secrets never in code, logs, responses or commits. Never return password hashes, tokens or encrypted settings to clients.
 
 ## API (Python)

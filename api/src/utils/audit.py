@@ -146,7 +146,7 @@ def _read_snapshot(entity, entity_id):
         with SessionLocal() as db:
             return snapshot(db, entity, entity_id)
     except Exception as e:
-        logger.error("Error reading a row for the audit log: " + str(e))
+        logger.error("Error reading a row for the audit log: " + str(e), exc_info=True)
         return None
 
 
@@ -193,7 +193,7 @@ def write(pending: Pending, request: Request, status: int, created_id: str | Non
             ))
             db.commit()
     except Exception as e:
-        logger.error("Error writing the audit log: " + str(e))
+        logger.error("Error writing the audit log: " + str(e), exc_info=True)
 
 
 class AuditedRoute(APIRoute):

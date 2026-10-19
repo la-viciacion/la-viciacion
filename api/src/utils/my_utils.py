@@ -365,7 +365,7 @@ async def _telegram_send(bot, chat_id, text: str, image=None) -> bool:
                 return False
             parse_mode = None
         except Exception as e:
-            logger.error("Error sending telegram message: " + str(e))
+            logger.error("Error sending telegram message: " + str(e), exc_info=True)
     logger.error("Max retries reached. Message not sent.")
     return False
 
@@ -419,7 +419,7 @@ async def send_message(
                 if await _telegram_send(bot, settings.get("telegram.group_id"), msg, image):
                     logger.info("Message sent successfully!")
         except Exception as e:  # e.g. Telegram unreachable when the bot session opens
-            logger.error("Error sending telegram message: " + str(e))
+            logger.error("Error sending telegram message: " + str(e), exc_info=True)
     else:
         logger.info("Silent mode. Message not sent.")
 
@@ -448,7 +448,7 @@ async def send_message_to_user(user_telegram_id, msg, user_id=None, telegram_on=
             if await _telegram_send(bot, user_telegram_id, msg):
                 logger.info("Message sent successfully!")
     except Exception as e:
-        logger.error("Error sending telegram message to user: " + str(e))
+        logger.error("Error sending telegram message to user: " + str(e), exc_info=True)
 
 
 def announcement_text(title: str, body: str | None = None) -> str:
@@ -489,7 +489,7 @@ async def send_message_to_admins(db: Session, msg):
                     if await _telegram_send(bot, user.telegram_id, msg):
                         logger.info("Message sent successfully!")
     except Exception as e:  # a notice must never break what triggered it
-        logger.error(f"Error sending a message to the admins: {e}")
+        logger.error(f"Error sending a message to the admins: {e}", exc_info=True)
 
 
 async def send_test_message(sent_by: str) -> None:

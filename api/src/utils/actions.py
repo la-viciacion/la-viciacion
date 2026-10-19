@@ -115,7 +115,7 @@ async def check_users(
                 await check_user_lifetime(db, user, silent=silent)
             except Exception as e:
                 db.rollback()
-                logger.error(f"Error checking achievements of {user.username}: {e}")
+                logger.error(f"Error checking achievements of {user.username}: {e}", exc_info=True)
                 failures.append(user.username)
         elapsed_time = time.time() - start_time
         if elapsed_time > 30:
@@ -128,7 +128,7 @@ async def check_users(
                 db, "Error checking achievements of: " + ", ".join(failures)
             )
     except Exception as e:
-        logger.error("Error checking achievements: " + str(e))
+        logger.error("Error checking achievements: " + str(e), exc_info=True)
         await utils.send_message_to_admins(db, "Error checking achievements: " + str(e))
 
 
@@ -190,7 +190,7 @@ def after_session_change(
         try:
             asyncio.run(_run())
         except Exception as e:
-            logger.error("Error checking after a session change: " + str(e))
+            logger.error("Error checking after a session change: " + str(e), exc_info=True)
 
 
 def after_timer_start(user_id: int, start_time: datetime.datetime, new_game_id: str | None = None):
@@ -237,7 +237,7 @@ def after_timer_start(user_id: int, start_time: datetime.datetime, new_game_id: 
         try:
             asyncio.run(_run())
         except Exception as e:
-            logger.error("Error checking after a timer start: " + str(e))
+            logger.error("Error checking after a timer start: " + str(e), exc_info=True)
 
 
 def after_timer_stop(user_id: int, game_id: str, duration_seconds: int | None):
@@ -253,7 +253,7 @@ def after_timer_stop(user_id: int, game_id: str, duration_seconds: int | None):
     try:
         asyncio.run(_run())
     except Exception as e:
-        logger.error("Error unpinning the timer notification: " + str(e))
+        logger.error("Error unpinning the timer notification: " + str(e), exc_info=True)
 
 
 def after_completion(entry_id: int, silent: bool = False):
@@ -274,7 +274,7 @@ def after_completion(entry_id: int, silent: bool = False):
         try:
             asyncio.run(_run())
         except Exception as e:
-            logger.error("Error in post-completion tasks: " + str(e))
+            logger.error("Error in post-completion tasks: " + str(e), exc_info=True)
 
 
 async def announce_lost_streaks(db: Session, today: datetime.date | None = None, silent: bool = False):
@@ -397,7 +397,7 @@ async def announce_ranking_changes(db: Session, before: dict, silent: bool):
             logger.info(message)
             await utils.send_message(message, silent, ai_use="ranking_players")
     except Exception as e:
-        logger.error("Error announcing ranking changes: " + str(e))
+        logger.error("Error announcing ranking changes: " + str(e), exc_info=True)
 
 
 ##################
@@ -522,7 +522,7 @@ def after_challenge_launch(challenge_id: int):
     try:
         asyncio.run(_run())
     except Exception as e:
-        logger.error("Error announcing a challenge: " + str(e))
+        logger.error("Error announcing a challenge: " + str(e), exc_info=True)
 
 
 async def send_timer_notice(db: Session, timer: models.GameTimer | None):
@@ -651,4 +651,4 @@ async def weekly_resume(
         resume["achievements"] = weekly_achievements
         return resume
     except Exception as e:
-        logger.error("Error sending weekly resume to user " + user.name + ": " + str(e))
+        logger.error("Error sending weekly resume to user " + user.name + ": " + str(e), exc_info=True)

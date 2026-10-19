@@ -119,7 +119,7 @@ def user_played_games(
 
         return db.execute(stmt).fetchall()
     except Exception as e:
-        logger.error("Error getting user played games: " + str(e))
+        logger.error("Error getting user played games: " + str(e), exc_info=True)
         raise e
 
 

@@ -102,7 +102,7 @@ def test_ai(admin: models.User = Depends(auth.require_admin)):
             "Responde solo con una frase corta y divertida sobre videojuegos.", "Saluda al grupo.", force=True
         )
     except ai.AIError as e:
-        logger.error(f"AI test by {admin.username} failed: {e}")
+        logger.error(f"AI test by {admin.username} failed: {e}", exc_info=True)
         raise HTTPException(status_code=502, detail=f"La IA no ha respondido: {e}")
     return {"message": "La IA ha respondido", "reply": reply, "provider": provider, "model": model}
 
@@ -119,7 +119,7 @@ def send_test_email(admin: models.User = Depends(auth.require_admin)):
     try:
         mail.send_test_email(admin.email, admin.username)
     except Exception as e:
-        logger.error(f"Test email failed: {e}")
+        logger.error(f"Test email failed: {e}", exc_info=True)
         raise HTTPException(status_code=502, detail=f"El servidor de correo no lo ha aceptado: {e}")
     return {"message": f"Correo de prueba enviado a {admin.email}"}
 

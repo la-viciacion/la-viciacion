@@ -59,7 +59,7 @@ def load_into_database(db: Session, directory: Path = IMAGES_DIR) -> dict:
         try:
             data = images.normalize_image(path.read_bytes(), images.ACHIEVEMENT_MAX_SIDE, palette=True)
         except (ValueError, OSError) as e:
-            logger.error(f"Achievement image {path.name} cannot be used: {e}")
+            logger.error(f"Achievement image {path.name} cannot be used: {e}", exc_info=True)
             report["skipped"] += 1
             continue
         if data == stored[key]:

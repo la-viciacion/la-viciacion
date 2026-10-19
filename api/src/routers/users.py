@@ -468,7 +468,7 @@ def upload_avatar(
         users.upload_avatar(db, username, data)
         return "Avatar uploaded"
     except Exception as e:
-        logger.error("Error saving avatar: " + str(e))
+        logger.error("Error saving avatar: " + str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=msg.INTERNAL_ERROR)
 
 
@@ -505,7 +505,7 @@ def get_avatar(
     try:
         data = users.get_avatar(db, username)
     except Exception as e:
-        logger.error("Error reading avatar: " + str(e))
+        logger.error("Error reading avatar: " + str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=msg.INTERNAL_ERROR)
     if not data or not data[0]:
         raise HTTPException(status_code=404, detail="Avatar not found")

@@ -231,7 +231,7 @@ async def recalculate_user(
             try:
                 await actions.achievements.announce_added(db, user, change.key, change.game_after)
             except Exception as e:  # a notice must not stop the rest
-                logger.error(f"Error announcing {change.key} to {user.username}: {e}")
+                logger.error(f"Error announcing {change.key} to {user.username}: {e}", exc_info=True)
     return changes
 
 
@@ -291,4 +291,4 @@ def recalculate(
                 apply(db, changes)
             logger.info(f"Achievements recalculated: {len(changes)} changes")
         except Exception as e:
-            logger.error("Error recalculating the achievements: " + str(e))
+            logger.error("Error recalculating the achievements: " + str(e), exc_info=True)
