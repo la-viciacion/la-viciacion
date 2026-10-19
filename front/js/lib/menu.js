@@ -10,17 +10,17 @@ export function menuSections(user) {
     ] },
     { label: 'Explorar', items: [
       { id: 'games', label: 'Juegos', href: '#/games', icon: 'iconGamepad' },
-      { id: 'wishlist', label: 'Deseados', href: '#/wishlist', icon: 'iconHeart' },
-      { id: 'challenges', label: 'Retos', href: '#/challenges', icon: 'iconFlag' },
       { id: 'calendar', label: 'Calendario', href: '#/calendar', icon: 'iconCalendar' },
-      { id: 'recommendations', label: 'Recomendados', href: '#/recommendations', icon: 'iconDice' },
       { id: 'achievements', label: 'Logros', href: '#/achievements', icon: 'iconTrophy' },
       { id: 'players', label: 'Jugadores', href: '#/players', icon: 'iconPerson' },
-      { id: 'recap', label: 'Resumen', href: '#/recap', icon: 'iconStar' },
       { id: 'stats', label: 'Estadísticas', href: '#/stats', icon: 'iconChart', wip: true },
     ] },
     { label: 'Tú', items: [
       { id: 'profile', label: 'Mi perfil', href: '#/profile/resumen', icon: 'iconProfile' },
+      { id: 'recap', label: 'Resumen', href: '#/recap', icon: 'iconStar' },
+      { id: 'wishlist', label: 'Deseados', href: '#/wishlist', icon: 'iconHeart' },
+      { id: 'recommendations', label: 'Recomendados', href: '#/recommendations', icon: 'iconDice' },
+      { id: 'challenges', label: 'Retos', href: '#/challenges', icon: 'iconFlag' },
       { id: 'settings', label: 'Ajustes', href: '#/profile/ajustes', icon: 'iconSettings' },
     ] },
     { label: 'Administración', items: user?.is_admin ? [
