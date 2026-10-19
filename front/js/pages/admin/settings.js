@@ -86,7 +86,7 @@ function view(values, jobs, pushDevices, mail, aiUses) {
     monthly: html`
       <section class="adm-set-card">
         <h3>Resumen mensual</h3>
-        ${check('monthly.enabled', 'Enviar el resumen del mes', 'Al grupo, el resumen del mes que acaba de terminar y, a cada jugador activo con Telegram o la app, el suyo en privado. Necesita las notificaciones activadas. Apagado hasta que lo actives: pruébalo antes con «Enviar ahora».')}
+        ${check('monthly.enabled', 'Enviar el resumen del mes', 'Avisa de que el resumen del mes que acaba de terminar ya está disponible: un solo aviso, al grupo de Telegram y a las notificaciones de la app, con el enlace a la historia. Necesita las notificaciones activadas. Apagado hasta que lo actives: pruébalo antes con «Enviar ahora».')}
         <div class="adm-set-row">
           <label>Día del mes
             <select class="adm-input" name="monthly.day">${[1, 2, 3, 4, 5].map((day) => html`<option value="${day}">${day}</option>`)}</select>
@@ -99,7 +99,7 @@ function view(values, jobs, pushDevices, mail, aiUses) {
     annual: html`
       <section class="adm-set-card">
         <h3>Resumen anual</h3>
-        ${check('annual.enabled', 'Enviar el resumen de la temporada', 'Aparte del mensual: al grupo y, en privado, a cada jugador activo con Telegram o la app. En diciembre cuenta lo jugado hasta ese día; en enero, la temporada completa. Necesita las notificaciones activadas.')}
+        ${check('annual.enabled', 'Enviar el resumen de la temporada', 'Aparte del mensual: el mismo aviso de que el resumen de la temporada ya está disponible, al grupo de Telegram y a las notificaciones de la app. En diciembre cuenta lo jugado hasta ese día; en enero, la temporada completa. Necesita las notificaciones activadas.')}
         <div class="adm-set-row">
           <label>Mes
             <select class="adm-input" name="annual.month">${ANNUAL_MONTHS.map(([value, label]) => html`<option value="${value}">${label}</option>`)}</select>

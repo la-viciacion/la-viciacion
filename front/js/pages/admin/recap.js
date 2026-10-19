@@ -1,5 +1,5 @@
-// "Recap": look at the recap of any month or season before it goes out, see the texts the notices would carry (the
-// group's and one player's), send it now and set when the monthly and the annual ones go out automatically (the same
+// "Recap": look at the recap of any month or season before it goes out, see the notice that tells it is ready (the
+// same on Telegram and on the app's devices), send it now and set when the monthly and the annual ones go out (the same
 // settings form as the rest of the notifications, only its cards for the recap). The page itself (#/recap) opens from
 // here for any player. Sending goes through the same code as the jobs.
 import { api, jsonRequest } from '../../lib/api.js';
@@ -36,7 +36,7 @@ function view() {
             <select class="adm-input" id="rcaUser">${store.users.map((u) => html`<option value="${u.id}" ${u.id === userId ? 'selected' : ''}>${u.username}</option>`)}</select>
           </label>
         </div>
-        <div class="adm-sub">El periodo en curso enseña lo que hay hasta hoy. Es el mismo cálculo para meses y temporadas.</div>
+        <div class="adm-sub">El periodo en curso enseña lo que hay hasta hoy. Es el mismo cálculo para meses y temporadas. El jugador solo cambia a quién enseñan los botones: el aviso es el mismo para todos.</div>
         <div class="adm-actions">
           <a class="adm-btn" id="rcaOpen" href="#">Abrir la página del resumen</a>
           <a class="adm-btn" id="rcaStory" href="#">Abrir la historia</a>
@@ -44,24 +44,24 @@ function view() {
       </section>
 
       <section class="adm-set-card">
-        <h3>Texto para el grupo</h3>
-        <pre class="rc-preview" id="rcaGroup">Cargando…</pre>
-        <div class="adm-sub">Tal cual saldría sin IA; con la IA activada para este aviso (Sistema → Avisos que usan la IA) el grupo recibe una versión reescrita con las mismas cifras.</div>
-      </section>
-
-      <section class="adm-set-card">
-        <h3>Texto para el jugador</h3>
-        <pre class="rc-preview" id="rcaPlayer">Cargando…</pre>
-        <div class="adm-sub">Mensaje privado, por Telegram y por la app. Cada jugador recibe el suyo; los que no jugaron ese periodo no reciben nada.</div>
+        <h3>El aviso</h3>
+        <div class="adm-sub">Un solo aviso, el mismo en el grupo de Telegram y en las notificaciones de la app (a quien tenga activados los avisos del grupo). Solo dice que el resumen está disponible y lleva el enlace a la historia: las cifras no van en el aviso.</div>
+        <div class="adm-sub">Telegram</div>
+        <pre class="rc-preview" id="rcaTelegram">Cargando…</pre>
+        <div class="adm-sub">En la app (al pulsarlo abre la historia)</div>
+        <div class="adm-notif" aria-hidden="true">
+          <div class="adm-notif-app">La Viciación · ahora</div>
+          <div class="adm-notif-title" id="rcaPushTitle"></div>
+          <div class="adm-notif-body" id="rcaPushBody"></div>
+        </div>
       </section>
 
       <section class="adm-set-card">
         <h3>Enviar ahora</h3>
-        <div class="adm-sub">Lo mismo que hacen los envíos automáticos, para el periodo elegido (un mes o una temporada). Respeta el interruptor general de notificaciones.</div>
+        <div class="adm-sub">Lo mismo que hacen los envíos automáticos, para el periodo elegido (un mes o una temporada). Respeta el interruptor general de notificaciones. Si nadie jugó en ese periodo, no se envía.</div>
         <div class="adm-actions">
-          <button type="button" class="adm-btn" data-send="me">Enviarme mi resumen (prueba)</button>
-          <button type="button" class="adm-btn" data-send="group">Enviar al grupo…</button>
-          <button type="button" class="adm-btn" data-send="all">Enviar a todos…</button>
+          <button type="button" class="adm-btn" data-send="me">Enviármelo (prueba)</button>
+          <button type="button" class="adm-btn" data-send="group">Enviarlo al grupo…</button>
         </div>
         <div class="adm-error" role="alert"></div>
       </section>
@@ -70,31 +70,41 @@ function view() {
     <div id="rcaSettings"></div>`;
 }
 
-async function refresh() {
-  const id = ++navigation;
-  const open = panel.querySelector('#rcaOpen');
+// Where the buttons open: the page and the story of the period, for the player chosen
+function links() {
   const target = userById(userId);
   const username = target && target.id !== store.me ? target.username : null;
-  open.setAttribute('href', recapHref(period, username));
+  panel.querySelector('#rcaOpen').setAttribute('href', recapHref(period, username));
   panel.querySelector('#rcaStory').setAttribute('href', storyHref(period, username));
-  const group = panel.querySelector('#rcaGroup');
-  const player = panel.querySelector('#rcaPlayer');
-  group.textContent = player.textContent = 'Cargando…';
+}
+
+async function refresh() {
+  const id = ++navigation;
+  links();
+  const telegram = panel.querySelector('#rcaTelegram');
+  const title = panel.querySelector('#rcaPushTitle');
+  const body = panel.querySelector('#rcaPushBody');
+  telegram.textContent = 'Cargando…';
+  title.textContent = body.textContent = '';
   try {
-    const preview = await api(`/manage/recap/preview?period=${period}&user_id=${userId}`);
+    const preview = await api(`/manage/recap/preview?period=${period}`);
     if (id !== navigation) return;
-    group.textContent = preview.nobody_played ? 'Nadie jugó en este periodo: no se enviaría nada.' : preview.group_message;
-    player.textContent = preview.nobody_played ? '—' : preview.player_message;
+    if (preview.nobody_played) {
+      telegram.textContent = 'Nadie jugó en este periodo: no se enviaría nada.';
+      return;
+    }
+    telegram.textContent = preview.telegram;
+    title.textContent = preview.push.title;
+    body.textContent = preview.push.body;
   } catch (err) {
     if (id !== navigation) return;
-    group.textContent = player.textContent = err.message;
+    telegram.textContent = err.message;
   }
 }
 
 const WHO = {
   me: null,
-  group: 'Se enviará el resumen al grupo (Telegram y avisos del grupo de la app).',
-  all: 'Se enviará el resumen al grupo y el suyo, en privado, a cada jugador activo que pueda recibirlo.',
+  group: 'Se enviará el aviso al grupo de Telegram y a las notificaciones de la app que tengan activados los avisos del grupo.',
 };
 
 async function send(audience) {
@@ -103,7 +113,7 @@ async function send(audience) {
   if (WHO[audience] && !(await confirmDialog('Enviar el resumen', html`<p>${WHO[audience]}</p><p>No se puede deshacer.</p>`, { ok: 'Enviar' }))) return;
   try {
     const result = await api('/manage/recap/send', jsonRequest('POST', { period, audience }));
-    toast(`Resumen enviado: ${result.message}`);
+    toast(result.message);
   } catch (err) {
     errorEl.textContent = err.message;
   }
@@ -115,7 +125,7 @@ export async function render(target) {
   try {
     mount(panel, view());
     panel.querySelector('#rcaPeriod').addEventListener('change', (e) => { period = e.target.value; refresh(); });
-    panel.querySelector('#rcaUser').addEventListener('change', (e) => { userId = Number(e.target.value); refresh(); });
+    panel.querySelector('#rcaUser').addEventListener('change', (e) => { userId = Number(e.target.value); links(); });
     panel.onclick = (e) => { // not addEventListener: the panel is reused, and a second listener would send twice
       const button = e.target.closest('[data-send]');
       if (button) send(button.dataset.send);

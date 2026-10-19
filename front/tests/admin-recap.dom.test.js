@@ -22,7 +22,7 @@ const VALUES = {
 
 function routes(extra = {}) {
   return {
-    'GET /manage/recap/preview': { period: '2026-09', label: 'septiembre de 2026', nobody_played: false, group_message: 'GRUPO', player_message: 'JUGADOR' },
+    'GET /manage/recap/preview': { period: '2026-09', label: 'septiembre de 2026', nobody_played: false, telegram: 'TELEGRAM', push: { title: 'TITULO', body: 'CUERPO', url: '#/story/2026-09' } },
     'GET /manage/settings': { values: VALUES, jobs: { annual_recap: { last_run_at: '2027-01-01T10:00:00', last_status: 'ok: 2026: group and 3 users' } }, push_devices: { devices: 0, users: 0 }, mail: { configured: false, missing: [] }, ai_uses: [] },
     ...extra,
   };
@@ -36,17 +36,32 @@ const change = (el, value) => {
   el.dispatchEvent(new window.Event('change', { bubbles: true }));
 };
 
-test('the Recap tab has the preview, the sending and the two schedules', async () => {
-  installApi(routes());
+test('the Recap tab has the notice, the sending and the two schedules', async () => {
+  const calls = installApi(routes());
   await render(panel());
   await settle();
-  assert.equal(panel().querySelector('#rcaGroup').textContent, 'GRUPO');
-  assert.equal(panel().querySelector('#rcaPlayer').textContent, 'JUGADOR');
+  assert.equal(panel().querySelector('#rcaTelegram').textContent, 'TELEGRAM');
+  assert.equal(panel().querySelector('#rcaPushTitle').textContent, 'TITULO');
+  assert.equal(panel().querySelector('#rcaPushBody').textContent, 'CUERPO');
+  assert.match(calls.find((c) => c.path.startsWith('/manage/recap/preview')).path, /^\/manage\/recap\/preview\?period=\d{4}-\d{2}$/);
+  assert.doesNotMatch(panel().textContent, /Texto para el jugador/);
   assert.match(panel().textContent, /Envío automático/);
   assert.match(panel().textContent, /Resumen mensual/);
   assert.match(panel().textContent, /Resumen anual/);
   assert.match(panel().textContent, /Último envío/); // the annual job ran
-  assert.equal(panel().querySelectorAll('[data-send]').length, 3);
+  assert.deepEqual([...panel().querySelectorAll('[data-send]')].map((b) => b.dataset.send), ['me', 'group']);
+});
+
+test('the player only changes where the buttons open, not the notice', async () => {
+  const calls = installApi(routes());
+  await render(panel());
+  await settle();
+  const before = calls.filter((c) => c.path.startsWith('/manage/recap/preview')).length;
+  change(panel().querySelector('#rcaUser'), 2);
+  await settle();
+  assert.equal(calls.filter((c) => c.path.startsWith('/manage/recap/preview')).length, before);
+  assert.match(panel().querySelector('#rcaStory').getAttribute('href'), /^#\/story\/\d{4}-\d{2}\/biel$/);
+  assert.match(panel().querySelector('#rcaOpen').getAttribute('href'), /^#\/recap\/\d{4}-\d{2}\/biel$/);
 });
 
 test('the monthly recap can go out from the 1st to the 5th', async () => {
