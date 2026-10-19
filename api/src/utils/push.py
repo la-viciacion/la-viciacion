@@ -78,8 +78,14 @@ RECAP_TEASERS = {"mensual": "Descubre cómo ha ido el mes", "anual": "Descubre c
 
 
 def build_recap_payload(kind: str, period: str) -> dict:
-    """"Your recap is ready": a tap opens the story of the period (the app resolves #/story/<period> for whoever taps)."""
-    return {"title": _shorten(f"🎬 Ya está disponible el resumen {kind}", TITLE_MAX), "body": RECAP_TEASERS[kind], "url": f"#/story/{period}", "tag": f"{RECAP_TAG}-{period}"}
+    """"Your recap is ready": a tap opens the story of whoever taps. The monthly link names no period (the story opens on the
+    month that has ended); the annual one does, because a bare story would open on a month, not on the season."""
+    return {"title": _shorten(f"🎬 Ya está disponible el resumen {kind}", TITLE_MAX), "body": RECAP_TEASERS[kind], "url": recap_story_path(kind, period), "tag": f"{RECAP_TAG}-{period}"}
+
+
+def recap_story_path(kind: str, period: str) -> str:
+    """The in-app address a recap notice opens: the story, with the period only for an annual recap."""
+    return "#/story" if kind == "mensual" else f"#/story/{period}"
 
 
 def build_announcement(title: str, body: str | None = None, url: str | None = None, image: str | None = None) -> dict:

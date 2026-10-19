@@ -38,7 +38,7 @@ def annual_period(day: datetime.date) -> recap.Period:
 
 
 def kind_word(period: recap.Period) -> str:
-    """"mensual" or "anual": all the notice says about which recap it is (the period is in the link, not in the text)."""
+    """"mensual" or "anual": all the notice says about which recap it is (the text never names the period; only the annual link does)."""
     return "mensual" if period.kind == "month" else "anual"
 
 
@@ -52,7 +52,7 @@ def telegram_text(period: recap.Period) -> str:
     title = f"🎬 *Ya está disponible el resumen {kind_word(period)}*"
     if not config.PUBLIC_URL:
         return f"{title}\n\nMíralo en historias dentro de la app."
-    return f"{title}\n\n[{push.RECAP_TEASERS[kind_word(period)]}]({config.PUBLIC_URL}/#/story/{period.key})"
+    return f"{title}\n\n[{push.RECAP_TEASERS[kind_word(period)]}]({config.PUBLIC_URL}/{push.recap_story_path(kind_word(period), period.key)})"
 
 
 async def announce_recap(db: Session, period: recap.Period, only: models.User | None = None) -> dict:
