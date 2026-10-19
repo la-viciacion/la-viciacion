@@ -7,7 +7,7 @@ import { formatDate, formatDuration } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
 import { gameHref } from '../../lib/links.js';
 import { storyHref } from '../../lib/story.js';
-import { change, lastMonth, parseHash, periodChoices, periodLabel, previousPeriod, recapHref } from '../../lib/recap.js';
+import { change, clampPick, lastMonth, monthChoices, parseHash, periodKey, periodLabel, pickOf, previousPeriod, recapHref, withKind, yearChoices } from '../../lib/recap.js';
 import { statTile } from '../../ui/profile-summary.js';
 
 export const active = null; // it belongs to no item of the top bar
@@ -15,6 +15,7 @@ export const active = null; // it belongs to no item of the top bar
 let main;
 let me;
 let period;
+let pick; // the period as a choice: monthly or annual, the year and, for a month, the month
 let username; // whose recap: yours unless an admin asks for another player's
 let view = 'player'; // 'player' | 'group'
 let data = null;
@@ -98,18 +99,30 @@ export function groupView(g) {
 
 const otherPlayer = () => username && username !== me.username;
 
+// Monthly or annual, then the year (and the month): a short list at each step instead of one that grows every month
+function picker() {
+  const selected = (on) => (on ? 'selected' : '');
+  return html`
+    <label class="rc-select">Resumen
+      <select class="adm-input" id="rcKind">
+        <option value="month" ${selected(pick.kind === 'month')}>Mensual</option>
+        <option value="year" ${selected(pick.kind === 'year')}>Anual</option>
+      </select>
+    </label>
+    <label class="rc-select">Año
+      <select class="adm-input" id="rcYear">${yearChoices().map((year) => html`<option value="${year}" ${selected(year === pick.year)}>${year}</option>`)}</select>
+    </label>
+    ${pick.kind === 'month' ? html`
+      <label class="rc-select">Mes
+        <select class="adm-input" id="rcMonth">${monthChoices(pick.year).map(({ value, label }) => html`<option value="${value}" ${selected(value === pick.month)}>${label}</option>`)}</select>
+      </label>` : ''}`;
+}
+
 function header() {
-  const { months, seasons } = periodChoices();
-  const option = ({ value, label }) => html`<option value="${value}" ${value === period ? 'selected' : ''}>${label}</option>`;
   return html`
     <div class="rc-head">
       <h1 class="pf-title pg-title">Resumen</h1>
-      <label class="rc-select">Periodo
-        <select class="adm-input" id="rcPeriod">
-          <optgroup label="Meses">${months.map(option)}</optgroup>
-          <optgroup label="Temporadas">${seasons.map(option)}</optgroup>
-        </select>
-      </label>
+      <div class="rc-picker">${picker()}</div>
     </div>
     <a class="pf-btn rc-story" id="rcStory" href="${storyHref(period, otherPlayer() ? username : null)}">▶ Ver como historia</a>
     <div class="gc-toggles" role="tablist">
@@ -146,13 +159,18 @@ export async function render({ user, main: target }) {
   main = target;
   me = user;
   const asked = parseHash(location.hash);
-  period = asked.period || lastMonth();
+  pick = clampPick(pickOf(asked.period || lastMonth()));
+  period = periodKey(pick);
   username = user.is_admin ? asked.username : null;
   view = 'player';
   data = null;
   main.onchange = (event) => {
-    if (event.target.id !== 'rcPeriod') return;
-    period = event.target.value;
+    const { id, value } = event.target;
+    if (id === 'rcKind') pick = withKind(pick, value);
+    else if (id === 'rcYear') pick = clampPick({ ...pick, year: Number(value) });
+    else if (id === 'rcMonth') pick = { ...pick, month: Number(value) };
+    else return;
+    period = periodKey(pick);
     load();
   };
   main.onclick = (event) => {

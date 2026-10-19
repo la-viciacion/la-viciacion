@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { change, clampPick, isMonth, lastMonth, monthChoices, monthKey, parseHash, periodChoices, periodKey, periodLabel, pickOf, previousPeriod, recapHref, withKind, yearChoices } from '../js/lib/recap.js';
+import { change, clampPick, isMonth, lastMonth, monthChoices, monthKey, parseHash, periodKey, periodLabel, pickOf, previousPeriod, recapHref, withKind, yearChoices } from '../js/lib/recap.js';
 
 test('a month and a season are told apart and named', () => {
   assert.equal(isMonth('2026-09'), true);
@@ -19,14 +19,6 @@ test('the period before', () => {
   assert.equal(previousPeriod('2026-03'), '2026-02');
   assert.equal(previousPeriod('2026-01'), '2025-12');
   assert.equal(previousPeriod('2026'), '2025');
-});
-
-test('the selector offers every month from the running one back to 2023, and the seasons', () => {
-  const { months, seasons } = periodChoices(new Date(2026, 9, 18));
-  assert.equal(months[0].value, '2026-10');
-  assert.equal(months.at(-1).value, '2023-01');
-  assert.equal(months.length, 3 * 12 + 10);
-  assert.deepEqual(seasons.map((s) => s.value), ['2026', '2025', '2024', '2023']);
 });
 
 test('an address goes there and back', () => {

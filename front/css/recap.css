@@ -1,7 +1,8 @@
 /* Recap (#/recap): the "Wrapped" of a month or a season */
 .rc-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
 .rc-head .pg-title { margin-bottom: 8px; }
-.rc-select { display: flex; flex-direction: column; gap: 4px; font-size: 0.8rem; color: var(--text-secondary); min-width: 200px; }
+.rc-picker { display: flex; gap: 10px; flex-wrap: wrap; }
+.rc-select { display: flex; flex-direction: column; gap: 4px; font-size: 0.8rem; color: var(--text-secondary); min-width: 110px; }
 .rc-running { margin: 0 0 10px; }
 
 .rc-hero {

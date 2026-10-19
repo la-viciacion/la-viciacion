@@ -67,8 +67,8 @@ test('choosing another period asks for it and keeps the address', async () => {
   });
   await recap.render({ user: ME, main: main() });
   await settle();
-  const select = document.getElementById('rcPeriod');
-  select.value = '2026-08';
+  const select = document.getElementById('rcMonth');
+  select.value = '8';
   select.dispatchEvent(new window.Event('change', { bubbles: true }));
   await settle();
   assert.equal(calls.at(-1).path, '/statistics/recap/2026-08?username=ana');
@@ -104,4 +104,54 @@ test('an error is shown instead of the recap', async () => {
   await recap.render({ user: ME, main: main() });
   await settle();
   assert.match(main().textContent, /boom/);
+});
+
+test('the period is chosen as monthly or annual, a year and a month, not from one long list', async () => {
+  window.location.hash = '#/recap/2026-09';
+  installApi({ 'GET /statistics/recap/2026-09?': DATA });
+  await recap.render({ user: ME, main: main() });
+  await settle();
+  assert.equal(document.getElementById('rcPeriod'), null);
+  assert.equal(document.getElementById('rcKind').value, 'month');
+  assert.equal(document.getElementById('rcYear').value, '2026');
+  assert.equal(document.getElementById('rcMonth').value, '9');
+  assert.equal(document.querySelectorAll('#rcYear option').length, new Date().getFullYear() - 2023 + 1);
+});
+
+test('annual opens the season of the year, without a month, and monthly goes back to the last month of it', async () => {
+  window.location.hash = '#/recap/2026-09';
+  const calls = installApi({
+    'GET /statistics/recap/2026-09?': DATA,
+    'GET /statistics/recap/2026?': { ...DATA, period: '2026', kind: 'year' },
+  });
+  await recap.render({ user: ME, main: main() });
+  await settle();
+  const kind = document.getElementById('rcKind');
+  kind.value = 'year';
+  kind.dispatchEvent(new window.Event('change', { bubbles: true }));
+  await settle();
+  assert.equal(calls.at(-1).path, '/statistics/recap/2026?username=ana');
+  assert.equal(window.location.hash, '#/recap/2026');
+  assert.equal(document.getElementById('rcMonth'), null);
+  assert.match(main().textContent, /frente a temporada 2025/);
+});
+
+test('an address with a season opens it as annual', async () => {
+  window.location.hash = '#/recap/2026';
+  const calls = installApi({ 'GET /statistics/recap/2026?': { ...DATA, period: '2026', kind: 'year' } });
+  await recap.render({ user: ME, main: main() });
+  await settle();
+  assert.equal(calls[0].path, '/statistics/recap/2026?username=ana');
+  assert.equal(document.getElementById('rcKind').value, 'year');
+  assert.equal(document.getElementById('rcMonth'), null);
+});
+
+test('a period that does not exist yet is moved to one that does', async () => {
+  const future = `${new Date().getFullYear() + 1}-03`;
+  window.location.hash = `#/recap/${future}`;
+  const calls = installApi({ 'GET /statistics/recap/': DATA });
+  await recap.render({ user: ME, main: main() });
+  await settle();
+  assert.equal(calls[0].path.includes(String(new Date().getFullYear() + 1)), false);
+  assert.equal(document.getElementById('rcYear').value, String(new Date().getFullYear()));
 });
