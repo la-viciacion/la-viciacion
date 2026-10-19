@@ -148,8 +148,8 @@ USES: dict[str, Use] = {
         WISHLIST_RELEASE_PROMPT,
     ),
     "monthly_recap": Use(
-        "Resumen mensual",
-        "Aviso al grupo con el resumen del mes que acaba de terminar (los resúmenes privados de cada jugador no pasan por la IA).",
+        "Resumen mensual y anual",
+        "Aviso al grupo con el resumen del mes que acaba de terminar o de la temporada (los resúmenes privados de cada jugador no pasan por la IA).",
         MONTHLY_RECAP_PROMPT,
     ),
 }

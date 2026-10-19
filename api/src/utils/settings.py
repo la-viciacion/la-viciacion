@@ -68,8 +68,26 @@ def _weekday(value: int) -> str | None:
     return None if 0 <= value <= 6 else "El día debe estar entre 0 (lunes) y 6 (domingo)"
 
 
-def _month_day(value: int) -> str | None:
+def _monthly_day(value: int) -> str | None:
+    return None if 1 <= value <= 5 else "El día debe estar entre 1 y 5"
+
+
+# The season's recap goes out when the year is about to end or has just ended: the days each month allows
+ANNUAL_DAYS = {12: range(20, 29), 1: range(1, 6)}
+
+
+def _annual_month(value: int) -> str | None:
+    return None if value in ANNUAL_DAYS else "El resumen anual se envía en diciembre (12) o en enero (1)"
+
+
+def _annual_day(value: int) -> str | None:
     return None if 1 <= value <= 28 else "El día debe estar entre 1 y 28"
+
+
+def check_annual(month: int, day: int) -> str | None:
+    """The month and the day of the annual recap together: December 20-28 or January 1-5."""
+    days = ANNUAL_DAYS[month]
+    return None if day in days else f"En {'diciembre' if month == 12 else 'enero'} el resumen anual se envía entre el {days[0]} y el {days[-1]}"
 
 
 def _contact(value: str) -> str | None:
@@ -105,10 +123,15 @@ REGISTRY: dict[str, Spec] = {
     "weekly.enabled": Spec("bool", True),
     "weekly.weekday": Spec("int", 0, check=_weekday),  # 0 = Monday
     "weekly.time": Spec("str", "09:00", check=_time),
-    # Off until an admin has seen it in the panel (Notificaciones → Resumen mensual)
+    # Off until an admin has seen it in the panel (Notificaciones → Recap)
     "monthly.enabled": Spec("bool", False),
-    "monthly.day": Spec("int", 1, check=_month_day),  # day of the month; up to 28 so every month has it
+    "monthly.day": Spec("int", 1, check=_monthly_day),  # day of the month, in the first days: the app offers it from the 1st to the 5th
     "monthly.time": Spec("str", "10:00", check=_time),
+    # The season's recap, apart from the monthly one: December 20-28 or January 1-5 (checked together in set_values)
+    "annual.enabled": Spec("bool", False),
+    "annual.month": Spec("int", 1, check=_annual_month),
+    "annual.day": Spec("int", 1, check=_annual_day),
+    "annual.time": Spec("str", "10:00", check=_time),
     # Web Push (utils/push.py). The keys are generated from the panel, never typed.
     "push.enabled": Spec("bool", True),
     "push.contact": Spec("str", None, check=_contact),
@@ -274,6 +297,11 @@ def set_values(db: Session, values: dict[str, Any], user_id: int | None = None) 
             raise ValueError(f"{key}: no puede estar vacío")
         clean[key] = coerce(key, value)
     current = get_all(db)
+    if any(key.startswith("annual.") for key in clean):
+        effective = {**current, **{key: value for key, value in clean.items() if value is not None}}
+        problem = check_annual(effective["annual.month"], effective["annual.day"])
+        if problem:
+            raise ValueError(problem)
     changed = []
     for key, value in clean.items():
         if value is None:  # back to the default

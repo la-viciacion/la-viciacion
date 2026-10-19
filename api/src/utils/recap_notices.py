@@ -49,6 +49,8 @@ def group_message(data: dict, period: recap.Period) -> str:
     """The recap of the group, for the group chat."""
     group = data["group"]
     lines = [f"📅 *Resumen de {period_label(period)}* 📅"]
+    if not data["complete"]:
+        lines.append("Con lo jugado hasta hoy.")
     lines.append(
         f"El grupo ha jugado {utils.format_duration(group['seconds'])} ({_change(group['seconds'], group['previous_seconds'])}) "
         f"en {_plural(group['sessions'], 'sesión', 'sesiones')}."
@@ -81,6 +83,8 @@ def player_message(data: dict, period: recap.Period) -> str:
     """The recap of one player, for them alone."""
     player = data["player"]
     lines = [f"🎬 *Tu resumen de {period_label(period)}* 🎬"]
+    if not data["complete"]:
+        lines.append("Con lo jugado hasta hoy.")
     hours = f"Horas: {utils.format_duration(player['seconds'])} ({_change(player['seconds'], player['previous_seconds'])})"
     lines.append(hours + (f" · puesto {player['position']}º" if player["position"] else ""))
     lines.append(f"Sesiones: {player['sessions']} · Días: {player['days']} · Juegos: {player['games']}")
@@ -109,11 +113,10 @@ def previous_month(today: datetime.date) -> recap.Period:
     return recap.month_period(today.year, today.month).previous()
 
 
-def periods_due(day: datetime.date) -> list[recap.Period]:
-    """What the monthly job reports on when it runs on `day`: the month that has just ended and, when that month was
-    December, the season that ended with it (run in January: December and last year)."""
-    month = previous_month(day)
-    return [month, recap.year_period(month.start.year)] if month.start.month == 12 else [month]
+def annual_period(day: datetime.date) -> recap.Period:
+    """The season the annual job reports on when it runs on `day`: the running one in December (what there is so far),
+    the one that has just ended in January."""
+    return recap.year_period(day.year if day.month == 12 else day.year - 1)
 
 
 async def announce_recap(
