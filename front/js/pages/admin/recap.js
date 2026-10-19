@@ -4,7 +4,7 @@
 // here for any player. Sending goes through the same code as the jobs.
 import { api, jsonRequest } from '../../lib/api.js';
 import { html, mount } from '../../lib/html.js';
-import { lastMonth, periodChoices, recapHref } from '../../lib/recap.js';
+import { clampPick, lastMonth, monthChoices, periodKey, pickOf, recapHref, withKind, yearChoices } from '../../lib/recap.js';
 import { storyHref } from '../../lib/story.js';
 import { toast } from '../../ui/toast.js';
 import { errorState, store } from './components.js';
@@ -12,31 +12,42 @@ import { confirmDialog } from './dialogs.js';
 import { render as renderSettings } from './settings.js';
 
 let panel;
-let period = lastMonth();
+let pick = clampPick(pickOf(lastMonth())); // what is being looked at: monthly or annual, the year and, for a month, the month
 let userId = null;
 let navigation = 0; // only the latest preview may draw
 
+const period = () => periodKey(pick);
 const userById = (id) => store.users.find((u) => u.id === Number(id));
 
+// Monthly or annual, then the year (and the month): a short list at each step instead of one that grows every month
+function pickerView() {
+  const selected = (on) => (on ? 'selected' : '');
+  return html`
+    <label>Resumen
+      <select class="adm-input" id="rcaKind">
+        <option value="month" ${selected(pick.kind === 'month')}>Mensual</option>
+        <option value="year" ${selected(pick.kind === 'year')}>Anual</option>
+      </select>
+    </label>
+    <label>Año
+      <select class="adm-input" id="rcaYear">${yearChoices().map((year) => html`<option value="${year}" ${selected(year === pick.year)}>${year}</option>`)}</select>
+    </label>
+    ${pick.kind === 'month' ? html`
+      <label>Mes
+        <select class="adm-input" id="rcaMonth">${monthChoices(pick.year).map(({ value, label }) => html`<option value="${value}" ${selected(value === pick.month)}>${label}</option>`)}</select>
+      </label>` : ''}
+    <label>Jugador
+      <select class="adm-input" id="rcaUser">${store.users.map((u) => html`<option value="${u.id}" ${selected(u.id === userId)}>${u.username}</option>`)}</select>
+    </label>`;
+}
+
 function view() {
-  const { months, seasons } = periodChoices();
-  const option = ({ value, label }) => html`<option value="${value}" ${value === period ? 'selected' : ''}>${label}</option>`;
   return html`
     <div class="adm-settings" id="rcAdmin">
       <section class="adm-set-card">
-        <h3>Qué ver</h3>
-        <div class="adm-set-row">
-          <label>Periodo
-            <select class="adm-input" id="rcaPeriod">
-              <optgroup label="Meses">${months.map(option)}</optgroup>
-              <optgroup label="Temporadas">${seasons.map(option)}</optgroup>
-            </select>
-          </label>
-          <label>Jugador
-            <select class="adm-input" id="rcaUser">${store.users.map((u) => html`<option value="${u.id}" ${u.id === userId ? 'selected' : ''}>${u.username}</option>`)}</select>
-          </label>
-        </div>
-        <div class="adm-sub">El periodo en curso enseña lo que hay hasta hoy. Es el mismo cálculo para meses y temporadas. El jugador solo cambia a quién enseñan los botones: el aviso es el mismo para todos.</div>
+        <h3>Previsualizar</h3>
+        <div class="adm-set-row" id="rcaPicker">${pickerView()}</div>
+        <div class="adm-sub">El periodo en curso enseña lo que hay hasta hoy. El jugador solo cambia a quién abren los botones: el aviso es el mismo para todos.</div>
         <div class="adm-actions">
           <a class="adm-btn" id="rcaOpen" href="#">Abrir la página del resumen</a>
           <a class="adm-btn" id="rcaStory" href="#">Abrir la historia</a>
@@ -54,11 +65,7 @@ function view() {
           <div class="adm-notif-title" id="rcaPushTitle"></div>
           <div class="adm-notif-body" id="rcaPushBody"></div>
         </div>
-      </section>
-
-      <section class="adm-set-card">
-        <h3>Enviar ahora</h3>
-        <div class="adm-sub">Lo mismo que hacen los envíos automáticos, para el periodo elegido (un mes o una temporada). Respeta el interruptor general de notificaciones. Si nadie jugó en ese periodo, no se envía.</div>
+        <div class="adm-sub">Enviarlo ahora es lo mismo que hacen los envíos automáticos, para el periodo elegido. Respeta el interruptor general de notificaciones y, si nadie jugó en ese periodo, no se envía.</div>
         <div class="adm-actions">
           <button type="button" class="adm-btn" data-send="me">Enviármelo (prueba)</button>
           <button type="button" class="adm-btn" data-send="group">Enviarlo al grupo…</button>
@@ -74,8 +81,8 @@ function view() {
 function links() {
   const target = userById(userId);
   const username = target && target.id !== store.me ? target.username : null;
-  panel.querySelector('#rcaOpen').setAttribute('href', recapHref(period, username));
-  panel.querySelector('#rcaStory').setAttribute('href', storyHref(period, username));
+  panel.querySelector('#rcaOpen').setAttribute('href', recapHref(period(), username));
+  panel.querySelector('#rcaStory').setAttribute('href', storyHref(period(), username));
 }
 
 async function refresh() {
@@ -87,7 +94,7 @@ async function refresh() {
   telegram.textContent = 'Cargando…';
   title.textContent = body.textContent = '';
   try {
-    const preview = await api(`/manage/recap/preview?period=${period}`);
+    const preview = await api(`/manage/recap/preview?period=${period()}`);
     if (id !== navigation) return;
     if (preview.nobody_played) {
       telegram.textContent = 'Nadie jugó en este periodo: no se enviaría nada.';
@@ -102,6 +109,21 @@ async function refresh() {
   }
 }
 
+// What the selects of the picker changed; the months on offer depend on the year and the selects on the kind
+function onPicker(event) {
+  const { id, value } = event.target;
+  if (id === 'rcaUser') {
+    userId = Number(value);
+    return links();
+  }
+  if (id === 'rcaKind') pick = withKind(pick, value);
+  else if (id === 'rcaYear') pick = clampPick({ ...pick, year: Number(value) });
+  else if (id === 'rcaMonth') pick = { ...pick, month: Number(value) };
+  else return;
+  mount(panel.querySelector('#rcaPicker'), pickerView());
+  refresh();
+}
+
 const WHO = {
   me: null,
   group: 'Se enviará el aviso al grupo de Telegram y a las notificaciones de la app que tengan activados los avisos del grupo.',
@@ -112,7 +134,7 @@ async function send(audience) {
   errorEl.textContent = '';
   if (WHO[audience] && !(await confirmDialog('Enviar el resumen', html`<p>${WHO[audience]}</p><p>No se puede deshacer.</p>`, { ok: 'Enviar' }))) return;
   try {
-    const result = await api('/manage/recap/send', jsonRequest('POST', { period, audience }));
+    const result = await api('/manage/recap/send', jsonRequest('POST', { period: period(), audience }));
     toast(result.message);
   } catch (err) {
     errorEl.textContent = err.message;
@@ -121,12 +143,12 @@ async function send(audience) {
 
 export async function render(target) {
   panel = target;
-  userId ??= store.me;
+  pick = clampPick(pickOf(lastMonth())); // each visit starts on the last month, for yourself
+  userId = store.me;
   try {
     mount(panel, view());
-    panel.querySelector('#rcaPeriod').addEventListener('change', (e) => { period = e.target.value; refresh(); });
-    panel.querySelector('#rcaUser').addEventListener('change', (e) => { userId = Number(e.target.value); links(); });
-    panel.onclick = (e) => { // not addEventListener: the panel is reused, and a second listener would send twice
+    panel.onchange = onPicker; // not addEventListener: the panel is reused, and a second listener would act twice
+    panel.onclick = (e) => {
       const button = e.target.closest('[data-send]');
       if (button) send(button.dataset.send);
     };
