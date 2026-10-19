@@ -135,18 +135,22 @@ async def search_rawg_games(query: str, db: Session = None) -> list[schemas.Rawg
 
     candidates = []
     for item in results:
+        # RAWG sends explicit nulls (`platforms`, `genres`, `slug`...) for some entries: one of them must not
+        # turn the whole search into a 500, and an entry without id cannot be picked anyway.
+        if not item.get("id"):
+            continue
         candidates.append(
             schemas.RawgGameCandidate(
-                rawg_id=item.get("id"),
-                name=item.get("name", ""),
-                slug=item.get("slug", ""),
+                rawg_id=item["id"],
+                name=item.get("name") or "",
+                slug=item.get("slug") or "",
                 released=item.get("released"),
                 image_url=item.get("background_image"),
-                genres=[g["name"] for g in item.get("genres", []) if "name" in g],
+                genres=[g["name"] for g in item.get("genres") or [] if g.get("name")],
                 platforms=[
-                    p.get("platform", {}).get("name")
-                    for p in item.get("platforms", [])
-                    if p.get("platform", {}).get("name")
+                    name
+                    for p in item.get("platforms") or []
+                    if (name := (p.get("platform") or {}).get("name"))
                 ],
                 rating=item.get("rating"),
                 metacritic=item.get("metacritic"),
