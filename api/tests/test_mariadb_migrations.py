@@ -1,7 +1,7 @@
 """Migrations and schema rules checked on a real MariaDB (see tests/mariadb_db.py).
 
 `test_migrations.py` only inspects the files; these run them. They cover an older revision with data
-taken to the head (step 3 of the verification checklist in docs/migrations.md) plus the rules that only
+taken to the head (step 3 of the verification checklist in docs/desarrollo/migrations.md) plus the rules that only
 MariaDB enforces. Empty -> head, re-run, downgrade and back, and the models matching the schema are in
 `test_mariadb_migration_chain.py`, for every migration. The checklist's step 3 with a copy of the
 production backup stays manual: it needs real data.

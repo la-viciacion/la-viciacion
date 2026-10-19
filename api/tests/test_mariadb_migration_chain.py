@@ -3,7 +3,7 @@
 `test_mariadb_migrations.py` and `test_mariadb_v1_upgrade.py` check the ends of the road (empty or v1
 to head). These check each step: that it applies on data, that running it again changes nothing,
 that it can be undone, that both roads end in the same schema and that the schema is what the models
-say. They automate steps 2, 4, 6 and 7 of the checklist in docs/migrations.md for all migrations.
+say. They automate steps 2, 4, 6 and 7 of the checklist in docs/desarrollo/migrations.md for all migrations.
 """
 import unittest
 
@@ -29,7 +29,7 @@ def revisions() -> list[str]:
 LAST_REVISION_THAT_IS_NOT_RERUNNABLE = "005_prune_dead_tables"
 
 # Downgrades that fail on MariaDB, with the reason. They are applied and immutable; the production
-# way back is the pre-deploy backup (docs/deployment.md), not downgrade.
+# way back is the pre-deploy backup (docs/desarrollo/deployment.md), not downgrade.
 KNOWN_BROKEN_DOWNGRADES = {
     "008_season_generated": "ALTER TABLE ... MODIFY on a generated column is unsupported (error 1907)",
 }

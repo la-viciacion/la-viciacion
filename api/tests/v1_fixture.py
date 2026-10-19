@@ -2,7 +2,7 @@
 
 Nothing here comes from a real backup: names, e-mails and ids are made up and the sessions are
 generated from a fixed seed, so the fixture is the same on every run. What it does reproduce are
-the awkward cases the migrations were written for (see docs/migrations.md): sessions of a Clockify
+the awkward cases the migrations were written for (see docs/desarrollo/migrations.md): sessions of a Clockify
 project that never reached `games`, a double-start, abandoned timers, e-mails with spaces and
 capitals, a blank e-mail, per-year library tables with rows that must and must not come back.
 

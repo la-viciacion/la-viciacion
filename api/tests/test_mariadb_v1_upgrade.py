@@ -3,7 +3,7 @@
 This is the road a v1 backup walks in production: import the dump (no `alembic_version`), start the
 API, `alembic upgrade head` runs 000 to the latest. The data comes from tests/v1_fixture.py, which
 is synthetic; what must hold afterwards is computed from the fixture's own rows. Only a copy of the
-real backup can prove more than this, and that check stays manual (docs/migrations.md, step 3).
+real backup can prove more than this, and that check stays manual (docs/desarrollo/migrations.md, step 3).
 """
 from sqlalchemy import inspect, text
 

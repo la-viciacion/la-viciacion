@@ -2,7 +2,7 @@
 
 Adding a route that is reachable without a login, or a per-user route that never
 checks the caller owns the data, fails here. Adding a new public endpoint means
-adding it to PUBLIC on purpose (and documenting why in docs/architecture.md).
+adding it to PUBLIC on purpose (and documenting why in docs/desarrollo/architecture.md).
 """
 import ast
 import inspect

@@ -57,7 +57,7 @@
       enabled: false,
     },
     // The MariaDB image in docker-compose.yml: only patch releases of the pinned series arrive on their own.
-    // Moving to another series is a data decision (docs/deployment.md#mariadb-version).
+    // Moving to another series is a data decision (docs/desarrollo/deployment.md#mariadb-version).
     {
       matchManagers: ["docker-compose"],
       matchPackageNames: ["mariadb"],

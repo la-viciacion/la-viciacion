@@ -1,6 +1,6 @@
 # GitLab CI/CD, the equivalent of .github/workflows/. PREPARED, NOT IN USE: the repository lives on GitHub and these
 # files do nothing there. They are kept in step with the workflows so a move to GitLab is a push, not a rewrite;
-# docs/gitlab.md has the project settings to make, the CI/CD variables and what was not tried.
+# docs/desarrollo/gitlab.md has the project settings to make, the CI/CD variables and what was not tried.
 #
 #   GitHub                      GitLab
 #   ci.yml (pull_request)       merge request pipeline: pr-title, changes -> checks (child pipeline)

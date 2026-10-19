@@ -1,6 +1,6 @@
 """Migrations that refuse to run on data that breaks what they are about to enforce (MariaDB required).
 
-docs/migrations.md: a migration never rewrites data to make a constraint fit; it stops, says what is
+docs/desarrollo/migrations.md: a migration never rewrites data to make a constraint fit; it stops, says what is
 wrong and leaves the database as it was, so that a person decides. For each refusal these tests check
 the three things that matter: it fails and names the offending data, the database stays at the last
 revision that was applied (with the schema untouched), and once the data is fixed running it again

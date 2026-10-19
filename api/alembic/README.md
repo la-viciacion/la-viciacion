@@ -1,6 +1,6 @@
 # Alembic Database Migrations
 
-> **Read [docs/migrations.md](../../docs/migrations.md) first.** It holds the mandatory rules (immutability, linear history, naming, idempotency, verification checklist). The commands below are only a quick reference; where they differ, that page wins.
+> **Read [docs/desarrollo/migrations.md](../../docs/desarrollo/migrations.md) first.** It holds the mandatory rules (immutability, linear history, naming, idempotency, verification checklist). The commands below are only a quick reference; where they differ, that page wins.
 
 This directory contains database migration scripts for La Viciación API.
 

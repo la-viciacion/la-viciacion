@@ -1,6 +1,6 @@
 """Failed-attempt limiter for the public login endpoint.
 
-In memory and per process: enough for a single API replica (see docs/architecture.md);
+In memory and per process: enough for a single API replica (see docs/desarrollo/architecture.md);
 a restart forgets the counters. Time is passed in so it is testable without clocks.
 
 Two limiters are used for the login: one per account name (stops guessing one

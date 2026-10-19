@@ -516,7 +516,7 @@ class AchievementsElems(Enum):
     }
 
     # About the world outside the app: the weather, the calendar, the sky and the age of a game. All of them are hidden,
-    # have no season limit and count from 2027 (see docs/features.md)
+    # have no season limit and count from 2027 (see docs/desarrollo/features.md)
     STORM_LIFETIME = {
         "since": 2027,
         "special": 1,

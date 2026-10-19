@@ -5,7 +5,7 @@
 #   prod  builds a release tag on the server (`latest` = the newest vX.Y.Z tag, or e.g. 2.0.0). It refuses a tag
 #         whose release pipeline (every check) did not pass on the commit the tag points to.
 # The secrets are CI/CD variables marked Protected, so only pipelines on main and on protected tags can read them
-# (a merge request cannot reach them by editing this file). See docs/gitlab.md for the list.
+# (a merge request cannot reach them by editing this file). See docs/desarrollo/gitlab.md for the list.
 
 .deploy:
   stage: deploy

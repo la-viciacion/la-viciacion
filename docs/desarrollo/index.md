@@ -1,4 +1,4 @@
-# La Viciación: documentation
+# Documentación técnica (en inglés)
 
 For people who run it:
 
@@ -16,4 +16,4 @@ For people who change the code:
 - [GitLab](gitlab.md): the prepared, unused GitLab CI/CD and how to move there.
 - [Roadmap](roadmap.md): pending decisions and known debt.
 
-LLM/agent entry point: [AGENTS.md](../AGENTS.md) (`CLAUDE.md` and `.github/copilot-instructions.md` point to it). Project presentation: [README](../README.md).
+LLM/agent entry point: [AGENTS.md](https://github.com/la-viciacion/la-viciacion/blob/main/AGENTS.md) (`CLAUDE.md` and `.github/copilot-instructions.md` point to it). Project presentation: [README](https://github.com/la-viciacion/la-viciacion/blob/main/README.md).
