@@ -1,0 +1,102 @@
+site_name: La Viciación
+site_description: Documentación de La Viciación, la app para llevar la cuenta del tiempo que el grupo dedica a los videojuegos.
+site_url: https://la-viciacion.github.io/la-viciacion/
+repo_url: https://github.com/la-viciacion/la-viciacion
+repo_name: la-viciacion/la-viciacion
+edit_uri: edit/main/docs/
+docs_dir: docs
+strict: true
+
+theme:
+  name: material
+  language: es
+  logo: assets/logo.png
+  favicon: assets/logo.png
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-night
+        name: Cambiar a modo oscuro
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-sunny
+        name: Cambiar a modo claro
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - search.highlight
+    - search.suggest
+    - content.code.copy
+    - content.action.edit
+
+extra_css:
+  - stylesheets/extra.css
+extra_javascript:
+  - javascripts/zoom.js
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+plugins:
+  - search:
+      lang: es
+
+# The technical docs are written in English and stay a plain section; the pages
+# for people who play and who run the app are in Spanish and get their own tabs.
+nav:
+  - Inicio: index.md
+  - Guía de usuario:
+      - guia-usuario/index.md
+      - Primeros pasos: guia-usuario/primeros-pasos.md
+      - Timers y sesiones: guia-usuario/sesiones.md
+      - Tu perfil: guia-usuario/perfil.md
+      - El grupo: guia-usuario/grupo.md
+      - Logros: guia-usuario/logros.md
+      - Resumen e historia: guia-usuario/resumen.md
+      - Deseados, recomendados y retos: guia-usuario/descubrir.md
+      - Notificaciones y Telegram: guia-usuario/notificaciones.md
+      - Preguntas frecuentes: guia-usuario/preguntas-frecuentes.md
+  - Configuración:
+      - configuracion/index.md
+      - Instalación: configuracion/instalacion.md
+      - Variables del .env: configuracion/variables.md
+      - Cuentas y acceso: configuracion/cuentas.md
+      - Telegram: configuracion/telegram.md
+      - Servicios externos: configuracion/servicios.md
+      - Panel de administración: configuracion/panel-admin.md
+      - Operación: configuracion/operacion.md
+  - Documentación técnica:
+      - desarrollo/index.md
+      - Operación:
+          - Despliegue: desarrollo/deployment.md
+          - Configuración: desarrollo/configuration.md
+          - Funcionalidades: desarrollo/features.md
+      - Código:
+          - Arquitectura: desarrollo/architecture.md
+          - Desarrollo local: desarrollo/development.md
+          - Convenciones y recetas: desarrollo/conventions.md
+          - Migraciones: desarrollo/migrations.md
+          - Flujo de Git: desarrollo/workflow.md
+      - Planes:
+          - GitLab: desarrollo/gitlab.md
+          - Roadmap: desarrollo/roadmap.md

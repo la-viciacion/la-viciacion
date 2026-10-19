@@ -97,6 +97,27 @@ Run these inside the API container (`docker compose exec laviciacion-api alembic
 
 To inspect data: connect any MySQL client to `127.0.0.1:3307` with `MARIADB_USER`/`MARIADB_PASSWORD`.
 
+## Documentation site
+
+`docs/` is the source of a MkDocs site (Material theme, `mkdocs.yml` at the root) published to GitHub Pages by `.github/workflows/docs.yml`: a PR that touches `docs/` builds it with `--strict` (a broken link fails), `main` also deploys it. The pages for players and operators are in Spanish; the technical ones (`docs/desarrollo/`) are in English.
+
+```bash
+pip install -r requirements-docs.txt   # in a venv
+mkdocs serve                           # http://127.0.0.1:8000, reloads on save
+mkdocs build --strict                  # the same check CI runs; the output (site/) is gitignored
+```
+
+The screenshots in `docs/assets/screens/` are taken from a throwaway demo stack, never from real data (the repository is public): `docs-demo/` holds its compose override (another project name, ports 3100/5100/3407, its own volume) and the scripts. Everything it creates is invented (real game titles with generated covers, made-up players).
+
+```bash
+python docs-demo/demo.py up           # writes docs-demo/.env (random secrets, gitignored), builds and starts it
+python docs-demo/demo.py seed         # players, games, ~1,500 sessions, completions, ratings, challenges
+python docs-demo/screenshots.py       # retakes every picture (needs playwright and pillow; uses the installed Edge or Chrome)
+python docs-demo/demo.py down         # stops it and deletes its database
+```
+
+Run them with a Python that has Pillow (the API's venv does). A change to the UI is a reason to rerun `screenshots.py`.
+
 ## Debugging tips
 
 - `API_LOG_LEVEL=DEBUG` / `BOT_LOG_LEVEL=DEBUG` in `.env`, then recreate the container.

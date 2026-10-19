@@ -16,9 +16,10 @@ ALL_CHECKS = ("api-tests", "bot-tests", "front-tests", "mariadb")
 ALL_SERVICES = ("api", "front", "bot")
 
 # Nothing in these is executed, built or read by a test.
-INERT_PREFIXES = ("docs/", "design/")
+INERT_PREFIXES = ("docs/", "design/", "docs-demo/")
 INERT_FILES = {
     "README.md", "CONTRIBUTING.md", "AGENTS.md", "CLAUDE.md", "LICENSE", ".gitignore", ".gitattributes",
+    "mkdocs.yml", "requirements-docs.txt", ".github/workflows/docs.yml",
     ".github/pull_request_template.md", ".github/dependabot.yml", ".github/copilot-instructions.md",
 }
 

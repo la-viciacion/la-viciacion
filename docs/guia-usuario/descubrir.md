@@ -1,0 +1,44 @@
+# Deseados, recomendados y retos
+
+Tres páginas del bloque **Tú** para decidir a qué jugar y marcarte objetivos.
+
+## Deseados
+
+**Menú → Deseados** es tu lista de juegos que quieres jugar, incluidos los que aún no han salido, así que no necesitas otra pantalla para lo uno y lo otro.
+
+![Tu lista de deseados](../assets/screens/wishlist.webp){ .screenshot }
+
+Tiene dos mitades:
+
+- **Próximos lanzamientos**: juegos sin fecha de salida o con una futura, los más cercanos primero, con cuenta atrás y fecha («Sin fecha confirmada» al final).
+- **Quiero jugar**: juegos ya lanzados, el último deseo primero.
+
+Cada tarjeta dice qué otros jugadores quieren el mismo juego («Lo quieren Bea y Cai») y tiene una ✕ para quitarlo. Para añadir uno, pulsa **Añadir juego** (el mismo buscador que en Juegos) o, en la página de un juego que no tengas en tu biblioteca, **Añadir a mi lista**.
+
+Un juego sale de la lista **solo** cuando empiezas a jugarlo. Cada día se vuelve a consultar la fecha de salida de los juegos que se esperan, y el día antes de un lanzamiento el grupo recibe un aviso con quién lo espera.
+
+## Recomendados
+
+**Menú → Recomendados** te propone **12 juegos** que tienen otros jugadores y tú nunca has jugado. Se escogen al azar, con más probabilidad para los que tienen más jugadores, más completados y más horas, los que encajan con los géneros que más juegas y los mejor puntuados. Cada visita, o **Otras recomendaciones**, puede darte unos distintos.
+
+![Juegos recomendados](../assets/screens/recommendations.webp){ .screenshot }
+
+## Retos
+
+**Menú → Retos** reúne objetivos con fecha de inicio y de fin, a diferencia de los logros. Hay dos tipos:
+
+![La página de retos](../assets/screens/challenges.webp){ .screenshot }
+
+**Del grupo** (los lanza un administrador):
+
+- **Juego del mes**: un juego, un mes, unas horas mínimas por jugador y un total entre todos. Ves una barra por jugador (verde al llegar a su mínimo) y otra para el grupo.
+- **Temático**: una etiqueta de juegos (Horror, Singleplayer…), un mes y lo que tiene que hacer cada jugador: jugar un número de horas o completar al menos un juego. Cuenta cualquier juego con esa etiqueta.
+
+Puedes **dejar de participar** y volver mientras el reto no haya terminado. Cuando el grupo alcanza el total, se avisa una vez.
+
+**Personales** (los lanzas tú con **Nuevo reto**; los demás los ven, pero nadie recibe aviso):
+
+- **Probar un género**: elige un género de la base de datos y juega unas horas (2 por defecto) o completa uno de esos juegos, en una semana, un mes o tres meses. Solo cuentan juegos de ese género que no tuvieras ya en tu biblioteca.
+- **Bajar la deuda**: un objetivo sobre tu **deuda** (lo que te falta para terminar los juegos que has empezado), en porcentaje o en número de juegos. La app te dice, antes de lanzarlo, lo que significa («El 25 % de tu deuda son unas 10 h»).
+
+Tus retos terminados, con cómo te fue, quedan en **Perfil → Resumen → Retos**.
