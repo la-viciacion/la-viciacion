@@ -43,6 +43,8 @@ PAYLOAD_MAX_BYTES = 3500  # the Web Push limit is 4096 bytes once encrypted
 TTL_SECONDS = 3600  # a notice that could not be delivered within the hour is stale
 MAX_DEVICES_PER_USER = 10
 
+INBOX_URL = "#/notifications"  # where a tap on any notice but the timer's opens: the app's notification inbox
+
 TIMER_TAG = "timer"
 TIMER_TTL_SECONDS = 600  # a refresh that arrives late is worse than none: the next one is due in 10 minutes or more
 
@@ -58,8 +60,8 @@ def _shorten(text: str, limit: int) -> str:
     return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
 
 
-def build_payload(message: str, url: str = "/", tag: str | None = None) -> dict:
-    """First line becomes the title and the rest the body; a one-liner gets the app name as title."""
+def build_payload(message: str, url: str = INBOX_URL, tag: str | None = None) -> dict:
+    """First line becomes the title and the rest the body; a one-liner gets the app name as title. A tap opens the inbox."""
     lines = [line.strip() for line in plain_text(message).splitlines() if line.strip()]
     if not lines:
         title, body = APP_NAME, ""
@@ -92,7 +94,7 @@ def build_announcement(title: str, body: str | None = None, url: str | None = No
     """A notice written by an admin. Raises ValueError with a message for the panel if it cannot be sent.
 
     Plain text only (no Markdown or HTML). `url` is where a tap opens the app (a path or a #/ route of
-    this site), `image` an https picture shown large on Android and desktop (iOS ignores it).
+    this site; the inbox when empty), `image` an https picture shown large on Android and desktop (iOS ignores it).
     """
     title = (title or "").strip()
     body = (body or "").strip()
@@ -102,7 +104,7 @@ def build_announcement(title: str, body: str | None = None, url: str | None = No
         raise ValueError(f"El título admite {TITLE_MAX} caracteres como máximo")
     if len(body) > ANNOUNCEMENT_BODY_MAX:
         raise ValueError(f"El mensaje admite {ANNOUNCEMENT_BODY_MAX} caracteres como máximo")
-    url = (url or "").strip() or "/"
+    url = (url or "").strip() or INBOX_URL
     if not re.fullmatch(r"(/(?!/)|#/)[\w\-./?=&%#]*", url):
         raise ValueError("El enlace debe ser una ruta de la app (por ejemplo / o #/profile)")
     image = (image or "").strip() or None

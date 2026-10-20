@@ -428,7 +428,9 @@ async def check_forgotten_timer(db: Session, user: models.User):
             + " Si es correcto, sigue disfrutando. Si te has olvidado de pararlo,"
             + " párala y edita la sesión con el tiempo correcto."
         )
-        await utils.send_message_to_user(user.telegram_id, msg, user_id=user.id, telegram_on=telegram_on, push_on=push_on)
+        await utils.send_message_to_user(
+            user.telegram_id, msg, user_id=user.id, telegram_on=telegram_on, push_on=push_on, in_inbox=False
+        )
 
 
 def join_names(names: list[str]) -> str:

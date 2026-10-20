@@ -17,6 +17,7 @@ what nothing else can trigger remains here:
   daily_wishlist    every day at 09:00, refreshes the release date of the games somebody waits for
                     and, while actions.WISHLIST_PRIVATE_NOTICE is on (off), tells who wished a game that comes out today
   wishlist_eve      every day at 12:30, tells the group which wished games come out tomorrow
+  inbox_purge       every day at 04:00, deletes the inbox notices older than `inbox.retention_days`
 
 Every run is recorded in `job_runs`, so a restart never repeats a run and a job
 that was due while the API was down still runs when it comes back, within a
@@ -34,7 +35,7 @@ from sqlalchemy.orm import Session
 from ..crud import users
 from ..database import models
 from ..database.database import SessionLocal
-from . import actions, push, recap_notices, settings
+from . import actions, inbox, push, recap_notices, settings
 from .logger import LogManager
 
 log_manager = LogManager()
@@ -49,6 +50,7 @@ ANNUAL_GRACE = datetime.timedelta(hours=12)
 HOURLY_GRACE = datetime.timedelta(minutes=10)
 DAILY_GRACE = datetime.timedelta(hours=3)
 DAILY_STREAKS_HOUR = 5
+INBOX_PURGE_HOUR = 4
 DAILY_WISHLIST_HOUR = 9
 # After the 09:00 refresh, so a date that slipped overnight is already corrected when the group is told
 WISHLIST_EVE_TIME = (12, 30)
@@ -185,6 +187,10 @@ async def _daily_wishlist(db: Session) -> str:
     return await actions.check_wishlist(db, datetime.date.today())
 
 
+async def _inbox_purge(db: Session) -> str:
+    return f"{inbox.purge(db)} deleted"
+
+
 async def _wishlist_eve(db: Session) -> str:
     return await actions.announce_wishlist_eve(db, datetime.date.today() + datetime.timedelta(days=1))
 
@@ -220,6 +226,10 @@ def tick(now: datetime.datetime | None = None) -> None:
             slot = hourly_slot(now)
             if is_due(now, slot, _last_run(db, "forgotten_timers"), HOURLY_GRACE) and _claim(db, "forgotten_timers", slot, now):
                 _run(db, "forgotten_timers", lambda: _forgotten_timers(db))
+
+        slot = daily_slot(now, INBOX_PURGE_HOUR)
+        if is_due(now, slot, _last_run(db, "inbox_purge"), DAILY_GRACE) and _claim(db, "inbox_purge", slot, now):
+            _run(db, "inbox_purge", lambda: _inbox_purge(db))
 
         slot = daily_slot(now, DAILY_STREAKS_HOUR)
         if is_due(now, slot, _last_run(db, "daily_streaks"), DAILY_GRACE) and _claim(db, "daily_streaks", slot, now):

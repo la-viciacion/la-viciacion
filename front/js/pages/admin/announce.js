@@ -10,6 +10,7 @@ import { confirmDialog } from './dialogs.js';
 const TITLE_MAX = 80;
 const BODY_MAX = 240;
 const LINKS = [
+  ['#/notifications', 'Avisos'],
   ['/', 'Inicio'],
   ['#/profile', 'Mi perfil'],
 ];

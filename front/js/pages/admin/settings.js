@@ -72,6 +72,16 @@ function view(values, jobs, pushDevices, mail, aiUses, aiModel) {
         ${check('notifications.admin_alerts', 'Avisos a administradores', 'Errores y ejecuciones lentas, por mensaje privado a los admins con ID de Telegram. Funciona aunque las notificaciones generales estén apagadas.')}
       </section>`,
 
+    inbox: html`
+      <section class="adm-set-card">
+        <h3>Avisos en la app</h3>
+        <div class="adm-sub">Cada usuario puede ver en la app (la campana de la barra superior) los avisos del grupo y los suyos, aunque tenga las notificaciones apagadas. No se guardan los del timer (inicio, fin y olvido) ni los enviados con las notificaciones desactivadas.</div>
+        <label>Días que se guardan
+          <input class="adm-input" type="number" name="inbox.retention_days" min="1" max="365" step="1" required />
+        </label>
+        <div class="adm-sub">Pasado ese tiempo se borran solos, cada madrugada.${jobs.inbox_purge ? ` Última limpieza: ${formatDateTime(jobs.inbox_purge.last_run_at)}.` : ''}</div>
+      </section>`,
+
     weekly: html`
       <section class="adm-set-card">
         <h3>Resumen semanal</h3>
@@ -232,7 +242,7 @@ function collect(form) {
       continue;
     }
     const isNumber = typeof before === 'number';
-    const now = field.type === 'checkbox' ? field.checked : field.type === 'select-one' && isNumber ? Number(field.value) : field.value.trim();
+    const now = field.type === 'checkbox' ? field.checked : (field.type === 'select-one' || field.type === 'number') && isNumber ? Number(field.value) : field.value.trim();
     if (key.startsWith('ai.prompt.')) {
       // the original text (or nothing) is not an override: it goes back to following the application's prompt
       const use = aiUses.find((u) => `ai.prompt.${u.id}` === key);

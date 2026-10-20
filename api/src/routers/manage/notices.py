@@ -10,7 +10,7 @@ from ... import auth
 from ...auth import get_db
 from ...crud import recap
 from ...database import models
-from ...utils import actions, messages, my_utils, push, recap_notices, settings
+from ...utils import actions, inbox, messages, my_utils, push, recap_notices, settings
 from ...utils.logger import LogManager
 from .common import get_or_404, router
 
@@ -68,6 +68,7 @@ async def send_announcement(
         if body.user_id is None:
             raise HTTPException(status_code=400, detail="Falta elegir el usuario")
         user_id = get_or_404(db, models.User, body.user_id, "Usuario").id
+    inbox.record_audience(body.audience, user_id, payload)
     sent, failed = await push.deliver(payload, body.audience, user_id)
     logger.info(f"Announcement by {admin.username} to {body.audience}: {sent} sent, {failed} failed")
     if sent == 0:
@@ -108,6 +109,11 @@ async def send_telegram_announcement(
             raise HTTPException(status_code=409, detail=f"{target.username} no tiene Telegram ID")
     if not await my_utils.send_announcement_to_chat(chat_id, body.title, body.body):
         raise HTTPException(status_code=502, detail="Telegram no ha aceptado el mensaje")
+    notice = {"title": body.title, "body": body.body or "", "url": "/"}
+    if body.audience == "group":
+        inbox.record_group("", notice)
+    else:
+        inbox.record_user(target.id, "", notice)
     logger.info(f"Telegram announcement by {admin.username} to {body.audience}")
     return {"message": f"Enviado a {who}"}
 

@@ -1,8 +1,8 @@
 // Page shell shared by every logged-in page: navbar + <main>.
-import { loadAvatarUrl } from '../lib/api.js';
+import { api, loadAvatarUrl } from '../lib/api.js';
 import { html, mount } from '../lib/html.js';
 import { startPresence } from '../lib/presence.js';
-import { iconHome, iconMenu, iconShield } from './icons.js';
+import { iconBell, iconHome, iconMenu, iconShield } from './icons.js';
 import { mountMenu } from './menu.js';
 import { mountPlaying } from './playing.js';
 
@@ -56,6 +56,7 @@ function navbar(user, active) {
       <div class="navbar-actions">
         <div class="playing-slot" id="playingSlot"></div>
         ${link('#', 'home', 'Inicio', iconHome())}
+        <a href="#/notifications" class="navbar-link bell ${active === 'notifications' ? 'active' : ''}" aria-label="Avisos" title="Avisos">${iconBell()}<span class="navbar-link-text">Avisos</span><span class="bell-badge" id="bellBadge" hidden></span></a>
         <a href="#/profile" class="navbar-user ${active === 'profile' ? 'active' : ''}" title="Mi perfil (@${user.username})">
           <div class="navbar-avatar navbar-avatar-placeholder" aria-hidden="true">${initial}</div>
           <span class="navbar-username">${user.name || user.username}</span>
@@ -63,6 +64,14 @@ function navbar(user, active) {
         ${user.is_admin ? link('#/admin', 'admin', 'Panel de administración', iconShield()) : ''}
       </div>
     </nav>`;
+}
+
+/** Show how many notices are unread on the bell (nothing when there are none or the count cannot be read). */
+export function setUnread(count) {
+  const badge = document.getElementById('bellBadge');
+  if (!badge) return;
+  badge.hidden = !count;
+  badge.textContent = count > 99 ? '99+' : String(count || '');
 }
 
 /**
@@ -78,6 +87,7 @@ export function renderShell({ user, active, mainClass = '', onLogout }) {
   mountMenu(document.getElementById('menuBtn'), { user, onLogout });
   mountPlaying(document.getElementById('playingSlot'), user);
   startPresence();
+  api('/notifications/unread').then((data) => data && setUnread(data.unread)).catch(() => {});
   // the initial first and the picture when it arrives: nothing waits for it (once loaded it comes from memory)
   const placeholder = app().querySelector('.navbar-avatar');
   loadAvatarUrl(user.username).then((url) => showAvatar(placeholder, url));

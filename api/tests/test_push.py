@@ -26,7 +26,7 @@ class PayloadTests(unittest.TestCase):
         self.assertEqual(payload["title"], "📣 Ranking 📣")
         self.assertEqual(payload["body"], "1. Ana: 3h · 2. Bob: 2h")
         self.assertEqual(payload["tag"], "group")
-        self.assertEqual(payload["url"], "/")
+        self.assertEqual(payload["url"], push.INBOX_URL)
 
     def test_a_single_line_gets_the_app_name_as_title(self):
         payload = push.build_payload("Ana acaba de perder la racha de 12 días.")
@@ -104,7 +104,7 @@ class AnnouncementTests(unittest.TestCase):
 
     def test_body_link_and_image_are_optional(self):
         payload = push.build_announcement("Hola")
-        self.assertEqual((payload["body"], payload["url"], "image" in payload), ("", "/", False))
+        self.assertEqual((payload["body"], payload["url"], "image" in payload), ("", push.INBOX_URL, False))
 
     def test_rejects_what_cannot_be_sent(self):
         bad = [
