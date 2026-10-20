@@ -119,7 +119,7 @@ test('saving sends the month and the day together', async () => {
 
 test('the schedules are with the other sends, and the recap tab only previews', async () => {
   const { ENTITIES } = await import('../js/pages/admin/entities.js');
-  assert.deepEqual(ENTITIES.sends.sections, ['notifications', 'weekly', 'monthly', 'annual']);
+  assert.deepEqual(ENTITIES.sends.sections, ['notifications', 'inbox', 'weekly', 'monthly', 'annual']);
   assert.equal(ENTITIES.recap.label, 'Probar resumen');
   assert.equal(ENTITIES.recap.custom, 'recap');
 });

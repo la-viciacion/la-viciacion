@@ -13,7 +13,7 @@ from ..config import Config
 from ..crud import games, users
 from ..database import models, schemas
 from .achievements import AchievementsElems
-from . import ai, hltb_sync, push, settings
+from . import ai, hltb_sync, inbox, push, settings
 from .redaction import redact_rawg_key
 from ..utils.logger import LogManager
 
@@ -404,7 +404,8 @@ async def send_message(
                 logger.info("Error generating completion: " + str(e))
         if new_game_recommended and not rewritten:
             msg += f"\n\n🎮 ¿Te apetece probar *{escape_markdown(new_game_recommended['game'])}*?"
-        # neither raises: a push must not affect Telegram
+        # neither raises: the inbox and a push must not affect Telegram
+        inbox.record_group(msg, push_payload)
         if push_payload:
             await push.deliver(push_payload, "group")
         else:
@@ -424,13 +425,18 @@ async def send_message(
         logger.info("Silent mode. Message not sent.")
 
 
-async def send_message_to_user(user_telegram_id, msg, user_id=None, telegram_on=True, push_on=True, push_payload=None):
-    """Private notice: Telegram (if the user has an id) and, given `user_id`, their pushed devices.
+async def send_message_to_user(
+    user_telegram_id, msg, user_id=None, telegram_on=True, push_on=True, push_payload=None, in_inbox=True
+):
+    """Private notice: Telegram (if the user has an id) and, given `user_id`, their pushed devices and their inbox.
     `telegram_on` / `push_on` carry the user's choice of channel for this kind of notice; `push_payload` is what the
-    devices get instead of the text of the message (a short notice that opens a page)."""
+    devices get instead of the text of the message (a short notice that opens a page). `in_inbox=False` is for the
+    notices that only matter at the moment (a forgotten timer)."""
     if not settings.get("notifications.enabled"):
         logger.info("Notifications are disabled. Message to user not sent.")
         return
+    if user_id is not None and in_inbox:
+        inbox.record_user(user_id, msg, push_payload)
     if user_id is not None and push_on:
         if push_payload:
             await push.deliver(push_payload, "user", user_id)

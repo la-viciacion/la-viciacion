@@ -96,6 +96,13 @@ def _vapid_public(value: str) -> str | None:
     return None if re.fullmatch(r"[A-Za-z0-9_-]{80,100}", value) else "Clave pública VAPID no válida"
 
 
+INBOX_RETENTION_MAX = 365
+
+
+def _retention(value: int) -> str | None:
+    return None if 1 <= value <= INBOX_RETENTION_MAX else f"Los días deben estar entre 1 y {INBOX_RETENTION_MAX}"
+
+
 PROMPT_MAX = 4000
 
 
@@ -129,6 +136,8 @@ REGISTRY: dict[str, Spec] = {
     "push.contact": Spec("str", None, check=_contact),
     "push.vapid_public": Spec("str", None, check=_vapid_public),
     "push.vapid_private": Spec("str", None, secret=True, hint=False),
+    # Days the app's notification inbox keeps a notice before the scheduler purges it (utils/inbox.py)
+    "inbox.retention_days": Spec("int", 14, check=_retention),
     # AI text for the notices (utils/ai.py). The key is AI_API_KEY (or the old OPENAI_API_KEY) and is never stored;
     # the provider and the model are read from AI_PROVIDER and AI_MODEL every time; there is no default for either.
     "ai.enabled": Spec("bool", True),

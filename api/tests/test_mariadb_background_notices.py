@@ -243,10 +243,12 @@ class ForgottenTimerTests(MessagingTestCase):
         self.game("celeste", "Celeste")
         self.reminders = []
         self.channels = []
+        self.in_inbox = []
 
-        async def to_user(telegram_id, message, user_id=None, telegram_on=True, push_on=True):
+        async def to_user(telegram_id, message, user_id=None, telegram_on=True, push_on=True, in_inbox=True):
             self.reminders.append((telegram_id, message, user_id))
             self.channels.append((telegram_on, push_on))
+            self.in_inbox.append(in_inbox)
 
         patcher = mock.patch.object(my_utils, "send_message_to_user", new=to_user)
         patcher.start()
@@ -272,6 +274,7 @@ class ForgottenTimerTests(MessagingTestCase):
         self.assertEqual((telegram_id, user_id), (111, self.ana))
         self.assertIn("Hola, Ana", message)
         self.assertIn(f"más de {user_settings.DEFAULT_FORGOTTEN_TIMER_HOURS} horas", message)
+        self.assertEqual(self.in_inbox, [False])  # only matters now: it does not go to the notification inbox
 
     def test_a_timer_that_is_not_old_enough_or_was_already_reminded_about_is_left_alone(self):
         self.running_timer(hours_ago=1)

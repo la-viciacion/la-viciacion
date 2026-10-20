@@ -7,6 +7,7 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     LargeBinary,
     Numeric,
@@ -298,6 +299,25 @@ class PushSubscription(Base):
     created_at = Column(DateTime, server_default=text("CURRENT_TIMESTAMP"))
 
     __table_args__ = (UniqueConstraint("endpoint", name="uq_push_subscriptions_endpoint"),)
+
+
+class UserNotification(Base):
+    """A notice in a player's inbox (see utils/inbox.py): what the group and the player were told, kept for a few days."""
+
+    __tablename__ = "user_notifications"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(
+        Integer, ForeignKey("users.id", name="fk_user_notifications_user", ondelete="CASCADE"), nullable=False
+    )
+    title = Column(String(80), nullable=False)
+    body = Column(String(255), nullable=False, server_default=text("''"))
+    # where a tap opens the app (a path or a #/ route of this site)
+    url = Column(String(200), nullable=False, server_default=text("'/'"))
+    created_at = Column(DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP"))
+    read_at = Column(DateTime, nullable=True)
+
+    __table_args__ = (Index("ix_user_notifications_user_created", "user_id", "created_at"),)
 
 
 class Challenge(Base):

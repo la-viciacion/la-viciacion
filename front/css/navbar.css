@@ -152,3 +152,8 @@
   .navbar-left { gap: 2px; }
   .navbar-link { width: 38px; height: 38px; }
 }
+
+/* Unread notices on the bell */
+.navbar-link.bell { position: relative; }
+.bell-badge { position: absolute; top: 2px; right: 2px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--accent-teal); color: #0a0a14; font-size: 0.7rem; font-weight: 700; line-height: 16px; text-align: center; }
+.bell-badge[hidden] { display: none; }
