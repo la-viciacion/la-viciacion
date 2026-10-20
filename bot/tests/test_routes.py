@@ -8,8 +8,8 @@ from tests import support  # noqa: F401  (sets the environment and the path befo
 from tests.support import make_context, make_update, user
 
 from telegram import InlineKeyboardMarkup
-from telegram.error import NetworkError, TelegramError
-from telegram.ext import CallbackQueryHandler, CommandHandler, ConversationHandler, TypeHandler
+from telegram.error import NetworkError
+from telegram.ext import Application, CallbackQueryHandler, CommandHandler, ConversationHandler, TypeHandler
 
 import app as bot_app
 import utils.keyboard as kb
@@ -176,9 +176,8 @@ class WiringTests(unittest.TestCase):
             def add_handler(self, handler, group=0):
                 cls.handlers.append((handler, group))
 
-            def run_polling(self, error_callback=None):
+            def run_polling(self):
                 cls.registered["polled"] = True
-                cls.registered["polling_error_callback"] = error_callback
 
         cls.FakeApp = FakeApp
         with mock.patch.object(bot_app, "ApplicationBuilder", return_value=Builder()):
@@ -191,7 +190,6 @@ class WiringTests(unittest.TestCase):
         self.assertEqual(group, -1)
         self.assertIs(self.registered["error_handler"], bot_app.on_error)
         self.assertTrue(self.registered["polled"])
-        self.assertIs(self.registered["polling_error_callback"], bot_app.on_polling_error)
 
     def test_the_commands_are_registered_outside_the_conversation(self):
         commands = {tuple(h.commands) for h, _ in self.handlers if isinstance(h, CommandHandler)}
@@ -223,27 +221,19 @@ class WiringTests(unittest.TestCase):
         self.assertEqual(self.conversation.conversation_timeout, 60)
 
 
+class RealApplicationTests(unittest.TestCase):
+    def test_main_polls_with_arguments_the_real_library_accepts(self):
+        """The fake application above takes anything; this one has the library's own signatures (autospec)."""
+        with mock.patch.object(Application, "run_polling", autospec=True) as polling:
+            bot_app.main()
+        polling.assert_called_once()
+
+
 class FakeUpdate:
     """Stands in for telegram.Update, whose attributes are read-only: on_error checks isinstance(update, Update)."""
 
     def __init__(self, **attributes):
         self.__dict__.update(attributes)
-
-
-class PollingErrorTests(unittest.TestCase):
-    def test_a_dropped_connection_is_one_warning_line_without_a_traceback(self):
-        with self.assertLogs(bot_app.logger, level="WARNING") as logged:
-            bot_app.on_polling_error(NetworkError("httpx.ReadError: "))
-        self.assertEqual([r.levelname for r in logged.records], ["WARNING"])
-        self.assertIsNone(logged.records[0].exc_info)
-        self.assertIn("httpx.ReadError", logged.records[0].getMessage())
-
-    def test_any_other_telegram_error_keeps_its_traceback(self):
-        error = TelegramError("Conflict: terminated by other getUpdates request")
-        with self.assertLogs(bot_app.logger, level="WARNING") as logged:
-            bot_app.on_polling_error(error)
-        self.assertEqual(logged.records[0].levelname, "ERROR")
-        self.assertIs(logged.records[0].exc_info[1], error)
 
 
 class ErrorHandlerTests(unittest.IsolatedAsyncioTestCase):
@@ -259,6 +249,27 @@ class ErrorHandlerTests(unittest.IsolatedAsyncioTestCase):
         update = self.update(text="/menu")
         await bot_app.on_error(update, make_context())
         self.assertIn("Inténtalo de nuevo", update.message.reply_text.await_args.args[0])
+
+    async def test_a_dropped_polling_connection_is_one_warning_line_without_a_traceback(self):
+        with self.assertLogs(bot_app.logger, level="WARNING") as logged:
+            await bot_app.on_error(None, make_context(error=NetworkError("httpx.ReadError: ")))
+        self.assertEqual([r.levelname for r in logged.records], ["WARNING"])
+        self.assertIsNone(logged.records[0].exc_info)
+        self.assertIn("httpx.ReadError", logged.records[0].getMessage())
+
+    async def test_any_other_failure_without_an_update_keeps_its_traceback(self):
+        error = RuntimeError("boom")
+        with self.assertLogs(bot_app.logger, level="WARNING") as logged:
+            await bot_app.on_error(None, make_context(error=error))
+        self.assertEqual(logged.records[0].levelname, "ERROR")
+        self.assertIs(logged.records[0].exc_info[1], error)
+
+    async def test_a_network_failure_while_answering_someone_is_still_an_error_with_its_apology(self):
+        update = self.update(text="/menu")
+        with self.assertLogs(bot_app.logger, level="WARNING") as logged:
+            await bot_app.on_error(update, make_context(error=NetworkError("down")))
+        self.assertEqual(logged.records[0].levelname, "ERROR")
+        update.message.reply_text.assert_awaited_once()
 
     async def test_a_failure_in_a_button_edits_the_message(self):
         update = self.update(callback=True)

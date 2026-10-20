@@ -44,5 +44,5 @@ def make_update(text=None, chat_type="private", chat_id=111, sender_id=111, is_b
     return SimpleNamespace(effective_chat=chat, effective_user=sender, message=message, callback_query=query)
 
 
-def make_context(app_user=None, bot_username="LaViciacionBot"):
-    return SimpleNamespace(bot=SimpleNamespace(username=bot_username), user_data={"app_user": app_user} if app_user else {}, error=None)
+def make_context(app_user=None, bot_username="LaViciacionBot", error=None):
+    return SimpleNamespace(bot=SimpleNamespace(username=bot_username), user_data={"app_user": app_user} if app_user else {}, error=error)
