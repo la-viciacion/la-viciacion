@@ -90,14 +90,13 @@ test('a secret one that is not unlocked still has the aura of its level, and say
   assert.doesNotMatch(special.textContent, /Secreto|Especial/);
 });
 
-test('a hidden one says who has it, and only that, so that it is seen to be possible', async () => {
-  const players = [{ user_id: 2, name: 'Bea' }, { user_id: 3, name: 'Cai' }];
-  installApi({ 'GET /group/achievements': [{ id: 6, hidden: true, unlocked_by_me: false, secret: true, special: 1, unlocked_by: 2, players }, LIST[1]] });
+test('a hidden one says how many have it, and only that, so that it is seen to be possible', async () => {
+  installApi({ 'GET /group/achievements': [{ id: 6, hidden: true, unlocked_by_me: false, secret: true, special: 1, unlocked_by: 2 }, LIST[1]] });
   await page.render({ main: main() });
   await settle();
   const card = document.querySelector('.ach-card.hidden');
-  assert.match(card.textContent, /Lo han conseguido 2: Bea y Cai/);
-  assert.doesNotMatch(card.textContent, /Último|\d{1,2}\/\d{1,2}|×/);  // no date, no times
+  assert.match(card.textContent, /Lo han conseguido 2\./);
+  assert.doesNotMatch(card.textContent, /Bea|Cai|Último|\d{1,2}\/\d{1,2}|×/);  // no names, no date, no times
   assert.match(document.querySelectorAll('.ach-card.hidden')[1].textContent, /Nadie lo ha conseguido todavía/);
 });
 

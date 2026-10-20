@@ -19,7 +19,7 @@ Los que se acumulan (horas totales, días jugados, juegos jugados, juegos comple
 
 ## Secretos y especiales
 
-- **Logro oculto**: algunos no enseñan nada hasta que los consigues, ni título, ni descripción, ni imagen. Cuando alguien desbloquea uno, al grupo solo le llega «Alguien ha desbloqueado un logro oculto»; el protagonista recibe el aviso completo en privado.
+- **Logro oculto**: algunos no enseñan nada hasta que los consigues, ni título, ni descripción, ni imagen. Cuando alguien desbloquea uno, al grupo solo le llega «Alguien ha desbloqueado un logro oculto» (por Telegram, por aviso push, en los Avisos y en la Actividad, también para quien lo tiene); no se dice ni cuál es ni quién lo ha sacado. El protagonista recibe el aviso completo en privado. En la lista de logros, quien no lo tiene solo ve cuántos lo han conseguido; los nombres los ven los que ya lo han desbloqueado.
 - **Especiales**: brillan con un **aura de color** según lo difíciles o raros que son: **plateado** (nivel 1, un esfuerzo claro o una coincidencia poco común), **dorado** (nivel 2, meses de constancia o algo muy raro) y **morado** (nivel 3, casi inalcanzable). Los especiales también son secretos, pero se ve su aura aunque estén bloqueados, para que sepas que hay algo por lo que luchar.
 
 ## Los del «mundo exterior»
