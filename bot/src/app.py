@@ -3,7 +3,7 @@ from routes.basic_routes import BasicRoutes
 from routes.my_routes import MyRoutes
 from routes.ranking_routes import RankingRoutes
 from telegram import BotCommand, BotCommandScopeChat, Update
-from telegram.error import NetworkError, TelegramError
+from telegram.error import NetworkError
 from telegram.ext import (
     Application,
     ApplicationBuilder,
@@ -48,19 +48,13 @@ if config.SENTRY_URL is not None and config.SENTRY_URL != "":
 
 
 
-def on_polling_error(error: TelegramError) -> None:
-    """A failed poll of Telegram, before the library retries by itself (waiting longer each time).
-
-    A dropped connection (httpx.ReadError and the like) is routine for long polling: one line, not a traceback.
-    The library's own callback would log every one of them as an error with its whole stack."""
-    if isinstance(error, NetworkError):
-        logger.warning(f"Polling Telegram failed, retrying: {error}")
-    else:
-        logger.error("Polling Telegram failed, retrying", exc_info=error)
-
-
 async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Any failure ends in a short message for the user instead of silence."""
+    if update is None and isinstance(context.error, NetworkError):
+        # the library reports a failed poll of Telegram here, with no update, and retries by itself: a dropped
+        # connection (httpx.ReadError and the like) is routine for long polling, so one line and not a traceback
+        logger.warning(f"Polling Telegram failed, retrying: {context.error}")
+        return
     logger.error("Unhandled error", exc_info=context.error)
     if not isinstance(update, Update):
         return
@@ -186,7 +180,7 @@ def main() -> None:
     app.add_handler(CommandHandler("start", utils.start))
     # not blocking: the AI can take a while to write it, and the bot keeps answering everybody else meanwhile
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, utils.welcome, block=False))
-    app.run_polling(error_callback=on_polling_error)
+    app.run_polling()
 
 
 if __name__ == "__main__":
