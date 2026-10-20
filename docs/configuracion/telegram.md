@@ -56,6 +56,10 @@ Cada jugador escribe `/activate` en el grupo. El bot guarda su identificador de 
 
 Esa es la **única escritura** del bot; todo lo demás que hace es consultar.
 
+### Bienvenida a quien entra al grupo
+
+Cuando alguien entra al grupo, el bot le da la bienvenida y le dice que escriba `/activate`. El texto lo escribe la IA (en tono gamer, con el prompt editable en **Notificaciones → IA → Bienvenida al grupo**, que tiene su propio interruptor) y siempre tiene que incluir `/activate`: si la IA está apagada, tarda más de la cuenta, falla o su texto no lo incluye, el bot manda un mensaje fijo. Crea la cuenta de la app de la persona **antes** de añadirla al grupo, para que pueda activarse nada más entrar.
+
 ## Qué avisos salen
 
 Desde **Notificaciones → Envíos** (ver el [panel](panel-admin.md)) controlas el interruptor general de notificaciones, el de los avisos a administradores (independiente), el **resumen semanal** (día y hora), el **resumen mensual** y el **anual** (apagados por defecto) y otros avisos programados. Los trabajos corren dentro de la API: no necesitas cron.

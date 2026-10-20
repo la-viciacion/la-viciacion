@@ -32,6 +32,8 @@ El bot solo atiende a los miembros del grupo con cuenta en la app. Para que te r
 2. Pide a un administrador que tu **usuario de la app** sea el mismo que tu `@usuario` de Telegram (da igual mayúsculas o minúsculas).
 3. Escribe `/activate` **en el grupo**. El bot guarda tu identificador de Telegram y, a partir de ahí, ya no importa que cambies de `@usuario`.
 
+Cuando entras al grupo, el bot te da la bienvenida y te recuerda este paso.
+
 También puedes poner tu **Telegram ID** a mano en **Perfil → Ajustes → Mis datos** y probarlo con **Enviar mensaje de prueba**.
 
 ### El menú del bot
