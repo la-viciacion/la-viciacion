@@ -8,6 +8,7 @@ from tests import support  # noqa: F401  (sets the environment and the path befo
 from tests.support import make_context, make_update, user
 
 from telegram import InlineKeyboardMarkup
+from telegram.error import NetworkError, TelegramError
 from telegram.ext import CallbackQueryHandler, CommandHandler, ConversationHandler, TypeHandler
 
 import app as bot_app
@@ -175,8 +176,9 @@ class WiringTests(unittest.TestCase):
             def add_handler(self, handler, group=0):
                 cls.handlers.append((handler, group))
 
-            def run_polling(self):
+            def run_polling(self, error_callback=None):
                 cls.registered["polled"] = True
+                cls.registered["polling_error_callback"] = error_callback
 
         cls.FakeApp = FakeApp
         with mock.patch.object(bot_app, "ApplicationBuilder", return_value=Builder()):
@@ -189,6 +191,7 @@ class WiringTests(unittest.TestCase):
         self.assertEqual(group, -1)
         self.assertIs(self.registered["error_handler"], bot_app.on_error)
         self.assertTrue(self.registered["polled"])
+        self.assertIs(self.registered["polling_error_callback"], bot_app.on_polling_error)
 
     def test_the_commands_are_registered_outside_the_conversation(self):
         commands = {tuple(h.commands) for h, _ in self.handlers if isinstance(h, CommandHandler)}
@@ -225,6 +228,22 @@ class FakeUpdate:
 
     def __init__(self, **attributes):
         self.__dict__.update(attributes)
+
+
+class PollingErrorTests(unittest.TestCase):
+    def test_a_dropped_connection_is_one_warning_line_without_a_traceback(self):
+        with self.assertLogs(bot_app.logger, level="WARNING") as logged:
+            bot_app.on_polling_error(NetworkError("httpx.ReadError: "))
+        self.assertEqual([r.levelname for r in logged.records], ["WARNING"])
+        self.assertIsNone(logged.records[0].exc_info)
+        self.assertIn("httpx.ReadError", logged.records[0].getMessage())
+
+    def test_any_other_telegram_error_keeps_its_traceback(self):
+        error = TelegramError("Conflict: terminated by other getUpdates request")
+        with self.assertLogs(bot_app.logger, level="WARNING") as logged:
+            bot_app.on_polling_error(error)
+        self.assertEqual(logged.records[0].levelname, "ERROR")
+        self.assertIs(logged.records[0].exc_info[1], error)
 
 
 class ErrorHandlerTests(unittest.IsolatedAsyncioTestCase):
