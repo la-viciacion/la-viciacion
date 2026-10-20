@@ -3,6 +3,7 @@ from routes.basic_routes import BasicRoutes
 from routes.my_routes import MyRoutes
 from routes.ranking_routes import RankingRoutes
 from telegram import BotCommand, BotCommandScopeChat, Update
+from telegram.error import NetworkError, TelegramError
 from telegram.ext import (
     Application,
     ApplicationBuilder,
@@ -45,6 +46,17 @@ if config.SENTRY_URL is not None and config.SENTRY_URL != "":
         release=None if config.APP_VERSION == "dev" else config.APP_VERSION,
     )
 
+
+
+def on_polling_error(error: TelegramError) -> None:
+    """A failed poll of Telegram, before the library retries by itself (waiting longer each time).
+
+    A dropped connection (httpx.ReadError and the like) is routine for long polling: one line, not a traceback.
+    The library's own callback would log every one of them as an error with its whole stack."""
+    if isinstance(error, NetworkError):
+        logger.warning(f"Polling Telegram failed, retrying: {error}")
+    else:
+        logger.error("Polling Telegram failed, retrying", exc_info=error)
 
 
 async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -174,7 +186,7 @@ def main() -> None:
     app.add_handler(CommandHandler("start", utils.start))
     # not blocking: the AI can take a while to write it, and the bot keeps answering everybody else meanwhile
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, utils.welcome, block=False))
-    app.run_polling()
+    app.run_polling(error_callback=on_polling_error)
 
 
 if __name__ == "__main__":
