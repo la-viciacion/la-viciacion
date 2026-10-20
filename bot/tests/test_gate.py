@@ -10,6 +10,7 @@ from tests.support import GROUP_ID, make_context, make_update, user
 from telegram.ext import ApplicationHandlerStop
 
 import utils.messages as msgs
+import utils.my_utils as my_utils
 from utils.my_utils import ApiError, MyUtils
 
 utils = MyUtils()
@@ -203,6 +204,52 @@ class ActivateTests(unittest.IsolatedAsyncioTestCase):
 
 def member(first_name="Marta", username="marta_gg", is_bot=False, telegram_id=777):
     return SimpleNamespace(id=telegram_id, first_name=first_name, username=username, is_bot=is_bot)
+
+
+class MenuOwnerTests(unittest.IsolatedAsyncioTestCase):
+    """In the group a menu's buttons are for who opened it: the conversation alone is per user, not per message."""
+
+    def setUp(self):
+        utils.forget_users()
+        self.fetch = mock.patch.object(utils, "fetch_json", return_value=USERS)
+        self.fetch.start()
+        self.addCleanup(self.fetch.stop)
+        self.context = make_context()
+        utils.remember_menu(self.context, GROUP_ID, 900, 111)  # Ana opened message 900
+
+    def press(self, sender_id, message_id=900, chat_type="supergroup", chat_id=GROUP_ID):
+        return make_update(callback=True, chat_type=chat_type, chat_id=chat_id, sender_id=sender_id, message_id=message_id)
+
+    async def test_the_owner_s_buttons_work(self):
+        await utils.gate(self.press(111), self.context)
+
+    async def test_somebody_else_gets_a_popup_and_the_message_is_not_touched(self):
+        update = self.press(333)  # an active, linked player, but not who opened it
+        with self.assertRaises(ApplicationHandlerStop):
+            await utils.gate(update, self.context)
+        update.callback_query.answer.assert_awaited_once_with(msgs.not_your_menu, show_alert=True)
+        update.callback_query.edit_message_text.assert_not_awaited()
+
+    async def test_a_menu_nobody_remembers_is_nobody_s(self):
+        for message_id in (901, None):
+            update = self.press(111, message_id=message_id)
+            with self.assertRaises(ApplicationHandlerStop):
+                await utils.gate(update, self.context)
+
+    async def test_the_same_message_id_in_another_chat_is_another_menu(self):
+        with self.assertRaises(ApplicationHandlerStop):
+            await utils.gate(self.press(111, chat_id=-100999), self.context)  # not the app's group: no answer at all
+
+    async def test_a_private_chat_has_nobody_else_to_stop(self):
+        await utils.gate(self.press(111, chat_type="private", chat_id=111, message_id=12345), make_context())
+
+    async def test_only_the_latest_menus_are_remembered(self):
+        context = make_context()
+        for i in range(my_utils.MENUS_KEPT + 5):
+            utils.remember_menu(context, GROUP_ID, i, 111)
+        self.assertEqual(len(context.bot_data["menu_owners"]), my_utils.MENUS_KEPT)
+        self.assertFalse(utils.menu_belongs_to(context, GROUP_ID, 0, 111))
+        self.assertTrue(utils.menu_belongs_to(context, GROUP_ID, my_utils.MENUS_KEPT + 4, 111))
 
 
 class WelcomeGateTests(unittest.IsolatedAsyncioTestCase):

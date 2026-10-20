@@ -179,7 +179,6 @@ def main() -> None:
         },
         fallbacks=[CommandHandler("menu", basic_routes.menu)],
         per_user=True,
-        conversation_timeout=60,
     )
     # group -1 runs before everything else; the gate stops what is not the app's group or users
     app.add_handler(TypeHandler(Update, utils.gate), group=-1)

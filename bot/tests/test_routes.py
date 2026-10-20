@@ -3,12 +3,13 @@ handlers of app.py agree (a button with no handler behind it would do nothing)."
 import re
 import unittest
 import warnings
+from types import SimpleNamespace
 from unittest import mock
 
 from tests import support  # noqa: F401  (sets the environment and the path before the bot is imported)
 from tests.support import make_context, make_update, user
 
-from telegram import Bot, CallbackQuery, InlineKeyboardMarkup, Update
+from telegram import Bot, CallbackQuery, InlineKeyboardMarkup, Message, Update
 from telegram.error import NetworkError
 from telegram.ext import Application, CallbackQueryHandler, CommandHandler, ConversationHandler, TypeHandler
 
@@ -217,9 +218,10 @@ class WiringTests(unittest.TestCase):
                     self.assertIsNotNone(literal)
                     self.assertIn(literal.group(1), shown, "a handler no button can trigger")
 
-    def test_the_conversation_is_per_user_and_expires(self):
+    def test_the_conversation_is_per_user_and_has_no_timeout(self):
         self.assertTrue(self.conversation.per_user)
-        self.assertEqual(self.conversation.conversation_timeout, 60)
+        # a timeout needs the library's JobQueue, which the image does not install: it would be ignored with a warning
+        self.assertIsNone(self.conversation.conversation_timeout)
 
 
 class RealApplicationTests(unittest.IsolatedAsyncioTestCase):
@@ -239,15 +241,48 @@ class RealApplicationTests(unittest.IsolatedAsyncioTestCase):
             patcher = mock.patch.object(Bot, name, new_callable=mock.AsyncMock)
             patcher.start()
             self.addCleanup(patcher.stop)
+        patcher = mock.patch.object(Bot, "username", new_callable=mock.PropertyMock, return_value="LaViciacionBot")
+        patcher.start()
+        self.addCleanup(patcher.stop)
         await app.initialize()
         self.addAsyncCleanup(app.shutdown)
+        self.bot = app.bot
         return app
 
-    def press(self, data, user_id=111, chat_id=111, chat_type="private"):
+    def press(self, data, user_id=111, chat_id=111, chat_type="private", message_id=5):
         return Update.de_json({"update_id": 1, "callback_query": {
             "id": "1", "chat_instance": "x", "data": data, "from": {"id": user_id, "is_bot": False, "first_name": "Ana"},
-            "message": {"message_id": 5, "date": 0, "chat": {"id": chat_id, "type": chat_type}},
-        }}, None)
+            "message": {"message_id": message_id, "date": 0, "chat": {"id": chat_id, "type": chat_type}},
+        }}, getattr(self, "bot", None))
+
+    def command(self, text, user_id, chat_id=-1001234567890, chat_type="supergroup"):
+        return Update.de_json({"update_id": 2, "message": {
+            "message_id": 50 + user_id, "date": 0, "text": text, "chat": {"id": chat_id, "type": chat_type},
+            "from": {"id": user_id, "is_bot": False, "first_name": "U%d" % user_id},
+            "entities": [{"type": "bot_command", "offset": 0, "length": len(text)}],
+        }}, getattr(self, "bot", None))
+
+    async def test_nobody_can_press_the_buttons_of_a_menu_somebody_else_opened_even_with_a_menu_of_their_own(self):
+        """The conversation is per chat and user, not per message: a second player with their own open menu must not
+        be able to drive the first one's message."""
+        from tests.support import GROUP_ID
+        users = [user(111, "ana", "Ana"), user(222, "bea", "Bea", user_id=2)]
+        with mock.patch.object(MyRoutes, "my_data", new_callable=mock.AsyncMock) as my_data:
+            app = await self.running()
+            menus = [SimpleNamespace(message_id=900), SimpleNamespace(message_id=901)]  # Ana's menu, Bea's
+            with mock.patch.object(bot_app.utils, "fetch_json", return_value=users),                     mock.patch.object(Message, "reply_text", new_callable=mock.AsyncMock, side_effect=menus) as reply,                     mock.patch.object(CallbackQuery, "answer", new_callable=mock.AsyncMock) as answer:
+                bot_app.utils.forget_users()
+                for player in (111, 222):  # both open a menu in the group
+                    await app.process_update(self.command("/menu", player, chat_id=GROUP_ID))
+                self.assertEqual(reply.await_count, 2)
+                # Ana's menu is message 900, Bea's 901. Bea presses a button of Ana's:
+                await app.process_update(self.press("my_data", user_id=222, chat_id=GROUP_ID, chat_type="supergroup", message_id=900))
+                my_data.assert_not_awaited()
+                self.assertTrue(any(c.kwargs.get("show_alert") for c in answer.await_args_list))
+                # ... but her own works, and so does Ana's on hers
+                await app.process_update(self.press("my_data", user_id=222, chat_id=GROUP_ID, chat_type="supergroup", message_id=901))
+                await app.process_update(self.press("my_data", user_id=111, chat_id=GROUP_ID, chat_type="supergroup", message_id=900))
+                self.assertEqual(my_data.await_count, 2)
 
     def test_main_polls_with_arguments_the_real_library_accepts(self):
         self.assertIsInstance(self.application(), Application)
