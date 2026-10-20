@@ -64,6 +64,6 @@ En cada logro de un jugador, **Editar** cambia la fecha en que lo consiguió y *
 
 - **Correo**: estado del correo de recuperación y correo de prueba (ver [Cuentas y acceso](cuentas.md)).
 - **Copia de seguridad**: **Descargar copia (.sql.gz)** genera un volcado completo de la base de datos (usuarios, sesiones, biblioteca, logros, ajustes y fotos). Ver [Operación](operacion.md).
-- **Registro**: qué ha cambiado cada administrador desde el panel, de lo más reciente a lo más antiguo, con un **Ver** que despliega cómo estaba antes y qué se envió. Se puede filtrar por administrador, sección y tipo de acción. Las contraseñas, tokens y claves nunca aparecen, y no registra lo que hacen los jugadores en su propia cuenta.
+- **Registro**: qué ha cambiado cada administrador desde el panel, de lo más reciente a lo más antiguo, con un **Ver** que despliega cómo estaba antes y qué se envió. Se puede filtrar por usuario, tipo (cambios del panel o accesos y seguridad), sección y tipo de acción. También anota los accesos y los intentos fallidos de cualquier cuenta (y cuándo una cuenta queda bloqueada unos minutos), los cambios y recuperaciones de contraseña, los cambios del propio email o id de Telegram y los intentos de entrar al panel sin ser administrador, con la dirección y el navegador desde los que se hicieron. Las contraseñas, tokens y claves nunca aparecen; lo demás que hacen los jugadores en su cuenta no se registra.
 
 ![El registro de cambios](../assets/screens/admin-audit.webp){ .screenshot }

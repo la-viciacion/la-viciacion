@@ -38,3 +38,20 @@ test('the filter offers the sections that keep their rows, capitalised', () => {
   assert.deepEqual(ENTITY_OPTIONS[0], ['users', 'Usuario']);
   assert.ok(ENTITY_OPTIONS.some(([value]) => value === 'timers'));
 });
+
+test('a security event reads as a sentence, whatever its path', () => {
+  const event = (name, over) => entry({ method: 'POST', path: '/api/v1/token', entity: 'auth', entity_id: null, event: name, username: 'ana', ...over });
+  assert.equal(describe(event('login')), 'Inició sesión');
+  assert.match(describe(event('login_failed', { detail: { locked: true } })), /bloqueada/);
+  assert.equal(describe(event('login_failed')), 'Intento de acceso fallido');
+  assert.match(describe(event('recovery_requested', { detail: { sent: true } })), /enlace enviado/);
+  assert.equal(describe(event('profile_updated', { detail: { account: 'ana', changed: { email: {} } } })), 'Cambió el email');
+  assert.equal(describe(event('profile_updated', { detail: { account: 'luis', changed: { email: {}, telegram_id: {} } } })), 'Cambió el email y el id de Telegram de luis');
+  assert.equal(describe(event('something_new')), 'something_new');
+});
+
+test('an event shows its data and where it came from', () => {
+  const parts = detailParts(entry({ event: 'login_failed', detail: { locked: true }, ip: '203.0.113.7', user_agent: 'Firefox' }));
+  assert.deepEqual(parts.map(([title]) => title), ['Datos', 'Desde']);
+  assert.equal(parts[1][1], '203.0.113.7 · Firefox');
+});

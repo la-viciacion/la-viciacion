@@ -350,17 +350,18 @@ ENTITIES.awards = {
 
 ENTITIES.audit = {
   label: 'Registro',
-  description: 'Qué ha cambiado cada administrador desde el panel y cómo estaba antes. Solo se anotan los cambios que salieron bien.',
+  description: 'Qué ha cambiado cada administrador desde el panel y cómo estaba antes (solo los cambios que salieron bien), y los accesos y cambios de contraseña de todas las cuentas, con la dirección desde la que se hicieron.',
   endpoint: '/manage/audit',
   filters: ['user'],
   selects: [
+    { key: 'events', label: 'Tipo', options: [['', 'Tipo: todos'], ['false', 'Cambios del panel'], ['true', 'Accesos y seguridad']] },
     { key: 'entity', label: 'Sección', options: [['', 'Sección: todas'], ...ENTITY_OPTIONS] },
     { key: 'method', label: 'Acción', options: [['', 'Acción: todas'], ['POST', 'Creaciones'], ['PATCH', 'Ediciones'], ['PUT', 'Cambios de ajustes'], ['DELETE', 'Borrados']] },
   ],
   readOnly: true,
   columns: [
     { label: 'Cuándo', render: (r) => formatTimestamp(r.created_at) },
-    { label: 'Admin', render: (r) => r.username },
+    { label: 'Usuario', render: (r) => r.username },
     { label: 'Acción', render: (r) => html`<strong>${describe(r)}</strong><div class="adm-sub">${r.method} ${r.path.replace(/^.*?\/manage/, '')}</div>` },
     {
       label: 'Detalle',

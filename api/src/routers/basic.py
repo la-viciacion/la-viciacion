@@ -11,6 +11,7 @@ from ..auth import get_db
 from ..config import Config
 from ..crud import users
 from ..database import models, schemas
+from ..utils import audit
 from ..utils import messages as msg
 from ..utils import password_reset
 from ..utils.my_utils import validate_password_requirements
@@ -100,6 +101,12 @@ def login_for_access_token(
         LOGIN_BY_ACCOUNT.fail(account)
         if client:
             LOGIN_BY_CLIENT.fail(client)
+        # the attempts refused afterwards (429) are not logged one by one, so a flood cannot fill the table:
+        # the failure that closes the door says so
+        locked = LOGIN_BY_ACCOUNT.retry_after(account) > 0 or bool(client and LOGIN_BY_CLIENT.retry_after(client) > 0)
+        audit.record_event(
+            request, "login_failed", status.HTTP_401_UNAUTHORIZED, username=account, detail={"locked": True} if locked else None
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
@@ -108,7 +115,9 @@ def login_for_access_token(
     LOGIN_BY_ACCOUNT.reset(account)
     if not user.is_active:
         # only after a correct password, so this does not reveal which accounts exist
+        audit.record_event(request, "login_disabled", status.HTTP_403_FORBIDDEN, user=user)
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=msg.ACCOUNT_DISABLED)
+    audit.record_event(request, "login", status.HTTP_200_OK, user=user)
     return auth.issue_token(user)
 
 
@@ -152,10 +161,15 @@ def forgot_password(
     if client:
         RECOVERY_BY_CLIENT.fail(client)
     user = users.get_user_by_login(db, body.login)
-    if user and user.is_active and user.email and RECOVERY_BY_ACCOUNT.retry_after(str(user.id)) == 0:
+    sent = bool(user and user.is_active and user.email and RECOVERY_BY_ACCOUNT.retry_after(str(user.id)) == 0)
+    if sent:
         RECOVERY_BY_ACCOUNT.fail(str(user.id))
         token = password_reset.create_token(db, user)
         background_tasks.add_task(password_reset.send_recovery_email, user.email, user.name, token)
+    # only the log says whether a link went out: the answer is the same either way
+    audit.record_event(
+        request, "recovery_requested", status.HTTP_202_ACCEPTED, user=user, username=body.login.strip().lower(), detail={"sent": sent}
+    )
     return {"message": msg.RECOVERY_REQUESTED}
 
 
@@ -170,5 +184,7 @@ def reset_password(request: Request, body: ResetPasswordBody, db: Session = Depe
     if not password_reset.reset_password(db, body.token, body.new_password):
         if client:
             RESET_LINK_FAILS.fail(client)
+        audit.record_event(request, "password_reset_failed", 400)
         raise HTTPException(status_code=400, detail=msg.RECOVERY_LINK_INVALID)
+    audit.record_event(request, "password_reset", 200, user=password_reset.user_of_token(db, body.token))
     return {"message": msg.PASSWORD_RESET_DONE}

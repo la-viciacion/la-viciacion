@@ -20,7 +20,7 @@ from .. import auth
 from ..auth import get_db
 from ..crud import data_export, games, scores, users, wishlist
 from ..database import models, schemas
-from ..utils import actions, images, places
+from ..utils import actions, audit, images, places
 from ..utils import messages as msg
 from ..utils import my_utils as utils
 from ..utils.logger import LogManager
@@ -98,6 +98,7 @@ def get_profile(
 
 @router.patch("/{username}/profile")
 def update_profile(
+    request: Request,
     username: str,
     body: schemas.UserProfileUpdate,
     active_user: models.User = Depends(auth.get_current_active_user),
@@ -121,7 +122,12 @@ def update_profile(
             raise HTTPException(status_code=400, detail=msg.EMAIL_IN_USE)
     if data.get("telegram_id") is not None and users.telegram_id_in_use(db, data["telegram_id"], exclude_user_id=user.id):
         raise HTTPException(status_code=400, detail=msg.TELEGRAM_ID_IN_USE)
+    previous = {key: getattr(user, key) for key in ("email", "telegram_id") if key in data}
     users.update_profile(db, user, data)
+    changed = {key: {"from": old, "to": data[key]} for key, old in previous.items() if old != data[key]}
+    if changed:
+        # the name and the other fields are not security relevant; the address that receives the recovery link is
+        audit.record_event(request, "profile_updated", 200, user=active_user, detail={"account": user.username, "changed": changed})
     return {
         "id": user.id,
         "username": user.username,
@@ -195,6 +201,7 @@ def update_settings(
 
 @router.post("/{username}/password")
 def change_password(
+    request: Request,
     username: str,
     body: schemas.PasswordChange,
     active_user: models.User = Depends(auth.get_current_active_user),
@@ -204,10 +211,12 @@ def change_password(
     auth.ensure_self(active_user, username)
     user = _target_user(db, active_user, username)
     if not auth.verify_password(body.current_password, user.password):
+        audit.record_event(request, "password_change_failed", 400, user=user)
         raise HTTPException(status_code=400, detail=msg.PASSWORD_WRONG)
     if not utils.validate_password_requirements(body.new_password):
         raise HTTPException(status_code=400, detail=msg.PASSWORD_RULES)
     users.change_password(db, user, body.new_password)
+    audit.record_event(request, "password_changed", 200, user=user)
     return {"message": "Contraseña actualizada"}
 
 

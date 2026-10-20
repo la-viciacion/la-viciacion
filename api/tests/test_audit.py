@@ -187,6 +187,39 @@ class RecordingTests(unittest.TestCase):
         self.assertEqual(self.rows(), [])
 
 
+class SecurityEventTests(unittest.TestCase):
+    def setUp(self):
+        self.db = make_session()
+        patcher = mock.patch.object(audit, "SessionLocal", lambda: contextlib.nullcontext(self.db))
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.request = mock.Mock(method="POST", client=mock.Mock(host="203.0.113.7"), headers={"user-agent": "Firefox"})
+        self.request.url.path = "/api/v1/token"
+
+    def only_row(self):
+        (row,) = self.db.query(models.AuditLog).all()
+        return audit.entry_out(row)
+
+    def test_an_event_keeps_who_where_from_and_what_happened(self):
+        audit.record_event(self.request, "login", 200, user=models.User(id=None, username="ana"))
+        row = self.only_row()
+        self.assertEqual((row["event"], row["username"], row["status"], row["entity"]), ("login", "ana", 200, "auth"))
+        self.assertEqual((row["ip"], row["user_agent"], row["path"]), ("203.0.113.7", "Firefox", "/api/v1/token"))
+
+    def test_without_an_account_the_typed_name_is_kept(self):
+        audit.record_event(self.request, "login_failed", 401, username="nobody", detail={"locked": True})
+        row = self.only_row()
+        self.assertEqual((row["user_id"], row["username"], row["detail"]), (None, "nobody", {"locked": True}))
+
+    def test_secrets_in_the_detail_are_hidden(self):
+        audit.record_event(self.request, "profile_updated", 200, username="ana", detail={"token": "abc"})
+        self.assertEqual(self.only_row()["detail"], {"token": "***"})
+
+    def test_a_failure_writing_it_is_swallowed(self):
+        with mock.patch.object(audit, "SessionLocal", side_effect=RuntimeError("db down")):
+            audit.record_event(self.request, "login", 200, username="ana")
+
+
 class EveryWriteOfThePanelIsAuditedTests(unittest.TestCase):
     def test_the_manage_router_uses_the_audited_route_and_its_dependency(self):
         self.assertIs(manage.router.route_class, audit.AuditedRoute)

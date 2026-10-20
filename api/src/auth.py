@@ -3,7 +3,7 @@ import hmac
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 
 import jwt
@@ -119,10 +119,14 @@ async def get_current_active_user(
 
 
 def require_admin(
-    current_user: Annotated[models.User, Depends(get_current_active_user)]
+    request: Request,
+    current_user: Annotated[models.User, Depends(get_current_active_user)],
 ):
-    """Dependency: only admins get through."""
+    """Dependency: only admins get through. A refusal is recorded in the audit log."""
     if not current_user.is_admin:
+        from .utils import audit  # audit depends on this module
+
+        audit.record_event(request, "admin_denied", status.HTTP_403_FORBIDDEN, user=current_user)
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail=messages.USER_NOT_ADMIN
         )
