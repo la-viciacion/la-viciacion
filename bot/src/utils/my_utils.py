@@ -1,5 +1,6 @@
 import asyncio
 import time
+from collections import OrderedDict
 
 import telegram
 import utils.access as access
@@ -17,6 +18,9 @@ config = Config()
 # The gate needs the accounts for every update: they are asked for at most once in this many seconds. A Telegram id
 # an admin links in the panel works after it at the latest; /activate forgets them at once.
 USERS_TTL_SECONDS = 60
+
+# The group's menus whose owner is remembered (the oldest are forgotten): a button is only for who opened its menu.
+MENUS_KEPT = 500
 
 # The API waits for the AI (up to 30 s) to write a welcome: a little more, so its answer is not cut off.
 WELCOME_TIMEOUT_SECONDS = 40
@@ -72,6 +76,19 @@ class MyUtils:
     def forget_users(self) -> None:
         self._users = None
 
+    def remember_menu(self, context: ContextTypes.DEFAULT_TYPE, chat_id: int, message_id: int, owner_id: int) -> None:
+        """Note who opened the menu in this message. The conversation is per chat and user, not per message, so
+        without this a second player with a menu of their own could drive somebody else's message.
+        It lives in `bot_data`: every module builds its own MyUtils, the application's data is the shared place."""
+        owners = context.bot_data.setdefault("menu_owners", OrderedDict())
+        owners[(chat_id, message_id)] = owner_id
+        owners.move_to_end((chat_id, message_id))
+        while len(owners) > MENUS_KEPT:
+            owners.popitem(last=False)
+
+    def menu_belongs_to(self, context: ContextTypes.DEFAULT_TYPE, chat_id: int, message_id: int | None, user_id: int) -> bool:
+        return context.bot_data.get("menu_owners", {}).get((chat_id, message_id)) == user_id
+
     async def gate(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Runs before every handler: nothing gets past it unless the chat and the sender are the app's.
 
@@ -90,6 +107,12 @@ class MyUtils:
             if message.new_chat_members:
                 return  # somebody joined the group: welcomed whether or not they are linked (the sender may be who added them)
             raise ApplicationHandlerStop  # group chatter is none of our business
+        if chat.type != access.PRIVATE and update.callback_query:
+            # in the group only who opened a menu may press its buttons (a menu from before a restart is nobody's)
+            message_id = getattr(update.callback_query.message, "message_id", None)
+            if not self.menu_belongs_to(context, chat.id, message_id, sender.id):
+                await self._refuse_button(update)
+                raise ApplicationHandlerStop
         if command in ("activate", "start"):
             # for people not linked yet, and only inside the app's group
             if chat.type != access.PRIVATE:
@@ -112,6 +135,13 @@ class MyUtils:
             await self._refuse(update, msgs.inactive)
             raise ApplicationHandlerStop
         context.user_data["app_user"] = app_user
+
+    async def _refuse_button(self, update: Update) -> None:
+        """A popup for whoever pressed; the message stays as it is."""
+        try:
+            await update.callback_query.answer(msgs.not_your_menu, show_alert=True)
+        except Exception as e:  # e.g. Telegram refuses to answer a very old query
+            logger.warning(f"Could not answer a button that is not theirs: {e}")
 
     async def _refuse(self, update: Update, text: str) -> None:
         """Tell the sender why (a pressed button just gets its spinner stopped)."""

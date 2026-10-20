@@ -27,6 +27,7 @@ activate_taken = (
     "Tu cuenta de la app ya está vinculada a otro usuario de Telegram. "
     + "Habla con un administrador."
 )
+not_your_menu = "Este menú ha caducado o no es tuyo. Escribe /menu para abrir uno nuevo."
 forbidden_in_group = "No estás activado. Escribe /activate para vincular tu cuenta de la app."
 
 

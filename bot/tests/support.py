@@ -31,18 +31,18 @@ def user(telegram_id=111, username="ana", name="Ana", is_active=1, user_id=1, **
     return {"id": user_id, "username": username, "name": name, "telegram_id": telegram_id, "is_active": is_active, **extra}
 
 
-def make_update(text=None, chat_type="private", chat_id=111, sender_id=111, is_bot=False, username="ana", first_name="Ana", callback=False, new_members=()):
+def make_update(text=None, chat_type="private", chat_id=111, sender_id=111, is_bot=False, username="ana", first_name="Ana", callback=False, new_members=(), message_id=5):
     """A Telegram update with an async `reply_text` and, for callbacks, a query with async `answer`/`edit_message_text`."""
     sender = SimpleNamespace(id=sender_id, is_bot=is_bot, username=username, first_name=first_name)
     chat = SimpleNamespace(id=chat_id, type=chat_type)
     message = None
     query = None
     if callback:
-        query = SimpleNamespace(answer=mock.AsyncMock(), edit_message_text=mock.AsyncMock())
+        query = SimpleNamespace(answer=mock.AsyncMock(), edit_message_text=mock.AsyncMock(), message=SimpleNamespace(message_id=message_id))
     else:
         message = SimpleNamespace(text=text, chat=chat, from_user=sender, reply_text=mock.AsyncMock(), new_chat_members=tuple(new_members))
     return SimpleNamespace(effective_chat=chat, effective_user=sender, message=message, callback_query=query)
 
 
 def make_context(app_user=None, bot_username="LaViciacionBot", error=None):
-    return SimpleNamespace(bot=SimpleNamespace(username=bot_username), user_data={"app_user": app_user} if app_user else {}, error=error)
+    return SimpleNamespace(bot=SimpleNamespace(username=bot_username), user_data={"app_user": app_user} if app_user else {}, bot_data={}, error=error)
