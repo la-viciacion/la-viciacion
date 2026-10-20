@@ -10,7 +10,9 @@ from telegram.ext import (
     CommandHandler,
     ContextTypes,
     ConversationHandler,
+    MessageHandler,
     TypeHandler,
+    filters,
 )
 from utils.config import Config
 from utils.my_utils import MyUtils
@@ -170,6 +172,8 @@ def main() -> None:
     app.add_handler(conv_handler)
     app.add_handler(CommandHandler("activate", utils.activate))
     app.add_handler(CommandHandler("start", utils.start))
+    # not blocking: the AI can take a while to write it, and the bot keeps answering everybody else meanwhile
+    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, utils.welcome, block=False))
     app.run_polling()
 
 

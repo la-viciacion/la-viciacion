@@ -31,7 +31,7 @@ def user(telegram_id=111, username="ana", name="Ana", is_active=1, user_id=1, **
     return {"id": user_id, "username": username, "name": name, "telegram_id": telegram_id, "is_active": is_active, **extra}
 
 
-def make_update(text=None, chat_type="private", chat_id=111, sender_id=111, is_bot=False, username="ana", first_name="Ana", callback=False):
+def make_update(text=None, chat_type="private", chat_id=111, sender_id=111, is_bot=False, username="ana", first_name="Ana", callback=False, new_members=()):
     """A Telegram update with an async `reply_text` and, for callbacks, a query with async `answer`/`edit_message_text`."""
     sender = SimpleNamespace(id=sender_id, is_bot=is_bot, username=username, first_name=first_name)
     chat = SimpleNamespace(id=chat_id, type=chat_type)
@@ -40,7 +40,7 @@ def make_update(text=None, chat_type="private", chat_id=111, sender_id=111, is_b
     if callback:
         query = SimpleNamespace(answer=mock.AsyncMock(), edit_message_text=mock.AsyncMock())
     else:
-        message = SimpleNamespace(text=text, chat=chat, from_user=sender, reply_text=mock.AsyncMock())
+        message = SimpleNamespace(text=text, chat=chat, from_user=sender, reply_text=mock.AsyncMock(), new_chat_members=tuple(new_members))
     return SimpleNamespace(effective_chat=chat, effective_user=sender, message=message, callback_query=query)
 
 
