@@ -30,6 +30,14 @@ activate_taken = (
 forbidden_in_group = "No estás activado. Escribe /activate para vincular tu cuenta de la app."
 
 
+def welcome(name, username):
+    """The fixed welcome, for when the AI's is not available. Telegram's @username is what /activate matches."""
+    how = "escribe /activate aquí en el grupo"
+    if not username:
+        how = "primero ponte un @usuario en los ajustes de Telegram y " + how
+    return f"🎮 ¡Nuevo jugador en la partida! Te damos la bienvenida a La Viciación, {name}. Para desbloquear el bot {how}. Luego, /menu y a farmear horas."
+
+
 def start(name, in_group):
     text = f"Hola {name}, soy el bot de 'La Viciación'. Escribe /menu para consultar tus estadísticas y los rankings."
     if in_group:

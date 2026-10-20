@@ -18,6 +18,9 @@ config = Config()
 # an admin links in the panel works after it at the latest; /activate forgets them at once.
 USERS_TTL_SECONDS = 60
 
+# The API waits for the AI (up to 30 s) to write a welcome: a little more, so its answer is not cut off.
+WELCOME_TIMEOUT_SECONDS = 40
+
 
 class ApiError(Exception):
     """The API did not give a usable answer."""
@@ -40,16 +43,17 @@ class MyUtils:
         self._users = None
         self._users_at = 0.0
 
-    def make_request(self, method, url, json=None):
-        return config.request(method, url, json=json)
+    def make_request(self, method, url, json=None, timeout=None):
+        return config.request(method, url, json=json, **({"timeout": timeout} if timeout else {}))
 
-    async def fetch_json(self, method, url, json=None):
+    async def fetch_json(self, method, url, json=None, timeout=None):
         """Request the API and return the parsed body; raise ApiError if it did not answer 200 with JSON.
+        `timeout` (seconds) is only for what is slower than a query, like the text the AI writes.
 
         It does not log: the one report is the traceback the error handler writes, so a failure is not counted twice.
 
         The request runs in a thread: `requests` blocks, and one event loop serves every chat of the bot."""
-        response = await asyncio.to_thread(self.make_request, method, url, json=json)
+        response = await asyncio.to_thread(self.make_request, method, url, json=json, **({"timeout": timeout} if timeout else {}))
         if response.status_code != 200:
             raise ApiError(response.status_code, f"{method} {url}: {response.text[:200]}")
         try:
@@ -83,6 +87,8 @@ class MyUtils:
         if not access.chat_allowed(chat.type, chat.id, config.TELEGRAM_GROUP_ID):
             raise ApplicationHandlerStop
         if chat.type != access.PRIVATE and message and command is None:
+            if message.new_chat_members:
+                return  # somebody joined the group: welcomed whether or not they are linked (the sender may be who added them)
             raise ApplicationHandlerStop  # group chatter is none of our business
         if command in ("activate", "start"):
             # for people not linked yet, and only inside the app's group
@@ -161,6 +167,28 @@ class MyUtils:
                 access.ACTIVATE_TAKEN: msgs.activate_taken,
             }[outcome]
         await update.message.reply_text(text)
+
+    async def welcome(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Greet whoever joined the group and tell them to /activate. The text is the AI's (written by the API);
+        the bot's own when the AI is off or the API does not answer: a welcome must always go out.
+
+        Only reached from the app's group: the gate refuses a join anywhere else."""
+        for member in update.message.new_chat_members:
+            if member.is_bot:
+                continue
+            name = (member.first_name or "").strip()[:64] or "jugador"
+            try:
+                reply = await self.fetch_json(
+                    "POST",
+                    config.API_URL + "/manage/welcome-message",
+                    json={"name": name, "username": member.username},
+                    timeout=WELCOME_TIMEOUT_SECONDS,
+                )
+                text = reply.get("message")
+            except Exception as e:
+                logger.error(f"Could not get the AI's welcome for {member.id}: {e}", exc_info=True)
+                text = None
+            await update.message.reply_text(text or msgs.welcome(name, member.username))
 
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         in_group = update.message.chat.type != access.PRIVATE

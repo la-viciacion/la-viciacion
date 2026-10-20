@@ -1,6 +1,7 @@
 """The access gate and /activate: who gets past, what each refusal says, and what /activate writes."""
 import threading
 import unittest
+from types import SimpleNamespace
 from unittest import mock
 
 from tests import support  # noqa: F401  (sets the environment and the path before the bot is imported)
@@ -200,6 +201,92 @@ class ActivateTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("/activate", text)
 
 
+def member(first_name="Marta", username="marta_gg", is_bot=False, telegram_id=777):
+    return SimpleNamespace(id=telegram_id, first_name=first_name, username=username, is_bot=is_bot)
+
+
+class WelcomeGateTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        utils.forget_users()
+        self.fetch = mock.patch.object(utils, "fetch_json", return_value=USERS)
+        self.fetch.start()
+        self.addCleanup(self.fetch.stop)
+
+    async def test_a_join_in_the_app_s_group_passes_whoever_added_them_and_asks_nothing(self):
+        update = make_update(None, chat_type="supergroup", chat_id=GROUP_ID, sender_id=999, new_members=[member()])
+        context = make_context()
+        await utils.gate(update, context)  # the sender is not linked: still no refusal
+        update.message.reply_text.assert_not_awaited()
+        self.assertEqual(utils.fetch_json.call_count, 0)
+
+    async def test_a_join_anywhere_else_gets_no_answer(self):
+        update = make_update(None, chat_type="supergroup", chat_id=-100999, new_members=[member()])
+        with self.assertRaises(ApplicationHandlerStop):
+            await utils.gate(update, make_context())
+
+    async def test_chatter_without_new_members_is_still_ignored(self):
+        update = make_update("anyone up for Hades?", chat_type="supergroup", chat_id=GROUP_ID)
+        with self.assertRaises(ApplicationHandlerStop):
+            await utils.gate(update, make_context())
+
+
+class WelcomeTests(unittest.IsolatedAsyncioTestCase):
+    async def welcome(self, members, reply=None, error=None):
+        update = make_update(None, chat_type="supergroup", chat_id=GROUP_ID, new_members=members)
+        calls = []
+
+        def fetch(method, url, json=None, timeout=None):
+            calls.append((method, url, json, timeout))
+            if error:
+                raise error
+            return reply
+
+        with mock.patch.object(utils, "fetch_json", side_effect=fetch):
+            await utils.welcome(update, make_context())
+        return [c.args[0] for c in update.message.reply_text.await_args_list], calls
+
+    async def test_it_sends_the_text_the_api_got_from_the_ai(self):
+        texts, calls = await self.welcome([member()], reply={"message": "Hola Marta, escribe /activate"})
+        self.assertEqual(texts, ["Hola Marta, escribe /activate"])
+        self.assertEqual(calls[0][0:2], ("POST", mock.ANY))
+        self.assertTrue(calls[0][1].endswith("/manage/welcome-message"))
+        self.assertEqual(calls[0][2], {"name": "Marta", "username": "marta_gg"})
+        self.assertGreater(calls[0][3], 30)  # the API may wait for the AI that long
+
+    async def test_without_an_ai_text_it_sends_the_fixed_welcome_which_says_to_activate(self):
+        texts, _ = await self.welcome([member()], reply={"message": None})
+        self.assertEqual(texts, [msgs.welcome("Marta", "marta_gg")])
+        self.assertIn("/activate", texts[0])
+
+    async def test_when_the_api_fails_the_welcome_still_goes_out(self):
+        texts, _ = await self.welcome([member()], error=ApiError(502))
+        self.assertEqual(texts, [msgs.welcome("Marta", "marta_gg")])
+
+    async def test_someone_without_a_username_is_told_to_set_one_first(self):
+        with_username = msgs.welcome("Marta", "marta_gg")
+        without = msgs.welcome("Marta", None)
+        self.assertNotIn("@usuario", with_username)
+        self.assertIn("@usuario", without)
+        self.assertLess(without.index("@usuario"), without.index("/activate"))
+
+    async def test_bots_are_not_welcomed_and_each_person_gets_their_own_welcome(self):
+        texts, calls = await self.welcome(
+            [member("Marta"), member("Otro bot", is_bot=True), member("Pepe", username=None, telegram_id=888)],
+            reply={"message": None},
+        )
+        self.assertEqual(texts, [msgs.welcome("Marta", "marta_gg"), msgs.welcome("Pepe", None)])
+        self.assertEqual([c[2]["name"] for c in calls], ["Marta", "Pepe"])
+
+    async def test_a_long_or_empty_name_is_cut_to_what_the_api_accepts(self):
+        _, calls = await self.welcome([member("x" * 100), member("  ")], reply={"message": None})
+        self.assertEqual([len(c[2]["name"]) for c in calls], [64, len("jugador")])
+
+    async def test_a_welcome_is_not_a_write(self):
+        _, calls = await self.welcome([member()], reply={"message": None})
+        self.assertEqual({c[0] for c in calls}, {"POST"})
+        self.assertEqual({c[1].rsplit("/", 1)[1] for c in calls}, {"welcome-message"})
+
+
 class FetchJsonTests(unittest.IsolatedAsyncioTestCase):
     def response(self, status=200, payload=None, text="body", json_error=False):
         response = mock.Mock(status_code=status, text=text)
@@ -225,6 +312,11 @@ class FetchJsonTests(unittest.IsolatedAsyncioTestCase):
         with mock.patch.object(utils, "make_request", return_value=self.response(json_error=True)):
             with self.assertRaises(ApiError):
                 await utils.fetch_json("GET", "http://api/x")
+
+    async def test_a_slower_request_can_be_given_its_own_timeout(self):
+        with mock.patch.object(utils, "make_request", return_value=self.response(payload={})) as request:
+            await utils.fetch_json("POST", "http://api/x", json={}, timeout=40)
+        request.assert_called_once_with("POST", "http://api/x", json={}, timeout=40)
 
     async def test_the_request_does_not_block_the_event_loop(self):
         seen = []
