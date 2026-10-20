@@ -54,7 +54,7 @@ El compose publica la app en el puerto `3000` por HTTP, y la API y la base de da
 
 - `FRONT_HOST_IP`/`FRONT_HOST_PORT` cambian dónde se publica la app (por ejemplo, solo en la IP interna del servidor).
 - Pon `CORS_ORIGINS` con el origen público y `PUBLIC_URL` con la dirección real.
-- Con proxy, rellena `FORWARDED_ALLOW_IPS` con su IP para que el límite de intentos de acceso por cliente funcione.
+- Con proxy, pon en `FORWARDED_ALLOW_IPS` el rango de `LAVI_SUBNET` (la red de los contenedores) para que el registro de auditoría y el límite de intentos de acceso por cliente vean la IP real. Si producción y desarrollo comparten servidor, cada uno necesita su propio `LAVI_SUBNET`.
 - **No publiques nunca la API ni la base de datos directamente.**
 
 ## La base de datos
