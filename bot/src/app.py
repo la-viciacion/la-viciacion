@@ -1,9 +1,12 @@
+import warnings
+
 import telegram
 from routes.basic_routes import BasicRoutes
 from routes.my_routes import MyRoutes
 from routes.ranking_routes import RankingRoutes
 from telegram import BotCommand, BotCommandScopeChat, Update
 from telegram.error import NetworkError
+from telegram.warnings import PTBUserWarning
 from telegram.ext import (
     Application,
     ApplicationBuilder,
@@ -83,6 +86,11 @@ async def post_init(application: Application):
         )
     except Exception as e:  # e.g. the bot is not in the group yet
         logger.warning(f"Could not list /activate in the group: {e}")
+
+
+# The menu is per user and not per message on purpose (per_message=True cannot mix the /menu command with buttons),
+# so the library's reminder about it, printed at every start, says nothing new.
+warnings.filterwarnings("ignore", message=r".*per_message=False.*", category=PTBUserWarning)
 
 
 def main() -> None:

@@ -2,6 +2,7 @@
 handlers of app.py agree (a button with no handler behind it would do nothing)."""
 import re
 import unittest
+import warnings
 from unittest import mock
 
 from tests import support  # noqa: F401  (sets the environment and the path before the bot is imported)
@@ -227,6 +228,19 @@ class RealApplicationTests(unittest.TestCase):
         with mock.patch.object(Application, "run_polling", autospec=True) as polling:
             bot_app.main()
         polling.assert_called_once()
+
+
+class StartupWarningsTests(unittest.TestCase):
+    def test_building_the_conversation_does_not_print_the_per_message_reminder(self):
+        # the test runner puts its own "show everything" filter first: keep only the one app.py installs
+        own = [f for f in warnings.filters if f[0] == "ignore" and f[1] is not None and "per_message" in f[1].pattern]
+        self.assertTrue(own, "app.py no longer silences the reminder")
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.resetwarnings()
+            warnings.filters[:] = own + [("always", None, Warning, None, 0)]
+            with mock.patch.object(Application, "run_polling", autospec=True):
+                bot_app.main()
+        self.assertEqual([str(w.message) for w in caught if "per_message" in str(w.message)], [])
 
 
 class FakeUpdate:
