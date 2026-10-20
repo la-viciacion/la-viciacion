@@ -184,6 +184,8 @@ def main() -> None:
     # group -1 runs before everything else; the gate stops what is not the app's group or users
     app.add_handler(TypeHandler(Update, utils.gate), group=-1)
     app.add_handler(conv_handler)
+    # after the conversation, in the same group: it only gets the buttons the conversation did not take
+    app.add_handler(CallbackQueryHandler(basic_routes.expired))
     app.add_handler(CommandHandler("activate", utils.activate))
     app.add_handler(CommandHandler("start", utils.start))
     # not blocking: the AI can take a while to write it, and the bot keeps answering everybody else meanwhile

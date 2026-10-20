@@ -8,7 +8,7 @@ from unittest import mock
 from tests import support  # noqa: F401  (sets the environment and the path before the bot is imported)
 from tests.support import make_context, make_update, user
 
-from telegram import InlineKeyboardMarkup
+from telegram import Bot, CallbackQuery, InlineKeyboardMarkup, Update
 from telegram.error import NetworkError
 from telegram.ext import Application, CallbackQueryHandler, CommandHandler, ConversationHandler, TypeHandler
 
@@ -222,12 +222,69 @@ class WiringTests(unittest.TestCase):
         self.assertEqual(self.conversation.conversation_timeout, 60)
 
 
-class RealApplicationTests(unittest.TestCase):
-    def test_main_polls_with_arguments_the_real_library_accepts(self):
-        """The fake application above takes anything; this one has the library's own signatures (autospec)."""
-        with mock.patch.object(Application, "run_polling", autospec=True) as polling:
+class RealApplicationTests(unittest.IsolatedAsyncioTestCase):
+    """The bot as the library runs it: its own handlers on a real Application, real updates through process_update."""
+
+    def application(self):
+        """main() on the real Application (run_polling has the library's own signature: autospec), handed back."""
+        built = []
+        with mock.patch.object(Application, "run_polling", autospec=True, side_effect=lambda app, **kw: built.append(app)):
             bot_app.main()
-        polling.assert_called_once()
+        return built[0]
+
+    async def running(self):
+        """The real application, initialized as the library does it except for the one request to Telegram."""
+        app = self.application()
+        for name in ("initialize", "shutdown"):
+            patcher = mock.patch.object(Bot, name, new_callable=mock.AsyncMock)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        await app.initialize()
+        self.addAsyncCleanup(app.shutdown)
+        return app
+
+    def press(self, data, user_id=111, chat_id=111, chat_type="private"):
+        return Update.de_json({"update_id": 1, "callback_query": {
+            "id": "1", "chat_instance": "x", "data": data, "from": {"id": user_id, "is_bot": False, "first_name": "Ana"},
+            "message": {"message_id": 5, "date": 0, "chat": {"id": chat_id, "type": chat_type}},
+        }}, None)
+
+    def test_main_polls_with_arguments_the_real_library_accepts(self):
+        self.assertIsInstance(self.application(), Application)
+
+    def test_the_expired_buttons_handler_comes_after_the_conversation_in_the_same_group(self):
+        handlers = self.application().handlers
+        group = next(g for g, hs in handlers.items() if any(isinstance(h, ConversationHandler) for h in hs))
+        in_group = handlers[group]
+        conversation = next(h for h in in_group if isinstance(h, ConversationHandler))
+        expired = next(h for h in in_group if isinstance(h, CallbackQueryHandler) and h.callback == bot_app.basic_routes.expired)
+        self.assertLess(in_group.index(conversation), in_group.index(expired))
+        self.assertIsNone(expired.pattern)  # it takes any button the conversation left
+
+    async def test_a_button_nobody_holds_is_answered_with_a_popup_and_the_message_is_left_alone(self):
+        app = await self.running()
+        with mock.patch.object(bot_app.utils, "fetch_json", return_value=[user(111, "ana", "Ana")]),                 mock.patch.object(CallbackQuery, "answer", new_callable=mock.AsyncMock) as answer,                 mock.patch.object(CallbackQuery, "edit_message_text", new_callable=mock.AsyncMock) as edit:
+            bot_app.utils.forget_users()
+            await app.process_update(self.press("my_data"))  # a menu that expired: no conversation is open
+        answer.assert_awaited_once()
+        self.assertTrue(answer.await_args.kwargs["show_alert"])
+        self.assertIn("/menu", answer.await_args.args[0])
+        edit.assert_not_awaited()
+
+    async def test_the_gate_still_comes_first_for_buttons(self):
+        app = await self.running()
+        with mock.patch.object(bot_app.utils, "fetch_json", return_value=[user(111, "ana", "Ana")]),                 mock.patch.object(CallbackQuery, "answer", new_callable=mock.AsyncMock) as answer:
+            bot_app.utils.forget_users()
+            await app.process_update(self.press("my_data", user_id=999))  # not linked: the gate stops it, no popup text
+        answer.assert_awaited_once_with()
+
+
+class ExpiredButtonTests(unittest.IsolatedAsyncioTestCase):
+    async def test_a_refusal_from_telegram_is_swallowed_it_is_the_end_of_the_line(self):
+        update = make_update(callback=True)
+        update.callback_query.answer.side_effect = RuntimeError("query is too old")
+        await BasicRoutes().expired(update, make_context())  # does not raise: the error handler would apologise for nothing
+        update.callback_query.edit_message_text.assert_not_awaited()
 
 
 class StartupWarningsTests(unittest.TestCase):
