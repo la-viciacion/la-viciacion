@@ -85,6 +85,25 @@ No hables de logros ni de horas jugadas: solo se trata de un estreno.
 El texto debe ser Markdown válido: deja los nombres de los juegos con el formato del mensaje original (*así*).
 """
 
+WELCOME_PROMPT = """
+Escribe el mensaje con el que el bot de 'La Viciación' da la bienvenida a alguien que acaba de entrar al grupo de
+Telegram de unos amigos que juegan a videojuegos. El mensaje proporcionado indica su nombre y su @usuario de Telegram
+(o que no tiene).
+
+Tono gracioso y gamer, entre colegas, con alguna referencia de videojuegos (nueva partida, respawn, loot, tutorial,
+speedrun, lag...). Saluda por su nombre.
+
+Lo más importante, que no puede faltar ni quedar escondido tras la broma: para poder usar el bot tiene que escribir el
+comando /activate en este mismo grupo. Escríbelo tal cual, /activate, sin comillas ni formato. Después, /menu le
+enseña sus estadísticas y los rankings. Si el mensaje indica que no tiene @usuario, dile que primero se ponga uno en
+los ajustes de Telegram; si lo tiene, no lo menciones.
+
+No adivines el género por el nombre: usa fórmulas neutras ("te damos la bienvenida") y evita adjetivos con género
+("bienvenido/a", "listo/a"). No te inventes funciones del bot ni cifras.
+
+Sé breve: dos o tres frases y unos 250 caracteres como máximo. Texto plano, sin Markdown (los emojis están bien).
+"""
+
 
 @dataclass(frozen=True)
 class Use:
@@ -133,5 +152,10 @@ USES: dict[str, Use] = {
         "Sale un juego deseado",
         "Aviso al grupo, el día antes, cuando sale un juego que alguien tiene en su lista de deseados.",
         WISHLIST_RELEASE_PROMPT,
+    ),
+    "welcome": Use(
+        "Bienvenida al grupo",
+        "Mensaje del bot cuando alguien entra al grupo de Telegram: le da la bienvenida y le dice que escriba /activate.",
+        WELCOME_PROMPT,
     ),
 }
