@@ -63,7 +63,8 @@ Sin las **tres** variables de la IA, esta no escribe nada y los avisos salen com
 | `FRONT_HOST_IP` / `FRONT_HOST_PORT` | Dirección y puerto con los que se publica la app (por defecto `0.0.0.0:3000`). |
 | `API_HOST_IP` / `API_HOST_PORT` | Lo mismo para la API (por defecto `127.0.0.1:5000`). |
 | `DB_HOST_IP` / `DB_HOST_PORT` | Lo mismo para la base de datos (por defecto `127.0.0.1:3307`). |
-| `FORWARDED_ALLOW_IPS` | Proxies en los que confía la API para saber la IP real del cliente. Sin esto, el límite de intentos de acceso por IP no se aplica detrás de un proxy. |
+| `LAVI_SUBNET` | Rango de la red de Docker que comparten los contenedores (por defecto `192.168.64.0/20`). Está fijo para que `FORWARDED_ALLOW_IPS` pueda nombrarlo. Dos entornos en el mismo servidor (producción y desarrollo) necesitan rangos distintos. Docker solo lo lee al crear la red, no en un redespliegue normal. |
+| `FORWARDED_ALLOW_IPS` | Proxies en los que confía la API para saber la IP real del cliente: direcciones o redes separadas por comas. Detrás del nginx del front, pon el rango entero de `LAVI_SUBNET`. Sin esto, ni el registro de auditoría ni el límite de intentos de acceso por IP ven al cliente real. Nunca `*`. |
 | `DB_DATA` | Dónde guarda MariaDB sus ficheros. Vacío: carpeta `./db/data` (Linux). `laviciacion_db_data`: un volumen de Docker (**Windows**). |
 | `LAVI_VERSION` | Versión de las imágenes publicadas que se descargan (por defecto `latest`). |
 

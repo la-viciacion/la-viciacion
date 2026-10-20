@@ -19,6 +19,7 @@ EXTERNAL = {
     "LAVI_VERSION",  # docker-compose.yml (image tag)
     "API_UPSTREAM",  # docker-compose.yml, rendered into the front's nginx config
     "DNS_RESOLVER",  # same
+    "LAVI_SUBNET",  # docker-compose.yml (range of the network)
     "FRONT_HOST_IP", "FRONT_HOST_PORT", "API_HOST_IP", "API_HOST_PORT", "DB_HOST_IP", "DB_HOST_PORT",  # docker-compose.yml (published ports)
 }
 # Set when the image is built (a build arg of release.yml), not by whoever deploys it.
