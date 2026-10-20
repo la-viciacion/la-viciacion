@@ -9,6 +9,10 @@ queried for a caller who is not an admin): it keeps the actor, the JSON body and
 known row, how that row was before. `AuditedRoute` then writes the row once the handler has answered with a
 success. A failed request changed nothing, so it leaves no trace; a failure to write the log never fails the request.
 
+The same table also keeps the security events of every account (`record_event`: logins, failed logins, password
+changes and recoveries, a change of one's own email or Telegram id, a refused access to the panel). Those rows
+have an `event`, the address and the browser they came from, and no panel path.
+
 What is stored is for people to read: passwords, tokens and keys are replaced by `***`, long texts are cut, and
 the pictures of a user or an achievement are left out.
 """
@@ -89,6 +93,15 @@ def snapshot(db, entity: str | None, entity_id: str | None) -> dict | None:
     return redact({c: _plain(getattr(row, c)) for c in columns})
 
 
+def client_address(request: Request) -> str | None:
+    """The caller's address as uvicorn reports it (the real one behind nginx only if the proxy is trusted)."""
+    return request.client.host[:45] if request.client else None
+
+
+def _user_agent(request: Request) -> str | None:
+    return (request.headers.get("user-agent") or "")[:255] or None
+
+
 def _plain(value):
     return value.isoformat() if isinstance(value, (datetime.date, datetime.datetime)) else value
 
@@ -127,6 +140,9 @@ def entry_out(row: models.AuditLog) -> dict:
         "entity_id": row.entity_id,
         "status": row.status,
         "detail": detail,
+        "event": row.event,
+        "ip": row.ip,
+        "user_agent": row.user_agent,
     }
 
 
@@ -190,6 +206,32 @@ def write(pending: Pending, request: Request, status: int, created_id: str | Non
                 entity_id=entity_id or created_id,
                 status=status,
                 detail=detail_json(pending.body, pending.before, request.url.query),
+                ip=client_address(request),
+                user_agent=_user_agent(request),
+            ))
+            db.commit()
+    except Exception as e:
+        logger.error("Error writing the audit log: " + str(e), exc_info=True)
+
+
+def record_event(request: Request, event: str, status: int, user=None, username: str | None = None, detail: dict | None = None) -> None:
+    """Add the row of a security event. `user` is the account it is about (its name is kept even if the account is
+    deleted); without one, `username` is what was typed (a failed login for an account that may not exist).
+    Never raises: the answer to the request does not depend on the log."""
+    try:
+        text = json.dumps(redact(detail), ensure_ascii=False, default=str) if detail else None
+        with SessionLocal() as db:
+            db.add(models.AuditLog(
+                user_id=user.id if user else None,
+                username=(user.username if user else username or "")[:255],
+                method=request.method,
+                path=request.url.path[:255],
+                entity="auth",
+                status=status,
+                detail=text,
+                event=event,
+                ip=client_address(request),
+                user_agent=_user_agent(request),
             ))
             db.commit()
     except Exception as e:

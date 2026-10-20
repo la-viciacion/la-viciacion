@@ -147,11 +147,12 @@ def list_audit(
     user_id: Optional[int] = None,
     entity: Optional[str] = Query(None, max_length=50),
     method: Optional[str] = Query(None, pattern="^(POST|PUT|PATCH|DELETE)$"),
+    events: Optional[bool] = Query(None, description="true: only the security events; false: only the panel writes"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
-    """What the admins changed, newest first."""
+    """What the admins changed and the security events of every account, newest first."""
     q = db.query(models.AuditLog)
     if user_id is not None:
         q = q.filter(models.AuditLog.user_id == user_id)
@@ -159,6 +160,8 @@ def list_audit(
         q = q.filter(models.AuditLog.entity == entity)
     if method:
         q = q.filter(models.AuditLog.method == method)
+    if events is not None:
+        q = q.filter(models.AuditLog.event.isnot(None) if events else models.AuditLog.event.is_(None))
     total = q.count()
     rows = q.order_by(models.AuditLog.id.desc()).limit(limit).offset(offset).all()
     return {"total": total, "items": [audit.entry_out(r) for r in rows]}

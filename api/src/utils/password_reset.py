@@ -89,6 +89,12 @@ def reset_password(db: Session, token: str, new_password: str) -> bool:
     return True
 
 
+def user_of_token(db: Session, token: str) -> models.User | None:
+    """The account a link was issued for (also after it was used), for the audit log."""
+    row = db.query(models.PasswordReset).filter(models.PasswordReset.token_hash == hash_token(token)).first()
+    return db.get(models.User, row.user_id) if row else None
+
+
 def recovery_link(token: str) -> str:
     # in the fragment: it is never sent to a server or left in a proxy's access log
     return f"{config.PUBLIC_URL}/#/reset-password?token={token}"

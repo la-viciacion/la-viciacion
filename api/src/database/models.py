@@ -339,7 +339,7 @@ class ChallengeOptOut(Base):
 
 
 class AuditLog(Base):
-    """What an admin changed from the admin panel (see utils/audit.py): one row per successful write."""
+    """The audit log (see utils/audit.py): one row per successful write of the admin panel, and one per security event."""
 
     __tablename__ = "audit_log"
 
@@ -356,3 +356,7 @@ class AuditLog(Base):
     status = Column(SmallInteger, nullable=False)
     # JSON: {"before": the row as it was, "body": what was sent (secrets hidden), "query": ...}
     detail = Column(Text, nullable=True)
+    # what happened when the row is not a panel write ("login_failed"...); NULL for a panel write
+    event = Column(String(40), nullable=True, index=True)
+    ip = Column(String(45), nullable=True)
+    user_agent = Column(String(255), nullable=True)
