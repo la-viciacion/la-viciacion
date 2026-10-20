@@ -10,7 +10,7 @@ Telegram bot (bot) ── HTTP, superadmin token ────────┘   �
 
 - The **API is the only component that touches the DB** and holds all business rules.
 - The **front** is a static SPA served by nginx; nginx proxies `/api/` to `API_UPSTREAM` (default `laviciacion-api:5000`; `front/nginx.conf.template`, rendered at container start), so the browser only talks to one origin.
-- The **bot** is a read-only client (its one write is `/activate`, below): it logs in as the superadmin `admin` (password `GOD_ADMIN_PASS`) and uses generic endpoints (`/manage/...`, `/statistics/...`). It re-logs in on 401. Its Telegram token and chats come from its own environment, not from the API.
+- The **bot** is a read-only client (its one write is `/activate`, below): it logs in as the superadmin `admin` (password `GOD_ADMIN_PASS`) and uses generic endpoints (`/manage/...`, `/statistics/...`) plus one that writes nothing, `POST /manage/welcome-message`, which has the AI write the welcome for whoever joins the group (the AI's keys stay in the API). It re-logs in on 401. Its Telegram token and chats come from its own environment, not from the API.
 - The API sends notifications to Telegram itself (through `utils/my_utils.py`, using the token of the environment, never stored); the bot handles interactive commands.
 - All services share one `.env` (`env_file`); nothing secret or environment-specific is baked into images (they are built by CI, see [deployment](deployment.md#images)).
 
