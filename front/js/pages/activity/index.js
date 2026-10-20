@@ -24,16 +24,21 @@ const SENTENCES = {
   started: (e) => html`empezó ${game(e)}`,
   completed: (e) => html`completó ${game(e)} ${scoreBadge(e.score)}`,
   rated: (e) => html`puntuó ${game(e)} ${scoreBadge(e.score)}`,
-  achievement: (e) => (e.hidden
-    ? html`desbloqueó un logro oculto`
-    : html`desbloqueó el logro «${e.title}»${e.game_id ? html` en ${game(e)}` : ''}`),
+  achievement: (e) => html`desbloqueó el logro «${e.title}»${e.game_id ? html` en ${game(e)}` : ''}`,
 };
 
-const eventRow = (e) => html`
+// A hidden achievement does not say who unlocked it either: no avatar, no name.
+const eventRow = (e) => (e.hidden
+  ? html`
+  <li class="ac-event">
+    <span class="pl-avatar" aria-hidden="true">🔒</span>
+    <div class="ac-text">Alguien desbloqueó un logro oculto</div>
+  </li>`
+  : html`
   <li class="ac-event">
     ${playerAvatar(e)}
     <div class="ac-text"><strong>${e.name}</strong> ${SENTENCES[e.type](e)}</div>
-  </li>`;
+  </li>`);
 
 function draw() {
   mount(main, html`

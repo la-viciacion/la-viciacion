@@ -19,6 +19,7 @@ const PROFILE = {
   stats: { played_time: 7200, played_days: 3, played_games: 2, completed_games: 1, current_streak: 2, best_streak: 4, achievements: 1 },
   top_games: [{ game_id: 'hades', game_name: 'Hades', played_time: 7200, score: 90 }],
   achievements: [{ title: 'Madrugador', date: '2026-01-02' }],
+  hidden_achievements: 2,
   playing: { game_id: 'hades', game_name: 'Hades' }, is_active: true, is_me: false,
 };
 
@@ -65,6 +66,7 @@ test('a player page reuses the summary: figures, most played with ratings, achie
   assert.equal(text('.pf-bar-label')[0].includes('Hades'), true);
   assert.equal(document.querySelectorAll('.pf-bar-label .score-badge').length, 1);
   assert.match(main().textContent, /Madrugador/);
+  assert.match(main().textContent, /\+2 logros ocultos/);  // counted, never named nor dated
   assert.equal(document.querySelectorAll('.pf-head .pl-avatar.live').length, 1);
   assert.equal(document.querySelector('#pfAvatarInput'), null); // nothing of the owner's tools
 });

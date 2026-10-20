@@ -70,12 +70,14 @@ class ActivityTests(ApiTestCase):
             ("played", "hades"), ("started", "hades"), ("rated", "celeste"), ("played", "celeste"), ("started", "celeste"),
         ])
 
-    def test_a_secret_achievement_the_viewer_lacks_is_announced_without_saying_which(self):
+    def test_a_secret_achievement_is_announced_to_everybody_without_saying_which_nor_who(self):
         self.award(self.ana, TODAY(), "celeste")
         with self.engine.begin() as conn:
             conn.execute(text("UPDATE achievements SET secret = 1"))
         item = self.feed(as_user="bea")["items"][0]
-        self.assertEqual((item["type"], item["hidden"], item["title"], item["game_id"], item["name"]), ("achievement", True, None, None, "Ana"))
+        self.assertEqual((item["type"], item["hidden"], item["title"], item["game_id"], item["name"], item["user_id"]), ("achievement", True, None, None, None, None))
+        item = self.feed(as_user="ana")["items"][0]  # not even its owner
+        self.assertEqual((item["hidden"], item["title"], item["name"]), (True, None, None))
 
     def test_one_that_is_not_secret_is_told_in_full_to_everybody(self):
         title = self.award(self.ana, TODAY(), "celeste")

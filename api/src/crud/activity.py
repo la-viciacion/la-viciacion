@@ -7,7 +7,6 @@ from sqlalchemy import desc, func
 from sqlalchemy.orm import Session
 
 from ..database import models
-from . import group
 
 # Events at the very same moment come in this order
 RANK = {"completed": 0, "achievement": 1, "rated": 2, "started": 3, "played": 4}
@@ -66,12 +65,11 @@ def _place_in_time(db: Session, events: list[dict]) -> None:
             e["at"] = after_day
 
 
-def feed(db: Session, viewer_id: int, limit: int = 30, offset: int = 0) -> dict:
+def feed(db: Session, limit: int = 30, offset: int = 0) -> dict:
     """`limit` events from `offset`, and whether there are more. Every source gives its newest
     `offset + limit + 1` rows, which is enough to know the newest ones of the merge. The secret achievements the
-    viewer has not unlocked are announced without saying which."""
+    secret achievements are announced without saying which, nor who, to everybody (their owner too)."""
     n = offset + limit + 1
-    mine = group.unlocked_ids(db, viewer_id)
     players = (models.not_god(),)
     ratings = {(u, g): s for u, g, s in db.query(models.GameScore.user_id, models.GameScore.game_id, models.GameScore.score)}
     events: list[dict] = []
@@ -142,8 +140,9 @@ def feed(db: Session, viewer_id: int, limit: int = 30, offset: int = 0) -> dict:
         .order_by(desc(models.UserAchievement.date), models.UserAchievement.user_id, models.UserAchievement.achievement_id)
         .limit(n)
     ):
-        # a secret one the viewer has not unlocked stays hidden: no title, and the game would give it away
-        seen = award.achievement_id in mine or not secret
+        # a secret one stays hidden for everybody: no title, and the game would give it away (the player is dropped
+        # at the end, once the events are sorted)
+        seen = not secret
         add("achievement", award.date, award.user_id, name, username, game_id if seen else None,
             game_name if seen else None, image if seen else None, title=title if seen else None, hidden=not seen)
 
@@ -152,4 +151,6 @@ def feed(db: Session, viewer_id: int, limit: int = 30, offset: int = 0) -> dict:
     page = events[offset:offset + limit]
     for e in page:
         del e["at"]
+        if e.get("hidden"):  # after the sort, which needs the player: nobody learns who unlocked a hidden one
+            e["user_id"] = e["name"] = None
     return {"items": page, "has_more": len(events) > offset + limit}
