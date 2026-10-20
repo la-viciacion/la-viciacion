@@ -46,6 +46,8 @@ Escribe `/menu` (en privado o en el grupo) para consultar tus estadísticas y lo
 | 🏅 **Rankings** | Días, horas, jugados, completados, logros, ratio, racha actual y máxima, más jugados, deuda y deuda total. |
 | 🎲 **Recomendados** | Juegos que tienen otros jugadores y tú no. |
 
+El menú se cierra solo al cabo de un minuto sin usarlo; si pulsas un botón de un menú caducado (o de otra persona) te sale un aviso y basta con escribir `/menu` otra vez.
+
 El bot es de **solo lectura**: no registra sesiones, solo consulta. Las cuentas desactivadas no aparecen en sus rankings.
 
 ## Notificaciones en el móvil (push)

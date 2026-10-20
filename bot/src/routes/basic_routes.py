@@ -34,6 +34,16 @@ class BasicRoutes:
         )
         return utils.MAIN_MENU
 
+    async def expired(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """A button the conversation no longer answers: its menu timed out, belongs to someone else or predates a restart.
+
+        Only the person who pressed sees the notice (a popup): the message stays as it is, so in the group a
+        bystander cannot spoil another player's menu. It must never raise: this is the end of the line."""
+        try:
+            await update.callback_query.answer("Este menú ha caducado o no es tuyo. Escribe /menu para abrir uno nuevo.", show_alert=True)
+        except Exception as e:  # e.g. Telegram refuses to answer a very old query
+            logger.warning(f"Could not answer an expired button: {e}")
+
     async def end(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         """Returns `ConversationHandler.END`, which tells the
         ConversationHandler that the conversation is over.
