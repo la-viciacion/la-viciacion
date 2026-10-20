@@ -10,7 +10,7 @@ from ... import auth
 from ...auth import get_db
 from ...crud import recap
 from ...database import models
-from ...utils import actions, inbox, messages, my_utils, push, recap_notices, settings
+from ...utils import actions, inbox, messages, my_utils, push, recap_notices, settings, welcome
 from ...utils.logger import LogManager
 from .common import get_or_404, router
 
@@ -24,6 +24,19 @@ class AnnouncementBody(BaseModel):
     image: Optional[str] = Field(None, max_length=500)
     audience: str = Field("me", pattern="^(me|user|group|all)$")
     user_id: Optional[int] = None
+
+
+class WelcomeBody(BaseModel):
+    name: str = Field(min_length=1, max_length=64)
+    username: Optional[str] = Field(None, max_length=32, pattern="^[A-Za-z0-9_]+$")
+
+
+@router.post("/welcome-message")
+def welcome_message(body: WelcomeBody):
+    """The welcome the AI writes for somebody who joined the group, for the bot to send (blocking network call: a
+    plain def, so it runs in a worker thread). `message` is null when the AI is off or did not give a usable text:
+    the bot has its own fixed welcome for that."""
+    return {"message": welcome.write(body.name, body.username)}
 
 
 @router.get("/push/audience")
