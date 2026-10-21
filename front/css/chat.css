@@ -13,11 +13,13 @@
 .chat-fab:hover { transform: scale(1.06); }
 .chat-fab:focus-visible, .chat-icon-btn:focus-visible, .chat-chip:focus-visible, .chat-send:focus-visible { outline: 2px solid var(--accent-teal); outline-offset: 2px; }
 
+/* On a phone it is the visual viewport, which the keyboard shrinks (js/ui/chat.js sets --chat-top and --chat-height) */
 .chat-panel {
-  position: fixed; z-index: 1050; inset: 0; display: flex; flex-direction: column;
-  height: 100dvh; background: var(--bg-surface); animation: chat-in 0.18s ease;
+  position: fixed; z-index: 1050; top: var(--chat-top, 0); left: 0; right: 0; display: flex; flex-direction: column;
+  height: var(--chat-height, 100dvh); background: var(--bg-surface); animation: chat-in 0.18s ease;
   padding-bottom: env(safe-area-inset-bottom);
 }
+@media (max-width: 599px) { body.chat-open { overflow: hidden; } }
 @keyframes chat-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
 
 @media (min-width: 600px) {

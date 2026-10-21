@@ -16,6 +16,7 @@ let open = false;
 let busy = false;
 let abort = null;
 let cleanup = null;
+let unfollowViewport = null;
 let switchedOff = false; // the API said the chat is off (503): the button goes when the panel is closed
 
 const root = () => document.getElementById(ID);
@@ -109,10 +110,44 @@ async function send(text) {
   }
 }
 
+// On a phone the on-screen keyboard shrinks the *visual* viewport but not the layout one, and the browser scrolls the
+// page to show the box being typed in: a panel that is `fixed` to the layout viewport slides up with it and the header
+// and the messages go out of sight. So, while the panel is open, it takes the position and the height of the visual
+// viewport (CSS variables on the container, which render() does not replace; only the phone layout reads them).
+function fitToViewport(scroll) {
+  const viewport = window.visualViewport;
+  const el = root();
+  if (!viewport || !el) return;
+  el.style.setProperty('--chat-top', `${Math.round(viewport.offsetTop)}px`);
+  el.style.setProperty('--chat-height', `${Math.round(viewport.height)}px`);
+  const log = scroll && el.querySelector('.chat-log');
+  if (log) log.scrollTop = log.scrollHeight; // the last message stays in sight above the keyboard
+}
+
+function followViewport(on) {
+  unfollowViewport?.();
+  unfollowViewport = null;
+  document.body.classList.toggle('chat-open', on); // the page behind does not scroll under the sheet
+  const viewport = window.visualViewport;
+  if (!on || !viewport) return;
+  const onResize = () => fitToViewport(true);
+  const onScroll = () => fitToViewport(false);
+  viewport.addEventListener('resize', onResize);
+  viewport.addEventListener('scroll', onScroll);
+  fitToViewport(false);
+  unfollowViewport = () => {
+    viewport.removeEventListener('resize', onResize);
+    viewport.removeEventListener('scroll', onScroll);
+    root()?.style.removeProperty('--chat-top');
+    root()?.style.removeProperty('--chat-height');
+  };
+}
+
 function setOpen(value) {
   open = value;
   if (!open && switchedOff) return unmountChat();
   render();
+  followViewport(open);
   if (!open) root()?.querySelector('.chat-fab')?.focus();
 }
 
@@ -196,6 +231,7 @@ export async function mountChat() {
 /** Takes the button away and forgets the conversation (the session ended). */
 export function unmountChat() {
   abort?.abort();
+  followViewport(false);
   cleanup?.();
   root()?.remove();
   turns = [];
