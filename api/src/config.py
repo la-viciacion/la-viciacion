@@ -15,6 +15,7 @@ class Config:
         # utils/settings.py, `env_only`): the Telegram token and chats (TELEGRAM_TOKEN / TELEGRAM_GROUP_ID /
         # TELEGRAM_ADMIN_CHAT_ID), the AI key (AI_API_KEY, or the old OPENAI_API_KEY), the AI provider (AI_PROVIDER) and the AI
         # model (AI_MODEL, or the old OPENAI_MODEL); there is no default for the provider or the model in the code.
+        # The chat uses the same provider and key and, as its model, the optional CHAT_AI_MODEL (AI_MODEL when it is not set).
 
         # Admin
         self.GOD_ADMIN_PASS = self._get_env("GOD_ADMIN_PASS")

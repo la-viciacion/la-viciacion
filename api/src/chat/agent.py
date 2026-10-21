@@ -1,6 +1,6 @@
 """The chat agent: one question (plus a little history) in, one answer out.
 
-The scope is limited three ways: the instructions (the admin's `ai.prompt.chat`), the tools (read-only, see
+The scope is limited three ways: the instructions (the admin's `chat.prompt`), the tools (read-only, see
 tools.py) and hard caps on what one question may cost (UsageLimits, a timeout). The answer is structured so the
 code, not only the prompt, knows when a question was out of scope."""
 import datetime
@@ -43,7 +43,7 @@ agent = Agent(output_type=Reply, deps_type=ChatDeps, tools=TOOLS, retries=2, mod
 def instructions(ctx: RunContext[ChatDeps]) -> str:
     name = ctx.deps.user.name or ctx.deps.user.username
     return (
-        settings.get("ai.prompt.chat")
+        settings.get("chat.prompt")
         + f"\n\nHoy es {datetime.date.today().isoformat()} y la temporada actual es {seasons.current()}."
         + f" Hablas con {name}; cuando diga 'yo' o 'mi', se refiere a esa persona."
     )
@@ -79,3 +79,16 @@ def ask(db: Session, user: models.User, question: str, history: list[tuple[str, 
         raise AIError(f"chat: {type(e).__name__}: {str(e).replace(key or chr(0), '***')}") from None
     reply = result.output
     return Answer(reply.answer.strip() if reply.in_scope else messages.CHAT_OFF_TOPIC, reply.in_scope)
+
+
+def probe(model=None) -> str:
+    """One short sentence from the chat's model, with no tools: for the panel's test button (blocking, like `ask`).
+    Raises AIError if the provider fails."""
+    key = settings.get("ai.api_key")
+    try:
+        result = Agent(model or chat_model.build_model(), model_settings=SETTINGS).run_sync(
+            "Saluda al grupo con una frase corta y divertida sobre videojuegos.", usage_limits=LIMITS
+        )
+    except Exception as e:
+        raise AIError(f"chat: {type(e).__name__}: {str(e).replace(key or chr(0), '***')}") from None
+    return result.output.strip()

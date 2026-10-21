@@ -9,6 +9,8 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ... import auth
+from ...chat import agent as chat_agent
+from ...chat import model as chat_model
 from ...auth import get_db
 from ...database import models
 from ...utils import ai, audit, my_utils, push, settings, sql_dump
@@ -39,6 +41,7 @@ def get_settings(admin: models.User = Depends(auth.require_admin), db: Session =
         "mail": mail_info,
         "ai_uses": settings.ai_uses(db),
         "ai_model": ai.in_use(),
+        "chat": {**chat_model.in_use(), **settings.chat_prompt(db)},
     }
 
 
@@ -52,7 +55,7 @@ def put_settings(body: SettingsBody, admin: models.User = Depends(auth.require_a
     if any(key.startswith("push.vapid") for key in body.values):
         raise HTTPException(status_code=400, detail="Las claves VAPID se generan con «Generar claves», no se escriben")
     if any(settings.REGISTRY[key].env_only for key in body.values if key in settings.REGISTRY):
-        raise HTTPException(status_code=400, detail="El token y los IDs de Telegram y la clave de la IA se configuran en el .env del servidor, no desde el panel")
+        raise HTTPException(status_code=400, detail="El token y los IDs de Telegram y las claves, proveedores y modelos de la IA (y el del chat) se configuran en el .env del servidor, no desde el panel")
     try:
         changed = settings.set_values(db, body.values, user_id=admin.id)
     except ValueError as e:
@@ -105,6 +108,23 @@ def test_ai(admin: models.User = Depends(auth.require_admin)):
         logger.error(f"AI test by {admin.username} failed: {e}", exc_info=True)
         raise HTTPException(status_code=502, detail=f"La IA no ha respondido: {e}")
     return {"message": "La IA ha respondido", "reply": reply, "provider": provider, "model": model}
+
+
+@router.post("/settings/test-chat")
+def test_chat(admin: models.User = Depends(auth.require_admin)):
+    """Ask the chat's model for one short sentence, with the provider and key of the AI and the chat's model (blocking
+    network call: a plain def, so it runs in a worker thread). Works with the chat switched off, to try it before using it."""
+    if not chat_model.configured():
+        raise HTTPException(
+            status_code=409,
+            detail="El chat no está completo: AI_PROVIDER (" + " o ".join(chat_model.BUILDERS) + "), AI_API_KEY y un modelo (CHAT_AI_MODEL, o AI_MODEL si no hay) deben estar en el .env del servidor",
+        )
+    try:
+        reply = chat_agent.probe()
+    except ai.AIError as e:
+        logger.error(f"Chat test by {admin.username} failed: {e}", exc_info=True)
+        raise HTTPException(status_code=502, detail=f"El chat no ha respondido: {e}")
+    return {"message": "El chat ha respondido", "reply": reply, **chat_model.in_use()}
 
 
 @router.post("/settings/test-email")

@@ -6,7 +6,7 @@ are encrypted with a key derived from SECRET_KEY and are never returned by the
 API, only a hint of their last characters.
 
 A setting with `env_only` is not in the table: the keys of outside services (the Telegram token and chats, the AI key)
-and the AI provider and model. They are read from the environment every time and never stored, so a copy of the
+and the AI provider and model (and the chat's model, which falls back to the AI's). They are read from the environment every time and never stored, so a copy of the
 database (a backup, a dump loaded on a laptop) cannot use them, which only whoever holds the .env should be able to do,
 and the panel cannot change them.
 """
@@ -25,6 +25,7 @@ from sqlalchemy.orm import Session
 from ..config import Config
 from ..database import models
 from ..database.database import SessionLocal
+from ..chat.prompt import CHAT_PROMPT
 from .ai_prompts import USES as AI_USES
 from .logger import LogManager
 
@@ -144,6 +145,11 @@ REGISTRY: dict[str, Spec] = {
     "ai.provider": Spec("str", None, env="AI_PROVIDER", env_only=True),  # "google" or "openai" (utils/ai.py PROVIDERS)
     "ai.api_key": Spec("str", None, secret=True, env_only=True, env="AI_API_KEY", legacy_env="OPENAI_API_KEY"),
     "ai.model": Spec("str", None, env="AI_MODEL", legacy_env="OPENAI_MODEL", env_only=True),  # no default in the code: without it the AI does not write
+    # The chat assistant (chat/): its own switch and instructions. It talks to the same provider with the same key as the
+    # notices (ai.provider, ai.api_key); only the model may be its own (CHAT_AI_MODEL, optional: without it, ai.model).
+    "chat.enabled": Spec("bool", True),
+    "chat.model": Spec("str", None, env="CHAT_AI_MODEL", env_only=True),
+    "chat.prompt": Spec("str", CHAT_PROMPT.strip(), check=_prompt, resettable=True),
     "telegram.token": Spec("str", None, secret=True, env_only=True, env="TELEGRAM_TOKEN", check=_token),
     "telegram.group_id": Spec("str", None, env_only=True, env="TELEGRAM_GROUP_ID", check=_chat_id),
     "telegram.admin_chat_id": Spec("str", None, env_only=True, env="TELEGRAM_ADMIN_CHAT_ID", check=_chat_id),
@@ -267,6 +273,11 @@ def ai_uses(db: Session) -> list[dict]:
         }
         for use_id, use in AI_USES.items()
     ]
+
+
+def chat_prompt(db: Session) -> dict:
+    """The chat's instructions, for the panel: the prompt the code brings and whether the admin changed it."""
+    return {"default_prompt": REGISTRY["chat.prompt"].default, "customized": "chat.prompt" in customized(db)}
 
 
 def public_view(db: Session) -> dict[str, Any]:
