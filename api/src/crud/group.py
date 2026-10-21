@@ -45,8 +45,9 @@ def achievements_catalog(db: Session, viewer_id: int, today: datetime.date | Non
     they exist, whether they are secret and their special level (so that everybody knows there are special ones to
     unlock). One that is switched on but not valid yet (`valid_from_season` in the future), secret or not, is listed
     that way too, in the running season, so it is already there as a hidden one when it begins to count. Whoever has unlocked an achievement once knows what it is: that is what shows the description and
-    lifts the secrecy, whatever the season on screen. The same goes for its key and its picture, which would
-    give away what it is about: they are only sent for the ones the viewer has unlocked at some point.
+    lifts the secrecy, whatever the season on screen, except for a secret season achievement: that one is only
+    revealed in the season the viewer earned it in. The same goes for its key and its picture, which would
+    give away what it is about: they are only sent for the ones the viewer has unlocked.
 
     `season` (default: the running one) is the season of the season achievements, which are earned once a season:
     only the ones valid in it are listed, and what is said of each (who has it, whether the viewer has it, the
@@ -93,7 +94,10 @@ def achievements_catalog(db: Session, viewer_id: int, today: datetime.date | Non
         if (not row.active or row.valid_from_season > listed_in) and not mine and not upcoming:
             continue  # switched off, or not valid yet: it does not exist yet, not even as a hidden one
         who = sorted(unlocked.get(row.id, {}).values(), key=lambda w: (w["last"], w["name"].lower()), reverse=True)
-        if row.id not in known and (row.secret or upcoming):
+        # a secret season achievement is only revealed in the season it was earned in (a lifetime one belongs to none,
+        # so it always is); the others, once the viewer has unlocked them in any season
+        revealed = mine if row.secret else row.id in known
+        if not revealed and (row.secret or upcoming):
             catalog.append({
                 "id": row.id, "hidden": True, "unlocked_by_me": False, "secret": bool(row.secret), "special": row.special,
                 "lifetime": lifetime,  # which block of the page it goes in; says nothing about what it is
@@ -102,7 +106,7 @@ def achievements_catalog(db: Session, viewer_id: int, today: datetime.date | Non
                 "unlocked_by": len(who),
             })
             continue
-        is_known = row.id in known
+        is_known = revealed
         catalog.append({
             "id": row.id,
             "hidden": False,
@@ -181,11 +185,11 @@ def player_profile(db: Session, viewer_id: int, player_id: int, season=None) -> 
     if user is None:
         return None
     data = users.get_profile(db, user, season)
-    mine = unlocked_ids(db, viewer_id)
-    # the secret ones the viewer lacks are only counted: naming one, or dating it, would say who unlocked what
+    # the secret ones of another player are only counted, even to whoever has them: naming one, or dating it, would
+    # say who unlocked what
     achievements = [
         {"title": a["title"], "date": a["date"], "secret": a["secret"], "special": a["special"]}
-        for a in data["achievements"] if a["id"] in mine or not a["secret"]
+        for a in data["achievements"] if player_id == viewer_id or not a["secret"]
     ]
     return {
         "user": {"id": user.id, "username": user.username, "name": user.name or user.username},

@@ -115,6 +115,17 @@ class AchievementsCatalogTests(ApiTestCase):
         seen = next(a for a in other if a["id"] == lifetime)  # whoever lacks it sees it, once, dimmed
         self.assertEqual((seen["hidden"], seen["unlocked_by_me"], seen["lifetime"]), (False, False, True))
 
+    def test_a_secret_season_one_is_only_revealed_in_the_season_it_was_earned_in(self):
+        year = TODAY().year
+        with self.engine.begin() as conn:
+            conn.execute(text("UPDATE achievements SET secret = 1 WHERE id = :a"), {"a": self.first})
+        self.award(self.ana, self.first, datetime.date(year - 1, 5, 1))
+        past = next(a for a in self.api("GET", "/group/achievements", as_user="ana", params={"season": year - 1}).json() if a["id"] == self.first)
+        self.assertEqual((past["hidden"], past["unlocked_by_me"]), (False, True))  # in its season she sees it in full
+        now = next(a for a in self.catalog() if a["id"] == self.first)
+        self.assertEqual(now, {"id": self.first, "hidden": True, "unlocked_by_me": False, "secret": True, "special": 0, "lifetime": False,
+                               "unlocked_by": 0})  # in any other it is a hidden one again, even for whoever earned it
+
     def test_one_that_is_not_valid_yet_is_listed_hidden_unless_the_viewer_has_it(self):
         with self.engine.begin() as conn:
             conn.execute(text("UPDATE achievements SET valid_from_season = :s WHERE id IN (:a, :b)"), {"s": TODAY().year + 1, "a": self.first, "b": self.second})
@@ -182,14 +193,17 @@ class AchievementsCatalogTests(ApiTestCase):
         self.assertFalse(mine[self.second])
         self.assertTrue(theirs[self.second])
 
-    def test_the_page_of_another_player_only_counts_the_secret_ones_the_viewer_lacks(self):
+    def test_the_page_of_another_player_only_counts_their_secret_ones_even_to_whoever_has_them_too(self):
         self.award(self.bea, self.first, TODAY())
         self.award(self.bea, self.second, TODAY())
         self.award(self.ana, self.first, TODAY())
+        self.award(self.ana, self.second, TODAY())
         with self.engine.begin() as conn:
             conn.execute(text("UPDATE achievements SET secret = 1, special = 2 WHERE id = :a"), {"a": self.second})
         page = self.api("GET", f"/group/players/{self.bea}", as_user="ana").json()
-        self.assertEqual((len(page["achievements"]), page["hidden_achievements"]), (1, 1))  # no title, no date, no aura: only that there is one
+        self.assertEqual((len(page["achievements"]), page["hidden_achievements"]), (1, 1))  # no title, no date, no aura: only that there is one, even if she has it too
+        own = self.api("GET", f"/group/players/{self.bea}", as_user="bea").json()
+        self.assertEqual((len(own["achievements"]), own["hidden_achievements"]), (2, 0))  # their own page tells them in full
         with self.engine.begin() as conn:
             conn.execute(text("UPDATE achievements SET secret = 0 WHERE id = :a"), {"a": self.second})
         page = self.api("GET", f"/group/players/{self.bea}", as_user="ana").json()
