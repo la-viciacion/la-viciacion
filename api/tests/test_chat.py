@@ -2,6 +2,7 @@
 (FunctionModel), so no provider is called."""
 import datetime
 import os
+from pathlib import Path
 import types
 import unittest
 from unittest import mock
@@ -15,6 +16,7 @@ from pydantic_ai.models.function import AgentInfo, FunctionModel
 from src import auth
 from src.chat import limits as chat_limits
 from src.chat import agent, tools
+from src.chat import help as chat_help
 from src.chat import prompt as chat_prompt
 from src.chat import model as chat_model
 from src.clients.ai_error import AIError
@@ -140,9 +142,124 @@ class ToolTests(unittest.TestCase):
         self.assertEqual([r["name"] for r in rows], ["Beto"])
         self.assertEqual(set(rows[0]), {"name", "percent", "shared_games", "shared_rated"})
 
+    def test_the_limits_tool_says_what_each_limit_is_and_how_much_of_it_is_left(self):
+        chat_limits.limiter.clear()
+        self.addCleanup(chat_limits.limiter.clear)
+        values = {"chat.limit_user_minute": 5, "chat.limit_user_hour": 0, "chat.limit_user_day": 100, "chat.limit_group_minute": 10, "chat.limit_group_day": 300}
+        with mock.patch.object(settings, "get", side_effect=lambda key: values[key]):
+            chat_limits.limiter.acquire(chat_limits.scopes_of(1))  # the question that is being answered
+            chat_limits.limiter.acquire(chat_limits.scopes_of(2))  # somebody else's
+            info = self.run_tool(tools.chat_limits)
+        self.assertEqual(info["questions"]["user"], {
+            "minute": {"limit": 5, "used": 1, "remaining": 4},
+            "hour": {"limit": None, "used": None, "remaining": None},
+            "day": {"limit": 100, "used": 1, "remaining": 99},
+        })
+        self.assertEqual(info["questions"]["group"], {
+            "minute": {"limit": 10, "used": 2, "remaining": 8},
+            "day": {"limit": 300, "used": 2, "remaining": 298},
+        })
+        self.assertEqual(info["per_question"]["max_characters"], chat_limits.MAX_QUESTION)
+        self.assertEqual(info["per_question"]["tool_calls"], chat_limits.LIMITS.tool_calls_limit)
+
+    def test_the_help_tool_answers_from_the_topic_asked(self):
+        found = self.run_tool(tools.app_help, "¿Cómo funcionan las temporadas?")["topics"]
+        self.assertEqual(found[0]["topic"], "temporadas")
+        self.assertIn("1 de enero", found[0]["text"])
+        self.assertEqual(found[0]["guide_page"], "docs/guia-usuario/preguntas-frecuentes.md")
+        self.assertEqual(self.run_tool(tools.app_help, "racha")["topics"][0]["topic"], "dias_y_rachas")
+
+    def test_the_help_tool_lists_the_topics_when_asked_for_nothing_or_for_something_it_does_not_know(self):
+        for query in ("", "   ", "xyzzy"):
+            answer = self.run_tool(tools.app_help, query)
+            self.assertEqual([t["topic"] for t in answer["topics"]], [t.id for t in chat_help.TOPICS], query)
+            self.assertTrue(all(set(t) == {"topic", "title"} for t in answer["topics"]))
+        self.assertIn("note", self.run_tool(tools.app_help, "xyzzy"))
+
+    def seed_achievements(self):
+        today = datetime.date.today()
+        self.db.add_all([
+            models.Achievement(id=1, key="first_steps", title="Primeros pasos", message="Juega una hora", active=True, secret=False, special=0, valid_from_season=2023),
+            models.Achievement(id=2, key="night_owl", title="Búho", message="Juega de madrugada", active=True, secret=False, special=0, valid_from_season=2023),
+            models.Achievement(id=3, key="mystery", title="Misterio", message="No se cuenta", active=True, secret=True, special=0, valid_from_season=2023),
+            models.UserAchievement(user_id=1, achievement_id=1, date=today),
+            models.UserAchievement(user_id=2, achievement_id=1, date=today),
+            models.UserAchievement(user_id=2, achievement_id=2, date=today),
+            models.UserAchievement(user_id=2, achievement_id=3, date=today),
+        ])
+        self.db.commit()
+
+    def test_the_achievements_tool_gives_the_description_only_of_what_the_user_has(self):
+        self.seed_achievements()
+        found = self.run_tool(tools.achievements)
+        by_title = {a["title"]: a for a in found["achievements"]}
+        self.assertEqual(set(by_title), {"Primeros pasos", "Búho"})
+        self.assertEqual(by_title["Primeros pasos"]["description"], "Juega una hora")
+        self.assertTrue(by_title["Primeros pasos"]["mine"])
+        self.assertEqual(by_title["Primeros pasos"]["players_who_have_it"], 2)
+        self.assertNotIn("description", by_title["Búho"])  # finding out what it is about is part of the game
+        self.assertFalse(by_title["Búho"]["mine"])
+        self.assertEqual((found["mine"], found["hidden_ones_not_unlocked"]), (1, 1))
+        self.assertNotIn("Misterio", str(found))  # a hidden one is only counted: neither its title nor its text
+        self.assertNotIn("No se cuenta", str(found))
+
+    def test_the_achievements_can_be_filtered(self):
+        self.seed_achievements()
+        self.assertEqual([a["title"] for a in self.run_tool(tools.achievements, only="missing")["achievements"]], ["Búho"])
+        self.assertEqual([a["title"] for a in self.run_tool(tools.achievements, only="mine")["achievements"]], ["Primeros pasos"])
+        self.assertEqual([a["title"] for a in self.run_tool(tools.achievements, "pasos")["achievements"]], ["Primeros pasos"])
+        self.assertEqual(self.run_tool(tools.achievements, "madrugada")["achievements"], [])  # a text the user cannot read does not search
+
     def test_players_lists_the_group_without_the_emergency_account(self):
         names = [p["name"] for p in self.run_tool(tools.players)]
         self.assertCountEqual(names, ["Ana", "Beto"])
+
+
+GUIDE = Path(__file__).resolve().parents[2] / "docs" / "guia-usuario"
+
+
+class HelpTopicsTests(unittest.TestCase):
+    def test_every_topic_comes_from_a_page_of_the_user_guide_that_exists(self):
+        for topic in chat_help.TOPICS:
+            self.assertTrue((GUIDE / topic.source).is_file(), f"{topic.id}: {topic.source}")
+
+    def test_topics_are_whole_and_not_repeated(self):
+        ids = [t.id for t in chat_help.TOPICS]
+        self.assertEqual(len(ids), len(set(ids)))
+        for topic in chat_help.TOPICS:
+            self.assertTrue(topic.title and topic.keywords, topic.id)
+            self.assertTrue(100 < len(topic.text) < 2500, f"{topic.id}: {len(topic.text)} characters")
+            self.assertEqual(topic.keywords, tuple(chat_help.plain(k) for k in topic.keywords), f"{topic.id}: keywords are lowercase without accents")
+
+    def test_each_topic_is_found_by_its_own_title_and_by_each_of_its_keywords(self):
+        for topic in chat_help.TOPICS:
+            self.assertIn(topic, chat_help.find(topic.title, limit=3), topic.id)
+            for keyword in topic.keywords:
+                if len(keyword) >= 4:
+                    self.assertTrue(chat_help.find(keyword, limit=len(chat_help.TOPICS)), keyword)
+
+    def test_accents_case_and_question_marks_do_not_matter(self):
+        self.assertEqual(chat_help.find("¿SESIÓN manual?")[0].id, "sesiones")
+        self.assertEqual(chat_help.find("sesion manual")[0].id, "sesiones")
+
+    def test_the_suggested_questions_about_the_app_find_their_topic(self):
+        for question, topic in (
+            ("¿Cómo funcionan las temporadas?", "temporadas"),
+            ("¿Cómo se cuentan los días de la racha?", "dias_y_rachas"),
+            ("¿Cómo puedo exportar mis datos?", "perfil_ajustes"),
+            ("¿Para qué sirve la lista de deseados?", "deseados"),
+            ("¿Cómo vinculo Telegram?", "notificaciones"),
+            ("¿Qué límites tiene el chat?", "chat"),
+            ("¿Quién puede ver mis datos?", "privacidad"),
+            ("¿Cómo funcionan los retos?", "retos"),
+            ("¿Cómo recibo los avisos en el móvil?", "notificaciones"),
+            ("¿Cómo registro una sesión que se me olvidó?", "sesiones"),
+        ):
+            self.assertEqual(chat_help.find(question)[0].id, topic, question)
+
+    def test_something_that_matches_nothing_finds_nothing(self):
+        self.assertEqual(chat_help.find("xyzzy"), [])
+        self.assertEqual(chat_help.find("de la"), [])
 
 
 class LimitsTests(unittest.TestCase):

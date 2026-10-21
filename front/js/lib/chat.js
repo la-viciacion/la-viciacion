@@ -5,7 +5,7 @@ export const MAX_QUESTION = 500;
 const MAX_TURN_TEXT = 2000;
 
 // Questions the chat's tools can answer (api/src/chat/tools.py): the group's rankings and activity, one's own figures, the
-// wishlist and the catalog. A few of them are offered each time a conversation starts (pickSuggestions), so the list can be
+// wishlist, the catalog and how the app and the chat work. A few of them are offered each time a conversation starts (pickSuggestions), so the list can be
 // long: it is how people find out what to ask. Keep each one a question of the user's own words and under MAX_QUESTION,
 // and one that one or two calls of the tools answer: a question that needs a call per player, or that leaves the model
 // to decide what to look at, can run out of the limits of a question (api/src/chat/agent.py LIMITS).
@@ -46,10 +46,22 @@ export const SUGGESTIONS = [
   '¿En qué puesto voy en horas este año?',
   '¿Cuánto me falta para alcanzar al primero en horas?',
   '¿Con quién tengo más afinidad de gustos?',
+  // about the app and the chat itself
+  '¿Cómo funcionan las temporadas?',
+  '¿Cómo se cuentan los días de la racha?',
+  '¿Cómo registro una sesión que se me olvidó?',
+  '¿Cómo funcionan los retos?',
+  '¿Cómo recibo los avisos en el móvil?',
+  '¿Quién puede ver mis datos?',
+  '¿Cómo puedo exportar mis datos?',
+  '¿Qué logros me faltan por conseguir?',
+  '¿Cuántas preguntas me quedan en el chat?',
+  '¿Qué límites tiene el chat?',
   // the wishlist
   '¿Qué juegos tengo en mi lista de deseados?',
   '¿A qué estoy esperando que salga?',
   '¿Cuándo sale el próximo juego de mi lista de deseados?',
+  '¿Para qué sirve la lista de deseados?',
   '¿Alguien más del grupo quiere los mismos juegos que yo?',
   // the catalog
   '¿Qué juegos de terror tenemos?',

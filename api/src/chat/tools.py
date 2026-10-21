@@ -17,6 +17,8 @@ from sqlalchemy.orm import Session
 from ..crud import activity, affinity, game_overview, games, group, rankings, time_entries, wishlist
 from ..database import models
 from ..utils import seasons
+from . import help as app_help_topics
+from . import limits
 
 MAX_ITEMS = 10  # the most items any tool returns: the model gets what fits in a short answer
 
@@ -260,6 +262,70 @@ async def affinity_with_players(ctx: RunContext[ChatDeps]) -> list[dict]:
     ]
 
 
+async def chat_limits(ctx: RunContext[ChatDeps]) -> dict:
+    """The limits of this chat and how much of them is used: the questions each player and the whole group may ask per
+    minute, hour and day (the day is the last 24 hours) with how many are used and left now, this question included
+    (`limit` null: no limit), and what one question may cost. Use it for "how many questions do I have left" or "what limits
+    does the chat have"."""
+    return {
+        "questions": limits.usage_of(ctx.deps.user.id),
+        "per_question": {
+            "max_characters": limits.MAX_QUESTION,
+            "conversation_messages_the_model_sees": limits.MAX_HISTORY,
+            "model_requests": limits.LIMITS.request_limit,
+            "tool_calls": limits.LIMITS.tool_calls_limit,
+        },
+        "note": "El administrador ajusta los límites de preguntas desde el panel; reiniciar el servidor pone los contadores a cero.",
+    }
+
+
+async def app_help(ctx: RunContext[ChatDeps], topic: str = "") -> dict:
+    """How the app works and where things are (not the group's data): logging in and installing it, timers and sessions,
+    completing, rating and abandoning games, seasons, days and streaks, achievements, the profile and settings, the
+    group's pages, the wishlist, recommendations, challenges, the monthly and yearly summary, notifications and Telegram,
+    who sees what and this chat. Pass a few words of the topic ("temporadas", "sesión manual", "notificaciones"); empty
+    gives the list of topics. Answer only from what it returns: if it does not say it, say you do not know."""
+    found = app_help_topics.find(topic) if topic.strip() else []
+    if not found:
+        return {"topics": app_help_topics.index(), "note": "Pide uno de estos temas con unas pocas palabras." if topic.strip() else "Temas disponibles."}
+    return {"topics": [{"topic": t.id, "title": t.title, "text": t.text, "guide_page": f"docs/guia-usuario/{t.source}"} for t in found]}
+
+
+async def achievements(ctx: RunContext[ChatDeps], query: str = "", only: Literal["mine", "missing"] | None = None) -> dict:
+    """The achievements of the running season and the lifetime ones: for each its title, whether the user has it, how many
+    players do and, for the user's own, what it is about. What the user does not have comes with no description, and the
+    hidden ones only as a count: finding out what they are about is part of the game, so never say how to get one the
+    user does not have. `query` filters by title or description, `only` keeps the user's own or the ones still missing.
+    Up to 10 are listed; progress (e.g. "35 / 100") is given for the ones that add up."""
+    catalog = group.achievements_catalog(ctx.deps.db, ctx.deps.user.id)
+    words = (query or "").lower().split()
+    shown = [a for a in catalog if not a["hidden"]]
+    if only == "mine":
+        shown = [a for a in shown if a["unlocked_by_me"]]
+    elif only == "missing":
+        shown = [a for a in shown if not a["unlocked_by_me"]]
+    if words:
+        shown = [a for a in shown if all(w in f"{a['title']} {a['description'] or ''}".lower() for w in words)]
+    return {
+        "total_visible": len([a for a in catalog if not a["hidden"]]),
+        "mine": len([a for a in catalog if a["unlocked_by_me"]]),
+        "hidden_ones_not_unlocked": len([a for a in catalog if a["hidden"]]),
+        "achievements": [
+            {
+                "title": a["title"],
+                "mine": a["unlocked_by_me"],
+                "players_who_have_it": a["unlocked_by"],
+                "kind": "lifetime" if a["lifetime"] else "season",
+                "special_level": a["special"] or None,
+                **({"description": a["description"]} if a["description"] else {}),
+                **({"progress": a["progress"]} if a["progress"] else {}),
+            }
+            for a in shown[:MAX_ITEMS]
+        ],
+        "more": max(0, len(shown) - MAX_ITEMS),
+    }
+
+
 async def my_wishlist(ctx: RunContext[ChatDeps]) -> dict:
     """The user's own wishlist: upcoming games (with the days left) and released ones they still want, and who else wants them."""
     data = wishlist.wishlist(ctx.deps.db, ctx.deps.user.id, datetime.date.today())
@@ -278,4 +344,7 @@ async def my_wishlist(ctx: RunContext[ChatDeps]) -> dict:
     }
 
 
-TOOLS = [search_games, game_info, players, player_profile, ranking, most_played_games, recent_activity, affinity_with_players, my_wishlist]
+TOOLS = [
+    search_games, game_info, players, player_profile, ranking, most_played_games, recent_activity, affinity_with_players,
+    my_wishlist, achievements, chat_limits, app_help,
+]

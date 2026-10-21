@@ -125,6 +125,18 @@ class UsageLimiter:
                     self._record(scope.key, now)
             return None
 
+    def usage(self, scope: Scope) -> list[dict]:
+        """For each window of the scope: its limit, the uses inside it and how many are left (None where it has no limit)."""
+        with self._lock:
+            now = self._clock()
+            active = scope.active()
+            uses = self._inside(scope.key, now, max(window for window, _ in active)) if active else deque()
+            rows = []
+            for window, most in scope.limits:
+                used = sum(1 for t in uses if now - t < window) if most > 0 else None
+                rows.append({"window": window, "limit": most if most > 0 else None, "used": used, "remaining": None if used is None else max(0, most - used)})
+            return rows
+
     def _record(self, key: str, now: float) -> None:
         if key not in self._uses and len(self._uses) >= MAX_KEYS:
             self._uses.pop(next(iter(self._uses)))  # the oldest key: bounds the memory whatever the users
