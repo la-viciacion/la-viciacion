@@ -20,6 +20,7 @@ from telegram.ext import (
 )
 from utils.config import Config
 from utils.my_utils import utils
+from utils.updates import PerUserUpdateProcessor
 from utils.logger import LogManager
 
 log_manager = LogManager()
@@ -93,7 +94,14 @@ warnings.filterwarnings("ignore", message=r".*per_message=False.*", category=PTB
 
 
 def main() -> None:
-    app = ApplicationBuilder().token(config.TELEGRAM_TOKEN).post_init(post_init).build()
+    app = (
+        ApplicationBuilder()
+        .token(config.TELEGRAM_TOKEN)
+        .post_init(post_init)
+        .concurrent_updates(PerUserUpdateProcessor())
+        
+        .build()
+    )
     app.add_error_handler(on_error)
     conv_handler = ConversationHandler(
         entry_points=[

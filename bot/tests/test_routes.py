@@ -1,5 +1,6 @@
 """What the bot answers: the text of every statistic and ranking, the menus, and that the keyboards and the
 handlers of app.py agree (a button with no handler behind it would do nothing)."""
+import asyncio
 import re
 import unittest
 import warnings
@@ -15,6 +16,7 @@ from telegram.ext import Application, CallbackQueryHandler, CommandHandler, Conv
 
 import app as bot_app
 import utils.keyboard as kb
+from utils.updates import PerUserUpdateProcessor
 from routes.basic_routes import BasicRoutes
 from routes.my_routes import MyRoutes
 from routes.ranking_routes import RankingRoutes
@@ -167,6 +169,10 @@ class WiringTests(unittest.TestCase):
             def post_init(self, _):
                 return self
 
+            def concurrent_updates(self, processor):
+                cls.registered["update_processor"] = processor
+                return self
+
             def build(self_inner):
                 return cls.FakeApp()
 
@@ -240,9 +246,10 @@ class RealApplicationTests(unittest.IsolatedAsyncioTestCase):
             patcher = mock.patch.object(Bot, name, new_callable=mock.AsyncMock)
             patcher.start()
             self.addCleanup(patcher.stop)
-        patcher = mock.patch.object(Bot, "username", new_callable=mock.PropertyMock, return_value="LaViciacionBot")
-        patcher.start()
-        self.addCleanup(patcher.stop)
+        for name, value in (("username", "LaViciacionBot"), ("id", 1)):  # what get_me would have told it
+            patcher = mock.patch.object(Bot, name, new_callable=mock.PropertyMock, return_value=value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
         await app.initialize()
         self.addAsyncCleanup(app.shutdown)
         self.bot = app.bot
@@ -282,6 +289,50 @@ class RealApplicationTests(unittest.IsolatedAsyncioTestCase):
                 await app.process_update(self.press("my_data", user_id=222, chat_id=GROUP_ID, chat_type="supergroup", message_id=901))
                 await app.process_update(self.press("my_data", user_id=111, chat_id=GROUP_ID, chat_type="supergroup", message_id=900))
                 self.assertEqual(my_data.await_count, 2)
+
+    async def test_the_real_application_takes_different_users_at_once_and_each_user_in_order(self):
+        """Through the library's own update loop: the wiring of the processor, not only the processor."""
+        from tests.support import GROUP_ID
+        log = []
+
+        async def my_data(self, update, context):  # stands for any route that waits for the API
+            user_id = update.effective_user.id
+            log.append(("in", user_id))
+            await asyncio.sleep(0.05)
+            log.append(("out", user_id))
+            return utils.MAIN_MENU  # the conversation stays open: the same button works again
+
+        users = [user(111, "ana", "Ana"), user(222, "bea", "Bea", user_id=2)]
+        menus = [SimpleNamespace(message_id=900), SimpleNamespace(message_id=901)]
+        with mock.patch.object(MyRoutes, "my_data", my_data):
+            app = await self.running()
+        self.assertIsInstance(app.update_processor, PerUserUpdateProcessor)
+        with mock.patch.object(bot_app.utils, "fetch_json", return_value=users),                 mock.patch.object(Message, "reply_text", new_callable=mock.AsyncMock, side_effect=menus),                 mock.patch.object(CallbackQuery, "answer", new_callable=mock.AsyncMock):
+            bot_app.utils.forget_users()
+            for player in (111, 222):
+                await app.process_update(self.command("/menu", player, chat_id=GROUP_ID))
+            await app.start()
+            self.addAsyncCleanup(app.stop)
+
+            async def finished(entries):
+                for _ in range(200):
+                    if len(log) >= entries:
+                        return
+                    await asyncio.sleep(0.01)
+                self.fail(f"the updates were not processed: {log}")
+
+            def press(user_id, message_id):
+                return self.press("my_data", user_id=user_id, chat_id=GROUP_ID, chat_type="supergroup", message_id=message_id)
+
+            await app.update_queue.put(press(111, 900))
+            await app.update_queue.put(press(222, 901))
+            await finished(4)
+            self.assertEqual([kind for kind, _ in log[:2]], ["in", "in"], log)  # both inside before either is out
+            log.clear()
+            await app.update_queue.put(press(111, 900))
+            await app.update_queue.put(press(111, 900))  # a double tap
+            await finished(4)
+            self.assertEqual(log, [("in", 111), ("out", 111), ("in", 111), ("out", 111)])
 
     def test_main_polls_with_arguments_the_real_library_accepts(self):
         self.assertIsInstance(self.application(), Application)
