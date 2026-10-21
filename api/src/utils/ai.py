@@ -5,8 +5,9 @@ What is used (switch, provider, key, model) is read from the settings on every c
 functions block on the network: call them from a worker thread.
 """
 from ..clients import google_ai, open_ai
-from ..clients.ai_error import AIError
-from . import settings
+from ..clients.ai_error import AIError, QuotaError
+from ..clients.quota import classify
+from . import ai_quota, settings
 from .logger import LogManager
 
 log_manager = LogManager()
@@ -14,7 +15,7 @@ logger = log_manager.get_logger()
 
 PROVIDERS = {"google": google_ai.generate, "openai": open_ai.generate}
 
-__all__ = ["AIError", "complete", "current", "is_ready", "prompt_for"]
+__all__ = ["AIError", "QuotaError", "complete", "current", "is_ready", "prompt_for"]
 
 
 def is_ready(use: str | None = None) -> bool:
@@ -52,17 +53,25 @@ def in_use() -> dict:
     return {"provider": provider, "model": model}
 
 
-def complete(system_prompt: str, user_prompt: str, *, temperature: float = 1.0, force: bool = False) -> str | None:
+def complete(system_prompt: str, user_prompt: str, *, temperature: float = 1.0, force: bool = False, source: str = "notice") -> str | None:
     """The text the AI writes, or None when the AI is off or has no key (`force` ignores the switch,
-    for the test button). Raises AIError if the provider fails."""
+    for the test button). Raises AIError if the provider fails, QuotaError (an AIError) if a quota ran out: that one is
+    also written to the audit log (utils/ai_quota.py), `source` saying who asked."""
     key = settings.get("ai.api_key")
     provider, model = current()
     if not key or provider not in PROVIDERS or not model or not (force or settings.get("ai.enabled")):
         return None
     try:
         return PROVIDERS[provider](key, model, system_prompt, user_prompt, temperature)
+    except QuotaError as e:
+        ai_quota.report(e.quota, source, provider, model)
+        raise
     except AIError:
         raise
     except Exception as e:
+        quota = classify(e)
+        if quota:
+            ai_quota.report(quota, source, provider, model)
+            raise QuotaError(f"{provider}: {quota.describe()}", quota) from None
         # a provider library may quote what it was given: never let the key out in the message
         raise AIError(f"{provider}: {type(e).__name__}: {str(e).replace(key, '***')}") from None

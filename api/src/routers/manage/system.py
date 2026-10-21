@@ -102,8 +102,10 @@ def test_ai(admin: models.User = Depends(auth.require_admin)):
         )
     try:
         reply = ai.complete(
-            "Responde solo con una frase corta y divertida sobre videojuegos.", "Saluda al grupo.", force=True
+            "Responde solo con una frase corta y divertida sobre videojuegos.", "Saluda al grupo.", force=True, source="ai_test"
         )
+    except ai.QuotaError as e:
+        raise HTTPException(status_code=429, detail=e.quota.describe())
     except ai.AIError as e:
         logger.error(f"AI test by {admin.username} failed: {e}", exc_info=True)
         raise HTTPException(status_code=502, detail=f"La IA no ha respondido: {e}")
@@ -121,6 +123,8 @@ def test_chat(admin: models.User = Depends(auth.require_admin)):
         )
     try:
         reply = chat_agent.probe()
+    except ai.QuotaError as e:
+        raise HTTPException(status_code=429, detail=e.quota.describe())
     except ai.AIError as e:
         logger.error(f"Chat test by {admin.username} failed: {e}", exc_info=True)
         raise HTTPException(status_code=502, detail=f"El chat no ha respondido: {e}")

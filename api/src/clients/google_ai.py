@@ -3,7 +3,8 @@ from functools import lru_cache
 from google import genai
 from google.genai import errors, types
 
-from .ai_error import AIError
+from .ai_error import AIError, QuotaError
+from .quota import classify
 
 TIMEOUT_MS = 30_000  # a chat notice is not worth a long wait (the SDK counts in milliseconds)
 
@@ -21,6 +22,9 @@ def generate(api_key: str, model: str, system_prompt: str, user_prompt: str, tem
             config=types.GenerateContentConfig(system_instruction=system_prompt, temperature=temperature),
         )
     except errors.APIError as e:
+        quota = classify(e)
+        if quota:
+            raise QuotaError(f"Google respondió {e.code}: {quota.describe()}", quota) from None
         raise AIError(f"Google respondió {e.code}: {e.message}") from None
     candidate = response.candidates[0] if response.candidates else None
     if candidate is None:
