@@ -47,7 +47,7 @@
 .chat-msg { max-width: 88%; padding: 9px 13px; border-radius: var(--radius-md); font-size: 0.94rem; line-height: 1.45; overflow-wrap: anywhere; }
 .chat-me { align-self: flex-end; white-space: pre-wrap; background: rgba(61, 217, 179, 0.16); border: 1px solid var(--border-accent); border-bottom-right-radius: 4px; }
 .chat-bot { align-self: flex-start; background: var(--bg-card); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
-.chat-bot > * + * { margin-top: 6px; }
+.chat-bot > :is(p, ul, ol) + :is(p, ul, ol) { margin-top: 6px; } /* between the blocks of an answer, not the dots of the typing indicator */
 .chat-bot ul, .chat-bot ol { padding-left: 20px; }
 .chat-bot code { padding: 1px 5px; border-radius: 5px; background: rgba(255, 255, 255, 0.08); font-size: 0.9em; }
 .chat-error { align-self: flex-start; color: #fca5a5; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.35); }

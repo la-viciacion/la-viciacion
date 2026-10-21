@@ -212,3 +212,21 @@ test('the answer is drawn with its italics, bold, code and lists, and its markup
   assert.equal(bot.querySelectorAll('p strong').length, 2); // the bold word and the heading
   assert.doesNotMatch(bot.textContent, /\*|`|#/);
 });
+
+// The dots of the typing indicator are children of a `.chat-bot` bubble like the paragraphs of an answer: a rule for the spacing between
+// the blocks of an answer once put 6 px above the second and the third dot, and the first one looked higher than the others
+test('the three dots of the typing indicator sit on the same line whatever the rules for the blocks of an answer', async () => {
+  const { readFileSync } = await import('node:fs');
+  const style = document.createElement('style');
+  style.textContent = readFileSync(new URL('../css/chat.css', import.meta.url), 'utf8');
+  document.head.append(style);
+  installApi({ 'GET /chat/status': { available: true }, 'POST /chat': () => new Promise(() => {}) });
+  await mountChat();
+  q('.chat-fab').click();
+  q('.chat-chip').click(); // the answer never arrives: the indicator stays
+  await settle();
+  const dots = [...document.querySelectorAll('.chat-typing span')];
+  assert.equal(dots.length, 3);
+  for (const dot of dots) assert.equal(parseFloat(window.getComputedStyle(dot).marginTop || '0'), 0, `margin-top ${window.getComputedStyle(dot).marginTop}`);
+  style.remove();
+});
