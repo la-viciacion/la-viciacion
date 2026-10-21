@@ -193,3 +193,22 @@ test('logging out while it is open leaves the page scrollable', async () => {
   unmountChat();
   assert.equal(document.body.classList.contains('chat-open'), false);
 });
+
+test('the answer is drawn with its italics, bold, code and lists, and its markup stays text', async () => {
+  installApi({
+    'GET /chat/status': { available: true },
+    'POST /chat': { answer: 'Tienes *Zelda* y **GTA** (`id`).\n1. Uno\n2. Dos\n- <b>x</b>\n# Título', in_scope: true },
+  });
+  await mountChat();
+  q('.chat-fab').click();
+  await ask('hola');
+  const bot = q('.chat-bot');
+  assert.equal(bot.querySelector('em').textContent, 'Zelda');
+  assert.equal(bot.querySelector('p strong').textContent, 'GTA');
+  assert.equal(bot.querySelector('code').textContent, 'id');
+  assert.deepEqual(text('ol li', bot), ['Uno', 'Dos']);
+  assert.deepEqual(text('ul li', bot), ['<b>x</b>']);
+  assert.equal(bot.querySelector('b'), null);
+  assert.equal(bot.querySelectorAll('p strong').length, 2); // the bold word and the heading
+  assert.doesNotMatch(bot.textContent, /\*|`|#/);
+});

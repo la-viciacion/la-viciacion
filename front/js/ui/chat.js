@@ -21,14 +21,20 @@ let switchedOff = false; // the API said the chat is off (503): the button goes 
 
 const root = () => document.getElementById(ID);
 
-const part = (p) => (p.bold ? html`<strong>${p.text}</strong>` : p.text);
+function part(p) {
+  if (p.code) return html`<code>${p.text}</code>`;
+  if (p.bold) return html`<strong>${p.text}</strong>`;
+  if (p.italic) return html`<em>${p.text}</em>`;
+  return p.text;
+}
 
 function answerMarkup(text) {
-  return parseAnswer(text).map((b) => (
-    b.type === 'ul'
-      ? html`<ul>${b.items.map((item) => html`<li>${item.map(part)}</li>`)}</ul>`
-      : html`<p>${b.parts.map(part)}</p>`
-  ));
+  return parseAnswer(text).map((b) => {
+    const items = (list) => list.map((item) => html`<li>${item.map(part)}</li>`);
+    if (b.type === 'ul') return html`<ul>${items(b.items)}</ul>`;
+    if (b.type === 'ol') return html`<ol>${items(b.items)}</ol>`;
+    return html`<p>${b.parts.map(part)}</p>`;
+  });
 }
 
 function bubble(turn) {
