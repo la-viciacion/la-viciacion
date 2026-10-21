@@ -424,8 +424,10 @@ class CompletionTests(UsersTestCase):
         self.assertEqual(self.complete().status_code, 200)
         second = self.complete(entry=other_platform)
         self.assertEqual((second.status_code, second.json()["detail"]), (409, messages.ALREADY_COMPLETED_IN_SEASON))
-        blocked = next(i for i in self.api("GET", "/users/ana/library", as_user="ana").json()["items"] if i["id"] == other_platform)
-        self.assertEqual(blocked["complete_blocked"], "completed_in_season")
+        # the library shows the game once, as the completed entry, whatever the platform
+        rows = [i for i in self.api("GET", "/users/ana/library", as_user="ana").json()["items"] if i["game_id"] == "celeste"]
+        self.assertEqual([(i["id"], i["completed"]) for i in rows], [(self.entry, True)])
+        self.assertEqual({p["id"] for p in rows[0]["platforms"]}, {"pc", "switch"})
 
     def test_a_closed_season_cannot_be_completed(self):
         old = self.library_entry(self.ana, "hades", datetime.date(seasons.current() - 1, 4, 1), "pc")
