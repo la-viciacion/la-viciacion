@@ -22,6 +22,10 @@ export const NO_FILTERS = { q: '', season: '', state: '', rated: '', platform: '
 
 const plain = (text) => String(text ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
+/** The platforms a row stands for: every one of its game and season, or its own platform for an item without the list. */
+export const entryPlatforms = (entry) => entry.platforms
+  || (entry.platform_id ? [{ id: entry.platform_id, name: entry.platform_name }] : []);
+
 /** The entries that pass every filter that is set; `rated` is "yes" or "no". Keeps the order. */
 export function filterEntries(entries, filters) {
   const { q, season, state, rated, platform } = { ...NO_FILTERS, ...filters };
@@ -31,7 +35,7 @@ export function filterEntries(entries, filters) {
     && (!season || String(g.season) === String(season))
     && (!state || entryState(g) === state)
     && (!rated || (rated === 'yes') === (g.score != null))
-    && (!platform || String(g.platform_id ?? NO_PLATFORM) === String(platform))
+    && (!platform || (entryPlatforms(g).length ? entryPlatforms(g) : [{ id: NO_PLATFORM }]).some((p) => String(p.id) === String(platform)))
   ));
 }
 

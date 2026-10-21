@@ -593,6 +593,37 @@ def completed_in_season(db: Session, user_id: int, game_id: str, season: int) ->
     return (game_id, season) in _completed_keys(db, user_id)
 
 
+def _representative_entries(user_id: int):
+    """The id of one entry per (game, season): a game played on several platforms in a season is one row
+    of the library. A completed entry stands for the group (a game is completed once per season, whatever
+    the platform), then the most recent one."""
+    rank = func.row_number().over(
+        partition_by=(models.UserGame.game_id, models.UserGame.season),
+        order_by=(func.coalesce(models.UserGame.completed, 0).desc(), models.UserGame.id.desc()),
+    )
+    return (
+        select(models.UserGame.id.label("id"), rank.label("rank"))
+        .where(models.UserGame.user_id == user_id)
+        .subquery("representative")
+    )
+
+
+def _platforms_by_group(db: Session, user_id: int, game_id: str | None = None) -> dict:
+    """The platforms ({id, name}) of every entry of a (game, season), most recent entry first."""
+    stmt = (
+        select(models.UserGame.game_id, models.UserGame.season, models.PlatformTag.id, models.PlatformTag.name)
+        .join(models.PlatformTag, models.PlatformTag.id == models.UserGame.platform)
+        .where(models.UserGame.user_id == user_id)
+        .order_by(models.UserGame.id.desc())
+    )
+    if game_id is not None:
+        stmt = stmt.where(models.UserGame.game_id == game_id)
+    out: dict = {}
+    for game, season, platform_id, name in db.execute(stmt).all():
+        out.setdefault((game, season), []).append({"id": platform_id, "name": name})
+    return out
+
+
 def _library_query(user_id: int, entry_id: int | None = None, game_id: str | None = None):
     from . import time_entries as time_entries_crud
 
@@ -629,6 +660,9 @@ def _library_query(user_id: int, entry_id: int | None = None, game_id: str | Non
     )
     if entry_id is not None:
         stmt = stmt.where(models.UserGame.id == entry_id)
+    else:
+        representative = _representative_entries(user_id)
+        stmt = stmt.where(models.UserGame.id.in_(select(representative.c.id).where(representative.c.rank == 1)))
     if game_id is not None:
         stmt = stmt.where(models.UserGame.game_id == game_id)
     # most recently played first; entries without sessions go last (by start date)
@@ -648,7 +682,7 @@ def is_abandoned(entry: models.UserGame, last_played: datetime.datetime | None) 
     return last_played is None or last_played <= entry.abandoned_at
 
 
-def _library_item(row, completed_keys: set, current_season: int, ratings: dict) -> dict:
+def _library_item(row, completed_keys: set, current_season: int, ratings: dict, platforms: dict) -> dict:
     entry = row.UserGame
     done = bool(entry.completed)
     abandoned = is_abandoned(entry, row.last_played)
@@ -666,6 +700,8 @@ def _library_item(row, completed_keys: set, current_season: int, ratings: dict) 
         "image_url": row.image_url,
         "platform_id": entry.platform,
         "platform_name": row.platform_name,
+        # every platform the game was played on that season: the row stands for all of them
+        "platforms": platforms.get((entry.game_id, entry.season), []),
         "season": entry.season,
         "started_date": entry.started_date,
         "last_played": row.last_played,
@@ -686,23 +722,21 @@ def _library_item(row, completed_keys: set, current_season: int, ratings: dict) 
 def get_library(
     db: Session, user_id: int, limit: int = 15, offset: int = 0, game_id: str | None = None, only_season: int | None = None
 ) -> dict:
-    """`season` in the answer is the running one (it decides what can be completed), not the filter."""
+    """One row per (game, season), whatever the platforms. `season` in the answer is the running one (it decides
+    what can be completed), not the filter."""
     season = seasons.current()
-    count = db.query(models.UserGame).filter(models.UserGame.user_id == user_id)
-    if game_id is not None:
-        count = count.filter(models.UserGame.game_id == game_id)
     query = _library_query(user_id, game_id=game_id)
     if only_season is not None:
-        count = count.filter(models.UserGame.season == only_season)
         query = query.where(models.UserGame.season == only_season)
     rows = db.execute(query.limit(limit).offset(offset)).all()
-    total = count.count()
+    total = db.execute(select(func.count()).select_from(query.order_by(None).subquery())).scalar()
     keys = _completed_keys(db, user_id)
     ratings = scores.user_scores(db, user_id)
+    platforms = _platforms_by_group(db, user_id, game_id)
     return {
         "season": season,
         "total": total,
-        "items": [_library_item(r, keys, season, ratings) for r in rows],
+        "items": [_library_item(r, keys, season, ratings, platforms) for r in rows],
     }
 
 
@@ -710,7 +744,10 @@ def get_library_item(db: Session, user_id: int, entry_id: int) -> dict | None:
     row = db.execute(_library_query(user_id, entry_id)).first()
     if row is None:
         return None
-    return _library_item(row, _completed_keys(db, user_id), seasons.current(), scores.user_scores(db, user_id))
+    return _library_item(
+        row, _completed_keys(db, user_id), seasons.current(), scores.user_scores(db, user_id),
+        _platforms_by_group(db, user_id, row.UserGame.game_id),
+    )
 
 
 def get_library_entry(db: Session, user_id: int, entry_id: int) -> models.UserGame | None:

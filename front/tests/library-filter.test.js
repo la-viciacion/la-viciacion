@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { entryState, filterEntries, shuffle, unratedGames } from '../js/lib/library-filter.js';
+import { entryPlatforms, entryState, filterEntries, shuffle, unratedGames } from '../js/lib/library-filter.js';
 
 const e = (over) => ({ id: 1, game_id: 'a', game_name: 'Celeste', season: 2026, platform_id: 1, score: null, completed: false, abandoned: false, complete_blocked: null, played_time: 60, ...over });
 
@@ -44,4 +44,22 @@ test('shuffle keeps every item and does not touch the original', () => {
   assert.deepEqual([...out].sort(), list);
   assert.deepEqual(list, [1, 2, 3, 4, 5]);
   assert.notDeepEqual(out, list);
+});
+
+test('a row that stands for several platforms matches the filter of any of them', () => {
+  const list = [
+    e({ id: 1, platform_id: 1, platforms: [{ id: 2, name: 'Switch 2' }, { id: 1, name: 'Switch' }] }),
+    e({ id: 2, game_id: 'b', platform_id: 3, platforms: [{ id: 3, name: 'PC' }] }),
+    e({ id: 3, game_id: 'c', platform_id: null, platforms: [] }),
+  ];
+  const ids = (platform) => filterEntries(list, { platform }).map((g) => g.id);
+  assert.deepEqual(ids('1'), [1]);
+  assert.deepEqual(ids('2'), [1]);
+  assert.deepEqual(ids('3'), [2]);
+  assert.deepEqual(ids('none'), [3]);
+});
+
+test('an item without the list of platforms stands for its own', () => {
+  assert.deepEqual(entryPlatforms(e({ platform_name: 'PC' })), [{ id: 1, name: 'PC' }]);
+  assert.deepEqual(entryPlatforms(e({ platform_id: null })), []);
 });
