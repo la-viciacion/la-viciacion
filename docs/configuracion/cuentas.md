@@ -41,7 +41,7 @@ SMTP_USER=lavi@ejemplo.com            # si el servidor pide login
 SMTP_PASS=la-contraseña-smtp
 ```
 
-Reinicia (`docker compose up -d`) y comprueba la configuración en **Sistema → Correo**: te dice si el correo está configurado (o qué variables faltan, y qué servidor y remitente usa, nunca la contraseña) y un botón envía un correo de prueba **a tu propio email**.
+Reinicia (`docker compose up -d`) y comprueba la configuración en **Sistema → Servicios**: te dice si el correo está configurado (o qué variables faltan, y qué servidor y remitente usa, nunca la contraseña) y un botón envía un correo de prueba **a tu propio email**.
 
 ![La tarjeta de correo del panel](../assets/screens/admin-mail.webp){ .screenshot }
 

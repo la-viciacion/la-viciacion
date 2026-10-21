@@ -31,7 +31,7 @@ The login page has **¿Has olvidado tu contraseña?**: the user types their emai
 
 Set in `.env` (see `.env.template`): `PUBLIC_URL` (where users reach the app, the link points there), `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURITY` (`starttls` on 587, the default, or `ssl` on 465), `SMTP_EMAIL` (the From address), `SMTP_USER`/`SMTP_PASS` (login, if the server asks for it; `SMTP_USER` defaults to `SMTP_EMAIL`). The answer never says whether an account exists, the link is only usable once, and using it signs out every session of that user. Accounts without an email (for instance `admin`) cannot use it: the `admin` password is `GOD_ADMIN_PASS`.
 
-To check the setup, the **Sistema → Correo** page of the admin panel: it shows whether mail is configured (or which variables are missing, and the server and sender in use, never the password) and a button that sends a test email to the email of the admin who presses it (`POST /manage/settings/test-email`). If the server refuses it, the panel shows why.
+To check the setup, the **Sistema → Servicios** page of the admin panel: it shows whether mail is configured (or which variables are missing, and the server and sender in use, never the password) and a button that sends a test email to the email of the admin who presses it (`POST /manage/settings/test-email`). If the server refuses it, the panel shows why.
 
 ## API docs
 
