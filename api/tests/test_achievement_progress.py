@@ -186,12 +186,10 @@ class SeasonViewTests(unittest.TestCase):
             self.assertTrue(got["unlocked_by_me"])
             self.assertTrue(got["lifetime"])
 
-    def test_a_secret_one_stays_known_to_whoever_earned_it_in_any_season(self):
-        got = self.view(YEAR)["EARLY_RISER"]
-        self.assertFalse(got["hidden"])
-        self.assertFalse(got["unlocked_by_me"])  # not this season
-        self.assertTrue(self.view(YEAR - 1)["EARLY_RISER"]["unlocked_by_me"])
-        self.assertTrue(self.view(YEAR, viewer=2)[4]["hidden"])  # bea never had it
+    def test_a_secret_one_is_only_revealed_to_whoever_earned_it_in_the_season_it_was_earned_in(self):
+        self.assertTrue(self.view(YEAR)[4]["hidden"])  # not this season: hidden again, even for ana
+        self.assertTrue(self.view(YEAR - 1)["EARLY_RISER"]["unlocked_by_me"])  # in its season she sees it in full
+        self.assertTrue(self.view(YEAR - 1, viewer=2)[4]["hidden"])  # bea never had it
 
     def test_a_future_season_is_refused_by_the_route(self):
         from fastapi import HTTPException
