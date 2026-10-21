@@ -97,29 +97,43 @@ export function toRequest(turns, text) {
   };
 }
 
-// **bold** inside a line; everything else is plain text (it is escaped when rendered)
-function inline(line) {
-  return line.split(/(\*\*[^*]+\*\*)/).filter(Boolean).map((part) => (
-    part.startsWith('**') && part.endsWith('**') && part.length > 4 ? { bold: true, text: part.slice(2, -2) } : { text: part }
-  ));
+// What an answer may carry of Markdown: `code`, **bold**, *italic* inside a line, headings, bulleted and numbered lists.
+// Everything else (links, tables, HTML...) stays plain text, and none of it is ever turned into markup: ui/chat.js builds the
+// elements from these parts, so what the model writes cannot add a tag, an attribute or a link.
+const INLINE = /(`[^`\s](?:[^`]*[^`\s])?`|\*\*[^*]+\*\*|\*[^*\s](?:[^*]*[^*\s])?\*)/;
+
+function token(text) {
+  if (text.startsWith('`')) return { code: true, text: text.slice(1, -1) };
+  if (text.startsWith('**')) return { bold: true, text: text.slice(2, -2) };
+  return { italic: true, text: text.slice(1, -1) };
 }
 
-const BULLET = /^\s*(?:[-*•]|\d+[.)])\s+(.*)$/;
+// split() with a group keeps what matched at the odd positions, so a stray asterisk in the plain text is never taken for one
+function inline(line) {
+  return line.split(INLINE).map((text, i) => (i % 2 ? token(text) : { text })).filter((part) => part.text);
+}
 
-/** An answer as blocks: [{ type: 'p', parts }, { type: 'ul', items: [parts] }]. The model writes a little Markdown
- * (bold, lists); nothing else is interpreted, and the text is never turned into markup. */
+const HEADING = /^\s{0,3}#{1,6}\s+(.*)$/;
+const BULLET = /^\s*[-*•]\s+(.*)$/;
+const NUMBERED = /^\s*\d+[.)]\s+(.*)$/;
+
+/** An answer as blocks: { type: 'p', parts }, { type: 'ul' | 'ol', items: [parts] }; a heading is a paragraph in bold. */
 export function parseAnswer(text) {
   const blocks = [];
+  const item = (type, parts) => {
+    const last = blocks[blocks.length - 1];
+    if (last?.type === type) last.items.push(parts);
+    else blocks.push({ type, items: [parts] });
+  };
   for (const line of String(text ?? '').split('\n')) {
     if (!line.trim()) continue;
+    const heading = line.match(HEADING);
     const bullet = line.match(BULLET);
-    if (bullet) {
-      const last = blocks[blocks.length - 1];
-      if (last?.type === 'ul') last.items.push(inline(bullet[1]));
-      else blocks.push({ type: 'ul', items: [inline(bullet[1])] });
-    } else {
-      blocks.push({ type: 'p', parts: inline(line.trim()) });
-    }
+    const numbered = line.match(NUMBERED);
+    if (heading) blocks.push({ type: 'p', parts: inline(heading[1].trim()).map((p) => (p.code ? p : { ...p, bold: true })) });
+    else if (bullet) item('ul', inline(bullet[1]));
+    else if (numbered) item('ol', inline(numbered[1]));
+    else blocks.push({ type: 'p', parts: inline(line.trim()) });
   }
   return blocks;
 }

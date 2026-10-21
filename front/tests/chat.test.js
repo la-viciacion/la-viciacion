@@ -34,13 +34,43 @@ test('an answer is split into paragraphs, lists and bold text', () => {
   const blocks = parseAnswer('Ana va **primera**.\n\n- Ana: 3 h\n- Beto: 1 h\n1. Otra\nFin');
   assert.deepEqual(blocks[0], { type: 'p', parts: [{ text: 'Ana va ' }, { bold: true, text: 'primera' }, { text: '.' }] });
   assert.equal(blocks[1].type, 'ul');
-  assert.deepEqual(blocks[1].items.map((item) => item.map((p) => p.text).join('')), ['Ana: 3 h', 'Beto: 1 h', 'Otra']);
-  assert.deepEqual(blocks[2], { type: 'p', parts: [{ text: 'Fin' }] });
+  assert.deepEqual(blocks[1].items.map((item) => item.map((p) => p.text).join('')), ['Ana: 3 h', 'Beto: 1 h']);
+  assert.equal(blocks[2].type, 'ol'); // a numbered list is another list from a bulleted one
+  assert.deepEqual(blocks[2].items.map((item) => item.map((p) => p.text).join('')), ['Otra']);
+  assert.deepEqual(blocks[3], { type: 'p', parts: [{ text: 'Fin' }] });
 });
 
-test('nothing else is interpreted: markup stays text', () => {
-  const [block] = parseAnswer('<img src=x onerror=alert(1)> **a** `code` # no');
-  assert.equal(block.parts[0].text, '<img src=x onerror=alert(1)> ');
+test('*italic*, `code` and headings are understood, as the model writes them', () => {
+  const [line] = parseAnswer('Tienes *The Legend of Zelda: Ocarina of Time* (sale el 5) y `game_id`.');
+  assert.deepEqual(line.parts, [
+    { text: 'Tienes ' }, { italic: true, text: 'The Legend of Zelda: Ocarina of Time' }, { text: ' (sale el 5) y ' },
+    { code: true, text: 'game_id' }, { text: '.' },
+  ]);
+  const [h1, h3] = parseAnswer('# Ranking\n### Horas **de hoy**');
+  assert.deepEqual(h1, { type: 'p', parts: [{ text: 'Ranking', bold: true }] });
+  assert.deepEqual(h3.parts.map((p) => p.text), ['Horas ', 'de hoy']);
+  assert.ok(h3.parts.every((p) => p.bold));
+});
+
+test('a list may use * or - or a dot, and an italic at the start of a line is not a bullet', () => {
+  const [list] = parseAnswer('* Ana\n- Beto\n• Cris');
+  assert.deepEqual([list.type, list.items.length], ['ul', 3]);
+  const [paragraph] = parseAnswer('*Hades* es genial');
+  assert.equal(paragraph.type, 'p');
+  assert.deepEqual(paragraph.parts[0], { italic: true, text: 'Hades' });
+});
+
+test('a stray asterisk, an open marker or a space inside stays text', () => {
+  for (const text of ['2 * 3 = 6', 'a * b * c', 'abierto *sin cerrar', '**', '****', '` `', 'precio: 5*']) {
+    const [block] = parseAnswer(text);
+    assert.equal(block.parts.map((p) => p.text).join(''), text, text);
+    assert.ok(block.parts.every((p) => !p.bold && !p.italic), text);
+  }
+});
+
+test('nothing else is interpreted: markup, links and tables stay text', () => {
+  const [block] = parseAnswer('<img src=x onerror=alert(1)> [x](javascript:alert(1)) | a | b |');
+  assert.deepEqual(block.parts, [{ text: '<img src=x onerror=alert(1)> [x](javascript:alert(1)) | a | b |' }]);
   assert.deepEqual(parseAnswer(''), []);
   assert.deepEqual(parseAnswer(null), []);
 });
