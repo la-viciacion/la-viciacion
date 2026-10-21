@@ -193,11 +193,7 @@ class AchievementsCatalogTests(ApiTestCase):
         with self.engine.begin() as conn:
             conn.execute(text("UPDATE achievements SET secret = 0 WHERE id = :a"), {"a": self.second})
         page = self.api("GET", f"/group/players/{self.bea}", as_user="ana").json()
-        self.assertEqual((len(page["achievements"]), page["hidden_achievements"]), (1, 1))  # still special: as hidden as a secret one
-        with self.engine.begin() as conn:
-            conn.execute(text("UPDATE achievements SET special = 0 WHERE id = :a"), {"a": self.second})
-        page = self.api("GET", f"/group/players/{self.bea}", as_user="ana").json()
-        self.assertEqual((len(page["achievements"]), page["hidden_achievements"]), (2, 0))  # nothing is hidden when nothing is secret or special
+        self.assertEqual((len(page["achievements"]), page["hidden_achievements"]), (2, 0))  # special alone hides nothing: only the aura
 
 
 class ReleasesTests(ApiTestCase):
