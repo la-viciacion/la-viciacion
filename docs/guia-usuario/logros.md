@@ -8,7 +8,7 @@ Los logros se desbloquean **solos** al jugar (nunca los pides tú) y se anuncian
 
 **Menú → Logros** tiene dos bloques, cada uno con su «Tienes X de Y»:
 
-- **De temporada**: se consiguen una vez al año y cuentan solo lo jugado en esa temporada. Hay una pastilla por temporada (la en curso por defecto) y cada una muestra quién del grupo lo consiguió *en ese año* y, en la temporada actual, cuánto te falta.
+- **De temporada**: se consiguen una vez al año y cuentan solo lo jugado en esa temporada. Hay una pastilla **Resumen**, que junta todas las temporadas (cada logro una vez, entero si lo has conseguido, con las temporadas en que lo hiciste), y una pastilla por temporada (la en curso por defecto) y cada una muestra quién del grupo lo consiguió *en ese año* y, en la temporada actual, cuánto te falta.
 - **Lifetime** («de por vida»): cuentan todo tu historial y se consiguen **una sola vez**.
 
 Cada tarjeta muestra el logro, su descripción y quién lo tiene. Los que aún no tienes aparecen **atenuados y solo con el nombre**: hay que averiguar de qué van. Si todavía no los has desbloqueado, no ves ni la descripción ni la imagen.
@@ -19,7 +19,7 @@ Los que se acumulan (horas totales, días jugados, juegos jugados, juegos comple
 
 ## Secretos y especiales
 
-- **Logro oculto**: algunos no enseñan nada hasta que los consigues, ni título, ni descripción, ni imagen. Cuando alguien desbloquea uno, al grupo solo le llega «*Fulano* ha desbloqueado un logro oculto» (por Telegram, por aviso push, en los Avisos y en la Actividad, también para quien lo tiene); se dice quién lo ha sacado, pero no cuál es. El protagonista recibe el aviso completo en privado. En la lista de logros, quien no lo tiene solo ve cuántos lo han conseguido; los nombres los ven los que ya lo han desbloqueado. Un oculto **de temporada** solo se ve entero en la temporada en que lo conseguiste: en las demás vuelve a aparecer como «Logro oculto», incluso para ti, y en el perfil de otros jugadores nunca se enseña cuál es (solo «+N logros ocultos»). Los ocultos *lifetime* no pertenecen a ninguna temporada, así que los ves siempre.
+- **Logro oculto**: algunos no enseñan nada hasta que los consigues, ni título, ni descripción, ni imagen. Cuando alguien desbloquea uno, al grupo solo le llega «*Fulano* ha desbloqueado un logro oculto» (por Telegram, por aviso push, en los Avisos y en la Actividad, también para quien lo tiene); se dice quién lo ha sacado, pero no cuál es. El protagonista recibe el aviso completo en privado. En la lista de logros, quien no lo tiene solo ve cuántos lo han conseguido; los nombres los ven los que ya lo han desbloqueado. Un oculto **de temporada** solo se ve entero en la temporada en que lo conseguiste (o en la pestaña **Resumen**, que junta todas las temporadas y dice en cuáles lo conseguiste): en las demás vuelve a aparecer como «Logro oculto», incluso para ti, y en el perfil de otros jugadores nunca se enseña cuál es (solo «+N logros ocultos»). Los ocultos *lifetime* no pertenecen a ninguna temporada, así que los ves siempre.
 - **Especiales**: brillan con un **aura de color** según lo difíciles o raros que son: **plateado** (nivel 1, un esfuerzo claro o una coincidencia poco común), **dorado** (nivel 2, meses de constancia o algo muy raro) y **morado** (nivel 3, casi inalcanzable). Un especial puede ser también secreto o no; se ve su aura aunque esté bloqueado, para que sepas que hay algo por lo que luchar.
 
 ## Los del «mundo exterior»

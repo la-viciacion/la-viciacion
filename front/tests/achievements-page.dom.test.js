@@ -136,9 +136,10 @@ test('an achievement that adds something up shows how far the player is, and the
   assert.equal(document.querySelector('.ach-progress').textContent.trim(), ''); // no count, goal or unit
 });
 
-test('the season block has a pill per season, newest first, and the running one is pressed', () => {
+test('the season block has a summary pill and then a pill per season, newest first, and the running one is pressed', () => {
   const year = new Date().getFullYear();
-  const pills = [...document.querySelectorAll('.ach-seasons [data-season]')];
+  const [summary, ...pills] = [...document.querySelectorAll('.ach-seasons [data-season]')];
+  assert.deepEqual([summary.dataset.season, summary.textContent.trim()], ['all', 'Resumen']);
   assert.deepEqual(pills.map((p) => p.dataset.season), Array.from({ length: year - 2022 }, (_, i) => String(year - i)));
   assert.deepEqual(pills.filter((p) => p.getAttribute('aria-pressed') === 'true').map((p) => p.dataset.season), [String(year)]);
   assert.equal(document.querySelectorAll('.ach-seasons').length, 1);
@@ -161,6 +162,25 @@ test('choosing a season asks for it and shows what that season had, keeping the 
   document.querySelector(`.ach-seasons [data-season="${year}"]`).click();
   await settle();
   assert.equal(calls.at(-1).path, '/group/achievements'); // the running season is the default one
+});
+
+test('the summary pill asks for every season at once and says in which seasons each was earned', async () => {
+  const year = new Date().getFullYear();
+  const calls = installApi({ 'GET /group/achievements': ({ path }) => (path.includes('summary=true')
+    ? [{ ...LIST[0], seasons: [year - 1, year] }, { ...LIST[0], id: 3, key: 'one', title: 'Solo una', seasons: [year - 2] }, LIST[1]]
+    : LIST) });
+  await page.render({ main: main() });
+  await settle();
+  document.querySelector('.ach-seasons [data-season="all"]').click();
+  await settle();
+  assert.equal(calls.at(-1).path, '/group/achievements?summary=true');
+  assert.equal(document.querySelector('.ach-seasons [aria-pressed="true"]').dataset.season, 'all');
+  assert.match(text('.ach-card')[0], new RegExp(`Conseguido en las temporadas ${year - 1}, ${year}`));
+  assert.match(text('.ach-card')[1], new RegExp(`Conseguido en la temporada ${year - 2}`));
+  assert.doesNotMatch(text('.ach-card')[2], /Conseguido en/);
+  document.querySelector(`.ach-seasons [data-season="${year}"]`).click();
+  await settle();
+  assert.equal(calls.at(-1).path, '/group/achievements');
 });
 
 test('every block starts open and can be folded, and stays as left when a season is chosen', async () => {

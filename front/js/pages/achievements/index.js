@@ -2,7 +2,9 @@
 // who of the group has unlocked them and when; the rest are listed hidden. They come in two blocks, the ones earned
 // once a season and the lifetime ones (earned once, counting the whole history). The ones that add something up show
 // how far the viewer is from them. The season block has a pill per season: each shows only the achievements of that
-// season, with who had them and whether the viewer did then. GET /group/achievements (derived, nothing stored).
+// season, with who had them and whether the viewer did then; the first pill, "Resumen", puts every season together: each
+// achievement once, in full if the viewer has earned it in any season, with the seasons they did.
+// GET /group/achievements (derived, nothing stored).
 import { API_BASE, api } from '../../lib/api.js';
 import { formatDate, formatPlayers } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
@@ -16,6 +18,12 @@ export const active = null; // it belongs to no item of the top bar
 const picture = (a) => (a.has_image
   ? html`<img class="ach-img" src="${API_BASE}/utils/achievement-image/${a.key}" alt="" loading="lazy" />`
   : html`<div class="ach-img ach-img-placeholder" aria-hidden="true">🏆</div>`);
+
+const SUMMARY = 'all'; // the pill that is not a season
+
+const earnedIn = (a) => (a.seasons?.length
+  ? html`<div class="pf-sub ach-seasons-earned">Conseguido en ${a.seasons.length === 1 ? 'la temporada' : 'las temporadas'} ${a.seasons.join(', ')}</div>`
+  : '');
 
 const who = (a) => {
   if (!a.unlocked_by) return html`<div class="pf-sub">Nadie lo ha conseguido todavía.</div>`;
@@ -61,6 +69,7 @@ const card = (a) => (a.hidden ? hiddenCard(a) : html`
     <div class="ach-body">
       ${a.description ? html`<div class="pf-sub">${a.description}</div>` : ''}
       ${progressBar(a.progress)}
+      ${earnedIn(a)}
       ${who(a)}
     </div>
   </article>`);
@@ -74,7 +83,8 @@ let shown = seasons.current(); // the season on screen in the season block
 const folded = new Set(); // the titles of the blocks the viewer has folded: they start open, and stay as left when a season changes
 
 const pills = () => html`
-  <div class="pf-season ach-seasons" role="group" aria-label="Temporada">${seasons.available().map((year) => html`
+  <div class="pf-season ach-seasons" role="group" aria-label="Temporada">
+    <button type="button" class="pf-season-badge" data-season="${SUMMARY}" aria-pressed="${String(shown === SUMMARY)}">Resumen</button>${seasons.available().map((year) => html`
     <button type="button" class="pf-season-badge" data-season="${year}" aria-pressed="${String(year === shown)}">Temporada ${year}</button>`)}
   </div>`;
 
@@ -94,7 +104,8 @@ const block = ({ title, note, seasonal }, list) => html`
 async function load(main) {
   const target = main.querySelector('#achList');
   try {
-    const list = await api(shown === seasons.current() ? '/group/achievements' : `/group/achievements?season=${shown}`);
+    const list = await api(shown === SUMMARY ? '/group/achievements?summary=true'
+      : shown === seasons.current() ? '/group/achievements' : `/group/achievements?season=${shown}`);
     if (!list) return;
     const mine = list.filter((a) => a.unlocked_by_me).length;
     mount(target, html`
@@ -122,7 +133,7 @@ export async function render({ main }) {
     }
     const pill = e.target.closest('[data-season]');
     if (!pill || pill.getAttribute('aria-pressed') === 'true') return;
-    shown = Number(pill.dataset.season);
+    shown = pill.dataset.season === SUMMARY ? SUMMARY : Number(pill.dataset.season);
     load(main);
   });
   await load(main);
