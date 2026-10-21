@@ -126,6 +126,21 @@ class AchievementsCatalogTests(ApiTestCase):
         self.assertEqual(now, {"id": self.first, "hidden": True, "unlocked_by_me": False, "secret": True, "special": 0, "lifetime": False,
                                "unlocked_by": 0})  # in any other it is a hidden one again, even for whoever earned it
 
+    def test_the_summary_puts_every_season_together_revealing_what_the_viewer_earned_in_any_of_them(self):
+        year = TODAY().year
+        with self.engine.begin() as conn:
+            conn.execute(text("UPDATE achievements SET secret = 1 WHERE id IN (:a, :b)"), {"a": self.first, "b": self.second})
+        self.award(self.ana, self.first, datetime.date(year - 1, 5, 1))
+        self.award(self.ana, self.first, datetime.date(year, 2, 1))
+        self.award(self.bea, self.first, datetime.date(year - 2, 3, 1))
+        summary = {a["id"]: a for a in self.api("GET", "/group/achievements", as_user="ana", params={"summary": "true"}).json()}
+        first = summary[self.first]
+        self.assertEqual((first["hidden"], first["unlocked_by_me"], first["seasons"], first["unlocked_by"]), (False, True, [year - 1, year], 2))
+        self.assertIsNotNone(first["description"])  # secret, but earned: in full, whichever the seasons
+        self.assertEqual(summary[self.second]["hidden"], True)  # not earned: still a hidden one
+        bea = {a["id"]: a for a in self.api("GET", "/group/achievements", as_user="bea", params={"summary": "true"}).json()}
+        self.assertEqual(bea[self.first]["seasons"], [year - 2])
+
     def test_one_that_is_not_valid_yet_is_listed_hidden_unless_the_viewer_has_it(self):
         with self.engine.begin() as conn:
             conn.execute(text("UPDATE achievements SET valid_from_season = :s WHERE id IN (:a, :b)"), {"s": TODAY().year + 1, "a": self.first, "b": self.second})
