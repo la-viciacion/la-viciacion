@@ -106,6 +106,12 @@ def _retention(value: int) -> str | None:
 
 PROMPT_MAX = 4000
 
+LIMIT_MAX = 100000
+
+
+def _limit(value: int) -> str | None:
+    return None if 0 <= value <= LIMIT_MAX else f"Debe estar entre 0 (sin límite) y {LIMIT_MAX}"
+
 
 def _prompt(value: str) -> str | None:
     return None if len(value) <= PROMPT_MAX else f"Como máximo {PROMPT_MAX} caracteres"
@@ -149,6 +155,13 @@ REGISTRY: dict[str, Spec] = {
     # notices (ai.provider, ai.api_key); only the model may be its own (CHAT_AI_MODEL, optional: without it, ai.model).
     "chat.enabled": Spec("bool", True),
     "chat.model": Spec("str", None, env="CHAT_AI_MODEL", env_only=True),
+    # Questions the chat answers (routers/chat.py), 0 = no limit: per player in the last minute, hour and 24 hours, and
+    # in all for the group (the provider's quota is the project's, not each player's)
+    "chat.limit_user_minute": Spec("int", 5, check=_limit),
+    "chat.limit_user_hour": Spec("int", 30, check=_limit),
+    "chat.limit_user_day": Spec("int", 100, check=_limit),
+    "chat.limit_group_minute": Spec("int", 10, check=_limit),
+    "chat.limit_group_day": Spec("int", 300, check=_limit),
     "chat.prompt": Spec("str", CHAT_PROMPT.strip(), check=_prompt, resettable=True),
     "telegram.token": Spec("str", None, secret=True, env_only=True, env="TELEGRAM_TOKEN", check=_token),
     "telegram.group_id": Spec("str", None, env_only=True, env="TELEGRAM_GROUP_ID", check=_chat_id),
