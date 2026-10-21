@@ -39,6 +39,12 @@ class ScopeTests(unittest.TestCase):
         self.assertEqual(run("bot/src/routes/my_routes.py"), ({"bot-tests", "api-tests", "mariadb"}, {"bot"}))
         self.assertEqual(run("bot/tests/test_gate.py"), ({"bot-tests"}, {"bot"}))
 
+    def test_the_user_guide_runs_the_api_test_that_checks_the_chat_help_against_it_and_the_rest_of_docs_nothing(self):
+        self.assertEqual(run("docs/guia-usuario/sesiones.md"), ({"api-tests"}, set()))
+        self.assertEqual(run("docs/guia-usuario/sesiones.md", "front/css/a.css"), ({"api-tests", "front-tests"}, {"front"}))
+        for path in ("docs/desarrollo/features.md", "docs/configuracion/panel-admin.md", "docs/index.md"):
+            self.assertEqual(run(path), (set(), set()), path)
+
     def test_root_files_the_tests_read(self):
         self.assertEqual(run(".env.template"), ({"api-tests"}, set()))
         self.assertEqual(run("docker-compose.yml"), ({"api-tests", "mariadb"}, set()))
@@ -73,9 +79,10 @@ class WhatTheTestsReadTests(unittest.TestCase):
                 read.add(match.group(1))
             if "ROOT /" in text or "ROOT.glob" in text:
                 read.add("<root>")
-        # front/js (test_front_api_paths), bot/src (test_mariadb_bot_contract) and files of the repository root
-        # (.env.template, docker-compose*.yml, */Dockerfile) are the reads ci_scope.py knows about
-        self.assertEqual(read, {"front", "bot", "<root>"})
+        # front/js (test_front_api_paths), bot/src (test_mariadb_bot_contract), docs/guia-usuario (test_chat: the chat's
+        # help topics name pages of it) and files of the repository root (.env.template, docker-compose*.yml,
+        # */Dockerfile) are the reads ci_scope.py knows about
+        self.assertEqual(read, {"front", "bot", "docs", "<root>"})
 
 
 if __name__ == "__main__":

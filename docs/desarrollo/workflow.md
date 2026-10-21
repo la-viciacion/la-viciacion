@@ -30,7 +30,8 @@ A pull request only runs the checks its files can affect; the release workflow (
 
 | The change touches | Runs |
 |---|---|
-| `docs/`, `design/`, `*.md` at the root, `LICENSE`, `.gitignore`, `.gitattributes`, the PR template, `dependabot.yml` | nothing but the PR title |
+| `docs/` (except `docs/guia-usuario/`), `design/`, `*.md` at the root, `LICENSE`, `.gitignore`, `.gitattributes`, the PR template, `dependabot.yml` | nothing but the PR title |
+| `docs/guia-usuario/` | the API tests (one of them checks that the topics of the chat's help name pages of the guide that exist) |
 | `front/` | front tests and lint, front image; plus the API tests when it is `front/js/` or `front/Dockerfile` (a test reads them) |
 | `api/` | API tests, MariaDB tests, API image |
 | `bot/src/` | bot tests, bot image, API tests and MariaDB tests (the contract test and the `.env.template` check read the bot's code) |

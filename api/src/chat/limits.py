@@ -18,6 +18,7 @@ LIMITS = UsageLimits(request_limit=10, tool_calls_limit=8, total_tokens_limit=60
 USER_LIMITS = (("chat.limit_user_minute", 60), ("chat.limit_user_hour", 3600), ("chat.limit_user_day", 86400))
 GROUP_LIMITS = (("chat.limit_group_minute", 60), ("chat.limit_group_day", 86400))
 GROUP_KEY = "group"
+WINDOW_NAMES = {60: "minute", 3600: "hour", 86400: "day"}
 
 limiter = UsageLimiter()
 
@@ -28,3 +29,11 @@ def scopes_of(user_id: int) -> list[Scope]:
         return tuple((window, settings.get(key)) for key, window in table)
 
     return [Scope(f"user:{user_id}", "user", limits(USER_LIMITS)), Scope(GROUP_KEY, "group", limits(GROUP_LIMITS))]
+
+
+def usage_of(user_id: int) -> dict:
+    """How many questions each limit allows and how many are left to this player and to the group, now."""
+    return {
+        scope.name: {WINDOW_NAMES[row["window"]]: {k: row[k] for k in ("limit", "used", "remaining")} for row in limiter.usage(scope)}
+        for scope in scopes_of(user_id)
+    }
