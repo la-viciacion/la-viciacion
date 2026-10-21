@@ -27,6 +27,16 @@ const ACTIONS = [
   ['POST', /^hltb-sync\//, 'Usó la sincronización de tiempos con HowLongToBeat'],
 ];
 
+// Who asked the AI when its quota ran out (api/src/utils/ai_quota.py `source`)
+const AI_SOURCES = { chat: 'el chat', chat_test: 'la prueba del chat', ai_test: 'la prueba de la IA', welcome: 'la bienvenida del grupo', notice: 'un aviso' };
+const AI_PERIODS = { minute: ' por minuto', day: ' por día', billing: ' de facturación' };
+
+function aiQuota(e) {
+  const source = String(e.detail?.source || '');
+  const who = AI_SOURCES[source] || (source.startsWith('notice:') ? 'un aviso' : source || 'la IA');
+  return `Se agotó el cupo de la IA${AI_PERIODS[e.detail?.kind] || ''} al pedirlo ${who}`;
+}
+
 // Security events (rows with an `event`): the sentence, or a function of the entry when the detail changes it
 const EVENTS = {
   login: 'Inició sesión',
@@ -39,6 +49,7 @@ const EVENTS = {
   password_reset_failed: 'Usó un enlace de recuperación que no vale',
   profile_updated: (e) => `Cambió ${Object.keys(e.detail?.changed || {}).map((k) => (k === 'telegram_id' ? 'el id de Telegram' : 'el email')).join(' y ')}${e.detail?.account && e.detail.account !== e.username ? ` de ${e.detail.account}` : ''}`,
   admin_denied: 'Intentó usar el panel de administración sin ser admin',
+  ai_quota: aiQuota,
 };
 
 const VERB = { POST: 'Creó', PUT: 'Cambió', PATCH: 'Editó', DELETE: 'Borró' };

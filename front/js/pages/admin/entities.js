@@ -354,7 +354,7 @@ ENTITIES.audit = {
   endpoint: '/manage/audit',
   filters: ['user'],
   selects: [
-    { key: 'events', label: 'Tipo', options: [['', 'Tipo: todos'], ['false', 'Cambios del panel'], ['true', 'Accesos y seguridad']] },
+    { key: 'events', label: 'Tipo', options: [['', 'Tipo: todos'], ['false', 'Cambios del panel'], ['true', 'Accesos, seguridad e IA']] },
     { key: 'entity', label: 'Sección', options: [['', 'Sección: todas'], ...ENTITY_OPTIONS] },
     { key: 'method', label: 'Acción', options: [['', 'Acción: todas'], ['POST', 'Creaciones'], ['PATCH', 'Ediciones'], ['PUT', 'Cambios de ajustes'], ['DELETE', 'Borrados']] },
   ],
