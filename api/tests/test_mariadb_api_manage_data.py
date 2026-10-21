@@ -237,8 +237,10 @@ class SessionsAdminTests(ManageTestCase):
         self.assertEqual(self.admin("POST", "/timers", json=self.body(notes="x" * 501)).status_code, 422)
 
     def test_the_same_session_twice_is_a_conflict(self):
-        self.assertEqual(self.admin("POST", "/timers", json=self.body()).status_code, 201)
-        self.assertEqual(self.admin("POST", "/timers", json=self.body()).status_code, 409)
+        # one body, sent twice: `body()` reads the clock to the second, so two calls a second apart are two different sessions
+        body = self.body()
+        self.assertEqual(self.admin("POST", "/timers", json=body).status_code, 201)
+        self.assertEqual(self.admin("POST", "/timers", json=body).status_code, 409)
 
     def listing(self):
         self.session(self.ana, "celeste", ago(hours=9), 60, "pc")
