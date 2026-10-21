@@ -47,6 +47,7 @@ Tus retos terminados, con cómo te fue, quedan en **Perfil → Resumen → Retos
 
 Si el administrador tiene la IA activada, verás un botón redondo abajo a la derecha en todas las pantallas. Ábrelo y pregunta lo que quieras sobre videojuegos y sobre los datos del grupo: quién lleva más horas, qué juegos de terror tenéis, cuál es tu racha, cuánto ha jugado alguien a un juego, qué has apuntado en deseados...
 
+- Al abrirlo vacío te propone tres preguntas al azar (otras cada vez que empiezas una conversación) para que veas qué puedes preguntarle.
 - Solo habla de videojuegos y de los datos de La Viciación; de otras cosas no te responderá.
 - No guarda las conversaciones: al recargar la página o cerrar sesión empiezas de cero. El botón ↺ también empieza una nueva.
 - Ve lo mismo que ves tú en el grupo (nunca la biblioteca ni los datos privados de otra persona).
