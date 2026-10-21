@@ -9,6 +9,8 @@
 //     once its season is closed the completion is frozen
 //   - a pending game of the current season can be given up (and taken back) with the "Abandonar" (and "Retomar") button of
 //     its row. Playing it again resumes it by itself
+//   - a game played on several platforms in a season is one row (the API groups its entries); the buttons act on
+//     the entry the API picked to stand for them
 //   - "Sesiones" lists the sessions of the entry (game and season); those of the current season
 //     can be corrected or deleted there
 // The API enforces the rules (once per game and season, current season only for completing,
@@ -17,7 +19,7 @@ import { api, jsonRequest } from '../../lib/api.js';
 import { blockedReason } from '../../lib/completion.js';
 import { formatDate, formatDateTime, formatDuration, formatRelative } from '../../lib/format.js';
 import { html, mount, raw } from '../../lib/html.js';
-import { NO_FILTERS, NO_PLATFORM, STATES, entryState, filterEntries, unratedGames } from '../../lib/library-filter.js';
+import { NO_FILTERS, NO_PLATFORM, STATES, entryPlatforms, entryState, filterEntries, unratedGames } from '../../lib/library-filter.js';
 import { gameHref } from '../../lib/links.js';
 import { platformName } from '../../lib/platforms.js';
 import { SCORE_HINT, SCORE_MAX, SCORE_MIN, parseScore, saveScore } from '../../lib/score.js';
@@ -182,7 +184,8 @@ export function createLibrary(el, options) {
   // ── Filters (the full list) ───────────────────────────────
   function drawBar() {
     const years = [...new Set(items.map((g) => g.season))].sort((a, b) => b - a);
-    const platforms = new Map(items.map((g) => [String(g.platform_id ?? NO_PLATFORM), g.platform_name || 'Sin plataforma']));
+    const platforms = new Map(items.flatMap((g) => (entryPlatforms(g).length ? entryPlatforms(g) : [{ id: NO_PLATFORM, name: 'Sin plataforma' }])
+      .map((p) => [String(p.id), p.name])));
     const pending = unratedGames(items).length;
     mount(el.querySelector('.pf-lib-bar'), html`
       <input class="adm-input" type="search" data-filter="q" value="${filters.q}" placeholder="Buscar juego" aria-label="Buscar juego" />
@@ -256,7 +259,7 @@ export function createLibrary(el, options) {
         <div class="pf-row-main">
           <div class="pf-game-title"><strong><a class="game-link" href="${gameHref(g.game_id)}">${g.game_name}</a></strong> ${scoreBadge(g.score)} ${status(g)}</div>
           <div class="pf-sub">
-            ${g.platform_name || 'Sin plataforma'} · Temporada ${g.season} · ${formatDuration(g.played_time)}
+            ${entryPlatforms(g).map((p) => p.name).join(' · ') || 'Sin plataforma'} · Temporada ${g.season} · ${formatDuration(g.played_time)}
             ${g.last_played ? ` · Última sesión: ${formatRelative(g.last_played)}` : ''}
           </div>
           ${g.complete_blocked ? html`<div class="pf-lock">🔒 ${blockedReason(g, season)}</div>` : ''}

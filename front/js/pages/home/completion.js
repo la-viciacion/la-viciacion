@@ -1,11 +1,12 @@
 // "Marcar completado" from the history: a modal with the library entries of one game (one per
-// platform and season). The API decides what can be completed; this only offers it. Dates,
+// season, naming every platform it was played on). The API decides what can be completed; this only offers it. Dates,
 // unmarking and the sessions of a game are in the profile (the games list of the profile summary).
 // Once a game is completed, a second modal (rating.js) offers to rate it.
 import { api, jsonRequest } from '../../lib/api.js';
 import { blockedReason } from '../../lib/completion.js';
 import { formatDate, formatDuration } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
+import { entryPlatforms } from '../../lib/library-filter.js';
 import { modalHeader, openModal } from '../../ui/modal.js';
 import { toast } from '../../ui/toast.js';
 import { scoreBadge } from '../../ui/score-badge.js';
@@ -36,7 +37,7 @@ export async function openCompletion({ username, game, onChange }) {
       ${items.length ? items.map((g) => html`
         <div class="comp-entry">
           <div>
-            <div><strong>${g.platform_name || 'Sin plataforma'}</strong> · Temporada ${g.season} ${status(g)}</div>
+            <div><strong>${entryPlatforms(g).map((p) => p.name).join(' · ') || 'Sin plataforma'}</strong> · Temporada ${g.season} ${status(g)}</div>
             <div class="pf-sub">${formatDuration(g.played_time)} jugados</div>
           </div>
           ${action(g)}
