@@ -6,6 +6,7 @@ sees the group as the logged-in user does (`deps.user`). There is no tool that w
 blocking body on purpose: the agent runs them one after another on its own thread, so the one DB session is
 never used by two at once."""
 import datetime
+import unicodedata
 from dataclasses import dataclass
 from typing import Literal
 
@@ -13,7 +14,7 @@ from pydantic_ai import ModelRetry, RunContext
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from ..crud import activity, game_overview, games, group, rankings, time_entries, wishlist
+from ..crud import activity, affinity, game_overview, games, group, rankings, time_entries, wishlist
 from ..database import models
 from ..utils import seasons
 
@@ -67,26 +68,48 @@ def find_game(db: Session, text: str) -> models.Game:
     raise ModelRetry("Hay varios juegos que encajan, usa el nombre exacto o pregunta cuál: " + "; ".join(g.name for g in found))
 
 
-async def search_games(ctx: RunContext[ChatDeps], query: str) -> list[dict]:
-    """Looks for games of the group's catalog by a part of the name, a genre or a tag ("terror", "rpg", "zelda").
-    Returns up to 10 with their genres, release date and average time to finish (hours)."""
-    like = f"%{query.strip()}%"
-    found = (
-        ctx.deps.db.query(models.Game)
-        .filter(or_(models.Game.name.like(like), models.Game.genres.like(like), models.Game.tags.like(like)))
-        .order_by(models.Game.name)
-        .limit(MAX_ITEMS)
-        .all()
-    )
-    return [
-        {
-            "name": g.name,
-            "genres": games.genre_list(g.genres),
-            "release_date": _day(g.release_date),
-            "average_hours_to_finish": hours(g.avg_time) if g.avg_time else None,
-        }
-        for g in found
+# The genres and tags of the catalog come from RAWG, in English: what a player asks for in Spanish, as RAWG calls it
+SEARCH_TERMS = {
+    "terror": "horror", "miedo": "horror", "rol": "rpg", "plataformas": "platformer", "plataforma": "platformer",
+    "cooperativo": "co-op", "cooperativos": "co-op", "cooperacion": "co-op", "mundo abierto": "open world",
+    "carreras": "racing", "conduccion": "racing", "estrategia": "strategy", "puzle": "puzzle", "puzles": "puzzle",
+    "rompecabezas": "puzzle", "lucha": "fighting", "peleas": "fighting", "disparos": "shooter", "tiros": "shooter",
+    "deportes": "sports", "deporte": "sports", "simulacion": "simulation", "aventura": "adventure", "aventuras": "adventure",
+    "accion": "action", "sigilo": "stealth", "supervivencia": "survival", "un jugador": "singleplayer",
+    "multijugador": "multiplayer", "indie": "indie", "casual": "casual", "arcade": "arcade", "musica": "music",
+    "ritmo": "music", "familiar": "family", "educativo": "educational", "fantasia": "fantasy", "ciencia ficcion": "sci-fi",
+}
+
+
+def search_terms(query: str) -> list[str]:
+    """What to look for: the words as typed and, when it is one the catalog calls otherwise, its English name."""
+    typed = query.strip()
+    plain = "".join(c for c in unicodedata.normalize("NFD", typed.lower()) if not unicodedata.combining(c))
+    return [typed] + ([SEARCH_TERMS[plain]] if plain in SEARCH_TERMS else [])
+
+
+async def search_games(ctx: RunContext[ChatDeps], query: str) -> dict:
+    """Looks for games of the group's catalog by a part of the name, a genre or a tag ("terror", "rpg", "zelda"; the
+    genres and tags are in English in the catalog, and common Spanish words are translated). Returns up to 10 with their
+    genres, release date and average time to finish (hours)."""
+    conditions = [
+        column.like(f"%{term}%") for term in search_terms(query) for column in (models.Game.name, models.Game.genres, models.Game.tags)
     ]
+    found = ctx.deps.db.query(models.Game).filter(or_(*conditions)).order_by(models.Game.name).limit(MAX_ITEMS).all()
+    result: dict = {
+        "games": [
+            {
+                "name": g.name,
+                "genres": games.genre_list(g.genres),
+                "release_date": _day(g.release_date),
+                "average_hours_to_finish": hours(g.avg_time) if g.avg_time else None,
+            }
+            for g in found
+        ]
+    }
+    if not found:
+        result["note"] = "No hay juegos que encajen en el catálogo. No sigas buscando: dilo."
+    return result
 
 
 async def game_info(ctx: RunContext[ChatDeps], game: str) -> dict:
@@ -203,10 +226,16 @@ async def most_played_games(ctx: RunContext[ChatDeps], season: int | None = None
     return [{"name": r["name"], "hours": hours(r["played_time"])} for r in rows]
 
 
-async def recent_activity(ctx: RunContext[ChatDeps], limit: int = 10) -> list[dict]:
+ActivityKind = Literal["played", "started", "completed", "rated", "achievement"]
+FEED_WINDOW = 50  # events looked at when one kind is asked for: the latest of that kind may be further back
+
+
+async def recent_activity(ctx: RunContext[ChatDeps], limit: int = 10, kind: ActivityKind | None = None) -> list[dict]:
     """The latest things that happened in the group: sessions played, games started or completed, ratings and
-    achievements (a hidden achievement is reported without who nor which)."""
-    events = activity.feed(ctx.deps.db, limit=max(1, min(limit, MAX_ITEMS)))["items"]
+    achievements (a hidden achievement is reported without who nor which). `kind` keeps only one of those."""
+    limit = max(1, min(limit, MAX_ITEMS))
+    events = activity.feed(ctx.deps.db, limit=FEED_WINDOW if kind else limit)["items"]
+    events = [e for e in events if kind is None or e["type"] == kind][:limit]
     return [
         {
             "type": e["type"],
@@ -218,6 +247,16 @@ async def recent_activity(ctx: RunContext[ChatDeps], limit: int = 10) -> list[di
             **({"rating_out_of_100": e["score"]} if e.get("score") is not None else {}),
         }
         for e in events
+    ]
+
+
+async def affinity_with_players(ctx: RunContext[ChatDeps]) -> list[dict]:
+    """How alike the user's taste is to each other player's (percent, games and ratings in common), the most alike
+    first; no percent when there is too little in common to say."""
+    names = {u.id: u.name or u.username for u in ctx.deps.db.query(models.User).filter(models.not_god())}
+    return [
+        {"name": names[r["user_id"]], "percent": r["percent"], "shared_games": r["shared_games"], "shared_rated": r["shared_rated"]}
+        for r in affinity.with_everyone(ctx.deps.db, ctx.deps.user.id)
     ]
 
 
@@ -239,4 +278,4 @@ async def my_wishlist(ctx: RunContext[ChatDeps]) -> dict:
     }
 
 
-TOOLS = [search_games, game_info, players, player_profile, ranking, most_played_games, recent_activity, my_wishlist]
+TOOLS = [search_games, game_info, players, player_profile, ranking, most_played_games, recent_activity, affinity_with_players, my_wishlist]

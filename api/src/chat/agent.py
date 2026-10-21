@@ -18,11 +18,16 @@ from ..clients.ai_error import AIError, QuotaError
 from ..clients.quota import classify
 from ..database import models
 from ..utils import ai_quota, messages, seasons, settings
+from ..utils.logger import LogManager
 from . import model as chat_model
 from .tools import TOOLS, ChatDeps
 
+logger = LogManager().get_logger()
+
 MAX_HISTORY = 10  # messages of the conversation the model sees: older ones are dropped
-LIMITS = UsageLimits(request_limit=8, tool_calls_limit=8, output_tokens_limit=1500)
+# The tokens are those of the whole run (every request of it, the thinking of a reasoning model included): a cap on the
+# output alone would cut a plain question short. This one only stops a conversation that runs away.
+LIMITS = UsageLimits(request_limit=10, tool_calls_limit=8, total_tokens_limit=60_000)
 SETTINGS = ModelSettings(temperature=0.3, timeout=30)  # a chat answer that takes longer is a failure, not patience
 
 
@@ -83,7 +88,9 @@ def ask(db: Session, user: models.User, question: str, history: list[tuple[str, 
             message_history=history_messages(history),
             usage_limits=LIMITS,
         )
-    except UsageLimitExceeded:
+    except UsageLimitExceeded as e:
+        # which limit it was is what tells whether a question is too big or a limit too tight
+        logger.warning(f"Chat question stopped by a usage limit: {e}")
         return Answer(messages.CHAT_TOO_COMPLEX, True)
     except Exception as e:
         raise failure(e, "chat") from None

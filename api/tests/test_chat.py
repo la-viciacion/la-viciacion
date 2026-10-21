@@ -102,18 +102,59 @@ class ToolTests(unittest.TestCase):
         self.assertNotIn("Admin", str(error.exception))
         self.assertEqual(tools.find_player(self.db, "BETO").id, 2)
 
+    def search(self, query):
+        return self.run_tool(tools.search_games, query)
+
     def test_search_finds_by_genre_and_tag_not_only_by_name(self):
-        self.assertEqual([g["name"] for g in self.run_tool(tools.search_games, "horror")], ["Hollow Knight"])
-        self.assertEqual([g["name"] for g in self.run_tool(tools.search_games, "action")], ["Hollow Hunt", "Hollow Knight"])
+        self.assertEqual([g["name"] for g in self.search("horror")["games"]], ["Hollow Knight"])
+        self.assertEqual([g["name"] for g in self.search("action")["games"]], ["Hollow Hunt", "Hollow Knight"])
+
+    def test_search_understands_the_spanish_words_of_the_genres_and_tags(self):
+        self.assertEqual([g["name"] for g in self.search("terror")["games"]], ["Hollow Knight"])
+        self.assertEqual([g["name"] for g in self.search("Terror ")["games"]], ["Hollow Knight"])
+        self.assertEqual([g["name"] for g in self.search("Simulación")["games"]], ["Stardew Valley"])
+        self.assertEqual([g["name"] for g in self.search("acción")["games"]], ["Hollow Hunt", "Hollow Knight"])
+        self.assertEqual(tools.search_terms("mundo abierto"), ["mundo abierto", "open world"])
+
+    def test_an_empty_search_tells_the_model_to_stop_looking(self):
+        found = self.search("nada que ver")
+        self.assertEqual(found["games"], [])
+        self.assertIn("No sigas buscando", found["note"])
+        self.assertNotIn("note", self.search("stardew"))
 
     def test_game_info_adds_up_the_group_and_lists_each_player(self):
         info = self.run_tool(tools.game_info, "Hollow Knight")
         self.assertEqual((info["players_count"], info["total_hours"]), (2, 4.0))
         self.assertEqual([(p["name"], p["hours"]) for p in info["players"]], [("Ana", 3.0), ("Beto", 1.0)])
 
+    def test_the_activity_can_be_limited_to_one_kind_and_the_latest_of_it_is_found_further_back(self):
+        everything = self.run_tool(tools.recent_activity)
+        self.assertTrue({e["type"] for e in everything} >= {"played", "started"})
+        only = self.run_tool(tools.recent_activity, kind="played")
+        self.assertTrue(only and {e["type"] for e in only} == {"played"})
+        self.assertEqual(self.run_tool(tools.recent_activity, kind="achievement"), [])
+
+    def test_affinity_with_everybody_comes_in_one_call_without_the_user_or_the_emergency_account(self):
+        rows = self.run_tool(tools.affinity_with_players)
+        self.assertEqual([r["name"] for r in rows], ["Beto"])
+        self.assertEqual(set(rows[0]), {"name", "percent", "shared_games", "shared_rated"})
+
     def test_players_lists_the_group_without_the_emergency_account(self):
         names = [p["name"] for p in self.run_tool(tools.players)]
         self.assertCountEqual(names, ["Ana", "Beto"])
+
+
+class LimitsTests(unittest.TestCase):
+    def test_a_question_is_capped_in_calls_and_in_the_tokens_of_the_whole_run_not_in_the_output_alone(self):
+        self.assertEqual((agent.LIMITS.request_limit, agent.LIMITS.tool_calls_limit), (10, 8))
+        # a reasoning model's thinking counts as output and the output of every request adds up: a cap on it
+        # stopped "¿Qué juegos de terror tenemos?"
+        self.assertIsNone(agent.LIMITS.output_tokens_limit)
+        self.assertGreaterEqual(agent.LIMITS.total_tokens_limit, 30_000)
+
+    def test_the_prompt_asks_for_few_calls_and_says_the_catalog_is_in_english(self):
+        self.assertIn("parsimonia", chat_prompt.CHAT_PROMPT)
+        self.assertIn("inglés", chat_prompt.CHAT_PROMPT)
 
 
 class AgentTests(unittest.TestCase):
@@ -171,8 +212,10 @@ class AgentTests(unittest.TestCase):
 
     def test_a_question_that_needs_too_many_tool_calls_is_cut_short_with_a_friendly_answer(self):
         loop = FunctionModel(lambda history, info: ModelResponse(parts=[ToolCallPart(tool_name="players", args={})]))
-        answer = agent.ask(self.db, self.user, "dame todo", [], model=loop)
+        with self.assertLogs(agent.logger, "WARNING") as logged:
+            answer = agent.ask(self.db, self.user, "dame todo", [], model=loop)
         self.assertEqual(answer.text, messages.CHAT_TOO_COMPLEX)
+        self.assertIn("usage limit", logged.output[0])  # which one it was, to tell a big question from a tight limit
 
     def test_a_provider_failure_becomes_an_ai_error_without_the_key(self):
         def fail(history, info):

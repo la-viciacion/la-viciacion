@@ -76,6 +76,17 @@ def _tastes(db: Session, user_ids: list[int]) -> dict[int, dict]:
     return tastes
 
 
+def with_everyone(db: Session, viewer_id: int) -> list[dict]:
+    """The affinity of the viewer with every other player (never the emergency account), the most alike first; those
+    with too little in common to say come last. One load of the tastes for all of them."""
+    others = [
+        user_id for (user_id,) in db.query(models.User.id).filter(models.not_god(), models.User.id != viewer_id)
+    ]
+    tastes = _tastes(db, [viewer_id, *others])
+    rows = [{"user_id": user_id, **score(tastes[viewer_id], tastes[user_id])} for user_id in others]
+    return sorted(rows, key=lambda r: (r["percent"] is None, -(r["percent"] or 0), r["user_id"]))
+
+
 def between(db: Session, viewer_id: int, player_id: int) -> dict:
     """The affinity of the viewer with another player (see `score`)."""
     tastes = _tastes(db, [viewer_id, player_id])
