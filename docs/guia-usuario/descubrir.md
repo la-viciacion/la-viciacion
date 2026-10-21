@@ -49,7 +49,8 @@ Si el administrador tiene la IA activada, verás un botón redondo abajo a la de
 
 - Al abrirlo vacío te propone tres preguntas al azar (otras cada vez que empiezas una conversación) para que veas qué puedes preguntarle.
 - Solo habla de videojuegos y de los datos de La Viciación; de otras cosas no te responderá.
+- También sabe **cómo funciona la app** (temporadas, rachas, sesiones, notificaciones, quién ve qué…), qué logros te faltan (sin contarte de qué van los que aún no tienes) y cuántas preguntas te quedan en el chat.
 - No guarda las conversaciones: al recargar la página o cerrar sesión empiezas de cero. El botón ↺ también empieza una nueva.
 - Ve lo mismo que ves tú en el grupo (nunca la biblioteca ni los datos privados de otra persona).
-- Hay un límite de preguntas por hora para que nadie gaste el cupo de la IA.
+- Hay un límite de preguntas por minuto, por hora y por día para cada jugador, y otro para todo el grupo, para que nadie gaste el cupo de la IA. Si te pasas, el chat te dice cuál y cuánto esperar. El administrador los ajusta.
 
