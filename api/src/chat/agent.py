@@ -4,6 +4,7 @@ The scope is limited three ways: the instructions (the admin's `chat.prompt`), t
 tools.py) and hard caps on what one question may cost (UsageLimits, a timeout). The answer is structured so the
 code, not only the prompt, knows when a question was out of scope."""
 import datetime
+import time
 from dataclasses import dataclass
 
 from pydantic import BaseModel, Field
@@ -24,7 +25,11 @@ from .tools import TOOLS, ChatDeps
 
 logger = LogManager().get_logger()
 
-SETTINGS = ModelSettings(temperature=0.3, timeout=30)  # a chat answer that takes longer is a failure, not patience
+# A question is answered from what the tools return, so the model has nothing to think over: with its reasoning on, a plain
+# question took 40 to 48 s. `thinking=False` turns it off (the lowest level on a model that cannot be turned off) and is
+# ignored by a model that does not reason, whatever the provider.
+# A request that takes longer than the timeout is a failure, not patience.
+SETTINGS = ModelSettings(temperature=0.3, timeout=30, thinking=False)
 
 
 class Reply(BaseModel):
@@ -76,6 +81,7 @@ def failure(e: Exception, source: str) -> AIError:
 
 def ask(db: Session, user: models.User, question: str, history: list[tuple[str, str]], model=None) -> Answer:
     """Blocking: call it from a worker thread. Raises AIError if the provider fails. `model` is for the tests."""
+    started = time.monotonic()
     try:
         result = agent.run_sync(
             question,
@@ -90,6 +96,11 @@ def ask(db: Session, user: models.User, question: str, history: list[tuple[str, 
         return Answer(messages.CHAT_TOO_COMPLEX, True)
     except Exception as e:
         raise failure(e, "chat") from None
+    used = result.usage
+    logger.info(
+        f"Chat question answered in {time.monotonic() - started:.1f} s: {used.requests} model requests, {used.tool_calls} tool calls, "
+        f"{used.input_tokens} tokens in and {used.output_tokens} out"
+    )
     reply = result.output
     return Answer(reply.answer.strip() if reply.in_scope else messages.CHAT_OFF_TOPIC, reply.in_scope)
 
