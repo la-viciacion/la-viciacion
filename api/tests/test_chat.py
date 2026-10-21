@@ -1,23 +1,26 @@
 """The chat: what the agent may look up, how it is limited and what the endpoint refuses. The model is scripted
 (FunctionModel), so no provider is called."""
 import datetime
+import os
 import types
 import unittest
 from unittest import mock
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 from pydantic_ai import ModelRetry
-from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse, ToolCallPart, ToolReturnPart
+from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse, TextPart, ToolCallPart, ToolReturnPart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 
 from src import auth
 from src.chat import agent, tools
+from src.chat import prompt as chat_prompt
 from src.chat import model as chat_model
 from src.clients.ai_error import AIError
 from src.database import models
 from src.routers import chat as chat_router
-from src.utils import messages
+from src.routers.manage import system
+from src.utils import ai_prompts, messages, settings
 from tests.sqlite_db import make_session
 
 START = datetime.datetime(2026, 3, 1, 10, 0)
@@ -118,7 +121,7 @@ class AgentTests(unittest.TestCase):
         self.db = make_session()
         seed(self.db)
         self.user = self.db.get(models.User, 1)
-        patcher = mock.patch.object(agent.settings, "get", side_effect=lambda key: {"ai.prompt.chat": "Eres un bot.", "ai.api_key": "KEY"}[key])
+        patcher = mock.patch.object(agent.settings, "get", side_effect=lambda key: {"chat.prompt": "Eres un bot.", "ai.api_key": "KEY"}[key])
         patcher.start()
         self.addCleanup(patcher.stop)
 
@@ -243,20 +246,121 @@ class EndpointTests(unittest.TestCase):
 
 class ReadinessTests(unittest.TestCase):
     def values(self, **overrides):
-        base = {"ai.enabled": True, "ai.use.chat": True, "ai.api_key": "k", "ai.provider": "openai", "ai.model": "m"}
+        base = {
+            "chat.enabled": True, "chat.model": None,
+            "ai.provider": "openai", "ai.api_key": "k", "ai.model": "m", "ai.enabled": True,
+        }
         return mock.patch.object(chat_model.settings, "get", side_effect=lambda key: {**base, **overrides}[key])
 
-    def test_it_needs_the_switches_a_key_a_known_provider_and_a_model(self):
+    def test_it_needs_its_switch_and_the_ai_provider_key_and_a_model(self):
         with self.values():
             self.assertTrue(chat_model.is_ready())
-        for missing in ({"ai.enabled": False}, {"ai.use.chat": False}, {"ai.api_key": None}, {"ai.provider": "other"}, {"ai.model": None}):
+        for missing in ({"chat.enabled": False}, {"ai.api_key": None}, {"ai.provider": "other"}, {"ai.model": None}):
             with self.values(**missing):
                 self.assertFalse(chat_model.is_ready(), missing)
+
+    def test_switched_off_it_is_still_configured(self):
+        with self.values(**{"chat.enabled": False}):
+            self.assertTrue(chat_model.configured())
+
+    def test_its_own_model_wins_and_without_it_the_ais_is_used(self):
+        with self.values():
+            self.assertEqual(chat_model.in_use(), {"provider": "openai", "model": "m", "own_model": False})
+        with self.values(**{"chat.model": "strong"}):
+            self.assertEqual(chat_model.in_use(), {"provider": "openai", "model": "strong", "own_model": True})
+            self.assertEqual(chat_model.build_model().model_name, "strong")
+
+    def test_its_own_model_is_enough_without_ai_model(self):
+        with self.values(**{"chat.model": "strong", "ai.model": None}):
+            self.assertTrue(chat_model.configured())
 
     def test_the_model_is_built_for_each_provider(self):
         for provider in ("openai", "google"):
             with self.values(**{"ai.provider": provider}):
                 self.assertEqual(chat_model.build_model().model_name, "m")
+
+    def test_the_notices_general_switch_does_not_touch_the_chat(self):
+        with self.values(**{"ai.enabled": False}):
+            self.assertTrue(chat_model.is_ready())
+
+
+class SettingsTests(unittest.TestCase):
+    def test_the_chat_shares_the_provider_and_key_and_has_an_optional_model_of_its_own(self):
+        db = make_session()
+        env = {"AI_PROVIDER": "openai", "AI_API_KEY": "sk-shared", "AI_MODEL": "gpt-cheap", "CHAT_AI_MODEL": "gpt-strong"}
+        with mock.patch.dict(os.environ, env):
+            self.assertEqual(chat_model.in_use(), {"provider": "openai", "model": "gpt-strong", "own_model": True})
+            view = settings.public_view(db)
+            self.assertEqual(view["chat.model"], {"is_set": True, "hint": None})
+            with self.assertRaises(ValueError):
+                settings.set_values(db, {"chat.model": "other"})  # not from the panel
+        with mock.patch.dict(os.environ, {**env, "CHAT_AI_MODEL": ""}):
+            self.assertEqual(chat_model.in_use(), {"provider": "openai", "model": "gpt-cheap", "own_model": False})
+        self.assertEqual(db.query(models.AppSetting).filter(models.AppSetting.key.like("chat.%")).count(), 0)
+
+    def test_there_are_no_provider_or_key_settings_of_its_own(self):
+        self.assertNotIn("chat.provider", settings.REGISTRY)
+        self.assertNotIn("chat.api_key", settings.REGISTRY)
+
+    def test_the_prompt_follows_the_code_until_the_admin_changes_it(self):
+        db = make_session()
+        self.assertEqual(settings.get_all(db)["chat.prompt"], chat_prompt.CHAT_PROMPT.strip())
+        self.assertFalse(settings.chat_prompt(db)["customized"])
+        settings.set_values(db, {"chat.prompt": "  Mío  "})
+        self.assertEqual(settings.get_all(db)["chat.prompt"], "Mío")
+        self.assertTrue(settings.chat_prompt(db)["customized"])
+        settings.set_values(db, {"chat.prompt": None})
+        self.assertEqual(settings.get_all(db)["chat.prompt"], chat_prompt.CHAT_PROMPT.strip())
+        with self.assertRaises(ValueError):
+            settings.set_values(db, {"chat.prompt": "x" * (settings.PROMPT_MAX + 1)})
+
+    def test_the_chat_is_not_one_of_the_notices(self):
+        self.assertNotIn("chat", ai_prompts.USES)
+        self.assertNotIn("ai.use.chat", settings.REGISTRY)
+
+
+class ProbeTests(unittest.TestCase):
+    def test_the_test_button_asks_the_chat_model_for_one_sentence(self):
+        with mock.patch.object(agent.settings, "get", return_value="KEY"):
+            model = FunctionModel(lambda history, info: ModelResponse(parts=[TextPart(content=" Hola, gamers ")]))
+            self.assertEqual(agent.probe(model=model), "Hola, gamers")
+
+    def test_a_provider_failure_is_an_ai_error_without_the_key(self):
+        def fail(history, info):
+            raise RuntimeError("401 for key KEY")
+
+        with mock.patch.object(agent.settings, "get", return_value="KEY"):
+            with self.assertRaises(AIError) as error:
+                agent.probe(model=FunctionModel(fail))
+        self.assertNotIn("KEY", str(error.exception))
+
+
+class TestRouteTests(unittest.TestCase):
+    admin = types.SimpleNamespace(username="root")
+
+    def configured(self, **overrides):
+        base = {"chat.enabled": False, "chat.model": None, "ai.provider": "openai", "ai.api_key": "k", "ai.model": "m"}
+        return mock.patch.object(chat_model.settings, "get", side_effect=lambda key: {**base, **overrides}[key])
+
+    def test_without_the_ai_variables_it_is_a_409_that_says_where_to_set_them(self):
+        for missing in ({"ai.api_key": None}, {"ai.provider": None}, {"ai.model": None}):
+            with self.configured(**missing), self.assertRaises(HTTPException) as caught:
+                system.test_chat(self.admin)
+            self.assertEqual(caught.exception.status_code, 409)
+            self.assertIn("AI_MODEL", caught.exception.detail)
+            self.assertIn("CHAT_AI_MODEL", caught.exception.detail)
+
+    def test_it_works_with_the_chat_switched_off_and_reports_what_was_used(self):
+        with self.configured(), mock.patch.object(system.chat_agent, "probe", return_value="Hola"):
+            result = system.test_chat(self.admin)
+        self.assertEqual((result["reply"], result["provider"], result["model"]), ("Hola", "openai", "m"))
+
+    def test_a_provider_failure_is_a_502_with_the_reason(self):
+        with self.configured(), mock.patch.object(system.chat_agent, "probe", side_effect=AIError("chat: 403")):
+            with self.assertRaises(HTTPException) as caught:
+                system.test_chat(self.admin)
+        self.assertEqual(caught.exception.status_code, 502)
+        self.assertIn("403", caught.exception.detail)
 
 
 if __name__ == "__main__":
