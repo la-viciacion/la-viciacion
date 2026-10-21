@@ -51,8 +51,8 @@ En cada logro de un jugador, **Editar** cambia la fecha en que lo consiguió y *
 ## Notificaciones
 
 - **Envíos**: el interruptor general de notificaciones, el de avisos a administradores, y los envíos programados: resumen semanal (día y hora), resumen mensual y resumen anual (apagados por defecto).
-- **Canales**: Telegram (estado y mensaje de prueba) y avisos en la app (push).
-- **IA**: la configuración y los textos de los avisos que reescribe la IA.
+- **Canales**: Telegram (si está configurado y el mensaje de prueba) y avisos en la app (push: el interruptor y cuántos dispositivos hay suscritos). Lo que se configura en el `.env` se ve en **Sistema → Servicios**.
+- **IA**: el interruptor de la IA, **Probar la IA** y los avisos que la usan, cada uno con su interruptor e instrucciones. El proveedor, la clave y el modelo se ven en **Sistema → Servicios**.
 - **Probar resumen**: previsualiza el resumen de cualquier mes o temporada para cualquier jugador, enseña el aviso tal como saldría (sin enviarlo) y permite enviarlo ahora solo a ti o al grupo.
 - **Redactar aviso**: escribe un mensaje propio, con título (80 caracteres) y mensaje (240), y envíalo por **un** canal: la **app** (push) o **Telegram**; a tus dispositivos, a un jugador, al grupo o a todos. Enviar al grupo o a todos pide confirmación.
 
@@ -62,7 +62,8 @@ En cada logro de un jugador, **Editar** cambia la fecha en que lo consiguió y *
 
 ## Sistema
 
-- **Correo**: estado del correo de recuperación y correo de prueba (ver [Cuentas y acceso](cuentas.md)).
+- **Chat**: interruptor del asistente de la app (el botón flotante), sus instrucciones y si los jugadores lo tienen disponible ahora (y, si no, por qué). Usa el proveedor y la clave de la IA de los avisos y, como modelo, `CHAT_AI_MODEL` (o `AI_MODEL` si no está): su interruptor y sus instrucciones son suyos, así que apagarlo aquí no afecta a los avisos ni al revés. Incluye un botón para probar el modelo.
+- **Servicios**: lo que se configura en el `.env` del servidor y la app usa, junto: la **IA** (proveedor, clave y modelos, el de los avisos y el del chat), **Telegram** (token y chats: solo si están puestos), los **avisos en la app** (contacto y claves VAPID, con **Regenerar claves**) y el **correo** de recuperación de contraseña, con su correo de prueba (ver [Cuentas y acceso](cuentas.md)). Lo único editable es el contacto del push; lo demás solo se ve.
 - **Copia de seguridad**: **Descargar copia (.sql.gz)** genera un volcado completo de la base de datos (usuarios, sesiones, biblioteca, logros, ajustes y fotos). Ver [Operación](operacion.md).
 - **Registro**: qué ha cambiado cada administrador desde el panel, de lo más reciente a lo más antiguo, con un **Ver** que despliega cómo estaba antes y qué se envió. Se puede filtrar por usuario, tipo (cambios del panel o accesos y seguridad), sección y tipo de acción. También anota los accesos y los intentos fallidos de cualquier cuenta (y cuándo una cuenta queda bloqueada unos minutos), los cambios y recuperaciones de contraseña, los cambios del propio email o id de Telegram y los intentos de entrar al panel sin ser administrador, con la dirección y el navegador desde los que se hicieron. Las contraseñas, tokens y claves nunca aparecen; lo demás que hacen los jugadores en su cuenta no se registra.
 

@@ -46,7 +46,7 @@ La API y el bot leen estas variables cada vez que las necesitan y **no las guard
 
 ## 5. Revisa el panel
 
-En **Notificaciones → Canales** ves el estado de Telegram (si el token y los identificadores están puestos, sin enseñarlos) y puedes **Enviar mensaje de prueba al grupo**.
+En **Sistema → Servicios** ves si el token y los identificadores están puestos (sin enseñarlos), y en **Notificaciones → Canales** puedes **Enviar mensaje de prueba al grupo**.
 
 ![Canales de notificación en el panel](../assets/screens/admin-channels.webp){ .screenshot }
 

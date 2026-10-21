@@ -44,6 +44,13 @@ Detalle en [Telegram](telegram.md).
 
 Sin las **tres** variables de la IA, esta no escribe nada y los avisos salen como texto normal. Ver [Servicios externos](servicios.md).
 
+El chat de la app usa el mismo proveedor y la misma clave. Solo tiene una variable propia, **opcional**:
+
+| Variable | Para qué sirve |
+|---|---|
+| `CHAT_AI_MODEL` | El modelo que usa el chat (de ese mismo proveedor). Si no la pones, usa `AI_MODEL`. |
+
+Ver [Servicios externos](servicios.md#chat-de-la-app).
 ### Correo (recuperar contraseña)
 
 | Variable | Para qué sirve |
