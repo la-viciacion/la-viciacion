@@ -18,9 +18,8 @@ import utils.keyboard as kb
 from routes.basic_routes import BasicRoutes
 from routes.my_routes import MyRoutes
 from routes.ranking_routes import RankingRoutes
-from utils.my_utils import ApiError, MyUtils
+from utils.my_utils import ApiError, MyUtils, utils
 
-utils = MyUtils()
 ANA = user(111, "ana", "Ana")
 
 
@@ -312,6 +311,30 @@ class RealApplicationTests(unittest.IsolatedAsyncioTestCase):
             bot_app.utils.forget_users()
             await app.process_update(self.press("my_data", user_id=999))  # not linked: the gate stops it, no popup text
         answer.assert_awaited_once_with()
+
+
+class PlainTextAnswerTests(unittest.IsolatedAsyncioTestCase):
+    async def test_names_with_markdown_characters_are_sent_as_they_are_in_plain_text(self):
+        """Telegram's legacy Markdown refuses an unbalanced _ or *: a game or a player called like that would break
+        the whole answer. Nothing the bot says is formatted, so it sends plain text."""
+        update = make_update(callback=True)
+        text = "1. Hades_II (01h00m)\n2. *Pepe_gg* [x\n"
+        await utils.response_conversation(update, make_context(), text)
+        update.callback_query.edit_message_text.assert_awaited_once_with(text)
+
+
+class OneSharedUtilsTests(unittest.TestCase):
+    def test_every_module_uses_the_same_instance(self):
+        """Each MyUtils keeps its own state (the accounts the gate remembers, and whatever is added): two instances
+        meant a module could write where the gate never looks."""
+        import routes.basic_routes as basic
+        import routes.my_routes as mine
+        import routes.ranking_routes as ranking
+        import utils.my_utils as shared
+
+        self.assertIs(bot_app.utils, shared.utils)
+        for module in (basic, mine, ranking):
+            self.assertIs(module.utils, shared.utils, module.__name__)
 
 
 class ExpiredButtonTests(unittest.IsolatedAsyncioTestCase):

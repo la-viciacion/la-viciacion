@@ -19,7 +19,7 @@ from telegram.ext import (
     filters,
 )
 from utils.config import Config
-from utils.my_utils import MyUtils
+from utils.my_utils import utils
 from utils.logger import LogManager
 
 log_manager = LogManager()
@@ -30,7 +30,6 @@ import sentry_sdk
 ## INIT ##
 ##########
 
-utils = MyUtils()
 config = Config()
 my_routes = MyRoutes()
 basic_routes = BasicRoutes()

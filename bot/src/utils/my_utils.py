@@ -2,7 +2,6 @@ import asyncio
 import time
 from collections import OrderedDict
 
-import telegram
 import utils.access as access
 import utils.messages as msgs
 from telegram import Update
@@ -79,7 +78,7 @@ class MyUtils:
     def remember_menu(self, context: ContextTypes.DEFAULT_TYPE, chat_id: int, message_id: int, owner_id: int) -> None:
         """Note who opened the menu in this message. The conversation is per chat and user, not per message, so
         without this a second player with a menu of their own could drive somebody else's message.
-        It lives in `bot_data`: every module builds its own MyUtils, the application's data is the shared place."""
+        It lives in `bot_data`, the application's own shared data."""
         owners = context.bot_data.setdefault("menu_owners", OrderedDict())
         owners[(chat_id, message_id)] = owner_id
         owners.move_to_end((chat_id, message_id))
@@ -153,25 +152,14 @@ class MyUtils:
         except Exception as e:
             logger.error(f"Could not answer a refused update: {e}", exc_info=True)
 
-    async def reply_message(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE, msg
-    ) -> None:
-        await update.message.reply_text(
-            msg,
-            disable_notification=True,
-            disable_web_page_preview=None,
-            parse_mode=telegram.constants.ParseMode.MARKDOWN,
-        )
-        return ConversationHandler.END
-
     async def response_conversation(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE, msg
     ):
         query = update.callback_query
         await query.answer()
-        await query.edit_message_text(
-            msg, parse_mode=telegram.constants.ParseMode.MARKDOWN
-        )
+        # plain text on purpose: nothing here is formatted, and Telegram's Markdown refuses a name with an
+        # unbalanced _ or * (a game, a player) and drops the whole answer
+        await query.edit_message_text(msg)
         return ConversationHandler.END
 
     async def activate(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -223,3 +211,8 @@ class MyUtils:
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         in_group = update.message.chat.type != access.PRIVATE
         await update.message.reply_text(msgs.start(update.message.from_user.first_name, in_group))
+
+
+# The one instance of the bot: it keeps state (the accounts the gate remembers), so two of them would mean a module
+# writing where the gate never looks.
+utils = MyUtils()
