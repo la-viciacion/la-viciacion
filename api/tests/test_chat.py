@@ -275,6 +275,35 @@ class LimitsTests(unittest.TestCase):
         self.assertIn("inglés", chat_prompt.CHAT_PROMPT)
 
 
+class ReasoningTests(unittest.IsolatedAsyncioTestCase):
+    """A question is answered from what the tools return: the model's reasoning is switched off, and each provider's own
+    way of saying so is what goes out (checked on the real classes, so a library upgrade that changes it fails here)."""
+
+    def sent(self, model):
+        from pydantic_ai.models import ModelRequestParameters
+
+        settings, params = model.prepare_request(dict(agent.SETTINGS), ModelRequestParameters())
+        return model._translate_thinking(settings or {}, params)
+
+    async def test_the_chat_asks_for_no_reasoning(self):
+        self.assertIs(agent.SETTINGS["thinking"], False)
+
+    async def test_a_gemini_model_gets_its_lowest_level_or_a_zero_budget(self):
+        from pydantic_ai.models.google import GoogleModel
+        from pydantic_ai.providers.google import GoogleProvider
+
+        provider = GoogleProvider(api_key="k")
+        self.assertEqual(self.sent(GoogleModel("gemini-3.5-flash-lite", provider=provider)), {"thinking_level": "MINIMAL"})
+        self.assertEqual(self.sent(GoogleModel("gemini-2.5-flash", provider=provider)), {"thinking_budget": 0})
+
+    async def test_an_openai_model_that_does_not_reason_is_left_alone(self):
+        from pydantic_ai.models.openai import OpenAIChatModel
+        from pydantic_ai.providers.openai import OpenAIProvider
+
+        sent = self.sent(OpenAIChatModel("gpt-4o-mini", provider=OpenAIProvider(api_key="k")))
+        self.assertNotIsInstance(sent, str)  # no reasoning_effort that a model without it would refuse
+
+
 class AgentTests(unittest.TestCase):
     def setUp(self):
         self.db = make_session()
@@ -310,6 +339,13 @@ class AgentTests(unittest.TestCase):
         answer = agent.ask(self.db, self.user, "¿Quién ha jugado más?", [], model=FunctionModel(respond))
         self.assertEqual((answer.text, answer.in_scope), ("Ana va primera.", True))
         self.assertEqual(seen[0][0], {"name": "Ana", "hours": 3.0})
+
+    def test_how_long_a_question_took_and_what_it_cost_is_logged(self):
+        model = scripted(("tool", "players", {}), ("final", {"in_scope": True, "answer": "Dos."}))
+        with self.assertLogs(agent.logger, "INFO") as logged:
+            agent.ask(self.db, self.user, "¿Quiénes somos?", [], model=model)
+        line = next(line for line in logged.output if "Chat question answered" in line)
+        self.assertRegex(line, r"in \d+\.\d s: 2 model requests, 1 tool calls, \d+ tokens in and \d+ out")
 
     def test_the_instructions_carry_the_admins_prompt_the_day_and_who_asks(self):
         captured = []
