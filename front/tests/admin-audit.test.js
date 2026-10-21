@@ -19,6 +19,17 @@ test('the writes that are not on a row have their own sentence', () => {
   assert.equal(describe(entry({ method: 'POST', entity: 'recalculate-achievements', entity_id: null, path: '/api/v1/manage/recalculate-achievements' })), 'Pidió recalcular todos los logros');
 });
 
+test('the AI running out of quota says which quota and who asked', () => {
+  const quota = (detail) => entry({ method: 'SYSTEM', path: 'ai/chat', entity: 'ai', event: 'ai_quota', detail });
+  assert.equal(describe(quota({ source: 'chat', kind: 'day' })), 'Se agotó el cupo de la IA por día al pedirlo el chat');
+  assert.equal(describe(quota({ source: 'notice:new_game', kind: 'minute' })), 'Se agotó el cupo de la IA por minuto al pedirlo un aviso');
+  assert.equal(describe(quota({ source: 'welcome', kind: 'unknown' })), 'Se agotó el cupo de la IA al pedirlo la bienvenida del grupo');
+  assert.equal(describe(quota({ source: 'chat_test', kind: 'billing' })), 'Se agotó el cupo de la IA de facturación al pedirlo la prueba del chat');
+  assert.equal(describe(quota(null)), 'Se agotó el cupo de la IA al pedirlo la IA');
+  const parts = detailParts(quota({ source: 'chat', kind: 'day', quotas: ['GenerateRequestsPerDayPerProjectPerModel-FreeTier'], limit: '20', retry_after: 34 }));
+  assert.match(parts.find(([title]) => title === 'Datos')[1], /"limit": "20"/);
+});
+
 test('an entity it does not know is still described', () => {
   assert.equal(describe(entry({ method: 'POST', entity: 'future', entity_id: null, path: '/api/v1/manage/future' })), 'Creó future');
 });
