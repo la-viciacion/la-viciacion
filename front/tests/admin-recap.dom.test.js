@@ -19,12 +19,13 @@ const VALUES = {
   'annual.enabled': false, 'annual.month': 1, 'annual.day': 1, 'annual.time': '10:00', 'annual.unlocked_year': 0,
   'telegram.token': { is_set: false }, 'telegram.group_id': { is_set: false }, 'telegram.admin_chat_id': { is_set: false },
   'push.enabled': true, 'push.contact': '', 'push.vapid_private': { is_set: true }, 'ai.enabled': true, 'ai.provider': { is_set: true }, 'ai.api_key': { is_set: false }, 'ai.model': '',
+  'chat.enabled': true, 'chat.model': { is_set: false }, 'chat.prompt': '',
 };
 
 function routes(extra = {}, values = VALUES) {
   return {
     'GET /manage/recap/preview': { period: '2026-09', label: 'septiembre de 2026', nobody_played: false, telegram: 'TELEGRAM', push: { title: 'TITULO', body: 'CUERPO', url: '#/story/2026-09' } },
-    'GET /manage/settings': { values, jobs: { annual_recap: { last_run_at: '2027-01-01T10:00:00', last_status: 'ok: 2026: group and 3 users' } }, push_devices: { devices: 0, users: 0 }, mail: { configured: false, missing: [] }, ai_uses: [], ai_model: { provider: 'google', model: 'gemini-test' } },
+    'GET /manage/settings': { values, jobs: { annual_recap: { last_run_at: '2027-01-01T10:00:00', last_status: 'ok: 2026: group and 3 users' } }, push_devices: { devices: 0, users: 0 }, mail: { configured: false, missing: [] }, ai_uses: [], ai_model: { provider: 'google', model: 'gemini-test' }, chat: { provider: null, model: null, default_prompt: '', customized: false } },
     ...extra,
   };
 }

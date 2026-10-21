@@ -1,5 +1,6 @@
 // Settings pages of the admin panel: general switches, weekly summary schedule, the Telegram bot
-// (token, group, admin chat), the AI that writes the notices (provider, key, model), push and mail.
+// (token, group, admin chat), the AI that writes the notices (provider, key, model), the chat (its own switch and instructions;
+// it shares the AI's provider and key, and its model may be its own), push and mail.
 // They are all one form split in cards; each page (see entities.js) shows the cards listed in its
 // `sections`, and saving sends only the fields on screen that changed.
 // Values live in the app_settings table; the API never returns a secret (the AI key), only whether it is set.
@@ -13,7 +14,7 @@ import { errorState } from './components.js';
 import { confirmDialog } from './dialogs.js';
 
 const SECRETS = []; // never loaded back: sent only when something is typed (the keys of outside services are not: they are in the server's .env)
-const LOCKED = ['telegram.token', 'telegram.group_id', 'telegram.admin_chat_id', 'ai.api_key', 'ai.provider', 'ai.model']; // shown only as set or not, never editable
+const LOCKED = ['telegram.token', 'telegram.group_id', 'telegram.admin_chat_id', 'ai.api_key', 'ai.provider', 'ai.model', 'chat.model']; // shown only as set or not, never editable
 const READ_ONLY = ['mail', 'backup']; // cards with nothing to save
 const AI_PROVIDERS = [['google', 'Google (Gemini)'], ['openai', 'OpenAI']];
 
@@ -27,6 +28,7 @@ let panel;
 let sections = []; // cards of the page on screen
 let loaded = {}; // values as the server has them
 let aiUses = []; // where the AI writes: label, original prompt and whether it was changed
+let chatInfo = {}; // the chat: the provider and model it uses (and whether the model is its own), original instructions and whether they were changed
 
 const check = (name, label, hint, tag = '') => html`
   <label class="adm-check adm-set-check"><input type="checkbox" name="${name}" /> <span><strong>${label}${tag}</strong><span class="adm-sub">${hint}</span></span></label>`;
@@ -39,6 +41,24 @@ function lastRun(job) {
 function mailStatus(mail) {
   if (!mail.configured) return `Sin configurar: faltan ${mail.missing.join(', ')} en el .env.`;
   return `Configurado: envía como ${mail.from} por ${mail.host}:${mail.port} (${mail.security}); los enlaces apuntan a ${mail.public_url}.`;
+}
+
+// What the chat still needs in the server's .env: the AI's provider and key, and a model (its own, or the AI's)
+function chatMissing(values, chat) {
+  return [
+    !chat.provider && 'AI_PROVIDER',
+    !values['ai.api_key'].is_set && 'AI_API_KEY',
+    !chat.model && 'AI_MODEL (o CHAT_AI_MODEL)',
+  ].filter(Boolean);
+}
+
+/** Whether the players get the chat button now, and if not why (what is saved, not what is typed). */
+function chatState(values, chat) {
+  const reasons = [
+    !values['chat.enabled'] && 'el chat está apagado',
+    chatMissing(values, chat).length && `falta ${chatMissing(values, chat).join(', ')} en el .env`,
+  ].filter(Boolean);
+  return reasons.length ? `No disponible: ${reasons.join('; ')}.` : 'Disponible: los jugadores ven el botón del chat.';
 }
 
 const customizedTag = (use) => (use.customized ? html`<span class="adm-tag">Personalizado</span>` : '');
@@ -60,7 +80,16 @@ function aiUse(use, fragments) {
     </div>`;
 }
 
-function view(values, jobs, pushDevices, mail, aiUses, aiModel) {
+const telegramReady = (values) => values['telegram.token'].is_set && values['telegram.group_id'].is_set;
+
+/** What the notices' AI still needs in the server's .env. */
+const aiMissing = (values, aiModel) => [
+  !aiModel.provider && 'AI_PROVIDER',
+  !values['ai.api_key'].is_set && 'AI_API_KEY',
+  !aiModel.model && 'AI_MODEL',
+].filter(Boolean);
+
+function view(values, jobs, pushDevices, mail, aiUses, aiModel, chat) {
   const state = (key) => (values[key].is_set ? 'Configurado' : 'Sin configurar');
   const aiKey = values['ai.api_key'];
   const vapid = values['push.vapid_private'];
@@ -128,27 +157,63 @@ function view(values, jobs, pushDevices, mail, aiUses, aiModel) {
         <div class="adm-sub">En diciembre, entre el 20 y el 28; en enero, entre el 1 y el 5. ${lastRun(jobs.annual_recap)}</div>
       </section>`,
 
+    // Notificaciones → Canales: only what is about sending (whether it is set, and the test); the configuration is in Sistema → Servicios
     telegram: html`
+      <section class="adm-set-card">
+        <h3>Telegram</h3>
+        ${telegramReady(values)
+          ? html`<div class="adm-sub">Bot configurado: los avisos del grupo salen por Telegram.</div>`
+          : html`<div class="adm-warn">Telegram no está configurado: faltan ${[['telegram.token', 'TELEGRAM_TOKEN'], ['telegram.group_id', 'TELEGRAM_GROUP_ID']].filter(([key]) => !values[key].is_set).map(([, name]) => name).join(' y ')} en el .env del servidor (ver Sistema → Servicios). La aplicación funciona, pero no envía nada por Telegram y el bot no arranca.</div>`}
+        <div><button type="button" class="adm-btn" data-set-act="test" ${telegramReady(values) ? '' : html`disabled`}>Enviar mensaje de prueba al grupo</button></div>
+      </section>`,
+
+    // Notificaciones → IA: the switch and the test; the provider, key and model are in Sistema → Servicios
+    ai: html`
+      <section class="adm-set-card">
+        <h3>Inteligencia artificial</h3>
+        ${check('ai.enabled', 'Usar IA en los avisos', 'Apagada, los avisos salen con el texto original. Necesita una clave guardada para funcionar.')}
+        ${aiMissing(values, aiModel).length ? html`<div class="adm-warn">Falta <code>${aiMissing(values, aiModel).join(', ')}</code> en el .env del servidor: la aplicación no tiene ningún proveedor ni modelo por defecto, así que la IA no escribe ningún aviso hasta que los definas (ver Sistema → Servicios) y reinicies la API.</div>` : html`<div class="adm-sub">Usa ${AI_PROVIDERS.find(([id]) => id === aiModel.provider)?.[1] ?? aiModel.provider} (${aiModel.model}).</div>`}
+        <div><button type="button" class="adm-btn" data-set-act="test-ai" ${aiKey.is_set ? '' : html`disabled`}>Probar la IA</button></div>
+      </section>`,
+
+    // Sistema → Servicios: what comes from the server's .env, read only
+    aiconfig: html`
+      <section class="adm-set-card">
+        <h3>Inteligencia artificial</h3>
+        <label>Proveedor <input class="adm-input adm-ai-provider" type="text" value="${AI_PROVIDERS.find(([id]) => id === aiModel.provider)?.[1] ?? aiModel.provider ?? 'Sin configurar'}" disabled /></label>
+        <label>Clave de la API <input class="adm-input" type="text" value="${state('ai.api_key')}" disabled /></label>
+        <label>Modelo de los avisos <input class="adm-input adm-ai-model" type="text" value="${aiModel.model || 'Sin configurar'}" disabled /></label>
+        <label>Modelo del chat <input class="adm-input adm-chat-model" type="text" value="${chat.model || 'Sin configurar'}" disabled /></label>
+        ${aiMissing(values, aiModel).length ? html`<div class="adm-warn">Falta <code>${aiMissing(values, aiModel).join(', ')}</code> en el .env del servidor: la aplicación no tiene ningún proveedor ni modelo por defecto, así que la IA no escribe ningún aviso hasta que los definas (y reinicies la API).</div>` : ''}
+        <div class="adm-sub">El proveedor (<code>AI_PROVIDER</code>), la clave (<code>AI_API_KEY</code>) y el modelo (<code>AI_MODEL</code>) están en el .env del servidor y los comparten los avisos y el chat: desde el panel solo se ven. El modelo debe ser uno del proveedor.</div>
+        <div class="adm-sub">El chat usa <code>CHAT_AI_MODEL</code> si está en el .env${chat.own_model ? '' : html` (ahora no lo está: usa <code>AI_MODEL</code>)`}, para darle un modelo distinto del de los avisos.</div>
+      </section>`,
+
+    telegramconfig: html`
       <section class="adm-set-card">
         <h3>Telegram</h3>
         <label>Token del bot <input class="adm-input" type="text" value="${state('telegram.token')}" disabled /></label>
         <label>ID del canal o grupo <input class="adm-input" type="text" value="${state('telegram.group_id')}" disabled /></label>
         <label>ID del chat de administración <input class="adm-input" type="text" value="${state('telegram.admin_chat_id')}" disabled /></label>
-        ${values['telegram.token'].is_set && values['telegram.group_id'].is_set ? '' : html`<div class="adm-warn">Telegram no está configurado: faltan ${[['telegram.token', 'TELEGRAM_TOKEN'], ['telegram.group_id', 'TELEGRAM_GROUP_ID']].filter(([key]) => !values[key].is_set).map(([, name]) => name).join(' y ')} en el .env del servidor. La aplicación funciona, pero no envía nada por Telegram y el bot no arranca.</div>`}
-        <div class="adm-sub">Se configuran en el .env del servidor: desde el panel solo se ve si están definidos.</div>
-        <div><button type="button" class="adm-btn" data-set-act="test">Enviar mensaje de prueba al grupo</button></div>
+        ${telegramReady(values) ? '' : html`<div class="adm-warn">Telegram no está configurado: faltan ${[['telegram.token', 'TELEGRAM_TOKEN'], ['telegram.group_id', 'TELEGRAM_GROUP_ID']].filter(([key]) => !values[key].is_set).map(([, name]) => name).join(' y ')} en el .env del servidor. La aplicación funciona, pero no envía nada por Telegram y el bot no arranca.</div>`}
+        <div class="adm-sub">Se configuran en el .env del servidor: desde el panel solo se ve si están definidos. El mensaje de prueba está en Notificaciones → Canales.</div>
       </section>`,
 
-    ai: html`
-      <section class="adm-set-card">
-        <h3>Inteligencia artificial</h3>
-        ${check('ai.enabled', 'Usar IA en los avisos', 'Apagada, los avisos salen con el texto original. Necesita una clave guardada para funcionar.')}
-        <label>Proveedor <input class="adm-input adm-ai-provider" type="text" value="${AI_PROVIDERS.find(([id]) => id === aiModel.provider)?.[1] ?? aiModel.provider ?? 'Sin configurar'}" disabled /></label>
-        <label>Clave de la API <input class="adm-input" type="text" value="${state('ai.api_key')}" disabled /></label>
-        <label>Modelo <input class="adm-input adm-ai-model" type="text" value="${aiModel.model || 'Sin configurar'}" disabled /></label>
-        ${aiModel.provider && aiModel.model ? '' : html`<div class="adm-warn">Falta <code>${[['AI_PROVIDER', aiModel.provider], ['AI_MODEL', aiModel.model]].filter(([, value]) => !value).map(([name]) => name).join(' y ')}</code> en el .env del servidor: la aplicación no tiene ningún proveedor ni modelo por defecto, así que la IA no escribe ningún aviso hasta que los definas (y reinicies la API).</div>`}
-        <div class="adm-sub">El proveedor (<code>AI_PROVIDER</code>), el modelo (<code>AI_MODEL</code>) y la clave (<code>AI_API_KEY</code>) están en el .env del servidor: desde el panel solo se ven. El modelo debe ser uno del proveedor.</div>
-        <div><button type="button" class="adm-btn" data-set-act="test-ai" ${aiKey.is_set ? '' : html`disabled`}>Probar la IA</button></div>
+    chat: html`
+      <section class="adm-set-card adm-chat-card">
+        <h3>Chat</h3>
+        <div class="adm-sub">Un botón flotante, abajo a la derecha de cada pantalla, abre un asistente que responde solo sobre videojuegos y los datos del grupo. Usa el proveedor y la clave de la IA de los avisos y su propio modelo si lo hay (ver Sistema → Servicios). Quien ya tenga la página abierta lo ve desaparecer al preguntar o al recargar.</div>
+        ${check('chat.enabled', 'Chat activado', 'Apagado, el botón desaparece para todos y el chat deja de responder.')}
+        ${chatMissing(values, chat).length ? html`<div class="adm-warn">Falta <code>${chatMissing(values, chat).join(', ')}</code> en el .env del servidor: el chat usa el proveedor y la clave de la IA de los avisos, y no tiene ningún modelo por defecto, así que no estará disponible hasta que los definas (y reinicies la API).</div>` : ''}
+        <details class="adm-details adm-ai-prompt">
+          <summary class="adm-btn sm">Instrucciones ${chat.customized ? html`<span class="adm-tag">Personalizado</span>` : ''}</summary>
+          <div>
+            <textarea class="adm-input" name="chat.prompt" rows="9" spellcheck="false"></textarea>
+            ${chat.customized ? html`<button type="button" class="adm-btn sm" data-set-act="reset-prompt" data-use="chat">Restaurar las originales</button>` : ''}
+          </div>
+        </details>
+        <div class="adm-sub adm-chat-state">${chatState(values, chat)}</div>
+        <div><button type="button" class="adm-btn" data-set-act="test-chat" ${chatMissing(values, chat).length ? html`disabled` : ''}>Probar el chat</button></div>
       </section>`,
 
     aiuses: html`
@@ -165,12 +230,17 @@ function view(values, jobs, pushDevices, mail, aiUses, aiModel) {
       <section class="adm-set-card">
         <h3>Avisos en la app (push)</h3>
         ${check('push.enabled', 'Enviar avisos a la app instalada', 'Función activa para todos por defecto; nadie recibe nada hasta que cada usuario lo active en su perfil (Ajustes → Notificaciones) y elija en qué dispositivos. Los avisos del grupo llegan a quien los marque y los privados (timer olvidado…) solo a su usuario. Necesita las notificaciones activadas y HTTPS.')}
+        <div class="adm-sub">${pushDevices.devices} dispositivo${pushDevices.devices === 1 ? '' : 's'} suscrito${pushDevices.devices === 1 ? '' : 's'} (${pushDevices.users} usuario${pushDevices.users === 1 ? '' : 's'}).</div>
+        <div class="adm-sub">Para redactar y enviar avisos (o probarlos en tus dispositivos) usa la pestaña <strong>Redactar aviso</strong>.</div>
+      </section>`,
+
+    pushconfig: html`
+      <section class="adm-set-card">
+        <h3>Avisos en la app (push)</h3>
         <label>Contacto para los servicios push
           <input class="adm-input" type="text" name="push.contact" placeholder="mailto:tu@correo.com (vacío: usa el remitente del correo o la dirección pública)" />
         </label>
         <div class="adm-sub">${vapid.is_set ? 'Las claves del servidor se crearon solas al arrancar; son las mismas para todos los usuarios.' : 'Sin claves (se crean al arrancar la API).'}</div>
-        <div class="adm-sub">${pushDevices.devices} dispositivo${pushDevices.devices === 1 ? '' : 's'} suscrito${pushDevices.devices === 1 ? '' : 's'} (${pushDevices.users} usuario${pushDevices.users === 1 ? '' : 's'}).</div>
-        <div class="adm-sub">Para redactar y enviar avisos (o probarlos en tus dispositivos) usa la pestaña <strong>Redactar aviso</strong>.</div>
         <div><button type="button" class="adm-btn" data-set-act="push-keys">Regenerar claves…</button></div>
       </section>`,
 
@@ -243,9 +313,9 @@ function collect(form) {
     }
     const isNumber = typeof before === 'number';
     const now = field.type === 'checkbox' ? field.checked : (field.type === 'select-one' || field.type === 'number') && isNumber ? Number(field.value) : field.value.trim();
-    if (key.startsWith('ai.prompt.')) {
+    if (key.startsWith('ai.prompt.') || key === 'chat.prompt') {
       // the original text (or nothing) is not an override: it goes back to following the application's prompt
-      const use = aiUses.find((u) => `ai.prompt.${u.id}` === key);
+      const use = key === 'chat.prompt' ? chatInfo : aiUses.find((u) => `ai.prompt.${u.id}` === key);
       if (now === '' || now === use.default_prompt.trim()) {
         if (use.customized) changes[key] = null;
       } else if (now !== before) {
@@ -331,9 +401,20 @@ async function testAi(form) {
   }
 }
 
+async function testChat() {
+  toast('Probando el chat…');
+  try {
+    const result = await api('/manage/settings/test-chat', { method: 'POST' });
+    toast(`${result.provider} (${result.model}) responde: ${result.reply}`);
+  } catch (err) {
+    toast(err.message, 'err');
+  }
+}
+
 // Puts the original instructions back in the box; they take effect when the changes are saved.
 function resetPrompt(form, id) {
-  form.elements[`ai.prompt.${id}`].value = aiUses.find((u) => u.id === id).default_prompt.trim();
+  const [name, use] = id === 'chat' ? ['chat.prompt', chatInfo] : [`ai.prompt.${id}`, aiUses.find((u) => u.id === id)];
+  form.elements[name].value = use.default_prompt.trim();
   toast('Instrucciones originales restauradas: guarda los cambios para aplicarlo');
 }
 
@@ -355,11 +436,12 @@ export async function render(target, { entity }) {
   panel = target;
   sections = entity.sections;
   try {
-    const { values, jobs, push_devices: pushDevices, mail, ai_uses: uses, ai_model: aiModel } = await api('/manage/settings');
+    const { values, jobs, push_devices: pushDevices, mail, ai_uses: uses, ai_model: aiModel, chat } = await api('/manage/settings');
     aiUses = uses;
+    chatInfo = chat;
     loaded = Object.fromEntries(Object.entries(values).filter(([key]) => !SECRETS.includes(key) && !LOCKED.includes(key) && !key.startsWith('push.vapid')));
     for (const key of SECRETS) loaded[key] = null;
-    mount(panel, view(values, jobs, pushDevices, mail, aiUses, aiModel));
+    mount(panel, view(values, jobs, pushDevices, mail, aiUses, aiModel, chat));
     const form = panel.querySelector('#admSettings');
     fill(form, values);
     syncAnnualDay(form);
@@ -375,6 +457,7 @@ export async function render(target, { entity }) {
       else if (act === 'backup') downloadBackup(e.target.closest('[data-set-act]'));
       else if (act === 'test-email') sendTestEmail(mail);
       else if (act === 'test-ai') testAi(form);
+      else if (act === 'test-chat') testChat();
       else if (act === 'reset-prompt') resetPrompt(form, e.target.closest('[data-use]').dataset.use);
       else if (act === 'push-keys') generateKeys(values['push.vapid_private'].is_set);
     });

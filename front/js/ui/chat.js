@@ -15,6 +15,7 @@ let open = false;
 let busy = false;
 let abort = null;
 let cleanup = null;
+let switchedOff = false; // the API said the chat is off (503): the button goes when the panel is closed
 
 const root = () => document.getElementById(ID);
 
@@ -94,6 +95,7 @@ async function send(text) {
     turns.push({ role: 'assistant', content: answer.answer });
   } catch (err) {
     if (err.name === 'AbortError') return;
+    if (err.status === 503) switchedOff = true;
     turns[turns.length - 1].failed = true;
     turns.push({ role: 'error', content: err.message || 'No he podido responder. Inténtalo de nuevo' });
   } finally {
@@ -108,6 +110,7 @@ async function send(text) {
 
 function setOpen(value) {
   open = value;
+  if (!open && switchedOff) return unmountChat();
   render();
   if (!open) root()?.querySelector('.chat-fab')?.focus();
 }
@@ -197,4 +200,5 @@ export function unmountChat() {
   open = false;
   busy = false;
   cleanup = null;
+  switchedOff = false;
 }
