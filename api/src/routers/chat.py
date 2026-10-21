@@ -8,7 +8,7 @@ from .. import auth
 from ..auth import get_db
 from ..chat import agent
 from ..chat import model as chat_model
-from ..clients.ai_error import AIError
+from ..clients.ai_error import AIError, QuotaError, wait_text
 from ..database import models
 from ..utils import messages
 from ..utils.logger import LogManager
@@ -66,6 +66,14 @@ def ask(
     limiter.fail(str(current_user.id))  # not a failure: the limiter just counts the attempts
     try:
         answer = agent.ask(db, current_user, body.message.strip(), [(t.role, t.content) for t in body.history])
+    except QuotaError as e:
+        # already written to the audit log by the agent; not an error of ours, so not one in Sentry either
+        retry = e.quota.retry_after
+        raise HTTPException(
+            status_code=429,
+            detail=messages.CHAT_QUOTA.format(when=f" (reintenta en {wait_text(retry)})" if retry else ""),
+            headers={"Retry-After": str(retry)} if retry else None,
+        )
     except AIError as e:
         logger.error("Chat failed: " + str(e), exc_info=True)
         raise HTTPException(status_code=502, detail=messages.CHAT_FAILED)

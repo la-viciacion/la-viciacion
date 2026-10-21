@@ -395,7 +395,7 @@ async def send_message(
         if ai_use and ai.is_ready(ai_use):
             try:
                 # the clients block on the network: keep them off the event loop
-                text = await asyncio.to_thread(ai.complete, ai.prompt_for(ai_use, new_game_recommended), msg)
+                text = await asyncio.to_thread(ai.complete, ai.prompt_for(ai_use, new_game_recommended), msg, source=f"notice:{ai_use}")
                 if text:
                     logger.info(text)
                     msg = text

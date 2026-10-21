@@ -16,7 +16,7 @@ class OffTheLoopTests(unittest.IsolatedAsyncioTestCase):
     async def test_the_ai_call_runs_in_a_worker_thread(self):
         seen = []
 
-        def completion(system_prompt, user_prompt):
+        def completion(system_prompt, user_prompt, **kwargs):
             seen.append(threading.current_thread())
             return None
 

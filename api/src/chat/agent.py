@@ -14,9 +14,10 @@ from pydantic_ai.settings import ModelSettings
 from pydantic_ai.usage import UsageLimits
 from sqlalchemy.orm import Session
 
-from ..clients.ai_error import AIError
+from ..clients.ai_error import AIError, QuotaError
+from ..clients.quota import classify
 from ..database import models
-from ..utils import messages, seasons, settings
+from ..utils import ai_quota, messages, seasons, settings
 from . import model as chat_model
 from .tools import TOOLS, ChatDeps
 
@@ -61,9 +62,19 @@ def history_messages(history: list[tuple[str, str]]) -> list[ModelMessage]:
     ]
 
 
+def failure(e: Exception, source: str) -> AIError:
+    """What a provider failure becomes: a QuotaError (also written to the audit log) if a quota ran out, else an AIError
+    whose message never carries the key."""
+    quota = classify(e)
+    if quota:
+        ai_quota.report(quota, source, settings.get("ai.provider"), chat_model.model_name())
+        return QuotaError(f"chat: {quota.describe()}", quota)
+    # a provider library may quote what it was given: never let the key out in the message
+    return AIError(f"chat: {type(e).__name__}: {str(e).replace(settings.get('ai.api_key') or chr(0), '***')}")
+
+
 def ask(db: Session, user: models.User, question: str, history: list[tuple[str, str]], model=None) -> Answer:
     """Blocking: call it from a worker thread. Raises AIError if the provider fails. `model` is for the tests."""
-    key = settings.get("ai.api_key")
     try:
         result = agent.run_sync(
             question,
@@ -75,8 +86,7 @@ def ask(db: Session, user: models.User, question: str, history: list[tuple[str, 
     except UsageLimitExceeded:
         return Answer(messages.CHAT_TOO_COMPLEX, True)
     except Exception as e:
-        # a provider library may quote what it was given: never let the key out in the message
-        raise AIError(f"chat: {type(e).__name__}: {str(e).replace(key or chr(0), '***')}") from None
+        raise failure(e, "chat") from None
     reply = result.output
     return Answer(reply.answer.strip() if reply.in_scope else messages.CHAT_OFF_TOPIC, reply.in_scope)
 
@@ -84,11 +94,10 @@ def ask(db: Session, user: models.User, question: str, history: list[tuple[str, 
 def probe(model=None) -> str:
     """One short sentence from the chat's model, with no tools: for the panel's test button (blocking, like `ask`).
     Raises AIError if the provider fails."""
-    key = settings.get("ai.api_key")
     try:
         result = Agent(model or chat_model.build_model(), model_settings=SETTINGS).run_sync(
             "Saluda al grupo con una frase corta y divertida sobre videojuegos.", usage_limits=LIMITS
         )
     except Exception as e:
-        raise AIError(f"chat: {type(e).__name__}: {str(e).replace(key or chr(0), '***')}") from None
+        raise failure(e, "chat_test") from None
     return result.output.strip()

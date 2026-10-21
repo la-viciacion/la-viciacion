@@ -36,7 +36,7 @@ def write(name: str, username: str | None) -> str | None:
     if not ai.is_ready("welcome"):
         return None
     try:
-        text = ai.complete(ai.prompt_for("welcome"), request_for(name, username))
+        text = ai.complete(ai.prompt_for("welcome"), request_for(name, username), source="welcome")
     except ai.AIError as e:
         logger.error(f"AI welcome failed: {e}")
         return None
