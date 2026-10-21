@@ -51,6 +51,7 @@ function leaveCurrentPage() {
 }
 
 function endSession() {
+  import('./ui/chat.js').then((chat) => chat.unmountChat()).catch(() => {});
   session.clear();
   knownUser = null;
   stopPresence();
@@ -135,6 +136,7 @@ async function route() {
   }
   inviteToPush().catch(() => {}); // optional: never blocks or breaks a page
   inviteToRecap(user).catch(() => {}); // the same
+  import('./ui/chat.js').then((chat) => chat.mountChat()).catch(() => {}); // the same: the button only appears if the API says the chat works
 }
 
 setUnauthorizedHandler(() => {
