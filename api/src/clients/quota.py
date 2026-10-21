@@ -17,7 +17,7 @@ MESSAGE_MAX = 300
 CHAIN_MAX = 5  # how many exceptions of a `raise ... from` chain are looked at
 
 
-def _chain(exc: BaseException):
+def chain(exc: BaseException):
     seen = 0
     while exc is not None and seen < CHAIN_MAX:
         yield exc
@@ -25,7 +25,7 @@ def _chain(exc: BaseException):
         seen += 1
 
 
-def _status_and_body(exc: BaseException) -> tuple[int | None, object, dict]:
+def status_and_body(exc: BaseException) -> tuple[int | None, object, dict]:
     """(HTTP status, parsed body, headers) of an exception of a library we know; (None, None, {}) of any other."""
     if isinstance(exc, google_errors.APIError):
         response = getattr(exc, "response", None)
@@ -83,8 +83,8 @@ def _quota(body: object, headers: dict, retry_after: float | None = None) -> Quo
 
 def classify(exc: BaseException) -> Quota | None:
     """The quota that ran out if `exc` (or what it was raised from) is a provider's 429, else None."""
-    for found in _chain(exc):
-        status, body, headers = _status_and_body(found)
+    for found in chain(exc):
+        status, body, headers = status_and_body(found)
         if status == 429:
             return _quota(body, headers, getattr(found, "retry_after", None))
     return None
