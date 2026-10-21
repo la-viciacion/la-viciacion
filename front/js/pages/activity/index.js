@@ -27,18 +27,12 @@ const SENTENCES = {
   achievement: (e) => html`desbloqueó el logro «${e.title}»${e.game_id ? html` en ${game(e)}` : ''}`,
 };
 
-// A hidden achievement does not say who unlocked it either: no avatar, no name.
-const eventRow = (e) => (e.hidden
-  ? html`
-  <li class="ac-event">
-    <span class="pl-avatar" aria-hidden="true">🔒</span>
-    <div class="ac-text">Alguien desbloqueó un logro oculto</div>
-  </li>`
-  : html`
+// A hidden achievement names who unlocked it, but not which one it is.
+const eventRow = (e) => html`
   <li class="ac-event">
     ${playerAvatar(e)}
-    <div class="ac-text"><strong>${e.name}</strong> ${SENTENCES[e.type](e)}</div>
-  </li>`);
+    <div class="ac-text"><strong>${e.name}</strong> ${e.hidden ? 'desbloqueó un logro oculto' : SENTENCES[e.type](e)}</div>
+  </li>`;
 
 function draw() {
   mount(main, html`

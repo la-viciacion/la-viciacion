@@ -581,13 +581,12 @@ class AchievementCheckTests(unittest.IsolatedAsyncioTestCase):
         self.addCleanup(patcher.stop)
         return private
 
-    async def test_a_secret_one_is_told_to_the_group_without_saying_which_and_to_the_player_in_full(self):
+    async def test_a_secret_one_is_told_to_the_group_naming_the_player_but_not_which_and_to_the_player_in_full(self):
         private = self.make_secret("PLAYED_7_DAYS")
         await self.ach.user_played_total_days(self.db, USER, self.days(7))
         self.assertEqual(set(self.awarded()), {"PLAYED_7_DAYS"})  # it is earned all the same
         group = self.message()
-        self.assertNotIn("Ana", group)  # nor who
-        self.assertIn("Alguien ha desbloqueado un logro oculto", group)
+        self.assertIn("*Ana* ha desbloqueado un logro oculto", group)  # who, not which
         self.assertNotIn("7 días", group)  # nothing that gives it away
         self.assertEqual(self.sent.await_args.kwargs, {})  # and no picture
         private.assert_awaited_once()
@@ -601,24 +600,23 @@ class AchievementCheckTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("7 días jugados", self.message())
         private.assert_not_awaited()
 
-    async def test_a_special_one_is_secret_even_if_it_is_not_marked_so_and_says_its_level_to_the_player(self):
+    async def test_a_special_one_that_is_not_secret_is_announced_in_full_with_its_level_and_nobody_is_told_privately(self):
         private = self.make_secret()
         self.db.query(models.Achievement).filter_by(key="PLAYED_7_DAYS").update({"special": 3})
         self.db.commit()
-        self.assertFalse(self.db.query(models.Achievement.secret).filter_by(key="PLAYED_7_DAYS").scalar())  # the mark is not set
         await self.ach.user_played_total_days(self.db, USER, self.days(7))
         group = self.message()
-        self.assertIn("Alguien ha desbloqueado un logro oculto", group)  # the group is told nothing else about it...
-        self.assertTrue(group.startswith("Logro especial de nivel 3\n"))  # ...but its level, the interesting part
-        self.assertNotIn("7 días", group)
-        self.assertIn("Logro especial de nivel 3", private.await_args.args[1])
+        self.assertTrue(group.startswith("Logro especial de nivel 3\n"))
+        self.assertIn("7 días jugados", group)  # special is the aura, not a secret
+        self.assertNotIn("logro oculto", group)
+        private.assert_not_awaited()
 
-    async def test_a_special_and_secret_one_is_anonymous_to_the_group_and_special_to_the_player(self):
+    async def test_a_special_and_secret_one_is_hidden_from_the_group_and_special_to_the_player(self):
         private = self.make_secret("PLAYED_7_DAYS")
         self.db.query(models.Achievement).filter_by(key="PLAYED_7_DAYS").update({"special": 1})
         self.db.commit()
         await self.ach.user_played_total_days(self.db, USER, self.days(7))
-        self.assertIn("Alguien ha desbloqueado un logro oculto", self.message())
+        self.assertIn("ha desbloqueado un logro oculto", self.message())
         self.assertTrue(self.message().startswith("Logro especial de nivel 1\n"))  # the level is told to the group too
         self.assertIn("Logro especial de nivel 1", private.await_args.args[1])
         self.assertNotIn("7 días", self.message())
@@ -629,18 +627,18 @@ class AchievementCheckTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.sent.await_args.args[1], True)
         private.assert_not_awaited()
 
-    async def test_several_players_that_unlock_a_secret_are_not_named_and_each_is_told_privately(self):
+    async def test_several_players_that_unlock_a_secret_are_all_named_and_each_is_told_privately(self):
         private = self.make_secret("TEAMWORK", "ALL_TOGETHER")
         for i in range(2, 6):
             self.db.add(models.User(id=i, name=f"P{i}", username=f"p{i}", is_active=1))
             self.db.add(models.GameTimer(user_id=i, game_id="g1", start_time=datetime.datetime(YEAR, 3, 1, 10), is_active=True))
         self.db.commit()
         await self.ach.teamwork(self.db, silent=False)
-        self.assertIn("Alguien ha desbloqueado un logro oculto", self.message(0))
-        self.assertNotIn("P2", self.message(0))
+        self.assertIn("han desbloqueado un logro oculto", self.message(0))
+        self.assertIn("*P2*", self.message(0))
         self.assertEqual(private.await_count, 4)
         await self.ach.all_together(self.db, "g1")
-        self.assertIn("Alguien ha desbloqueado un logro oculto", self.message(1))
+        self.assertIn("han desbloqueado un logro oculto", self.message(1))
         self.assertEqual(private.await_count, 8)
 
     async def test_silent_checks_award_but_pass_silent_on(self):
@@ -1316,8 +1314,6 @@ class CatalogueTests(unittest.TestCase):
         self.assertLessEqual({key for key, _, _ in migration.SPECIAL} | set(migration.SECRET), set(by_name))
         for key, _, level in migration.SPECIAL:
             self.assertEqual(by_name[key].value.get("special", 0), level, key)  # the snapshot is what the code says now
-        for key in migration.SECRET:
-            self.assertTrue(by_name[key].value.get("secret"), key)
 
     def test_what_the_migration_sets_is_about_achievements_that_exist(self):
         from tests.test_migrations import load_script_directory

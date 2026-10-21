@@ -45,13 +45,12 @@ test('"Mostrar más" asks for the next page from where it stopped and goes away 
   assert.equal(document.querySelector('#acMore'), null);
 });
 
-test('a hidden achievement is announced without saying who unlocked it', async () => {
+test('a hidden achievement names who unlocked it but not which one it is', async () => {
   installApi({
-    'GET /activity?limit=30&offset=0': { items: [{ type: 'achievement', day: today, user_id: null, name: null, game_id: null, game_name: null, title: null, hidden: true }], has_more: false },
+    'GET /activity?limit=30&offset=0': { items: [{ type: 'achievement', day: today, user_id: 2, name: 'Bea', game_id: null, game_name: null, title: null, hidden: true }], has_more: false },
     'GET /users/photo/': json({ detail: 'no' }, 404),
   });
   await page.render({ main: main(), user: { id: 1, username: 'ana' } });
   await settle();
-  assert.equal(text('.ac-text')[0], 'Alguien desbloqueó un logro oculto');
-  assert.equal(document.querySelector('.ac-event [data-photo]'), null);
+  assert.equal(text('.ac-text')[0], 'Bea desbloqueó un logro oculto');
 });

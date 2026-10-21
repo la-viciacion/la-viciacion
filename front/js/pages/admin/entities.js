@@ -307,7 +307,7 @@ export const ENTITIES = {
           ? html`<details class="adm-awardees" data-achievement="${r.id}"><summary><strong>${r.title}</strong><div class="adm-sub">${r.key}</div></summary><div class="adm-awardees-list"></div></details>`
           : html`<strong>${r.title}</strong><div class="adm-sub">${r.key}</div>`),
       },
-      { label: 'Estado', render: (r) => html`${r.active ? badge('Activo', 'green') : badge('Inactivo', 'orange')}${r.secret || r.special ? badge('Secreto', 'ink') : ''}${SPECIAL_NAMES[r.special] ? badge(`Especial nivel ${r.special}`, specialClass(r.special).trim()) : ''}${r.lifetime ? badge('Único', 'gray') : ''}` },
+      { label: 'Estado', render: (r) => html`${r.active ? badge('Activo', 'green') : badge('Inactivo', 'orange')}${r.secret ? badge('Secreto', 'ink') : ''}${SPECIAL_NAMES[r.special] ? badge(`Especial nivel ${r.special}`, specialClass(r.special).trim()) : ''}${r.lifetime ? badge('Único', 'gray') : ''}` },
       { label: 'Desde', render: (r) => r.valid_from_season },
       { label: 'Concedido', render: (r) => r.awarded },
     ],

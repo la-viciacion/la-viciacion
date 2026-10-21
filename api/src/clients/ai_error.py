@@ -32,6 +32,14 @@ def wait_text(seconds: int) -> str:
     return f"{round(seconds / 3600)} h"
 
 
+class ProviderError(AIError):
+    """The provider failed in a way a player can be told about: `kind` is one of clients/failure.py."""
+
+    def __init__(self, message: str, kind: str):
+        super().__init__(message)
+        self.kind = kind
+
+
 class QuotaError(AIError):
     """The provider refused the call because a quota ran out (a per-minute limit, the day's, or the billing)."""
 

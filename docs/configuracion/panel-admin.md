@@ -26,7 +26,7 @@ Todos los logros con su estado. Pulsa uno para ver quién lo ha conseguido y cu�
 
 - **Activo**: apagado, nadie lo gana ni se anuncia, pero lo ya ganado se conserva.
 - **Secreto**: oculto para quien no lo tiene.
-- **Especial** (nivel 1 plateado, 2 dorado, 3 morado): le da el aura. Los especiales son también secretos.
+- **Especial** (nivel 1 plateado, 2 dorado, 3 morado): le da el aura. Es independiente de **Secreto**: un logro puede ser una cosa, las dos o ninguna.
 - **Desde**: la temporada en la que empieza a contar. Los nuevos logros empiezan en 2027.
 - El texto y la imagen.
 

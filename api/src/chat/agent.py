@@ -14,7 +14,8 @@ from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse, Text
 from pydantic_ai.settings import ModelSettings
 from sqlalchemy.orm import Session
 
-from ..clients.ai_error import AIError, QuotaError
+from ..clients import failure as provider_failure
+from ..clients.ai_error import AIError, ProviderError, QuotaError
 from ..clients.quota import classify
 from ..database import models
 from ..utils import ai_quota, messages, seasons, settings
@@ -76,7 +77,9 @@ def failure(e: Exception, source: str) -> AIError:
         ai_quota.report(quota, source, settings.get("ai.provider"), chat_model.model_name())
         return QuotaError(f"chat: {quota.describe()}", quota)
     # a provider library may quote what it was given: never let the key out in the message
-    return AIError(f"chat: {type(e).__name__}: {str(e).replace(settings.get('ai.api_key') or chr(0), '***')}")
+    message = f"chat: {type(e).__name__}: {str(e).replace(settings.get('ai.api_key') or chr(0), '***')}"
+    kind = provider_failure.kind(e)
+    return ProviderError(message, kind) if kind else AIError(message)
 
 
 def ask(db: Session, user: models.User, question: str, history: list[tuple[str, str]], model=None) -> Answer:

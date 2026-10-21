@@ -933,7 +933,7 @@ def get_achievements(db: Session, username: str, season: int = None):
             models.UserAchievement.date,
             models.Achievement.id,
             models.Achievement.title,
-            models.Achievement.is_secret.label("secret"),
+            models.Achievement.secret,
             models.Achievement.special,
         )
         .join(models.User, models.User.id == models.UserAchievement.user_id)

@@ -132,7 +132,7 @@ def feed(db: Session, limit: int = 30, offset: int = 0) -> dict:
 
     for award, name, username, title, secret, game_id, game_name, image in (
         db.query(models.UserAchievement, models.User.name, models.User.username, models.Achievement.title,
-                 models.Achievement.is_secret, models.UserAchievement.game_id, models.Game.name, models.Game.image_url)
+                 models.Achievement.secret, models.UserAchievement.game_id, models.Game.name, models.Game.image_url)
         .join(models.User, models.UserAchievement.user_id == models.User.id)
         .join(models.Achievement, models.UserAchievement.achievement_id == models.Achievement.id)
         .outerjoin(models.Game, models.UserAchievement.game_id == models.Game.id)
@@ -140,8 +140,7 @@ def feed(db: Session, limit: int = 30, offset: int = 0) -> dict:
         .order_by(desc(models.UserAchievement.date), models.UserAchievement.user_id, models.UserAchievement.achievement_id)
         .limit(n)
     ):
-        # a secret one stays hidden for everybody: no title, and the game would give it away (the player is dropped
-        # at the end, once the events are sorted)
+        # a secret one stays hidden for everybody: no title, and the game would give it away (the player is named)
         seen = not secret
         add("achievement", award.date, award.user_id, name, username, game_id if seen else None,
             game_name if seen else None, image if seen else None, title=title if seen else None, hidden=not seen)
@@ -151,6 +150,4 @@ def feed(db: Session, limit: int = 30, offset: int = 0) -> dict:
     page = events[offset:offset + limit]
     for e in page:
         del e["at"]
-        if e.get("hidden"):  # after the sort, which needs the player: nobody learns who unlocked a hidden one
-            e["user_id"] = e["name"] = None
     return {"items": page, "has_more": len(events) > offset + limit}
