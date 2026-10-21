@@ -60,7 +60,7 @@ def achievements_catalog(db: Session, viewer_id: int, today: datetime.date | Non
 
     achievements = db.query(
         models.Achievement.id, models.Achievement.key, models.Achievement.title, models.Achievement.message,
-        models.Achievement.image.isnot(None).label("has_image"), models.Achievement.active, models.Achievement.is_secret.label("secret"),
+        models.Achievement.image.isnot(None).label("has_image"), models.Achievement.active, models.Achievement.secret,
         models.Achievement.special, models.Achievement.valid_from_season,
     ).order_by(models.Achievement.id).all()
     lifetime_ids = {a.id for a in achievements if is_lifetime(a.key)}

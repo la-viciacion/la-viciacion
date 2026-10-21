@@ -636,7 +636,6 @@ class AchievementsElems(Enum):
     TEAMWORK = {
         "since": 2023,
         "special": 1,
-        "secret": True,
         "title": "Trabajo en equipo (de 4+)",
         "message": "*{}*"
         + " han demostrado que el trabajo en equipo no es un mito."

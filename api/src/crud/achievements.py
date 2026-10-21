@@ -397,15 +397,15 @@ class Achievements:
 
     def _flags(self, db: Session, key: str) -> tuple[bool, int]:
         """(secret, special level) of an achievement."""
-        secret, special = db.query(models.Achievement.is_secret, models.Achievement.special).filter(models.Achievement.key == key).one()
+        secret, special = db.query(models.Achievement.secret, models.Achievement.special).filter(models.Achievement.key == key).one()
         return bool(secret), special or 0
 
     async def _announce(
         self, db: Session, ach: AchievementsElems, players: list, message: str, silent: bool, image=None
     ):
-        """Tell the group that `players` unlocked `ach`, with `message`. A special one says so, and its level, even
-        if it is secret (the level is the interesting part and says nothing about what it is). A secret one does not
-        say which, nor who: the group (Telegram and push) only hears that somebody unlocked a hidden achievement (no
+        """Tell the group that `players` unlocked `ach`, with `message`. A special one says so, and its level, secret
+        or not (the level is the interesting part and says nothing about what it is). A secret one does not
+        say which: the group (Telegram and push) hears who unlocked a hidden achievement but not what it is (no
         picture), and each player gets `message` privately, on every channel they have (Telegram if linked, push if
         they have a device)."""
         silent = silent or self.silent
@@ -414,7 +414,10 @@ class Achievements:
         if not secret:
             await utils.send_message(level + message, silent, image=image)
             return
-        await utils.send_message(f"{level}🏆 Logro oculto 🏆\nAlguien ha desbloqueado un logro oculto.", silent)
+        names = [f"*{player.name}*" for player in players]
+        who = names[0] if len(names) == 1 else ", ".join(names[:-1]) + " y " + names[-1]
+        verb = "ha" if len(names) == 1 else "han"
+        await utils.send_message(f"{level}🏆 Logro oculto 🏆\n{who} {verb} desbloqueado un logro oculto.", silent)
         if not silent:
             for player in players:
                 await utils.send_message_to_user(player.telegram_id, level + message, user_id=player.id)

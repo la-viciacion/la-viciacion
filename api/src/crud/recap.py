@@ -260,7 +260,7 @@ def _achievements(db: Session, period: Period) -> list[dict]:
             models.UserAchievement.date,
             models.Achievement.id,
             models.Achievement.title,
-            models.Achievement.is_secret,
+            models.Achievement.secret,
             holders.c.holders,
         )
         .join(models.Achievement, models.Achievement.id == models.UserAchievement.achievement_id)
