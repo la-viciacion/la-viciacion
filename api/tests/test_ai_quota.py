@@ -10,13 +10,14 @@ from fastapi import HTTPException
 from google.genai import errors as google_errors
 from pydantic_ai.exceptions import ModelHTTPError
 
+from src.chat import limits as chat_limits
 from src.chat import agent
 from src.clients import google_ai, quota
 from src.clients.ai_error import AIError, Quota, QuotaError
 from src.database import models
 from src.routers import chat as chat_router
 from src.routers.manage import system
-from src.utils import ai, ai_quota, audit, messages
+from src.utils import ai, ai_quota, audit, messages, settings
 from tests.sqlite_db import make_session
 
 DAY = "GenerateRequestsPerDayPerProjectPerModel-FreeTier"
@@ -170,11 +171,12 @@ class AnswersTests(unittest.TestCase):
     admin = types.SimpleNamespace(username="root", id=1)
 
     def test_the_chat_endpoint_answers_429_with_a_friendly_message_and_the_wait(self):
-        chat_router.limiter.reset("7")
-        self.addCleanup(chat_router.limiter.reset, "7")
+        chat_limits.limiter.clear()
+        self.addCleanup(chat_limits.limiter.clear)
         user = types.SimpleNamespace(id=7)
         failing = mock.Mock(side_effect=QuotaError("q", Quota("day", 90, (DAY,))))
-        with mock.patch.object(chat_router.chat_model, "is_ready", return_value=True), mock.patch.object(chat_router.agent, "ask", failing):
+        with mock.patch.object(chat_router.chat_model, "is_ready", return_value=True), mock.patch.object(chat_router.agent, "ask", failing), \
+                mock.patch.object(settings, "get", return_value=0):
             with self.assertRaises(HTTPException) as caught:
                 chat_router.ask(chat_router.ChatRequest(message="hola"), current_user=user, db=mock.Mock())
         self.assertEqual(caught.exception.status_code, 429)
@@ -182,10 +184,11 @@ class AnswersTests(unittest.TestCase):
         self.assertEqual(caught.exception.headers, {"Retry-After": "90"})
 
     def test_without_a_known_wait_the_message_has_none(self):
-        chat_router.limiter.reset("8")
-        self.addCleanup(chat_router.limiter.reset, "8")
+        chat_limits.limiter.clear()
+        self.addCleanup(chat_limits.limiter.clear)
         failing = mock.Mock(side_effect=QuotaError("q", Quota()))
-        with mock.patch.object(chat_router.chat_model, "is_ready", return_value=True), mock.patch.object(chat_router.agent, "ask", failing):
+        with mock.patch.object(chat_router.chat_model, "is_ready", return_value=True), mock.patch.object(chat_router.agent, "ask", failing), \
+                mock.patch.object(settings, "get", return_value=0):
             with self.assertRaises(HTTPException) as caught:
                 chat_router.ask(chat_router.ChatRequest(message="hola"), current_user=types.SimpleNamespace(id=8), db=mock.Mock())
         self.assertEqual(caught.exception.detail, messages.CHAT_QUOTA.format(when=""))

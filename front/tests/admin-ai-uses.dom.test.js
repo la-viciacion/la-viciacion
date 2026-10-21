@@ -9,7 +9,8 @@ const { render } = await import('../js/pages/admin/settings.js');
 
 const VALUES = {
   'ai.enabled': true, 'ai.provider': { is_set: true }, 'ai.api_key': { is_set: true }, 'ai.model': { is_set: true },
-  'ai.use.completed_game': true, 'ai.use.new_game': false, 'chat.enabled': true, 'chat.model': { is_set: true }, 'chat.prompt': 'd', 'completed_game.recommend': true,
+  'ai.use.completed_game': true, 'ai.use.new_game': false, 'chat.enabled': true, 'chat.model': { is_set: true }, 'chat.prompt': 'd',
+  'chat.limit_user_minute': 5, 'chat.limit_user_hour': 30, 'chat.limit_user_day': 100, 'chat.limit_group_minute': 10, 'chat.limit_group_day': 300, 'completed_game.recommend': true,
   'telegram.token': { is_set: false }, 'telegram.group_id': { is_set: false }, 'telegram.admin_chat_id': { is_set: false }, 'push.vapid_private': { is_set: true },
   'ai.prompt.completed_game': 'a', 'ai.prompt.completed_game_recommendation': 'b', 'ai.prompt.new_game': 'c',
 };
@@ -215,4 +216,31 @@ test('the test button asks the API, which uses what is stored', async () => {
   chatCard().querySelector('[data-set-act="test-chat"]').click();
   await settle();
   assert.deepEqual(calls.map((c) => `${c.method} ${c.path}`), ['POST /manage/settings/test-chat']);
+});
+
+const LIMIT_FIELDS = ['chat.limit_user_minute', 'chat.limit_user_hour', 'chat.limit_user_day', 'chat.limit_group_minute', 'chat.limit_group_day'];
+
+test('the chat card has the limits per player and for the group, with what the server has', async () => {
+  await openWithChat();
+  const fields = LIMIT_FIELDS.map((name) => chatCard().querySelector(`input[name="${name}"]`));
+  assert.ok(fields.every((field) => field && field.type === 'number' && field.min === '0'));
+  assert.deepEqual(fields.map((field) => field.value), ['5', '30', '100', '10', '300']);
+  assert.match(chatCard().textContent, /0 es sin límite/);
+});
+
+test('changing a limit sends that number, and only that one', async () => {
+  await openWithChat();
+  const form = panel().querySelector('#admSettings');
+  form.elements['chat.limit_user_day'].value = '0';
+  form.elements['chat.limit_group_minute'].value = '20';
+  let saved = null;
+  installApi({
+    'GET /manage/settings': answer(VALUES, GOOGLE, CHAT),
+    'PUT /manage/settings': ({ body }) => { saved = body; return { changed: [], values: VALUES }; },
+  });
+  form.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+  await settle();
+  assert.deepEqual(Object.fromEntries(Object.entries(saved.values).filter(([key]) => key.startsWith('chat.limit_'))), {
+    'chat.limit_user_day': 0, 'chat.limit_group_minute': 20, // numbers, not texts, and zero is a value
+  });
 });

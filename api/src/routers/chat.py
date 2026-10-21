@@ -6,13 +6,13 @@ from sqlalchemy.orm import Session
 
 from .. import auth
 from ..auth import get_db
-from ..chat import agent
+from ..chat import agent, limits
 from ..chat import model as chat_model
 from ..clients.ai_error import AIError, QuotaError, wait_text
 from ..database import models
 from ..utils import messages
 from ..utils.logger import LogManager
-from ..utils.rate_limit import AttemptLimiter
+from ..utils.rate_limit import Refused
 
 log_manager = LogManager()
 logger = log_manager.get_logger()
@@ -24,9 +24,16 @@ router = APIRouter(
     dependencies=[Depends(auth.get_current_active_user)],
 )
 
-# Each question costs a call to a paid model: this keeps one account (or a leaked token) from emptying the quota
-QUESTIONS_PER_HOUR = 30
-limiter = AttemptLimiter(max_failures=QUESTIONS_PER_HOUR, window_seconds=3600)
+WHEN = {60: "el último minuto", 3600: "la última hora", 86400: "las últimas 24 horas"}
+
+
+def refusal(refused: Refused) -> HTTPException:
+    template = messages.CHAT_GROUP_LIMITED if refused.scope == "group" else messages.CHAT_USER_LIMITED
+    return HTTPException(
+        status_code=429,
+        detail=template.format(when=WHEN[refused.window], wait=wait_text(refused.wait)),
+        headers={"Retry-After": str(refused.wait)},
+    )
 
 
 class ChatTurn(BaseModel):
@@ -35,7 +42,7 @@ class ChatTurn(BaseModel):
 
 
 class ChatRequest(BaseModel):
-    message: str = Field(min_length=1, max_length=500)
+    message: str = Field(min_length=1, max_length=limits.MAX_QUESTION)
     history: list[ChatTurn] = Field(default_factory=list, max_length=agent.MAX_HISTORY)
 
 
@@ -60,10 +67,9 @@ def ask(
     nothing of the conversation is stored."""
     if not chat_model.is_ready():
         raise HTTPException(status_code=503, detail=messages.CHAT_UNAVAILABLE)
-    wait = limiter.retry_after(str(current_user.id))
-    if wait:
-        raise HTTPException(status_code=429, detail=messages.CHAT_RATE_LIMITED.format(minutes=wait // 60 + 1), headers={"Retry-After": str(wait)})
-    limiter.fail(str(current_user.id))  # not a failure: the limiter just counts the attempts
+    refused = limits.limiter.acquire(limits.scopes_of(current_user.id))
+    if refused:
+        raise refusal(refused)
     try:
         answer = agent.ask(db, current_user, body.message.strip(), [(t.role, t.content) for t in body.history])
     except QuotaError as e:

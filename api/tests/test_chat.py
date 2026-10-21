@@ -13,6 +13,7 @@ from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse, Text
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 
 from src import auth
+from src.chat import limits as chat_limits
 from src.chat import agent, tools
 from src.chat import prompt as chat_prompt
 from src.chat import model as chat_model
@@ -227,10 +228,19 @@ class AgentTests(unittest.TestCase):
         self.assertIn("***", str(error.exception))
 
 
+def limits(**overrides):
+    """The chat's limits as the settings give them: the defaults of the code, with the ones a test changes."""
+    base = {key: spec.default for key, spec in settings.REGISTRY.items() if key.startswith("chat.limit_")}
+    return mock.patch.object(settings, "get", side_effect=lambda key: {**base, **overrides}[key])
+
+
 class EndpointTests(unittest.TestCase):
     def setUp(self):
-        chat_router.limiter.reset("1")
-        self.addCleanup(chat_router.limiter.reset, "1")
+        chat_limits.limiter.clear()
+        self.addCleanup(chat_limits.limiter.clear)
+        patcher = limits(**{key: 0 for key in settings.REGISTRY if key.startswith("chat.limit_")})
+        patcher.start()
+        self.addCleanup(patcher.stop)
         app = FastAPI()
         app.include_router(chat_router.router)
         self.user = types.SimpleNamespace(id=1, username="ana", name="Ana", is_admin=0, is_active=1)
@@ -277,14 +287,72 @@ class EndpointTests(unittest.TestCase):
         ):
             self.assertEqual(self.client.post("/chat", json=body).status_code, 422, body)
 
-    def test_one_account_cannot_ask_more_than_the_hourly_limit(self):
+    def ask(self):
+        return self.client.post("/chat", json={"message": "hola"})
+
+    def test_the_limits_come_from_the_settings_and_a_player_is_told_which_one_and_for_how_long(self):
+        self.ready()
+        with mock.patch.object(chat_router.agent, "ask", return_value=agent.Answer("ok", True)) as ask:
+            with limits(**{"chat.limit_user_minute": 2, "chat.limit_user_hour": 0, "chat.limit_user_day": 0,
+                           "chat.limit_group_minute": 0, "chat.limit_group_day": 0}):
+                self.assertEqual([self.ask().status_code for _ in range(2)], [200, 200])
+                response = self.ask()
+        self.assertEqual(ask.call_count, 2)
+        self.assertEqual(response.status_code, 429)
+        self.assertEqual(response.json()["detail"], messages.CHAT_USER_LIMITED.format(when="el último minuto", wait="60 s"))
+        self.assertEqual(response.headers["Retry-After"], "60")
+
+    def test_each_window_names_itself_in_the_message(self):
+        self.ready()
+        for setting, when in (("chat.limit_user_hour", "la última hora"), ("chat.limit_user_day", "las últimas 24 horas")):
+            chat_limits.limiter.clear()
+            only = {key: 0 for key in settings.REGISTRY if key.startswith("chat.limit_")} | {setting: 1}
+            with mock.patch.object(chat_router.agent, "ask", return_value=agent.Answer("ok", True)), limits(**only):
+                self.assertEqual(self.ask().status_code, 200)
+                response = self.ask()
+            self.assertEqual(response.status_code, 429)
+            self.assertIn(when, response.json()["detail"])
+
+    def test_the_group_limit_counts_every_player_and_says_it_is_the_groups(self):
+        self.ready()
+        only = {key: 0 for key in settings.REGISTRY if key.startswith("chat.limit_")} | {"chat.limit_group_day": 2}
+        with mock.patch.object(chat_router.agent, "ask", return_value=agent.Answer("ok", True)), limits(**only):
+            for user_id in (1, 2):
+                self.user.id = user_id
+                self.assertEqual(self.ask().status_code, 200)
+            self.user.id = 3
+            response = self.ask()
+        self.assertEqual(response.status_code, 429)
+        self.assertTrue(response.json()["detail"].startswith("El grupo ha hecho demasiadas preguntas"))
+
+    def test_a_limit_changed_in_the_panel_applies_to_the_next_question(self):
         self.ready()
         with mock.patch.object(chat_router.agent, "ask", return_value=agent.Answer("ok", True)):
-            for _ in range(chat_router.QUESTIONS_PER_HOUR):
-                self.assertEqual(self.client.post("/chat", json={"message": "hola"}).status_code, 200)
-            response = self.client.post("/chat", json={"message": "hola"})
-        self.assertEqual(response.status_code, 429)
-        self.assertIn("Retry-After", response.headers)
+            with limits(**{"chat.limit_user_minute": 1, "chat.limit_user_hour": 0, "chat.limit_user_day": 0, "chat.limit_group_minute": 0, "chat.limit_group_day": 0}):
+                self.assertEqual(self.ask().status_code, 200)
+                self.assertEqual(self.ask().status_code, 429)
+            with limits(**{"chat.limit_user_minute": 0, "chat.limit_user_hour": 0, "chat.limit_user_day": 0, "chat.limit_group_minute": 0, "chat.limit_group_day": 0}):
+                self.assertEqual(self.ask().status_code, 200)
+
+    def test_with_every_limit_at_zero_nothing_is_limited_or_remembered(self):
+        self.ready()
+        with mock.patch.object(chat_router.agent, "ask", return_value=agent.Answer("ok", True)):
+            for _ in range(60):
+                self.assertEqual(self.ask().status_code, 200)
+        self.assertEqual(chat_limits.limiter._uses, {})
+
+    def test_the_defaults_are_reasonable_and_a_limit_is_a_whole_number_from_zero(self):
+        defaults = {key: spec.default for key, spec in settings.REGISTRY.items() if key.startswith("chat.limit_")}
+        self.assertEqual(defaults, {
+            "chat.limit_user_minute": 5, "chat.limit_user_hour": 30, "chat.limit_user_day": 100,
+            "chat.limit_group_minute": 10, "chat.limit_group_day": 300,
+        })
+        db = make_session()
+        settings.set_values(db, {"chat.limit_user_day": 0})
+        self.assertEqual(settings.get_all(db)["chat.limit_user_day"], 0)
+        for bad in (-1, 100001, "x"):
+            with self.assertRaises(ValueError):
+                settings.set_values(db, {"chat.limit_user_day": bad})
 
 
 class ReadinessTests(unittest.TestCase):

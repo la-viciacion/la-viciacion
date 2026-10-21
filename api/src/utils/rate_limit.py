@@ -1,4 +1,4 @@
-"""Failed-attempt limiter for the public login endpoint.
+"""Failed-attempt limiter for the public login endpoint, and the usage limiter of the chat (UsageLimiter, below).
 
 In memory and per process: enough for a single API replica (see docs/desarrollo/architecture.md);
 a restart forgets the counters. Time is passed in so it is testable without clocks.
@@ -11,6 +11,7 @@ private peer such as the nginx container would put everybody in the same bucket.
 import threading
 import time
 from collections import deque
+from dataclasses import dataclass
 
 MAX_KEYS = 10000  # bound the memory an attacker can make us use with random names
 
@@ -58,3 +59,77 @@ class AttemptLimiter:
     def reset(self, key: str) -> None:
         with self._lock:
             self._failures.pop(key, None)
+
+
+@dataclass(frozen=True)
+class Scope:
+    """Whose use is counted (`key`: one user, or the whole group) and how much of it each window allows:
+    `limits` is ((window in seconds, most uses), ...); a most of 0 or less leaves that window free."""
+
+    key: str
+    name: str  # what the refusal says it was ("user", "group")
+    limits: tuple[tuple[int, int], ...]
+
+    def active(self) -> tuple[tuple[int, int], ...]:
+        return tuple((window, most) for window, most in self.limits if most > 0)
+
+
+@dataclass(frozen=True)
+class Refused:
+    scope: str  # Scope.name
+    window: int  # the window that was used up, in seconds (the one that takes longest to free if several are)
+    wait: int  # seconds until it lets one more through
+
+
+class UsageLimiter:
+    """How many times something may be used (a question to the chat) per minute, hour and day, for a user and for the
+    whole group at once.
+
+    One list of times per key, whatever the windows: a use is counted in each window it is still inside, so the day
+    is the last 24 hours, not the calendar day. A use is recorded only if every scope lets it through (one refused by
+    the group does not eat the user's allowance). In memory and per process, like AttemptLimiter: enough for the single
+    API replica, and a restart forgets the counts. Time is passed in so it is testable without clocks."""
+
+    def __init__(self, clock=time.monotonic):
+        self._clock = clock
+        self._uses: dict[str, deque] = {}
+        self._lock = threading.Lock()
+
+    def _inside(self, key: str, now: float, horizon: int) -> deque:
+        uses = self._uses.get(key)
+        if uses is None:
+            return deque()
+        while uses and now - uses[0] >= horizon:
+            uses.popleft()
+        return uses
+
+    def acquire(self, scopes: list[Scope]) -> Refused | None:
+        """None if every scope allows one more use (it is recorded); else which one refuses and for how long (nothing is recorded)."""
+        with self._lock:
+            now = self._clock()
+            for scope in scopes:
+                limits = scope.active()
+                if not limits:
+                    continue
+                uses = self._inside(scope.key, now, max(window for window, _ in limits))
+                waits = []
+                for window, most in limits:
+                    recent = [t for t in uses if now - t < window]
+                    if len(recent) >= most:
+                        waits.append((int(window - (now - recent[len(recent) - most])) + 1, window))
+                if waits:
+                    wait, window = max(waits)
+                    return Refused(scope.name, window, wait)
+            for scope in scopes:
+                if scope.active():
+                    self._record(scope.key, now)
+            return None
+
+    def _record(self, key: str, now: float) -> None:
+        if key not in self._uses and len(self._uses) >= MAX_KEYS:
+            self._uses.pop(next(iter(self._uses)))  # the oldest key: bounds the memory whatever the users
+        self._uses.setdefault(key, deque()).append(now)
+
+    def clear(self) -> None:
+        with self._lock:
+            self._uses.clear()

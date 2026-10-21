@@ -15,6 +15,14 @@ import { confirmDialog } from './dialogs.js';
 
 const SECRETS = []; // never loaded back: sent only when something is typed (the keys of outside services are not: they are in the server's .env)
 const LOCKED = ['telegram.token', 'telegram.group_id', 'telegram.admin_chat_id', 'ai.api_key', 'ai.provider', 'ai.model', 'chat.model']; // shown only as set or not, never editable
+// the questions the chat answers, per player and for the whole group (api/src/utils/settings.py chat.limit_*)
+const CHAT_LIMITS = [
+  ['chat.limit_user_minute', 'Por jugador, por minuto'],
+  ['chat.limit_user_hour', 'Por jugador, por hora'],
+  ['chat.limit_user_day', 'Por jugador, por día'],
+  ['chat.limit_group_minute', 'Grupo, por minuto'],
+  ['chat.limit_group_day', 'Grupo, por día'],
+];
 const READ_ONLY = ['mail', 'backup']; // cards with nothing to save
 const AI_PROVIDERS = [['google', 'Google (Gemini)'], ['openai', 'OpenAI']];
 
@@ -204,6 +212,10 @@ function view(values, jobs, pushDevices, mail, aiUses, aiModel, chat) {
         <h3>Chat</h3>
         <div class="adm-sub">Un botón flotante, abajo a la derecha de cada pantalla, abre un asistente que responde solo sobre videojuegos y los datos del grupo. Usa el proveedor y la clave de la IA de los avisos y su propio modelo si lo hay (ver Sistema → Servicios). Quien ya tenga la página abierta lo ve desaparecer al preguntar o al recargar.</div>
         ${check('chat.enabled', 'Chat activado', 'Apagado, el botón desaparece para todos y el chat deja de responder.')}
+        <div class="adm-sub">Preguntas que se pueden hacer al chat; 0 es sin límite. Cada pregunta gasta varias llamadas a la IA y el cupo de la IA es del proyecto entero, no de cada jugador: por eso hay un límite por jugador y otro para todo el grupo. «Día» son las últimas 24 horas, no desde medianoche. Se cuentan en memoria: reiniciar la API los pone a cero. Quien se pasa ve cuál ha superado y cuánto esperar.</div>
+        <div class="adm-set-row adm-chat-limits">
+          ${CHAT_LIMITS.map(([name, label]) => html`<label>${label} <input class="adm-input" type="number" name="${name}" min="0" max="100000" step="1" required /></label>`)}
+        </div>
         ${chatMissing(values, chat).length ? html`<div class="adm-warn">Falta <code>${chatMissing(values, chat).join(', ')}</code> en el .env del servidor: el chat usa el proveedor y la clave de la IA de los avisos, y no tiene ningún modelo por defecto, así que no estará disponible hasta que los definas (y reinicies la API).</div>` : ''}
         <details class="adm-details adm-ai-prompt">
           <summary class="adm-btn sm">Instrucciones ${chat.customized ? html`<span class="adm-tag">Personalizado</span>` : ''}</summary>
