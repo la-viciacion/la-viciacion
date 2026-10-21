@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { afterEach, test } from 'node:test';
-import { installApi, installDom, installStorage, json, settle } from './dom.js';
+import { installApi, installDom, installStorage, json, settle, text } from './dom.js';
 
 const window = installDom('', 'http://localhost/');
 installStorage();
@@ -71,6 +71,27 @@ test('a failed question shows the error and is not sent again as history', async
   fail = false;
   await ask('otra vez');
   assert.deepEqual(calls.filter((c) => c.method === 'POST')[1].body.history, []);
+});
+
+test('three suggestions are offered, and a new conversation offers others', async () => {
+  installApi({ 'GET /chat/status': { available: true }, 'POST /chat': { answer: 'ok', in_scope: true } });
+  await mountChat();
+  q('.chat-fab').click();
+  const first = text('.chat-chip');
+  assert.equal(first.length, 3);
+  assert.equal(new Set(first).size, 3);
+  // a conversation started: the chips are gone; reset and they come back, chosen again
+  q('.chat-chip').click();
+  await settle();
+  assert.equal(document.querySelectorAll('.chat-chip').length, 0);
+  const seen = new Set(first);
+  for (let i = 0; i < 20; i++) {
+    q('[data-reset]')?.click();
+    text('.chat-chip').forEach((question) => seen.add(question));
+    q('.chat-chip').click();
+    await settle();
+  }
+  assert.ok(seen.size > 3, 'each new conversation offers its own questions');
 });
 
 test('a suggestion asks it, and the new conversation button empties the chat', async () => {
