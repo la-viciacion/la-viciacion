@@ -3,13 +3,12 @@ from telegram import InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 from utils.config import Config
 from utils.duration import format_duration
-from utils.my_utils import MyUtils
+from utils.my_utils import utils
 from utils.logger import LogManager
 
 log_manager = LogManager()
 logger = log_manager.get_logger()
 
-utils = MyUtils()
 config = Config()
 
 

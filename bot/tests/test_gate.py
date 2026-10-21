@@ -11,9 +11,8 @@ from telegram.ext import ApplicationHandlerStop
 
 import utils.messages as msgs
 import utils.my_utils as my_utils
-from utils.my_utils import ApiError, MyUtils
+from utils.my_utils import ApiError, utils
 
-utils = MyUtils()
 USERS = [user(111, "ana", "Ana", user_id=1), user(None, "luis", "Luis", user_id=2), user(333, "off", "Off", is_active=0, user_id=3)]
 
 
