@@ -97,3 +97,14 @@ test('it hides on the story and comes back, and logging out removes it', async (
   unmountChat();
   assert.equal(q('#chat-root'), null);
 });
+
+test('when the admin has switched the chat off the question says so and the button goes when it is closed', async () => {
+  installApi({ 'GET /chat/status': { available: true }, 'POST /chat': () => json({ detail: 'El chat no está disponible ahora mismo' }, 503) });
+  await mountChat();
+  q('.chat-fab').click();
+  await ask('hola');
+  assert.equal(q('.chat-error').textContent, 'El chat no está disponible ahora mismo');
+  assert.ok(q('#chat-root'));
+  q('[data-close]').click();
+  assert.equal(q('#chat-root'), null);
+});

@@ -389,21 +389,27 @@ ENTITIES.sends = {
 };
 ENTITIES.channels = {
   label: 'Canales',
-  description: 'Por dónde salen los avisos: el bot de Telegram y las notificaciones de la app.',
+  description: 'Por dónde salen los avisos: Telegram y las notificaciones de la app.',
   custom: 'settings',
   sections: ['telegram', 'push'],
 };
 ENTITIES.ai = {
   label: 'IA',
-  description: 'Inteligencia artificial que redacta algunos avisos: proveedor, modelo y cuáles la usan.',
+  description: 'Inteligencia artificial que redacta algunos avisos: el interruptor, la prueba y cuáles la usan.',
   custom: 'settings',
   sections: ['ai', 'aiuses'],
 };
-ENTITIES.mail = {
-  label: 'Correo',
-  description: 'Correo con el que los jugadores recuperan su contraseña.',
+ENTITIES.chat = {
+  label: 'Chat',
+  description: 'Asistente de la app: interruptor, instrucciones y si los jugadores lo tienen disponible.',
   custom: 'settings',
-  sections: ['mail'],
+  sections: ['chat'],
+};
+ENTITIES.services = {
+  label: 'Servicios',
+  description: 'Lo que se configura en el .env del servidor y la app usa: la IA, Telegram, los avisos en la app y el correo.',
+  custom: 'settings',
+  sections: ['aiconfig', 'telegramconfig', 'pushconfig', 'mail'],
 };
 ENTITIES.backup = {
   label: 'Copia de seguridad',
