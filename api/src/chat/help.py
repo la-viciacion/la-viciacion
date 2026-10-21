@@ -74,7 +74,7 @@ TOPICS = (
         "temporada; los lifetime cuentan todo el historial y se consiguen una sola vez. En Menú → Logros, los que aún no se tienen aparecen atenuados y "
         "solo con el nombre: averiguar de qué van es parte del juego, así que no se explica cómo conseguirlos. Los que se acumulan (horas, días, juegos, "
         "completados, racha) muestran una barra de progreso. Los ocultos no enseñan nada hasta conseguirlos y, cuando alguien desbloquea uno, al grupo "
-        "solo llega «Alguien ha desbloqueado un logro oculto». Los especiales brillan con un aura plateada, dorada o morada según su dificultad. Un grupo de "
+        "solo llega quién lo ha sacado («<nombre> ha desbloqueado un logro oculto»), no cuál es. Los especiales brillan con un aura plateada, dorada o morada según su dificultad. Un grupo de "
         "logros depende de cuándo y a qué se juega (tormenta, luna llena, cumpleaños…) y algunos necesitan la ciudad y la fecha de nacimiento en Ajustes. "
         "Los logros nuevos cuentan desde la temporada 2027 (no son retroactivos). Se reevalúan al parar un timer o cambiar sesiones; si falta alguno, un "
         "administrador puede recalcularlos.",

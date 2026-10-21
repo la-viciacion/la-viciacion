@@ -93,14 +93,14 @@ class AchievementsCatalogTests(ApiTestCase):
             self.assertNotIn(key, seen)
         self.assertTrue({a["id"]: a for a in self.catalog("bea")}[self.second]["unlocked_by_me"])  # whoever has it sees it in full
 
-    def test_the_level_of_a_special_one_is_known_to_everybody_even_when_it_is_locked_and_a_special_one_is_always_hidden(self):
+    def test_the_level_of_a_special_one_is_known_to_everybody_even_when_it_is_locked_and_a_special_one_is_hidden_only_when_it_is_secret(self):
         with self.engine.begin() as conn:
             conn.execute(text("UPDATE achievements SET special = 3, secret = 1 WHERE id = :a"), {"a": self.first})
             conn.execute(text("UPDATE achievements SET special = 1 WHERE id = :a"), {"a": self.second})
         by_id = {a["id"]: a for a in self.catalog()}
         self.assertEqual(by_id[self.first], {"id": self.first, "hidden": True, "unlocked_by_me": False, "secret": True, "special": 3, "lifetime": False,
                                              "unlocked_by": 0})  # the lock and its aura
-        self.assertEqual((by_id[self.second]["hidden"], by_id[self.second]["special"], by_id[self.second]["secret"]), (True, 1, True))  # special: hidden even if not marked
+        self.assertEqual((by_id[self.second]["hidden"], by_id[self.second]["special"], by_id[self.second]["secret"]), (False, 1, False))  # special alone is the aura, not a secret: it shows its title
         self.award(self.ana, self.first, TODAY())
         self.assertEqual({a["id"]: a["special"] for a in self.catalog()}[self.first], 3)
 
