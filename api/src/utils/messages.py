@@ -43,6 +43,12 @@ EMAIL_VALIDATION = "The email has not a valid email format"
 ACHIEVEMENT_NOT_EXISTS = "Achievement not exists"
 
 INTERNAL_ERROR = "Error interno. Inténtalo de nuevo más tarde"
+
+CHAT_UNAVAILABLE = "El chat no está disponible ahora mismo"
+CHAT_FAILED = "El asistente no ha podido responder. Inténtalo de nuevo en un rato"
+CHAT_RATE_LIMITED = "Has hecho muchas preguntas seguidas. Vuelve a intentarlo en {minutes} min"
+CHAT_OFF_TOPIC = "Solo sé de videojuegos y de los datos de La Viciación. ¡Pregúntame por juegos, horas, rankings o logros!"
+CHAT_TOO_COMPLEX = "Esa pregunta me ha quedado muy grande. ¿Puedes dividirla en otras más concretas?"
 TOO_MANY_ATTEMPTS = "Demasiados intentos fallidos. Vuelve a intentarlo en {minutes} min"
 RECOVERY_NOT_CONFIGURED = "La recuperación de contraseña por correo no está configurada. Pídele a un administrador que te la cambie"
 RECOVERY_REQUESTED = "Si existe una cuenta con ese usuario o email y tiene un correo, te hemos enviado un enlace para elegir una nueva contraseña (vale 1 hora)"
