@@ -129,3 +129,67 @@ test('when the admin has switched the chat off the question says so and the butt
   q('[data-close]').click();
   assert.equal(q('#chat-root'), null);
 });
+
+// A phone's keyboard shrinks the visual viewport and the browser scrolls the page: the panel follows the visual viewport
+function fakeViewport(height, offsetTop = 0) {
+  const viewport = new window.EventTarget();
+  Object.assign(viewport, { height, offsetTop });
+  window.visualViewport = viewport;
+  return viewport;
+}
+const root = () => document.getElementById('chat-root');
+
+test('on a phone the open panel takes the position and the height of the visual viewport and follows the keyboard', async () => {
+  const viewport = fakeViewport(800);
+  installApi({ 'GET /chat/status': { available: true }, 'POST /chat': { answer: 'ok', in_scope: true } });
+  await mountChat();
+  assert.equal(root().style.getPropertyValue('--chat-height'), ''); // closed: nothing to follow
+  q('.chat-fab').click();
+  assert.equal(root().style.getPropertyValue('--chat-height'), '800px');
+  assert.equal(root().style.getPropertyValue('--chat-top'), '0px');
+  assert.ok(document.body.classList.contains('chat-open'));
+  // the keyboard opens: the visual viewport is shorter and the browser has scrolled the page under it
+  Object.assign(viewport, { height: 420, offsetTop: 133.4 });
+  viewport.dispatchEvent(new window.Event('resize'));
+  assert.equal(root().style.getPropertyValue('--chat-height'), '420px');
+  assert.equal(root().style.getPropertyValue('--chat-top'), '133px');
+  Object.assign(viewport, { offsetTop: 0 });
+  viewport.dispatchEvent(new window.Event('scroll'));
+  assert.equal(root().style.getPropertyValue('--chat-top'), '0px');
+  // a re-render (an answer arrives) must not lose it: it lives on the container, which is not replaced
+  await ask('hola');
+  assert.equal(root().style.getPropertyValue('--chat-height'), '420px');
+});
+
+test('closing the panel stops following the viewport and lets the page scroll again', async () => {
+  const viewport = fakeViewport(700);
+  installApi({ 'GET /chat/status': { available: true } });
+  await mountChat();
+  q('.chat-fab').click();
+  q('[data-close]').click();
+  assert.equal(root().style.getPropertyValue('--chat-height'), '');
+  assert.equal(document.body.classList.contains('chat-open'), false);
+  viewport.height = 300;
+  viewport.dispatchEvent(new window.Event('resize'));
+  assert.equal(root().style.getPropertyValue('--chat-height'), '');
+});
+
+test('a browser without a visual viewport still opens and closes the chat', async () => {
+  delete window.visualViewport;
+  installApi({ 'GET /chat/status': { available: true } });
+  await mountChat();
+  q('.chat-fab').click();
+  assert.equal(q('.chat-panel').hidden, false);
+  assert.equal(root().style.getPropertyValue('--chat-height'), '');
+  q('[data-close]').click();
+  assert.equal(q('.chat-panel').hidden, true);
+});
+
+test('logging out while it is open leaves the page scrollable', async () => {
+  fakeViewport(700);
+  installApi({ 'GET /chat/status': { available: true } });
+  await mountChat();
+  q('.chat-fab').click();
+  unmountChat();
+  assert.equal(document.body.classList.contains('chat-open'), false);
+});
