@@ -8,7 +8,8 @@ from .. import auth
 from ..auth import get_db
 from ..chat import agent, limits
 from ..chat import model as chat_model
-from ..clients.ai_error import AIError, QuotaError, wait_text
+from ..clients import failure as provider_failure
+from ..clients.ai_error import AIError, ProviderError, QuotaError, wait_text
 from ..database import models
 from ..utils import messages
 from ..utils.logger import LogManager
@@ -24,6 +25,12 @@ router = APIRouter(
     dependencies=[Depends(auth.get_current_active_user)],
 )
 
+PROVIDER_MESSAGES = {
+    provider_failure.TIMEOUT: messages.CHAT_TIMEOUT,
+    provider_failure.OVERLOADED: messages.CHAT_OVERLOADED,
+    provider_failure.SERVER: messages.CHAT_SERVER,
+    provider_failure.DENIED: messages.CHAT_DENIED,
+}
 WHEN = {60: "el último minuto", 3600: "la última hora", 86400: "las últimas 24 horas"}
 
 
@@ -80,6 +87,12 @@ def ask(
             detail=messages.CHAT_QUOTA.format(when=f" (reintenta en {wait_text(retry)})" if retry else ""),
             headers={"Retry-After": str(retry)} if retry else None,
         )
+    except ProviderError as e:
+        # a provider that is slow or overloaded is not a bug of ours: a warning, not an event in Sentry. The status is 504 for a
+        # timeout and 502 for the rest, never 503: the front reads that as "the admin switched the chat off"
+        transient = e.kind in (provider_failure.TIMEOUT, provider_failure.OVERLOADED)
+        (logger.warning if transient else logger.error)("Chat failed: " + str(e), exc_info=not transient)
+        raise HTTPException(status_code=504 if e.kind == provider_failure.TIMEOUT else 502, detail=PROVIDER_MESSAGES[e.kind])
     except AIError as e:
         logger.error("Chat failed: " + str(e), exc_info=True)
         raise HTTPException(status_code=502, detail=messages.CHAT_FAILED)
