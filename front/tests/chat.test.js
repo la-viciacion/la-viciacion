@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { MAX_QUESTION, MAX_TURNS, parseAnswer, toRequest } from '../js/lib/chat.js';
+import { MAX_QUESTION, MAX_TURNS, SUGGESTIONS, SUGGESTION_COUNT, parseAnswer, pickSuggestions, toRequest } from '../js/lib/chat.js';
 
 const turn = (role, content, extra = {}) => ({ role, content, ...extra });
 
@@ -43,4 +43,36 @@ test('nothing else is interpreted: markup stays text', () => {
   assert.equal(block.parts[0].text, '<img src=x onerror=alert(1)> ');
   assert.deepEqual(parseAnswer(''), []);
   assert.deepEqual(parseAnswer(null), []);
+});
+
+test('there is a long list of different questions, each one a question the box accepts', () => {
+  assert.ok(SUGGESTIONS.length >= 40);
+  assert.equal(new Set(SUGGESTIONS).size, SUGGESTIONS.length);
+  for (const question of SUGGESTIONS) {
+    assert.match(question, /^¿.+\?$/, question);
+    assert.ok(question.length <= MAX_QUESTION, question);
+  }
+});
+
+test('three different questions of the list are offered, and the list is left as it was', () => {
+  const before = [...SUGGESTIONS];
+  const picked = pickSuggestions();
+  assert.equal(picked.length, SUGGESTION_COUNT);
+  assert.equal(SUGGESTION_COUNT, 3);
+  assert.equal(new Set(picked).size, 3);
+  for (const question of picked) assert.ok(SUGGESTIONS.includes(question));
+  assert.deepEqual(SUGGESTIONS, before);
+});
+
+test('the choice follows the random numbers, so it can differ every time', () => {
+  assert.deepEqual(pickSuggestions(3, () => 0), SUGGESTIONS.slice(0, 3));
+  assert.deepEqual(pickSuggestions(2, () => 0.999999), [SUGGESTIONS.at(-1), SUGGESTIONS.at(-2)]);
+  const seen = new Set();
+  for (let i = 0; i < 200; i++) pickSuggestions().forEach((question) => seen.add(question));
+  assert.ok(seen.size > 3 * 5, 'across many starts, many different questions come up');
+});
+
+test('asking for more than there is, or for none, does not break', () => {
+  assert.equal(pickSuggestions(1000).length, SUGGESTIONS.length);
+  assert.deepEqual(pickSuggestions(0), []);
 });

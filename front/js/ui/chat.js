@@ -3,7 +3,7 @@
 // It lives outside #app, so changing page does not close it nor lose the conversation; it goes away with the
 // session (unmountChat). The conversation is kept in memory only: the API stores nothing of it.
 import { api, jsonRequest } from '../lib/api.js';
-import { MAX_QUESTION, SUGGESTIONS, parseAnswer, toRequest } from '../lib/chat.js';
+import { MAX_QUESTION, parseAnswer, pickSuggestions, toRequest } from '../lib/chat.js';
 import { html, mount } from '../lib/html.js';
 import { iconClose } from './icons.js';
 
@@ -11,6 +11,7 @@ const ID = 'chat-root';
 const ICON_CHAT = html`<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><circle cx="9" cy="10" r="0.6" fill="currentColor"/><circle cx="13" cy="10" r="0.6" fill="currentColor"/><circle cx="17" cy="10" r="0.6" fill="currentColor"/></svg>`;
 
 let turns = []; // { role: 'user' | 'assistant' | 'error', content, failed? }
+let suggestions = pickSuggestions(); // the questions offered while the conversation is empty: others each time one starts
 let open = false;
 let busy = false;
 let abort = null;
@@ -40,7 +41,7 @@ function welcome() {
     <div class="chat-welcome">
       <p><strong>¡Hola!</strong> Pregúntame por juegos, horas, rankings, rachas o logros del grupo.</p>
       <div class="chat-suggestions">
-        ${SUGGESTIONS.map((s) => html`<button type="button" class="chat-chip" data-suggestion="${s}">${s}</button>`)}
+        ${suggestions.map((s) => html`<button type="button" class="chat-chip" data-suggestion="${s}">${s}</button>`)}
       </div>
     </div>`;
 }
@@ -119,6 +120,7 @@ function reset() {
   abort?.abort();
   abort = null;
   turns = [];
+  suggestions = pickSuggestions();
   busy = false;
   render();
 }
@@ -197,6 +199,7 @@ export function unmountChat() {
   cleanup?.();
   root()?.remove();
   turns = [];
+  suggestions = pickSuggestions();
   open = false;
   busy = false;
   cleanup = null;
