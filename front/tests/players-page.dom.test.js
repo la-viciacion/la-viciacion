@@ -29,8 +29,11 @@ test('the players come as cards leading to their page, with the one playing mark
   installApi({ 'GET /group/players': LIST, 'GET /users/photo/': json({ detail: 'no' }, 404) });
   await players.render({ main: main() });
   await settle();
+  assert.deepEqual(text('.pl-card-name'), ['Bea <b>', 'Ana (tú)']);
+  document.querySelector('[data-filter="all"]').click();
   assert.deepEqual(text('.pl-card-name'), ['Bea <b>', 'Ana (tú)', 'Old Inactivo']);
   assert.equal(document.querySelectorAll('.pl-card.inactive').length, 1);
+  document.querySelector('[data-filter="active"]').click();
   assert.equal(document.querySelectorAll('.pl-card-name b').length, 0);
   assert.equal(document.querySelector('.pl-card').getAttribute('href'), '#/player/2');
   assert.match(text('.pl-card')[0], /Jugando Hades/);
@@ -41,17 +44,17 @@ test('the players come as cards leading to their page, with the one playing mark
   assert.equal(document.querySelectorAll('.pl-card .pl-avatar.live').length, 1);
 });
 
-test('the filter shows everybody or only the active players', async () => {
+test('only the active players show by default, and the filter adds the rest', async () => {
   installApi({ 'GET /group/players': LIST, 'GET /users/photo/': json({ detail: 'no' }, 404) });
   await players.render({ main: main() });
   await settle();
+  assert.equal(document.querySelectorAll('.pl-card').length, 2);
+  assert.equal(document.querySelector('[data-filter="active"]').getAttribute('aria-pressed'), 'true');
+  document.querySelector('[data-filter="all"]').click();
   assert.equal(document.querySelectorAll('.pl-card').length, 3);
   assert.equal(document.querySelector('[data-filter="all"]').getAttribute('aria-pressed'), 'true');
   document.querySelector('[data-filter="active"]').click();
   assert.deepEqual(text('.pl-card-name'), ['Bea <b>', 'Ana (tú)']);
-  assert.equal(document.querySelector('[data-filter="active"]').getAttribute('aria-pressed'), 'true');
-  document.querySelector('[data-filter="all"]').click();
-  assert.equal(document.querySelectorAll('.pl-card').length, 3);
 });
 
 test('a player page reuses the summary: figures, most played with ratings, achievements', async () => {
