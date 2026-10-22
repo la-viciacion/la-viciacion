@@ -18,7 +18,7 @@ Un timer de más de 6 horas se muestra atenuado con «¿Un timer olvidado?» y n
 
 ## Jugadores
 
-**Menú → Jugadores** lista a todos los miembros con su foto, sus horas, sus juegos y completados, y qué están jugando ahora. Los que están jugando van primero. El filtro **Todos / Activos** oculta las cuentas desactivadas.
+**Menú → Jugadores** lista a los miembros con su foto, sus horas, sus juegos y completados, y qué están jugando ahora. Los que están jugando van primero. Por defecto solo ves a los activos; el filtro **Activos / Todos** añade las cuentas desactivadas.
 
 ![Los jugadores del grupo](../assets/screens/players.webp){ .screenshot }
 

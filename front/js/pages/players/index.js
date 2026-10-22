@@ -27,7 +27,7 @@ const card = (p) => html`
     </div>
   </a>`;
 
-const filters = [['all', 'Todos'], ['active', 'Activos']];
+const filters = [['active', 'Activos'], ['all', 'Todos']];
 
 const cards = (list, filter) => {
   const shown = filter === 'active' ? list.filter((p) => p.is_active) : list;
@@ -51,7 +51,7 @@ export async function render({ main }) {
         ${cards(list, filter)}`);
       hydratePhotos(main);
     };
-    draw('all');
+    draw('active');
     main.querySelector('#plList').addEventListener('click', (e) => {
       const pill = e.target.closest('[data-filter]');
       if (pill) draw(pill.dataset.filter);
