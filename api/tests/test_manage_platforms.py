@@ -39,8 +39,15 @@ class PlatformsAdminTests(unittest.TestCase):
         self.db.commit()
 
     def test_the_list_shows_usage_sorted_by_name(self):
-        got = platforms.list_platforms(self.db)
+        got = platforms.list_platforms("name", "asc", self.db)
         self.assertEqual([(p["name"], p["sessions"], p["library"]) for p in got], [("PC", 2, 1), ("PlayStation 5", 0, 0)])
+
+    def test_the_list_sorts_by_name_sessions_or_library_in_either_direction(self):
+        names = lambda sort, order: [p["name"] for p in platforms.list_platforms(sort, order, self.db)]
+        self.assertEqual(names("name", "desc"), ["PlayStation 5", "PC"])
+        self.assertEqual(names("sessions", "desc"), ["PC", "PlayStation 5"])
+        self.assertEqual(names("sessions", "asc"), ["PlayStation 5", "PC"])
+        self.assertEqual(names("library", "asc"), ["PlayStation 5", "PC"])
 
     def test_create_makes_an_id_from_the_name(self):
         created = platforms.create_platform(platforms.PlatformBody(name=" Nintendo Switch 2 "), self.db)

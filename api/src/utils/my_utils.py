@@ -6,7 +6,7 @@ import requests
 from starlette.concurrency import run_in_threadpool
 import telegram
 from howlongtobeatpy import HowLongToBeat
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from ..config import Config
@@ -528,5 +528,5 @@ def get_platforms(db: Session):
     stmt = select(
         models.PlatformTag.id,
         models.PlatformTag.name,
-    )
+    ).order_by(func.lower(models.PlatformTag.name))
     return db.execute(stmt).fetchall()

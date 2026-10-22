@@ -3,7 +3,7 @@ import re
 import unicodedata
 from typing import Optional
 
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -57,7 +57,11 @@ class PlatformBody(BaseModel):
 
 
 @router.get("/platforms")
-def list_platforms(db: Session = Depends(get_db)):
+def list_platforms(
+    sort: str = Query("name", pattern="^(name|sessions|library)$"),
+    order: str = Query("asc", pattern="^(asc|desc)$"),
+    db: Session = Depends(get_db),
+):
     """Every platform with how many sessions and library entries use it."""
     sessions = dict(
         db.query(models.GameTimer.platform, func.count(models.GameTimer.id))
@@ -72,7 +76,14 @@ def list_platforms(db: Session = Depends(get_db)):
         .all()
     )
     platforms = db.query(models.PlatformTag).order_by(models.PlatformTag.name).all()
-    return [_platform_out(p, sessions.get(p.id, 0), library.get(p.id, 0)) for p in platforms]
+    rows = [_platform_out(p, sessions.get(p.id, 0), library.get(p.id, 0)) for p in platforms]
+    # the name breaks ties, so equal counts keep the alphabetical order whichever way they are sorted
+    rows.sort(key=lambda r: r["name"].lower())
+    if sort != "name":
+        rows.sort(key=lambda r: r[sort], reverse=order == "desc")
+    elif order == "desc":
+        rows.reverse()
+    return rows
 
 
 @router.post("/platforms", status_code=201)
