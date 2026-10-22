@@ -168,8 +168,19 @@ def contact() -> str:
     return config.PUBLIC_URL if config.PUBLIC_URL.startswith("https://") else "mailto:admin@localhost"
 
 
+def current_origin() -> str:
+    """Which deployment this is: ENVIRONMENT plus the public address. The devices subscribed to a key belong to the
+    site that served the app, so keys carried over in a database copy must not be used from anywhere else."""
+    return f"{config.ENVIRONMENT}|{config.PUBLIC_URL}"
+
+
 def is_ready() -> bool:
-    return bool(settings.get("push.enabled") and settings.get("push.vapid_public") and settings.get("push.vapid_private"))
+    return bool(
+        settings.get("push.enabled")
+        and settings.get("push.vapid_public")
+        and settings.get("push.vapid_private")
+        and settings.get("push.vapid_origin") == current_origin()
+    )
 
 
 def ensure_vapid_keys(db) -> bool:
@@ -178,13 +189,23 @@ def ensure_vapid_keys(db) -> bool:
     There is one pair for the whole server, never one per user. If the private key is
     missing or unreadable (SECRET_KEY changed), the old public key is useless: new keys are
     made and every device is dropped, because it subscribed to the old ones.
+    Keys made for another deployment (a production dump restored in dev) are left untouched and push stays off:
+    the devices in that copy are real ones. Keys from before the origin was recorded are claimed only by production.
     Returns True if keys were created.
     """
     values = settings.get_all(db)
     if values["push.vapid_public"] and values["push.vapid_private"]:
+        origin = values.get("push.vapid_origin")
+        if origin is None and config.ENVIRONMENT == "production":
+            settings.set_values(db, {"push.vapid_origin": current_origin()})
+        elif origin != current_origin():
+            logger.error(
+                f"Push is off: its keys belong to {origin or 'an unknown deployment'}, this is {current_origin()}. "
+                "Generate new keys from the admin panel (this drops the devices of this database)."
+            )
         return False
     public, private = generate_vapid_keys()
-    settings.set_values(db, {"push.vapid_public": public, "push.vapid_private": private})
+    settings.set_values(db, {"push.vapid_public": public, "push.vapid_private": private, "push.vapid_origin": current_origin()})
     dropped = db.query(models.PushSubscription).delete()
     db.commit()
     logger.info(f"Push keys created{f' ({dropped} old devices dropped)' if dropped else ''}")

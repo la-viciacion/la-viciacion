@@ -97,6 +97,25 @@ class DisabledTests(unittest.TestCase):
         send.assert_not_called()
 
 
+class ReadyTests(unittest.TestCase):
+    def ready(self, origin):
+        stored = {"push.enabled": True, "push.vapid_public": "pub", "push.vapid_private": "priv", "push.vapid_origin": origin}
+        with mock.patch.object(push.settings, "get", side_effect=stored.get):
+            return push.is_ready()
+
+    def test_ready_only_with_keys_made_for_this_deployment(self):
+        self.assertTrue(self.ready(push.current_origin()))
+        self.assertFalse(self.ready("production|https://lavi.example"))
+        self.assertFalse(self.ready(None))
+
+    def test_the_address_is_part_of_the_deployment(self):
+        with mock.patch.object(push.config, "ENVIRONMENT", "production"):
+            with mock.patch.object(push.config, "PUBLIC_URL", "https://a.example"):
+                made_here = push.current_origin()
+            with mock.patch.object(push.config, "PUBLIC_URL", "https://b.example"):
+                self.assertFalse(self.ready(made_here))
+
+
 class AnnouncementTests(unittest.TestCase):
     def test_a_valid_announcement(self):
         payload = push.build_announcement("  Mantenimiento  ", "Esta noche a las 3", "#/profile", "https://img.example/a.png")
@@ -173,15 +192,33 @@ class EnsureKeysTests(unittest.TestCase):
         created, store, db = self.run_ensure({"push.vapid_public": None, "push.vapid_private": None})
         self.assertTrue(created)
         values = store.call_args.args[1]
-        self.assertEqual(set(values), {"push.vapid_public", "push.vapid_private"})
+        self.assertEqual(set(values), {"push.vapid_public", "push.vapid_private", "push.vapid_origin"})
         self.assertIn("PRIVATE KEY", values["push.vapid_private"])
         db.query.return_value.delete.assert_called_once()  # devices of the old keys are useless
 
+    def test_new_keys_record_the_deployment_they_were_made_for(self):
+        _, store, _ = self.run_ensure({"push.vapid_public": None, "push.vapid_private": None})
+        self.assertEqual(store.call_args.args[1]["push.vapid_origin"], push.current_origin())
+
     def test_existing_keys_are_left_alone(self):
-        created, store, db = self.run_ensure({"push.vapid_public": "pub", "push.vapid_private": "priv"})
+        created, store, db = self.run_ensure({"push.vapid_public": "pub", "push.vapid_private": "priv", "push.vapid_origin": push.current_origin()})
         self.assertFalse(created)
         store.assert_not_called()
         db.query.assert_not_called()
+
+    def test_keys_of_another_deployment_are_never_touched_nor_claimed(self):
+        for origin in ("production|https://lavi.example", None):  # None: keys from before the origin was recorded
+            created, store, db = self.run_ensure({"push.vapid_public": "pub", "push.vapid_private": "priv", "push.vapid_origin": origin})
+            self.assertFalse(created)
+            store.assert_not_called()  # a dump restored in dev must not be adopted: its devices are real ones
+            db.query.assert_not_called()
+
+    def test_production_claims_keys_from_before_the_origin_was_recorded(self):
+        with mock.patch.object(push.config, "ENVIRONMENT", "production"), mock.patch.object(push.config, "PUBLIC_URL", "https://lavi.example"):
+            created, store, db = self.run_ensure({"push.vapid_public": "pub", "push.vapid_private": "priv", "push.vapid_origin": None})
+        self.assertFalse(created)
+        self.assertEqual(store.call_args.args[1], {"push.vapid_origin": "production|https://lavi.example"})
+        db.query.assert_not_called()  # the devices stay
 
     def test_an_unreadable_private_key_is_replaced(self):
         created, _, _ = self.run_ensure({"push.vapid_public": "pub", "push.vapid_private": None})

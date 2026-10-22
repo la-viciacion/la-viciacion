@@ -143,6 +143,9 @@ REGISTRY: dict[str, Spec] = {
     "push.contact": Spec("str", None, check=_contact),
     "push.vapid_public": Spec("str", None, check=_vapid_public),
     "push.vapid_private": Spec("str", None, secret=True, hint=False),
+    # The deployment the keys were made for (utils/push.current_origin): a database copied to another one keeps keys that
+    # still reach the devices of the first, so push stays off until the keys are made again there.
+    "push.vapid_origin": Spec("str", None),
     # Days the app's notification inbox keeps a notice before the scheduler purges it (utils/inbox.py)
     "inbox.retention_days": Spec("int", 14, check=_retention),
     # AI text for the notices (utils/ai.py). The key is AI_API_KEY (or the old OPENAI_API_KEY) and is never stored;
