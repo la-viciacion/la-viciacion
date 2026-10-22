@@ -193,21 +193,21 @@
   display: flex; align-items: center; gap: 6px; flex-shrink: 0;
   background: transparent; color: var(--accent-teal);
   border: 1px solid var(--border-accent); border-radius: var(--radius-sm);
-  padding: 8px 10px; font-weight: 600; font-size: 0.85rem; cursor: pointer;
+  padding: 11px 14px; font-weight: 600; font-size: 0.85rem; cursor: pointer;
   transition: all 0.2s ease;
 }
 
-.btn-continue svg { width: 14px; height: 14px; }
+.btn-continue svg { width: 18px; height: 18px; }
 
 .btn-continue:hover:not(:disabled) { background: var(--accent-teal); color: #0a0a14; }
 
 /* complete mark, no box: an empty circle in soft white while the game is open (its tick lights up on hover), a filled
-   green circle once it is completed this season. The hit area stays about 36 px even though nothing draws it. */
+   green circle once it is completed this season. The hit area is about 44 px even though nothing draws it. */
 .btn-complete {
-  display: flex; flex-shrink: 0; padding: 6px; background: none; border: none; border-radius: 50%;
+  display: flex; flex-shrink: 0; padding: 8px; background: none; border: none; border-radius: 50%;
   color: var(--check-pending); cursor: pointer; transition: color 0.2s ease;
 }
-.btn-complete svg { width: 24px; height: 24px; }
+.btn-complete svg { width: 28px; height: 28px; }
 .btn-complete .ck-tick { opacity: 0.45; transition: opacity 0.2s ease; }
 .btn-complete:hover, .btn-complete:focus-visible { color: var(--text-primary); }
 .btn-complete:hover .ck-tick, .btn-complete:focus-visible .ck-tick { opacity: 1; }
