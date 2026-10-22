@@ -13,7 +13,7 @@ from ..config import Config
 from ..crud import games, users
 from ..database import models, schemas
 from .achievements import AchievementsElems
-from . import ai, hltb_sync, inbox, push, settings
+from . import ai, ai_prompts, hltb_sync, inbox, push, settings
 from .redaction import redact_rawg_key
 from ..utils.logger import LogManager
 
@@ -400,6 +400,9 @@ async def send_message(
                     logger.info(text)
                     msg = text
                     rewritten = True
+                    # the AI writes no title: the kind of notice is the title, so the text is not cut to fit one
+                    if not push_payload:
+                        push_payload = push.build_payload(text, tag="group", title=ai_prompts.USES[ai_use].label)
             except Exception as e:
                 logger.info("Error generating completion: " + str(e))
         if new_game_recommended and not rewritten:

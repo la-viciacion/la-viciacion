@@ -33,6 +33,11 @@ class PayloadTests(unittest.TestCase):
         self.assertEqual(payload["title"], push.APP_NAME)
         self.assertEqual(payload["body"], "Ana acaba de perder la racha de 12 días.")
 
+    def test_a_given_title_leaves_the_whole_message_as_the_body(self):
+        payload = push.build_payload("Mañana sale Call of Duty, que Juan ya lo tiene.\nA preparar la tarjeta.", title="Sale un juego deseado")
+        self.assertEqual(payload["title"], "Sale un juego deseado")
+        self.assertEqual(payload["body"], "Mañana sale Call of Duty, que Juan ya lo tiene. · A preparar la tarjeta.")
+
     def test_long_texts_are_shortened(self):
         payload = push.build_payload("T" * 300 + "\n" + "b" * 500)
         self.assertLessEqual(len(payload["title"]), push.TITLE_MAX)
