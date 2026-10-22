@@ -70,7 +70,7 @@
   .navbar { padding: 0 12px; }
   .navbar-actions { gap: 2px; }
   .navbar-username { display: none; } /* the avatar is enough on a phone */
-  .navbar-user { padding: 3px; }
+  .navbar .navbar-user { padding: 3px; } /* specific enough to beat the base rule further down */
   .home-main { padding: 24px 16px 60px; }
 }
 
