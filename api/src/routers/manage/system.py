@@ -71,7 +71,7 @@ def generate_push_keys(replace: bool = False, admin: models.User = Depends(auth.
     if current["push.vapid_private"] and not replace:
         raise HTTPException(status_code=409, detail="Ya hay claves; reemplazarlas obliga a todos a volver a activar los avisos")
     public, private = push.generate_vapid_keys()
-    settings.set_values(db, {"push.vapid_public": public, "push.vapid_private": private}, user_id=admin.id)
+    settings.set_values(db, {"push.vapid_public": public, "push.vapid_private": private, "push.vapid_origin": push.current_origin()}, user_id=admin.id)
     if replace:
         db.query(models.PushSubscription).delete()
         db.commit()
