@@ -3,7 +3,8 @@
 // default: the stats of a season (the running one, another one or the total of all, chosen with the
 // pills), top games, achievements and, below them, the games of the selected season (see library.js).
 // Mis juegos is the whole library with filters and a random rating; it loads the first time it is opened.
-// Ajustes (personal data, password, notifications, session) is the other; it loads the first time it is opened.
+// Ajustes is the other; it loads the first time it is opened and splits its options in four groups chosen with
+// pills (Perfil, Seguridad, Notificaciones, Tus datos), the last one in the URL: #/profile/ajustes/<group>.
 // The layout classes (adm-shell, adm-side, adm-nav...) are the admin's, so both look the same.
 // All routes are /api/v1/users/{username}/...
 import { api, loadAvatarUrl } from '../../lib/api.js';
@@ -36,8 +37,17 @@ const TABS = [
   ['ajustes', 'Ajustes'],
 ];
 
+// The groups inside Ajustes, so the options do not pile up in one long page. The first is the default.
+const SETTINGS = [
+  ['perfil', 'Perfil'],
+  ['seguridad', 'Seguridad'],
+  ['avisos', 'Notificaciones'],
+  ['datos', 'Tus datos'],
+];
+
 let main;
 let user;
+let group = SETTINGS[0][0]; // the group of Ajustes on screen
 let avatarUrl;
 let opened; // tabs already initialised
 let summaryGames; // the list of Resumen (the season on screen)
@@ -74,6 +84,19 @@ const tabFromHash = () => {
   return TABS.some(([tab]) => tab === id) ? id : TABS[0][0];
 };
 
+const groupFromHash = () => {
+  const id = location.hash.split('/')[3];
+  return SETTINGS.some(([g]) => g === id) ? id : SETTINGS[0][0];
+};
+
+// Show one group of Ajustes (a "tab" inside the tab, with its own URL: #/profile/ajustes/<group>).
+function showGroup(id) {
+  group = id;
+  main.querySelectorAll('.pf-group').forEach((pill) => pill.setAttribute('aria-pressed', String(pill.dataset.group === id)));
+  main.querySelectorAll('.pf-group-panel').forEach((panel) => { panel.hidden = panel.id !== `pfGroup-${id}`; });
+  history.replaceState(null, '', `#/profile/ajustes/${id}`);
+}
+
 // Tabs do not touch the router: replaceState changes the URL without a hashchange.
 function showTab(id) {
   main.querySelectorAll('.pf-tab').forEach((tab) => {
@@ -85,7 +108,8 @@ function showTab(id) {
   });
   closeNav();
   main.querySelectorAll('.pf-panel').forEach((panel) => { panel.hidden = panel.id !== `pfPanel-${id}`; });
-  history.replaceState(null, '', `#/profile/${id}`);
+  if (id === 'ajustes') showGroup(opened.has(id) ? group : groupFromHash());
+  else history.replaceState(null, '', `#/profile/${id}`);
   if (opened.has(id)) return;
   opened.add(id);
   if (id === 'resumen') showChallengesHistory(main.querySelector('#pfChallenges'), user.id, true);
@@ -218,6 +242,11 @@ function draw(d) {
     </section>
 
     <section class="pf-panel" role="tabpanel" id="pfPanel-ajustes" aria-labelledby="pfTab-ajustes" hidden>
+    <div class="pf-season" id="pfGroups" role="group" aria-label="Grupo de ajustes">
+      ${SETTINGS.map(([id, label]) => html`<button type="button" class="pf-season-badge pf-group" data-group="${id}" aria-pressed="false">${label}</button>`)}
+    </div>
+
+    <div class="pf-group-panel" id="pfGroup-perfil">
     ${sectionTitle('Mis datos')}
     <form class="pf-card pf-form" id="pfData" novalidate>
       <label>Usuario (apodo)<input class="adm-input" type="text" value="${d.user.username}" disabled /></label>
@@ -230,7 +259,10 @@ function draw(d) {
       <div class="pf-msg" id="pfDataMsg" role="status"></div>
       <div><button class="pf-btn primary" type="submit">Guardar datos</button></div>
     </form>
+    <div id="pfPrefs"></div>
+    </div>
 
+    <div class="pf-group-panel" id="pfGroup-seguridad" hidden>
     ${sectionTitle('Cambiar contraseña')}
     <form class="pf-card pf-form" id="pfPass" novalidate>
       <label>Contraseña actual<input class="adm-input" type="password" name="current" autocomplete="current-password" /></label>
@@ -241,18 +273,21 @@ function draw(d) {
       <div><button class="pf-btn primary" type="submit">Cambiar contraseña</button></div>
     </form>
 
-    <div id="pfNotifs"></div>
-
-    <div id="pfPush"></div>
-
-    <div id="pfPrefs"></div>
-
-    <div id="pfDataFiles"></div>
-
     ${sectionTitle('Sesión')}
     <div class="pf-card pf-form">
       <div class="pf-sub">Cierra la sesión en este dispositivo.</div>
       <div><button class="pf-btn danger" type="button" id="pfLogout">Cerrar sesión</button></div>
+    </div>
+    </div>
+
+    <div class="pf-group-panel" id="pfGroup-avisos" hidden>
+    <div id="pfNotifs"></div>
+
+    <div id="pfPush"></div>
+    </div>
+
+    <div class="pf-group-panel" id="pfGroup-datos" hidden>
+    <div id="pfDataFiles"></div>
     </div>
     </section>
     </div>
@@ -268,6 +303,10 @@ function draw(d) {
   });
   main.querySelector('.pf-tabs').addEventListener('keydown', onTabKey);
   main.querySelector('#pfSeasons').addEventListener('click', onSeason);
+  main.querySelector('#pfGroups').addEventListener('click', (e) => {
+    const pill = e.target.closest('.pf-group');
+    if (pill) showGroup(pill.dataset.group);
+  });
   main.querySelector('#pfLogout').addEventListener('click', () => onLogout());
   initAvatar(main, { path: userPath('avatar') });
   initAccount(main, { user, userPath, about: () => aboutYou });

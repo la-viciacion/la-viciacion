@@ -33,7 +33,9 @@ Toda tu biblioteca, de todas las temporadas, con filtros por nombre, temporada, 
 
 ![Ajustes del perfil](../assets/screens/profile-settings.webp){ .screenshot }
 
-- **Mis datos**: tu nombre, tu usuario, tu email, tu **Telegram ID** (con un botón para enviarte un mensaje de prueba), tu **ciudad** y tu **fecha de nacimiento**. La ciudad y la fecha de nacimiento solo sirven para algunos [logros secretos](logros.md) (el tiempo, los eclipses, tu cumpleaños…); nadie más las ve.
-- **Contraseña**: cámbiala cuando quieras.
+Los ajustes están en cuatro grupos, que eliges con los botones de arriba: **Perfil**, **Seguridad**, **Notificaciones** y **Tus datos**.
+
+- **Perfil** (Mis datos): tu nombre, tu usuario, tu email, tu **Telegram ID** (con un botón para enviarte un mensaje de prueba), tu **ciudad** y tu **fecha de nacimiento**. La ciudad y la fecha de nacimiento solo sirven para algunos [logros secretos](logros.md) (el tiempo, los eclipses, tu cumpleaños…); nadie más las ve.
+- **Seguridad**: cambia tu contraseña cuando quieras y cierra la sesión en ese dispositivo.
 - **Notificaciones**: qué avisos privados quieres recibir y por qué canal (Telegram y/o móvil), y los dispositivos en los que tienes las notificaciones activadas. Más en [Notificaciones y Telegram](notificaciones.md).
 - **Tus datos**: **Descargar mis datos** te da un archivo `.json` con tus sesiones, tu biblioteca, tus notas, tu lista de deseados y tus logros.
