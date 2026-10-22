@@ -34,7 +34,7 @@ El bot solo atiende a los miembros del grupo con cuenta en la app. Para que te r
 
 Cuando entras al grupo, el bot te da la bienvenida y te recuerda este paso.
 
-También puedes poner tu **Telegram ID** a mano en **Perfil → Ajustes → Mis datos** y probarlo con **Enviar mensaje de prueba**.
+También puedes poner tu **Telegram ID** a mano en **Perfil → Ajustes → Perfil** y probarlo con **Enviar mensaje de prueba**.
 
 ### El menú del bot
 
