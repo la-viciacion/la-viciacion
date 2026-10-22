@@ -308,6 +308,8 @@
 @media (min-width: 1000px) {
   .cal-layout { grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); gap: 16px; align-items: stretch; }
   .cal-cell { min-height: 56px; }
+  /* The calendar sets the row height; a long month scrolls inside the list instead of stretching the page. */
+  .cal-list { contain: size; overflow-y: auto; }
 }
 @media (max-width: 640px) {
   .cal-cell { min-height: 44px; padding: 3px; }
