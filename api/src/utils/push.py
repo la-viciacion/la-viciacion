@@ -37,7 +37,7 @@ config = Config()
 
 APP_NAME = "La Viciación"
 TITLE_MAX = 80
-BODY_MAX = 200
+BODY_MAX = 250  # what the AI notices take (their prompts ask for about 250 characters)
 ANNOUNCEMENT_BODY_MAX = 240
 PAYLOAD_MAX_BYTES = 3500  # the Web Push limit is 4096 bytes once encrypted
 TTL_SECONDS = 3600  # a notice that could not be delivered within the hour is stale
@@ -60,9 +60,12 @@ def _shorten(text: str, limit: int) -> str:
     return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
 
 
-def build_payload(message: str, url: str = INBOX_URL, tag: str | None = None) -> dict:
-    """First line becomes the title and the rest the body; a one-liner gets the app name as title. A tap opens the inbox."""
+def build_payload(message: str, url: str = INBOX_URL, tag: str | None = None, title: str | None = None) -> dict:
+    """First line becomes the title and the rest the body; a one-liner gets the app name as title. A tap opens the inbox.
+    A given `title` (the kind of notice, for a text that has none of its own) leaves the whole message as the body."""
     lines = [line.strip() for line in plain_text(message).splitlines() if line.strip()]
+    if title:
+        return {"title": _shorten(title, TITLE_MAX), "body": _shorten(" · ".join(lines), BODY_MAX), "url": url, "tag": tag}
     if not lines:
         title, body = APP_NAME, ""
     elif len(lines) == 1:
