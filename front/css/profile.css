@@ -334,7 +334,7 @@
 .ch-history-item { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 
 /* "Mis juegos": the filters above the list and the random rating */
-.pf-lib-bar { margin-bottom: 0; }
+.pf-lib-bar { margin-bottom: 12px; }
 .pf-lib-bar [data-filter="q"] { flex: 1 1 180px; }
 .pf-lib-bar .pf-btn { display: inline-flex; align-items: center; gap: 6px; }
 .rand-game { display: flex; gap: 14px; align-items: center; }
