@@ -51,8 +51,9 @@ TIMER_TTL_SECONDS = 600  # a refresh that arrives late is worse than none: the n
 
 # ── payload ─────────────────────────────────────────────────
 def plain_text(message: str) -> str:
-    """Telegram Markdown to plain text."""
-    text = re.sub(r"\\(.)", r"\1", str(message))
+    """Telegram Markdown to plain text; a link keeps its text and loses the address (neither push nor the inbox can show it)."""
+    text = re.sub(r"\[((?:\\.|[^\]\\])*)\]\([^)\s]*\)", r"\1", str(message))
+    text = re.sub(r"\\(.)", r"\1", text)
     return re.sub(r"[*_`]", "", text)
 
 

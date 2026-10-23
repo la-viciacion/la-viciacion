@@ -21,6 +21,11 @@ class PayloadTests(unittest.TestCase):
     def test_markdown_is_removed(self):
         self.assertEqual(push.plain_text("*Ana* ha subido \\(↑2\\) `x`_y_"), "Ana ha subido (↑2) xy")
 
+    def test_a_link_keeps_its_text_and_loses_the_address(self):
+        text = "*Oriol* acaba de empezar [Grand Theft Auto IV](https://rawg.io/games/grand-theft-auto-iv), su juego número 1."
+        self.assertEqual(push.plain_text(text), "Oriol acaba de empezar Grand Theft Auto IV, su juego número 1.")
+        self.assertEqual(push.plain_text("[Game \\[2\\]](https://rawg.io/games/a_b)"), "Game [2]")
+
     def test_first_line_is_the_title_and_the_rest_the_body(self):
         payload = push.build_payload("📣 Ranking 📣\n1. *Ana*: 3h\n2. Bob: 2h", tag="group")
         self.assertEqual(payload["title"], "📣 Ranking 📣")

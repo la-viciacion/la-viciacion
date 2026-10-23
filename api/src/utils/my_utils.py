@@ -349,7 +349,8 @@ async def _telegram_send(bot, chat_id, text: str, image=None) -> bool:
     break the operation that triggered it.
 
     It goes as Markdown; if Telegram cannot parse it (a name with `_` or `*` in it, an
-    unbalanced reply from the model) it is sent again as plain text.
+    unbalanced reply from the model) it is sent again as plain text, and if it still fails
+    with a picture (one Telegram cannot fetch, a caption too long) as text alone.
     """
     parse_mode = telegram.constants.ParseMode.MARKDOWN
     for _ in range(TELEGRAM_RETRIES):
@@ -361,9 +362,12 @@ async def _telegram_send(bot, chat_id, text: str, image=None) -> bool:
             return True
         except telegram.error.BadRequest as e:
             logger.warning("Telegram rejected the message (" + str(e) + ")")
-            if parse_mode is None:
+            if parse_mode is not None:
+                parse_mode = None
+            elif image is not None:
+                image = None
+            else:
                 return False
-            parse_mode = None
         except Exception as e:
             logger.error("Error sending telegram message: " + str(e), exc_info=True)
     logger.error("Max retries reached. Message not sent.")
@@ -377,11 +381,13 @@ async def send_message(
     ai_use: str | None = None,
     new_game_recommended: dict | None = None,
     push_payload: dict | None = None,
+    push_url: str | None = None,
 ):
     """`ai_use` (an id of utils/ai_prompts.USES) lets the AI rewrite the notice when it is on for that use.
     `new_game_recommended` ({"game", "reasons"}) is suggested at the end of the notice: by the AI when
     it rewrites the message, as a plain line when it does not (off, no key, or it failed).
-    `push_payload` is what the app's devices get instead of the text of the message (a short notice that opens a page)."""
+    `push_payload` is what the app's devices get instead of the text of the message (a short notice that opens a page).
+    `push_url` is the page a tap on the push opens, instead of the inbox (a push cannot carry a link inside its text)."""
     if not silent and not settings.get("notifications.enabled"):
         logger.info("Notifications are disabled. Message not sent.")
         return
@@ -402,11 +408,13 @@ async def send_message(
                     rewritten = True
                     # the AI writes no title: the kind of notice is the title, so the text is not cut to fit one
                     if not push_payload:
-                        push_payload = push.build_payload(text, tag="group", title=ai_prompts.USES[ai_use].label)
+                        push_payload = push.build_payload(text, url=push_url or push.INBOX_URL, tag="group", title=ai_prompts.USES[ai_use].label)
             except Exception as e:
                 logger.info("Error generating completion: " + str(e))
         if new_game_recommended and not rewritten:
             msg += f"\n\n🎮 ¿Te apetece probar *{escape_markdown(new_game_recommended['game'])}*?"
+        if push_url and not push_payload:
+            push_payload = push.build_payload(msg, url=push_url, tag="group")
         # neither raises: the inbox and a push must not affect Telegram
         inbox.record_group(msg, push_payload)
         if push_payload:

@@ -28,6 +28,14 @@ class TelegramSendTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(await my_utils._telegram_send(bot, 1, "Half_Life *"))
         self.assertEqual(bot.calls, [telegram.constants.ParseMode.MARKDOWN, None])
 
+    async def test_a_picture_telegram_rejects_is_dropped_and_the_text_still_goes(self):
+        bot = mock.Mock()
+        bot.send_photo = mock.AsyncMock(side_effect=telegram.error.BadRequest("wrong file identifier"))
+        bot.send_message = mock.AsyncMock()
+        self.assertTrue(await my_utils._telegram_send(bot, 1, "hola", image="https://x/y.jpg"))
+        self.assertEqual(bot.send_photo.await_count, 2)  # as Markdown, then as plain text
+        bot.send_message.assert_awaited_once()
+
     async def test_a_dead_network_is_retried_and_never_raises(self):
         bot = PickyBot(broken=True)
         self.assertFalse(await my_utils._telegram_send(bot, 1, "hola"))
@@ -78,17 +86,22 @@ class NewGameAnnouncementTests(unittest.IsolatedAsyncioTestCase):
                 mock.patch.object(users_crud.utils, "send_message", send):
             await users_crud.announce_new_game(None, user, game, __import__("datetime").date(2026, 1, 1), False)
 
+    async def test_the_game_links_to_rawg_and_a_tap_on_the_push_opens_its_page_in_the_app(self):
+        send = mock.AsyncMock()
+        await self.announce(types.SimpleNamespace(id=5, name="Doom", slug="doom"), send)
+        text = send.await_args.args[0]
+        self.assertIn("[Doom](https://rawg.io/games/doom)", text)
+        self.assertIn("Ana\_B", text)
+        self.assertEqual(send.await_args.kwargs["push_url"], "#/game/5")
+
     async def test_a_game_without_slug_is_announced_without_link(self):
         send = mock.AsyncMock()
-        await self.announce(types.SimpleNamespace(name="Doom", slug=None), send)
-        text = send.await_args.args[0]
-        self.assertIn("Doom", text)
-        self.assertNotIn("rawg.io", text)
-        self.assertIn("Ana\\_B", text)
+        await self.announce(types.SimpleNamespace(id=5, name="Doom", slug=None), send)
+        self.assertNotIn("](", send.await_args.args[0])
 
     async def test_a_failing_announcement_does_not_propagate(self):
         send = mock.AsyncMock(side_effect=RuntimeError("down"))
-        await self.announce(types.SimpleNamespace(name="Doom", slug="doom"), send)
+        await self.announce(types.SimpleNamespace(id=5, name="Doom", slug="doom"), send)
 
 
 if __name__ == "__main__":
