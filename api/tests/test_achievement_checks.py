@@ -250,17 +250,19 @@ class AchievementCheckTests(unittest.IsolatedAsyncioTestCase):
 
     def test_the_just_in_time_margin_grows_with_the_game(self):
         hour = 3600
-        for hours, expected in ((0.5, 0.01), (2, 0.01), (5, 0.01 + 0.04 * 3 / 38), (20, 0.01 + 0.04 * 18 / 38), (40, 0.05), (100, 0.05)):
+        for hours, expected in ((0.5, 0.01), (2, 0.01), (5, 0.01 + 0.04 * 3 / 98), (20, 0.01 + 0.04 * 18 / 98), (60, 0.01 + 0.04 * 58 / 98), (100, 0.05), (150, 0.05)):
             self.assertAlmostEqual(ach_module.just_in_time_tolerance(int(hours * hour)), expected, places=6, msg=hours)
 
     async def test_just_in_time_needs_the_time_within_the_margin_of_the_average(self):
         hour, minute = 3600, 60
         for played, avg, expected in (
             (10 * hour, 10 * hour, True),
-            (10 * hour + 10 * minute, 10 * hour, True),  # ~1.8 % of 10 h is 11 min
-            (10 * hour - 10 * minute, 10 * hour, True),
-            (10 * hour + 12 * minute, 10 * hour, False),
-            (10 * hour - 12 * minute, 10 * hour, False),
+            (10 * hour + 7 * minute, 10 * hour, True),  # ~1.33 % of 10 h is 8 min
+            (10 * hour - 7 * minute, 10 * hour, True),
+            (10 * hour + 9 * minute, 10 * hour, False),
+            (10 * hour - 9 * minute, 10 * hour, False),
+            (60 * hour + 2 * hour, 60 * hour, True),  # ~3.37 % of 60 h is 2 h 1 min
+            (60 * hour + 2 * hour + 5 * minute, 60 * hour, False),
             (2 * hour + minute, 2 * hour, True),  # 1 % of 2 h is 72 s...
             (2 * hour + 2 * minute, 2 * hour, False),  # ...so 5 % (6 min) no longer lets this in
             (45 * minute, hour, False),  # 25 % under: the hour rounding used to let this one in
