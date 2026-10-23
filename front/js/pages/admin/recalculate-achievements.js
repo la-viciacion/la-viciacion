@@ -2,9 +2,10 @@
 // It works everything out again from the sessions and the library, silently (nobody is notified), and it
 // adds, corrects and revokes, so it takes two explicit steps: a preview of exactly what would change and
 // a typed phrase. The players, the seasons and the achievements can be chosen (all by default; the ones that
-// are switched off are left alone). The API enforces the phrase too.
+// are switched off are left alone). Every change of the preview can be unticked, and only the ticked ones are
+// made. The API enforces the phrase too.
 import { api, jsonRequest } from '../../lib/api.js';
-import { formatDate } from '../../lib/format.js';
+import { formatDate, formatDuration } from '../../lib/format.js';
 import { html } from '../../lib/html.js';
 import { modalHeader, openModal } from '../../ui/modal.js';
 import { toast } from '../../ui/toast.js';
@@ -18,6 +19,19 @@ const gameOf = (c) => {
   const after = c.game_after_name;
   return before && after && before !== after ? `${before} → ${after}` : after || before || '';
 };
+
+const percent = (value) => value.toLocaleString('es-ES', { maximumFractionDigits: 2 });
+
+/** The time of a run of "Justo a tiempo" against the average of the game: how far it is, in time and in %, from
+ *  the margin it is allowed. Nothing when the game has no completion in the season or no average. */
+const timeNote = (label, game, t) => {
+  if (!t) return '';
+  const sign = t.seconds > 0 ? '+' : t.seconds < 0 ? '−' : '';
+  return html`<span class="adm-time-note${t.holds ? '' : ' off'}">${label}${game ? ` ${game}` : ''}: ${formatDuration(t.played)} frente a ${formatDuration(t.avg)} (${sign}${formatDuration(Math.abs(t.seconds))}, ${sign}${percent(Math.abs(t.percent))} %; margen ±${percent(t.tolerance)} %) · ${t.holds ? 'cumple' : 'no cumple'}</span>`;
+};
+
+/** What goes under a change that has a note (the time of "Justo a tiempo"): how it stood and how it stands. */
+const notes = (c) => (c.note ? html`${timeNote('Antes', c.game_before_name, c.note.before)}${timeNote(c.action === 'add' ? 'Tiempo' : 'Ahora', c.game_after_name, c.note.after)}` : '');
 
 const SECTIONS = [
   ['add', 'Se concederán', (c) => formatDate(c.date_after)],
@@ -129,6 +143,11 @@ export function recalculateAchievementsFlow({ onDone } = {}) {
   });
 }
 
+/** Ticked to begin with, except the revocations of the achievements judged against a time that may have changed
+ *  since (the average of the game): those are kept unless the admin says otherwise. */
+const KEPT_BY_DEFAULT = new Set(['JUST_IN_TIME']);
+const ticked = (c) => !(c.action === 'revoke' && KEPT_BY_DEFAULT.has(c.key));
+
 function previewStep(selection, { counts, changes }, onDone) {
   const total = changes.length;
   const m = openModal(html`
@@ -141,32 +160,56 @@ function previewStep(selection, { counts, changes }, onDone) {
         ${statTile('a revocar', counts.revoke)}
       </div>
       ${total
-    ? html`<p class="adm-sub">Esto es lo que se haría ahora mismo. Las fechas que hayas editado a mano se vuelven a calcular, y lo que ya no se cumple se revoca.</p>
+    ? html`<p class="adm-sub">Esto es lo que se haría ahora mismo. Las fechas que hayas editado a mano se vuelven a calcular, y lo que ya no se cumple se revoca. Desmarca lo que no quieras que se haga: los logros de «Justo a tiempo» que dejarían de cumplirse vienen sin marcar, porque la media de HLTB puede haber cambiado desde que se concedieron.</p>
         ${SECTIONS.map(([action, title, when]) => {
     const rows = changes.filter((c) => c.action === action);
-    return rows.length ? html`<details class="adm-details"><summary>${title} (${rows.length})</summary>
-          ${rows.map((c) => html`<div class="adm-sub"><strong>${c.user}</strong> · ${c.season} · ${c.title} · ${when(c)}${gameOf(c) ? html` · <em>${gameOf(c)}</em>` : ''}</div>`)}
+    return rows.length ? html`<details class="adm-details" data-section="${action}"><summary>${title} (<span data-section-count="${action}"></span>/${rows.length})</summary>
+          <div class="adm-pick-tools"><button type="button" class="adm-btn sm" data-all="${action}">Todos</button><button type="button" class="adm-btn sm" data-none="${action}">Ninguno</button></div>
+          ${rows.map((c) => html`<label class="adm-pick-item"><input type="checkbox" name="change" data-action="${action}" value="${c.ref}" ${ticked(c) ? 'checked' : ''} /><span><strong>${c.user}</strong> · ${c.season} · ${c.title} · ${when(c)}${gameOf(c) ? html` · <em>${gameOf(c)}</em>` : ''}${notes(c)}</span></label>`)}
         </details>` : '';
   })}`
     : html`<div class="adm-ok">Todo en orden: no hay nada que cambiar.</div>`}
+      <div class="adm-pick-summary" role="status"></div>
       <div class="adm-actions">
         <button type="button" class="adm-btn" data-close>${total ? 'Cancelar' : 'Cerrar'}</button>
         ${total ? html`<button class="adm-btn danger" data-continue>Continuar…</button>` : ''}
       </div>
     </div>`, { wide: true });
+  const boxes = () => [...m.el.querySelectorAll('input[name=change]')];
+  const refresh = () => {
+    const on = boxes().filter((box) => box.checked);
+    m.el.querySelectorAll('[data-section-count]').forEach((el) => {
+      el.textContent = on.filter((box) => box.dataset.action === el.dataset.sectionCount).length;
+    });
+    m.el.querySelector('.adm-pick-summary').textContent = total ? `Se aplicarán ${on.length} de ${total} cambios` : '';
+    const next = m.el.querySelector('[data-continue]');
+    if (next) next.disabled = !on.length;
+  };
+  m.el.addEventListener('click', (e) => {
+    const { all, none } = e.target.dataset;
+    const action = all || none;
+    if (!action) return;
+    e.preventDefault(); // the buttons live inside the folded block: they must not fold it
+    boxes().filter((box) => box.dataset.action === action).forEach((box) => { box.checked = Boolean(all); });
+    refresh();
+  });
+  m.el.addEventListener('change', refresh);
+  refresh();
   m.el.querySelector('[data-continue]')?.addEventListener('click', () => {
+    const accepted = boxes().filter((box) => box.checked).map((box) => box.value);
     m.close();
-    confirmStep(selection, total, onDone);
+    confirmStep(selection, accepted, onDone);
   });
 }
 
-function confirmStep(selection, total, onDone) {
+function confirmStep(selection, accepted, onDone) {
+  const total = accepted.length;
   const m = openModal(html`
     ${modalHeader('⚠️ Segunda confirmación')}
     <form class="adm-form" novalidate>
       <div class="adm-warn">
         <strong>Se aplicarán ${total} cambios en los logros</strong> de ${describe(selection)}.
-        Se vuelve a calcular en ese momento, así que puede variar si hay datos nuevos. <strong>No se notifica a nadie</strong>, pero lo que se revoque o cambie de fecha no se puede deshacer.
+        Se vuelve a calcular en ese momento, pero solo se hace lo que marcaste en la vista previa. <strong>No se notifica a nadie</strong>, pero lo que se revoque o cambie de fecha no se puede deshacer.
       </div>
       <label>Escribe <strong>${PHRASE}</strong> para habilitar el botón<input class="adm-input" name="phrase" autocomplete="off" /></label>
       <div class="adm-error" role="alert"></div>
@@ -185,7 +228,7 @@ function confirmStep(selection, total, onDone) {
     go.disabled = true;
     try {
       await api('/manage/recalculate-achievements', jsonRequest('POST', {
-        user_ids: selection.userIds, season_list: selection.seasonList, achievement_keys: selection.achievementKeys, confirm: PHRASE,
+        user_ids: selection.userIds, season_list: selection.seasonList, achievement_keys: selection.achievementKeys, accepted, confirm: PHRASE,
       }));
       m.close();
       toast('Recálculo en marcha');

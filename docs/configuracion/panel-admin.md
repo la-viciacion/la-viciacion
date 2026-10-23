@@ -34,7 +34,7 @@ En cada logro de un jugador, **Editar** cambia la fecha en que lo consiguió y *
 
 ![Logros en el panel](../assets/screens/admin-achievements.webp){ .screenshot }
 
-**Recalcular logros…** vuelve a calcular todos los logros de todas las temporadas a partir de las sesiones y la biblioteca, **sin avisar a nadie**. Funciona en dos pasos: una vista previa de lo que añadiría, corregiría y revocaría, y, tras escribir `RECALCULAR`, el recálculo en segundo plano. Puedes elegir jugadores, temporadas y logros. Úsalo cuando importes historial o cuando arregles datos antiguos.
+**Recalcular logros…** vuelve a calcular todos los logros de todas las temporadas a partir de las sesiones y la biblioteca, **sin avisar a nadie**. Funciona en dos pasos: una vista previa de lo que añadiría, corregiría y revocaría (puedes desmarcar cualquier cambio y solo se harán los marcados; las revocaciones de *Justo a tiempo* vienen desmarcadas) y, tras escribir `RECALCULAR`, el recálculo en segundo plano. Puedes elegir jugadores, temporadas y logros. Úsalo cuando importes historial o cuando arregles datos antiguos.
 
 ## Jugadores
 

@@ -22,15 +22,16 @@ from ..utils import actions  # noqa: F401  (imported first: the crud and utils m
 from ..utils import seasons
 from ..utils.achievements import is_lifetime
 from ..utils.logger import LogManager
-from .achievements import ALL_TOGETHER_PLAYERS, Achievements, Award
+from . import time_entries
+from .achievements import ALL_TOGETHER_PLAYERS, Achievements, Award, just_in_time_holds, just_in_time_tolerance
 
 logger = LogManager().get_logger()
 
 TEAMWORK_PLAYERS = 4
 # judged on the timers running together, one message naming everybody: only a timer that starts can announce them
 MULTIPLAYER_KEYS = {"TEAMWORK", "ALL_TOGETHER"}
-# judged once, at the moment it happens, against data that changes afterwards (the average time of HLTB): working
-# them out again would award or take away what the moment did not, so a recalculation leaves them exactly as they are
+# judged against data that changes afterwards (the average time of HLTB, stored in `games`, never fetched here): the
+# recalculation that follows a session never touches them, only the admin's, which shows each change before it is made
 MOMENT_KEYS = {"JUST_IN_TIME"}
 
 
@@ -46,10 +47,22 @@ class Change(NamedTuple):
     game_before: str | None
     game_after: str | None
     rows: tuple  # ids of the stored rows it touches
+    note: dict | None = None  # what the panel shows besides the change (the time of "Justo a tiempo", see _margins)
+
+    @property
+    def ref(self) -> str:
+        """What identifies the change between the preview and the moment it is applied: if the data moved in
+        between, the change is another one and what was ticked does not cover it."""
+        return "|".join(
+            str(part) for part in (
+                self.action, self.user_id, self.season, self.key, self.date_after, self.game_after, ",".join(map(str, self.rows)),
+            )
+        )
 
     def as_dict(self) -> dict:
         data = self._asdict()
         data["rows"] = list(self.rows)
+        data["ref"] = self.ref
         return data
 
 
@@ -100,13 +113,87 @@ def _seasons_of(db: Session, user_id: int) -> set[int]:
     return found
 
 
-async def _expected(db: Session, user: models.User, season: int) -> dict[str, Award]:
-    """What the user deserves in the season: {achievement key: Award}."""
+async def _expected(
+    db: Session, user: models.User, season: int, moments: bool = False, runs: list | None = None
+) -> dict[str, Award]:
+    """What the user deserves in the season: {achievement key: Award}. With `moments`, also the ones of MOMENT_KEYS,
+    and `runs` (a list) is filled with the completions they were judged on (see _just_in_time)."""
     collected: list[Award] = []
     checks = Achievements(silent=True, season=season, collected=collected)
     await actions.check_user(db, user, silent=True, checks=checks)
     await checks.opened_by_mistake_from_sessions(db, user)
+    if moments:
+        await _just_in_time(db, user, season, checks, runs if runs is not None else [])
     return {award.key: award for award in collected}
+
+
+class Run(NamedTuple):
+    """A game completed in a season, with the time of its run against the average of the game."""
+
+    game_id: str
+    date: datetime.date
+    played: int
+    avg: int
+
+
+async def _just_in_time(db: Session, user: models.User, season: int, checks: Achievements, runs: list) -> None:
+    """Every game the user completed in the season, judged as when it was completed: the time of its run (see
+    played_time_of_run) against the average time stored for the game, dated the day of the completion. The earliest
+    completion that holds is the one that earns it. `runs` gets every one of them, whether it holds or not."""
+    entries = (
+        db.query(models.UserGame)
+        .filter(
+            models.UserGame.user_id == user.id,
+            models.UserGame.completed == 1,
+            models.UserGame.completed_date >= datetime.date(season, 1, 1),
+            models.UserGame.completed_date <= datetime.date(season, 12, 31),
+        )
+        .order_by(models.UserGame.completed_date, models.UserGame.id)
+        .all()
+    )
+    for entry in entries:
+        avg_time = db.query(models.Game.avg_time).filter(models.Game.id == entry.game_id).scalar() or 0
+        played = time_entries.played_time_of_run(db, entry)
+        runs.append(Run(entry.game_id, entry.completed_date, played, avg_time))
+        await checks.just_in_time(
+            db, user, played, avg_time, entry.game_id, date=str(entry.completed_date), silent=True,
+        )
+
+
+def _keep_just_in_time(expected: dict[str, Award], stored: list, runs: list[Run]) -> None:
+    """The one stored that still holds stays as it is: the earliest completion that holds is only what an
+    achievement nobody has yet is dated, it is not a reason to move one that was earned fairly."""
+    award = expected.get("JUST_IN_TIME")
+    if award is None:
+        return
+    holding = {run.game_id for run in runs if just_in_time_holds(run.played, run.avg)}
+    for row in stored:
+        if row.key == "JUST_IN_TIME" and row.game_id in holding:
+            expected["JUST_IN_TIME"] = Award(award.user_id, award.key, row.date, row.game_id)
+            return
+
+
+def _margins(changes: list[Change], runs: list[Run]) -> list[Change]:
+    """The changes of "Justo a tiempo" with the time of the run of each of its games: {"before": ..., "after": ...},
+    each {played, avg, seconds (the difference), percent, tolerance (percent), holds} or None."""
+    by_game = {run.game_id: run for run in runs}
+
+    def describe(game_id):
+        run = by_game.get(game_id)
+        if run is None or not run.avg:
+            return None
+        return {
+            "played": run.played, "avg": run.avg, "seconds": run.played - run.avg,
+            "percent": round((run.played - run.avg) / run.avg * 100, 2),
+            "tolerance": round(just_in_time_tolerance(run.avg) * 100, 2),
+            "holds": just_in_time_holds(run.played, run.avg),
+        }
+
+    return [
+        change._replace(note={"before": describe(change.game_before), "after": describe(change.game_after)})
+        if change.key == "JUST_IN_TIME" else change
+        for change in changes
+    ]
 
 
 async def _expected_lifetime(db: Session, user: models.User) -> tuple[dict[str, Award], set[str]]:
@@ -155,13 +242,16 @@ async def _plan(
     user_ids: list[int] | None = None,
     only_seasons: set[int] | None = None,
     achievement_keys: list[str] | None = None,
+    moments: bool = False,
 ) -> list[Change]:
     query = db.query(models.User).filter(models.not_god())
     if user_ids is not None:
         query = query.filter(models.User.id.in_(user_ids))
     titles = {key: title for key, title in db.query(models.Achievement.key, models.Achievement.title).all()}
     switched_on = {key for (key,) in db.query(models.Achievement.key).filter(models.Achievement.active == True)}  # noqa: E712
-    allowed = (switched_on if achievement_keys is None else switched_on & set(achievement_keys)) - MOMENT_KEYS
+    allowed = switched_on if achievement_keys is None else switched_on & set(achievement_keys)
+    if not moments:
+        allowed -= MOMENT_KEYS
     valid_from = dict(db.query(models.Achievement.key, models.Achievement.valid_from_season).all())
     this_season = seasons.current()
     lifetime_keys = {key for key in allowed if is_lifetime(key)}
@@ -179,7 +269,8 @@ async def _plan(
     changes: list[Change] = []
     for user in query.order_by(models.User.id).all():
         for season in sorted(_seasons_of(db, user.id) if only_seasons is None else _seasons_of(db, user.id) & only_seasons):
-            expected = await _expected(db, user, season)
+            runs: list[Run] = []
+            expected = await _expected(db, user, season, moments, runs)
             if season not in teamwork:
                 teamwork[season] = teamwork_dates(db, season)
             if user.id in teamwork[season]:
@@ -190,7 +281,10 @@ async def _plan(
                 day, game_id = together[season][user.id]
                 expected["ALL_TOGETHER"] = Award(user.id, "ALL_TOGETHER", day, game_id)
             stored = stored_rows.filter(models.UserAchievement.user_id == user.id, models.UserAchievement.season == season).all()
-            changes.extend(_diff(user, expected, stored, titles, {key for key in allowed if valid_from[key] <= season}))
+            if moments:
+                _keep_just_in_time(expected, stored, runs)
+            found = _diff(user, expected, stored, titles, {key for key in allowed if valid_from[key] <= season})
+            changes.extend(_margins(found, runs) if moments else found)
         if lifetime_keys:  # whatever the seasons asked for: they belong to none
             stored = stored_rows.filter(models.UserAchievement.user_id == user.id, models.Achievement.key.in_(lifetime_keys)).all()
             expected, undecided = await _expected_lifetime(db, user)
@@ -205,8 +299,8 @@ def plan(
     achievement_keys: list[str] | None = None,
 ) -> list[Change]:
     """What a recalculation would change, for every player, season and achievement that is switched on or
-    only the ones given. It changes nothing."""
-    return asyncio.run(_plan(db, user_ids, None if season_list is None else set(season_list), achievement_keys))
+    only the ones given. It changes nothing. It is the admin's recalculation, so it also judges MOMENT_KEYS."""
+    return asyncio.run(_plan(db, user_ids, None if season_list is None else set(season_list), achievement_keys, moments=True))
 
 
 async def recalculate_user(
@@ -255,11 +349,14 @@ def preview(
     return {"counts": counts, "changes": items}
 
 
-def apply(db: Session, changes: list[Change]) -> None:
-    """Make the changes, all or none."""
+def apply(db: Session, changes: list[Change], accepted: set[str] | None = None) -> None:
+    """Make the changes, all or none. With `accepted` (the `ref` of the changes the admin ticked in the preview) only
+    those are made: whatever else the data turned out to need since is left for the next recalculation."""
     ids = {key: id_ for id_, key in db.query(models.Achievement.id, models.Achievement.key).all()}
     try:
         for change in changes:
+            if accepted is not None and change.ref not in accepted:
+                continue
             if change.action == "add":
                 db.add(models.UserAchievement(
                     user_id=change.user_id, achievement_id=ids[change.key], date=change.date_after, game_id=change.game_after,
@@ -277,9 +374,13 @@ def apply(db: Session, changes: list[Change]) -> None:
 
 
 def recalculate(
-    user_ids: list[int] | None = None, season_list: list[int] | None = None, achievement_keys: list[str] | None = None
+    user_ids: list[int] | None = None,
+    season_list: list[int] | None = None,
+    achievement_keys: list[str] | None = None,
+    accepted: list[str] | None = None,
 ) -> None:
-    """Background-task entrypoint of the admin panel: work everything out again and apply it, in silence.
+    """Background-task entrypoint of the admin panel: work everything out again and apply it, in silence. `accepted`
+    are the changes ticked in the preview (none: all of them).
 
     Under the lock of the other checks, with its own DB session, like the rest of the follow-ups."""
     from ..database.database import SessionLocal
@@ -288,7 +389,7 @@ def recalculate(
         try:
             with SessionLocal() as db:
                 changes = plan(db, user_ids, season_list, achievement_keys)
-                apply(db, changes)
+                apply(db, changes, None if accepted is None else set(accepted))
             logger.info(f"Achievements recalculated: {len(changes)} changes")
         except Exception as e:
             logger.error("Error recalculating the achievements: " + str(e), exc_info=True)

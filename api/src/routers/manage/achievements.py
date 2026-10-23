@@ -33,6 +33,7 @@ class RecalculateAchievementsBody(BaseModel):
     user_ids: Optional[list[int]] = Field(None, min_length=1)  # none: every player
     season_list: Optional[list[int]] = Field(None, min_length=1)  # none: every season
     achievement_keys: Optional[list[str]] = Field(None, min_length=1)  # none: every achievement that is switched on
+    accepted: Optional[list[str]] = None  # the `ref` of the changes ticked in the preview; none: all of them
     confirm: str  # must equal RECALCULATE_ACHIEVEMENTS_PHRASE (the panel shows the preview first and asks for it)
 
 
@@ -42,7 +43,9 @@ def recalculate_achievements(body: RecalculateAchievementsBody, background_tasks
     ones given, and bring what is stored to it (in background). It never notifies anybody. It rewrites dates and revokes, so it has to be confirmed explicitly."""
     if body.confirm != RECALCULATE_ACHIEVEMENTS_PHRASE:
         raise HTTPException(status_code=400, detail="Confirmación incorrecta")
-    background_tasks.add_task(achievements_recalc.recalculate, body.user_ids, body.season_list, body.achievement_keys)
+    background_tasks.add_task(
+        achievements_recalc.recalculate, body.user_ids, body.season_list, body.achievement_keys, body.accepted
+    )
     return {"message": "Recálculo en marcha"}
 
 
