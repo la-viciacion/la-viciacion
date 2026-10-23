@@ -127,7 +127,7 @@
 
 .pl-list { list-style: none; margin: 0; padding: 8px 20px 20px; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; }
 .pl-row { display: flex; align-items: center; gap: 12px; }
-.pl-row .pl-avatar { width: 40px; height: 40px; font-size: 1rem; border-color: var(--bg-surface); }
+.pl-row .pl-avatar { width: 40px; height: 40px; font-size: 1rem; border: 0; }
 .pl-row.stale { opacity: 0.6; }
 .pl-info { min-width: 0; }
 .pl-name { font-weight: 700; color: var(--text-primary); }
@@ -144,7 +144,7 @@
   .navbar-link-text { display: none; }
 }
 .pl-row.shared .pl-stack { flex: none; }
-.pl-row.shared .pl-avatar { width: 34px; height: 34px; border-color: var(--bg-surface); }
+.pl-row.shared .pl-avatar { width: 34px; height: 34px; border: 2px solid var(--bg-surface); } /* stacked: the ring separates the overlapping photos */
 .pl-row.shared .pl-stack .pl-avatar + .pl-avatar { margin-left: -12px; }
 
 .navbar-left { display: flex; align-items: center; gap: 6px; min-width: 0; }
