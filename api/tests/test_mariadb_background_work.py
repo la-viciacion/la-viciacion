@@ -378,6 +378,27 @@ class CompletionWorkTests(WorkTestCase):
         self.assertIn("JUST_IN_TIME", self.awarded())
         self.assertIn("*Celeste* en 02h00m", self.sent[-1]["text"])
 
+    def test_time_played_after_the_completion_date_does_not_count(self):
+        with self.engine.begin() as conn:
+            conn.execute(text("UPDATE games SET avg_time = 7200 WHERE id = 'celeste'"))
+        entry = self.library_entry(self.ana, "celeste", datetime.date(YEAR, 3, 1), completed=1, completed_date=datetime.date(YEAR, 3, 5))
+        self.session(self.ana, "celeste", at(3, 1), 120)
+        self.session(self.ana, "celeste", at(3, 5, 22), 30)  # the completion day still counts
+        self.session(self.ana, "celeste", at(3, 6), 600)  # a later run
+        self.real_actions["after_completion"](entry, False)
+        self.assertIn("*Celeste* en 02h30m", self.sent[-1]["text"])
+
+    def test_an_earlier_run_is_not_inflated_by_a_later_one(self):
+        with self.engine.begin() as conn:
+            conn.execute(text("UPDATE games SET avg_time = 7200 WHERE id = 'celeste'"))
+        first = self.library_entry(self.ana, "celeste", datetime.date(YEAR - 1, 3, 1), completed=1, completed_date=datetime.date(YEAR - 1, 3, 5))
+        self.session(self.ana, "celeste", datetime.datetime(YEAR - 1, 3, 1, 20, 0), 120)
+        self.library_entry(self.ana, "celeste", datetime.date(YEAR, 3, 1), completed=1, completed_date=datetime.date(YEAR, 3, 5))
+        self.session(self.ana, "celeste", at(3, 1), 300)  # the second run
+        self.real_actions["after_completion"](first, False)
+        self.assertIn("JUST_IN_TIME", self.awarded())
+        self.assertIn("*Celeste* en 02h00m", self.sent[-1]["text"])
+
     def test_a_game_far_from_the_average_does_not(self):
         with self.engine.begin() as conn:
             conn.execute(text("UPDATE games SET avg_time = 36000 WHERE id = 'celeste'"))
