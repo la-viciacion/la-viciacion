@@ -95,10 +95,13 @@ class OverviewTests(OpsTestCase):
                 "confirm": "RECALCULAR", "user_ids": [self.ana], "season_list": [2025], "achievement_keys": ["STREAK_7_DAYS"],
             })
             self.assertEqual(response.status_code, 202)
-            run.assert_called_once_with([self.ana], [2025], ["STREAK_7_DAYS"])
+            run.assert_called_once_with([self.ana], [2025], ["STREAK_7_DAYS"], None)
             run.reset_mock()
             self.admin("POST", "/recalculate-achievements", json={"confirm": "RECALCULAR"})
-            run.assert_called_once_with(None, None, None)
+            run.assert_called_once_with(None, None, None, None)
+            run.reset_mock()
+            self.admin("POST", "/recalculate-achievements", json={"confirm": "RECALCULAR", "accepted": ["add|1|2025|X|2025-03-07|None|"]})
+            run.assert_called_once_with(None, None, None, ["add|1|2025|X|2025-03-07|None|"])
 
     def test_the_preview_lists_the_changes_and_makes_none(self):
         for day in range(1, 8):

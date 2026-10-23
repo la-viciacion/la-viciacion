@@ -220,6 +220,10 @@
 .adm-form .adm-pick-item:hover { background: var(--bg-card-hover); }
 .adm-pick-item input { flex: none; }
 .adm-pick-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.adm-details .adm-pick-tools { display: flex; gap: 6px; margin-bottom: 4px; }
+.adm-details .adm-pick-item span { white-space: normal; }
+.adm-time-note { display: block; font-weight: 400; font-size: 0.8rem; color: var(--text-secondary); }
+.adm-time-note.off { color: #f87171; }
 .adm-pick-summary { color: var(--text-secondary); font-size: 0.85rem; text-align: right; }
 
 .adm-field-game { display: flex; flex-direction: column; gap: 6px; font-size: 0.85rem; color: var(--text-secondary); font-weight: 600; }

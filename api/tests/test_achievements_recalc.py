@@ -173,21 +173,97 @@ class RecalculationTests(unittest.TestCase):
         self.assertIn(("revoke", 1, YEAR, "PLAYED_7_DAYS"), got)
         self.assertIn(("add", 1, PAST, "PLAYED_7_DAYS"), got)
 
-    def test_opened_by_mistake_is_worked_out_from_the_season_but_just_in_time_is_not(self):
-        self.db.add(models.UserGame(user_id=1, game_id="g1", started_date=D(PAST, 3, 1), platform=None, completed=1, completed_date=D(PAST, 3, 3)))
+    def complete(self, completed_date, user_id=1, game="g1", started=None):
+        self.db.add(models.UserGame(user_id=user_id, game_id=game, started_date=started or completed_date, platform=None, completed=1, completed_date=completed_date))
+        self.db.commit()
+
+    def test_just_in_time_is_worked_out_from_the_run_of_the_game_dated_its_completion(self):
+        self.complete(D(PAST, 3, 3), started=D(PAST, 3, 1))
         self.play(1, at(PAST, 3, 1, 12), minutes=120)  # the 2 h of the average time
         self.play(1, at(PAST, 3, 2, 12), minutes=1)  # and a session of 1 minute: 2 h 1 min is within the margin
-        self.db.commit()
         got = self.changes()
         self.assertEqual(got[("add", 1, PAST, "PLAYED_LESS_5_MIN_SESSION")].date_after, D(PAST, 3, 2))
-        self.assertFalse([key for key in got if key[3] == "JUST_IN_TIME"])  # only the moment of completing the game awards it
+        self.assertEqual((got[("add", 1, PAST, "JUST_IN_TIME")].date_after, got[("add", 1, PAST, "JUST_IN_TIME")].game_after), (D(PAST, 3, 3), "g1"))
 
-    def test_just_in_time_is_never_added_corrected_or_revoked(self):
-        self.award(1, "JUST_IN_TIME", D(PAST, 1, 5), "g1")  # earned then, whatever the sessions or the average say today
+    def test_just_in_time_ignores_what_was_played_after_the_completion_and_before_a_previous_one(self):
+        self.complete(D(PAST - 1, 5, 2))
+        self.play(1, at(PAST - 1, 5, 1, 12), minutes=600)  # the first run
+        self.complete(D(PAST, 3, 3))
+        self.play(1, at(PAST, 3, 1, 12), minutes=120)  # the second run, on the average
+        self.play(1, at(PAST, 3, 4, 12), minutes=600)  # a third one
+        got = self.changes()
+        self.assertIn(("add", 1, PAST, "JUST_IN_TIME"), got)
+        self.assertNotIn(("add", 1, PAST - 1, "JUST_IN_TIME"), got)
+
+    def test_just_in_time_reads_the_stored_average_and_never_asks_hltb(self):
+        self.complete(D(PAST, 3, 3))
+        self.play(1, at(PAST, 3, 1, 12), minutes=120)
+        with mock.patch.object(ach_module.utils, "get_game_info", new=mock.AsyncMock()) as hltb:
+            recalc.apply(self.db, recalc.plan(self.db))
+        hltb.assert_not_awaited()
+        self.assertEqual(self.db.get(models.Game, "g1").avg_time, 7200)
+        self.assertIn(("JUST_IN_TIME", D(PAST, 3, 3), "g1"), self.stored())
+
+    def test_just_in_time_that_no_longer_holds_is_proposed_for_revoking(self):
+        self.award(1, "JUST_IN_TIME", D(PAST, 1, 5), "g1")
         self.play(1, at(PAST, 3, 1, 12), minutes=10)
+        got = self.changes()
+        self.assertIn(("revoke", 1, PAST, "JUST_IN_TIME"), got)
+        self.assertFalse([key for key in self.changes() if key[3] == "JUST_IN_TIME" and key[0] != "revoke"])
+
+    def two_games_on_the_average(self):
+        self.db.add(models.Game(id="g2", name="Hades", avg_time=7200))
+        self.db.commit()
+        self.complete(D(PAST, 3, 3), started=D(PAST, 3, 1))
+        self.play(1, at(PAST, 3, 1, 12), minutes=120)
+        self.complete(D(PAST, 5, 20), game="g2", started=D(PAST, 5, 19))
+        self.play(1, at(PAST, 5, 19, 12), minutes=120, game="g2")
+
+    def test_the_one_stored_that_still_holds_is_not_moved_to_an_earlier_one(self):
+        self.two_games_on_the_average()
+        self.award(1, "JUST_IN_TIME", D(PAST, 5, 20), "g2")  # g1, completed earlier, holds too
         self.assertFalse([key for key in self.changes() if key[3] == "JUST_IN_TIME"])
-        self.assertFalse([key for key in self.changes(achievement_keys=["JUST_IN_TIME"])])
-        recalc.apply(self.db, recalc.plan(self.db))
+
+    def test_the_one_stored_that_no_longer_holds_moves_to_the_earliest_that_does(self):
+        self.two_games_on_the_average()
+        self.db.get(models.Game, "g2").avg_time = 36000  # the average of g2 is not what it was
+        self.db.commit()
+        self.award(1, "JUST_IN_TIME", D(PAST, 5, 20), "g2")
+        change = self.changes()[("date", 1, PAST, "JUST_IN_TIME")]
+        self.assertEqual((change.date_after, change.game_after), (D(PAST, 3, 3), "g1"))
+        self.assertFalse(change.note["before"]["holds"])
+        self.assertTrue(change.note["after"]["holds"])
+
+    def test_the_change_of_just_in_time_carries_the_time_against_the_average(self):
+        self.complete(D(PAST, 3, 3))
+        self.play(1, at(PAST, 3, 1, 12), minutes=119)  # 1 min under the 2 h
+        self.play(1, at(PAST, 3, 4, 12), minutes=600)  # later: not of this run
+        note = self.changes()[("add", 1, PAST, "JUST_IN_TIME")].note["after"]
+        self.assertEqual((note["played"], note["avg"], note["seconds"], note["holds"]), (119 * 60, 7200, -60, True))
+        self.assertAlmostEqual(note["percent"], -0.83)
+        self.assertAlmostEqual(note["tolerance"], 1.0)  # 1 % at 2 h
+
+    def test_only_the_changes_that_were_accepted_are_made(self):
+        self.award(1, "JUST_IN_TIME", D(PAST, 1, 5), "g1")
+        self.award(1, "PLAYED_30_DAYS", D(PAST, 6, 20))
+        self.play_days(1, PAST, 7)
+        changes = recalc.plan(self.db)
+        refs = {change.key: change.ref for change in changes}
+        recalc.apply(self.db, changes, accepted={refs["PLAYED_30_DAYS"], refs["PLAYED_7_DAYS"]})
+        keys = {key for key, *_ in self.stored()}
+        self.assertIn("JUST_IN_TIME", keys)  # revoking it was not accepted
+        self.assertNotIn("PLAYED_30_DAYS", keys)
+        self.assertIn("PLAYED_7_DAYS", keys)
+        self.assertNotIn("STREAK_7_DAYS", keys)  # not accepted either: not even added
+        recalc.apply(self.db, recalc.plan(self.db), accepted=set())
+        self.assertIn("JUST_IN_TIME", {key for key, *_ in self.stored()})
+
+    def test_the_recalculation_after_a_session_leaves_just_in_time_alone(self):
+        import asyncio
+
+        self.award(1, "JUST_IN_TIME", D(PAST, 1, 5), "g1")
+        self.play(1, at(PAST, 3, 1, 12), minutes=10)
+        asyncio.run(recalc.recalculate_user(self.db, 1, [PAST]))
         self.assertIn(("JUST_IN_TIME", D(PAST, 1, 5), "g1"), self.stored())
 
     def test_what_a_recalculation_finds_from_before_today_is_stored_but_not_announced(self):
