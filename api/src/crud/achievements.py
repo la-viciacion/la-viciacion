@@ -120,7 +120,7 @@ OPENED_BY_MISTAKE_SECONDS = 5 * 60
 JUST_IN_TIME_MIN_TOLERANCE = 0.01
 JUST_IN_TIME_MAX_TOLERANCE = 0.05
 JUST_IN_TIME_SHORT_HOURS = 2
-JUST_IN_TIME_LONG_HOURS = 40
+JUST_IN_TIME_LONG_HOURS = 100
 
 
 def just_in_time_tolerance(avg_time: int) -> float:
@@ -129,6 +129,14 @@ def just_in_time_tolerance(avg_time: int) -> float:
     share = (hours - JUST_IN_TIME_SHORT_HOURS) / (JUST_IN_TIME_LONG_HOURS - JUST_IN_TIME_SHORT_HOURS)
     share = min(max(share, 0.0), 1.0)
     return JUST_IN_TIME_MIN_TOLERANCE + (JUST_IN_TIME_MAX_TOLERANCE - JUST_IN_TIME_MIN_TOLERANCE) * share
+
+
+def just_in_time_holds(played_time: int, avg_time: int) -> bool:
+    """Is `played_time` close enough to `avg_time` (both in seconds) to earn "Justo a tiempo"? An exact match is
+    unreachable, so it is enough to be within a few percent of the average."""
+    if not played_time or not avg_time:
+        return False
+    return abs(played_time - avg_time) <= avg_time * just_in_time_tolerance(avg_time)
 
 ######################
 #### ACHIEVEMENTS ####
@@ -963,11 +971,8 @@ class Achievements:
         date: str = None,
         silent: bool = False,
     ):
-        if not played_time or not avg_time:
-            return
-        # Both played_time and avg_time (HLTB comp_main) are in seconds. An exact match is
-        # unreachable, so it is enough to be within a few percent of the average.
-        if abs(played_time - avg_time) <= avg_time * just_in_time_tolerance(avg_time):
+        # Both played_time and avg_time (HLTB comp_main) are in seconds.
+        if just_in_time_holds(played_time, avg_time):
             await self._unlock_if_new(
                 db, user, AchievementsElems.JUST_IN_TIME, silent, date=date, game_id=game_id
             )
