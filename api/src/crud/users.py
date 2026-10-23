@@ -346,6 +346,11 @@ def get_avatar(db: Session, username: str):
         raise
 
 
+def game_path(game_id: int) -> str:
+    """The in-app address of a game's page."""
+    return f"#/game/{game_id}"
+
+
 def new_game_message(user_name: str, game_name: str, slug: str | None, number: int) -> str:
     """The notice of a game just started: who, which game (a link to RAWG when it has a slug) and the number of
     games they have started this season. The AI rewrites it keeping all three (see ai_prompts.NEW_GAME_PROMPT)."""
@@ -380,6 +385,7 @@ async def announce_new_game(
             msg,
             silent,
             ai_use="new_game",
+            push_url=game_path(game_db.id),
         )
     except Exception as e:
         logger.error("Error announcing new game: " + str(e), exc_info=True)
