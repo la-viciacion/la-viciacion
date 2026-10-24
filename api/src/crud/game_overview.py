@@ -76,10 +76,14 @@ def overview(db: Session, game_id: str, viewer_id: int) -> dict | None:
 
     wished = wishlist.wished_ids(db, viewer_id)
     rated = [r["score"] for r in rows if r["score"] is not None]
+    base = games.parent_of(db, game)
     return {
         "game": {
             "id": game.id,
             "name": game.name,
+            # a DLC / expansion; the link to its base game exists only when that one is in the catalogue
+            "is_dlc": bool(game.parent_rawg_id),
+            "parent": {"id": base.id, "name": base.name} if base else None,
             "image_url": game.image_url,
             "genres": games.genre_list(game.genres),
             "tags": games.genre_list(game.tags),

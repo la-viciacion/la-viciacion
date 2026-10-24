@@ -56,6 +56,11 @@ function draw(data) {
         : html`<div class="gm-cover gm-cover-placeholder" aria-hidden="true">🎮</div>`}
       <div>
         <h1 class="pf-title">${game.name}</h1>
+        ${game.is_dlc ? html`
+          <div class="gm-dlc">
+            <span class="pf-tag dlc">DLC</span>
+            ${game.parent ? html`<span class="pf-sub">Contenido adicional de <a href="#/game/${encodeURIComponent(game.parent.id)}">${game.parent.name}</a></span>` : ''}
+          </div>` : ''}
         <div class="gm-genres">${game.genres.map((genre) => html`<span class="pf-tag muted">${genre}</span>`)}</div>
         ${tags.length ? html`<div class="gm-genres gm-tags" aria-label="Etiquetas">${tags.map((tag) => html`<span class="pf-tag muted">${tag}</span>`)}</div>` : ''}
         ${details ? html`<div class="pf-sub">${details}</div>` : ''}

@@ -42,6 +42,12 @@ async def search_rawg(query: str, db: Session = Depends(get_db)):
     return await utils.search_rawg_games(query.strip(), db=db)
 
 
+@router.get("/rawg-parent/{rawg_id}", response_model=schemas.RawgParent | None)
+async def get_rawg_parent(rawg_id: int, db: Session = Depends(get_db)):
+    """The base game of a RAWG DLC / expansion (null for a game of its own): the notice before adding it."""
+    return await utils.rawg_parent_candidate(rawg_id, db)
+
+
 @router.get("/catalog")
 def get_game_catalog(
     q: str | None = Query(None, description="Part of the name"),

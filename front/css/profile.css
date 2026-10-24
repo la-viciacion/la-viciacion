@@ -163,7 +163,7 @@
 .gm-cover { width: 96px; height: 96px; border-radius: var(--radius-md); object-fit: cover; flex: none; }
 .gm-cover-placeholder { display: flex; align-items: center; justify-content: center; background: var(--bg-card); font-size: 2rem; }
 .gm-wanted { margin: 0 0 8px; }
-.gm-genres { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0; }
+.gm-genres, .gm-dlc { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0; align-items: center; }
 .gm-mine { flex-direction: row; align-items: center; justify-content: space-between; margin: 12px 0 8px; }
 .gm-players { list-style: none; margin: 0; gap: 14px; }
 .gm-player { display: flex; align-items: center; gap: 12px; }
@@ -265,6 +265,7 @@
 @media (max-width: 640px) { .pl-cards { grid-template-columns: 1fr; } }
 
 /* Wishlist page */
+.pf-tag.dlc { background: rgba(167, 139, 250, 0.15); color: #c4b5fd; }
 .pf-tag.wish { background: rgba(244, 114, 182, 0.15); color: #f9a8d4; }
 .wl-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
 .wl-card { position: relative; }

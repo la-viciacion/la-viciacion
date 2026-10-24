@@ -175,6 +175,7 @@ async function pickRawgCandidate(results, candidate, onPick, back) {
       <div class="modal-confirm-text">
         <strong>${candidate.name}${candidate.released ? ` (${candidate.released.slice(0, 4)})` : ''}</strong>
         <span>Este juego no está en tu catálogo. ¿Añadirlo? Quedará disponible para todos.</span>
+        <span class="modal-dlc-note" role="status"></span>
       </div>
       <div class="sess-actions">
         <button type="button" class="sess-btn" data-back>Volver</button>
@@ -185,6 +186,22 @@ async function pickRawgCandidate(results, candidate, onPick, back) {
     if (e.target.closest('[data-back]')) back();
     else if (e.target.closest('[data-confirm]')) addRawgGame(results, candidate, onPick);
   };
+  showDlcNote(results, candidate);
+}
+
+// RAWG's search does not say which results are DLCs; the base game is asked for the one about to be added. It only
+// informs: failing or not answering leaves the confirmation as it is.
+async function showDlcNote(results, candidate) {
+  try {
+    const parent = await api(`/games/rawg-parent/${candidate.rawg_id}`);
+    const note = results.querySelector('.modal-dlc-note');
+    if (!parent || !note) return; // a game of its own, or the confirmation was left meanwhile
+    note.textContent = parent.exists_in_db
+      ? `Es un DLC o expansión de «${parent.name}», que ya está en el catálogo.`
+      : `Es un DLC o expansión de «${parent.name}», que se añadirá también al catálogo.`;
+  } catch (err) {
+    console.error('Error fetching the base game:', err);
+  }
 }
 
 async function addRawgGame(results, candidate, onPick) {

@@ -202,6 +202,35 @@ async def _steam_id_from_rawg_stores(rawg_id: int, params: dict) -> str:
     return ""
 
 
+async def rawg_parent(rawg_id: int, params: dict | None = None) -> tuple[int, str] | None:
+    """(RAWG id, name) of the base game when `rawg_id` is a DLC / expansion / edition of another one; None when it is a
+    game of its own or RAWG fails (the mark is a bonus: the game is created without it)."""
+    params = params or {"key": config.RAWG_API_KEY}
+    try:
+        resp = await _http_get(f"https://api.rawg.io/api/games/{rawg_id}/parent-games", params, timeout=6)
+        if resp.ok:
+            for parent in resp.json().get("results") or []:
+                if parent.get("id"):
+                    return parent["id"], parent.get("name") or ""
+    except Exception as e:
+        logger.warning(f"Error fetching the base game of RAWG game {rawg_id}: {redact_rawg_key(e)}")
+    return None
+
+
+async def rawg_parent_candidate(rawg_id: int, db: Session) -> schemas.RawgParent | None:
+    """The base game of a RAWG game for the "add game" notice, flagged when it is already in the catalogue."""
+    if not config.RAWG_API_KEY:
+        return None
+    found = await rawg_parent(rawg_id)
+    if found is None:
+        return None
+    parent = schemas.RawgParent(rawg_id=found[0], name=found[1])
+    existing = await run_in_threadpool(lambda: db.query(models.Game.id).filter(models.Game.rawg_id == parent.rawg_id).first())
+    if existing:
+        parent.exists_in_db, parent.db_game_id = True, existing.id
+    return parent
+
+
 async def _hltb_details(name: str, released: str | None) -> tuple[int, str | None, str | None]:
     """(average seconds, developer, Steam id) from HowLongToBeat. The time only from a clear match (seconds, like the
     rest of `games.avg_time`); the developer and the Steam id, used only as fallbacks, from the closest result."""
@@ -245,7 +274,9 @@ async def get_game_details_by_rawg_id(rawg_id: int) -> dict | None:
 
     name = data.get("name", "")
     released = data.get("released")
-    (avg_time, hltb_dev, hltb_steam), steam_id = await asyncio.gather(_hltb_details(name, released), stores)
+    # RAWG counts the games this one is an addition of: only a DLC costs the extra request
+    parent = rawg_parent(rawg_id, params) if data.get("parents_count") else asyncio.sleep(0)
+    (avg_time, hltb_dev, hltb_steam), steam_id, parent = await asyncio.gather(_hltb_details(name, released), stores, parent)
 
     dev_list = [d["name"] for d in data.get("developers", []) if "name" in d] or [
         p["name"] for p in data.get("publishers", []) if "name" in p
@@ -269,6 +300,7 @@ async def get_game_details_by_rawg_id(rawg_id: int) -> dict | None:
         # the tags RAWG has in other languages are the same ones again: only the English ones
         "tags": ",".join(t["name"] for t in data.get("tags") or [] if t.get("name") and t.get("language") == "eng"),
         "avg_time": int(avg_time) if avg_time else 0,
+        "parent_rawg_id": parent[0] if parent else None,
     }
 
 
@@ -324,6 +356,7 @@ async def get_new_game_info(game) -> schemas.NewGame:
             avg_time=details["avg_time"],
             slug=details["slug"],
             rawg_id=details["rawg_id"],
+            parent_rawg_id=details["parent_rawg_id"],
         )
 
     logger.info(f"Adding '{game_name}' as typed (no RAWG entry)")
