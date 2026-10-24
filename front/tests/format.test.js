@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { formatClock, formatDate, formatDuration, formatPlayers, formatRelative, formatTimestamp, parseDay, toLocalISO } from '../js/lib/format.js';
+import { formatClock, formatDate, formatDateTime, formatDuration, formatPlayers, formatRelative, formatTimestamp, parseDay, toLocalISO } from '../js/lib/format.js';
 
 test('formatDuration', () => {
   assert.equal(formatDuration(0), '0 s');
@@ -23,6 +23,12 @@ test('formatRelative', () => {
   assert.equal(formatRelative(new Date(2026, 8, 29, 8, 0), now), 'Hoy');
   assert.equal(formatRelative(new Date(2026, 8, 28, 23, 0), now), 'Ayer');
   assert.equal(formatRelative(new Date(2026, 8, 26, 10, 0), now), 'Hace 3 días');
+});
+
+test('formatDateTime shows the year only when it is not the current one', () => {
+  const now = new Date(2026, 8, 29, 12, 0, 0);
+  assert.ok(!formatDateTime(new Date(2026, 0, 7, 23, 11), now).includes('2026'));
+  assert.ok(formatDateTime(new Date(2025, 0, 7, 23, 11), now).includes('2025'));
 });
 
 test('formatTimestamp and toLocalISO', () => {

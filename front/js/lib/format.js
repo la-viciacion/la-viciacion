@@ -45,8 +45,16 @@ export function formatDate(value) {
   return value ? parseDay(value).toLocaleDateString(LOCALE, { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
 }
 
-export function formatDateTime(ts) {
-  return new Date(ts).toLocaleString(LOCALE, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+/** Date and time; the year only when it is not the current one. */
+export function formatDateTime(ts, now = new Date()) {
+  const d = new Date(ts);
+  return d.toLocaleString(LOCALE, {
+    day: 'numeric',
+    month: 'short',
+    year: d.getFullYear() === now.getFullYear() ? undefined : 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 /** "2026-09-29T13:05:07" -> "2026-09-29 13:05" (admin tables) */
