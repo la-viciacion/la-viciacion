@@ -24,8 +24,6 @@ EXTERNAL = {
 }
 # Set when the image is built (a build arg of release.yml), not by whoever deploys it.
 BAKED = {"APP_VERSION"}
-# Only read to seed the settings the first time, or kept so an old .env keeps working.
-LEGACY = {"OPENAI_API_KEY", "OPENAI_MODEL", "RAWG_URL"}
 
 READ = re.compile(
     r"(?:getenv|_get_env|_get_env_json)\(\s*[\"']([A-Z][A-Z0-9_]*)[\"']|environ\[\s*[\"']([A-Z][A-Z0-9_]*)[\"']\]"
@@ -50,11 +48,11 @@ def variables_read() -> set[str]:
 
 class TemplateAgreesWithTheCodeTests(unittest.TestCase):
     def test_every_variable_the_code_reads_is_in_the_template(self):
-        missing = variables_read() - template_variables() - LEGACY - BAKED  # the old names are explained in a comment
+        missing = variables_read() - template_variables() - BAKED
         self.assertEqual(missing, set(), "read by the code but missing from .env.template")
 
     def test_nothing_in_the_template_is_left_over(self):
-        leftovers = template_variables() - variables_read() - EXTERNAL - LEGACY
+        leftovers = template_variables() - variables_read() - EXTERNAL
         self.assertEqual(leftovers, set(), "in .env.template but nobody reads it")
 
 
@@ -72,19 +70,12 @@ class AppVersionTests(unittest.TestCase):
 class RawgKeyTests(unittest.TestCase):
     def key(self, **env):
         config = object.__new__(Config)
-        config.RAWG_URL = env.pop("RAWG_URL", "")
         clean = {k: v for k, v in os.environ.items() if k != "RAWG_API_KEY"}
         with mock.patch.dict(os.environ, {**clean, **env}, clear=True):
             return config.RAWG_API_KEY
 
     def test_the_key_variable_is_used(self):
         self.assertEqual(self.key(RAWG_API_KEY=" abc "), "abc")
-
-    def test_the_key_variable_wins_over_the_old_url(self):
-        self.assertEqual(self.key(RAWG_API_KEY="new", RAWG_URL="https://api.rawg.io/api/games?key=old&page=1"), "new")
-
-    def test_an_old_env_with_only_the_url_keeps_working(self):
-        self.assertEqual(self.key(RAWG_URL="https://api.rawg.io/api/games?key=old&page=1&search="), "old")
 
     def test_no_key_at_all_is_an_empty_string(self):
         self.assertEqual(self.key(), "")

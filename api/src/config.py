@@ -13,8 +13,8 @@ class Config:
 
         # The keys of outside services are read from the environment every time and never stored (see
         # utils/settings.py, `env_only`): the Telegram token and chats (TELEGRAM_TOKEN / TELEGRAM_GROUP_ID /
-        # TELEGRAM_ADMIN_CHAT_ID), the AI key (AI_API_KEY, or the old OPENAI_API_KEY), the AI provider (AI_PROVIDER) and the AI
-        # model (AI_MODEL, or the old OPENAI_MODEL); there is no default for the provider or the model in the code.
+        # TELEGRAM_ADMIN_CHAT_ID), the AI key (AI_API_KEY), the AI provider (AI_PROVIDER) and the AI
+        # model (AI_MODEL); there is no default for the provider or the model in the code.
         # The chat uses the same provider and key and, as its model, the optional CHAT_AI_MODEL (AI_MODEL when it is not set).
 
         # Admin
@@ -25,10 +25,6 @@ class Config:
         self.DB_NAME = self._get_env("MARIADB_DATABASE")
         self.DB_USER = self._get_env("MARIADB_USER")
         self.DB_PASS = self._get_env("MARIADB_PASSWORD")
-        
-        # External APIs. RAWG_API_KEY is the key; RAWG_URL is the old way (a URL with `key=...` in it),
-        # still read so an existing .env keeps working (see the RAWG_API_KEY property).
-        self.RAWG_URL = os.getenv("RAWG_URL", "").strip()
         
         # Security
         self.SECRET_KEY = self._get_env("SECRET_KEY")
@@ -84,13 +80,4 @@ class Config:
 
     @property
     def RAWG_API_KEY(self) -> str:
-        direct_key = os.getenv("RAWG_API_KEY", "").strip()
-        if direct_key:
-            return direct_key
-        if self.RAWG_URL and "key=" in self.RAWG_URL:
-            import urllib.parse
-            parsed = urllib.parse.urlparse(self.RAWG_URL)
-            qs = urllib.parse.parse_qs(parsed.query)
-            if "key" in qs and qs["key"]:
-                return qs["key"][0]
-        return ""
+        return os.getenv("RAWG_API_KEY", "").strip()

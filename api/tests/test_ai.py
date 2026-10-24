@@ -35,16 +35,14 @@ class SettingsTests(unittest.TestCase):
 
     def test_the_model_comes_only_from_the_environment_and_has_no_default(self):
         db = make_session()
-        with mock.patch.dict(os.environ, {"AI_MODEL": "gemini-x", "OPENAI_MODEL": ""}):
+        with mock.patch.dict(os.environ, {"AI_MODEL": "gemini-x"}):
             self.assertEqual(settings.get("ai.model"), "gemini-x")
             self.assertEqual(settings.public_view(db)["ai.model"], {"is_set": True, "hint": None})
             with self.assertRaises(ValueError):
                 settings.set_values(db, {"ai.model": "other"})  # not from the panel
-        with mock.patch.dict(os.environ, {"AI_MODEL": "", "OPENAI_MODEL": ""}):
+        with mock.patch.dict(os.environ, {"AI_MODEL": ""}):
             self.assertIsNone(settings.get("ai.model"))  # nothing in the code fills the gap
             self.assertEqual(settings.public_view(db)["ai.model"], {"is_set": False, "hint": None})
-        with mock.patch.dict(os.environ, {"AI_MODEL": "", "OPENAI_MODEL": "gpt-old"}):
-            self.assertEqual(settings.get("ai.model"), "gpt-old")  # the old variable still gives it
         self.assertEqual(db.query(models.AppSetting).filter_by(key="ai.model").count(), 0)
 
     def test_the_key_comes_from_the_environment_is_never_stored_and_never_shown(self):
@@ -56,14 +54,8 @@ class SettingsTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 settings.set_values(db, {"ai.api_key": OTHER_KEY})  # not from the panel
         self.assertEqual(db.query(models.AppSetting).filter_by(key="ai.api_key").count(), 0)
-        with mock.patch.dict(os.environ, {"AI_API_KEY": "", "OPENAI_API_KEY": ""}):
+        with mock.patch.dict(os.environ, {"AI_API_KEY": ""}):
             self.assertEqual(settings.public_view(db)["ai.api_key"], {"is_set": False, "hint": None})
-
-    def test_the_old_openai_variable_still_gives_the_key(self):
-        with mock.patch.dict(os.environ, {"AI_API_KEY": "", "OPENAI_API_KEY": "sk-old"}):
-            self.assertEqual(settings.get("ai.api_key"), "sk-old")
-        with mock.patch.dict(os.environ, {"AI_API_KEY": KEY, "OPENAI_API_KEY": "sk-old"}):
-            self.assertEqual(settings.get("ai.api_key"), KEY)  # the new one wins
 
 
 class CompleteTests(unittest.TestCase):
