@@ -43,7 +43,12 @@ export async function render({ user, main, isCurrent }) {
     </div>
     <div class="history-more" id="historyMore"></div>`);
 
-  initTimer({ userId: user.id, onChange: refresh, onChoose: startTimerFlow });
+  initTimer({
+    userId: user.id,
+    onChange: refresh,
+    onChoose: startTimerFlow,
+    onContinue: (group) => startTimer(group.game_id, group.platform),
+  });
   initGamePicker(user.id);
   initSessions({ userId: user.id, onChange: refresh });
   initHistory({

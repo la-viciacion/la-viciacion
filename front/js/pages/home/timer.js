@@ -1,7 +1,7 @@
 // Timer card: shows the running timer (live clock) or the "start one" prompt,
 // and starts/stops timers through the API.
 import { api, jsonRequest } from '../../lib/api.js';
-import { formatClock } from '../../lib/format.js';
+import { formatClock, formatDuration, formatRelative } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
 import { iconPlay, iconStop } from '../../ui/icons.js';
 import { scoreBadge } from '../../ui/score-badge.js';
@@ -10,14 +10,15 @@ import { toast } from '../../ui/toast.js';
 let userId = null;
 let onChange = () => {};
 let onChoose = () => {};
+let onContinue = () => {};
 let clock = null;
 
 /** True while the user has a running timer (the history disables "Seguir"). */
 export let hasActive = false;
 
-/** onChange: a timer was started/stopped; onChoose: "Nuevo timer" was pressed. */
+/** onChange: a timer was started/stopped; onChoose: "Nuevo timer" was pressed; onContinue(group): "Continuar" on the last game. */
 export function initTimer(options) {
-  ({ userId, onChange, onChoose } = options);
+  ({ userId, onChange, onChoose, onContinue } = options);
   hasActive = false;
 }
 
@@ -58,6 +59,34 @@ const idleCard = () => html`
     <button class="btn-start-timer" id="chooseGameBtn">${iconPlay()} Nuevo timer</button>
   </div>`;
 
+// With a latest game, "Continuar" is the main action and "Nuevo timer" stays one press away.
+const resumeCard = (last) => html`
+  <div class="timer-idle timer-resume">
+    ${last.image_url
+      ? html`<img src="${last.image_url}" alt="" class="timer-resume-cover" />`
+      : html`<div class="timer-resume-cover timer-resume-placeholder" aria-hidden="true">🎮</div>`}
+    <div class="timer-idle-text">
+      <div class="timer-resume-label">Seguir donde lo dejaste</div>
+      <div class="timer-idle-title">${last.game_name || last.game_id} ${scoreBadge(last.score)}</div>
+      <div class="timer-idle-sub">${formatRelative(last.last_played)} · ${formatDuration(last.total_seconds)}${last.session_count > 1 ? ' en total' : ''}</div>
+    </div>
+    <div class="timer-resume-actions">
+      <button class="btn-start-timer" id="continueGameBtn">${iconPlay()} Continuar</button>
+      <button class="btn-new-timer" id="chooseGameBtn">+ Nuevo timer</button>
+    </div>
+  </div>`;
+
+/** The game played last (the first of the grouped history), or null when there is none or it can't be fetched. */
+async function fetchLastGame() {
+  try {
+    const page = await api(`/timers/history/${userId}/grouped?limit=1&offset=0`);
+    return page?.groups?.[0] || null;
+  } catch (err) {
+    console.error('Error fetching the last game:', err);
+    return null;
+  }
+}
+
 export async function loadTimerCard() {
   const section = document.getElementById('timerSection');
   if (!section) return;
@@ -77,9 +106,11 @@ export async function loadTimerCard() {
   } catch (err) {
     console.error('Error fetching timer:', err);
   }
+  const last = await fetchLastGame();
   if (!section.isConnected) return;
-  mount(section, idleCard());
+  mount(section, last ? resumeCard(last) : idleCard());
   document.getElementById('chooseGameBtn').addEventListener('click', () => onChoose());
+  document.getElementById('continueGameBtn')?.addEventListener('click', () => onContinue(last));
 }
 
 export async function startTimer(gameId, platform = null) {
