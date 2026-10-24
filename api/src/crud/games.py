@@ -343,38 +343,4 @@ def update_avg_time_game(db: Session, game_id: str, avg_time: int):
     db.commit()
 
 
-def update_game(db: Session, game_id: int, game: schemas.UpdateGame):
-    try:
-        db_game = get_game_by_id(db, game_id)
-        name = game.name if game.name is not None else db_game.name
-        dev = game.dev if game.dev is not None else db_game.dev
-        steam_id = game.steam_id if game.steam_id is not None else db_game.steam_id
-        image_url = game.image_url if game.image_url is not None else db_game.image_url
-        release_date = (
-            game.release_date if game.release_date is not None else db_game.release_date
-        )
-        genres = game.genres if game.genres is not None else db_game.genres
-        avg_time = game.avg_time if game.avg_time is not None else db_game.avg_time
-        stmt = (
-            update(models.Game)
-            .where(models.Game.id == game_id)
-            .values(
-                name=name,
-                dev=dev,
-                steam_id=steam_id,
-                image_url=image_url,
-                release_date=release_date,
-                genres=genres,
-                avg_time=avg_time,
-            )
-        )
-        db.execute(stmt)
-        db.commit()
-        return db.query(models.Game).filter(models.Game.id == game_id).first()
-    except Exception as e:
-        db.rollback()
-        error_message = "Error updating game: " + str(e)
-        logger.info(error_message)
-        raise RuntimeError(error_message) from e
-
 
