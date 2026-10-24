@@ -45,13 +45,8 @@ class ChallengesTestCase(ApiTestCase):
 
 class LaunchTests(ChallengesTestCase):
     def test_everything_needs_a_login(self):
-        for method, path in (("GET", "/challenges"), ("GET", "/challenges/1"), ("POST", "/challenges"), ("GET", "/challenges/templates"), ("DELETE", "/challenges/1")):
+        for method, path in (("GET", "/challenges"), ("GET", "/challenges/1"), ("POST", "/challenges"), ("DELETE", "/challenges/1")):
             self.assertEqual(self.api(method, path).status_code, 401, path)
-
-    def test_the_templates_say_the_group_ones_are_not_launched_from_the_challenges_page(self):
-        for user in ("root", "ana"):  # not even an admin
-            body = self.api("GET", "/challenges/templates", as_user=user).json()
-            self.assertEqual([(t["scope"], t["can_launch"]) for t in body if t["kind"] == "game_of_month"], [("group", False)])
 
     def test_an_admin_launches_a_game_of_the_month_for_the_group(self):
         response = self.launch()

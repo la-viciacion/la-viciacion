@@ -33,16 +33,6 @@ def _challenge(db: Session, challenge_id: int, viewer: models.User) -> models.Ch
     return found
 
 
-@router.get("/templates")
-def get_templates(current_user: models.User = Depends(auth.get_current_active_user)):
-    """The kinds of challenge that exist and whether the caller may launch each one from the challenges page: only the
-    personal ones. The group's are launched by an admin from the admin panel (`POST /manage/challenges`)."""
-    return [
-        {"kind": kind, "label": template.label, "scope": template.scope, "can_launch": template.scope != GROUP}
-        for kind, template in TEMPLATES.items()
-    ]
-
-
 @router.get("/genres")
 def get_genres(
     current_user: models.User = Depends(auth.get_current_active_user),
