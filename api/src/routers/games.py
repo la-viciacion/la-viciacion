@@ -83,16 +83,6 @@ def get_game_overview(
     return found
 
 
-@router.get("/{game_id}", response_model=schemas.Game)
-def get_game_by_id(game_id: str, db: Session = Depends(get_db)):
-    """One game of the catalogue."""
-    game_db = games.get_game_by_id(db, game_id)
-    if game_db is None:
-        raise HTTPException(status_code=404, detail="Game not exists")
-
-    return game_db
-
-
 @router.post("/", response_model=schemas.Game, status_code=201)
 async def create_game(game: schemas.NewGame, db: Session = Depends(get_db)):
     """Add a new game to DB: from its RAWG entry when `rawg_id` is given, as typed otherwise (only the name is required).

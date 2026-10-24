@@ -122,7 +122,7 @@ class ActiveStopCancelTests(TimerTestCase):
         self.assertTrue(body["is_active"])
         self.assertEqual(body["timer"]["id"], timer_id)
         # the name travels with it, so the timer card needs no second request
-        self.assertEqual(body["game_name"], self.api("GET", f"/games/{body['timer']['game_id']}", as_user="ana").json()["name"])
+        self.assertEqual(body["game_name"], self.api("GET", f"/games/{body['timer']['game_id']}/overview", as_user="ana").json()["game"]["name"])
 
     def test_somebody_else_cannot_see_it_but_an_admin_can(self):
         self.start()

@@ -16,7 +16,6 @@ ROUTER_MODULES = (activity, basic, challenges, chat, games, group, manage, notif
 
 # (method, path relative to the router): reachable without a token
 PUBLIC = {
-    ("GET", "/"),
     ("GET", "/keepalive"),
     ("POST", "/token"),  # login; throttled
     ("POST", "/auth/forgot-password"),  # same answer for any account; throttled; needs mail configured

@@ -197,23 +197,6 @@ def get_first_time_entry_on_day(db: Session, user_id: int, day: datetime.date):
     ).first()
 
 
-def get_user_games_played_time(
-    db: Session, user_id: str, game_id: str = None, season: int = None
-):
-    season = seasons.or_current(season)
-    sessions = sessions_subquery()
-    query = db.query(
-        sessions.c.game_id,
-        func.sum(sessions.c.duration),
-    ).filter(
-        sessions.c.user_id == user_id,
-        sessions.c.season == season,
-    )
-    if game_id is not None:
-        query = query.filter(sessions.c.game_id == game_id)
-    return query.group_by(sessions.c.game_id).all()
-
-
 def played_time_of_run(db: Session, entry: models.UserGame) -> int:
     """Seconds the user played the game of a completed library entry in the run that ended with it: every session
     since the previous completion of that game (any season or platform), or all of them when it is the first,

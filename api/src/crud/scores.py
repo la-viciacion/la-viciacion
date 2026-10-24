@@ -3,9 +3,6 @@ from sqlalchemy.orm import Session
 
 from ..database import models
 
-SCORE_MIN = 1
-SCORE_MAX = 100
-
 
 def user_scores(db: Session, user_id: int) -> dict[str, int]:
     """game_id -> rating, for every game the user rated."""

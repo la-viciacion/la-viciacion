@@ -104,11 +104,6 @@ class GamesTests(CatalogTestCase):
         self.assertEqual(sorted(g["name"] for g in found), ["Hollow Knight"])
         self.assertEqual(self.api("GET", "/games/", as_user="ana", params={"name": "zzz"}).json(), [])
 
-    def test_it_returns_one_game_or_404(self):
-        self.assertEqual(self.api("GET", "/games/celeste", as_user="ana").json()["genres"], "Platformer")
-        missing = self.api("GET", "/games/nope", as_user="ana")
-        self.assertEqual((missing.status_code, missing.json()["detail"]), (404, "Game not exists"))
-
 
 class SearchRawgTests(CatalogTestCase):
     def search(self, query="cel"):
