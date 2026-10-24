@@ -1,5 +1,4 @@
 USER_NOT_EXISTS = "User not exists"
-USER_ALREADY_EXISTS = "User already exists"
 ENTRY_NOT_FOUND = "Entrada de la biblioteca no encontrada"
 GAME_NOT_IN_LIBRARY = "Este juego no está en tu biblioteca"
 GAME_NOT_FOUND = "Juego no encontrado"
@@ -38,9 +37,6 @@ GAME_ALREADY_COMPLETED = "Game is already completed"
 
 FILE_TYPE_NOT_ALLOWED = "Archivo no admitido. Solo se aceptan imágenes JPG o PNG"
 FILE_TOO_BIG = "La imagen es demasiado grande (máximo {mb} MB y {mp} megapíxeles)"
-
-PASSWORD_REQUIREMENTS = "The password does not meet the requirements"
-EMAIL_VALIDATION = "The email has not a valid email format"
 
 ACHIEVEMENT_NOT_EXISTS = "Achievement not exists"
 

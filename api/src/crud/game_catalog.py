@@ -9,8 +9,6 @@ from sqlalchemy.orm import Session
 from ..database import models
 from . import games, time_entries, wishlist
 
-SORTS = ("activity", "played", "rated", "players", "release", "name")
-
 
 def _none_last(value, missing):
     """Sort key part that puts the games without a value after the ones that have it."""
