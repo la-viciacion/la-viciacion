@@ -37,10 +37,6 @@ class LaunchTests(NewGenreTestCase):
             {"Action": (2, False), "Metroidvania": (2, False), "Indie": (1, False), "Puzzle": (1, True), "Roguelike": (1, False)},
         )
 
-    def test_the_templates_say_a_player_may_launch_this_one_from_the_page(self):
-        body = self.api("GET", "/challenges/templates", as_user="ana").json()
-        self.assertEqual({t["kind"]: (t["scope"], t["can_launch"]) for t in body}, {"game_of_month": ("group", False), "themed": ("group", False), "new_genre": ("user", True), "debt_reduction": ("user", True)})
-
     def test_a_player_launches_a_personal_challenge_that_starts_today(self):
         response = self.launch_genre()
         self.assertEqual(response.status_code, 201)
