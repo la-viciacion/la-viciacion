@@ -95,12 +95,15 @@ def get_game_by_id(game_id: str, db: Session = Depends(get_db)):
 
 @router.post("/", response_model=schemas.Game, status_code=201)
 async def create_game(game: schemas.NewGame, db: Session = Depends(get_db)):
-    """Add a new game to DB: from its RAWG entry when `rawg_id` is given, as typed otherwise (only the name is required)."""
+    """Add a new game to DB: from its RAWG entry when `rawg_id` is given, as typed otherwise (only the name is required).
+    A game typed by hand can be marked as a DLC (`is_dlc`) and say which game it belongs to (`parent_game_id`, optional)."""
     # the duplicate check and the stored name must see the same text: " Celeste" is "Celeste"
     game.name = game.name.strip()
     if not game.name:
         raise HTTPException(status_code=400, detail=messages.GAME_NAME_EMPTY)
     await run_in_threadpool(_refuse_duplicates, db, game)
+    if game.parent_game_id and await run_in_threadpool(games.get_game_by_id, db, game.parent_game_id) is None:
+        raise HTTPException(status_code=400, detail=messages.GAME_PARENT_NOT_FOUND)
     return await games.new_game(db=db, game=game)
 
 

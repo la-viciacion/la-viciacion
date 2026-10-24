@@ -97,6 +97,7 @@ export function openAddGame(onPick) {
 
 // ── Step 1c: create a game RAWG does not have ───────────────
 // Only the name is required (it is all a session needs); the rest can be edited later from the admin panel.
+// It can be marked as a DLC, optionally saying which catalogue game it belongs to.
 function openManualGame(onPick, name = '') {
   const modal = openStep(html`
     ${modalHeader('Crear juego a mano')}
@@ -104,6 +105,12 @@ function openManualGame(onPick, name = '') {
       <label>Nombre <input class="sess-input" name="game" value="${name}" maxlength="255" autocomplete="off" required /></label>
       <label>Lanzamiento (opcional) <input class="sess-input" type="date" name="release_date" /></label>
       <label>Desarrolladora (opcional) <input class="sess-input" name="dev" maxlength="255" autocomplete="off" /></label>
+      <label class="sess-check"><input type="checkbox" name="is_dlc" /> Es un DLC o una expansión</label>
+      <div class="dlc-base" hidden>
+        <input class="sess-input" id="dlcBaseSearch" placeholder="Juego base (opcional): buscar en el catálogo..." autocomplete="off" />
+        <div class="dlc-base-chosen"></div>
+        <div class="modal-results-list dlc-base-results"></div>
+      </div>
       <div class="sess-hint">Quedará disponible para todos. Comprueba antes que el juego no esté ya en el catálogo.</div>
       <div class="sess-error" role="alert"></div>
       <div class="sess-actions">
@@ -115,6 +122,7 @@ function openManualGame(onPick, name = '') {
   const form = modal.el.querySelector('form');
   const error = form.querySelector('.sess-error');
   form.querySelector('[data-back]').addEventListener('click', () => openAddGame(onPick));
+  const base = bindBaseGame(modal, form);
   form.elements.game.focus();
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -122,10 +130,12 @@ function openManualGame(onPick, name = '') {
     if (!typed) { error.textContent = 'Escribe el nombre del juego'; return; }
     error.textContent = '';
     try {
+      const dlc = form.elements.is_dlc.checked;
       const game = await api('/games/', jsonRequest('POST', {
         name: typed,
         release_date: form.elements.release_date.value || null,
         dev: form.elements.dev.value.trim() || null,
+        ...(dlc ? { is_dlc: true, parent_game_id: base.chosen()?.id ?? null } : {}),
       }));
       closeAllModals();
       onPick(game.id, game.name);
@@ -133,6 +143,45 @@ function openManualGame(onPick, name = '') {
       if (form.isConnected) error.textContent = `Error: ${err.message}`;
     }
   });
+}
+
+// The "DLC" part of the manual form: the box shows when the check is on; the base game is looked up in the catalogue,
+// picked from the results and can be taken off again. `chosen()` is the picked game, or null.
+function bindBaseGame(modal, form) {
+  const box = form.querySelector('.dlc-base');
+  const chosenLine = box.querySelector('.dlc-base-chosen');
+  const results = box.querySelector('.dlc-base-results');
+  let chosen = null;
+  const draw = () => {
+    mount(chosenLine, chosen
+      ? html`<span class="pf-tag dlc">Juego base: ${chosen.name}</span> <button type="button" class="sess-btn" data-clear>Quitar</button>`
+      : html``);
+  };
+  form.elements.is_dlc.addEventListener('change', () => { box.hidden = !form.elements.is_dlc.checked; });
+  chosenLine.addEventListener('click', (e) => {
+    if (e.target.closest('[data-clear]')) { chosen = null; draw(); }
+  });
+  bindSearch(modal, 'dlcBaseSearch', async (query, isLatest) => {
+    if (query.length < 2) return mount(results, html``);
+    try {
+      const games = await api(`/games/?name=${encodeURIComponent(query)}`);
+      if (!results.isConnected || !isLatest()) return;
+      mount(results, games?.length
+        ? html`${games.map((g) => html`<button type="button" class="modal-result-row" data-game-id="${g.id}">${thumb(g.image_url)}<span class="modal-result-name">${g.name}</span></button>`)}`
+        : hint('Sin resultados en tu catálogo'));
+      results.onclick = (e) => {
+        const row = e.target.closest('.modal-result-row');
+        if (!row) return;
+        chosen = games.find((g) => String(g.id) === row.dataset.gameId);
+        mount(results, html``);
+        modal.el.querySelector('#dlcBaseSearch').value = '';
+        draw();
+      };
+    } catch (err) {
+      if (results.isConnected && isLatest()) mount(results, hint(`Error buscando: ${err.message}`));
+    }
+  });
+  return { chosen: () => chosen };
 }
 
 async function searchRawg(modal, query, onPick, isLatest = () => true) {

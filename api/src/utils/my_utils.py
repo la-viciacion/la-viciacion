@@ -300,6 +300,8 @@ async def get_game_details_by_rawg_id(rawg_id: int) -> dict | None:
         # the tags RAWG has in other languages are the same ones again: only the English ones
         "tags": ",".join(t["name"] for t in data.get("tags") or [] if t.get("name") and t.get("language") == "eng"),
         "avg_time": int(avg_time) if avg_time else 0,
+        # RAWG counts the games this one is an addition of even when asking for them failed
+        "is_dlc": bool(data.get("parents_count")),
         "parent_rawg_id": parent[0] if parent else None,
     }
 
@@ -356,6 +358,7 @@ async def get_new_game_info(game) -> schemas.NewGame:
             avg_time=details["avg_time"],
             slug=details["slug"],
             rawg_id=details["rawg_id"],
+            is_dlc=details["is_dlc"],
             parent_rawg_id=details["parent_rawg_id"],
         )
 
@@ -371,6 +374,8 @@ async def get_new_game_info(game) -> schemas.NewGame:
         avg_time=0,
         slug="",
         rawg_id=None,
+        is_dlc=bool(game_data.get("is_dlc")),
+        parent_game_id=game_data.get("parent_game_id") or None,
     )
 
 

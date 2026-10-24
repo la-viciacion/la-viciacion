@@ -75,7 +75,8 @@ class Game(BaseModel):
     avg_time: int | None = 0
     slug: str | None = None
     rawg_id: int | None = None
-    parent_rawg_id: int | None = None
+    is_dlc: bool = False
+    parent_game_id: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -91,6 +92,10 @@ class NewGame(BaseModel):
     avg_time: Optional[int | None] = None
     slug: Optional[str | None] = None
     rawg_id: Optional[int | None] = None
+    is_dlc: bool = False
+    # the base game in the catalogue; a game with one is a DLC whatever `is_dlc` says
+    parent_game_id: Optional[str | None] = None
+    # RAWG's id for the base game, set only by get_new_game_info so that creating the game can add the base: never stored
     parent_rawg_id: Optional[int | None] = None
 
 

@@ -82,7 +82,7 @@ def overview(db: Session, game_id: str, viewer_id: int) -> dict | None:
             "id": game.id,
             "name": game.name,
             # a DLC / expansion; the link to its base game exists only when that one is in the catalogue
-            "is_dlc": bool(game.parent_rawg_id),
+            "is_dlc": game.is_dlc,
             "parent": {"id": base.id, "name": base.name} if base else None,
             "image_url": game.image_url,
             "genres": games.genre_list(game.genres),

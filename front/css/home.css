@@ -298,6 +298,11 @@
 }
 .sess-input:focus { outline: none; border-color: var(--accent-teal); }
 .sess-hint { font-size: 0.78rem; color: var(--text-muted); }
+.sess-form label.sess-check { flex-direction: row; align-items: center; gap: 8px; }
+.dlc-base { display: flex; flex-direction: column; gap: 8px; }
+.dlc-base[hidden] { display: none; }
+.dlc-base-chosen { display: flex; align-items: center; gap: 8px; }
+.dlc-base-chosen:empty { display: none; }
 .sess-confirm { padding: 10px 12px; border: 1px solid var(--accent-teal); border-radius: var(--radius-sm); font-size: 0.9rem; font-weight: 600; }
 .sess-error { min-height: 1.2em; font-size: 0.85rem; color: var(--accent-pink); }
 .sess-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }

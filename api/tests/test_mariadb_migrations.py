@@ -231,6 +231,42 @@ class SecretsEnvOnlyTests(MariaDBTestCase):
         self.assertEqual(self.keys(), ["ai.provider", "push.vapid_private", "weekly.time"])
 
 
+class GameDlcLinkTests(MariaDBTestCase):
+    """039 turns 038's `parent_rawg_id` into `is_dlc` + `parent_game_id`: a DLC whose base is in the catalogue is
+    linked, one whose base is not stays marked and unlinked, and the old column goes."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.migrate("038_game_parent")
+        with cls.engine.begin() as conn:
+            conn.execute(text(
+                "INSERT INTO games (id, name, rawg_id, parent_rawg_id) VALUES "
+                "('d4', 'Diablo IV', 388309, NULL), ('voh', 'Vessel Of Hatred', 1011642, 388309), "
+                "('orphan', 'Some DLC', 5, 999), ('self', 'Odd', 7, 7), ('plain', 'Celeste', 9, NULL)"
+            ))
+        cls.migrate()
+
+    def rows(self):
+        with self.engine.connect() as conn:
+            return {r[0]: tuple(r[1:]) for r in conn.execute(text("SELECT id, is_dlc, parent_game_id FROM games"))}
+
+    def test_a_dlc_is_marked_and_linked_to_a_base_game_the_catalogue_has(self):
+        self.assertEqual(self.rows(), {
+            "d4": (0, None), "voh": (1, "d4"), "orphan": (1, None), "self": (1, None), "plain": (0, None),
+        })
+
+    def test_the_old_column_is_gone_and_the_link_is_a_key_that_unlinks_when_the_base_is_deleted(self):
+        self.assertNotIn("parent_rawg_id", {c["name"] for c in inspect(self.engine).get_columns("games")})
+        with self.engine.begin() as conn:
+            conn.execute(text("DELETE FROM games WHERE id = 'd4'"))
+        self.assertEqual(self.rows()["voh"], (1, None))
+
+    def test_a_link_to_nothing_is_refused(self):
+        with self.assertRaises(IntegrityError), self.engine.begin() as conn:
+            conn.execute(text("UPDATE games SET parent_game_id = 'nope' WHERE id = 'plain'"))
+
+
 class UpgradeFromAnOlderRevisionTests(MariaDBTestCase):
     """A database that already has data (what production is) must survive the migrations after it."""
 

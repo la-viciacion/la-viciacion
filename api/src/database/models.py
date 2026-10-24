@@ -101,9 +101,10 @@ class Game(Base):
     avg_time = Column(Integer)
     slug = Column(String(255))
     rawg_id = Column(Integer, nullable=True, index=True)
-    # RAWG id of the base game when this one is a DLC / expansion / edition (NULL = a game of its own). The id and
-    # not a foreign key: the base game may not be in the catalogue yet (rows synced before it was added)
-    parent_rawg_id = Column(Integer, nullable=True)
+    # A DLC / expansion / edition, with or without its base game: the link is optional (a game made by hand may not
+    # say which, RAWG's base may not be in the catalogue). Deleting the base game leaves the DLC marked, unlinked
+    is_dlc = Column(Boolean, nullable=False, server_default=text("0"), default=False)
+    parent_game_id = Column(String(255), ForeignKey("games.id", name="fk_games_parent", ondelete="SET NULL"), nullable=True)
 
     __table_args__ = (UniqueConstraint("name"),)
 

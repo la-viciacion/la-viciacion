@@ -245,36 +245,36 @@ async def new_game(db: Session, game: schemas.NewGame) -> models.Game:
 
     # 1. Resolve official game data from RAWG first (network: awaited, off the DB)
     game_info = await utils.get_new_game_info(game)
-    # 2. everything else is database work: keep it off the event loop
-    stored = await run_in_threadpool(_store_game, db, game, game_info)
-    # 3. a DLC brings its base game along
-    if game_info.parent_rawg_id:
-        await _ensure_parent(db, game_info.parent_rawg_id)
-    return stored
+    # 2. a DLC from RAWG brings its base game along (best effort: the DLC is stored even when this fails)
+    if game_info.parent_rawg_id and not game_info.parent_game_id:
+        game_info.parent_game_id = await _ensure_parent(db, game_info.parent_rawg_id)
+    # 3. everything else is database work: keep it off the event loop
+    return await run_in_threadpool(_store_game, db, game, game_info)
 
 
-async def _ensure_parent(db: Session, parent_rawg_id: int) -> None:
-    """Add the base game of a DLC to the catalogue when it is not there. Best effort: the DLC is already stored, so
-    a RAWG failure here is logged and the base game is added the next time it is needed. Only one level: the base
-    game's own base (a DLC of a DLC) is not followed."""
+async def _ensure_parent(db: Session, parent_rawg_id: int) -> str | None:
+    """The id of the base game of a DLC, adding it to the catalogue when it is not there. None when it could not
+    be added: the DLC is stored anyway, marked and unlinked. Only one level: the base game's own base (a DLC of a
+    DLC) is not followed."""
     try:
-        if await run_in_threadpool(lambda: db.query(models.Game.id).filter(models.Game.rawg_id == parent_rawg_id).first()):
-            return
+        existing = await run_in_threadpool(lambda: db.query(models.Game.id).filter(models.Game.rawg_id == parent_rawg_id).first())
+        if existing:
+            return existing.id
         info = await utils.get_new_game_info({"name": "", "rawg_id": parent_rawg_id})
         if info.rawg_id != parent_rawg_id:  # RAWG did not answer: never create a game "as typed" with no name
             logger.warning(f"Base game {parent_rawg_id} not added: RAWG gave no details")
-            return
-        await run_in_threadpool(_store_game, db, info, info)
+            return None
+        info.parent_rawg_id = None
+        return (await run_in_threadpool(_store_game, db, info, info)).id
     except Exception as e:
         db.rollback()
         logger.warning(f"Base game {parent_rawg_id} not added: {e}")
+        return None
 
 
 def parent_of(db: Session, game: models.Game) -> models.Game | None:
-    """The base game of a DLC when it is in the catalogue."""
-    if not game.parent_rawg_id:
-        return None
-    return db.query(models.Game).filter(models.Game.rawg_id == game.parent_rawg_id).first()
+    """The base game of a DLC when it has one."""
+    return db.get(models.Game, game.parent_game_id) if game.parent_game_id else None
 
 
 def _store_game(db: Session, game: schemas.NewGame, game_info: schemas.NewGame) -> models.Game:
@@ -306,7 +306,8 @@ def _store_game(db: Session, game: schemas.NewGame, game_info: schemas.NewGame) 
         avg_time=game_info.avg_time,
         slug=game_info.slug,
         rawg_id=game_info.rawg_id,
-        parent_rawg_id=game_info.parent_rawg_id,
+        is_dlc=bool(game_info.is_dlc or game_info.parent_game_id),
+        parent_game_id=game_info.parent_game_id,
     )
     try:
         db.add(game_to_add)
