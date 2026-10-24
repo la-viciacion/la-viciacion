@@ -85,7 +85,7 @@ def export_user(db: Session, user: models.User, now: datetime.datetime) -> dict:
         "library": [
             {
                 "game_id": e.game_id, "platform": e.platform, "started_date": _day(e.started_date),
-                "completed": bool(e.completed), "completed_date": _day(e.completed_date), "completion_time": e.completion_time,
+                "completed": bool(e.completed), "completed_date": _day(e.completed_date),
                 "abandoned_at": _day(e.abandoned_at),
             }
             for e in library
@@ -246,7 +246,6 @@ def import_data(db: Session, actor: models.User, user: models.User, data, dry_ru
             entry = models.UserGame(
                 user_id=user.id, game_id=game, platform=platform, started_date=row.started_date,
                 completed=int(done), completed_date=(done_date or row.started_date) if done else None,
-                completion_time=row.completion_time if done else None,
                 abandoned_at=None if done else row.abandoned_at,
             )
             db.add(entry)

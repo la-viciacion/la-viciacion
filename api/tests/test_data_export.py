@@ -220,9 +220,16 @@ class ImportSeasonsTests(DataTestCase):
 
 class ImportLibraryTests(DataTestCase):
     def test_a_completion_is_kept_with_its_date(self):
-        self.run_import(parse(library=[{"game_id": "doom", "platform": "pc", "started_date": f"{YEAR}-01-02", "completed": True, "completed_date": f"{YEAR}-01-20", "completion_time": 3600}]))
+        self.run_import(parse(library=[{"game_id": "doom", "platform": "pc", "started_date": f"{YEAR}-01-02", "completed": True, "completed_date": f"{YEAR}-01-20"}]))
         entry = self.db.query(models.UserGame).one()
-        self.assertEqual((entry.completed, entry.completed_date, entry.completion_time), (1, datetime.date(YEAR, 1, 20), 3600))
+        self.assertEqual((entry.completed, entry.completed_date), (1, datetime.date(YEAR, 1, 20)))
+
+    def test_a_file_exported_before_completion_time_was_dropped_is_still_read_and_the_field_ignored(self):
+        report = self.run_import(parse(library=[{"game_id": "doom", "platform": "pc", "started_date": f"{YEAR}-01-02", "completed": True, "completed_date": f"{YEAR}-01-20", "completion_time": 3600}]))
+        entry = self.db.query(models.UserGame).one()
+        self.assertEqual((entry.completed, entry.completed_date), (1, datetime.date(YEAR, 1, 20)))
+        self.assertNotIn("completion_time", {c.name for c in models.UserGame.__table__.columns})
+        self.assertEqual(report["library"]["imported"], 1)
 
     def test_a_game_is_completed_once_per_season(self):
         self.db.add(models.UserGame(user_id=1, game_id="doom", platform="ps5", started_date=at(2, 1).date(), completed=1, completed_date=at(4, 1).date()))

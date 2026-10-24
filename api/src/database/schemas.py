@@ -143,7 +143,6 @@ class UserGame(UsersGamesBase):
     completed: int | None = None
     completed_date: datetime.date | None = None
     played_time: int | None = None
-    completion_time: int | None = None
 
 
 class Achievement(BaseModel):
@@ -268,7 +267,6 @@ class ExportLibraryEntry(BaseModel):
     started_date: datetime.date
     completed: bool = False
     completed_date: datetime.date | None = None
-    completion_time: int | None = None
     abandoned_at: NaiveDatetime | None = None
 
 
