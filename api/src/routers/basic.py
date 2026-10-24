@@ -68,14 +68,6 @@ router = APIRouter(
 )
 
 
-@router.get("/")
-def hello_world(request: Request):
-    """
-    Test endpoint
-    """
-    return "API is working!"
-
-
 @router.get("/keepalive")
 def keepalive(request: Request):
     """

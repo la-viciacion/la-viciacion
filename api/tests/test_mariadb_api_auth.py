@@ -21,7 +21,6 @@ class LoginTests(ApiTestCase):
         return self.api("POST", "/token", data={"username": username, "password": password})
 
     def test_the_service_answers_without_a_token(self):
-        self.assertEqual(self.api("GET", "/").status_code, 200)
         self.assertEqual(self.api("GET", "/keepalive").status_code, 200)
 
     def test_a_correct_login_returns_a_token_that_opens_the_session(self):
