@@ -71,18 +71,6 @@ def search_places(
         raise HTTPException(status_code=503, detail=msg.PLACES_UNAVAILABLE)
 
 
-@router.get("/{username}", response_model=schemas.User)
-def get_user(
-    username: str,
-    active_user: models.User = Depends(auth.get_current_active_user),
-    db: Session = Depends(get_db),
-):
-    """One account: the caller's own, or anybody's for an admin."""
-    auth.ensure_self_or_admin(active_user, username=username)
-    user_db = _target_user(db, active_user, username)
-    return user_db
-
-
 @router.get("/{username}/profile")
 def get_profile(
     username: str,
