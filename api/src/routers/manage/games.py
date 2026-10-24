@@ -5,11 +5,11 @@ from typing import Optional
 from fastapi import Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
 from ...auth import get_db
 from ...database import models
-from ...utils import hltb_sync, rawg_sync
+from ...utils import hltb_sync, messages, rawg_sync
 from ...utils.redaction import redact_rawg_key
 from .common import commit, confirm_or_409, get_or_404, like, router
 
@@ -25,9 +25,11 @@ class GamePatch(BaseModel):
     avg_time: Optional[int] = None
     slug: Optional[str] = None
     rawg_id: Optional[int] = None
+    is_dlc: Optional[bool] = None
+    parent_game_id: Optional[str] = None
 
 
-def _game_out(g: models.Game, sessions: int = 0, players: int = 0, played_seconds: int = 0) -> dict:
+def _game_out(g: models.Game, sessions: int = 0, players: int = 0, played_seconds: int = 0, parent_name: str | None = None) -> dict:
     return {
         "id": g.id,
         "name": g.name,
@@ -40,6 +42,9 @@ def _game_out(g: models.Game, sessions: int = 0, players: int = 0, played_second
         "avg_time": g.avg_time,
         "slug": g.slug,
         "rawg_id": g.rawg_id,
+        "is_dlc": bool(g.is_dlc),
+        "parent_game_id": g.parent_game_id,
+        "parent_name": parent_name,
         "sessions": sessions,
         "players": players,
         "played_seconds": int(played_seconds or 0),
@@ -75,10 +80,12 @@ def list_games(
     sessions = func.coalesce(session_counts.c.n, 0)
     players = func.coalesce(player_counts.c.n, 0)
     played = func.coalesce(session_counts.c.secs, 0)
+    base = aliased(models.Game)
     q = (
-        db.query(models.Game, sessions.label("sessions"), players.label("players"), played.label("played"))
+        db.query(models.Game, sessions.label("sessions"), players.label("players"), played.label("played"), base.name.label("parent_name"))
         .outerjoin(session_counts, session_counts.c.gid == models.Game.id)
         .outerjoin(player_counts, player_counts.c.gid == models.Game.id)
+        .outerjoin(base, base.id == models.Game.parent_game_id)
     )
     if search:
         q = q.filter(models.Game.name.like(like(search)))
@@ -90,7 +97,7 @@ def list_games(
     column = {"name": models.Game.name, "release_date": models.Game.release_date, "played": played, "players": players}[sort]
     direction = column.desc() if order == "desc" else column.asc()
     rows = q.order_by(direction, models.Game.name, models.Game.id).limit(limit).offset(offset).all()
-    return {"total": total, "items": [_game_out(g, s, p, t) for g, s, p, t in rows]}
+    return {"total": total, "items": [_game_out(g, s, p, t, parent) for g, s, p, t, parent in rows]}
 
 
 @router.patch("/games/{game_id}")
@@ -99,10 +106,32 @@ def patch_game(game_id: str, body: GamePatch, db: Session = Depends(get_db)):
     data = body.model_dump(exclude_unset=True)
     if "name" in data and not (data["name"] or "").strip():
         raise HTTPException(status_code=400, detail="El nombre no puede estar vacío")
+    if data.get("is_dlc") is None:
+        data.pop("is_dlc", None)  # the column is NOT NULL: no value is "leave it"
+    _check_parent(db, game, data)
     for k, v in data.items():
         setattr(game, k, v)
     commit(db, "Juego")
-    return _game_out(game)
+    base = db.get(models.Game, game.parent_game_id) if game.parent_game_id else None
+    return _game_out(game, parent_name=base.name if base else None)
+
+
+def _check_parent(db: Session, game: models.Game, data: dict) -> None:
+    """The base game must exist and must not lead back to this one; naming one makes the game a DLC and a game
+    that is not a DLC has none (`data` is completed accordingly)."""
+    parent_id = data.get("parent_game_id")
+    if parent_id is not None:
+        seen, step = {game.id}, db.get(models.Game, parent_id)
+        if step is None:
+            raise HTTPException(status_code=400, detail=messages.GAME_PARENT_NOT_FOUND)
+        while step is not None:
+            if step.id in seen:
+                raise HTTPException(status_code=400, detail=messages.GAME_PARENT_LOOP)
+            seen.add(step.id)
+            step = db.get(models.Game, step.parent_game_id) if step.parent_game_id else None
+        data.setdefault("is_dlc", True)
+    if data.get("is_dlc") is False:
+        data["parent_game_id"] = None
 
 
 @router.post("/games/{game_id}/resync")

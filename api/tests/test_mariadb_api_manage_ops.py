@@ -28,6 +28,37 @@ class OpsTestCase(ApiTestCase):
         return self.api(method, f"/manage{path}", as_user="root", **kwargs)
 
 
+class GameDlcAdminTests(OpsTestCase):
+    """The admin edits the DLC mark and the base game of a game through real requests: the key to the base game,
+    ON DELETE SET NULL, and the list that joins the base game's name."""
+
+    def setUp(self):
+        super().setUp()
+        self.game("d4", "Diablo IV")
+
+    def test_the_mark_and_the_base_game_are_saved_listed_and_unlinked_when_the_base_is_deleted(self):
+        saved = self.admin("PATCH", "/games/celeste", json={"parent_game_id": "d4"})
+        self.assertEqual((saved.status_code, saved.json()["is_dlc"], saved.json()["parent_name"]), (200, True, "Diablo IV"))
+        listed = {g["id"]: g for g in self.admin("GET", "/games").json()["items"]}
+        self.assertEqual((listed["celeste"]["parent_game_id"], listed["celeste"]["parent_name"]), ("d4", "Diablo IV"))
+        self.assertEqual((listed["d4"]["is_dlc"], listed["d4"]["parent_name"]), (False, None))
+
+        self.assertEqual(self.admin("DELETE", "/games/d4", params={"force": True}).status_code, 200)
+        listed = {g["id"]: g for g in self.admin("GET", "/games").json()["items"]}
+        self.assertEqual((listed["celeste"]["is_dlc"], listed["celeste"]["parent_game_id"]), (True, None))
+
+    def test_a_base_game_that_does_not_exist_and_a_loop_are_refused(self):
+        self.assertEqual(self.admin("PATCH", "/games/celeste", json={"parent_game_id": "nope"}).status_code, 400)
+        self.admin("PATCH", "/games/celeste", json={"parent_game_id": "d4"})
+        self.assertEqual(self.admin("PATCH", "/games/d4", json={"parent_game_id": "celeste"}).status_code, 400)
+
+    def test_a_game_made_by_hand_is_created_as_a_dlc_of_a_catalogue_game(self):
+        made = self.api("POST", "/games/", as_user="ana", json={"name": "Mi expansión", "is_dlc": True, "parent_game_id": "d4"})
+        self.assertEqual((made.status_code, made.json()["is_dlc"], made.json()["parent_game_id"]), (201, True, "d4"))
+        refused = self.api("POST", "/games/", as_user="ana", json={"name": "Otra", "parent_game_id": "nope"})
+        self.assertEqual(refused.status_code, 400)
+
+
 class EveryRouteIsAdminOnlyTests(OpsTestCase):
     """Runs every route of the panel without a token and as a player: the router-level dependency must hold."""
 

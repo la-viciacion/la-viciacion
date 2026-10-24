@@ -33,6 +33,7 @@ USER_NOT_ADMIN ="You are not allowed to do this action"
 GAME_ALREADY_IN_CATALOGUE = "Ese juego ya está en el catálogo"
 GAME_NAME_EMPTY = "El nombre del juego no puede estar vacío"
 GAME_PARENT_NOT_FOUND = "El juego base no existe en el catálogo"
+GAME_PARENT_LOOP = "Un juego no puede ser, directa o indirectamente, el juego base de sí mismo"
 GAME_ALREADY_COMPLETED = "Game is already completed"
 
 FILE_TYPE_NOT_ALLOWED = "Archivo no admitido. Solo se aceptan imágenes JPG o PNG"

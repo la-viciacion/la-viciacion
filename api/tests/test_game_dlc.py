@@ -9,7 +9,8 @@ from fastapi import HTTPException
 from src.crud import game_catalog, games
 from src.database import models, schemas
 from src.routers import games as games_router
-from src.utils import my_utils, rawg_sync
+from src.routers.manage import games as manage_games
+from src.utils import messages, my_utils, rawg_sync
 from tests.sqlite_db import make_session
 
 DLC = schemas.NewGame(name="Diablo IV: Vessel Of Hatred", rawg_id=1011642, is_dlc=True, parent_rawg_id=388309)
@@ -176,6 +177,59 @@ class SyncFillsTheMarkTests(unittest.TestCase):
         self.assertEqual(game.parent_game_id, "other")
         rawg_sync._apply(self.db, game, det, overwrite=True)
         self.assertEqual(game.parent_game_id, "d4")
+
+
+class AdminEditsTheMarkTests(unittest.TestCase):
+    def setUp(self):
+        self.db = make_session()
+        self.db.add_all([
+            models.Game(id="d4", name="Diablo IV"),
+            models.Game(id="voh", name="Vessel Of Hatred"),
+            models.Game(id="plain", name="Celeste"),
+        ])
+        self.db.commit()
+
+    def patch(self, game_id, **fields):
+        return manage_games.patch_game(game_id, manage_games.GamePatch(**fields), self.db)
+
+    def refused(self, game_id, **fields):
+        with self.assertRaises(HTTPException) as refused:
+            self.patch(game_id, **fields)
+        self.db.rollback()
+        return refused.exception
+
+    def test_a_game_is_marked_as_a_dlc_without_a_base_game(self):
+        out = self.patch("voh", is_dlc=True)
+        self.assertEqual((out["is_dlc"], out["parent_game_id"], out["parent_name"]), (True, None, None))
+
+    def test_naming_a_base_game_marks_the_game_and_the_list_shows_its_name(self):
+        out = self.patch("voh", parent_game_id="d4")
+        self.assertEqual((out["is_dlc"], out["parent_game_id"], out["parent_name"]), (True, "d4", "Diablo IV"))
+        listed = {g["id"]: g for g in manage_games.list_games(search=None, rawg=None, sort="name", order="asc", limit=50, offset=0, db=self.db)["items"]}
+        self.assertEqual((listed["voh"]["is_dlc"], listed["voh"]["parent_name"]), (True, "Diablo IV"))
+        self.assertEqual((listed["d4"]["is_dlc"], listed["d4"]["parent_name"]), (False, None))
+
+    def test_the_base_game_can_be_taken_off_and_the_mark_stays(self):
+        self.patch("voh", parent_game_id="d4")
+        out = self.patch("voh", is_dlc=True, parent_game_id=None)
+        self.assertEqual((out["is_dlc"], out["parent_game_id"]), (True, None))
+
+    def test_a_game_that_is_not_a_dlc_has_no_base_game(self):
+        self.patch("voh", parent_game_id="d4")
+        out = self.patch("voh", is_dlc=False)
+        self.assertEqual((out["is_dlc"], out["parent_game_id"]), (False, None))
+
+    def test_editing_something_else_leaves_the_mark_alone(self):
+        self.patch("voh", parent_game_id="d4")
+        out = self.patch("voh", dev="Blizzard")
+        self.assertEqual((out["is_dlc"], out["parent_game_id"], out["dev"]), (True, "d4", "Blizzard"))
+
+    def test_a_base_game_that_does_not_exist_a_game_itself_and_a_loop_are_refused(self):
+        self.assertEqual(self.refused("voh", parent_game_id="nope").detail, messages.GAME_PARENT_NOT_FOUND)
+        self.assertEqual(self.refused("voh", parent_game_id="voh").detail, messages.GAME_PARENT_LOOP)
+        self.patch("voh", parent_game_id="d4")
+        self.assertEqual(self.refused("d4", parent_game_id="voh").detail, messages.GAME_PARENT_LOOP)
+        self.assertEqual(self.db.get(models.Game, "d4").parent_game_id, None)
 
 
 if __name__ == "__main__":

@@ -1,6 +1,7 @@
 // Generic create/edit form driven by the entity field definitions.
 //
-// Field: { key, label, type, required?, omitEmpty?, step?, nameKey? (game: the row's key holding the game's name) }
+// Field: { key, label, type, required?, omitEmpty?, step?, nameKey? (game: the row's key holding the game's name),
+//   clearable? (game: a button to leave it empty), checks? (game: the key of a checkbox that choosing a game checks) }
 // Types: text | textarea (rows?) | number | date | datetime | checkbox | select | month | platform | user | game | password | image
 // select: { options: [[number, label], ...] }
 // month: the running month and the next ones, as a "YYYY-MM" text (the challenges are launched for a month)
@@ -53,7 +54,7 @@ function fieldHtml(f, value, row) {
       </select></label>`;
     case 'game':
       return html`<div class="adm-field-game"><span>${f.label}</span>
-        <div><span class="adm-picked" id="${id}_name">${(f.nameKey && row?.[f.nameKey]) || (v ? v : 'Ninguno')}</span> <button type="button" class="adm-btn sm" data-pickfor="${f.key}">${v ? 'Cambiar…' : 'Elegir…'}</button></div>
+        <div><span class="adm-picked" id="${id}_name">${(f.nameKey && row?.[f.nameKey]) || (v ? v : 'Ninguno')}</span> <button type="button" class="adm-btn sm" data-pickfor="${f.key}">${v ? 'Cambiar…' : 'Elegir…'}</button>${f.clearable ? html` <button type="button" class="adm-btn sm" data-clearfor="${f.key}">Quitar</button>` : ''}</div>
         <input type="hidden" id="${id}" value="${v}" /></div>`;
     case 'image':
       return html`<label>${f.label}
@@ -98,7 +99,7 @@ function readField(f) {
 }
 
 // Buttons inside the form: show/hide password, generate password, pick a game.
-async function onFormClick(e, modal) {
+async function onFormClick(e, modal, fields) {
   const show = e.target.closest('[data-pw-show]');
   if (show) {
     const input = modal.el.querySelector(`#${show.dataset.pwShow}`);
@@ -121,7 +122,15 @@ async function onFormClick(e, modal) {
     if (game) {
       modal.el.querySelector(`#f_${pick.dataset.pickfor}`).value = game.id;
       modal.el.querySelector(`#f_${pick.dataset.pickfor}_name`).textContent = game.name;
+      const checks = fields.find((f) => f.key === pick.dataset.pickfor)?.checks;
+      if (checks) modal.el.querySelector(`#f_${checks}`).checked = true;
     }
+    return;
+  }
+  const clear = e.target.closest('[data-clearfor]');
+  if (clear) {
+    modal.el.querySelector(`#f_${clear.dataset.clearfor}`).value = '';
+    modal.el.querySelector(`#f_${clear.dataset.clearfor}_name`).textContent = 'Ninguno';
   }
 }
 
@@ -140,7 +149,7 @@ export function openForm(entity, row, admin, variant = null) {
       </div>
     </form>`, { wide: true });
 
-  modal.el.addEventListener('click', (e) => onFormClick(e, modal));
+  modal.el.addEventListener('click', (e) => onFormClick(e, modal, fields));
   modal.el.querySelector('form').addEventListener('submit', (e) => {
     e.preventDefault();
     submit(entity, row, fields, modal, admin, variant?.body);

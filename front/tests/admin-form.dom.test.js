@@ -64,3 +64,31 @@ test('what a way to create always sends goes with the form', async () => {
   await new Promise((resolve) => setImmediate(resolve));
   assert.deepEqual(sent.map((s) => [s.url, s.body]), [['/api/v1/manage/challenges', { tag: 'Horror', kind: 'themed' }]]);
 });
+
+test('the games form edits every field of a game, the DLC mark and its base game included', async () => {
+  const { ENTITIES } = await import('../js/pages/admin/entities.js');
+  const keys = ENTITIES.games.fields.map((f) => f.key);
+  assert.deepEqual(keys, ['name', 'dev', 'release_date', 'genres', 'tags', 'avg_time', 'image_url', 'steam_id', 'rawg_id', 'slug', 'is_dlc', 'parent_game_id']);
+
+  const row = { id: 'voh', name: 'Vessel <b>', is_dlc: true, parent_game_id: 'd4', parent_name: 'Diablo <IV>' };
+  openForm(ENTITIES.games, row, null);
+  assert.equal(document.getElementById('f_is_dlc').checked, true);
+  assert.equal(document.getElementById('f_parent_game_id').value, 'd4');
+  assert.equal(document.getElementById('f_parent_game_id_name').textContent, 'Diablo <IV>');
+  assert.equal(document.querySelectorAll('#f_parent_game_id_name b, #f_parent_game_id_name i').length, 0);
+});
+
+test('the base game can be taken off, and saving sends it as empty', async () => {
+  const { ENTITIES } = await import('../js/pages/admin/entities.js');
+  const sent = [];
+  globalThis.fetch = async (url, options) => { sent.push({ url: String(url), method: options.method, body: JSON.parse(options.body) }); return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }); };
+  openForm(ENTITIES.games, { id: 'voh', name: 'Vessel', is_dlc: true, parent_game_id: 'd4', parent_name: 'Diablo IV' }, { reload: async () => {} });
+  document.querySelector('[data-clearfor="parent_game_id"]').click();
+  assert.equal(document.getElementById('f_parent_game_id_name').textContent, 'Ninguno');
+  document.querySelector('.modal-content form').requestSubmit();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(sent[0].method, 'PATCH');
+  assert.equal(sent[0].url, '/api/v1/manage/games/voh');
+  assert.equal(sent[0].body.parent_game_id, null);
+  assert.equal(sent[0].body.is_dlc, true); // a DLC without a base game is fine
+});
