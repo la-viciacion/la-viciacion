@@ -44,7 +44,6 @@ class Spec:
     secret: bool = False
     hint: bool = True  # a secret shows its last characters in the panel unless this is False
     env: str | None = None  # variable that seeds the value the first time (the one it is read from, if env_only)
-    legacy_env: str | None = None  # an older variable an env_only setting falls back to
     check: Callable[[Any], str | None] | None = None  # error message or None
     blank_ok: bool = False  # an empty text is a valid value (it means "the default")
     resettable: bool = False  # `None` deletes the stored value, so the default applies again
@@ -148,12 +147,12 @@ REGISTRY: dict[str, Spec] = {
     "push.vapid_origin": Spec("str", None),
     # Days the app's notification inbox keeps a notice before the scheduler purges it (utils/inbox.py)
     "inbox.retention_days": Spec("int", 14, check=_retention),
-    # AI text for the notices (utils/ai.py). The key is AI_API_KEY (or the old OPENAI_API_KEY) and is never stored;
+    # AI text for the notices (utils/ai.py). The key is AI_API_KEY and is never stored;
     # the provider and the model are read from AI_PROVIDER and AI_MODEL every time; there is no default for either.
     "ai.enabled": Spec("bool", True),
     "ai.provider": Spec("str", None, env="AI_PROVIDER", env_only=True),  # "google" or "openai" (utils/ai.py PROVIDERS)
-    "ai.api_key": Spec("str", None, secret=True, env_only=True, env="AI_API_KEY", legacy_env="OPENAI_API_KEY"),
-    "ai.model": Spec("str", None, env="AI_MODEL", legacy_env="OPENAI_MODEL", env_only=True),  # no default in the code: without it the AI does not write
+    "ai.api_key": Spec("str", None, secret=True, env_only=True, env="AI_API_KEY"),
+    "ai.model": Spec("str", None, env="AI_MODEL", env_only=True),  # no default in the code: without it the AI does not write
     # The chat assistant (chat/): its own switch and instructions. It talks to the same provider with the same key as the
     # notices (ai.provider, ai.api_key); only the model may be its own (CHAT_AI_MODEL, optional: without it, ai.model).
     "chat.enabled": Spec("bool", True),
@@ -241,8 +240,7 @@ _lock = threading.Lock()
 
 
 def _from_env(spec: Spec) -> str | None:
-    value = os.getenv(spec.env) or (os.getenv(spec.legacy_env) if spec.legacy_env else None)
-    return (value or "").strip() or None
+    return (os.getenv(spec.env) or "").strip() or None
 
 
 def get(key: str) -> Any:
