@@ -616,8 +616,10 @@ def _representative_entries(user_id: int):
 
 def _platforms_by_group(db: Session, user_id: int, game_id: str | None = None) -> dict:
     """The platforms ({id, name}) of every entry of a (game, season), most recent entry first."""
+    # The season comes from started_date, not from the generated column: when a query is answered from the
+    # unique index that holds `season` and is also sorted, MariaDB 12 gives that virtual column as 0.
     stmt = (
-        select(models.UserGame.game_id, models.UserGame.season, models.PlatformTag.id, models.PlatformTag.name)
+        select(models.UserGame.game_id, models.UserGame.started_date, models.PlatformTag.id, models.PlatformTag.name)
         .join(models.PlatformTag, models.PlatformTag.id == models.UserGame.platform)
         .where(models.UserGame.user_id == user_id)
         .order_by(models.UserGame.id.desc())
@@ -625,8 +627,8 @@ def _platforms_by_group(db: Session, user_id: int, game_id: str | None = None) -
     if game_id is not None:
         stmt = stmt.where(models.UserGame.game_id == game_id)
     out: dict = {}
-    for game, season, platform_id, name in db.execute(stmt).all():
-        out.setdefault((game, season), []).append({"id": platform_id, "name": name})
+    for game, started, platform_id, name in db.execute(stmt).all():
+        out.setdefault((game, seasons.of(started)), []).append({"id": platform_id, "name": name})
     return out
 
 
