@@ -1,4 +1,5 @@
 name: Release images
+run-name: Release ${{ github.ref_name }}
 
 # Creating a tag `vX.Y.Z` runs every check, whatever the PRs that led to it touched: it is the one full run
 # (a PR only runs what its files can affect, and main is not tested again after a merge). Once they pass, a
