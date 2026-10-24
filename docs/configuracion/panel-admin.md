@@ -12,7 +12,7 @@ Un resumen de la instalación: cuántos usuarios, juegos, sesiones, timers activ
 
 ### Juegos
 
-La lista de todos los juegos con búsqueda, orden y filtros. **Editar** cambia cualquier dato (nombre, desarrollador, fecha, géneros, etiquetas, portada, tiempo medio…). Aquí están también las sincronizaciones con RAWG y HowLongToBeat: ver [Servicios externos](servicios.md).
+La lista de todos los juegos con búsqueda, orden y filtros. **Editar** cambia cualquier dato (nombre, desarrollador, fecha, géneros, etiquetas, portada, tiempo medio, IDs, si es un DLC y cuál es su juego base…). Un DLC puede quedar sin juego base; quitar la marca de DLC le quita también el juego base. Aquí están también las sincronizaciones con RAWG y HowLongToBeat: ver [Servicios externos](servicios.md).
 
 ### Plataformas
 

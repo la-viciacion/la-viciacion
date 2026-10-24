@@ -89,7 +89,7 @@ export const ENTITIES = {
         sort: 'name',
         render: (r) => html`<div class="adm-game">
           ${r.image_url ? html`<img src="${r.image_url}" alt="" loading="lazy" />` : html`<span>🎮</span>`}
-          <div><a class="adm-link" href="${gameHref(r.id)}"><strong>${r.name}</strong></a><div class="adm-sub">${r.dev || ''}</div></div>
+          <div><a class="adm-link" href="${gameHref(r.id)}"><strong>${r.name}</strong></a>${r.is_dlc ? badge('DLC', 'purple') : ''}<div class="adm-sub">${r.dev || ''}</div></div>
         </div>`,
       },
       { label: 'Géneros', render: (r) => r.genres || '—' },
@@ -108,6 +108,8 @@ export const ENTITIES = {
       { key: 'steam_id', label: 'Steam ID', type: 'text' },
       { key: 'rawg_id', label: 'RAWG ID', type: 'number' },
       { key: 'slug', label: 'Slug', type: 'text' },
+      { key: 'is_dlc', label: 'Es un DLC o una expansión', type: 'checkbox' },
+      { key: 'parent_game_id', label: 'Juego base (opcional)', type: 'game', nameKey: 'parent_name', clearable: true, checks: 'is_dlc' },
     ],
     name: (r) => r.name,
     actions: [
