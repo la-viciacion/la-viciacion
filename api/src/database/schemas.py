@@ -99,18 +99,6 @@ class NewGame(BaseModel):
     parent_rawg_id: Optional[int | None] = None
 
 
-class UpdateGame(BaseModel):
-    name: str
-    dev: Optional[str | None] = None
-    release_date: Optional[datetime.date | None] = None
-    steam_id: Optional[str | None] = None
-    image_url: Optional[str | None] = None
-    genres: Optional[str | None] = None
-    avg_time: Optional[int | None] = None
-    slug: Optional[str | None] = None
-    rawg_id: Optional[int | None] = None
-
-
 class RawgGameCandidate(BaseModel):
     rawg_id: int
     name: str

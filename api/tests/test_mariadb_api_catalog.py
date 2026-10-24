@@ -109,14 +109,6 @@ class GamesTests(CatalogTestCase):
         missing = self.api("GET", "/games/nope", as_user="ana")
         self.assertEqual((missing.status_code, missing.json()["detail"]), (404, "Game not exists"))
 
-    def test_only_an_admin_edits_a_game_and_empty_fields_keep_their_value(self):
-        body = {"name": "Celeste (Deluxe)", "dev": "Matt Makes Games"}
-        self.assertEqual(self.api("PUT", "/games/celeste", as_user="ana", json=body).status_code, 403)
-        done = self.api("PUT", "/games/celeste", as_user="root", json=body).json()
-        self.assertEqual((done["name"], done["dev"], done["genres"]), ("Celeste (Deluxe)", "Matt Makes Games", "Platformer"))
-        self.assertEqual(self.api("PUT", "/games/nope", as_user="root", json=body).status_code, 404)
-        self.assertEqual(self.api("PUT", "/games/celeste", as_user="root", json={"dev": "x"}).status_code, 422)  # the name is required
-
 
 class SearchRawgTests(CatalogTestCase):
     def search(self, query="cel"):

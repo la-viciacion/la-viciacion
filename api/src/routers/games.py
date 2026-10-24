@@ -122,16 +122,3 @@ def _refuse_duplicates(db: Session, game: schemas.NewGame) -> None:
         if game_db.name.strip().lower() == game.name.strip().lower():
             raise HTTPException(status_code=400, detail=messages.GAME_ALREADY_IN_CATALOGUE)
 
-
-@router.put("/{game_id}", response_model=schemas.Game, status_code=200)
-def update_game(
-    game_id: str,
-    game: schemas.UpdateGame,
-    admin: models.User = Depends(auth.require_admin),
-    db: Session = Depends(get_db),
-):
-    """Change a game of the catalogue (admins only)."""
-    game_db = games.get_game_by_id(db, game_id)
-    if game_db is None:
-        raise HTTPException(status_code=404, detail="Game not exists")
-    return games.update_game(db=db, game_id=game_id, game=game)
