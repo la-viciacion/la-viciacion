@@ -1,4 +1,5 @@
 name: Deploy
+run-name: Deploy ${{ inputs.target }} ${{ inputs.target == 'prod' && inputs.version || 'main' }}
 
 # Deploys on demand (Actions tab -> Deploy -> Run workflow), and prod also by itself: release.yml calls this
 # workflow once the checks of a new vX.Y.Z tag have passed. It connects over SSH and the server holds the
@@ -45,6 +46,9 @@ jobs:
   deploy-dev:
     # The server pulls main whatever branch the run was started from; refuse to start from anything else.
     if: inputs.target == 'dev' && github.ref == 'refs/heads/main'
+    environment:
+      name: development
+      url: ${{ vars.DEPLOY_URL_DEV }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -67,6 +71,9 @@ jobs:
   deploy-prod:
     # From a release run, github.ref is the tag (the one place a run may start from anything but main).
     if: inputs.target == 'prod' && (github.ref == 'refs/heads/main' || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')))
+    environment:
+      name: production
+      url: ${{ vars.DEPLOY_URL_PROD }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
