@@ -98,7 +98,7 @@ def catalog(
             "name": game.name,
             "image_url": game.image_url,
             "genres": genres,
-            "is_dlc": bool(game.parent_rawg_id),
+            "is_dlc": game.is_dlc,
             "release_date": game.release_date,
             "players": len(owners.get(game.id, ())),
             "played_seconds": seconds,

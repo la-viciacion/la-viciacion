@@ -204,6 +204,65 @@ test('a game RAWG does not have is created by hand with only the name required',
   assert.equal(document.querySelector('.modal-overlay'), null);
 });
 
+test('a game made by hand can be marked as a DLC, with or without a base game from the catalogue', async () => {
+  openGamePicker((id, name) => (picked = [id, name]));
+  document.querySelector('#modalAddGameBtn').click();
+  document.querySelector('#manualGameBtn').click();
+  const form = document.querySelector('.sess-form');
+  const submit = async () => {
+    form.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+    await settle();
+  };
+  assert.equal(document.querySelector('.dlc-base').hidden, true);
+
+  // a DLC without saying of which game
+  form.elements.game.value = 'Expansión suelta';
+  form.elements.is_dlc.checked = true;
+  form.elements.is_dlc.dispatchEvent(new window.Event('change', { bubbles: true }));
+  assert.equal(document.querySelector('.dlc-base').hidden, false);
+  calls = installApi({ 'POST /games/': { id: 'x', name: 'Expansión suelta' } });
+  await submit();
+  assert.deepEqual(calls.at(-1).body, { name: 'Expansión suelta', release_date: null, dev: null, is_dlc: true, parent_game_id: null });
+
+  // with a base game picked from the catalogue (escaped), which can be taken off again
+  openGamePicker((id, name) => (picked = [id, name]));
+  document.querySelector('#modalAddGameBtn').click();
+  document.querySelector('#manualGameBtn').click();
+  const second = document.querySelector('.sess-form');
+  second.elements.game.value = 'Vessel';
+  second.elements.is_dlc.checked = true;
+  second.elements.is_dlc.dispatchEvent(new window.Event('change', { bubbles: true }));
+  installApi({ 'GET /games/?name=dia': [{ id: 'd4', name: 'Diablo <IV>', image_url: null }] });
+  await search('#dlcBaseSearch', 'dia', 250);
+  assert.deepEqual(text('.dlc-base-results .modal-result-name'), ['Diablo <IV>']);
+  document.querySelector('.dlc-base-results .modal-result-row').click();
+  assert.equal(text('.dlc-base-chosen .pf-tag')[0], 'Juego base: Diablo <IV>');
+  assert.equal(document.querySelectorAll('.dlc-base-chosen i').length, 0);
+  assert.equal(document.querySelectorAll('.dlc-base-results .modal-result-row').length, 0);
+
+  document.querySelector('[data-clear]').click();
+  assert.equal(document.querySelector('.dlc-base-chosen .pf-tag'), null);
+  await search('#dlcBaseSearch', 'dia', 250);
+  document.querySelector('.dlc-base-results .modal-result-row').click();
+  calls = installApi({ 'POST /games/': { id: 'v', name: 'Vessel' } });
+  second.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+  await settle();
+  assert.deepEqual(calls.at(-1).body, { name: 'Vessel', release_date: null, dev: null, is_dlc: true, parent_game_id: 'd4' });
+  assert.deepEqual(picked, ['v', 'Vessel']);
+});
+
+test('a game made by hand without the DLC box checked is sent as before', async () => {
+  openGamePicker(() => {});
+  document.querySelector('#modalAddGameBtn').click();
+  document.querySelector('#manualGameBtn').click();
+  const form = document.querySelector('.sess-form');
+  form.elements.game.value = 'Celeste';
+  calls = installApi({ 'POST /games/': { id: 'c', name: 'Celeste' } });
+  form.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+  await settle();
+  assert.deepEqual(calls.at(-1).body, { name: 'Celeste', release_date: null, dev: null });
+});
+
 test('a failure while creating a game by hand stays in the form, and "Volver" goes back to the search', async () => {
   openGamePicker(() => {});
   document.querySelector('#modalAddGameBtn').click();

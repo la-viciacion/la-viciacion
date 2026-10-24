@@ -156,14 +156,15 @@ def _details(client: _Client, rawg_id: int, need_steam: bool) -> dict:
         "genres": ",".join(g["name"] for g in d.get("genres") or [] if g.get("name")),
         "tags": ",".join(t["name"] for t in d.get("tags") or [] if t.get("name") and t.get("language") == "eng"),
         "steam_id": steam,
+        "is_dlc": bool(d.get("parents_count")),
         "parent_rawg_id": parent_rawg_id,
     }
 
 
-FIELDS = ("slug", "dev", "release_date", "image_url", "genres", "tags", "steam_id", "parent_rawg_id")
+FIELDS = ("slug", "dev", "release_date", "image_url", "genres", "tags", "steam_id")
 
 
-def _apply(game: models.Game, det: dict, overwrite: bool) -> list[str]:
+def _apply(db, game: models.Game, det: dict, overwrite: bool) -> list[str]:
     changed = []
     if game.rawg_id != det["rawg_id"]:
         game.rawg_id = det["rawg_id"]
@@ -176,6 +177,16 @@ def _apply(game: models.Game, det: dict, overwrite: bool) -> list[str]:
             if getattr(game, f) != new:
                 setattr(game, f, new)
                 changed.append(f)
+    # RAWG only ever adds the DLC mark: a game marked by hand is not unmarked because RAWG does not know it as one
+    if det.get("is_dlc") and not game.is_dlc:
+        game.is_dlc = True
+        changed.append("is_dlc")
+    if det.get("parent_rawg_id") and (overwrite or game.parent_game_id is None):
+        # linked only when the base game is already in the catalogue: the sync never adds games
+        base = db.query(models.Game.id).filter(models.Game.rawg_id == det["parent_rawg_id"], models.Game.id != game.id).first()
+        if base and game.parent_game_id != base.id:
+            game.parent_game_id = base.id
+            changed.append("parent_game_id")
     if game.tags is None and det.get("tags") == "":
         game.tags = ""                            # RAWG has none for this game: asked once, not on every run
         changed.append("tags")
@@ -358,7 +369,7 @@ def _run(max_calls: int, overwrite: bool, max_games: int | None):
                         consecutive_errors = 0
                         continue
                 det = _details(client, rawg_id, _needs_steam(game, overwrite))
-                changed = _apply(game, det, overwrite)
+                changed = _apply(db, game, det, overwrite)
                 db.commit()
                 _bump("updated" if changed else "unchanged")
                 consecutive_errors = 0
@@ -429,7 +440,7 @@ def apply_one(db, game_id: str, rawg_id: int, overwrite: bool = False) -> dict:
         raise ValueError(f"Ese id de RAWG ya lo tiene «{taken.name}»")
     client = _Client(max_calls=3)
     det = _details(client, rawg_id, _needs_steam(game, overwrite))
-    changed = _apply(game, det, overwrite)
+    changed = _apply(db, game, det, overwrite)
     db.commit()
     return {"changed": changed, "calls": client.calls}
 
@@ -456,6 +467,6 @@ def resync_one(db, game_id: str) -> dict:
         taken = db.query(models.Game).filter(models.Game.rawg_id == rawg_id, models.Game.id != game.id).first()
         if taken:
             return {"status": "duplicate", "other_name": taken.name, "calls": client.calls}
-    changed = _apply(game, _details(client, rawg_id, need_steam=True), overwrite=True)
+    changed = _apply(db, game, _details(client, rawg_id, need_steam=True), overwrite=True)
     db.commit()
     return {"status": "updated" if changed else "unchanged", "changed": changed, "calls": client.calls}

@@ -88,13 +88,13 @@ class GameDetailsTests(unittest.IsolatedAsyncioTestCase):
     async def test_a_dlc_carries_the_id_of_its_base_game(self):
         sources = Sources(parents=[{"id": 388309, "name": "Diablo IV"}])
         found = await self.details(sources)
-        self.assertEqual(found["parent_rawg_id"], 388309)
+        self.assertEqual((found["is_dlc"], found["parent_rawg_id"]), (True, 388309))
         self.assertIn("parent-games", sources.asked)
 
     async def test_a_game_of_its_own_does_not_ask_for_a_base_game(self):
         sources = Sources()
         found = await self.details(sources)
-        self.assertIsNone(found["parent_rawg_id"])
+        self.assertEqual((found["is_dlc"], found["parent_rawg_id"]), (False, None))
         self.assertNotIn("parent-games", sources.asked)
 
 

@@ -30,7 +30,7 @@ Mientras tu timer corre, el resto del grupo te ve como «jugando ahora» (puedes
 
 Cualquiera puede añadir juegos al catálogo compartido. En el buscador pulsa **¿No está? Añadir nuevo juego**: se busca en RAWG, y si el juego no aparece ahí, **¿No aparece? Crearlo a mano** crea uno solo con el nombre (la fecha, el desarrollador y la portada se pueden completar después desde el panel de administración).
 
-Si el juego que eliges es un **DLC o una expansión**, te lo dice antes de añadirlo (sin impedírtelo) y, si su juego base no está en el catálogo, se añade también. En su página y en las tarjetas aparece la marca **DLC**, con un enlace al juego base.
+Si el juego que eliges es un **DLC o una expansión**, te lo dice antes de añadirlo (sin impedírtelo) y, si su juego base no está en el catálogo, se añade también. En su página y en las tarjetas aparece la marca **DLC**, con un enlace al juego base. Si lo creas a mano, marca **Es un DLC o una expansión** y, si quieres, busca su juego base en el catálogo (es opcional).
 
 ## A mano, después de jugar
 

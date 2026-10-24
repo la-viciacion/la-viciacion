@@ -123,10 +123,10 @@ class PureHelpersTests(ApiTestCase):
         game = models.Game(id="g", name="G", dev="Old Dev", slug=None, genres="", steam_id="-", image_url="https://old", rawg_id=None)
         det = {"rawg_id": 7, "slug": "g", "dev": "New Dev", "release_date": datetime.date(2020, 1, 1), "image_url": "https://new",
                "genres": "RPG", "steam_id": ""}
-        changed = rawg_sync._apply(game, det, overwrite=False)
+        changed = rawg_sync._apply(None, game, det, overwrite=False)
         self.assertEqual(sorted(changed), ["genres", "rawg_id", "release_date", "slug"])
         self.assertEqual((game.dev, game.image_url, game.steam_id), ("Old Dev", "https://old", "-"))  # kept: not blank / nothing to put
-        overwritten = rawg_sync._apply(game, det, overwrite=True)
+        overwritten = rawg_sync._apply(None, game, det, overwrite=True)
         self.assertEqual(sorted(overwritten), ["dev", "image_url"])
         self.assertEqual(game.steam_id, "-")  # an empty answer never blanks a value
 
@@ -370,10 +370,10 @@ class SyncRunTests(SyncTestCase):
             self.rawg.details[rawg_id] = rawg_game(rawg_id, "X")
         real = rawg_sync._apply
 
-        def flaky(game, det, overwrite):
+        def flaky(db, game, det, overwrite):
             if game.id == "a":
                 raise ValueError(f"cannot apply, key={KEY}")
-            return real(game, det, overwrite)
+            return real(db, game, det, overwrite)
 
         with mock.patch.object(rawg_sync, "_apply", new=flaky):
             status = self.sync()
