@@ -4,8 +4,6 @@
 export const MIN_MINUTES = 10;
 export const MAX_MINUTES = 120;
 
-export const MINUTES_HINT = `Un número entero de minutos entre ${MIN_MINUTES} y ${MAX_MINUTES}.`;
-
 /**
  * Value of the minutes field: `null` when empty (use the default), the number when it
  * is a whole number in range, `undefined` when it is not valid (decimals, below the minimum...).
