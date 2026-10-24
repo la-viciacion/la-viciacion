@@ -60,5 +60,3 @@ RANKING_MENU = [
         InlineKeyboardButton(EXIT, callback_data="cancel"),
     ],
 ]
-
-CANCEL = [EXIT]
