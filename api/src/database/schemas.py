@@ -75,6 +75,7 @@ class Game(BaseModel):
     avg_time: int | None = 0
     slug: str | None = None
     rawg_id: int | None = None
+    parent_rawg_id: int | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -90,6 +91,7 @@ class NewGame(BaseModel):
     avg_time: Optional[int | None] = None
     slug: Optional[str | None] = None
     rawg_id: Optional[int | None] = None
+    parent_rawg_id: Optional[int | None] = None
 
 
 class UpdateGame(BaseModel):
@@ -114,6 +116,14 @@ class RawgGameCandidate(BaseModel):
     platforms: list[str] = []
     rating: Optional[float | None] = None
     metacritic: Optional[int | None] = None
+    exists_in_db: bool = False
+    db_game_id: Optional[str | None] = None
+
+
+class RawgParent(BaseModel):
+    """The base game of a RAWG DLC / expansion, and whether it is already in the catalogue."""
+    rawg_id: int
+    name: str
     exists_in_db: bool = False
     db_game_id: Optional[str | None] = None
 

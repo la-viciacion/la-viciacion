@@ -8,6 +8,7 @@ import { confirmDialog } from './dialogs.js';
 const FIELDS = {
   rawg_id: 'ID de RAWG', slug: 'slug', dev: 'desarrolladora', release_date: 'lanzamiento',
   image_url: 'imagen', genres: 'géneros', tags: 'etiquetas', steam_id: 'Steam ID',
+  parent_rawg_id: 'juego base (DLC)',
 };
 
 const hours = (seconds) => `${Math.round(seconds / 360) / 10} h`;

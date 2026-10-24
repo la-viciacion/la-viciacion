@@ -85,6 +85,26 @@ test('an unknown game says so', async () => {
   assert.match(main().textContent, /Este juego no existe/);
 });
 
+test('a game that is not a DLC has no mark', () => {
+  assert.equal(document.querySelector('.gm-dlc'), null);
+});
+
+test('a DLC is marked and links to its base game, escaped; without the base game in the catalogue only the mark', async () => {
+  const dlc = (parent) => ({ ...OVERVIEW, game: { ...OVERVIEW.game, is_dlc: true, parent } });
+  installApi({ 'GET /games/celeste/overview': dlc({ id: 'base 1', name: 'Base <b>' }), 'GET /users/photo/': json({ detail: 'no' }, 404) });
+  await page.render({ main: main(), user: { id: 1, username: 'ana' } });
+  assert.deepEqual(text('.gm-dlc .pf-tag'), ['DLC']);
+  const link = document.querySelector('.gm-dlc a');
+  assert.equal(link.getAttribute('href'), '#/game/base%201');
+  assert.equal(link.textContent, 'Base <b>');
+  assert.equal(document.querySelectorAll('.gm-dlc b').length, 0);
+
+  installApi({ 'GET /games/celeste/overview': dlc(null), 'GET /users/photo/': json({ detail: 'no' }, 404) });
+  await page.render({ main: main(), user: { id: 1, username: 'ana' } });
+  assert.deepEqual(text('.gm-dlc .pf-tag'), ['DLC']);
+  assert.equal(document.querySelector('.gm-dlc a'), null);
+});
+
 test('it shows the genres and the tags, without repeating a genre among the tags and escaping them', () => {
   assert.deepEqual(text('.gm-genres:not(.gm-tags) .pf-tag'), ['Platformer']);
   assert.deepEqual(text('.gm-tags .pf-tag'), ['Singleplayer', 'Pixel <i>']);

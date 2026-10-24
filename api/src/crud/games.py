@@ -246,7 +246,35 @@ async def new_game(db: Session, game: schemas.NewGame) -> models.Game:
     # 1. Resolve official game data from RAWG first (network: awaited, off the DB)
     game_info = await utils.get_new_game_info(game)
     # 2. everything else is database work: keep it off the event loop
-    return await run_in_threadpool(_store_game, db, game, game_info)
+    stored = await run_in_threadpool(_store_game, db, game, game_info)
+    # 3. a DLC brings its base game along
+    if game_info.parent_rawg_id:
+        await _ensure_parent(db, game_info.parent_rawg_id)
+    return stored
+
+
+async def _ensure_parent(db: Session, parent_rawg_id: int) -> None:
+    """Add the base game of a DLC to the catalogue when it is not there. Best effort: the DLC is already stored, so
+    a RAWG failure here is logged and the base game is added the next time it is needed. Only one level: the base
+    game's own base (a DLC of a DLC) is not followed."""
+    try:
+        if await run_in_threadpool(lambda: db.query(models.Game.id).filter(models.Game.rawg_id == parent_rawg_id).first()):
+            return
+        info = await utils.get_new_game_info({"name": "", "rawg_id": parent_rawg_id})
+        if info.rawg_id != parent_rawg_id:  # RAWG did not answer: never create a game "as typed" with no name
+            logger.warning(f"Base game {parent_rawg_id} not added: RAWG gave no details")
+            return
+        await run_in_threadpool(_store_game, db, info, info)
+    except Exception as e:
+        db.rollback()
+        logger.warning(f"Base game {parent_rawg_id} not added: {e}")
+
+
+def parent_of(db: Session, game: models.Game) -> models.Game | None:
+    """The base game of a DLC when it is in the catalogue."""
+    if not game.parent_rawg_id:
+        return None
+    return db.query(models.Game).filter(models.Game.rawg_id == game.parent_rawg_id).first()
 
 
 def _store_game(db: Session, game: schemas.NewGame, game_info: schemas.NewGame) -> models.Game:
@@ -278,6 +306,7 @@ def _store_game(db: Session, game: schemas.NewGame, game_info: schemas.NewGame) 
         avg_time=game_info.avg_time,
         slug=game_info.slug,
         rawg_id=game_info.rawg_id,
+        parent_rawg_id=game_info.parent_rawg_id,
     )
     try:
         db.add(game_to_add)

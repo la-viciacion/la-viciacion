@@ -55,6 +55,7 @@ const card = (g) => html`
       <div class="gc-name">${g.name}</div>
       <div class="gc-tags">
         ${g.playing_now ? html`<span class="pf-tag live">Jugándose</span>` : ''}
+        ${g.is_dlc ? html`<span class="pf-tag dlc">DLC</span>` : ''}
         ${g.have ? html`<span class="pf-tag done">En tu biblioteca</span>` : ''}
         ${g.wished ? html`<span class="pf-tag wish">En tu lista</span>` : ''}
         ${g.genres.slice(0, 2).map((genre) => html`<span class="pf-tag muted">${genre}</span>`)}

@@ -139,6 +139,13 @@ def _details(client: _Client, rawg_id: int, need_steam: bool) -> dict:
                     break
         except ConnectionError:
             pass                              # steam id is best-effort
+    parent_rawg_id = None
+    if d.get("parents_count") and client.budget_left():  # only a DLC / expansion costs the extra request
+        try:
+            parents = client.get(f"/games/{rawg_id}/parent-games").get("results") or []
+            parent_rawg_id = next((p["id"] for p in parents if p.get("id")), None)
+        except ConnectionError:
+            pass                                  # the base game is best-effort too
     released = _parse_date(d.get("released"))
     return {
         "rawg_id": rawg_id,
@@ -149,10 +156,11 @@ def _details(client: _Client, rawg_id: int, need_steam: bool) -> dict:
         "genres": ",".join(g["name"] for g in d.get("genres") or [] if g.get("name")),
         "tags": ",".join(t["name"] for t in d.get("tags") or [] if t.get("name") and t.get("language") == "eng"),
         "steam_id": steam,
+        "parent_rawg_id": parent_rawg_id,
     }
 
 
-FIELDS = ("slug", "dev", "release_date", "image_url", "genres", "tags", "steam_id")
+FIELDS = ("slug", "dev", "release_date", "image_url", "genres", "tags", "steam_id", "parent_rawg_id")
 
 
 def _apply(game: models.Game, det: dict, overwrite: bool) -> list[str]:

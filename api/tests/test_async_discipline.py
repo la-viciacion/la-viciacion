@@ -9,7 +9,7 @@ ROUTERS = Path(__file__).resolve().parent.parent / "src" / "routers"
 # async on purpose: they await the network (RAWG, Telegram, push) and hand their database work
 # to the thread pool (run_in_threadpool) or do none
 ALLOWED_ASYNC_ROUTES = {
-    "games.py": {"search_rawg", "create_game"},
+    "games.py": {"search_rawg", "get_rawg_parent", "create_game"},
     "manage/notices.py": {"send_announcement", "send_telegram_announcement", "recap_send"},
     "manage/system.py": {"send_test_message"},
     "users.py": {"test_telegram_id"},

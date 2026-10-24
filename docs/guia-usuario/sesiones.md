@@ -30,6 +30,8 @@ Mientras tu timer corre, el resto del grupo te ve como «jugando ahora» (puedes
 
 Cualquiera puede añadir juegos al catálogo compartido. En el buscador pulsa **¿No está? Añadir nuevo juego**: se busca en RAWG, y si el juego no aparece ahí, **¿No aparece? Crearlo a mano** crea uno solo con el nombre (la fecha, el desarrollador y la portada se pueden completar después desde el panel de administración).
 
+Si el juego que eliges es un **DLC o una expansión**, te lo dice antes de añadirlo (sin impedírtelo) y, si su juego base no está en el catálogo, se añade también. En su página y en las tarjetas aparece la marca **DLC**, con un enlace al juego base.
+
 ## A mano, después de jugar
 
 Si no has usado el timer, pulsa **+ Sesión manual** en Inicio, elige el juego y rellena la plataforma y las horas de **inicio** y **fin**. Antes de guardar, la app te dice cuánto tiempo vas a añadir («Vas a añadir 1 h 30 min a …») y te pide confirmar.

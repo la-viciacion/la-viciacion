@@ -139,6 +139,34 @@ test('a new RAWG game is only created after a confirmation, and "Volver" cancels
   assert.equal(document.querySelector('.modal-overlay'), null);
 });
 
+test('a DLC says which game it belongs to, never blocks adding it, and a game of its own says nothing', async () => {
+  openGamePicker(() => {});
+  document.querySelector('#modalAddGameBtn').click();
+  const dlc = { name: 'Vessel of Hatred', rawg_id: 11, exists_in_db: false };
+  installApi({
+    'GET /games/search-rawg?query=vessel': [dlc, { name: 'Tunic', rawg_id: 9, exists_in_db: false }],
+    'GET /games/rawg-parent/11': { rawg_id: 5, name: 'Diablo <IV>', exists_in_db: false },
+    'GET /games/rawg-parent/9': null,
+  });
+  await search('#addGameSearch', 'vessel', 300);
+  document.querySelectorAll('.modal-result-row')[0].click();
+  await settle();
+  assert.equal(text('.modal-dlc-note')[0], 'Es un DLC o expansión de «Diablo <IV>», que se añadirá también al catálogo.');
+  assert.equal(document.querySelectorAll('.modal-dlc-note i').length, 0);
+  assert.ok(document.querySelector('[data-confirm]'));
+
+  document.querySelector('[data-back]').click();
+  document.querySelectorAll('.modal-result-row')[1].click();
+  await settle();
+  assert.equal(text('.modal-dlc-note')[0] ?? '', '');
+
+  installApi({ 'GET /games/rawg-parent/11': { rawg_id: 5, name: 'Diablo IV', exists_in_db: true, db_game_id: 'd4' } });
+  document.querySelector('[data-back]').click();
+  document.querySelectorAll('.modal-result-row')[0].click();
+  await settle();
+  assert.match(text('.modal-dlc-note')[0], /que ya está en el catálogo\.$/);
+});
+
 test('a failure while adding the game stays in the window', async () => {
   openGamePicker(() => {});
   document.querySelector('#modalAddGameBtn').click();
