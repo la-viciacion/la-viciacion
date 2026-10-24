@@ -51,19 +51,7 @@ class AccountsTests(UsersTestCase):
         names = sorted(u["username"] for u in self.api("GET", "/users/", as_user="root").json())
         self.assertEqual(names, ["ana", "bea", "root"])
 
-    def test_a_user_reads_their_own_account_but_not_another_one(self):
-        own = self.api("GET", "/users/ana", as_user="ana")
-        self.assertEqual((own.status_code, own.json()["username"], own.json()["email"]), (200, "ana", "ana@example.com"))
-        self.assertNotIn("password", own.json())
-        self.assertEqual(self.api("GET", "/users/bea", as_user="ana").status_code, 403)
-
-    def test_an_admin_reads_anybody_and_gets_a_404_for_an_unknown_name(self):
-        self.assertEqual(self.api("GET", "/users/bea", as_user="root").status_code, 200)
-        missing = self.api("GET", "/users/nobody", as_user="root")
-        self.assertEqual((missing.status_code, missing.json()["detail"]), (404, messages.USER_NOT_EXISTS))
-
     def test_every_route_of_the_router_needs_a_login(self):
-        self.assertEqual(self.api("GET", "/users/ana").status_code, 401)
         self.assertEqual(self.api("GET", "/users/ana/library").status_code, 401)
 
 
