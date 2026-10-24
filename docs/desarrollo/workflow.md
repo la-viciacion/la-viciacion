@@ -6,11 +6,28 @@ Simplified trunk-based development for a team of 2-3. `main` is the trunk: alway
 
 1. **Nobody pushes to `main`.** Every change goes through a pull request (branch protection enforces it, also for admins).
 2. **Short-lived branches** off `main`, named `<type>/<short-description>` (`feat/ranking-filters`, `fix/timer-stop`, `docs/desarrollo/workflow`). Aim to merge within a day or two; if a feature is bigger, split it into steps that are each safe to merge (behind a setting or not yet reachable from the UI).
-3. **Small PRs.** One concern per PR; do not mix refactors with behaviour changes.
+3. **Small PRs.** One concern per PR; do not mix refactors with behaviour changes. Several related or tiny changes may travel together as a [batch](#batching-changes), as long as each one is its own atomic commit.
 4. **Every commit lands on `main`.** PRs are **rebase-merged** (a trial, see [roadmap.md](roadmap.md)): each commit of the branch is replayed on `main` as it is, so each one must be atomic, green on its own, and follow Conventional Commits (`feat(front): ...`, types in `AGENTS.md`). The PR title follows the same format, and CI checks the title and the subject of every commit (merge commits are skipped). If it fails, fix the messages with `git rebase -i` and `git push --force-with-lease`; squash `fixup!` commits first. No "wip" or "fix typo" commits.
 5. **Merge when**: the `CI` check is green, the approvals the ruleset asks for are there (none while there is a single maintainer, one from the second person on), and the branch is up to date with `main`. Delete the branch after merging (GitHub does it automatically).
 6. **Review turnaround**: aim to review within a working day. With 2 people the reviewer is simply the other one; do not self-approve.
 7. **Releases** are tags `vX.Y.Z` cut from `main` (see [deployment.md](deployment.md#cicd)). There is no `develop` and no release branch; a hotfix is a normal PR to `main` followed by a new tag.
+
+## Batching changes
+
+CI runs when a pull request exists (`ci.yml` listens to `pull_request` only), never on a plain push, so a branch costs nothing until its PR is opened. Every PR that is ready and every push to an open PR starts a run of ~4-5 minutes. To pay for that once instead of many times:
+
+1. **Open the PR when the work is finished, not before.** Push the branch as often as you like meanwhile (backup, another machine, a second pair of eyes); do not keep pushing to an open PR step by step, each push restarts the checks (the previous run is cancelled).
+2. **Group related or small changes into one PR**, one atomic commit per change. The merge is a rebase, so `main` receives the commits one by one with their own Conventional Commit messages and each can still be reverted alone. The PR title summarises the batch (`feat: ...`, `chore: ...`) and CI checks it and every commit subject as usual.
+3. **Independent pieces of work on separate branches** (no PR yet) are brought together at the end on a fresh branch off `main`, in a linear way (a merge commit would be dropped by the rebase merge):
+
+   ```bash
+   git switch -c batch/<what> main
+   git cherry-pick main..feat/first
+   git cherry-pick main..feat/second
+   ```
+
+   Open one PR from `batch/<what>`, and delete the original branches (they never had a PR). CI runs the union of the checks that the files of all the commits need, once.
+4. **What a batch costs**: one failing change blocks the rest until it is fixed, and review and CI are not per change. Cherry-picking branches that touched the same files can conflict: if that is likely, do them one after another on the same branch. Keep a change out of the batch when it is risky, urgent (a hotfix) or needs its own review.
 
 ## What CI checks
 
