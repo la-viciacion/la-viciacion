@@ -226,7 +226,7 @@ def suggestion_reasons(item: dict, shared: set[str], affinity: dict[str, float])
 def completion_suggestion(db: Session, user_id: int, genres: str | list[str] | None, rng=random) -> dict | None:
     """The game the notice of a completed game recommends: one other players have and `user_id` never had that
     shares a genre with the completed one (any, if that has none), picked with the weights of the Recomendados page.
-    {"game", "reasons"}, or None when there is nothing to recommend."""
+    {"game", "game_id", "reasons"}, or None when there is nothing to recommend."""
     shared = {genre.lower() for genre in genre_list(genres)}
     candidates = [
         c for c in recommendation_candidates(db, user_id)
@@ -237,7 +237,7 @@ def completion_suggestion(db: Session, user_id: int, genres: str | list[str] | N
     affinity = genre_affinity(db, user_id)
     prior = rating_prior(db)
     pick = candidates[weighted_sample([recommendation_weight(c, affinity, prior) for c in candidates], 1, rng)[0]]
-    return {"game": pick["game_name"], "reasons": suggestion_reasons(pick, shared, affinity)}
+    return {"game": pick["game_name"], "game_id": pick["game_id"], "reasons": suggestion_reasons(pick, shared, affinity)}
 
 
 async def new_game(db: Session, game: schemas.NewGame) -> models.Game:

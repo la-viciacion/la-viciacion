@@ -3,6 +3,7 @@
 The AI only knows what the message of the notice says, and only does what its prompt asks: a figure missing from
 either side is a figure missing from the notice. These tests pin both sides together for every use of ai_prompts."""
 import unittest
+from unittest import mock
 
 from src.crud import users  # noqa: F401  (the app's modules import each other: this order resolves it)
 from src.crud.users import completion_message, new_game_message
@@ -13,6 +14,14 @@ class CompletionNoticeTests(unittest.TestCase):
     def test_it_says_how_long_it_took_the_player_and_the_average_apart(self):
         msg = completion_message("Toni", 1, "Tomodachi Life", 12 * 3600 + 30 * 60, 36 * 3600 + 24 * 60)
         self.assertEqual(msg, "Toni acaba de completar su juego número 1: *Tomodachi Life* en 12h30m. La media está en 36h24m.")
+
+    def test_the_game_links_to_its_page_in_the_app_when_the_address_is_known(self):
+        with mock.patch.object(users.utils.config, "PUBLIC_URL", "https://viciacion.test"):
+            msg = completion_message("Toni", 1, "Doom", 7200, None, "doom-id")
+            self.assertIn("[Doom](https://viciacion.test/#/game/doom-id) en 02h00m.", msg)
+            self.assertIn("*Doom*", completion_message("Toni", 1, "Doom", 7200, None))
+        with mock.patch.object(users.utils.config, "PUBLIC_URL", ""):
+            self.assertIn("*Doom* en", completion_message("Toni", 1, "Doom", 7200, None, "doom-id"))
 
     def test_the_player_time_comes_before_the_average(self):
         msg = completion_message("Toni", 3, "Doom", 7200, 36000)
@@ -66,7 +75,7 @@ class RankingNoticeTests(unittest.TestCase):
 
 class WishlistNoticeTests(unittest.TestCase):
     def test_it_names_each_game_and_everybody_who_waits_for_it_and_says_tomorrow(self):
-        msg = actions.wishlist_eve_message([("Hades II", ["Ana", "Bea"]), ("Silksong", ["Cai"])])
+        msg = actions.wishlist_eve_message([("Hades II", ["Ana", "Bea"], None), ("Silksong", ["Cai"], None)])
         self.assertEqual(msg.count("Mañana sale"), 2)
         for name in ("Hades II", "Silksong", "Ana y Bea", "Cai"):
             self.assertIn(name, msg)

@@ -3,7 +3,7 @@ import { beforeEach, test } from 'node:test';
 import { installApi, installDom, installStorage, settle, text } from './dom.js';
 
 installStorage();
-installDom('<span id="bellBadge">3</span><main id="main"></main>');
+installDom('<span id="bellBadge">3</span><main id="main"></main>', 'http://localhost/');
 const page = await import('../js/pages/notifications/index.js');
 
 const ITEMS = [
@@ -36,6 +36,24 @@ test('it lists the notices as text, links the ones that open a page and highligh
   assert.equal(main().querySelector('a.nt-link').getAttribute('href'), '#/achievements');
   assert.equal(main().querySelectorAll('div.nt-link').length, 1);
   assert.deepEqual([...main().querySelectorAll('.nt-card')].map((c) => c.classList.contains('unread')), [true, false]);
+});
+
+test('the game links of a body are anchors: RAWG opens in a new tab, the app navigates, anything else is text', async () => {
+  items = [
+    { id: 9, title: 'La Viciación', url: '#/game/g1', created_at: '2026-10-20T10:00:00', read: true,
+      body: `Ana empieza [Hades](https://rawg.io/games/hades), [Doom](http://localhost/#/game/doom) y [Mal](https://evil.test/x)`,
+    },
+  ];
+  await page.render({ main: main(), user: { id: 1, username: 'ana' } });
+  await settle();
+  const [rawg, app] = main().querySelectorAll('.nt-body a.game-link');
+  assert.equal(rawg.getAttribute('href'), 'https://rawg.io/games/hades');
+  assert.equal(rawg.getAttribute('target'), '_blank');
+  assert.equal(app.getAttribute('href'), '#/game/doom');
+  assert.equal(app.getAttribute('target'), null);
+  assert.match(main().querySelector('.nt-body').textContent, /y \[Mal\]\(https:\/\/evil\.test\/x\)$/);
+  assert.equal(main().querySelectorAll('a.nt-link').length, 0);
+  assert.equal(main().querySelector('div.nt-link').dataset.open, '#/game/g1');
 });
 
 test('seeing the unread ones marks them as read and clears the bell', () => {

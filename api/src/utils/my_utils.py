@@ -28,6 +28,18 @@ def escape_markdown(text) -> str:
     return re.sub(r"([_*`\[])", r"\\\1", str(text))
 
 
+def rawg_game_link(name, slug: str | None) -> str:
+    """A game's name as a Markdown link to its RAWG page (just the escaped name when it has no slug)."""
+    text = escape_markdown(name)
+    return f"[{text}](https://rawg.io/games/{slug})" if slug else text
+
+
+def app_game_link(name, game_id) -> str:
+    """A game's name as a Markdown link to its page in the app (just the escaped name when PUBLIC_URL is not set)."""
+    text = escape_markdown(name)
+    return f"[{text}]({config.PUBLIC_URL}/#/game/{game_id})" if config.PUBLIC_URL and game_id else text
+
+
 def validate_password_requirements(password):
     # Length
     if len(password) < 12 or len(password) > 24:
@@ -412,6 +424,20 @@ async def _telegram_send(bot, chat_id, text: str, image=None) -> bool:
     return False
 
 
+def recommended_game_text(recommended: dict) -> str:
+    """The recommended game for a notice: a link to its page in the app when it is known, bold otherwise."""
+    if recommended.get("game_id") and config.PUBLIC_URL:
+        return app_game_link(recommended["game"], recommended["game_id"])
+    return f"*{escape_markdown(recommended['game'])}*"
+
+
+def recommended_for_prompt(recommended: dict | None) -> dict | None:
+    """The suggestion as the AI is told it: the game's name as a link to its page in the app when there is one."""
+    if recommended and recommended.get("game_id") and config.PUBLIC_URL:
+        return {**recommended, "game": app_game_link(recommended["game"], recommended["game_id"])}
+    return recommended
+
+
 async def send_message(
     msg,
     silent: bool,
@@ -439,7 +465,7 @@ async def send_message(
         if ai_use and ai.is_ready(ai_use):
             try:
                 # the clients block on the network: keep them off the event loop
-                text = await asyncio.to_thread(ai.complete, ai.prompt_for(ai_use, new_game_recommended), msg, source=f"notice:{ai_use}")
+                text = await asyncio.to_thread(ai.complete, ai.prompt_for(ai_use, recommended_for_prompt(new_game_recommended)), msg, source=f"notice:{ai_use}")
                 if text:
                     logger.info(text)
                     msg = text

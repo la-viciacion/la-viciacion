@@ -130,7 +130,7 @@ class ReleaseNoticeTests(unittest.TestCase):
         self.assertEqual(actions.join_names(["Ana", "Bea", "Cai"]), "Ana, Bea y Cai")
 
     def test_the_notice_says_who_else_waits_for_each_game(self):
-        message = actions.wishlist_release_message([("Hades II", ["Bea"]), ("Celeste", []), ("Hollow", ["Bea", "Cai"])])
+        message = actions.wishlist_release_message([("Hades II", ["Bea"], None), ("Celeste", [], None), ("Hollow", ["Bea", "Cai"], None)])
         self.assertEqual(message, (
             "¡Hoy sale *Hades II*! Estaba en tu lista de deseados.\nTambién lo espera Bea.\n\n"
             "¡Hoy sale *Celeste*! Estaba en tu lista de deseados.\n\n"
@@ -138,12 +138,18 @@ class ReleaseNoticeTests(unittest.TestCase):
         ))
 
     def test_markdown_in_a_name_is_escaped(self):
-        self.assertIn("*Snake\\_Pass*", actions.wishlist_release_message([("Snake_Pass", [])]))
+        self.assertIn("*Snake\\_Pass*", actions.wishlist_release_message([("Snake_Pass", [], None)]))
+
+
+class GameLinkTests(unittest.TestCase):
+    def test_both_notices_link_the_game_to_rawg_when_it_has_a_slug(self):
+        self.assertIn("¡Hoy sale [Hades II](https://rawg.io/games/hades-ii)!", actions.wishlist_release_message([("Hades II", [], "hades-ii")]))
+        self.assertIn("Mañana sale [Snake\\_Pass](https://rawg.io/games/snake-pass).", actions.wishlist_eve_message([("Snake_Pass", ["Ana"], "snake-pass")]))
 
 
 class EveNoticeTests(unittest.TestCase):
     def test_the_group_notice_names_each_game_and_who_waits_for_it(self):
-        message = actions.wishlist_eve_message([("Hades II", ["Ana"]), ("Snake_Pass", ["Ana", "Bea", "Cai"])])
+        message = actions.wishlist_eve_message([("Hades II", ["Ana"], None), ("Snake_Pass", ["Ana", "Bea", "Cai"], None)])
         self.assertEqual(message, (
             "Mañana sale *Hades II*. Está en la lista de deseados de Ana.\n\n"
             "Mañana sale *Snake\\_Pass*. Está en la lista de deseados de Ana, Bea y Cai."

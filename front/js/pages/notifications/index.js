@@ -3,6 +3,7 @@
 import { api } from '../../lib/api.js';
 import { formatDateTime } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
+import { noticeBody } from '../../lib/links.js';
 import { setUnread } from '../../ui/layout.js';
 import { toast } from '../../ui/toast.js';
 
@@ -16,14 +17,23 @@ let armTimer;
 // A notice that opens a page is a link; one that only says "/" is plain text
 const opens = (url) => url && url !== '/';
 
+// The body as text, with the game links it holds as anchors
+const bodyOf = (body) => noticeBody(body).map((part) => typeof part === 'string' ? part
+  : html`<a class="game-link" href="${part.href}" ${part.external ? html`target="_blank" rel="noopener noreferrer"` : ''}>${part.text}</a>`);
+const hasLinks = (body) => noticeBody(body).some((part) => typeof part !== 'string');
+
 const card = (n) => {
   const content = html`
     <div class="nt-title">${n.title}</div>
-    ${n.body ? html`<div class="nt-body">${n.body}</div>` : ''}
+    ${n.body ? html`<div class="nt-body">${bodyOf(n.body)}</div>` : ''}
     <div class="nt-date">${formatDateTime(n.created_at)}</div>`;
+  // an anchor cannot hold another one: a card with game links in it opens its page when tapped, outside the links
+  const wrapped = !opens(n.url) ? html`<div class="nt-link">${content}</div>`
+    : hasLinks(n.body) ? html`<div class="nt-link" role="link" tabindex="0" data-open="${n.url}">${content}</div>`
+    : html`<a class="nt-link" href="${n.url}">${content}</a>`;
   return html`
     <div class="gc-card nt-card ${n.read ? '' : 'unread'}">
-      ${opens(n.url) ? html`<a class="nt-link" href="${n.url}">${content}</a>` : html`<div class="nt-link">${content}</div>`}
+      ${wrapped}
       <button class="nt-remove" type="button" data-remove="${n.id}" aria-label="Borrar el aviso" title="Borrar">×</button>
     </div>`;
 };
@@ -92,7 +102,13 @@ export async function render(ctx) {
   main.querySelector('#ntClear').addEventListener('click', (e) => clearAll(e.currentTarget));
   main.querySelector('#ntList').addEventListener('click', (e) => {
     const button = e.target.closest('[data-remove]');
-    if (button) remove(button.dataset.remove);
+    if (button) return remove(button.dataset.remove);
+    const card = e.target.closest('[data-open]');
+    if (card && !e.target.closest('a')) window.location.href = card.dataset.open;
+  });
+  main.querySelector('#ntList').addEventListener('keydown', (e) => {
+    const card = e.target.closest('[data-open]');
+    if (card && e.key === 'Enter' && e.target === card) window.location.href = card.dataset.open;
   });
   await load();
 }

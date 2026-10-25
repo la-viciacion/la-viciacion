@@ -438,12 +438,17 @@ def join_names(names: list[str]) -> str:
     return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " y " + names[-1]
 
 
-def wishlist_release_message(releases: list[tuple[str, list[str]]]) -> str:
+def _game_text(name: str, slug: str | None) -> str:
+    """A game in a notice: a link to its RAWG page, or in bold when it has no slug."""
+    return utils.rawg_game_link(name, slug) if slug else "*" + utils.escape_markdown(name) + "*"
+
+
+def wishlist_release_message(releases: list[tuple[str, list[str], str | None]]) -> str:
     """The notice for a player whose wished games come out today: (game, other players who want it) for each.
     One block per game; the first line of the first one is what a push shows as its title."""
     blocks = []
-    for game_name, others in releases:
-        block = f"¡Hoy sale *{utils.escape_markdown(game_name)}*! Estaba en tu lista de deseados."
+    for game_name, others, slug in releases:
+        block = f"¡Hoy sale {_game_text(game_name, slug)}! Estaba en tu lista de deseados."
         if others:
             verb = "lo espera" if len(others) == 1 else "lo esperan"
             block += f"\nTambién {verb} {utils.escape_markdown(join_names(others))}."
@@ -460,7 +465,7 @@ async def check_wishlist(db: Session, today: datetime.date) -> str:
         return f"{len(changed)} dates changed"
     per_user: dict[int, tuple[models.User, list]] = {}
     for user, game, others in wishlist.releases_on(db, today):
-        per_user.setdefault(user.id, (user, []))[1].append((game.name, [w["name"] for w in others]))
+        per_user.setdefault(user.id, (user, []))[1].append((game.name, [w["name"] for w in others], game.slug))
     for user, releases in per_user.values():
         if user.telegram_id is None and not push_has_devices(user.id):
             continue
@@ -468,12 +473,12 @@ async def check_wishlist(db: Session, today: datetime.date) -> str:
     return f"{len(changed)} dates changed, {len(per_user)} users told"
 
 
-def wishlist_eve_message(releases: list[tuple[str, list[str]]]) -> str:
+def wishlist_eve_message(releases: list[tuple[str, list[str], str | None]]) -> str:
     """The notice for the group the day before: (game, players who wait for it) for each game coming out tomorrow."""
     blocks = []
-    for game_name, waiting in releases:
+    for game_name, waiting, slug in releases:
         blocks.append(
-            f"Mañana sale *{utils.escape_markdown(game_name)}*. "
+            f"Mañana sale {_game_text(game_name, slug)}. "
             f"Está en la lista de deseados de {utils.escape_markdown(join_names(waiting))}."
         )
     return "\n\n".join(blocks)
@@ -482,7 +487,7 @@ def wishlist_eve_message(releases: list[tuple[str, list[str]]]) -> str:
 async def announce_wishlist_eve(db: Session, tomorrow: datetime.date) -> str:
     """The day before a game comes out, tell the group which wished games do (one message for all of them).
     The AI may rewrite it (`wishlist_release`). Nothing is remembered: a game comes out on one day only."""
-    releases = [(game.name, waiting) for game, waiting in wishlist.wished_releases_on(db, tomorrow)]
+    releases = [(game.name, waiting, game.slug) for game, waiting in wishlist.wished_releases_on(db, tomorrow)]
     if releases:
         await utils.send_message(wishlist_eve_message(releases), False, ai_use="wishlist_release")
     return f"{len(releases)} games"
