@@ -28,7 +28,7 @@ function row(p) {
       ${playerAvatar(p, p.stale ? 'dim' : 'live')}
       <div class="pl-info">
         <div class="pl-name">${p.name}</div>
-        <div class="pl-game"><a href="${gameHref(p.game_id)}">${p.game_name}</a>${p.platform ? ` · ${platformName(p.platform)}` : ''}</div>
+        <div class="pl-game"><a class="game-link" href="${gameHref(p.game_id)}">${p.game_name}</a>${p.platform ? ` · ${platformName(p.platform)}` : ''}</div>
         <div class="pl-since">${since(p)}${p.stale ? ' · ¿Un timer olvidado?' : ''}</div>
       </div>
     </li>`;
@@ -44,7 +44,7 @@ function sharedRow(group, myId) {
     <li class="pl-row shared">
       <span class="pl-stack">${group.players.map((p) => playerAvatar(p, 'live'))}</span>
       <div class="pl-info">
-        <div class="pl-name">${formatPlayers(names)} ${mine ? 'estáis' : 'están'} jugando a <a href="${gameHref(group.game_id)}">${group.game_name}</a></div>
+        <div class="pl-name">${formatPlayers(names)} ${mine ? 'estáis' : 'están'} jugando a <a class="game-link" href="${gameHref(group.game_id)}">${group.game_name}</a></div>
         <div class="pl-since">${since(latest)}</div>
       </div>
     </li>`;
