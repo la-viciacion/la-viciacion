@@ -8,7 +8,7 @@ globalThis.location = window.location; // the page reads the address
 const page = await import('../js/pages/game/index.js');
 
 const OVERVIEW = {
-  game: { id: 'celeste', name: 'Celeste <b>', image_url: null, genres: ['Platformer'], tags: ['Singleplayer', 'platformer', 'Pixel <i>'], dev: 'Maddy', release_date: '2018-01-25', avg_time: 30000 },
+  game: { id: 'celeste', name: 'Celeste <b>', image_url: null, genres: ['Platformer'], tags: ['Singleplayer', 'platformer', 'Pixel <i>'], dev: 'Maddy', slug: 'celeste', release_date: '2018-01-25', avg_time: 30000 },
   summary: { players: 2, played_seconds: 10800, completed_by: 1, score_count: 2, score_mean: 80 },
   players: [
     { user_id: 2, username: 'bea', name: 'Bea', played_seconds: 7200, sessions: 2, last_played: '2026-03-01T20:00:00', seasons: [2026], completed: true, completions: 1, score: 70, playing: true, is_active: true, is_me: false },
@@ -35,6 +35,12 @@ test('it asks for the game of the address and shows its name as text', () => {
   assert.equal(calls[0].path, '/games/celeste/overview');
   assert.equal(document.querySelector('h1').textContent, 'Celeste <b>');
   assert.equal(document.querySelectorAll('h1 b').length, 0);
+});
+
+test('the game links to its RAWG page, in a new tab, when it has a slug', async () => {
+  const link = () => main().querySelector('.gm-head a.game-link');
+  assert.equal(link().getAttribute('href'), 'https://rawg.io/games/celeste');
+  assert.equal(link().getAttribute('target'), '_blank');
 });
 
 test('the figures of the group and the players, the most played first, with who plays now', () => {
