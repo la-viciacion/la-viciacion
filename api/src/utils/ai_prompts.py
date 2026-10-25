@@ -23,8 +23,8 @@ COMPLETED_GAME_PROMPT = """
 Reescribe el mensaje proporcionado, un aviso para un grupo de amigos que juegan a videojuegos: alguien ha completado
 un juego.
 
-Empieza por lo importante: la primera frase debe llevar el nombre del usuario, el nombre del juego, la
-cantidad de juegos completados que indica el mensaje original y el tiempo que le ha costado al usuario completarlo
+Empieza por lo importante: la primera frase debe llevar el nombre del usuario, el nombre del juego (con su enlace,
+si lo hay, tal como viene: [Texto](enlace)), la cantidad de juegos completados que indica el mensaje original y el tiempo que le ha costado al usuario completarlo
 (el que aparece justo después del nombre del juego, tras la palabra "en"), tal como está escrito (por ejemplo, 12h30m).
 Si el mensaje original indica la media de tiempo, inclúyela también y puedes compararla con el tiempo del usuario
 (más rápido, más lento, parecido): es lo que se suele tardar en completar ese juego, no la media del usuario.
@@ -44,7 +44,7 @@ NEW_GAME_RECOMMENDATION = """
 Al final del mensaje añade una última frase muy corta recomendando el juego que se indica a continuación a la persona
 que acaba de completar el anterior (nómbrala y habla de ella siempre en tercera persona, por ejemplo "A Toni le
 vendría bien...", sin "tú" ni "te": el mensaje va al grupo). Debes incluir siempre el
-nombre del juego. Recomienda solo el juego: no menciones a ningún jugador que lo tenga o lo haya jugado. Si se
+nombre del juego (con su enlace, si lo hay, tal como viene: [Texto](enlace)). Recomienda solo el juego: no menciones a ningún jugador que lo tenga o lo haya jugado. Si se
 indican motivos, puedes apoyarte en uno, sin inventarte ningún dato ni cifra. No te alargues.
 """
 
@@ -73,7 +73,8 @@ WISHLIST_RELEASE_PROMPT = """
 Reescribe el mensaje proporcionado, un aviso para un grupo de amigos que juegan a videojuegos: mañana sale a la
 venta un juego (o varios) que alguien tiene en su lista de deseados.
 
-Empieza por lo importante: di el nombre de cada juego, tal como aparece en el mensaje original, y que sale mañana.
+Empieza por lo importante: di el nombre de cada juego, tal como aparece en el mensaje original (con su enlace, si lo
+hay, tal como viene: [Texto](enlace)), y que sale mañana.
 Si hay varios juegos, menciónalos todos, sin dejarte ninguno.
 Menciona también a todas las personas que lo esperan, pero de pasada y con naturalidad, dentro de la frase (por
 ejemplo, "Ana y Bea ya lo tienen apuntado"): sin repetir "para Fulano" ni hacer una lista aparte.

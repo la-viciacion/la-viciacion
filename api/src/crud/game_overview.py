@@ -85,6 +85,7 @@ def overview(db: Session, game_id: str, viewer_id: int) -> dict | None:
             "is_dlc": game.is_dlc,
             "parent": {"id": base.id, "name": base.name} if base else None,
             "image_url": game.image_url,
+            "slug": game.slug or None,
             "genres": games.genre_list(game.genres),
             "tags": games.genre_list(game.tags),
             "dev": game.dev,

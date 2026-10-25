@@ -9,6 +9,7 @@ moment, and anything sent silently or while the general notifications switch is 
 Like push, nothing here may break the Telegram path: errors are only logged.
 """
 import datetime
+import re
 
 from sqlalchemy import delete, select, update
 
@@ -21,13 +22,42 @@ logger = LogManager().get_logger()
 
 BODY_MAX = 255
 
+# A link to a game ([name](https://rawg.io/games/slug) or of its page in the app) in the Telegram text: the inbox keeps
+# the ones in the body so the page can show them. Any other link (a recap's story) is not shown inside the notice.
+LINK = re.compile(r"\[((?:\\.|[^\]\\])*)\]\((https?://(?:rawg\.io/games/|[^)\s]*/#/game/)[^)\s]*)\)")
+
+
+def linked_body(message: str, body: str) -> str:
+    """`body` (plain, as push shows it) with the links of `message` put back, as [text](url), where their text is
+    found in it. When the markup does not fit the column the last links go back to plain text first."""
+    spans = []
+    cursor = 0
+    for found in LINK.finditer(message):
+        text = push.plain_text(found.group(1))
+        start = body.find(text, cursor) if text else -1
+        if start < 0:
+            continue
+        spans.append((start, start + len(text), found.group(2)))
+        cursor = start + len(text)
+    while spans:
+        out, last = "", 0
+        for start, end, url in spans:
+            out += body[last:start] + f"[{body[start:end]}]({url})"
+            last = end
+        out += body[last:]
+        if len(out) <= BODY_MAX:
+            return out
+        spans.pop()
+    return body
+
 
 def payload_of(message: str, push_payload: dict | None = None) -> dict:
     """The title, body and link the inbox shows: the push payload when the notice has its own, else the message as push shows it."""
     payload = push_payload or push.build_payload(message)
+    body = (payload.get("body") or "")[:BODY_MAX]
     return {
         "title": payload["title"],
-        "body": (payload.get("body") or "")[:BODY_MAX],
+        "body": linked_body(message, body),
         # a notice that opens the inbox is not a link inside it
         "url": "/" if payload.get("url") in (None, "", push.INBOX_URL) else payload["url"],
     }

@@ -42,6 +42,30 @@ class PayloadTests(unittest.TestCase):
         self.assertEqual(got, {"title": "Resumen", "body": "Míralo", "url": "#/story"})
 
 
+class GameLinksTests(unittest.TestCase):
+    RAWG = "[Hades](https://rawg.io/games/hades)"
+
+    def test_the_game_links_of_a_notice_stay_in_the_body(self):
+        got = inbox.payload_of(f"*Ana* acaba de empezar {self.RAWG}, su juego número 3 de este año.")
+        self.assertEqual(got["body"], f"Ana acaba de empezar {self.RAWG}, su juego número 3 de este año.")
+
+    def test_a_link_in_the_title_line_is_left_to_the_title(self):
+        got = inbox.payload_of(f"¡Hoy sale {self.RAWG}! Estaba en tu lista.\nTambién lo espera Bea.")
+        self.assertEqual((got["title"], got["body"]), ("¡Hoy sale Hades! Estaba en tu lista.", "También lo espera Bea."))
+
+    def test_a_link_that_is_not_to_a_game_is_not_kept(self):
+        got = inbox.payload_of("Ana\n[Descubre el mes](https://viciacion.test/#/story)")
+        self.assertEqual(got["body"], "Descubre el mes")
+
+    def test_the_links_that_do_not_fit_go_back_to_plain_text(self):
+        text = "Hola\n" +" ".join(f"[Juego{i}](https://rawg.io/games/juego-{i})" for i in range(8))
+        body = inbox.payload_of(text)["body"]
+        self.assertLessEqual(len(body), inbox.BODY_MAX)
+        self.assertIn("Juego7", body)
+        self.assertNotIn("[Juego7]", body)
+        self.assertIn("[Juego0](", body)
+
+
 class RecordTests(unittest.TestCase):
     def setUp(self):
         self.db = make_session()

@@ -354,19 +354,21 @@ def game_path(game_id: int) -> str:
 def new_game_message(user_name: str, game_name: str, slug: str | None, number: int) -> str:
     """The notice of a game just started: who, which game (a link to RAWG when it has a slug) and the number of
     games they have started this season. The AI rewrites it keeping all three (see ai_prompts.NEW_GAME_PROMPT)."""
-    started_game = utils.escape_markdown(game_name)
-    if slug:
-        started_game = "[" + started_game + "](https://rawg.io/games/" + slug + ")"
+    started_game = utils.rawg_game_link(game_name, slug)
     return "*" + utils.escape_markdown(user_name) + "* acaba de empezar " + started_game + ", su juego número " + str(number) + " de este año."
 
 
-def completion_message(user_name: str, number: int, game_name: str, played_seconds: int, average_seconds: int | None) -> str:
+def completion_message(
+    user_name: str, number: int, game_name: str, played_seconds: int, average_seconds: int | None, game_id: str | None = None
+) -> str:
     """The notice of a game just completed: who, the number of games they have completed this season, which
     game, **how long it took them** (what they played it in the season) and, when it is known, the average time
-    to complete it. The AI rewrites it keeping all of that (see ai_prompts.COMPLETED_GAME_PROMPT)."""
+    to complete it. The game is a link to its page in the app when `game_id` is given and PUBLIC_URL is set. The AI
+    rewrites it keeping all of that (see ai_prompts.COMPLETED_GAME_PROMPT)."""
+    game = utils.app_game_link(game_name, game_id) if game_id and utils.config.PUBLIC_URL else "*" + utils.escape_markdown(game_name) + "*"
     msg = (
         utils.escape_markdown(user_name) + " acaba de completar su juego número " + str(number)
-        + ": *" + utils.escape_markdown(game_name) + "* en " + str(utils.format_duration(played_seconds)) + "."
+        + ": " + game + " en " + str(utils.format_duration(played_seconds)) + "."
     )
     if average_seconds:
         msg += " La media está en " + str(utils.format_duration(average_seconds)) + "."
@@ -843,7 +845,7 @@ async def after_completion(db: Session, entry: models.UserGame, silent: bool):
         await view.rescued_games(db, user, silent=silent)
     await achievements.completed_in_a_day(db, user, silent=silent)
 
-    message = completion_message(user.name, count_completed_games(db, user.id, entry.season), game.name, completion_time, avg_time)
+    message = completion_message(user.name, count_completed_games(db, user.id, entry.season), game.name, completion_time, avg_time, game.id)
     logger.info(message)
     new_game_info = games.completion_suggestion(db, entry.user_id, game.genres) if settings.get("completed_game.recommend") else None
     await utils.send_message(
