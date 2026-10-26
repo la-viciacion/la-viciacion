@@ -32,6 +32,6 @@ Si un administrador ha habilitado los resúmenes de forma permanente, arriba a l
 
 ## Los avisos
 
-El resumen de un mes (o de una temporada) **solo se puede abrir los primeros días después de que termine** (del 1 al 5 del mes siguiente; en enero, también el de la temporada). Pasado ese plazo ya no se puede ver, ni con un enlace antiguo, salvo que un administrador lo habilite.
+El resumen de un mes (o de una temporada) **solo se puede abrir los primeros días después de que termine** (del 1 al 5 del mes siguiente; en enero, también el de la temporada). Pasado ese plazo ya no se puede ver, ni con un enlace antiguo, salvo que un administrador lo habilite: entonces la tarjeta del perfil está siempre y puedes elegir cualquier periodo.
 
-Los primeros días de cada mes (del 1 al 5), si el aviso del resumen está activado, la app te ofrece el resumen del mes que acaba de terminar con una barra en la parte superior y una tarjeta en tu perfil, por si no tienes las notificaciones. En enero se ofrecen dos periodos: la temporada que terminó y diciembre. Si el grupo lo tiene activado, el resumen también se anuncia por Telegram y por notificación, con un enlace directo a la historia.
+Los primeros días de cada mes (del 1 al 5), la app te ofrece el resumen del mes que acaba de terminar con una barra en la parte superior y una tarjeta en tu perfil, por si no tienes las notificaciones. En enero se ofrecen dos periodos: la temporada que terminó y diciembre. Si el grupo lo tiene activado, el resumen también se anuncia por Telegram y por notificación, con un enlace directo a la historia.

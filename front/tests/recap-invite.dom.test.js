@@ -92,6 +92,15 @@ test('the profile card is there during the first days, whatever was seen, and li
   assert.equal(String(recapCard(LATE)), '');
 });
 
+test('with the recaps open the card is there every day, for the month that ended', () => {
+  reset();
+  mount(document.getElementById('main'), html`${recapCard(LATE, true)}`);
+  assert.deepEqual([...document.querySelectorAll('.recap-card')].map((c) => c.dataset.period), ['2026-09']);
+  assert.deepEqual([...document.querySelectorAll('.recap-card a')].map((a) => a.getAttribute('href')), ['#/story/2026-09', '#/recap/2026-09']);
+  mount(document.getElementById('main'), html`${recapCard(EARLY, true)}`);
+  assert.equal(document.querySelectorAll('.recap-card').length, 1, 'in the first days it is the same card, not two');
+});
+
 test('in January the season is offered first and December the next time, and the profile has both', async () => {
   reset();
   const JANUARY = new Date(2027, 0, 3);

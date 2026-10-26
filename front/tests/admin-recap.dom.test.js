@@ -31,7 +31,7 @@ function routes(extra = {}, values = VALUES) {
 }
 
 const panel = () => document.getElementById('panel');
-const renderSends = () => settings.render(panel(), { entity: { sections: ['monthly', 'annual'] } }); // the schedules live in the Envíos tab
+const renderSends = () => settings.render(panel(), { entity: { sections: ['monthly', 'annual', 'access'] } }); // the schedules live in the Envíos tab
 const field = (name) => panel().querySelector(`[name="${name}"]`);
 const lastMonthKey = () => { const d = new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
 const previewPaths = (calls) => calls.filter((c) => c.path.startsWith('/manage/recap/preview')).map((c) => c.path);
@@ -120,7 +120,7 @@ test('saving sends the month and the day together', async () => {
 
 test('the schedules are with the other sends, and the recap tab only previews', async () => {
   const { ENTITIES } = await import('../js/pages/admin/entities.js');
-  assert.deepEqual(ENTITIES.sends.sections, ['notifications', 'inbox', 'weekly', 'wishlist', 'monthly', 'annual']);
+  assert.deepEqual(ENTITIES.sends.sections, ['notifications', 'inbox', 'wishlist', 'weekly', 'monthly', 'annual', 'access']);
   assert.equal(ENTITIES.recap.label, 'Probar resumen');
   assert.equal(ENTITIES.recap.custom, 'recap');
 });
@@ -146,7 +146,7 @@ test('choosing annual hides the month and previews the season', async () => {
   assert.equal(panel().querySelector('#rcaMonth'), null);
   const year = panel().querySelector('#rcaYear').value;
   assert.equal(previewPaths(calls).at(-1), `/manage/recap/preview?period=${year}`);
-  assert.equal(panel().querySelector('#rcaStory').getAttribute('href'), `#/story/${year}`);
+  assert.equal(panel().querySelector('#rcaStory').getAttribute('href'), `#/story/${year}/ana`);
   change(panel().querySelector('#rcaKind'), 'month');
   await settle();
   assert.ok(panel().querySelector('#rcaMonth'));

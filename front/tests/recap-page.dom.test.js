@@ -96,7 +96,7 @@ test('only an admin can look at another player', async () => {
   window.location.hash = '#/recap/2026-09/biel';
   await recap.render({ user: { ...ME, is_admin: true }, main: main() });
   await settle();
-  assert.equal(calls.at(-1).path, '/statistics/recap/2026-09?username=biel');
+  assert.equal(calls.at(-1).path, '/statistics/recap/2026-09?username=biel&unrestricted=true');
   assert.match(main().querySelector('[data-view="player"]').textContent, /biel/);
   assert.match(main().textContent, /Ha jugado/);
 });
@@ -250,4 +250,15 @@ test('a player without the recaps open sees the one on offer and no way to chang
   await settle();
   assert.equal(document.querySelector('.rc-picker'), null);
   assert.match(main().querySelector('#rcBody').textContent, /Has jugado/);
+});
+
+test('an admin who names themselves keeps the address and the unrestricted request across the page and the story', async () => {
+  window.location.hash = '#/recap/2026-09/ana';
+  const calls = installApi({ 'GET /statistics/recap/2026-09?': DATA }, false);
+  await recap.render({ user: { ...ME, is_admin: true }, main: main() });
+  await settle();
+  assert.equal(first(calls).path, '/statistics/recap/2026-09?username=ana&unrestricted=true');
+  assert.ok(document.querySelector('.rc-picker'), 'the pickers of the panel links are there');
+  assert.equal(document.getElementById('rcStory').getAttribute('href'), '#/story/2026-09/ana');
+  assert.equal(window.location.hash, '#/recap/2026-09/ana');
 });

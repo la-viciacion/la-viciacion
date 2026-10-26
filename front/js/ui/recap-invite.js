@@ -3,7 +3,7 @@
 // notice is the only way those players ever hear of it.
 import { api } from '../lib/api.js';
 import { html, mount } from '../lib/html.js';
-import { periodLabel, recapHref } from '../lib/recap.js';
+import { lastMonth, periodLabel, recapHref } from '../lib/recap.js';
 import { hasSeen, markSeen, windowPeriods } from '../lib/recap-window.js';
 import { storyHref } from '../lib/story.js';
 
@@ -46,9 +46,11 @@ function showBar(period) {
   });
 }
 
-/** The cards of the profile while the days last, one per period on offer, or nothing. Always there in those days: it is not the notice. */
-export function recapCard(now = new Date()) {
-  return html`${windowPeriods(now).map(card)}`;
+/** The cards of the profile while the days last, one per period on offer, or nothing. Always there in those days: it is not the notice.
+ * With the recaps open (`always`) the card is there every day, for the month that ended once the days are over. */
+export function recapCard(now = new Date(), always = false) {
+  const periods = windowPeriods(now);
+  return html`${(always && !periods.length ? [lastMonth(now)] : periods).map(card)}`;
 }
 
 function card(period) {

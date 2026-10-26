@@ -149,7 +149,6 @@ function view(values, jobs, pushDevices, mail, aiUses, aiModel, chat) {
     monthly: html`
       <section class="adm-set-card">
         <h3>Resumen mensual</h3>
-        ${check('recap.always_available', 'Resumen siempre disponible', 'Apagado, los jugadores solo pueden abrir un resumen en los primeros días tras terminar el mes (o la temporada, en enero); después, ni por un enlace directo. Encendido, pueden abrir cualquier resumen ya terminado, también por enlace. Como administrador, siempre puedes verlos.')}
         ${check('monthly.enabled', 'Enviar el resumen del mes', 'Avisa de que el resumen del mes que acaba de terminar ya está disponible: un solo aviso, al grupo de Telegram y a las notificaciones de la app, con el enlace a la historia. Necesita las notificaciones activadas. Apagado hasta que lo actives: pruébalo antes con «Probar resumen».')}
         <div class="adm-set-row">
           <label>Día del mes
@@ -164,10 +163,6 @@ function view(values, jobs, pushDevices, mail, aiUses, aiModel, chat) {
       <section class="adm-set-card">
         <h3>Resumen anual</h3>
         ${check('annual.enabled', 'Enviar el resumen de la temporada', 'Aparte del mensual: el mismo aviso de que el resumen de la temporada ya está disponible, al grupo de Telegram y a las notificaciones de la app. En diciembre cuenta lo jugado hasta ese día; en enero, la temporada completa. Necesita las notificaciones activadas.')}
-        <label class="adm-check adm-set-check">
-          <input type="checkbox" id="annualUnlock" name="annualUnlock" />
-          <span><strong>Mostrar el resumen de la temporada en curso</strong><span class="adm-sub">Mientras esté apagado, nadie puede abrir ese resumen, ni por un enlace directo: así no se puede ir consultando día a día. Se enciende solo en cuanto el aviso llega al grupo (el envío automático o el manual); también lo puedes encender tú a mano. Como administrador, siempre puedes verlo esté como esté.</span></span>
-        </label>
         <div class="adm-set-row">
           <label>Mes
             <select class="adm-input" name="annual.month">${ANNUAL_MONTHS.map(([value, label]) => html`<option value="${value}">${label}</option>`)}</select>
@@ -178,6 +173,16 @@ function view(values, jobs, pushDevices, mail, aiUses, aiModel, chat) {
           <label>Hora <input class="adm-input" type="time" name="annual.time" required /></label>
         </div>
         <div class="adm-sub">En diciembre, entre el 20 y el 28; en enero, entre el 1 y el 5. ${lastRun(jobs.annual_recap)}</div>
+      </section>`,
+
+    access: html`
+      <section class="adm-set-card">
+        <h3>Acceso a los resúmenes</h3>
+        ${check('recap.always_available', 'Resumen siempre disponible', 'Apagado, un resumen solo se puede abrir los primeros días tras terminar el mes (o la temporada, en enero); después, ni por un enlace directo. Encendido, la tarjeta del perfil está siempre y se puede elegir cualquier resumen ya terminado (tipo, año y mes). Los administradores ven lo mismo que un jugador, para poder probarlo.')}
+        <label class="adm-check adm-set-check">
+          <input type="checkbox" id="annualUnlock" name="annualUnlock" />
+          <span><strong>Mostrar el resumen de la temporada en curso</strong><span class="adm-sub">Mientras esté apagado, nadie puede abrir ese resumen, ni por un enlace directo: así no se puede ir consultando día a día. Se enciende solo en cuanto el aviso llega al grupo (el envío automático o el manual); también lo puedes encender tú a mano. Los administradores ven lo mismo que un jugador, salvo en las herramientas del panel.</span></span>
+        </label>
       </section>`,
 
     // Notificaciones → Canales: only what is about sending (whether it is set, and the test); the configuration is in Sistema → Servicios
