@@ -149,6 +149,7 @@ function view(values, jobs, pushDevices, mail, aiUses, aiModel, chat) {
     monthly: html`
       <section class="adm-set-card">
         <h3>Resumen mensual</h3>
+        ${check('recap.always_available', 'Resumen siempre disponible', 'Apagado, los jugadores solo pueden abrir un resumen en los primeros días tras terminar el mes (o la temporada, en enero); después, ni por un enlace directo. Encendido, pueden abrir cualquier resumen ya terminado, también por enlace. Como administrador, siempre puedes verlos.')}
         ${check('monthly.enabled', 'Enviar el resumen del mes', 'Avisa de que el resumen del mes que acaba de terminar ya está disponible: un solo aviso, al grupo de Telegram y a las notificaciones de la app, con el enlace a la historia. Necesita las notificaciones activadas. Apagado hasta que lo actives: pruébalo antes con «Probar resumen».')}
         <div class="adm-set-row">
           <label>Día del mes

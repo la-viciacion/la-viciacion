@@ -314,8 +314,9 @@ class GetRecapEndpointTests(unittest.TestCase):
         self.player = models.User(id=1, username="ana", is_admin=False)
         self.admin = models.User(id=2, username="god", is_admin=True)
 
-    def get(self, period, user=None, unlocked_year=0):
-        with mock.patch.object(statistics.settings, "get", return_value=unlocked_year):
+    def get(self, period, user=None, unlocked_year=0, always=True):
+        values = {"annual.unlocked_year": unlocked_year, "recap.always_available": always}
+        with mock.patch.object(statistics.settings, "get", side_effect=values.__getitem__):
             return get_recap(period, username=None, active_user=user or self.player, db=self.db)
 
     def test_a_finished_month_is_served(self):
@@ -356,6 +357,63 @@ class GetRecapEndpointTests(unittest.TestCase):
         with self.assertRaises(HTTPException) as refused:
             self.get(str(datetime.date.today().year), unlocked_year=datetime.date.today().year - 1)
         self.assertEqual(refused.exception.detail, messages.RECAP_SEASON_LOCKED)
+
+    def test_a_finished_recap_is_closed_to_players_outside_its_window(self):
+        last_year = str(datetime.date.today().year - 1)
+        with self.assertRaises(HTTPException) as refused:
+            self.get(last_year, always=False)
+        self.assertEqual((refused.exception.status_code, refused.exception.detail), (400, messages.RECAP_CLOSED))
+
+    def test_an_admin_sees_a_closed_recap(self):
+        self.get(str(datetime.date.today().year - 1), user=self.admin, always=False)
+
+
+class RecapAccessTests(unittest.TestCase):
+    """GET /statistics/recap-access: who may choose the period on the page."""
+
+    def access(self, user, always):
+        with mock.patch.object(statistics.settings, "get", return_value=always):
+            return statistics.get_recap_access(active_user=user)
+
+    def test_a_player_chooses_only_while_the_recaps_are_open(self):
+        player = models.User(id=1, username="ana", is_admin=False)
+        self.assertEqual(self.access(player, False), {"selectable": False})
+        self.assertEqual(self.access(player, True), {"selectable": True})
+
+    def test_an_admin_always_chooses(self):
+        self.assertEqual(self.access(models.User(id=2, username="god", is_admin=True), False), {"selectable": True})
+
+
+class RecapClosedTests(unittest.TestCase):
+    """crud.recap.recap_closed: a finished recap is only open in the first days after it, unless the panel lifts that."""
+
+    def closed(self, period, today, always=False):
+        return recap.recap_closed(recap.parse_period(period), always, today)
+
+    def test_last_month_is_open_in_the_first_days_and_closed_after(self):
+        self.assertFalse(self.closed("2026-09", datetime.date(2026, 10, 1)))
+        self.assertFalse(self.closed("2026-09", datetime.date(2026, 10, 5)))
+        self.assertTrue(self.closed("2026-09", datetime.date(2026, 10, 6)))
+
+    def test_only_the_month_that_just_ended_is_open(self):
+        self.assertTrue(self.closed("2026-08", datetime.date(2026, 10, 2)))
+
+    def test_in_january_the_season_that_ended_and_december_are_open(self):
+        today = datetime.date(2027, 1, 3)
+        self.assertFalse(self.closed("2026", today))
+        self.assertFalse(self.closed("2026-12", today))
+        self.assertTrue(self.closed("2026-11", today))
+        self.assertTrue(self.closed("2025", today))
+
+    def test_a_season_is_closed_outside_january(self):
+        self.assertTrue(self.closed("2026", datetime.date(2027, 2, 2)))
+        self.assertTrue(self.closed("2025", datetime.date(2026, 10, 2)))
+
+    def test_the_panel_setting_opens_everything_finished(self):
+        self.assertFalse(self.closed("2024-03", datetime.date(2026, 10, 20), always=True))
+
+    def test_the_running_season_is_left_to_season_locked(self):
+        self.assertFalse(self.closed("2026", datetime.date(2026, 12, 24)))
 
 
 if __name__ == "__main__":

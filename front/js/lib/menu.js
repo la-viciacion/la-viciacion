@@ -17,7 +17,6 @@ export function menuSections(user) {
     ] },
     { label: 'Tú', items: [
       { id: 'profile', label: 'Mi perfil', href: '#/profile/resumen', icon: 'iconProfile' },
-      { id: 'recap', label: 'Resumen', href: '#/recap', icon: 'iconStar' },
       { id: 'wishlist', label: 'Deseados', href: '#/wishlist', icon: 'iconHeart' },
       { id: 'recommendations', label: 'Recomendados', href: '#/recommendations', icon: 'iconDice' },
       { id: 'challenges', label: 'Retos', href: '#/challenges', icon: 'iconFlag' },
@@ -35,8 +34,6 @@ const PAGES = [
   ['#/profile', 'profile'],
   ['#/admin', 'admin'],
   ['#/activity', 'activity'],
-  ['#/recap', 'recap'],
-  ['#/story', 'recap'],
   ['#/stats', 'stats'],
   ['#/games', 'games'],
   ['#/wishlist', 'wishlist'],
