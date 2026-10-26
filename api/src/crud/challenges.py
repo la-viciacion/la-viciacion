@@ -152,7 +152,7 @@ def outcome(progress: dict, user_id: int) -> dict:
 def history(db: Session, player_id: int, today: datetime.date, since_year: int | None = None) -> list[dict]:
     """The finished challenges a player took part in, the latest first, with how they did. Public ones only. With
     `since_year`, only those that began in that year or later (what the achievements read: the rest is not even
-    worked out). `contested` says whether a duel was played by both, so a win over nobody can be told apart."""
+    worked out)."""
     found = []
     finished = db.query(models.Challenge).filter(models.Challenge.ends_on < today, models.Challenge.visibility == "public")
     if since_year:
@@ -168,7 +168,6 @@ def history(db: Session, player_id: int, today: datetime.date, since_year: int |
             "id": challenge.id, "kind": challenge.kind, "label": TEMPLATES[challenge.kind].label, "scope": challenge.scope,
             "title": challenge.title, "starts_on": challenge.starts_on, "ends_on": challenge.ends_on,
             **outcome(progress, player_id),
-            "contested": challenge.scope != DUEL or all(p["seconds"] > 0 for p in progress["players"]),
         })
     return found
 

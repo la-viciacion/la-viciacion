@@ -1300,10 +1300,10 @@ class ChallengeAchievementTests(unittest.IsolatedAsyncioTestCase):
         )
         return {key: date for key, date in rows}
 
-    def entry(self, number, kind="streak", scope="user", done=True, group_done=None, year=YEAR, contested=True):
+    def entry(self, number, kind="streak", scope="user", done=True, group_done=None, year=YEAR):
         """A finished challenge of the history, the `number`-th of the player, ending on the 1st of that month."""
         return {
-            "id": number, "kind": kind, "scope": scope, "title": "t", "done": done, "group_done": group_done, "contested": contested,
+            "id": number, "kind": kind, "scope": scope, "title": "t", "done": done, "group_done": group_done,
             "starts_on": datetime.date(year, 1, 1), "ends_on": datetime.date(year, 1, number),
         }
 
@@ -1327,10 +1327,10 @@ class ChallengeAchievementTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(set(self.awarded()), {"CHALLENGES_1_LIFETIME"})
         self.assertEqual(self.asked, YEAR)
 
-    async def test_a_duel_won_against_nobody_does_not_count(self):
-        await self.check([self.entry(1, kind="duel_hours", scope="duel", contested=False)])
+    async def test_a_duel_never_counts_however_it_went(self):
+        await self.check([self.entry(n, kind="duel_hours", scope="duel") for n in range(1, 17)])
         self.assertEqual(self.awarded(), {})
-        await self.check([self.entry(1, kind="duel_hours", scope="duel", contested=True)])
+        await self.check([self.entry(20)])  # a personal one next to them does
         self.assertEqual(set(self.awarded()), {"CHALLENGES_1_LIFETIME"})
 
     async def test_nothing_met_is_nothing_and_what_is_earned_is_not_announced_twice(self):
