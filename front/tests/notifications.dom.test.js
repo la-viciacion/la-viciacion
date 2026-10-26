@@ -6,8 +6,8 @@ installStorage();
 installDom('<div id="el"></div>');
 const { initNotifications } = await import('../js/pages/profile/notifications.js');
 
-const DEFAULTS = { forgotten_timer_telegram: true, forgotten_timer_push: true, forgotten_timer_hours: 4 };
-const settings = (own = {}) => ({ forgotten_timer_hours: null, forgotten_timer_telegram: null, forgotten_timer_push: null, ...own, defaults: DEFAULTS });
+const DEFAULTS = { forgotten_timer_telegram: true, forgotten_timer_push: true, wishlist_release_telegram: true, wishlist_release_push: true, forgotten_timer_hours: 4 };
+const settings = (own = {}) => ({ forgotten_timer_hours: null, forgotten_timer_telegram: null, forgotten_timer_push: null, wishlist_release_telegram: null, wishlist_release_push: null, ...own, defaults: DEFAULTS });
 
 const show = async (own, patch = () => settings()) => {
   const calls = installApi({ 'GET /users/ana/settings': settings(own), 'PATCH /users/ana/settings': patch });
@@ -78,4 +78,21 @@ test('bad hours are refused without asking the API', async () => {
   await submit(options, '25');
   assert.match(el.querySelector('.pf-msg').textContent, /entre 1 y 24/);
   assert.equal(calls.length, before);
+});
+
+test('the wishlist notice is another row with its two channels, on by default, and has no options', async () => {
+  const { calls, el } = await show();
+  const row = el.querySelector('[data-notice="wishlist_release"]');
+  assert.equal(row.querySelector('.pf-notice-name').firstChild.textContent, 'Sale un juego deseado');
+  const [telegram, push] = row.querySelectorAll('input');
+  assert.deepEqual([telegram.checked, push.checked], [true, true]);
+  assert.equal(el.querySelector('[data-options="wishlist_release"]'), null);
+  await toggle(push);
+  assert.deepEqual(calls.at(-1).body, { wishlist_release_telegram: true, wishlist_release_push: false });
+});
+
+test('the wishlist notice shows the channels the user chose', async () => {
+  const { el } = await show({ wishlist_release_telegram: false });
+  const [telegram, push] = el.querySelectorAll('[data-notice="wishlist_release"] input');
+  assert.deepEqual([telegram.checked, push.checked], [false, true]);
 });

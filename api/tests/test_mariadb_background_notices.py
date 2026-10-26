@@ -333,6 +333,55 @@ class ForgottenTimerTests(MessagingTestCase):
         self.assertEqual(self.reminders, [])
 
 
+class WishlistReleaseNoticeTests(MessagingTestCase):
+    """The private notice of the day a wished game comes out: through the channels the user left on."""
+
+    def setUp(self):
+        super().setUp()
+        self.configure_telegram()
+        self.today = datetime.date.today()
+        self.game("hades", "Hades II", release_date=self.today, rawg_id=1)
+        with database.SessionLocal() as db:
+            db.add(models.UserWishlist(user_id=self.ana, game_id="hades"))
+            db.commit()
+        self.sent = []
+
+        async def to_user(telegram_id, message, user_id=None, telegram_on=True, push_on=True, in_inbox=True):
+            self.sent.append((telegram_id, user_id, telegram_on, push_on))
+
+        for patcher in (
+            mock.patch.object(my_utils, "send_message_to_user", new=to_user),
+            mock.patch.object(actions.rawg_sync, "refresh_release_dates", return_value=[]),
+        ):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    def check(self):
+        async def run():
+            with database.SessionLocal() as db:
+                return await actions.check_wishlist(db, self.today)
+        return self.run_async(run())
+
+    def test_by_default_the_user_is_told_through_both_channels(self):
+        self.assertIn("1 users told", self.check())
+        self.assertEqual(self.sent, [(111, self.ana, True, True)])
+
+    def test_only_the_channels_the_user_left_on_are_used(self):
+        self.api("PATCH", "/users/ana/settings", as_user="ana", json={"wishlist_release_push": False})
+        self.check()
+        self.assertEqual(self.sent, [(111, self.ana, True, False)])
+
+    def test_with_both_channels_off_nothing_is_sent(self):
+        self.api("PATCH", "/users/ana/settings", as_user="ana", json={"wishlist_release_telegram": False, "wishlist_release_push": False})
+        self.assertIn("0 users told", self.check())
+        self.assertEqual(self.sent, [])
+
+    def test_a_channel_the_user_cannot_be_reached_by_does_not_count(self):
+        self.api("PATCH", "/users/ana/settings", as_user="ana", json={"wishlist_release_telegram": False})  # ana has no push device
+        self.check()
+        self.assertEqual(self.sent, [])
+
+
 class TimerNoticeTests(MessagingTestCase):
     def setUp(self):
         super().setUp()

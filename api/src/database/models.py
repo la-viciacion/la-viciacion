@@ -72,6 +72,9 @@ class UserSettings(Base):
     # channels of that reminder (NULL = the default: on); the reminder is off when both are off
     forgotten_timer_telegram = Column(Boolean, nullable=True)
     forgotten_timer_push = Column(Boolean, nullable=True)
+    # channels of the notice of the day a wished game comes out (NULL = the default: on); off when both are off
+    wishlist_release_telegram = Column(Boolean, nullable=True)
+    wishlist_release_push = Column(Boolean, nullable=True)
     # minutes between refreshes of the running-timer push notification (10-120)
     timer_notice_minutes = Column(SmallInteger, nullable=True)
     # whether the others see this player in "playing now" (NULL = the default: shown)

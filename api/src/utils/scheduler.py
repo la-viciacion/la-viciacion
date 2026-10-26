@@ -15,7 +15,7 @@ what nothing else can trigger remains here:
   forgotten_timers  every hour, reminds who has a timer running for too long
   daily_streaks     every day at 05:00, announces the streaks lost the day before
   daily_wishlist    every day at 09:00, refreshes the release date of the games somebody waits for
-                    and, while actions.WISHLIST_PRIVATE_NOTICE is on (off), tells who wished a game that comes out today
+                    and tells who wished a game that comes out today (each user chooses the channels, or switches it off)
   wishlist_eve      every day at `wishlist.time` (12:30), tells the group which wished games come out tomorrow
   wishlist_week     every Sunday at `wishlist.time`, tells the group which wished games come out in the next 7 days.
                     Only one of wishlist_eve and wishlist_week runs: `wishlist.group_notice`
