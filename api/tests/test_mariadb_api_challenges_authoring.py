@@ -387,6 +387,16 @@ class ScheduleRunTests(ScheduleTestCase):
         self.assertEqual(body["options"], {"min_hours_each": 3.0, "min_hours_total": 8.0})
         self.assertEqual(self.api("PATCH", f"/manage/challenge-schedules/{schedule}", as_user="root", json={"games": ["nope"]}).status_code, 400)
 
+    def test_a_schedule_with_a_game_that_no_longer_exists_can_still_be_paused_and_renamed(self):
+        schedule = self.rotation().json()["id"]
+        with database.SessionLocal() as db:
+            db.query(models.ChallengeSchedule).update({"games": json.dumps(["ghost", "celeste"])})
+            db.commit()
+        body = self.api("PATCH", f"/manage/challenge-schedules/{schedule}", as_user="root", json={"active": False, "label": "En pausa"}).json()
+        self.assertEqual((body["active"], body["label"]), (False, "En pausa"))
+        again = self.api("PATCH", f"/manage/challenge-schedules/{schedule}", as_user="root", json={"participation": "opt_in"})
+        self.assertEqual(again.status_code, 400)  # what decides the launch is still checked when it changes
+
     def test_deleting_a_schedule_keeps_what_it_launched(self):
         schedule = self.rotation(start_now=True).json()["id"]
         self.assertEqual(self.api("DELETE", f"/manage/challenge-schedules/{schedule}", as_user="root").status_code, 200)

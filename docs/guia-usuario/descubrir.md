@@ -51,7 +51,7 @@ Puedes **dejar de participar** y volver mientras el reto no haya terminado. Cuan
 
 **Cómo vas.** Cada reto en el que participas te dice, dentro de la propia app, cómo estás: *Ya has cumplido tu parte*, *Vas bien*, *Vas por detrás del ritmo* (llevas menos de lo que toca por el tiempo que ha pasado), o, en los últimos días, *Quedan 2 días: te faltan 1,5 h*. Arriba de la página se cuenta cuántos tienes en marcha, cuántos cumplidos y cuántos con poco tiempo, y en el **Inicio** aparece una tarjeta **Mis retos** con los que están en marcha, los más urgentes primero. Es solo para ti: no se avisa a nadie.
 
-- **Duelo de horas** y **Duelo en un juego**: retas a otro jugador a ver quién juega más (en total o a un juego concreto) durante una semana, un mes o tres meses. **Empieza al lanzarlo**; el retado puede **rechazarlo durante las primeras 48 horas** (y echarse atrás en ese tiempo). Pasado ese plazo, el duelo sigue adelante. Gana quien más horas sume y, si empatan, ganan los dos. Un duelo rechazado no cuenta para nadie. Los demás lo ven, pero nadie recibe aviso.
+- **Duelo de horas** y **Duelo en un juego**: retas a otro jugador a ver quién juega más (en total o a un juego concreto) durante una semana, un mes o tres meses. **Empieza al lanzarlo**; el retado puede **rechazarlo durante las primeras 48 horas** (el rechazo no se puede deshacer). Pasado ese plazo, el duelo sigue adelante. Gana quien más horas sume y, si empatan, ganan los dos. Un duelo rechazado no cuenta para nadie. Los demás lo ven, pero nadie recibe aviso.
 
 El administrador puede lanzar un reto del grupo (juego del mes o temático) **como competición**: además de cumplir el objetivo, se ve quién va primero, con medallas, y el puesto aparece en tu línea.
 

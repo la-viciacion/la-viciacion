@@ -198,13 +198,13 @@ function baseStanding(challenge, meId, today) {
   return { tone: 'ok', text: `Vas bien: ${left.toLowerCase()}` };
 }
 
-const TONE_ORDER = { urgent: 0, behind: 1, pending: 2, ok: 3, done: 4 };
+const TONE_ORDER = { urgent: 0, behind: 1, pending: 2, ok: 3, done: 4, failed: 5 };
 
 /** The viewer's running challenges with how they stand, the ones that need attention first:
  * { items: [{ challenge, standing }], done, urgent } (what the Home card and the top of the page say). */
 export function digest(challenges, meId, today = new Date()) {
   const items = challenges
-    .filter((c) => c.status === 'active')
+    .filter((c) => c.status === 'active' && !c.declined)
     .map((challenge) => ({ challenge, standing: standing(challenge, meId, today) }))
     .filter((item) => item.standing)
     .sort((a, b) => TONE_ORDER[a.standing.tone] - TONE_ORDER[b.standing.tone]);

@@ -71,8 +71,8 @@ def participants(db: Session, challenge: models.Challenge) -> list[int]:
 
 def can_opt_out(challenge: models.Challenge, today: datetime.date, viewer_id: int | None = None, now: datetime.datetime | None = None) -> bool:
     """Who can change whether they take part: in a group challenge that has not finished, anybody; in a duel, only the
-    challenged player and only during the first DECLINE_HOURS after it was launched (they may turn it down and take it
-    back in that time; later it stands, so nobody dodges a duel they are losing)."""
+    challenged player and only during the first DECLINE_HOURS after it was launched, to turn it down (a decline is
+    final, see `view`; after that time the duel stands, so nobody dodges a duel they are losing)."""
     if challenge.scope == DUEL:
         launched = challenge.created_at or datetime.datetime.now()
         return viewer_id == opponent_id(challenge) and today <= challenge.ends_on and (now or datetime.datetime.now()) < launched + datetime.timedelta(hours=DECLINE_HOURS)
@@ -128,7 +128,7 @@ def view(db: Session, challenge: models.Challenge, viewer_id: int, today: dateti
         "opponent": {"id": opponent.id, "name": opponent.name or opponent.username} if opponent else None,
         "declined": declined(db, challenge),
         "taking_part": viewer_id in taking_part,
-        "can_opt_out": can_opt_out(challenge, today, viewer_id),
+        "can_opt_out": can_opt_out(challenge, today, viewer_id) and not declined(db, challenge),
         "progress": progress,
     }
 
@@ -149,14 +149,15 @@ def outcome(progress: dict, user_id: int) -> dict:
     return {"done": bool(mine and mine["done"]), "group_done": progress.get("total_done"), "tied": len(firsts) > 1 and any(p["winner"] for p in firsts)}
 
 
-def history(db: Session, player_id: int, today: datetime.date) -> list[dict]:
-    """The finished challenges a player took part in, the latest first, with how they did. Public ones only."""
+def history(db: Session, player_id: int, today: datetime.date, since_year: int | None = None) -> list[dict]:
+    """The finished challenges a player took part in, the latest first, with how they did. Public ones only. With
+    `since_year`, only those that began in that year or later (what the achievements read: the rest is not even
+    worked out). `contested` says whether a duel was played by both, so a win over nobody can be told apart."""
     found = []
-    for challenge in (
-        db.query(models.Challenge)
-        .filter(models.Challenge.ends_on < today, models.Challenge.visibility == "public")
-        .order_by(models.Challenge.ends_on.desc(), models.Challenge.id.desc())
-    ):
+    finished = db.query(models.Challenge).filter(models.Challenge.ends_on < today, models.Challenge.visibility == "public")
+    if since_year:
+        finished = finished.filter(models.Challenge.starts_on >= datetime.date(since_year, 1, 1))
+    for challenge in finished.order_by(models.Challenge.ends_on.desc(), models.Challenge.id.desc()):
         taking_part = participants(db, challenge)
         if player_id not in taking_part or declined(db, challenge):
             continue
@@ -167,6 +168,7 @@ def history(db: Session, player_id: int, today: datetime.date) -> list[dict]:
             "id": challenge.id, "kind": challenge.kind, "label": TEMPLATES[challenge.kind].label, "scope": challenge.scope,
             "title": challenge.title, "starts_on": challenge.starts_on, "ends_on": challenge.ends_on,
             **outcome(progress, player_id),
+            "contested": challenge.scope != DUEL or all(p["seconds"] > 0 for p in progress["players"]),
         })
     return found
 

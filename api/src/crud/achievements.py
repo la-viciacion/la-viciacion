@@ -635,7 +635,8 @@ class Achievements:
 
     async def challenges_met(self, db: Session, user: models.User, silent: bool = False):
         """The achievements about challenges, over the history from the season they start to count in (`since`: a
-        challenge that began earlier does not count). A challenge counts once it is over and the player met their part;
+        challenge that began earlier does not count). A challenge counts once it is over and the player met their part
+        (a duel only if both players played: winning against nobody is no merit);
         each is dated the day it ended. The tiers (1, 5 and 15) are dated the end of the challenge that reached them;
         "Todoterreno" is a challenge met of every personal kind, "Misión cumplida entre todos" a group challenge whose
         total was reached too. They look at the finished challenges only, so they are earned by the first check after
@@ -647,7 +648,7 @@ class Achievements:
         from . import challenges as challenges_crud  # that module imports the ones that import this one
 
         met = sorted(
-            (entry for entry in challenges_crud.history(db, user.id, datetime.date.today()) if entry["done"] and entry["starts_on"].year >= (self.since or 0)),
+            (entry for entry in challenges_crud.history(db, user.id, datetime.date.today(), self.since) if entry["done"] and entry["contested"]),
             key=lambda entry: (entry["ends_on"], entry["id"]),
         )
         if not met:

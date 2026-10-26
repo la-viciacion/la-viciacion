@@ -96,7 +96,9 @@ def update(db: Session, schedule: models.ChallengeSchedule, body: dict, today: d
     if "games" in body and body["games"] is not None:
         games = _games(db, schedule.kind, body["games"])
     participation = body.get("participation") or schedule.participation
-    _check(db, schedule.kind, json.loads(schedule.options), games, participation, today)
+    if participation != schedule.participation or ("games" in body and body["games"] is not None):
+        # only what decides the launch is tried again: pausing or renaming a schedule whose game was deleted must work
+        _check(db, schedule.kind, json.loads(schedule.options), games, participation, today)
     if "label" in body and body["label"] is not None:
         schedule.label = _label(body["label"])
     for key in ("active", "announce"):

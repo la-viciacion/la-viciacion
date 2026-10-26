@@ -86,7 +86,7 @@ class RequestsScheduleTheirNoticesTests(NoticeTestCase):
         for _ in range(2):
             self.api("PUT", f"/challenges/{duel}/participation", as_user="bea", params={"joined": False})
         self.background["after_duel_decline"].assert_called_once_with(duel)
-        self.api("PUT", f"/challenges/{duel}/participation", as_user="bea", params={"joined": True})  # taking it back tells nobody
+        self.assertEqual(self.api("PUT", f"/challenges/{duel}/participation", as_user="bea", params={"joined": True}).status_code, 409)  # a decline is final
         self.assertEqual(self.background["after_duel_decline"].call_count, 1)
 
     def test_leaving_a_group_challenge_tells_nobody(self):

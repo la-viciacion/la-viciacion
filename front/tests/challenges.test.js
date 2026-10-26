@@ -148,6 +148,13 @@ test('the last days are urgent whatever the pace', () => {
   assert.equal(standing(running(part, { ends: 0 }), 7, TODAY).text, 'Último día: te faltan 1 h');
 });
 
+test('a declined duel is not a running challenge for the digest, and every tone has a place in the order', () => {
+  const declined = duel(0, 0, { declined: true, progress: { players: [{ user_id: 7, name: 'Yo', seconds: 0, versus: true, done: false }] } });
+  const urgent = { ...running({ seconds: 0, target_seconds: 7200, done: false }, { ends: 1 }), id: 2 };
+  const result = digest([declined, urgent], 7, TODAY);
+  assert.deepEqual(result.items.map((i) => i.challenge.id), [2]);
+});
+
 test('a part behind the share of time gone by is told so, one in step is not, and a single game is only pending', () => {
   // 20 days long, 10 gone: half the time
   assert.equal(standing(running({ seconds: 3600, target_seconds: 36000, done: false }), 7, TODAY).tone, 'behind');

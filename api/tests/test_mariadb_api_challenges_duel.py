@@ -2,6 +2,7 @@
 api_support.py): launching, who may decline and until when, the progress of both players and the history."""
 from datetime import datetime, timedelta
 
+from src.crud import challenges as crud
 from src.database import database, models
 from src.utils import challenges
 from tests import clock, test_mariadb_api_challenges as base
@@ -110,11 +111,14 @@ class DeclineTests(DuelTestCase):
         self.assertEqual((body["declined"], body["taking_part"], [p["name"] for p in body["progress"]["players"]]), (True, False, ["Ana"]))
         self.assertTrue(self.view(challenge, "ana")["declined"])
 
-    def test_the_decline_can_be_taken_back_while_there_is_time(self):
+    def test_a_decline_is_final_and_a_duel_is_never_accepted_with_a_request(self):
         challenge = self.launch_duel().json()["id"]
+        self.assertEqual(self.decline(challenge, joined=True).status_code, 409)  # it starts when launched: there is nothing to accept
         self.decline(challenge)
-        body = self.decline(challenge, joined=True).json()
-        self.assertEqual((body["declined"], body["taking_part"]), (False, True))
+        self.assertEqual(self.decline(challenge, joined=True).status_code, 409)
+        body = self.view(challenge, "bea")
+        self.assertEqual((body["declined"], body["can_opt_out"], body["taking_part"]), (True, False, False))
+        self.assertEqual(self.decline(challenge).status_code, 200)  # asking again changes nothing
 
     def test_after_two_days_the_duel_stands(self):
         challenge = self.launch_duel().json()["id"]
@@ -152,6 +156,17 @@ class HistoryTests(DuelTestCase):
         won, lost = self.history(self.ana)[0], self.history(self.bea)[0]
         self.assertEqual((won["scope"], won["done"], won["tied"]), ("duel", True, False))
         self.assertEqual((lost["done"], lost["tied"]), (False, False))
+
+    def test_a_duel_won_against_nobody_is_not_contested(self):
+        self.finished(ana=60)
+        self.assertEqual((self.history(self.ana)[0]["done"], self.history(self.ana)[0]["contested"]), (True, False))
+
+    def test_a_played_duel_is_contested_and_the_history_can_start_from_a_year(self):
+        self.finished(ana=60, bea=30)
+        self.assertTrue(self.history(self.ana)[0]["contested"])
+        with database.SessionLocal() as db:
+            self.assertEqual(len(crud.history(db, self.ana, TODAY(), TODAY().year)), 1)
+            self.assertEqual(crud.history(db, self.ana, TODAY(), TODAY().year + 1), [])
 
     def test_a_tie_is_won_by_both(self):
         self.finished(ana=45, bea=45)

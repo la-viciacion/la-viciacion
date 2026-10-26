@@ -24,7 +24,7 @@ const OPTIONS = {
 };
 
 /** The list of the proposals of the player, into `el`; nothing at all when they have none (or it cannot be loaded). */
-export async function showProposals(el, reload) {
+export async function showProposals(el) {
   let list;
   try {
     list = await api('/challenges/proposals');
@@ -55,7 +55,7 @@ export async function showProposals(el, reload) {
     }
     try {
       await api(`/challenges/proposals/${button.closest('[data-proposal]').dataset.proposal}`, { method: 'DELETE' });
-      await showProposals(el, reload);
+      await showProposals(el);
     } catch (err) {
       toast(err.message, 'err');
     }

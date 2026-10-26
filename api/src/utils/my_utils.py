@@ -23,6 +23,11 @@ logger = log_manager.get_logger()
 config = Config()
 
 
+def join_names(names: list[str]) -> str:
+    """"A", "A y B", "A, B y C"."""
+    return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " y " + names[-1]
+
+
 def escape_markdown(text) -> str:
     """Escape what Telegram's legacy Markdown reads as formatting, for names inside a message."""
     return re.sub(r"([_*`\[])", r"\\\1", str(text))

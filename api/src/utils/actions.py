@@ -430,11 +430,6 @@ async def check_forgotten_timer(db: Session, user: models.User):
         )
 
 
-def join_names(names: list[str]) -> str:
-    """"A", "A y B", "A, B y C"."""
-    return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " y " + names[-1]
-
-
 def _game_text(name: str, slug: str | None) -> str:
     """A game in a notice: a link to its RAWG page, or in bold when it has no slug."""
     return utils.rawg_game_link(name, slug) if slug else "*" + utils.escape_markdown(name) + "*"
@@ -448,7 +443,7 @@ def wishlist_release_message(releases: list[tuple[str, list[str], str | None]]) 
         block = f"¡Hoy sale {_game_text(game_name, slug)}! Estaba en tu lista de deseados."
         if others:
             verb = "lo espera" if len(others) == 1 else "lo esperan"
-            block += f"\nTambién {verb} {utils.escape_markdown(join_names(others))}."
+            block += f"\nTambién {verb} {utils.escape_markdown(utils.join_names(others))}."
         blocks.append(block)
     return "\n\n".join(blocks)
 
@@ -479,7 +474,7 @@ def wishlist_eve_message(releases: list[tuple[str, list[str], str | None]]) -> s
     for game_name, waiting, slug in releases:
         blocks.append(
             f"Mañana sale {_game_text(game_name, slug)}. "
-            f"Está en la lista de deseados de {utils.escape_markdown(join_names(waiting))}."
+            f"Está en la lista de deseados de {utils.escape_markdown(utils.join_names(waiting))}."
         )
     return "\n\n".join(blocks)
 
@@ -503,7 +498,7 @@ def wishlist_week_message(releases: list[tuple[str, datetime.date, list[str], st
     for game_name, day, waiting, slug in releases:
         blocks.append(
             f"El {WEEKDAY_NAMES[day.weekday()]} {day.day} sale {_game_text(game_name, slug)}. "
-            f"Está en la lista de deseados de {utils.escape_markdown(join_names(waiting))}."
+            f"Está en la lista de deseados de {utils.escape_markdown(utils.join_names(waiting))}."
         )
     return "\n\n".join(blocks)
 
