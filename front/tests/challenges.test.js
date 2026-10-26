@@ -175,3 +175,18 @@ test('the digest keeps the running ones that count for the viewer, the ones that
   assert.equal(digestLine(result), '3 retos en marcha · 1 cumplido · 1 con poco tiempo');
   assert.equal(digestLine(digest([], 7, TODAY)), '');
 });
+
+test('a count part names what it counts and the new kinds are summarised by what they ask', () => {
+  assert.equal(amountLabel({ count: 3, target_count: 7, unit: 'days' }), '3 / 7 días');
+  assert.equal(amountLabel({ count: 0, target_count: 1, unit: 'sessions' }), '0 / 1 sesión');
+  assert.equal(amountLabel({ count: 1, target_count: 3, unit: 'genres' }), '1 / 3 géneros');
+  assert.equal(amountLabel({ count: 1, target_count: 3 }), '1 / 3 juegos');
+  assert.equal(remainingLabel({ count: 2, target_count: 3, unit: 'days' }), 'Te falta 1 día');
+  assert.equal(remainingLabel({ count: 0, target_count: 3, unit: 'sessions' }), 'Te faltan 3 sesiones');
+  const kind = (k, label, p) => summaryLine({ kind: k, label, params: p });
+  assert.equal(kind('streak', 'Racha', { mode: 'consecutive', days: 7 }), 'Racha · jugar 7 días seguidos');
+  assert.equal(kind('streak', 'Racha', { mode: 'days', days: 10 }), 'Racha · jugar 10 días distintos');
+  assert.equal(kind('long_sessions', 'Sesiones largas', { sessions: 1, minutes: 90 }), 'Sesiones largas · 1 sesión de al menos 90 min');
+  assert.equal(kind('variety', 'Variar de género', { genres: 3, hours: 1.5 }), 'Variar de género · jugar al menos 1,5 h a 3 géneros distintos');
+  assert.match(kind('wishlist', 'Cumplir deseados', { mode: 'start', games: 2 }), /empezar 2 juegos de los que esperabas en deseados/);
+});

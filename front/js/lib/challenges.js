@@ -53,9 +53,13 @@ export const partTarget = (part) => (isCount(part) ? part.target_count : isPerce
 
 const number = (n) => n.toLocaleString('es-ES');
 
-/** "3 / 5 h", "0 / 1 juego" or "12,5 % / 25 %" */
+// What a count part counts: games unless the part says (`unit`, from the API), as [singular, plural]
+const UNITS = { games: ['juego', 'juegos'], days: ['día', 'días'], sessions: ['sesión', 'sesiones'], genres: ['género', 'géneros'] };
+const unitName = (part, n) => (UNITS[part.unit] ?? UNITS.games)[n === 1 ? 0 : 1];
+
+/** "3 / 5 h", "0 / 1 juego", "3 / 7 días" or "12,5 % / 25 %" */
 export function amountLabel(part) {
-  if (isCount(part)) return `${part.count} / ${part.target_count} ${part.target_count === 1 ? 'juego' : 'juegos'}`;
+  if (isCount(part)) return `${part.count} / ${part.target_count} ${unitName(part, part.target_count)}`;
   if (isPercent(part)) return `${number(part.percent)} % / ${number(part.target_percent)} %`;
   return `${hoursLabel(part.seconds)} / ${hoursLabel(part.target_seconds)}`;
 }
@@ -97,6 +101,18 @@ export function summaryLine(challenge) {
     const what = p.mode === 'play' ? `jugar ${hoursLabel(p.hours * 3600)} a` : 'completar';
     return `${challenge.label} · ${what} un juego de ${p.genre} que no tuvieras antes`;
   }
+  if (challenge.kind === 'streak') {
+    return `${challenge.label} · jugar ${p.days} días ${p.mode === 'consecutive' ? 'seguidos' : 'distintos'}`;
+  }
+  if (challenge.kind === 'long_sessions') {
+    return `${challenge.label} · ${p.sessions} ${p.sessions === 1 ? 'sesión' : 'sesiones'} de al menos ${p.minutes} min`;
+  }
+  if (challenge.kind === 'variety') {
+    return `${challenge.label} · jugar al menos ${hoursLabel(p.hours * 3600)} a ${p.genres} géneros distintos`;
+  }
+  if (challenge.kind === 'wishlist') {
+    return `${challenge.label} · ${p.mode === 'start' ? 'empezar' : 'completar'} ${p.games} ${p.games === 1 ? 'juego' : 'juegos'} de los que esperabas en deseados`;
+  }
   return challenge.label;
 }
 
@@ -115,7 +131,7 @@ export function totalPart(progress) {
 export function remainingLabel(part) {
   if (isCount(part)) {
     const left = part.target_count - part.count;
-    return left === 1 ? 'Te falta 1 juego' : `Te faltan ${left} juegos`;
+    return left === 1 ? `Te falta 1 ${unitName(part, 1)}` : `Te faltan ${left} ${unitName(part, left)}`;
   }
   if (isPercent(part)) return `Te falta saldar un ${number(Math.round((part.target_percent - part.percent) * 10) / 10)} % más`;
   return `Te faltan ${hoursLabel(part.target_seconds - part.seconds)}`;
@@ -191,6 +207,16 @@ export function blocks(challenges, meId) {
     ...(others.length ? [{ key: 'others', title: 'De otros jugadores', list: cut(others), empty: '' }] : []),
   ];
 }
+
+/** The personal kinds a player can launch, for the form: [value, label]. */
+export const PERSONAL_KINDS = [
+  ['new_genre', 'Probar un género'],
+  ['debt_reduction', 'Bajar la deuda'],
+  ['streak', 'Racha'],
+  ['long_sessions', 'Sesiones largas'],
+  ['variety', 'Variar de género'],
+  ['wishlist', 'Cumplir deseados'],
+];
 
 /** How long a personal challenge lasts, to choose from. */
 export const DURATIONS = [['week', 'Una semana'], ['month', 'Un mes'], ['quarter', 'Tres meses']];

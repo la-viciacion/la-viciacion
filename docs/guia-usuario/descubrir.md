@@ -40,6 +40,10 @@ Puedes **dejar de participar** y volver mientras el reto no haya terminado. Cuan
 
 - **Probar un género**: elige un género de la base de datos y juega unas horas (2 por defecto) o completa uno de esos juegos, en una semana, un mes o tres meses. Solo cuentan juegos de ese género que no tuvieras ya en tu biblioteca.
 - **Bajar la deuda**: un objetivo sobre tu **deuda** (lo que te falta para terminar los juegos que has empezado), en porcentaje o en número de juegos. La app te dice, antes de lanzarlo, lo que significa («El 25 % de tu deuda son unas 10 h»).
+- **Racha**: juega varios días seguidos (o varios días distintos) dentro del plazo. Un día cuenta cuando juegas al menos 10 minutos, igual que en las rachas y los logros.
+- **Sesiones largas**: haz un número de sesiones de al menos los minutos que elijas, de cualquier juego.
+- **Variar de género**: juega a varios géneros distintos, dedicando a cada uno las horas que pidas. El tiempo de un juego cuenta en cada uno de sus géneros.
+- **Cumplir deseados**: empieza o completa juegos de tu lista de deseados. Solo cuentan los que ya estaban en ella el día que lanzas el reto; si quitas uno de la lista, deja de contar.
 
 **Cómo vas.** Cada reto en el que participas te dice, dentro de la propia app, cómo estás: *Ya has cumplido tu parte*, *Vas bien*, *Vas por detrás del ritmo* (llevas menos de lo que toca por el tiempo que ha pasado), o, en los últimos días, *Quedan 2 días: te faltan 1,5 h*. Arriba de la página se cuenta cuántos tienes en marcha, cuántos cumplidos y cuántos con poco tiempo, y en el **Inicio** aparece una tarjeta **Mis retos** con los que están en marcha, los más urgentes primero. Es solo para ti: no se avisa a nadie.
 
