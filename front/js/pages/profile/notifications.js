@@ -2,12 +2,16 @@
 // per channel (Telegram, push to the user's devices) that saves as soon as it changes
 // (PATCH /users/{username}/settings). A notice with neither channel checked is simply not sent.
 // A notice with options (the forgotten timer's hours) opens them under its row while any channel is
-// checked. The next notices are one more entry in NOTICES.
+// checked, folded until asked for; one without just has its two boxes. The options are saved with one button at
+// the end of the card, always there (saving what has not changed is harmless; the boxes save on their own). The next notices are one more entry in NOTICES.
 import { api, jsonRequest } from '../../lib/api.js';
 import { HOURS_HINT, MAX_HOURS, MIN_HOURS, parseHours } from '../../lib/hours.js';
 import { html, mount } from '../../lib/html.js';
 
-const NOTICES = [{ id: 'forgotten_timer', name: 'Timer olvidado', hint: 'Un recordatorio si dejas un timer activo demasiado tiempo' }];
+const NOTICES = [
+  { id: 'forgotten_timer', name: 'Timer olvidado', hint: 'Un recordatorio si dejas un timer activo demasiado tiempo', options: true },
+  { id: 'wishlist_release', name: 'Sale un juego deseado', hint: 'Te avisamos el día que sale un juego de tu lista de deseados' },
+];
 
 export async function initNotifications(el, { path }) {
   const settings = await api(path);
@@ -20,19 +24,30 @@ export async function initNotifications(el, { path }) {
     <div class="pf-card pf-notices">
       <div class="pf-notice-head" aria-hidden="true"><span></span><span>Telegram</span><span>Push</span></div>
       ${NOTICES.map((notice) => html`
-        <div class="pf-notice" data-notice="${notice.id}">
-          <div class="pf-notice-name">${notice.name}<div class="pf-sub">${notice.hint}</div></div>
-          <label class="pf-notice-box"><input type="checkbox" name="${notice.id}_telegram" ${channel(notice.id, 'telegram') ? 'checked' : ''} aria-label="${notice.name} por Telegram" /></label>
-          <label class="pf-notice-box"><input type="checkbox" name="${notice.id}_push" ${channel(notice.id, 'push') ? 'checked' : ''} aria-label="${notice.name} por push" /></label>
-        </div>
-        <form class="pf-notice-options pf-form" data-options="${notice.id}" novalidate>
-          <label>Avisarme si un timer lleva activo más de (horas)
-            <input class="adm-input" type="number" name="hours" inputmode="numeric" step="1" min="${MIN_HOURS}" max="${MAX_HOURS}"
-              value="${settings.forgotten_timer_hours ?? ''}" placeholder="${hoursDefault}" />
-          </label>
-          <div class="pf-sub">${HOURS_HINT} Si lo dejas vacío, te avisamos a las ${hoursDefault} horas. El aviso se comprueba cada hora, así que puede llegar hasta una hora después.</div>
-          <div><button class="pf-btn primary" type="submit">Guardar</button></div>
-        </form>`)}
+        <div class="pf-notice-item">
+          <div class="pf-notice" data-notice="${notice.id}">
+            <div class="pf-notice-name">${notice.name}<div class="pf-sub">${notice.hint}</div></div>
+            <label class="pf-notice-box"><input type="checkbox" name="${notice.id}_telegram" ${channel(notice.id, 'telegram') ? 'checked' : ''} aria-label="${notice.name} por Telegram" /></label>
+            <label class="pf-notice-box"><input type="checkbox" name="${notice.id}_push" ${channel(notice.id, 'push') ? 'checked' : ''} aria-label="${notice.name} por push" /></label>
+          </div>
+          ${notice.options ? html`
+            <form class="pf-notice-options pf-form" id="pf-options-${notice.id}" data-options="${notice.id}" novalidate>
+              <details>
+                <summary>Cambiar el tiempo de espera</summary>
+                <div class="pf-notice-fields">
+                  <label>Avisarme si un timer lleva activo más de (horas)
+                    <input class="adm-input" type="number" name="hours" inputmode="numeric" step="1" min="${MIN_HOURS}" max="${MAX_HOURS}"
+                      value="${settings.forgotten_timer_hours ?? ''}" placeholder="${hoursDefault}" />
+                  </label>
+                  <div class="pf-sub">${HOURS_HINT} Si lo dejas vacío, te avisamos a las ${hoursDefault} horas. El aviso se comprueba cada hora, así que puede llegar hasta una hora después.</div>
+                </div>
+              </details>
+            </form>` : ''}
+        </div>`)}
+      ${NOTICES.filter((notice) => notice.options).map((notice) => html`
+        <div class="pf-notice-save" data-save="${notice.id}">
+          <button class="pf-btn primary" type="submit" form="pf-options-${notice.id}">Guardar</button>
+        </div>`)}
       <div class="pf-sub">Telegram solo llega si has vinculado tu cuenta; push, si has activado los avisos en algún dispositivo.</div>
       <div class="pf-msg" role="status"></div>
     </div>`);
@@ -56,7 +71,7 @@ export async function initNotifications(el, { path }) {
   for (const notice of NOTICES) {
     const boxes = [...el.querySelectorAll(`[data-notice="${notice.id}"] input`)];
     const options = el.querySelector(`[data-options="${notice.id}"]`);
-    const sync = () => { options.hidden = !boxes.some((box) => box.checked); };
+    const sync = () => { if (options) options.hidden = !boxes.some((box) => box.checked); };
     sync();
     for (const box of boxes) {
       box.addEventListener('change', async () => {

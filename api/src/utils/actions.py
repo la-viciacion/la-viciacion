@@ -18,10 +18,6 @@ from .logger import LogManager
 log_manager = LogManager()
 logger = log_manager.get_logger()
 
-# Off: for now the wishlist releases are announced only to the group, the day before (announce_wishlist_eve).
-# The private notice of the release day (check_wishlist, wishlist_release_message) stays: turning this on brings it back.
-WISHLIST_PRIVATE_NOTICE = False
-
 config = Config()
 achievements = Achievements()
 
@@ -458,19 +454,22 @@ def wishlist_release_message(releases: list[tuple[str, list[str], str | None]]) 
 
 async def check_wishlist(db: Session, today: datetime.date) -> str:
     """Daily: refresh the release date of the games somebody is waiting for (they slip), then tell each player
-    which of the games they wished come out today (while WISHLIST_PRIVATE_NOTICE is on). Nothing is remembered:
-    a game comes out on one day only."""
+    which of the games they wished come out today, through the channels each one left on (both off: no notice).
+    Nothing is remembered: a game comes out on one day only."""
     changed = await asyncio.to_thread(rawg_sync.refresh_release_dates, db, wishlist.to_refresh(db, today))
-    if not WISHLIST_PRIVATE_NOTICE:
-        return f"{len(changed)} dates changed"
     per_user: dict[int, tuple[models.User, list]] = {}
     for user, game, others in wishlist.releases_on(db, today):
         per_user.setdefault(user.id, (user, []))[1].append((game.name, [w["name"] for w in others], game.slug))
+    told = 0
     for user, releases in per_user.values():
-        if user.telegram_id is None and not push_has_devices(user.id):
+        telegram_on, push_on = user_settings.wishlist_release_channels(db, user.id)
+        if not ((telegram_on and user.telegram_id is not None) or (push_on and push_has_devices(user.id))):
             continue
-        await utils.send_message_to_user(user.telegram_id, wishlist_release_message(releases), user_id=user.id)
-    return f"{len(changed)} dates changed, {len(per_user)} users told"
+        await utils.send_message_to_user(
+            user.telegram_id, wishlist_release_message(releases), user_id=user.id, telegram_on=telegram_on, push_on=push_on
+        )
+        told += 1
+    return f"{len(changed)} dates changed, {told} users told"
 
 
 def wishlist_eve_message(releases: list[tuple[str, list[str], str | None]]) -> str:
@@ -487,9 +486,35 @@ def wishlist_eve_message(releases: list[tuple[str, list[str], str | None]]) -> s
 async def announce_wishlist_eve(db: Session, tomorrow: datetime.date) -> str:
     """The day before a game comes out, tell the group which wished games do (one message for all of them).
     The AI may rewrite it (`wishlist_release`). Nothing is remembered: a game comes out on one day only."""
-    releases = [(game.name, waiting, game.slug) for game, waiting in wishlist.wished_releases_on(db, tomorrow)]
+    releases = [(game.name, waiting, game.slug) for game, waiting in wishlist.wished_releases_between(db, tomorrow, tomorrow)]
     if releases:
         await utils.send_message(wishlist_eve_message(releases), False, ai_use="wishlist_release")
+    return f"{len(releases)} games"
+
+
+WEEKDAY_NAMES = ("lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo")
+
+
+def wishlist_week_message(releases: list[tuple[str, datetime.date, list[str], str | None]]) -> str:
+    """The notice for the group once a week: (game, day it comes out, players who wait for it, slug) for each game
+    coming out in the days that follow."""
+    blocks = []
+    for game_name, day, waiting, slug in releases:
+        blocks.append(
+            f"El {WEEKDAY_NAMES[day.weekday()]} {day.day} sale {_game_text(game_name, slug)}. "
+            f"Está en la lista de deseados de {utils.escape_markdown(join_names(waiting))}."
+        )
+    return "\n\n".join(blocks)
+
+
+async def announce_wishlist_week(db: Session, today: datetime.date) -> str:
+    """Once a week, tell the group which wished games come out in the next 7 days, from tomorrow (one message for all
+    of them). The AI may rewrite it (`wishlist_week`). Nothing is remembered: a game comes out on one day only."""
+    first = today + datetime.timedelta(days=1)
+    found = wishlist.wished_releases_between(db, first, first + datetime.timedelta(days=6))
+    releases = [(game.name, game.release_date, waiting, game.slug) for game, waiting in found]
+    if releases:
+        await utils.send_message(wishlist_week_message(releases), False, ai_use="wishlist_week")
     return f"{len(releases)} games"
 
 

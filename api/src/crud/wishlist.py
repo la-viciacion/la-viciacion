@@ -169,20 +169,21 @@ def to_refresh(db: Session, today: datetime.date) -> list[models.Game]:
     )
 
 
-def wished_releases_on(db: Session, day: datetime.date) -> list[tuple[models.Game, list[str]]]:
-    """The games that come out on `day` that somebody still waits for, with the names of those players."""
+def wished_releases_between(db: Session, first: datetime.date, last: datetime.date) -> list[tuple[models.Game, list[str]]]:
+    """The games that come out from `first` to `last` (both included) that somebody still waits for, with the names of
+    those players, by date and then by name."""
     game_ids = [
         game_id
         for (game_id,) in db.query(models.Game.id)
         .join(models.UserWishlist, models.UserWishlist.game_id == models.Game.id)
         .join(models.User, models.UserWishlist.user_id == models.User.id)
-        .filter(models.Game.release_date == day, models.User.is_active == 1, models.not_god(), _pending())
+        .filter(models.Game.release_date.between(first, last), models.User.is_active == 1, models.not_god(), _pending())
         .distinct()
     ]
     waiting = wanters(db, game_ids)
     games_by_id = {game.id: game for game in db.query(models.Game).filter(models.Game.id.in_(game_ids))}
     found = [(games_by_id[game_id], [w["name"] for w in waiting[game_id]]) for game_id in game_ids]
-    return sorted(found, key=lambda item: (item[0].name or "").lower())
+    return sorted(found, key=lambda item: (item[0].release_date, (item[0].name or "").lower()))
 
 
 def releases_on(db: Session, day: datetime.date) -> list[tuple[models.User, models.Game, list[dict]]]:

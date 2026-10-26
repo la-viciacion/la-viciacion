@@ -8,7 +8,8 @@ from unittest.mock import MagicMock
 from src.utils import user_settings as us
 
 # the place and the birth date, not set
-UNSET = {"place_name": None, "place_latitude": None, "place_longitude": None, "birth_date": None}
+UNSET = {"place_name": None, "place_latitude": None, "place_longitude": None, "birth_date": None,
+         "wishlist_release_telegram": None, "wishlist_release_push": None}
 
 
 def db_with(row):
@@ -38,6 +39,8 @@ class ForgottenTimerHoursTests(unittest.TestCase):
                 "show_playing": None,
                 "forgotten_timer_telegram": None,
                 "forgotten_timer_push": None,
+                "wishlist_release_telegram": None,
+                "wishlist_release_push": None,
                 "place_name": None,
                 "place_latitude": None,
                 "place_longitude": None,
@@ -45,6 +48,8 @@ class ForgottenTimerHoursTests(unittest.TestCase):
                 "defaults": {
                     "forgotten_timer_telegram": us.DEFAULT_FORGOTTEN_TIMER_CHANNEL,
                     "forgotten_timer_push": us.DEFAULT_FORGOTTEN_TIMER_CHANNEL,
+                    "wishlist_release_telegram": us.DEFAULT_WISHLIST_RELEASE_CHANNEL,
+                    "wishlist_release_push": us.DEFAULT_WISHLIST_RELEASE_CHANNEL,
                     "forgotten_timer_hours": us.DEFAULT_FORGOTTEN_TIMER_HOURS,
                     "timer_notice_minutes": us.DEFAULT_TIMER_NOTICE_MINUTES,
                     "show_playing": us.DEFAULT_SHOW_PLAYING,
@@ -231,3 +236,24 @@ class UpdateTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class WishlistReleaseChannelsTests(unittest.TestCase):
+    def test_both_channels_are_on_until_the_user_chooses(self):
+        self.assertEqual(us.wishlist_release_channels(db_with(None), 1), (True, True))
+        row = SimpleNamespace(wishlist_release_telegram=None, wishlist_release_push=None)
+        self.assertEqual(us.wishlist_release_channels(db_with(row), 1), (True, True))
+
+    def test_each_channel_follows_its_own_choice_and_the_notices_do_not_share_them(self):
+        row = SimpleNamespace(wishlist_release_telegram=False, wishlist_release_push=None, forgotten_timer_telegram=True, forgotten_timer_push=False)
+        self.assertEqual(us.wishlist_release_channels(db_with(row), 1), (False, True))
+        self.assertEqual(us.forgotten_timer_channels(db_with(row), 1), (True, False))
+
+    def test_the_channels_are_saved_and_null_goes_back_to_the_default(self):
+        row = SimpleNamespace(user_id=7, forgotten_timer_hours=None, timer_notice_minutes=None, show_playing=None,
+                              forgotten_timer_telegram=None, forgotten_timer_push=None, **UNSET)
+        db = db_with(row)
+        us.update(db, 7, {"wishlist_release_telegram": False, "wishlist_release_push": False})
+        self.assertEqual((row.wishlist_release_telegram, row.wishlist_release_push), (False, False))
+        us.update(db, 7, {"wishlist_release_push": None})
+        self.assertEqual((row.wishlist_release_telegram, row.wishlist_release_push), (False, None))

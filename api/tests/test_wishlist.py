@@ -171,8 +171,36 @@ class EveNoticeTests(unittest.TestCase):
         for user_id, game_id in ((1, "b"), (2, "b"), (2, "a"), (3, "c"), (1, "d")):
             wishlist.add(db, user_id, game_id)
         db.commit()
-        found = wishlist.wished_releases_on(db, tomorrow)
+        found = wishlist.wished_releases_between(db, tomorrow, tomorrow)
         self.assertEqual([(g.id, names) for g, names in found], [("a", ["Bea"]), ("b", ["Ana", "Bea"])])
+
+    def test_a_range_lists_the_wished_releases_by_date_and_leaves_out_the_days_around_it(self):
+        db = make_session()
+        db.add_all([
+            models.User(id=1, username="ana", name="Ana", is_active=1),
+            models.Game(id="late", name="Late", release_date=D(2026, 12, 7), rawg_id=1),
+            models.Game(id="early", name="Zeta", release_date=D(2026, 12, 1), rawg_id=2),
+            models.Game(id="before", name="Before", release_date=D(2026, 11, 30), rawg_id=3),
+            models.Game(id="after", name="After", release_date=D(2026, 12, 8), rawg_id=4),
+        ])
+        db.commit()
+        for game_id in ("late", "early", "before", "after"):
+            wishlist.add(db, 1, game_id)
+        db.commit()
+        found = wishlist.wished_releases_between(db, D(2026, 12, 1), D(2026, 12, 7))
+        self.assertEqual([g.id for g, _ in found], ["early", "late"])
+
+
+class WeekNoticeTests(unittest.TestCase):
+    def test_the_group_notice_names_the_weekday_the_date_and_who_waits_for_it(self):
+        message = actions.wishlist_week_message([
+            ("Hades II", D(2026, 12, 7), ["Ana"], None),
+            ("Snake_Pass", D(2026, 12, 13), ["Ana", "Bea", "Cai"], "snake-pass"),
+        ])
+        self.assertEqual(message, (
+            "El lunes 7 sale *Hades II*. Está en la lista de deseados de Ana.\n\n"
+            "El domingo 13 sale [Snake\\_Pass](https://rawg.io/games/snake-pass). Está en la lista de deseados de Ana, Bea y Cai."
+        ))
 
 
 class RefreshReleaseDatesTests(unittest.TestCase):

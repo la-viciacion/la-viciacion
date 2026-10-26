@@ -93,8 +93,13 @@
 .pf-notice-name { font-weight: 600; }
 .pf-notice-box { display: flex; justify-content: center; cursor: pointer; }
 .pf-notice-box input { width: 20px; height: 20px; accent-color: var(--accent-teal); cursor: pointer; }
-.pf-notice-options { border-top: 1px solid var(--border); padding-top: 12px; }
+/* Each notice is one block (its row and, if it has them, its options) so the options read as part of it */
+.pf-notice-item { display: flex; flex-direction: column; gap: 12px; padding: 14px 0; border-top: 1px solid var(--border); }
+.pf-notice-options { padding: 12px 14px; background: var(--bg-surface); border-radius: var(--radius-sm); }
+.pf-notice-options summary { cursor: pointer; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600; }
+.pf-notice-fields { display: flex; flex-direction: column; gap: 12px; padding-top: 12px; }
 .pf-notice-options[hidden] { display: none; }
+.pf-notice-save { padding-top: 14px; border-top: 1px solid var(--border); }
 
 .pf-form label { display: flex; flex-direction: column; gap: 6px; font-size: 0.85rem; color: var(--text-secondary); font-weight: 600; }
 
