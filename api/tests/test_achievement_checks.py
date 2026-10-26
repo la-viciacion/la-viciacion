@@ -775,10 +775,11 @@ class LifetimeTests(unittest.IsolatedAsyncioTestCase):
         in_tables = {ach.name for table in tables for ach, _ in table}
         outside_world = {ach.name for ach in ach_module.EXTERNAL_LIFETIME}  # about when and what, not how much: no tables
         rescues = {ach.name for ach in ach_module.RESCUES_LIFETIME}  # about what happened to a game, not how much: no tables
+        challenges = {ach.name for ach, _ in ach_module.LIFETIME_CHALLENGES} | {ach.name for ach in ach_module.CHALLENGE_FEATS}  # about the challenges met: their own check
         by_name = {ach.name for ach in ach_module.AchievementsElems if is_lifetime(ach.name)}
-        self.assertEqual(in_tables | outside_world | rescues, by_name)  # a typo in the suffix would turn one into a seasonal one without a word
-        self.assertTrue(in_tables.isdisjoint(outside_world | rescues) and outside_world.isdisjoint(rescues))
-        self.assertEqual((len(in_tables), len(outside_world), len(rescues)), (20, 15, 2))
+        self.assertEqual(in_tables | outside_world | rescues | challenges, by_name)  # a typo in the suffix would turn one into a seasonal one without a word
+        self.assertTrue(in_tables.isdisjoint(outside_world | rescues | challenges) and outside_world.isdisjoint(rescues | challenges) and rescues.isdisjoint(challenges))
+        self.assertEqual((len(in_tables), len(outside_world), len(rescues), len(challenges)), (20, 15, 2, 5))
         for table in tables:
             self.assertTrue(all(is_lifetime(ach.name) for ach, _ in table))
         for table in (ach_module.TOTAL_HOURS, ach_module.TOTAL_DAYS, ach_module.PLAYED_GAMES, ach_module.COMPLETED_GAMES, ach_module.HOURS_IN_A_GAME):
@@ -1273,6 +1274,89 @@ LEGACY_2023 = {  # the achievements that existed before the rule 'every new one 
     "STREAK_15_DAYS", "STREAK_200_DAYS", "STREAK_300_DAYS", "STREAK_30_DAYS", "STREAK_365_DAYS", "STREAK_60_DAYS",
     "STREAK_7_DAYS", "TEAMWORK", "WORK_WEEK",
 }
+
+
+class ChallengeAchievementTests(unittest.IsolatedAsyncioTestCase):
+    """The achievements about the challenges a player met (the history is `crud.challenges.history`, tested with it)."""
+
+    PERSONAL = ("new_genre", "debt_reduction", "streak", "long_sessions", "variety", "wishlist")
+
+    def setUp(self):
+        self.db = make_session()
+        Achievements().populate_achievements(self.db)
+        self.db.query(models.Achievement).update({"valid_from_season": 2023, "special": 0, "secret": False})
+        self.db.commit()
+        self.sent = mock.AsyncMock()
+        patcher = mock.patch.object(ach_module.utils, "send_message", self.sent)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.view = Achievements(season=seasons.ALL, since=2023)
+
+    def awarded(self):
+        rows = (
+            self.db.query(models.Achievement.key, models.UserAchievement.date)
+            .join(models.UserAchievement, models.UserAchievement.achievement_id == models.Achievement.id)
+            .all()
+        )
+        return {key: date for key, date in rows}
+
+    def entry(self, number, kind="streak", scope="user", done=True, group_done=None, year=YEAR):
+        """A finished challenge of the history, the `number`-th of the player, ending on the 1st of that month."""
+        return {
+            "id": number, "kind": kind, "scope": scope, "title": "t", "done": done, "group_done": group_done,
+            "starts_on": datetime.date(year, 1, 1), "ends_on": datetime.date(year, 1, number),
+        }
+
+    async def check(self, entries):
+        with mock.patch("src.crud.challenges.history", return_value=entries):
+            await self.view.challenges_met(self.db, USER)
+
+    async def test_the_tiers_are_dated_the_end_of_the_challenge_that_reached_them(self):
+        await self.check([self.entry(n) for n in range(1, 6)])
+        self.assertEqual(self.awarded(), {"CHALLENGES_1_LIFETIME": datetime.date(YEAR, 1, 1), "CHALLENGES_5_LIFETIME": datetime.date(YEAR, 1, 5)})
+        self.assertEqual(self.sent.await_count, 2)
+
+    async def test_a_challenge_that_was_not_met_or_began_before_the_season_does_not_count(self):
+        self.view = Achievements(season=seasons.ALL, since=YEAR)
+        self.db.query(models.Achievement).update({"valid_from_season": YEAR})  # a lifetime view only awards what counts from its own season
+        self.db.commit()
+        await self.check([self.entry(1, done=False), self.entry(2, year=YEAR - 1)])
+        self.assertEqual(self.awarded(), {})
+        await self.check([self.entry(3)])
+        self.assertEqual(set(self.awarded()), {"CHALLENGES_1_LIFETIME"})
+
+    async def test_nothing_met_is_nothing_and_what_is_earned_is_not_announced_twice(self):
+        await self.check([])
+        self.assertEqual(self.awarded(), {})
+        await self.check([self.entry(1)])
+        await self.check([self.entry(1)])
+        self.assertEqual(self.sent.await_count, 1)
+
+    async def test_every_personal_kind_met_is_an_all_rounder_dated_the_challenge_that_completed_the_set(self):
+        entries = [self.entry(n + 1, kind=kind) for n, kind in enumerate(self.PERSONAL)]
+        await self.check(entries[:-1])
+        self.assertNotIn("ALL_ROUNDER_LIFETIME", self.awarded())
+        await self.check(entries)
+        self.assertEqual(self.awarded()["ALL_ROUNDER_LIFETIME"], datetime.date(YEAR, 1, len(self.PERSONAL)))
+
+    async def test_a_group_challenge_needs_the_groups_total_too_for_the_team_achievement(self):
+        await self.check([self.entry(1, kind="themed", scope="group", group_done=False)])
+        self.assertNotIn("TEAM_CHALLENGE_LIFETIME", self.awarded())
+        await self.check([self.entry(1, kind="themed", scope="group", group_done=False), self.entry(2, kind="game_of_month", scope="group", group_done=True)])
+        self.assertEqual(self.awarded()["TEAM_CHALLENGE_LIFETIME"], datetime.date(YEAR, 1, 2))
+
+    async def test_a_recalculation_only_notes_them(self):
+        collected = []
+        view = Achievements(season=seasons.ALL, since=2023, collected=collected)
+        with mock.patch("src.crud.challenges.history", return_value=[self.entry(1)]):
+            await view.challenges_met(self.db, USER)
+        self.assertEqual([(award.key, award.date) for award in collected], [("CHALLENGES_1_LIFETIME", datetime.date(YEAR, 1, 1))])
+        self.assertEqual((self.awarded(), self.sent.await_count), ({}, 0))
+
+    def test_the_personal_kinds_of_the_test_are_the_ones_of_the_code(self):
+        from src.utils import challenges
+
+        self.assertEqual({kind for kind, template in challenges.TEMPLATES.items() if template.scope == challenges.USER}, set(self.PERSONAL))
 
 
 class CatalogueTests(unittest.TestCase):

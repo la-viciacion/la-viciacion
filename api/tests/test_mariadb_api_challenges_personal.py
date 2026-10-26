@@ -1,8 +1,10 @@
 """The personal challenges made from the sessions and the lists (streak, long sessions, variety of genres, wishlist),
 through real requests (MariaDB required, see api_support.py): their options and what counts for their progress."""
+import asyncio
 from datetime import datetime, timedelta
 
 from src.database import database, models
+from src.utils import actions
 from tests import test_mariadb_api_challenges as base
 
 TODAY = base.TODAY
@@ -140,3 +142,32 @@ class WishlistTests(PersonalTestCase):
             row.completed, row.completed_date = 1, TODAY()
             db.commit()
         self.assertTrue(self.part(challenge["id"])["done"])
+
+
+class AchievementTests(PersonalTestCase):
+    def earned(self):
+        """Run the lifetime checks of Ana, as the check after a stopped timer does, and say what she has."""
+        async def run():
+            with database.SessionLocal() as db:
+                await actions.check_user_lifetime(db, db.get(models.User, self.ana), silent=True)
+
+        asyncio.run(run())
+        return {key for (key,) in self.rows("SELECT a.`key` FROM users_achievements ua JOIN achievements a ON a.id = ua.achievement_id WHERE ua.user_id = :u", u=self.ana)}
+
+    def test_a_met_challenge_earns_its_achievement_once_it_is_over_and_not_before(self):
+        with database.SessionLocal() as db:  # new achievements count from 2027: this one is switched to the season under test
+            db.query(models.Achievement).filter_by(key="CHALLENGES_1_LIFETIME").update({"valid_from_season": TODAY().year})
+            db.commit()
+        challenge = self.launch_personal("long_sessions", sessions=1, minutes=30, duration="week").json()["id"]
+        self.play(self.ana, "hades", 0, 45)
+        self.assertTrue(self.part(challenge)["done"])
+        self.assertEqual(self.earned(), set())  # met, but still running
+        with database.SessionLocal() as db:
+            row = db.get(models.Challenge, challenge)
+            row.starts_on, row.ends_on = TODAY() - timedelta(days=10), TODAY() - timedelta(days=3)
+            db.commit()
+        self.play(self.ana, "celeste", 5, 45)  # inside the period it has now
+        self.assertEqual(self.earned(), {"CHALLENGES_1_LIFETIME"})
+        self.assertEqual(self.scalar("SELECT DATE(ua.date) FROM users_achievements ua"), TODAY() - timedelta(days=3))  # dated the day it ended
+        self.assertEqual(self.earned(), {"CHALLENGES_1_LIFETIME"})  # earned once
+        self.assertEqual(self.scalar("SELECT COUNT(*) FROM users_achievements"), 1)

@@ -9,6 +9,7 @@ from ..config import Config
 from ..crud import time_entries, users, games
 from ..database import models
 from ..utils import my_utils as utils
+from ..utils import challenges as challenge_templates
 from ..utils.achievements import AchievementsElems, first_season
 from ..utils.logger import LogManager
 from ..utils import external_events, seasons, streaks, user_settings, weather
@@ -98,6 +99,9 @@ LIFETIME_COMPLETED_GAMES = (
     (E.COMPLETED_1000_GAMES_LIFETIME, 1000),
 )
 LIFETIME_HOURS_IN_A_GAME = ((E.PLAYED_1000_HOURS_GAME_LIFETIME, 1000),)
+# The challenges (key ending in _LIFETIME too): the ones a player met once they were over, and two feats about which
+LIFETIME_CHALLENGES = ((E.CHALLENGES_1_LIFETIME, 1), (E.CHALLENGES_5_LIFETIME, 5), (E.CHALLENGES_15_LIFETIME, 15))
+CHALLENGE_FEATS = (E.ALL_ROUNDER_LIFETIME, E.TEAM_CHALLENGE_LIFETIME)
 # "El hijo pródigo": days without playing, "Semana laboral": hours in a week, "Todos a una": players on a game
 PRODIGAL_GAP_DAYS = 30
 WORK_WEEK_HOURS = 40
@@ -628,6 +632,39 @@ class Achievements:
                     have.add(ach.name)
             if len(have) == len(RESCUES_LIFETIME):
                 return
+
+    async def challenges_met(self, db: Session, user: models.User, silent: bool = False):
+        """The achievements about challenges, over the history from the season they start to count in (`since`: a
+        challenge that began earlier does not count). A challenge counts once it is over and the player met their part;
+        each is dated the day it ended. The tiers (1, 5 and 15) are dated the end of the challenge that reached them;
+        "Todoterreno" is a challenge met of every personal kind, "Misión cumplida entre todos" a group challenge whose
+        total was reached too. They look at the finished challenges only, so they are earned by the first check after
+        the end (the next one that runs for the player), never while a challenge is running."""
+        names = [ach.name for ach, _ in LIFETIME_CHALLENGES] + [ach.name for ach in CHALLENGE_FEATS]
+        have = self.achieved_keys(db, user.id, names)
+        if len(have) == len(names):
+            return  # the common case costs one query
+        from . import challenges as challenges_crud  # that module imports the ones that import this one
+
+        met = sorted(
+            (entry for entry in challenges_crud.history(db, user.id, datetime.date.today()) if entry["done"] and entry["starts_on"].year >= (self.since or 0)),
+            key=lambda entry: (entry["ends_on"], entry["id"]),
+        )
+        if not met:
+            return
+        await self._unlock_reached(
+            db, user, len(met), LIFETIME_CHALLENGES, silent, date_for=lambda needed: str(met[needed - 1]["ends_on"])
+        )
+        every_kind = {kind for kind, template in challenge_templates.TEMPLATES.items() if template.scope == challenge_templates.USER}
+        seen: set[str] = set()
+        for entry in met:
+            seen.add(entry["kind"])
+            if every_kind <= seen:
+                await self._unlock_if_new(db, user, E.ALL_ROUNDER_LIFETIME, silent, date=str(entry["ends_on"]))
+                break
+        team = next((entry for entry in met if entry["scope"] == challenge_templates.GROUP and entry["group_done"]), None)
+        if team is not None:
+            await self._unlock_if_new(db, user, E.TEAM_CHALLENGE_LIFETIME, silent, date=str(team["ends_on"]))
 
     async def release_day(self, db: Session, user: models.User, silent: bool = False):
         """A session of a game that began on the day the game came out (wished or not)."""

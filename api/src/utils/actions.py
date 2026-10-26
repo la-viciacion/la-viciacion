@@ -84,6 +84,7 @@ async def check_user_lifetime(
         await view.archaeologist(db, user, silent=silent)
         await view.birth_year_game(db, user, silent=silent)
         await view.rescued_games(db, user, silent=silent)
+        await view.challenges_met(db, user, silent=silent)
 
 
 async def check_users(
