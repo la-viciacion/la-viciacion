@@ -1,7 +1,7 @@
 import datetime
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -10,7 +10,8 @@ from ..auth import get_db
 from ..crud import challenge_proposals as proposals
 from ..crud import challenges as crud
 from ..database import models
-from ..utils.challenges import GROUP, TEMPLATES, ChallengeConflict, ChallengeError, available_tags
+from ..utils import actions
+from ..utils.challenges import DUEL, GROUP, TEMPLATES, ChallengeConflict, ChallengeError, available_tags
 
 router = APIRouter(
     prefix="/challenges",
@@ -79,6 +80,7 @@ def get_my_proposals(
 @router.post("/proposals", status_code=201)
 def propose_challenge(
     body: NewProposal,
+    background_tasks: BackgroundTasks,
     current_user: models.User = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db),
 ):
@@ -90,6 +92,7 @@ def propose_challenge(
         raise HTTPException(status_code=409, detail=str(e))
     except ChallengeError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    background_tasks.add_task(actions.after_proposal_made, proposal.id)
     return proposals.view(db, proposal)
 
 
@@ -148,6 +151,7 @@ def get_challenge(
 @router.post("", status_code=201)
 def launch_challenge(
     body: NewChallenge,
+    background_tasks: BackgroundTasks,
     current_user: models.User = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db),
 ):
@@ -167,6 +171,8 @@ def launch_challenge(
         raise HTTPException(status_code=409, detail=str(e))
     except ChallengeError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    if challenge.scope == DUEL:
+        background_tasks.add_task(actions.after_duel_launch, challenge.id)
     return crud.view(db, challenge, current_user.id, today)
 
 
@@ -174,6 +180,7 @@ def launch_challenge(
 def set_participation(
     challenge_id: int,
     joined: bool,
+    background_tasks: BackgroundTasks,
     current_user: models.User = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db),
 ):
@@ -183,7 +190,10 @@ def set_participation(
     today = datetime.date.today()
     if not crud.can_opt_out(challenge, today, current_user.id):
         raise HTTPException(status_code=409, detail="En este reto no se puede cambiar la participación")
+    already_declined = crud.declined(db, challenge)
     crud.opt(db, challenge, current_user.id, joined)
+    if challenge.scope == DUEL and not joined and not already_declined:  # asking twice tells nobody twice
+        background_tasks.add_task(actions.after_duel_decline, challenge.id)
     return crud.view(db, challenge, current_user.id, today)
 
 

@@ -75,6 +75,11 @@ class UserSettings(Base):
     # channels of the notice of the day a wished game comes out (NULL = the default: on); off when both are off
     wishlist_release_telegram = Column(Boolean, nullable=True)
     wishlist_release_push = Column(Boolean, nullable=True)
+    # where the notices about the player's challenges go (NULL = the default: the notices on, the reminders off)
+    challenge_notices_telegram = Column(Boolean, nullable=True)
+    challenge_notices_push = Column(Boolean, nullable=True)
+    challenge_reminders_telegram = Column(Boolean, nullable=True)
+    challenge_reminders_push = Column(Boolean, nullable=True)
     # minutes between refreshes of the running-timer push notification (10-120)
     timer_notice_minutes = Column(SmallInteger, nullable=True)
     # whether the others see this player in "playing now" (NULL = the default: shown)

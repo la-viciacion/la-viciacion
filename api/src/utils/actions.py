@@ -10,7 +10,7 @@ from ..crud import challenges as challenges_crud
 from ..crud import games, rankings, time_entries, users, wishlist
 from ..crud.achievements import Achievements, Played
 from ..database import models
-from . import challenges, my_utils as utils
+from . import challenge_notices, challenges, my_utils as utils
 from . import push, rawg_sync
 from ..utils import seasons, streaks, user_settings
 from .logger import LogManager
@@ -529,6 +529,40 @@ async def announce_challenge_launch(db: Session, challenge_id: int) -> str:
     voluntary = "\nEs voluntario: apúntate en Retos." if challenge.participation == challenges.OPT_IN else ""
     await utils.send_message(f"🎯 *Nuevo reto del grupo*\n*{title}*\n{template.summary(challenge)}{voluntary}", False)
     return "sent"
+
+
+def _in_background(label: str, work):
+    """Run `work(db)` (a coroutine function) for a follow-up of a request: its own session, and an error is only logged."""
+    from ..database.database import SessionLocal
+
+    async def _run():
+        with SessionLocal() as db:
+            return await work(db)
+
+    try:
+        asyncio.run(_run())
+    except Exception as e:
+        logger.error(f"Error in the notice of {label}: {e}", exc_info=True)
+
+
+def after_duel_launch(challenge_id: int):
+    """Background-task entrypoint: the challenged player hears about the duel."""
+    _in_background("a duel", lambda db: challenge_notices.duel_launched(db, challenge_id))
+
+
+def after_duel_decline(challenge_id: int):
+    """Background-task entrypoint: the challenger hears the duel was turned down."""
+    _in_background("a declined duel", lambda db: challenge_notices.duel_declined(db, challenge_id))
+
+
+def after_proposal_made(proposal_id: int):
+    """Background-task entrypoint: the admins find the proposal in their inbox."""
+    _in_background("a proposal", lambda db: challenge_notices.proposal_made(db, proposal_id))
+
+
+def after_proposal_decided(proposal_id: int):
+    """Background-task entrypoint: the proposer hears how it was answered."""
+    _in_background("a decided proposal", lambda db: challenge_notices.proposal_decided(db, proposal_id))
 
 
 async def announce_challenge_totals(db: Session, today: datetime.date | None = None) -> int:

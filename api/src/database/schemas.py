@@ -36,6 +36,11 @@ class UserSettingsUpdate(BaseModel):
     # channels of the notice of the day a wished game comes out; None goes back to the default (on)
     wishlist_release_telegram: bool | None = None
     wishlist_release_push: bool | None = None
+    # channels of the notices about the player's challenges (on by default) and of the reminders (off by default)
+    challenge_notices_telegram: bool | None = None
+    challenge_notices_push: bool | None = None
+    challenge_reminders_telegram: bool | None = None
+    challenge_reminders_push: bool | None = None
     # whole minutes, 10-120 (checked in the route)
     timer_notice_minutes: int | None = None
     # whether the others see the user in "playing now"; None goes back to the default (shown)

@@ -9,7 +9,8 @@ from src.utils import user_settings as us
 
 # the place and the birth date, not set
 UNSET = {"place_name": None, "place_latitude": None, "place_longitude": None, "birth_date": None,
-         "wishlist_release_telegram": None, "wishlist_release_push": None}
+         "wishlist_release_telegram": None, "wishlist_release_push": None, "challenge_notices_telegram": None, "challenge_notices_push": None,
+         "challenge_reminders_telegram": None, "challenge_reminders_push": None}
 
 
 def db_with(row):
@@ -41,6 +42,10 @@ class ForgottenTimerHoursTests(unittest.TestCase):
                 "forgotten_timer_push": None,
                 "wishlist_release_telegram": None,
                 "wishlist_release_push": None,
+                "challenge_notices_telegram": None,
+                "challenge_notices_push": None,
+                "challenge_reminders_telegram": None,
+                "challenge_reminders_push": None,
                 "place_name": None,
                 "place_latitude": None,
                 "place_longitude": None,
@@ -50,6 +55,10 @@ class ForgottenTimerHoursTests(unittest.TestCase):
                     "forgotten_timer_push": us.DEFAULT_FORGOTTEN_TIMER_CHANNEL,
                     "wishlist_release_telegram": us.DEFAULT_WISHLIST_RELEASE_CHANNEL,
                     "wishlist_release_push": us.DEFAULT_WISHLIST_RELEASE_CHANNEL,
+                    "challenge_notices_telegram": us.DEFAULT_CHALLENGE_NOTICES_CHANNEL,
+                    "challenge_notices_push": us.DEFAULT_CHALLENGE_NOTICES_CHANNEL,
+                    "challenge_reminders_telegram": us.DEFAULT_CHALLENGE_REMINDERS_CHANNEL,
+                    "challenge_reminders_push": us.DEFAULT_CHALLENGE_REMINDERS_CHANNEL,
                     "forgotten_timer_hours": us.DEFAULT_FORGOTTEN_TIMER_HOURS,
                     "timer_notice_minutes": us.DEFAULT_TIMER_NOTICE_MINUTES,
                     "show_playing": us.DEFAULT_SHOW_PLAYING,

@@ -160,6 +160,14 @@ REGISTRY: dict[str, Spec] = {
     # The deployment the keys were made for (utils/push.current_origin): a database copied to another one keeps keys that
     # still reach the devices of the first, so push stays off until the keys are made again there.
     "push.vapid_origin": Spec("str", None),
+    # The notices about the challenges (utils/challenge_notices.py): what concerns each player (a duel, a proposal and how
+    # their challenges ended), the group hearing how a group challenge ended, and the reminders that a challenge is about
+    # to end (each player turns those on). Two daily jobs, at their own hour
+    "challenges.private_notices": Spec("bool", True),
+    "challenges.result_notice": Spec("bool", True),
+    "challenges.reminders": Spec("bool", True),
+    "challenges.results_time": Spec("str", "09:30", check=_time),
+    "challenges.reminders_time": Spec("str", "10:00", check=_time),
     # Days the app's notification inbox keeps a notice before the scheduler purges it (utils/inbox.py)
     "inbox.retention_days": Spec("int", 14, check=_retention),
     # AI text for the notices (utils/ai.py). The key is AI_API_KEY and is never stored;
