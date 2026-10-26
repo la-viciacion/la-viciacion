@@ -158,15 +158,17 @@ class AchievementTests(PersonalTestCase):
         with database.SessionLocal() as db:  # new achievements count from 2027: this one is switched to the season under test
             db.query(models.Achievement).filter_by(key="CHALLENGES_1_LIFETIME").update({"valid_from_season": TODAY().year})
             db.commit()
-        challenge = self.launch_personal("long_sessions", sessions=1, minutes=30, duration="week").json()["id"]
+        personal = self.launch_personal("long_sessions", sessions=1, minutes=30, duration="week").json()["id"]
+        challenge = self.launch(min_hours_each=0.5, min_hours_total=0.5).json()["id"]  # a group one: the tiers count those
         self.play(self.ana, "hades", 0, 45)
-        self.assertTrue(self.part(challenge)["done"])
+        self.assertTrue(self.part(challenge)["done"] and self.part(personal)["done"])
         self.assertEqual(self.earned(), set())  # met, but still running
         with database.SessionLocal() as db:
-            row = db.get(models.Challenge, challenge)
-            row.starts_on, row.ends_on = TODAY() - timedelta(days=10), TODAY() - timedelta(days=3)
+            for challenge_id in (challenge, personal):
+                row = db.get(models.Challenge, challenge_id)
+                row.starts_on, row.ends_on = TODAY() - timedelta(days=10), TODAY() - timedelta(days=3)
             db.commit()
-        self.play(self.ana, "celeste", 5, 45)  # inside the period it has now
+        self.play(self.ana, "hades", 5, 45)  # inside the period it has now
         self.assertEqual(self.earned(), {"CHALLENGES_1_LIFETIME"})
         self.assertEqual(self.scalar("SELECT DATE(ua.date) FROM users_achievements ua"), TODAY() - timedelta(days=3))  # dated the day it ended
         self.assertEqual(self.earned(), {"CHALLENGES_1_LIFETIME"})  # earned once

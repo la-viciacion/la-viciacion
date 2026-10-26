@@ -636,10 +636,10 @@ class Achievements:
     async def challenges_met(self, db: Session, user: models.User, silent: bool = False):
         """The achievements about challenges, over the history from the season they start to count in (`since`: a
         challenge that began earlier does not count). A challenge counts once it is over and the player met their part
-        (a duel never does, for now: it is easy to win against nobody);
-        each is dated the day it ended. The tiers (1, 5 and 15) are dated the end of the challenge that reached them;
-        "Todoterreno" is a challenge met of every personal kind, "Misión cumplida entre todos" a group challenge whose
-        total was reached too. They look at the finished challenges only, so they are earned by the first check after
+        (a duel never does, for now: it is easy to win against nobody); each is dated the day it ended. The tiers (1, 5
+        and 15) count the **group's** challenges only, since a personal one is chosen by the player and could be made
+        as easy as wished, and are dated the end of the challenge that reached them; "Todoterreno" is a challenge met
+        of every personal kind, "Misión cumplida entre todos" a group challenge whose total was reached too. They look at the finished challenges only, so they are earned by the first check after
         the end (the next one that runs for the player), never while a challenge is running."""
         names = [ach.name for ach, _ in LIFETIME_CHALLENGES] + [ach.name for ach in CHALLENGE_FEATS]
         have = self.achieved_keys(db, user.id, names)
@@ -653,8 +653,9 @@ class Achievements:
         )
         if not met:
             return
+        group_met = [entry for entry in met if entry["scope"] == challenge_templates.GROUP]
         await self._unlock_reached(
-            db, user, len(met), LIFETIME_CHALLENGES, silent, date_for=lambda needed: str(met[needed - 1]["ends_on"])
+            db, user, len(group_met), LIFETIME_CHALLENGES, silent, date_for=lambda needed: str(group_met[needed - 1]["ends_on"])
         )
         every_kind = {kind for kind, template in challenge_templates.TEMPLATES.items() if template.scope == challenge_templates.USER}
         seen: set[str] = set()
@@ -663,7 +664,7 @@ class Achievements:
             if every_kind <= seen:
                 await self._unlock_if_new(db, user, E.ALL_ROUNDER_LIFETIME, silent, date=str(entry["ends_on"]))
                 break
-        team = next((entry for entry in met if entry["scope"] == challenge_templates.GROUP and entry["group_done"]), None)
+        team = next((entry for entry in group_met if entry["group_done"]), None)
         if team is not None:
             await self._unlock_if_new(db, user, E.TEAM_CHALLENGE_LIFETIME, silent, date=str(team["ends_on"]))
 

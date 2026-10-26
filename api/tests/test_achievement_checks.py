@@ -1313,7 +1313,7 @@ class ChallengeAchievementTests(unittest.IsolatedAsyncioTestCase):
         self.asked = history.call_args.args[3]
 
     async def test_the_tiers_are_dated_the_end_of_the_challenge_that_reached_them(self):
-        await self.check([self.entry(n) for n in range(1, 6)])
+        await self.check([self.entry(n, kind="themed", scope="group") for n in range(1, 6)])
         self.assertEqual(self.awarded(), {"CHALLENGES_1_LIFETIME": datetime.date(YEAR, 1, 1), "CHALLENGES_5_LIFETIME": datetime.date(YEAR, 1, 5)})
         self.assertEqual(self.sent.await_count, 2)
 
@@ -1323,21 +1323,25 @@ class ChallengeAchievementTests(unittest.IsolatedAsyncioTestCase):
         self.db.commit()
         await self.check([self.entry(1, done=False)])  # the ones that began before the season never arrive: history(since_year) leaves them out
         self.assertEqual(self.awarded(), {})
-        await self.check([self.entry(3)])
+        await self.check([self.entry(3, kind="themed", scope="group")])
         self.assertEqual(set(self.awarded()), {"CHALLENGES_1_LIFETIME"})
         self.assertEqual(self.asked, YEAR)
 
     async def test_a_duel_never_counts_however_it_went(self):
         await self.check([self.entry(n, kind="duel_hours", scope="duel") for n in range(1, 17)])
         self.assertEqual(self.awarded(), {})
-        await self.check([self.entry(20)])  # a personal one next to them does
+        await self.check([self.entry(20, kind="themed", scope="group")])  # a group one next to them does
         self.assertEqual(set(self.awarded()), {"CHALLENGES_1_LIFETIME"})
+
+    async def test_personal_challenges_never_count_for_the_tiers_however_many_there_are(self):
+        await self.check([self.entry(n) for n in range(1, 17)])  # sixteen personal ones, all of the same kind
+        self.assertEqual(self.awarded(), {})
 
     async def test_nothing_met_is_nothing_and_what_is_earned_is_not_announced_twice(self):
         await self.check([])
         self.assertEqual(self.awarded(), {})
-        await self.check([self.entry(1)])
-        await self.check([self.entry(1)])
+        await self.check([self.entry(1, kind="themed", scope="group")])
+        await self.check([self.entry(1, kind="themed", scope="group")])
         self.assertEqual(self.sent.await_count, 1)
 
     async def test_every_personal_kind_met_is_an_all_rounder_dated_the_challenge_that_completed_the_set(self):
@@ -1356,7 +1360,7 @@ class ChallengeAchievementTests(unittest.IsolatedAsyncioTestCase):
     async def test_a_recalculation_only_notes_them(self):
         collected = []
         view = Achievements(season=seasons.ALL, since=2023, collected=collected)
-        with mock.patch("src.crud.challenges.history", return_value=[self.entry(1)]):
+        with mock.patch("src.crud.challenges.history", return_value=[self.entry(1, kind="themed", scope="group")]):
             await view.challenges_met(self.db, USER)
         self.assertEqual([(award.key, award.date) for award in collected], [("CHALLENGES_1_LIFETIME", datetime.date(YEAR, 1, 1))])
         self.assertEqual((self.awarded(), self.sent.await_count), ({}, 0))
