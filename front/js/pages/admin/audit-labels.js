@@ -9,6 +9,8 @@ const ENTITY = {
   library: 'entrada de biblioteca',
   scores: 'puntuación',
   challenges: 'reto',
+  'challenge-proposals': 'propuesta de reto',
+  'challenge-schedules': 'reto recurrente',
   achievements: 'logro',
   'user-achievements': 'logro concedido',
 };
@@ -21,6 +23,8 @@ const ACTIONS = [
   ['POST', /^settings\/test-/, 'Probó un ajuste'],
   ['POST', /^push\/announce$/, 'Envió un aviso en la app'],
   ['POST', /^telegram\/announce$/, 'Envió un aviso por Telegram'],
+  ['POST', /^challenge-proposals\/\d+\/approve$/, 'Aprobó una propuesta de reto y lo lanzó'],
+  ['POST', /^challenge-proposals\/\d+\/reject$/, 'Rechazó una propuesta de reto'],
   ['POST', /^check-achievements$/, 'Pidió comprobar los logros'],
   ['POST', /^recalculate-achievements$/, 'Pidió recalcular todos los logros'],
   ['POST', /^rawg-sync\//, 'Usó la sincronización con RAWG'],

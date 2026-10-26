@@ -369,3 +369,4 @@
 .nt-remove:hover { color: #fca5a5; background: rgba(239, 68, 68, 0.15); }
 .ch-game-results { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
 .ch-game-results:empty { display: none; }
+.ch-head-actions { display: flex; gap: 8px; flex-wrap: wrap; }

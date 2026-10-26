@@ -66,3 +66,10 @@ test('an event shows its data and where it came from', () => {
   assert.deepEqual(parts.map(([title]) => title), ['Datos', 'Desde']);
   assert.equal(parts[1][1], '203.0.113.7 · Firefox');
 });
+
+test('deciding a proposal and the schedules read as sentences', () => {
+  assert.equal(describe({ method: 'POST', path: '/api/v1/manage/challenge-proposals/7/approve', entity: 'challenge-proposals', entity_id: '7' }), 'Aprobó una propuesta de reto y lo lanzó');
+  assert.equal(describe({ method: 'POST', path: '/api/v1/manage/challenge-proposals/7/reject', entity: 'challenge-proposals', entity_id: '7' }), 'Rechazó una propuesta de reto');
+  assert.equal(describe({ method: 'POST', path: '/api/v1/manage/challenge-schedules', entity: 'challenge-schedules', entity_id: '3' }), 'Creó reto recurrente #3');
+  assert.equal(describe({ method: 'DELETE', path: '/api/v1/manage/challenge-proposals/7', entity: 'challenge-proposals', entity_id: '7' }), 'Borró propuesta de reto #7');
+});

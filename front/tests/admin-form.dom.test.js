@@ -92,3 +92,53 @@ test('the base game can be taken off, and saving sends it as empty', async () =>
   assert.equal(sent[0].body.parent_game_id, null);
   assert.equal(sent[0].body.is_dlc, true); // a DLC without a base game is fine
 });
+
+test('a choice field shows the value of the row when editing, and the default only when there is none', () => {
+  const choice = { key: 'participation', label: 'Quién', type: 'choice', default: 'auto', options: [['auto', 'Todos'], ['opt_in', 'Voluntario']] };
+  openForm({ name: (r) => r.label, fields: [choice] }, { label: 'x', participation: 'opt_in' }, null);
+  assert.equal(document.getElementById('f_participation').value, 'opt_in');
+  closeAllModals();
+  openForm({ name: (r) => r.label, fields: [choice] }, { label: 'x' }, null);
+  assert.equal(document.getElementById('f_participation').value, 'auto');
+});
+
+test('a games field lists the games of the row, adds one from the search, never twice, removes one and sends the ids', async () => {
+  const sent = [];
+  globalThis.fetch = async (url, options = {}) => {
+    sent.push({ url: String(url), method: options.method || 'GET', body: options.body ? JSON.parse(options.body) : undefined });
+    const body = String(url).includes('/manage/games?search=') ? { items: [{ id: 'celeste', name: 'Celeste <i>', image_url: null }] } : {};
+    return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  };
+  const games = { key: 'games', label: 'Juegos', type: 'games', required: true };
+  openForm({ name: (r) => r.label, endpoint: '/manage/challenge-schedules', fields: [games] }, { id: 4, games: [{ id: 'hades', name: 'Hades' }] }, { reload: async () => {} });
+  assert.deepEqual([...document.querySelectorAll('#f_games li span')].map((el) => el.textContent), ['Hades']);
+
+  document.querySelector('[data-gameadd="games"]').click();
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  const input = document.querySelector('.modal-search-input');
+  input.value = 'cel';
+  input.dispatchEvent(new window.Event('input', { bubbles: true }));
+  await new Promise((resolve) => setTimeout(resolve, 350));
+  document.querySelector('.modal-result-row').click();
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.deepEqual([...document.querySelectorAll('#f_games li')].map((li) => li.dataset.id), ['hades', 'celeste']);
+  assert.equal(document.querySelectorAll('#f_games li i').length, 0); // the name is text, never markup
+
+  document.querySelector('#f_games li [data-gameremove]').click(); // takes Hades off
+  assert.deepEqual([...document.querySelectorAll('#f_games li')].map((li) => li.dataset.id), ['celeste']);
+  document.querySelector('.modal-content form').requestSubmit();
+  await new Promise((resolve) => setImmediate(resolve));
+  const patch = sent.find((s) => s.method === 'PATCH');
+  assert.equal(patch.url, '/api/v1/manage/challenge-schedules/4');
+  assert.deepEqual(patch.body, { games: ['celeste'] });
+});
+
+test('a list of games that is required cannot be empty', async () => {
+  const sent = [];
+  globalThis.fetch = async (url) => { sent.push(String(url)); return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }); };
+  openForm({ name: (r) => r.label, endpoint: '/x', fields: [{ key: 'games', label: 'Juegos de la rotación', type: 'games', required: true }] }, { id: 1, games: [] }, { reload: async () => {} });
+  document.querySelector('.modal-content form').requestSubmit();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.match(document.querySelector('.adm-error').textContent, /Falta: Juegos de la rotación/);
+  assert.deepEqual(sent, []);
+});
