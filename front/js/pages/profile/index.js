@@ -49,6 +49,7 @@ let main;
 let user;
 let group = SETTINGS[0][0]; // the group of Ajustes on screen
 let avatarUrl;
+let recapsOpen = false; // the panel keeps the recaps open: the card of the profile is there every day
 let opened; // tabs already initialised
 let summaryGames; // the list of Resumen (the season on screen)
 let myGames; // the list of Mis juegos (every season)
@@ -66,9 +67,11 @@ export async function render(ctx) {
   await load();
 }
 
+const recapsAreOpen = () => api('/statistics/recap-access').then((access) => Boolean(access?.selectable), () => false);
+
 async function load() {
   let data;
-  [data, avatarUrl] = await Promise.all([api(userPath('profile')), loadAvatarUrl(user.username)]);
+  [data, avatarUrl, recapsOpen] = await Promise.all([api(userPath('profile')), loadAvatarUrl(user.username), recapsAreOpen()]);
   if (!data) return;
   shown = null;
   onScreen = data.season;
@@ -217,7 +220,7 @@ function draw(d) {
           </div>
         </div>
       </div>
-      ${recapCard()}
+      ${recapCard(new Date(), recapsOpen)}
       <div class="pf-season" id="pfSeasons" role="group" aria-label="Temporada">${seasonPills(d)}</div>
       <section class="pf-stats" id="pfStats" aria-label="Estadísticas: ${seasonName(d)}">${statsView(d)}</section>
       <div class="pf-cols">

@@ -388,7 +388,7 @@ ENTITIES.sends = {
   label: 'Envíos',
   description: 'Interruptor general de notificaciones y cuándo se envían el resumen semanal, el aviso de estrenos, el mensual y el anual.',
   custom: 'settings',
-  sections: ['notifications', 'inbox', 'weekly', 'wishlist', 'monthly', 'annual'],
+  sections: ['notifications', 'inbox', 'wishlist', 'weekly', 'monthly', 'annual', 'access'],
 };
 ENTITIES.channels = {
   label: 'Canales',

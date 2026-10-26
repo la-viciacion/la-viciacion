@@ -22,7 +22,7 @@ let explicit = false; // the address names the period: because it came so or bec
 let username; // whose recap: yours unless an admin asks for another player's
 let view = 'player'; // 'player' | 'group'
 let data = null;
-let selectable = false; // whether this player may choose the period: an admin, or everybody while the panel keeps the recaps open
+let selectable = false; // whether the period can be chosen: while the panel keeps the recaps open, or for an admin whose address names a player (the panel's links)
 let navigation = 0; // only the latest request may draw
 
 const cover = (game) => (game.image_url
@@ -136,7 +136,7 @@ function header() {
       <h1 class="pf-title pg-title">Resumen</h1>
       ${selectable ? html`<div class="rc-picker">${picker()}</div>` : ''}
     </div>
-    <a class="pf-btn primary rc-story" id="rcStory" href="${storyHref(period, otherPlayer() ? username : null)}">▶ ${otherPlayer() ? `Ver la historia de ${username}` : 'Ver mi historia'}</a>
+    <a class="pf-btn primary rc-story" id="rcStory" href="${storyHref(period, username)}">▶ ${otherPlayer() ? `Ver la historia de ${username}` : 'Ver mi historia'}</a>
     <div class="gc-toggles" role="tablist">
       <button type="button" class="gc-toggle" role="tab" data-view="player" aria-pressed="${String(view === 'player')}">${otherPlayer() ? username : 'Tú'}</button>
       <button type="button" class="gc-toggle rc-group-toggle" role="tab" data-view="group" aria-pressed="${String(view === 'group')}">El grupo</button>
@@ -153,10 +153,10 @@ function draw() {
 
 async function load() {
   const id = ++navigation;
-  if (explicit) history.replaceState(null, '', recapHref(period, otherPlayer() ? username : null));
+  if (explicit) history.replaceState(null, '', recapHref(period, username)); // an admin's own name stays too: it is what lifts a player's limits
   mount(main, html`${header()}<div id="rcBody" class="pf-sub">Cargando…</div>`);
   try {
-    const result = await api(`/statistics/recap/${period}?username=${encodeURIComponent(username || me.username)}`);
+    const result = await api(`/statistics/recap/${period}?username=${encodeURIComponent(username || me.username)}${username ? '&unrestricted=true' : ''}`);
     if (id !== navigation) return;
     data = result;
     draw();
@@ -177,7 +177,7 @@ export async function render({ user, main: target }) {
   username = user.is_admin ? asked.username : null;
   view = 'player';
   data = null;
-  selectable = await api('/statistics/recap-access').then((access) => access.selectable, () => false);
+  selectable = Boolean(username) || await api('/statistics/recap-access').then((access) => access.selectable, () => false);
   main.onchange = (event) => {
     const { id, value } = event.target;
     // picked, not addressed: a season still running is never reached this way, only by a link already pointing at it

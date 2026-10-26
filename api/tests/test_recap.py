@@ -314,10 +314,10 @@ class GetRecapEndpointTests(unittest.TestCase):
         self.player = models.User(id=1, username="ana", is_admin=False)
         self.admin = models.User(id=2, username="god", is_admin=True)
 
-    def get(self, period, user=None, unlocked_year=0, always=True):
+    def get(self, period, user=None, unlocked_year=0, always=True, unrestricted=False):
         values = {"annual.unlocked_year": unlocked_year, "recap.always_available": always}
         with mock.patch.object(statistics.settings, "get", side_effect=values.__getitem__):
-            return get_recap(period, username=None, active_user=user or self.player, db=self.db)
+            return get_recap(period, username=None, unrestricted=unrestricted, active_user=user or self.player, db=self.db)
 
     def test_a_finished_month_is_served(self):
         today = datetime.date.today()
@@ -345,9 +345,16 @@ class GetRecapEndpointTests(unittest.TestCase):
             self.get(year)
         self.assertEqual((refused.exception.status_code, refused.exception.detail), (400, messages.RECAP_SEASON_LOCKED))
 
-    def test_an_admin_sees_the_locked_season_anyway(self):
-        got = self.get(str(datetime.date.today().year), user=self.admin)
-        self.assertFalse(got["complete"])
+    def test_an_admin_is_locked_out_like_a_player_unless_the_panel_asks_for_it_unrestricted(self):
+        year = str(datetime.date.today().year)
+        with self.assertRaises(HTTPException) as refused:
+            self.get(year, user=self.admin)
+        self.assertEqual(refused.exception.detail, messages.RECAP_SEASON_LOCKED)
+        self.assertFalse(self.get(year, user=self.admin, unrestricted=True)["complete"])
+
+    def test_a_player_cannot_lift_the_limits_by_asking(self):
+        with self.assertRaises(HTTPException):
+            self.get(str(datetime.date.today().year), unrestricted=True)
 
     def test_unlocking_it_for_this_year_opens_it_to_everybody(self):
         got = self.get(str(datetime.date.today().year), unlocked_year=datetime.date.today().year)
@@ -364,12 +371,16 @@ class GetRecapEndpointTests(unittest.TestCase):
             self.get(last_year, always=False)
         self.assertEqual((refused.exception.status_code, refused.exception.detail), (400, messages.RECAP_CLOSED))
 
-    def test_an_admin_sees_a_closed_recap(self):
-        self.get(str(datetime.date.today().year - 1), user=self.admin, always=False)
+    def test_an_admin_meets_the_closed_recap_too_unless_unrestricted(self):
+        last_year = str(datetime.date.today().year - 1)
+        with self.assertRaises(HTTPException) as refused:
+            self.get(last_year, user=self.admin, always=False)
+        self.assertEqual(refused.exception.detail, messages.RECAP_CLOSED)
+        self.get(last_year, user=self.admin, always=False, unrestricted=True)
 
 
 class RecapAccessTests(unittest.TestCase):
-    """GET /statistics/recap-access: who may choose the period on the page."""
+    """GET /statistics/recap-access: whether the recaps are open (card every day, pickers on the page), for a player and an admin alike."""
 
     def access(self, user, always):
         with mock.patch.object(statistics.settings, "get", return_value=always):
@@ -380,8 +391,10 @@ class RecapAccessTests(unittest.TestCase):
         self.assertEqual(self.access(player, False), {"selectable": False})
         self.assertEqual(self.access(player, True), {"selectable": True})
 
-    def test_an_admin_always_chooses(self):
-        self.assertEqual(self.access(models.User(id=2, username="god", is_admin=True), False), {"selectable": True})
+    def test_an_admin_follows_the_same_rule(self):
+        admin = models.User(id=2, username="god", is_admin=True)
+        self.assertEqual(self.access(admin, False), {"selectable": False})
+        self.assertEqual(self.access(admin, True), {"selectable": True})
 
 
 class RecapClosedTests(unittest.TestCase):

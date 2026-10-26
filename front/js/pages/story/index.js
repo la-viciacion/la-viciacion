@@ -19,9 +19,10 @@ const SEASON_LOCKED = 'El resumen de esta temporada todavía no está disponible
 
 let player = null;
 let period;
+let named = null; // the player an admin's address names, even themselves
 let other = null; // the player asked for, when it is not the user
 
-const leave = () => { location.hash = recapHref(period, other); };
+const leave = () => { location.hash = recapHref(period, named); };
 
 async function share(slide) {
   try {
@@ -39,14 +40,15 @@ export async function render({ user, main }) {
   const asked = parseStoryHash(location.hash);
   // the same bounds as the recap page: a month that has not finished (the running one) falls back to the one before
   period = periodKey(clampPick(pickOf(asked.period || lastMonth())));
-  other = user.is_admin && asked.username && asked.username !== user.username ? asked.username : null;
+  named = user.is_admin ? asked.username : null; // an admin naming a player (the panel's links) sees it without a player's limits
+  other = named && named !== user.username ? named : null;
   if (!other) dismissRecapInvite(period); // the story is open: the notice of the first days of the month has done its job
   mount(main, html`<div class="st-overlay" id="stRoot"><div class="st-stage"><div class="st-slide"><div class="st-hint">Preparando tu resumen…</div></div></div></div>`);
   const root = main.querySelector('#stRoot');
 
   let data;
   try {
-    data = await api(`/statistics/recap/${period}?username=${encodeURIComponent(other || user.username)}`);
+    data = await api(`/statistics/recap/${period}?username=${encodeURIComponent(named || user.username)}${named ? '&unrestricted=true' : ''}`);
   } catch (err) {
     const locked = err.detail === SEASON_LOCKED;
     mount(root, html`

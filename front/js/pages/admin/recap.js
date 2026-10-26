@@ -76,7 +76,7 @@ function view() {
 // Where the buttons open: the page and the story of the period, for the player chosen
 function links() {
   const target = userById(userId);
-  const username = target && target.id !== store.me ? target.username : null;
+  const username = target ? target.username : null; // always named: that is what lifts the limits a player has (see the page)
   panel.querySelector('#rcaOpen').setAttribute('href', recapHref(period(), username));
   panel.querySelector('#rcaStory').setAttribute('href', storyHref(period(), username));
 }

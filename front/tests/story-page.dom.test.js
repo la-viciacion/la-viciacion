@@ -149,7 +149,7 @@ test('only an admin can ask for another player', async () => {
   assert.equal(calls[0].path, '/statistics/recap/2026-09?username=ana');
   story.dispose();
   calls = await open('#/story/2026-09/biel', { ...ME, is_admin: true });
-  assert.equal(calls[0].path, '/statistics/recap/2026-09?username=biel');
+  assert.equal(calls[0].path, '/statistics/recap/2026-09?username=biel&unrestricted=true');
   key('Escape');
   assert.equal(window.location.hash, '#/recap/2026-09/biel');
   story.dispose();
