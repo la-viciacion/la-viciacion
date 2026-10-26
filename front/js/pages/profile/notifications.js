@@ -3,7 +3,7 @@
 // (PATCH /users/{username}/settings). A notice with neither channel checked is simply not sent.
 // A notice with options (the forgotten timer's hours) opens them under its row while any channel is
 // checked, folded until asked for; one without just has its two boxes. The options are saved with one button at
-// the end of the card, shown while they are open (the boxes save on their own). The next notices are one more entry in NOTICES.
+// the end of the card, always there (saving what has not changed is harmless; the boxes save on their own). The next notices are one more entry in NOTICES.
 import { api, jsonRequest } from '../../lib/api.js';
 import { HOURS_HINT, MAX_HOURS, MIN_HOURS, parseHours } from '../../lib/hours.js';
 import { html, mount } from '../../lib/html.js';
@@ -71,15 +71,7 @@ export async function initNotifications(el, { path }) {
   for (const notice of NOTICES) {
     const boxes = [...el.querySelectorAll(`[data-notice="${notice.id}"] input`)];
     const options = el.querySelector(`[data-options="${notice.id}"]`);
-    const saveRow = el.querySelector(`[data-save="${notice.id}"]`);
-    const folded = options?.querySelector('details');
-    // the options are folded; Guardar shows while they are open and a channel is on
-    const sync = () => {
-      if (!options) return;
-      options.hidden = !boxes.some((box) => box.checked);
-      saveRow.hidden = options.hidden || !folded.open;
-    };
-    folded?.addEventListener('toggle', sync);
+    const sync = () => { if (options) options.hidden = !boxes.some((box) => box.checked); };
     sync();
     for (const box of boxes) {
       box.addEventListener('change', async () => {

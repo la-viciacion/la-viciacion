@@ -98,7 +98,7 @@
 .pf-notice-options { padding: 12px 14px; background: var(--bg-surface); border-radius: var(--radius-sm); }
 .pf-notice-options summary { cursor: pointer; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600; }
 .pf-notice-fields { display: flex; flex-direction: column; gap: 12px; padding-top: 12px; }
-.pf-notice-options[hidden], .pf-notice-save[hidden] { display: none; }
+.pf-notice-options[hidden] { display: none; }
 .pf-notice-save { padding-top: 14px; border-top: 1px solid var(--border); }
 
 .pf-form label { display: flex; flex-direction: column; gap: 6px; font-size: 0.85rem; color: var(--text-secondary); font-weight: 600; }
