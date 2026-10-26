@@ -2,7 +2,8 @@
 //
 // Field: { key, label, type, required?, omitEmpty?, step?, nameKey? (game: the row's key holding the game's name),
 //   clearable? (game: a button to leave it empty), checks? (game: the key of a checkbox that choosing a game checks) }
-// Types: text | textarea (rows?) | number | date | datetime | checkbox | select | month | platform | user | game | password | image
+// Types: text | textarea (rows?) | number | date | datetime | checkbox | select | month | platform | user | game | games | password | image
+// games: a list of games (the value is [{ id, name }], what is sent is the ids): each is added with the same picker as `game`
 // select: { options: [[number, label], ...] }
 // month: the running month and the next ones, as a "YYYY-MM" text (the challenges are launched for a month)
 // choice: { options: [[text, label], ...], default? } a select whose value stays text (select reads it as a number)
@@ -37,8 +38,12 @@ function fieldHtml(f, value, row) {
       </select></label>`;
     case 'choice':
       return html`<label>${f.label}<select class="adm-input" id="${id}">
-        ${f.options.map(([value, name]) => html`<option value="${value}" ${value === (f.default ?? '') ? html`selected` : ''}>${name}</option>`)}
+        ${f.options.map(([value, name]) => html`<option value="${value}" ${value === v ? html`selected` : ''}>${name}</option>`)}
       </select></label>`;
+    case 'games':
+      return html`<div class="adm-field-games"><span>${f.label}</span>
+        <ol class="adm-games" id="${id}">${(Array.isArray(value) ? value : []).map((g) => html`<li data-id="${g.id}"><span>${g.name}</span> <button type="button" class="adm-btn sm" data-gameremove>Quitar</button></li>`)}</ol>
+        <button type="button" class="adm-btn sm" data-gameadd="${f.key}">Añadir juego…</button></div>`;
     case 'platform': {
       const known = platformList();
       return html`<label>${f.label}<select class="adm-input" id="${id}">
@@ -89,6 +94,7 @@ function readField(f) {
     case 'number': return el.value === '' ? null : Number(el.value);
     case 'datetime': return el.value ? (el.value.length === 16 ? `${el.value}:00` : el.value) : null;
     case 'user': return el.value ? Number(el.value) : null;
+    case 'games': return [...el.querySelectorAll('li')].map((li) => li.dataset.id);
     case 'date':
     case 'month':
     case 'choice':
@@ -125,6 +131,30 @@ async function onFormClick(e, modal, fields) {
       const checks = fields.find((f) => f.key === pick.dataset.pickfor)?.checks;
       if (checks) modal.el.querySelector(`#f_${checks}`).checked = true;
     }
+    return;
+  }
+  const add = e.target.closest('[data-gameadd]');
+  if (add) {
+    const game = await pickGame();
+    const list = modal.el.querySelector(`#f_${add.dataset.gameadd}`);
+    if (game && ![...list.querySelectorAll('li')].some((li) => li.dataset.id === game.id)) {
+      const item = document.createElement('li');
+      item.dataset.id = game.id;
+      const name = document.createElement('span');
+      name.textContent = game.name;
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'adm-btn sm';
+      remove.dataset.gameremove = '';
+      remove.textContent = 'Quitar';
+      item.append(name, ' ', remove);
+      list.append(item);
+    }
+    return;
+  }
+  const removeGame = e.target.closest('[data-gameremove]');
+  if (removeGame) {
+    removeGame.closest('li').remove();
     return;
   }
   const clear = e.target.closest('[data-clearfor]');
@@ -183,7 +213,7 @@ async function submit(entity, row, fields, modal, admin, extra = {}) {
       continue;
     }
     const value = readField(f);
-    if (f.required && (value === null || value === '')) { errorEl.textContent = `Falta: ${f.label}`; return; }
+    if (f.required && (value === null || value === '' || (Array.isArray(value) && !value.length))) { errorEl.textContent = `Falta: ${f.label}`; return; }
     if (f.omitEmpty && value === null) continue;
     body[f.key] = value;
   }

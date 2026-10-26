@@ -34,6 +34,13 @@ function attentionItems(att) {
       filters: { rawg: 'unlinked' },
     });
   }
+  if (att.pending_challenge_proposals) {
+    items.push({
+      text: `${plural(att.pending_challenge_proposals, 'propuesta de reto espera', 'propuestas de retos esperan')} respuesta`,
+      go: 'Ver propuestas',
+      tab: 'proposals',
+    });
+  }
   return items;
 }
 

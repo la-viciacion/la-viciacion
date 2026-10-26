@@ -42,7 +42,9 @@ En cada logro de un jugador, **Editar** cambia la fecha en que lo consiguió y *
 - **Sesiones**: todas las sesiones de todos, con filtros. Puedes **crear una sesión a mano** (para un timer olvidado, por ejemplo), editar el juego, la plataforma, el inicio o el fin de cualquiera, incluso de temporadas cerradas, y cerrar un timer atascado poniéndole un fin. Los cambios de un administrador no avisan al grupo.
 - **Biblioteca**: las entradas de biblioteca de cada jugador, con su fecha de completado y la marca de abandonado.
 - **Puntuaciones**: crear, cambiar y borrar notas de cualquier jugador.
-- **Retos**: lanzar los retos del grupo (**Lanzar juego del mes** y **Lanzar reto temático**), con un interruptor para avisar al grupo, y borrar cualquiera (también los personales).
+- **Retos**: lanzar los retos del grupo (**Lanzar juego del mes** y **Lanzar reto temático**), con un interruptor para avisar al grupo, otro para que sea **una competición** (se ve quién va primero) y la opción de que sea **voluntario** (hay que apuntarse), y borrar cualquiera (también los personales y los duelos).
+- **Propuestas**: los retos que proponen los jugadores. **Aprobar y lanzar…** lo lanza como un reto del grupo (eliges si es voluntario y si se avisa al grupo); **Rechazar…** deja una nota que ve quien lo propuso. Si el mes ya pasó no se puede aprobar: recházalo. Las que esperan respuesta salen en **Requiere atención** del Inicio.
+- **Recurrentes**: retos del grupo que se lanzan solos el primer día de cada mes, a las 06:00. Hay dos: **un temático** con las mismas opciones cada mes, y **un juego del mes con rotación** (una lista de juegos, uno por mes, que vuelve a empezar al acabar). Empiezan el mes que viene salvo que marques *Lanzar ya el de este mes*, no avisan al grupo salvo que lo marques y se pueden parar o cambiar (el nombre, si avisan, quién participa y la lista de juegos). En **Último mes** se ve qué pasó la última vez, por ejemplo si no se pudo lanzar porque se borró el juego. Borrar uno no borra los retos que ya lanzó.
 
 ![Sesiones de todos los jugadores](../assets/screens/admin-timers.webp){ .screenshot }
 

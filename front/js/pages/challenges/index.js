@@ -8,6 +8,8 @@ import { html, mount } from '../../lib/html.js';
 import { gameHref } from '../../lib/links.js';
 import { modalHeader, openModal } from '../../ui/modal.js';
 import { toast } from '../../ui/toast.js';
+import { gameSearch, gameSearchField } from './game-search.js';
+import { openProposalForm, showProposals } from './proposals.js';
 
 export const active = null; // it belongs to no item of the top bar
 
@@ -43,7 +45,10 @@ const sub = (c) => {
 // the button of whoever can change their part: leave a group challenge, or turn a duel down (and take that back)
 const partButton = (c) => {
   if (!c.can_opt_out) return '';
-  const label = c.scope === 'duel' ? (c.taking_part ? 'Rechazar duelo' : 'Aceptar duelo') : (c.taking_part ? 'Dejar de participar' : 'Volver a participar');
+  const voluntary = c.participation === 'opt_in';
+  const label = c.scope === 'duel'
+    ? (c.taking_part ? 'Rechazar duelo' : 'Aceptar duelo')
+    : (c.taking_part ? 'Dejar de participar' : voluntary ? 'Apuntarme' : 'Volver a participar');
   return html`<button class="pf-btn" type="button" data-part="${c.taking_part ? 'leave' : 'join'}">${label}</button>`;
 };
 
@@ -56,14 +61,14 @@ function card(c) {
     <article class="pf-card ch-card" data-challenge="${c.id}">
       <div class="ch-head">
         <div class="ch-title">
-          ${c.game ? html`<a class="game-link" href="${gameHref(c.game.id)}">${c.title}</a>` : c.title}
+          ${c.game ? html`<a class="game-link" href="${gameHref(c.game.id)}">${c.title}</a>` : c.title}${c.participation === 'opt_in' ? html` <span class="pf-tag muted">Voluntario</span>` : ''}
           <div class="pf-sub">${sub(c)}</div>
         </div>
         <span class="${c.status === 'active' && !c.declined ? 'pf-tag' : 'pf-tag muted'}">${c.declined ? 'Rechazado' : timeLeft(c)}</span>
       </div>
       <div class="pf-sub">${summaryLine(c)}</div>
       ${standingLine(c)}
-      ${c.taking_part || c.scope !== 'group' ? parts : html`<div class="pf-empty">No participas en este reto.</div>`}
+      ${c.taking_part || c.scope !== 'group' ? parts : html`<div class="pf-empty">${c.participation === 'opt_in' ? 'Es un reto voluntario: apúntate si quieres jugarlo.' : 'No participas en este reto.'}</div>`}
       ${c.scope === 'duel' && c.can_opt_out && c.taking_part ? html`<div class="pf-sub">Puedes rechazarlo durante las 48 horas siguientes a su lanzamiento.</div>` : ''}
       <div class="ch-actions">
         ${partButton(c)}
@@ -89,6 +94,7 @@ async function load() {
   } catch (err) {
     mount(main.querySelector('#chLists'), html`<div class="pf-empty">Error cargando los retos: ${err.message}</div>`);
   }
+  await showProposals(main.querySelector('#chProposals'), load);
 }
 
 async function change(id, path, options) {
@@ -163,9 +169,7 @@ async function launchChallenge() {
       </div>
 
       <div data-kind="duel_game" hidden>
-        <label>Juego<input class="adm-input" type="search" name="duelGameQuery" placeholder="Buscar juego..." autocomplete="off" /></label>
-        <div class="ch-game-results" id="chGameResults"></div>
-        <p class="adm-sub" id="chGameChosen" aria-live="polite">Elige un juego de la lista.</p>
+        ${gameSearchField}
       </div>
 
       <div data-kind="streak" hidden>
@@ -222,28 +226,7 @@ async function launchChallenge() {
     preview.textContent = debtPreview(el.debtMode.value, Number(el.debtValue.value), debt);
   };
   const state = { game: null };
-  const results = form.querySelector('#chGameResults');
-  let timer;
-  el.duelGameQuery.addEventListener('input', () => {
-    clearTimeout(timer);
-    timer = setTimeout(async () => {
-      const query = el.duelGameQuery.value.trim();
-      if (query.length < 2) return mount(results, html``);
-      try {
-        const found = await api(`/games/catalog?q=${encodeURIComponent(query)}&limit=8`);
-        mount(results, html`${found.items.map((g) => html`<button type="button" class="pf-btn" data-game-id="${g.id}" data-game-name="${g.name}">${g.name}</button>`)}`);
-      } catch (err) {
-        mount(results, html`<div class="pf-empty">${err.message}</div>`);
-      }
-    }, 250);
-  });
-  results.addEventListener('click', (e) => {
-    const pick = e.target.closest('[data-game-id]');
-    if (!pick) return;
-    state.game = { id: pick.dataset.gameId, name: pick.dataset.gameName };
-    form.querySelector('#chGameChosen').textContent = `Juego elegido: ${state.game.name}`;
-    mount(results, html``);
-  });
+  gameSearch(form, state);
   form.addEventListener('input', refresh);
   form.addEventListener('change', refresh);
   refresh();
@@ -269,12 +252,17 @@ export async function render(ctx) {
   mount(main, html`
     <div class="wl-head">
       <h1 class="pf-title">Retos</h1>
-      <button class="pf-btn primary" type="button" id="chNew">Nuevo reto</button>
+      <div class="ch-head-actions">
+        <button class="pf-btn" type="button" id="chPropose">Proponer al grupo</button>
+        <button class="pf-btn primary" type="button" id="chNew">Nuevo reto</button>
+      </div>
     </div>
-    <p class="pf-sub cal-intro">Objetivos con fecha de fin. Los del grupo los lanza un administrador y cada uno puede salirse; los tuyos los lanzas tú y los ven los demás.</p>
+    <p class="pf-sub cal-intro">Objetivos con fecha de fin. Los del grupo los lanza un administrador (puedes proponerle uno) y cada uno puede salirse, salvo los voluntarios, a los que hay que apuntarse; los tuyos los lanzas tú y los ven los demás.</p>
     <div id="chDigest"></div>
-    <div id="chLists"><div class="loading-spinner">Cargando los retos...</div></div>`);
+    <div id="chLists"><div class="loading-spinner">Cargando los retos...</div></div>
+    <div id="chProposals"></div>`);
   main.querySelector('#chNew').addEventListener('click', launchChallenge);
+  main.querySelector('#chPropose').addEventListener('click', () => openProposalForm(load));
   main.querySelector('#chLists').addEventListener('click', (e) => {
     const id = e.target.closest('[data-challenge]')?.dataset.challenge;
     const part = e.target.closest('[data-part]');

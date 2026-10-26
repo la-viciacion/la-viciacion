@@ -257,6 +257,16 @@ export const PERSONAL_KINDS = [
   ['duel_game', 'Duelo en un juego'],
 ];
 
+/** The group challenges a player can propose, for the form: [value, label]. */
+export const PROPOSAL_KINDS = [['game_of_month', 'Juego del mes'], ['themed', 'Temático']];
+
+/** What the player reads of a proposal: { label, detail } (the answer of the admins, if there is one). */
+export function proposalStatus(proposal) {
+  if (proposal.status === 'approved') return { label: 'Aprobada', detail: 'Ya es un reto del grupo: míralo arriba.' };
+  if (proposal.status === 'rejected') return { label: 'Rechazada', detail: proposal.decision_note ? `Nota: ${proposal.decision_note}` : 'Sin nota.' };
+  return { label: 'Esperando respuesta', detail: '' };
+}
+
 /** How long a personal challenge lasts, to choose from. */
 export const DURATIONS = [['week', 'Una semana'], ['month', 'Un mes'], ['quarter', 'Tres meses']];
 

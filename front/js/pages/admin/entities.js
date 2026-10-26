@@ -17,6 +17,7 @@ import { platformList, platformName } from '../../lib/platforms.js';
 import { SPECIAL_NAMES, specialClass } from '../../lib/special.js';
 import { badge, seasonYears } from './components.js';
 import { ENTITY_OPTIONS, describe, detailParts } from './audit-labels.js';
+import { approveProposal, rejectProposal } from './challenge-decisions.js';
 import { closeTimerNow } from './dialogs.js';
 
 const platformField = { key: 'platform', label: 'Plataforma', type: 'platform' };
@@ -30,6 +31,8 @@ const seasonSelect = {
   options: () => [['', 'Temporada: todas'], ...seasonYears().map((y) => [String(y), y])],
 };
 const platformSelect = { key: 'platform', label: 'Plataforma', options: () => [['', 'Plataforma: todas'], ...platformList().map((p) => [p.id, p.name])] };
+
+const PARTICIPATION_FIELD = { key: 'participation', label: 'Quién participa', type: 'choice', default: 'auto', options: [['auto', 'Todos (pueden salirse)'], ['opt_in', 'Voluntario (hay que apuntarse)']] };
 
 const userColumn = { label: 'Usuario', sort: 'user', render: (r) => r.user || r.user_id, filter: (r) => ({ user_id: r.user_id }) };
 const gameColumn = { label: 'Juego', sort: 'game', render: (r) => r.game || r.game_id, filter: (r) => ({ game_id: r.game_id, game_name: r.game }) };
@@ -254,7 +257,7 @@ export const ENTITIES = {
       { label: 'Reto', render: (r) => html`<strong>${r.title}</strong><div class="adm-sub">${r.label} · ${r.scope === 'group' ? 'de grupo' : `de ${r.owner ?? '—'}`}</div>` },
       { label: 'Periodo', render: (r) => html`${formatDate(r.starts_on)} – ${formatDate(r.ends_on)}` },
       { label: 'Estado', render: (r) => ({ active: badge('En marcha', 'green'), upcoming: badge('Próximo', 'orange'), finished: badge('Terminado', 'gray') })[r.status] },
-      { label: 'Participan', render: (r) => `${r.players} (${r.done_players} cumplen)` },
+      { label: 'Participan', render: (r) => `${r.players} (${r.done_players} cumplen)${r.participation === 'opt_in' ? ' · voluntario' : ''}` },
       { label: 'Total', render: (r) => (r.total_done ? badge(r.notified ? 'Alcanzado, avisado' : 'Alcanzado', 'green') : '—') },
       { label: 'Lanzado por', render: (r) => r.created_by ?? '—' },
     ],
@@ -269,6 +272,7 @@ export const ENTITIES = {
           { key: 'min_hours_each', label: 'Horas mínimas por jugador', type: 'number', step: '0.5', default: 5, required: true },
           { key: 'min_hours_total', label: 'Horas mínimas entre todos', type: 'number', step: '0.5', default: 20, required: true },
           { key: 'versus', label: 'Además es una competición (gana quien más avance)', type: 'checkbox', default: false },
+          PARTICIPATION_FIELD,
           { key: 'announce', label: 'Avisar al grupo (Telegram y notificaciones)', type: 'checkbox', default: true },
         ],
       },
@@ -286,6 +290,7 @@ export const ENTITIES = {
             { key: 'min_hours_total', label: 'Horas entre todos (opcional, si hay que jugar)', type: 'number', step: '0.5' },
             { key: 'min_games_total', label: 'Juegos completados entre todos (opcional, si hay que completar)', type: 'number', step: '1' },
             { key: 'versus', label: 'Además es una competición (gana quien más avance)', type: 'checkbox', default: false },
+            PARTICIPATION_FIELD,
             { key: 'announce', label: 'Avisar al grupo (Telegram y notificaciones)', type: 'checkbox', default: true },
           ];
         },
@@ -294,6 +299,93 @@ export const ENTITIES = {
     name: (r) => r.title,
     canDelete: true,
     deleteNote: 'Se borra el reto y quién se salió de él. Los resultados dejan de salir en los perfiles.',
+  },
+
+  proposals: {
+    label: 'Propuestas de retos',
+    nav: 'Propuestas',
+    description: 'Retos del grupo que proponen los jugadores desde la página Retos (juego del mes o temático). Aprobar una la lanza como un reto del grupo, con las opciones que eligieron; rechazarla deja una nota que ve quien la propuso. Si el mes ya pasó no se puede aprobar: recházala.',
+    endpoint: '/manage/challenge-proposals',
+    paged: false,
+    readOnly: true,
+    columns: [
+      { label: 'Propuesta', render: (r) => html`<strong>${r.title}</strong><div class="adm-sub">${r.label}</div>` },
+      { label: 'Propuesta por', render: (r) => r.proposer?.name ?? '—' },
+      { label: 'Estado', render: (r) => ({ pending: badge('Esperando', 'orange'), approved: badge('Aprobada', 'green'), rejected: badge('Rechazada', 'gray') })[r.status] },
+      { label: 'Cuándo', render: (r) => formatTimestamp(r.created_at) },
+      { label: 'Decisión', render: (r) => (r.status === 'pending' ? '—' : html`${r.decided_by ?? '—'}${r.decision_note ? html`<div class="adm-sub">${r.decision_note}</div>` : ''}`) },
+    ],
+    actions: [
+      { label: 'Aprobar y lanzar…', show: (r) => r.status === 'pending', run: (r, admin) => approveProposal(r, admin) },
+      { label: 'Rechazar…', show: (r) => r.status === 'pending', run: (r, admin) => rejectProposal(r, admin) },
+    ],
+    name: (r) => r.title,
+    canDelete: true,
+    deleteNote: 'Se borra la propuesta; el reto que lanzó, si lo hizo, sigue.',
+  },
+
+  schedules: {
+    label: 'Retos recurrentes',
+    nav: 'Recurrentes',
+    description: 'Retos del grupo que se lanzan solos el primer día de cada mes (a las 06:00): un temático con las mismas opciones, o un juego del mes cuyo juego rota por una lista. Cada mes se lanza una sola vez; si no se puede lanzar, aquí se ve por qué. No avisan al grupo salvo que lo marques.',
+    endpoint: '/manage/challenge-schedules',
+    paged: false,
+    columns: [
+      { label: 'Reto', render: (r) => html`<strong>${r.label}</strong><div class="adm-sub">${r.kind_label}${r.kind === 'themed' ? ` · ${r.options.tag}` : ''}</div>` },
+      {
+        label: 'Lanza',
+        render: (r) => (r.games
+          ? html`<div>Este mes: ${r.this_month ?? 'aún no empieza'}</div><div class="adm-sub">Próximo: ${r.next_month} · rota por ${r.games.length}</div>`
+          : html`Cada mes, desde ${formatDate(r.first_month)}`),
+      },
+      { label: 'Estado', render: (r) => html`${r.active ? badge('Activo', 'green') : badge('Parado', 'gray')}${r.participation === 'opt_in' ? badge('Voluntario', 'ink') : ''}${r.announce ? badge('Avisa', 'orange') : ''}` },
+      { label: 'Último mes', render: (r) => (r.last_status ? html`<div class="adm-sub">${r.last_status}</div>` : '—') },
+    ],
+    fields: [
+      { key: 'label', label: 'Nombre', type: 'text', required: true },
+      { key: 'active', label: 'Activo (parado, no lanza nada)', type: 'checkbox' },
+      { key: 'announce', label: 'Avisar al grupo cuando se lance (Telegram y notificaciones)', type: 'checkbox' },
+      PARTICIPATION_FIELD,
+      { key: 'games', label: 'Juegos de la rotación (en este orden; cambiar la lista cambia el juego de los próximos meses)', type: 'games' },
+    ],
+    creates: [
+      {
+        label: 'Programar un temático',
+        body: { kind: 'themed' },
+        fields: async () => {
+          const tags = await api('/manage/challenges/tags');
+          return [
+            { key: 'label', label: 'Nombre', type: 'text', required: true },
+            { key: 'tag', label: 'Temática (etiqueta de los juegos)', type: 'choice', required: true, options: tags.length ? tags.map((t) => [t.tag, `${t.tag} (${t.games})`]) : [['', 'No hay etiquetas']] },
+            { key: 'mode', label: 'Objetivo de cada jugador', type: 'choice', required: true, default: 'play', options: [['play', 'Jugar unas horas'], ['complete', 'Completar al menos un juego']] },
+            { key: 'min_hours_each', label: 'Horas mínimas por jugador (si hay que jugar)', type: 'number', step: '0.5', default: 2 },
+            { key: 'min_hours_total', label: 'Horas entre todos (opcional, si hay que jugar)', type: 'number', step: '0.5' },
+            { key: 'min_games_total', label: 'Juegos completados entre todos (opcional, si hay que completar)', type: 'number', step: '1' },
+            { key: 'versus', label: 'Además es una competición (gana quien más avance)', type: 'checkbox', default: false },
+            PARTICIPATION_FIELD,
+            { key: 'announce', label: 'Avisar al grupo cuando se lance', type: 'checkbox', default: false },
+            { key: 'start_now', label: 'Lanzar ya el de este mes (si no, empieza el mes que viene)', type: 'checkbox', default: false },
+          ];
+        },
+      },
+      {
+        label: 'Programar un juego del mes con rotación',
+        body: { kind: 'game_of_month' },
+        fields: [
+          { key: 'label', label: 'Nombre', type: 'text', required: true },
+          { key: 'games', label: 'Juegos de la rotación (en este orden; al acabar la lista vuelve a empezar)', type: 'games', required: true },
+          { key: 'min_hours_each', label: 'Horas mínimas por jugador', type: 'number', step: '0.5', default: 5, required: true },
+          { key: 'min_hours_total', label: 'Horas mínimas entre todos', type: 'number', step: '0.5', default: 20, required: true },
+          { key: 'versus', label: 'Además es una competición (gana quien más avance)', type: 'checkbox', default: false },
+          PARTICIPATION_FIELD,
+          { key: 'announce', label: 'Avisar al grupo cuando se lance', type: 'checkbox', default: false },
+          { key: 'start_now', label: 'Lanzar ya el de este mes (si no, empieza el mes que viene)', type: 'checkbox', default: false },
+        ],
+      },
+    ],
+    name: (r) => r.label,
+    canDelete: true,
+    deleteNote: 'Se borra la programación; los retos que ya lanzó siguen.',
   },
 
   achievements: {

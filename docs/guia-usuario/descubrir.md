@@ -34,7 +34,11 @@ Un juego sale de la lista **solo** cuando empiezas a jugarlo. Cada día se vuelv
 - **Juego del mes**: un juego, un mes, unas horas mínimas por jugador y un total entre todos. Ves una barra por jugador (verde al llegar a su mínimo) y otra para el grupo.
 - **Temático**: una etiqueta de juegos (Horror, Singleplayer…), un mes y lo que tiene que hacer cada jugador: jugar un número de horas o completar al menos un juego. Cuenta cualquier juego con esa etiqueta.
 
-Puedes **dejar de participar** y volver mientras el reto no haya terminado. Cuando el grupo alcanza el total, se avisa una vez.
+Puedes **dejar de participar** y volver mientras el reto no haya terminado. Cuando el grupo alcanza el total, se avisa una vez. Un administrador puede lanzar un reto del grupo como **voluntario**: no cuenta nadie hasta que se **apunta** (botón *Apuntarme*), y solo cuentan los que se apuntan.
+
+**Proponer un reto al grupo.** Con **Proponer al grupo** sugieres un juego del mes o un reto temático (el juego o la temática, el mes y las horas). Un administrador lo aprueba, y entonces se lanza como un reto del grupo, o lo rechaza con una nota. En **Tus propuestas** ves en qué estado está cada una y puedes **retirar** las que aún esperan respuesta. Puedes tener hasta 3 esperando a la vez.
+
+**Retos recurrentes.** Algunos retos del grupo los programa un administrador para que se lancen solos cada mes (un temático, o un juego del mes que va cambiando de juego). Para ti son como cualquier otro reto del grupo.
 
 **Personales** (los lanzas tú con **Nuevo reto**; los demás los ven, pero nadie recibe aviso):
 
