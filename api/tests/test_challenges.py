@@ -1,6 +1,7 @@
 """The templates of the challenges that need no database (utils/challenges.py): periods, numbers, the progress of a
 game of the month, the notice texts and what makes two challenges the same."""
 import datetime
+import hashlib
 import json
 import types
 import unittest
@@ -279,6 +280,31 @@ class DuelTests(unittest.TestCase):
 
     def test_the_duel_templates_are_the_only_ones_of_that_scope(self):
         self.assertEqual({k for k, t in challenges.TEMPLATES.items() if t.scope == challenges.DUEL}, {"duel_hours", "duel_game"})
+
+
+class AuthoringTests(unittest.TestCase):
+    def test_months_are_counted_across_the_year_end(self):
+        self.assertEqual(challenges.month_start(datetime.date(2026, 10, 17)), datetime.date(2026, 10, 1))
+        self.assertEqual(challenges.next_month(datetime.date(2026, 12, 31)), datetime.date(2027, 1, 1))
+        self.assertEqual(challenges.next_month(datetime.date(2026, 1, 31)), datetime.date(2026, 2, 1))
+        self.assertEqual(challenges.months_between(datetime.date(2026, 11, 1), datetime.date(2027, 2, 20)), 3)
+        self.assertEqual(challenges.months_between(datetime.date(2026, 11, 1), datetime.date(2026, 10, 1)), -1)
+
+    def test_only_the_options_a_group_template_knows_are_kept(self):
+        kept = challenges.clean_options({"game_id": "hades", "month": "2026-10", "min_hours_each": 3, "tag": None, "owner_user_id": 5, "x": 1})
+        self.assertEqual(kept, {"game_id": "hades", "month": "2026-10", "min_hours_each": 3})
+        self.assertEqual(challenges.clean_options(None), {})
+
+    def test_an_old_challenge_keeps_its_fingerprint_and_a_voluntary_one_has_another(self):
+        one = built()
+        usual = challenges.fingerprint("game_of_month", one, None)
+        self.assertEqual(usual, challenges.fingerprint("game_of_month", one, None, "auto"))
+        self.assertNotEqual(usual, challenges.fingerprint("game_of_month", one, None, "opt_in"))
+        canonical = json.dumps(["game_of_month", one.params, one.game_id, one.starts_on.isoformat(), one.ends_on.isoformat(), None], sort_keys=True, ensure_ascii=False)
+        self.assertEqual(usual, hashlib.sha256(canonical.encode("utf-8")).hexdigest())  # what was stored before the participation existed
+
+    def test_a_conflict_is_a_challenge_error_too(self):
+        self.assertTrue(issubclass(challenges.ChallengeConflict, ChallengeError))
 
 
 if __name__ == "__main__":

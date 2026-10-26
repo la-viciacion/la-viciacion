@@ -8,31 +8,40 @@ from sqlalchemy.orm import Session
 
 from ..database import models
 from ..utils import challenges
-from ..utils.challenges import DECLINE_HOURS, DUEL, ChallengeError, GROUP, TEMPLATES, USER, rank_players
+from ..utils.challenges import AUTO, DECLINE_HOURS, DUEL, GROUP, OPT_IN, PARTICIPATIONS, TEMPLATES, USER, ChallengeConflict, ChallengeError, rank_players
 
 
-def create(db: Session, creator: models.User, kind: str, options: dict, today: datetime.date) -> models.Challenge:
-    """Launch a challenge. A group one belongs to nobody, a personal one to `creator`. Who may launch which is checked
-    by the caller. Raises ChallengeError for options that are not valid or a challenge that already exists."""
+def create(
+    db: Session, creator: models.User | None, kind: str, options: dict, today: datetime.date, participation: str = AUTO
+) -> models.Challenge:
+    """Launch a challenge. A group one belongs to nobody, a personal one to `creator` (a group one may have no creator:
+    a schedule whose admin was deleted launches it). Who may launch which is checked by the caller. `participation` is
+    for a group one only: every active player ("auto") or only those who join ("opt_in"). Raises ChallengeError for
+    options that are not valid and ChallengeConflict for a challenge that already exists."""
     template = TEMPLATES.get(kind)
     if template is None:
         raise ChallengeError("Ese tipo de reto no existe")
-    built = template.build(db, options or {}, today, creator.id)
-    owner_id = creator.id if template.scope in (USER, DUEL) else None
-    digest = challenges.fingerprint(kind, built, owner_id)
+    if participation not in PARTICIPATIONS:
+        raise ChallengeError("La participación debe ser de todos o voluntaria")
+    if participation != AUTO and template.scope != GROUP:
+        raise ChallengeError("Solo los retos del grupo pueden ser voluntarios")
+    creator_id = creator.id if creator else None
+    built = template.build(db, options or {}, today, creator_id)
+    owner_id = creator_id if template.scope in (USER, DUEL) else None
+    digest = challenges.fingerprint(kind, built, owner_id, participation)
     if db.query(models.Challenge.id).filter(models.Challenge.fingerprint == digest).first() is not None:
-        raise ChallengeError("Ya existe un reto igual")
+        raise ChallengeConflict("Ya existe un reto igual")
     challenge = models.Challenge(
-        kind=kind, scope=template.scope, owner_user_id=owner_id, created_by=creator.id, title=built.title,
+        kind=kind, scope=template.scope, owner_user_id=owner_id, created_by=creator_id, title=built.title,
         params=json.dumps(built.params, ensure_ascii=False), game_id=built.game_id, starts_on=built.starts_on,
-        ends_on=built.ends_on, fingerprint=digest,
+        ends_on=built.ends_on, fingerprint=digest, participation=participation,
     )
     db.add(challenge)
     try:
         db.commit()
     except IntegrityError:  # two equal ones launched at once: the key of the fingerprint decides
         db.rollback()
-        raise ChallengeError("Ya existe un reto igual")
+        raise ChallengeConflict("Ya existe un reto igual")
     return challenge
 
 
@@ -48,13 +57,15 @@ def declined(db: Session, challenge: models.Challenge) -> bool:
 
 def participants(db: Session, challenge: models.Challenge) -> list[int]:
     """Who takes part: a personal challenge its owner, a duel its owner and the challenged player (alone, if they
-    declined it), a group one every active player that has not opted out."""
+    declined it), a group one every active player that has not opted out or, if it is voluntary, only those who joined
+    (both are rows of `challenge_optouts`: the row is a choice against what the challenge assumes)."""
     if challenge.scope == DUEL:
         return [challenge.owner_user_id] if declined(db, challenge) else [challenge.owner_user_id, opponent_id(challenge)]
     if challenge.scope == USER:
         return [challenge.owner_user_id] if challenge.owner_user_id is not None else []
-    left = db.query(models.ChallengeOptOut.user_id).filter(models.ChallengeOptOut.challenge_id == challenge.id)
-    rows = db.query(models.User.id).filter(models.User.is_active == 1, models.not_god(), ~models.User.id.in_(left))
+    chosen = db.query(models.ChallengeOptOut.user_id).filter(models.ChallengeOptOut.challenge_id == challenge.id)
+    rows = db.query(models.User.id).filter(models.User.is_active == 1, models.not_god())
+    rows = rows.filter(models.User.id.in_(chosen) if challenge.participation == OPT_IN else ~models.User.id.in_(chosen))
     return [user_id for (user_id,) in rows.order_by(models.User.id)]
 
 
@@ -65,16 +76,18 @@ def can_opt_out(challenge: models.Challenge, today: datetime.date, viewer_id: in
     if challenge.scope == DUEL:
         launched = challenge.created_at or datetime.datetime.now()
         return viewer_id == opponent_id(challenge) and today <= challenge.ends_on and (now or datetime.datetime.now()) < launched + datetime.timedelta(hours=DECLINE_HOURS)
-    return challenge.scope == GROUP and challenge.participation == "auto" and today <= challenge.ends_on
+    return challenge.scope == GROUP and challenge.participation in PARTICIPATIONS and today <= challenge.ends_on
 
 
 def opt(db: Session, challenge: models.Challenge, user_id: int, joined: bool) -> None:
-    """Take part in a group challenge again (`joined`) or stop taking part. Asking twice changes nothing."""
+    """Take part in a group challenge (`joined`) or stop taking part, or decline a duel. Asking twice changes nothing.
+    The row means joining in a voluntary challenge and leaving (or declining) in any other."""
     row = db.get(models.ChallengeOptOut, (challenge.id, user_id))
-    if joined and row is not None:
-        db.delete(row)
-    elif not joined and row is None:
+    wants_row = joined if challenge.participation == OPT_IN else not joined
+    if wants_row and row is None:
         db.add(models.ChallengeOptOut(challenge_id=challenge.id, user_id=user_id))
+    elif not wants_row and row is not None:
+        db.delete(row)
     db.commit()
 
 
@@ -111,6 +124,7 @@ def view(db: Session, challenge: models.Challenge, viewer_id: int, today: dateti
         "game": {"id": game.id, "name": game.name, "image_url": game.image_url} if game else None,
         "owner": {"id": owner.id, "name": owner.name or owner.username} if owner else None,
         "visibility": challenge.visibility,
+        "participation": challenge.participation,
         "opponent": {"id": opponent.id, "name": opponent.name or opponent.username} if opponent else None,
         "declined": declined(db, challenge),
         "taking_part": viewer_id in taking_part,

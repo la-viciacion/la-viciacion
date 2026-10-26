@@ -20,6 +20,8 @@ what nothing else can trigger remains here:
   wishlist_week     every Sunday at `wishlist.time`, tells the group which wished games come out in the next 7 days.
                     Only one of wishlist_eve and wishlist_week runs: `wishlist.group_notice`
   inbox_purge       every day at 04:00, deletes the inbox notices older than `inbox.retention_days`
+  challenge_schedules  every day at 06:00, launches the challenge of the running month of each schedule that has not
+                    done it yet (a month is launched once; a day the API was down is made up for the next one)
 
 Every run is recorded in `job_runs`, so a restart never repeats a run and a job
 that was due while the API was down still runs when it comes back, within a
@@ -34,7 +36,7 @@ from sqlalchemy import update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from ..crud import users
+from ..crud import challenge_schedules, users
 from ..database import models
 from ..database.database import SessionLocal
 from . import actions, inbox, push, recap_notices, settings
@@ -54,6 +56,7 @@ DAILY_GRACE = datetime.timedelta(hours=3)
 DAILY_STREAKS_HOUR = 5
 INBOX_PURGE_HOUR = 4
 DAILY_WISHLIST_HOUR = 9
+CHALLENGE_SCHEDULES_HOUR = 6
 # The week the weekly wishlist notice tells about starts the day after (Monday to Sunday)
 WISHLIST_WEEKLY_WEEKDAY = 6
 # Off: the notification is shown once, when the timer starts. The job, the per-user interval
@@ -189,6 +192,14 @@ async def _daily_wishlist(db: Session) -> str:
     return await actions.check_wishlist(db, datetime.date.today())
 
 
+async def _challenge_schedules(db: Session) -> str:
+    launched = challenge_schedules.run_due(db, datetime.date.today())
+    for schedule, challenge in launched:
+        if schedule.announce:
+            await actions.announce_challenge_launch(db, challenge.id)
+    return f"{len(launched)} launched"
+
+
 async def _inbox_purge(db: Session) -> str:
     return f"{inbox.purge(db)} deleted"
 
@@ -236,6 +247,10 @@ def tick(now: datetime.datetime | None = None) -> None:
         slot = daily_slot(now, INBOX_PURGE_HOUR)
         if is_due(now, slot, _last_run(db, "inbox_purge"), DAILY_GRACE) and _claim(db, "inbox_purge", slot, now):
             _run(db, "inbox_purge", lambda: _inbox_purge(db))
+
+        slot = daily_slot(now, CHALLENGE_SCHEDULES_HOUR)
+        if is_due(now, slot, _last_run(db, "challenge_schedules"), DAILY_GRACE) and _claim(db, "challenge_schedules", slot, now):
+            _run(db, "challenge_schedules", lambda: _challenge_schedules(db))
 
         slot = daily_slot(now, DAILY_STREAKS_HOUR)
         if is_due(now, slot, _last_run(db, "daily_streaks"), DAILY_GRACE) and _claim(db, "daily_streaks", slot, now):
