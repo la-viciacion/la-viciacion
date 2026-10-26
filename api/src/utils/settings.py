@@ -66,6 +66,14 @@ def _weekday(value: int) -> str | None:
     return None if 0 <= value <= 6 else "El día debe estar entre 0 (lunes) y 6 (domingo)"
 
 
+# How the group hears about the wished games that come out: the day before, once a week, or not at all
+WISHLIST_GROUP_NOTICES = ("eve", "weekly", "off")
+
+
+def _wishlist_group_notice(value: str) -> str | None:
+    return None if value in WISHLIST_GROUP_NOTICES else "Debe ser eve (la víspera), weekly (semanal) u off (ninguno)"
+
+
 def _monthly_day(value: int) -> str | None:
     return None if 1 <= value <= 5 else "El día debe estar entre 1 y 5"
 
@@ -124,6 +132,11 @@ REGISTRY: dict[str, Spec] = {
     "weekly.enabled": Spec("bool", True),
     "weekly.weekday": Spec("int", 0, check=_weekday),  # 0 = Monday
     "weekly.time": Spec("str", "09:00", check=_time),
+    # The group's notice of the wished games that come out: one mode at a time, so the two never both go out
+    "wishlist.group_notice": Spec("str", "eve", check=_wishlist_group_notice),
+    # The time of either one: every day for "eve", on Sundays (scheduler.WISHLIST_WEEKLY_WEEKDAY) for "weekly".
+    # After the 09:00 release-date refresh, so a date that slipped is already corrected when the group is told
+    "wishlist.time": Spec("str", "12:30", check=_time),
     # Off until an admin has seen it in the panel (Notificaciones → Probar resumen)
     "monthly.enabled": Spec("bool", False),
     "monthly.day": Spec("int", 1, check=_monthly_day),  # day of the month, in the first days: the app offers it from the 1st to the 5th

@@ -24,6 +24,17 @@ class CoerceTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 settings.coerce("weekly.time", bad)
 
+    def test_the_group_notice_of_the_wished_releases_is_one_mode_at_a_time(self):
+        self.assertEqual(settings.REGISTRY["wishlist.group_notice"].default, "eve")  # as before
+        for mode in ("eve", "weekly", "off"):
+            self.assertEqual(settings.coerce("wishlist.group_notice", mode), mode)
+        for bad in ("both", "", "Eve", "weekly,eve"):
+            with self.assertRaises(ValueError):
+                settings.coerce("wishlist.group_notice", bad)
+        self.assertEqual(settings.coerce("wishlist.time", "12:30"), "12:30")
+        with self.assertRaises(ValueError):
+            settings.coerce("wishlist.time", "25:00")
+
     def test_the_monthly_recap_goes_out_in_the_first_five_days(self):
         for good in (1, "3", 5):
             self.assertIn(settings.coerce("monthly.day", good), range(1, 6))

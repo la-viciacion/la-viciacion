@@ -274,3 +274,60 @@ class LoopTests(SchedulerTestCase):
             self.assertEqual(len(ticks), 3)  # it went on after the failure
             scheduler.start()  # a second call finds the thread alive
             self.assertEqual(len(started), 1)
+
+
+class WishlistGroupNoticeJobTests(SchedulerTestCase):
+    """The group hears about the wished games that come out the day before or once a week, never both."""
+
+    def setUp(self):
+        super().setUp()
+
+        async def eve(db, tomorrow):
+            self.calls.append(("wishlist_eve", tomorrow))
+            return "0 games"
+
+        async def week(db, today):
+            self.calls.append(("wishlist_week", today))
+            return "0 games"
+
+        for patcher in (
+            mock.patch.object(actions, "announce_wishlist_eve", new=eve),
+            mock.patch.object(actions, "announce_wishlist_week", new=week),
+        ):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    def wishlist_calls(self, ticks):
+        for now in ticks:
+            scheduler.tick(now)
+        return [call for call in self.calls if call[0].startswith("wishlist_")]
+
+    def test_by_default_it_is_the_day_before(self):
+        # the eve looks at the real "tomorrow" (the pinned clock), not at the moment `tick` is given
+        calls = self.wishlist_calls([at(12, 31), at(12, 31, day=6)])
+        self.assertEqual([call[0] for call in calls], ["wishlist_eve", "wishlist_eve"])
+
+    def test_weekly_runs_on_the_chosen_day_and_looks_at_the_days_that_follow(self):
+        self.set_settings(**{"wishlist.group_notice": "weekly"})
+        self.assertEqual(self.wishlist_calls([at(12, 31), at(12, 31, day=6)]), [("wishlist_week", datetime.date(2026, 3, 8))])
+
+    def test_weekly_is_always_on_sunday_and_the_time_is_the_admin_s_choice(self):
+        self.set_settings(**{"wishlist.group_notice": "weekly", "wishlist.time": "18:30"})
+        self.assertEqual(self.wishlist_calls([at(18, 31, day=2), at(12, 31, day=6), at(18, 31, day=6)]), [("wishlist_week", datetime.date(2026, 3, 8))])
+
+    def test_the_eve_goes_out_every_day_at_the_chosen_time(self):
+        self.set_settings(**{"wishlist.time": "18:30"})
+        self.assertEqual(self.wishlist_calls([at(12, 31), at(18, 31)]), [("wishlist_eve", mock.ANY)])
+
+    def test_weekly_does_not_repeat_inside_the_same_slot(self):
+        self.set_settings(**{"wishlist.group_notice": "weekly"})
+        self.assertEqual(len(self.wishlist_calls([at(12, 31, day=6), at(12, 32, day=6), at(14, day=6)])), 1)
+
+    def test_off_sends_neither(self):
+        self.set_settings(**{"wishlist.group_notice": "off"})
+        self.assertEqual(self.wishlist_calls([at(12, 31), at(12, 31, day=6)]), [])
+
+    def test_notifications_off_sends_neither(self):
+        for mode in ("eve", "weekly"):
+            self.set_settings(**{"wishlist.group_notice": mode, "notifications.enabled": False})
+            self.assertEqual(self.wishlist_calls([at(12, 31, day=6)]), [], mode)

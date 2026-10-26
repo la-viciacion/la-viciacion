@@ -30,6 +30,9 @@ const ANNUAL_MONTHS = [[12, 'Diciembre'], [1, 'Enero']];
 // the days the annual recap can go out on, by month (api/src/utils/settings.py ANNUAL_DAYS)
 export const ANNUAL_DAYS = { 12: [20, 28], 1: [1, 5] };
 
+// how the group hears about the wished games that come out (api/src/utils/settings.py WISHLIST_GROUP_NOTICES)
+const WISHLIST_NOTICES = [['eve', 'La víspera de cada estreno'], ['weekly', 'Una vez por semana'], ['off', 'Ninguno']];
+
 const WEEKDAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
 let panel;
@@ -130,6 +133,17 @@ function view(values, jobs, pushDevices, mail, aiUses, aiModel, chat) {
           <label>Hora <input class="adm-input" type="time" name="weekly.time" required /></label>
         </div>
         <div class="adm-sub">Si el servidor está apagado a esa hora, se envía al volver siempre que no hayan pasado más de 6 horas. ${lastRun(jobs.weekly_summary)}</div>
+      </section>`,
+
+    wishlist: html`
+      <section class="adm-set-card">
+        <h3>Juegos deseados que salen</h3>
+        <label>Aviso al grupo
+          <select class="adm-input" name="wishlist.group_notice">${WISHLIST_NOTICES.map(([value, label]) => html`<option value="${value}">${label}</option>`)}</select>
+        </label>
+        <div class="adm-sub">Solo uno a la vez. Necesita las notificaciones activadas. La víspera se envía cada día, y el semanal cada domingo con los juegos que salen en los 7 días siguientes.</div>
+        <label>Hora <input class="adm-input" type="time" name="wishlist.time" required /></label>
+        <div class="adm-sub">Mejor después de las 09:00, cuando se actualizan las fechas de salida. Si el servidor está apagado a esa hora, se envía al volver siempre que no hayan pasado más de 3 horas (la víspera) o 6 (el semanal). ${lastRun(values['wishlist.group_notice'] === 'weekly' ? jobs.wishlist_week : jobs.wishlist_eve)}</div>
       </section>`,
 
     monthly: html`

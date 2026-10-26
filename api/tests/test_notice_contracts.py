@@ -2,6 +2,7 @@
 
 The AI only knows what the message of the notice says, and only does what its prompt asks: a figure missing from
 either side is a figure missing from the notice. These tests pin both sides together for every use of ai_prompts."""
+import datetime
 import unittest
 from unittest import mock
 
@@ -81,6 +82,18 @@ class WishlistNoticeTests(unittest.TestCase):
             self.assertIn(name, msg)
 
 
+class WishlistWeekNoticeTests(unittest.TestCase):
+    def test_it_names_each_game_with_its_weekday_and_everybody_who_waits_for_it(self):
+        msg = actions.wishlist_week_message([
+            ("Hades II", datetime.date(2026, 3, 9), ["Ana", "Bea"], None),
+            ("Silksong", datetime.date(2026, 3, 15), ["Cai"], None),
+        ])
+        self.assertIn("El lunes 9 sale Hades II", msg.replace("*", ""))
+        self.assertIn("El domingo 15 sale Silksong", msg.replace("*", ""))
+        self.assertIn("Ana y Bea", msg)
+        self.assertIn("Cai", msg)
+
+
 class PromptsAskForWhatTheNoticesCarryTests(unittest.TestCase):
     """The prompt of each use asks the AI to keep what its message holds."""
 
@@ -100,7 +113,7 @@ class PromptsAskForWhatTheNoticesCarryTests(unittest.TestCase):
         self.assertIn("tercera persona", self.prompt("completed_game_recommendation"))
 
     def test_every_prompt_asks_to_be_brief_and_to_start_with_the_message_itself(self):
-        for use in ("new_game", "completed_game", "completed_game_recommendation", "ranking_players", "ranking_games", "wishlist_release"):
+        for use in ("new_game", "completed_game", "completed_game_recommendation", "ranking_players", "ranking_games", "wishlist_release", "wishlist_week"):
             text = self.prompt(use)
             if use == "completed_game_recommendation":
                 self.assertIn("No te alargues", text, use)  # it only adds one last short sentence
@@ -131,6 +144,11 @@ class PromptsAskForWhatTheNoticesCarryTests(unittest.TestCase):
     def test_the_wishlist_asks_for_every_game_every_person_and_tomorrow(self):
         text = self.prompt("wishlist_release")
         for wanted in ("nombre de cada juego", "todas las personas", "mañana", "todos"):
+            self.assertIn(wanted, text)
+
+    def test_the_weekly_wishlist_asks_for_every_game_every_person_and_the_weekday(self):
+        text = self.prompt("wishlist_week")
+        for wanted in ("nombre de cada juego", "todas las personas", "día de la semana", "todos"):
             self.assertIn(wanted, text)
 
     def test_the_recommendation_asks_for_the_game_alone_never_for_who_has_it(self):

@@ -182,7 +182,7 @@ class UsesRegistryTests(unittest.TestCase):
     def test_the_places_that_use_the_ai_today(self):
         self.assertEqual(
             {i for i, u in ai_prompts.USES.items() if u.switchable},
-            {"new_game", "completed_game", "ranking_games", "ranking_players", "wishlist_release", "welcome"},
+            {"new_game", "completed_game", "ranking_games", "ranking_players", "wishlist_release", "wishlist_week", "welcome"},
         )
 
 

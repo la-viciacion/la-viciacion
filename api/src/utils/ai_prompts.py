@@ -86,6 +86,23 @@ No hables de logros ni de horas jugadas: solo se trata de un estreno.
 El texto debe ser Markdown válido: deja los nombres de los juegos con el formato del mensaje original (*así*).
 """
 
+WISHLIST_WEEK_PROMPT = """
+Reescribe el mensaje proporcionado, un aviso semanal para un grupo de amigos que juegan a videojuegos: durante los
+próximos días salen a la venta uno o varios juegos que alguien tiene en su lista de deseados.
+
+Empieza por lo importante: di el nombre de cada juego, tal como aparece en el mensaje original (con su enlace, si lo
+hay, tal como viene: [Texto](enlace)), y el día de la semana en que sale, tal como se indica.
+Si hay varios juegos, menciónalos todos, sin dejarte ninguno, por orden de fecha.
+Menciona también a todas las personas que lo esperan, pero de pasada y con naturalidad, dentro de la frase (por
+ejemplo, "Ana y Bea ya lo tienen apuntado"): sin repetir "para Fulano" ni hacer una lista aparte.
+Después, como mucho, una frase corta con un toque de humor (si conoces alguna broma de alguno de los juegos, puedes
+usarla).
+
+Sé breve: una frase por juego y la del humor. No expliques nada ni te alargues.
+No hables de logros ni de horas jugadas: solo se trata de estrenos.
+El texto debe ser Markdown válido: deja los nombres de los juegos con el formato del mensaje original (*así*).
+"""
+
 WELCOME_PROMPT = """
 Escribe el mensaje con el que el bot de 'La Viciación' da la bienvenida a alguien que acaba de entrar al grupo de
 Telegram de unos amigos que juegan a videojuegos. El mensaje proporcionado indica su nombre y su @usuario de Telegram
@@ -153,6 +170,11 @@ USES: dict[str, Use] = {
         "Sale un juego deseado",
         "Aviso al grupo, el día antes, cuando sale un juego que alguien tiene en su lista de deseados.",
         WISHLIST_RELEASE_PROMPT,
+    ),
+    "wishlist_week": Use(
+        "Salen juegos deseados esta semana",
+        "Aviso semanal al grupo con los juegos que alguien tiene en su lista de deseados y salen en los próximos días.",
+        WISHLIST_WEEK_PROMPT,
     ),
     "welcome": Use(
         "Bienvenida al grupo",
