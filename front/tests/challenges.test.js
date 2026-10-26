@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { amountLabel, blocks, daysUntil, debtPreview, digest, digestLine, hoursLabel, launchMonths, partTarget, partValue, percent, remainingLabel, resultLine, standing, summaryLine, timeLeft, totalPart } from '../js/lib/challenges.js';
+import { amountLabel, blocks, daysUntil, debtPreview, digest, digestLine, hoursLabel, launchMonths, medal, partTarget, partValue, percent, remainingLabel, resultLine, standing, summaryLine, timeLeft, totalPart } from '../js/lib/challenges.js';
 
 const TODAY = new Date(2026, 9, 15, 12, 0); // 15 October 2026
 
@@ -189,4 +189,66 @@ test('a count part names what it counts and the new kinds are summarised by what
   assert.equal(kind('long_sessions', 'Sesiones largas', { sessions: 1, minutes: 90 }), 'Sesiones largas · 1 sesión de al menos 90 min');
   assert.equal(kind('variety', 'Variar de género', { genres: 3, hours: 1.5 }), 'Variar de género · jugar al menos 1,5 h a 3 géneros distintos');
   assert.match(kind('wishlist', 'Cumplir deseados', { mode: 'start', games: 2 }), /empezar 2 juegos de los que esperabas en deseados/);
+});
+
+const duel = (me, other, extra = {}) => ({
+  id: 9, kind: 'duel_hours', label: 'Duelo de horas', scope: 'duel', status: 'active', declined: false, taking_part: true,
+  starts_on: iso(-2), ends_on: iso(5), owner: { id: 7, name: 'Yo' }, opponent: { id: 8, name: 'Bea' }, params: { opponent_id: 8 },
+  progress: { players: [{ user_id: 7, name: 'Yo', seconds: me, versus: true, done: me > other }, { user_id: 8, name: 'Bea', seconds: other, versus: true, done: other > me }] },
+  ...extra,
+});
+
+test('a duel says who is ahead and by how much, from either side', () => {
+  assert.deepEqual(standing(duel(7200, 3600), 7, TODAY), { tone: 'ok', text: 'Vas ganando a Bea por 1 h' });
+  assert.deepEqual(standing(duel(3600, 7200), 7, TODAY), { tone: 'behind', text: 'Vas perdiendo contra Bea por 1 h' });
+  assert.deepEqual(standing(duel(3600, 3600), 7, TODAY), { tone: 'pending', text: 'Empatados con Bea' });
+  const asBea = standing(duel(7200, 3600), 8, TODAY);
+  assert.deepEqual(asBea, { tone: 'behind', text: 'Vas perdiendo contra Yo por 1 h' });
+});
+
+test('losing a duel in the last days is urgent', () => {
+  assert.equal(standing(duel(0, 3600, { ends_on: iso(1) }), 7, TODAY).tone, 'urgent');
+});
+
+test('a finished duel says who won, a tie, or that nobody played', () => {
+  const done = (me, other) => standing({ ...duel(me, other), status: 'finished' }, 7, TODAY);
+  assert.deepEqual(done(7200, 3600), { tone: 'done', text: 'Ganaste el duelo a Bea' });
+  assert.deepEqual(done(3600, 7200), { tone: 'failed', text: 'Perdiste el duelo contra Bea' });
+  assert.deepEqual(done(3600, 3600), { tone: 'done', text: 'Empate: ganáis los dos' });
+  assert.deepEqual(done(0, 0), { tone: 'failed', text: 'Nadie jugó: sin ganador' });
+});
+
+test('a declined duel is told to the challenger and to nobody else', () => {
+  const declined = duel(0, 0, { declined: true, progress: { players: [{ user_id: 7, name: 'Yo', seconds: 0, versus: true, done: false }] } });
+  assert.deepEqual(standing(declined, 7, TODAY), { tone: 'failed', text: 'Bea ha rechazado el duelo' });
+  assert.equal(standing({ ...declined, taking_part: false }, 8, TODAY), null);
+});
+
+test('a versus group challenge adds the position, a duel part shows only its hours', () => {
+  const part = { user_id: 7, name: 'Yo', seconds: 3600, target_seconds: 18000, done: false, position: 2 };
+  const versus = { ...running(part, { starts: -2, ends: 18 }), params: { versus: true } };
+  assert.match(standing(versus, 7, TODAY).text, /· 🥈$/);
+  assert.equal(medal(1), '🥇');
+  assert.equal(medal(4), '4º');
+  assert.equal(amountLabel({ seconds: 5400, target_seconds: 7200, versus: true }), '1,5 h');
+});
+
+test('the duels of the viewer have their own block and the others go with the other players', () => {
+  const mine = duel(0, 0);
+  const asked = duel(0, 0, { id: 10, owner: { id: 8, name: 'Bea' }, opponent: { id: 7, name: 'Yo' } });
+  const other = duel(0, 0, { id: 11, owner: { id: 8, name: 'Bea' }, opponent: { id: 9, name: 'Cris' } });
+  const result = blocks([mine, asked, other], 7);
+  assert.deepEqual(result.map((b) => b.key), ['group', 'mine', 'duels', 'others']);
+  assert.deepEqual(result.find((b) => b.key === 'duels').list.map((c) => c.id), [9, 10]);
+  assert.deepEqual(result.find((b) => b.key === 'others').list.map((c) => c.id), [11]);
+});
+
+test('a duel result is told as a win, a loss or a tie, and the duels are summarised', () => {
+  assert.equal(resultLine({ scope: 'duel', done: true, tied: false }), 'Ganaste el duelo');
+  assert.equal(resultLine({ scope: 'duel', done: false, tied: false }), 'Perdiste el duelo');
+  assert.equal(resultLine({ scope: 'duel', done: true, tied: true }), 'Empate');
+  assert.equal(summaryLine({ kind: 'duel_hours', label: 'Duelo de horas', params: {} }), 'Duelo de horas · gana quien juegue más horas');
+  assert.equal(summaryLine({ kind: 'duel_game', label: 'Duelo en un juego', game: { name: 'Hades' }, params: {} }), 'Duelo en un juego · gana quien juegue más a Hades');
+  const versus = summaryLine({ kind: 'game_of_month', label: 'Juego del mes', params: { min_hours_each: 5, min_hours_total: 12, versus: true } });
+  assert.match(versus, /y gana quien más avance$/);
 });

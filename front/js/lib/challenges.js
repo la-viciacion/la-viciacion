@@ -59,6 +59,7 @@ const unitName = (part, n) => (UNITS[part.unit] ?? UNITS.games)[n === 1 ? 0 : 1]
 
 /** "3 / 5 h", "0 / 1 juego", "3 / 7 días" or "12,5 % / 25 %" */
 export function amountLabel(part) {
+  if (part.versus) return hoursLabel(part.seconds);
   if (isCount(part)) return `${part.count} / ${part.target_count} ${unitName(part, part.target_count)}`;
   if (isPercent(part)) return `${number(part.percent)} % / ${number(part.target_percent)} %`;
   return `${hoursLabel(part.seconds)} / ${hoursLabel(part.target_seconds)}`;
@@ -79,19 +80,24 @@ export function debtPreview(mode, value, debt) {
   return `El ${number(value)} % de tu deuda son unas ${hoursLabel((debt.seconds * value) / 100)} (tu deuda ahora: ${left}).`;
 }
 
+const versusNote = (challenge) => (challenge.params?.versus ? ' · y gana quien más avance' : '');
+
+/** 1 -> "🥇", 2 -> "🥈", 3 -> "🥉", then "4º" (a versus challenge ranks its players). */
+export const medal = (position) => ['🥇', '🥈', '🥉'][position - 1] ?? `${position}º`;
+
 /** What a challenge asks, in a line. */
 export function summaryLine(challenge) {
   const p = challenge.params;
   if (challenge.kind === 'game_of_month') {
-    return `${challenge.label} · mínimo ${hoursLabel(p.min_hours_each * 3600)} cada uno y ${hoursLabel(p.min_hours_total * 3600)} entre todos`;
+    return `${challenge.label} · mínimo ${hoursLabel(p.min_hours_each * 3600)} cada uno y ${hoursLabel(p.min_hours_total * 3600)} entre todos${versusNote(challenge)}`;
   }
   if (challenge.kind === 'themed') {
     if (p.mode === 'play') {
       const total = p.min_hours_total ? ` y ${hoursLabel(p.min_hours_total * 3600)} entre todos` : '';
-      return `${challenge.label} · jugar ${hoursLabel(p.min_hours_each * 3600)} cada uno a juegos de ${p.tag}${total}`;
+      return `${challenge.label} · jugar ${hoursLabel(p.min_hours_each * 3600)} cada uno a juegos de ${p.tag}${total}${versusNote(challenge)}`;
     }
     const total = p.min_games_total ? `, ${p.min_games_total} entre todos` : '';
-    return `${challenge.label} · completar un juego de ${p.tag} cada uno${total}`;
+    return `${challenge.label} · completar un juego de ${p.tag} cada uno${total}${versusNote(challenge)}`;
   }
   if (challenge.kind === 'debt_reduction') {
     const what = p.mode === 'percent' ? `saldar el ${number(p.percent)} % de lo que te quedaba por jugar` : `completar ${p.games} ${p.games === 1 ? 'juego' : 'juegos'} de los que tenías empezados`;
@@ -101,6 +107,8 @@ export function summaryLine(challenge) {
     const what = p.mode === 'play' ? `jugar ${hoursLabel(p.hours * 3600)} a` : 'completar';
     return `${challenge.label} · ${what} un juego de ${p.genre} que no tuvieras antes`;
   }
+  if (challenge.kind === 'duel_hours') return `${challenge.label} · gana quien juegue más horas`;
+  if (challenge.kind === 'duel_game') return `${challenge.label} · gana quien juegue más a ${challenge.game?.name ?? 'ese juego'}`;
   if (challenge.kind === 'streak') {
     return `${challenge.label} · jugar ${p.days} días ${p.mode === 'consecutive' ? 'seguidos' : 'distintos'}`;
   }
@@ -147,6 +155,32 @@ const PACE_GAP = 0.2;
 /** How the viewer is doing in a challenge, for the notice the card shows: { tone, text }, or null when they do not
  * take part or it has not begun. Tones: done, failed, urgent, behind, ok, pending. */
 export function standing(challenge, meId, today = new Date()) {
+  const result = baseStanding(challenge, meId, today);
+  const part = challenge.progress.players.find((p) => p.user_id === meId);
+  return result && challenge.params?.versus && part?.position ? { ...result, text: `${result.text} · ${medal(part.position)}` } : result;
+}
+
+/** A duel from the point of view of one of its two players. */
+function duelStanding(challenge, meId, today) {
+  const me = challenge.progress.players.find((p) => p.user_id === meId);
+  const other = challenge.progress.players.find((p) => p.user_id !== meId);
+  const rival = (meId === challenge.owner?.id ? challenge.opponent : challenge.owner)?.name ?? 'tu rival';
+  if (challenge.declined) return meId === challenge.owner?.id ? { tone: 'failed', text: `${rival} ha rechazado el duelo` } : null;
+  if (!me || !other || challenge.status === 'upcoming') return null;
+  if (challenge.status === 'finished') {
+    if (!me.seconds && !other.seconds) return { tone: 'failed', text: 'Nadie jugó: sin ganador' };
+    if (me.seconds === other.seconds) return { tone: 'done', text: 'Empate: ganáis los dos' };
+    return me.done ? { tone: 'done', text: `Ganaste el duelo a ${rival}` } : { tone: 'failed', text: `Perdiste el duelo contra ${rival}` };
+  }
+  const gap = me.seconds - other.seconds;
+  if (gap === 0) return { tone: 'pending', text: `Empatados con ${rival}` };
+  if (gap > 0) return { tone: 'ok', text: `Vas ganando a ${rival} por ${hoursLabel(gap)}` };
+  const days = daysUntil(challenge.ends_on, today);
+  return { tone: days <= URGENT_DAYS ? 'urgent' : 'behind', text: `Vas perdiendo contra ${rival} por ${hoursLabel(-gap)}` };
+}
+
+function baseStanding(challenge, meId, today) {
+  if (challenge.scope === 'duel') return duelStanding(challenge, meId, today);
   const part = challenge.taking_part ? challenge.progress.players.find((p) => p.user_id === meId) : null;
   if (!part || challenge.status === 'upcoming') return null;
   if (challenge.status === 'finished') {
@@ -200,10 +234,13 @@ export function blocks(challenges, meId) {
   const cut = (list) => [...sorted(list).filter((c) => c.status !== 'finished'), ...sorted(list).filter((c) => c.status === 'finished').slice(0, FINISHED_SHOWN)];
   const group = challenges.filter((c) => c.scope === 'group');
   const mine = challenges.filter((c) => c.scope === 'user' && c.owner?.id === meId);
-  const others = challenges.filter((c) => c.scope === 'user' && c.owner?.id !== meId);
+  const isMyDuel = (c) => c.scope === 'duel' && (c.owner?.id === meId || c.opponent?.id === meId);
+  const duels = challenges.filter(isMyDuel);
+  const others = challenges.filter((c) => (c.scope === 'user' && c.owner?.id !== meId) || (c.scope === 'duel' && !isMyDuel(c)));
   return [
     { key: 'group', title: 'Del grupo', list: cut(group), empty: 'No hay ningún reto del grupo.' },
     { key: 'mine', title: 'Tuyos', list: cut(mine), empty: 'No tienes ningún reto. Lanza uno con «Nuevo reto».' },
+    ...(duels.length ? [{ key: 'duels', title: 'Duelos', list: cut(duels), empty: '' }] : []),
     ...(others.length ? [{ key: 'others', title: 'De otros jugadores', list: cut(others), empty: '' }] : []),
   ];
 }
@@ -216,6 +253,8 @@ export const PERSONAL_KINDS = [
   ['long_sessions', 'Sesiones largas'],
   ['variety', 'Variar de género'],
   ['wishlist', 'Cumplir deseados'],
+  ['duel_hours', 'Duelo de horas'],
+  ['duel_game', 'Duelo en un juego'],
 ];
 
 /** How long a personal challenge lasts, to choose from. */
@@ -223,6 +262,7 @@ export const DURATIONS = [['week', 'Una semana'], ['month', 'Un mes'], ['quarter
 
 /** The line a finished challenge gets in a player's history. */
 export function resultLine(entry) {
+  if (entry.scope === 'duel') return entry.tied ? 'Empate' : entry.done ? 'Ganaste el duelo' : 'Perdiste el duelo';
   if (entry.scope === 'user') return entry.done ? 'Lo conseguiste' : 'No se cumplió';
   if (entry.done) return entry.group_done ? 'Cumpliste tu parte y el grupo llegó al total' : 'Cumpliste tu parte';
   return entry.group_done ? 'El grupo llegó al total' : 'No se cumplió';
