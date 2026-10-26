@@ -526,7 +526,8 @@ async def announce_challenge_launch(db: Session, challenge_id: int) -> str:
         return "gone"
     template = challenges.TEMPLATES[challenge.kind]
     title = utils.escape_markdown(challenge.title)
-    await utils.send_message(f"🎯 *Nuevo reto del grupo*\n*{title}*\n{template.summary(challenge)}", False)
+    voluntary = "\nEs voluntario: apúntate en Retos." if challenge.participation == challenges.OPT_IN else ""
+    await utils.send_message(f"🎯 *Nuevo reto del grupo*\n*{title}*\n{template.summary(challenge)}{voluntary}", False)
     return "sent"
 
 

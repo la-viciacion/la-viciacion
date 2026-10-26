@@ -33,5 +33,15 @@ class AttentionTests(unittest.TestCase):
     def test_players_without_telegram_leave_out_inactive_users_and_the_god_account(self):
         self.assertEqual(overview.attention(self.db)["users_without_telegram"], 1)
 
+    def test_the_proposals_nobody_has_answered_are_counted(self):
+        self.assertEqual(overview.attention(self.db)["pending_challenge_proposals"], 0)
+        self.db.add_all([
+            models.ChallengeProposal(proposer_id=1, kind="themed", options="{}", title="a", fingerprint="a"),
+            models.ChallengeProposal(proposer_id=1, kind="themed", options="{}", title="b", fingerprint="b", status="approved"),
+            models.ChallengeProposal(proposer_id=2, kind="themed", options="{}", title="c", fingerprint="c", status="rejected"),
+        ])
+        self.db.commit()
+        self.assertEqual(overview.attention(self.db)["pending_challenge_proposals"], 1)
+
     def test_games_without_rawg(self):
         self.assertEqual(overview.attention(self.db)["games_without_rawg"], 1)

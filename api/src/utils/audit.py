@@ -49,6 +49,8 @@ SNAPSHOTS = {
     "scores": (models.GameScore, int),
     "achievements": (models.Achievement, int),
     "user-achievements": (models.UserAchievement, int),
+    "challenge-proposals": (models.ChallengeProposal, int),
+    "challenge-schedules": (models.ChallengeSchedule, int),
 }
 # never copied into the log: secrets, and pictures that would only make it heavy
 SKIPPED_COLUMNS = {"password", "avatar", "image"}

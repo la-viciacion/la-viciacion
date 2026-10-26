@@ -4,12 +4,14 @@ restart never repeats a run, what it records in `job_runs`, and that a failing j
 (summaries, reminders, achievement checks) is replaced by recorders; it is tested in
 test_mariadb_background_notices.py and test_mariadb_background_work.py."""
 import datetime
+import json
 from datetime import timedelta
 from unittest import mock
 
 
-from src.database import database
+from src.database import database, models
 from src.utils import actions, push, scheduler
+from tests import clock
 from tests.api_support import ApiTestCase
 
 MONDAY = datetime.datetime(2026, 3, 2)  # a Monday: the default weekly summary is Monday 09:00
@@ -331,3 +333,58 @@ class WishlistGroupNoticeJobTests(SchedulerTestCase):
         for mode in ("eve", "weekly"):
             self.set_settings(**{"wishlist.group_notice": mode, "notifications.enabled": False})
             self.assertEqual(self.wishlist_calls([at(12, 31, day=6)]), [], mode)
+
+
+class ChallengeScheduleJobTests(SchedulerTestCase):
+    """The schedules of the group's challenges: the daily job launches the one of the running month, once."""
+
+    def setUp(self):
+        super().setUp()
+        self.game("hades", "Hades")
+        self.announced = []
+
+        async def announce(db, challenge_id):
+            self.announced.append(challenge_id)
+            return "sent"
+
+        patcher = mock.patch.object(actions, "announce_challenge_launch", new=announce)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def schedule(self, announce=False, active=True):
+        with database.SessionLocal() as db:
+            db.add(models.ChallengeSchedule(
+                label="Mensual", kind="game_of_month", options=json.dumps({"min_hours_each": 2, "min_hours_total": 6}),
+                games=json.dumps(["hades"]), announce=announce, active=active, first_month=clock.today().replace(day=1),
+            ))
+            db.commit()
+
+    def test_it_launches_the_challenge_of_the_month_once_at_its_hour(self):
+        self.schedule()
+        scheduler.tick(at(6, 1))
+        self.assertEqual(self.scalar("SELECT title FROM challenges"), "Juego del mes: Hades")
+        self.assertEqual(self.jobs()["challenge_schedules"][1], "ok: 1 launched")
+        scheduler.tick(at(6, 2, 30))
+        scheduler.tick(at(6, 3, day=1))  # tomorrow: the month is already launched
+        self.assertEqual(self.scalar("SELECT COUNT(*) FROM challenges"), 1)
+
+    def test_it_does_not_run_long_after_its_hour_nor_for_an_inactive_schedule(self):
+        self.schedule(active=False)
+        scheduler.tick(at(6, 1))
+        self.assertEqual(self.scalar("SELECT COUNT(*) FROM challenges"), 0)
+        self.schedule()
+        scheduler.tick(at(9, 30))  # more than the grace window after 06:00
+        self.assertEqual(self.scalar("SELECT COUNT(*) FROM challenges"), 0)
+
+    def test_the_group_is_told_only_when_the_schedule_says_so(self):
+        self.schedule(announce=False)
+        scheduler.tick(at(6, 1))
+        self.assertEqual(self.announced, [])
+        with database.SessionLocal() as db:
+            db.query(models.ChallengeSchedule).delete()
+            db.query(models.Challenge).delete()
+            db.commit()
+        self.schedule(announce=True)
+        scheduler.tick(at(6, 1, day=1))
+        self.assertEqual(len(self.announced), 1)
+

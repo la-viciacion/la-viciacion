@@ -7,9 +7,10 @@ from sqlalchemy.orm import Session
 
 from .. import auth
 from ..auth import get_db
+from ..crud import challenge_proposals as proposals
 from ..crud import challenges as crud
 from ..database import models
-from ..utils.challenges import GROUP, TEMPLATES, ChallengeError
+from ..utils.challenges import GROUP, TEMPLATES, ChallengeConflict, ChallengeError, available_tags
 
 router = APIRouter(
     prefix="/challenges",
@@ -22,6 +23,11 @@ NOT_FOUND = "Reto no encontrado"
 
 
 class NewChallenge(BaseModel):
+    kind: str
+    options: dict = Field(default_factory=dict)
+
+
+class NewProposal(BaseModel):
     kind: str
     options: dict = Field(default_factory=dict)
 
@@ -52,6 +58,56 @@ def get_debt(
     """The caller's debt as a "reduce the debt" challenge launched today would start from it: seconds left to play,
     games that owe time and games open. Derived, so the form can say how many hours a percentage is."""
     return crud.debt_preview(db, current_user.id, datetime.date.today())
+
+
+@router.get("/tags")
+def get_tags(db: Session = Depends(get_db)):
+    """The tags a themed challenge can be about (those of the games in the database, with how many have each): what a
+    player needs to propose one."""
+    return [{"tag": name, "games": count} for _, (name, count) in sorted(available_tags(db).items())]
+
+
+@router.get("/proposals")
+def get_my_proposals(
+    current_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """The group challenges the caller has proposed, with what the admins answered."""
+    return proposals.mine(db, current_user.id)
+
+
+@router.post("/proposals", status_code=201)
+def propose_challenge(
+    body: NewProposal,
+    current_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Propose a challenge for the whole group (a game of the month or a themed one). It is not launched: an admin
+    approves or rejects it from the panel. A player may have a few waiting at once."""
+    try:
+        proposal = proposals.propose(db, current_user, body.kind, body.options, datetime.date.today())
+    except ChallengeConflict as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except ChallengeError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return proposals.view(db, proposal)
+
+
+@router.delete("/proposals/{proposal_id}")
+def withdraw_proposal(
+    proposal_id: int,
+    current_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Take back a proposal of your own that nobody has decided yet."""
+    proposal = db.get(models.ChallengeProposal, proposal_id)
+    if proposal is None or proposal.proposer_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Propuesta no encontrada")
+    try:
+        proposals.withdraw(db, proposal)
+    except ChallengeConflict as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    return {"message": "Propuesta retirada"}
 
 
 @router.get("")
@@ -107,8 +163,10 @@ def launch_challenge(
     today = datetime.date.today()
     try:
         challenge = crud.create(db, current_user, body.kind, body.options, today)
+    except ChallengeConflict as e:
+        raise HTTPException(status_code=409, detail=str(e))
     except ChallengeError as e:
-        raise HTTPException(status_code=409 if "Ya existe" in str(e) else 400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e))
     return crud.view(db, challenge, current_user.id, today)
 
 

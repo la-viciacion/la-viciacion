@@ -361,6 +361,47 @@ class ChallengeOptOut(Base):
     created_at = Column(DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP"))
 
 
+class ChallengeProposal(Base):
+    """A group challenge a player proposes; an admin approves it (it is launched as a `Challenge`) or rejects it."""
+
+    __tablename__ = "challenge_proposals"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    proposer_id = Column(Integer, ForeignKey("users.id", name="fk_challenge_proposals_proposer", ondelete="CASCADE"), nullable=False)
+    kind = Column(String(32), nullable=False)  # the template
+    options = Column(Text, nullable=False)  # what the player chose, JSON
+    title = Column(String(120), nullable=False)  # as the challenge would be called
+    # the hash of the challenge it would be: an equal pending proposal is refused
+    fingerprint = Column(String(64), nullable=False)
+    status = Column(String(8), nullable=False, server_default=text("'pending'"))  # pending, approved or rejected
+    decision_note = Column(String(255), nullable=True)
+    decided_by = Column(Integer, ForeignKey("users.id", name="fk_challenge_proposals_decider", ondelete="SET NULL"), nullable=True)
+    decided_at = Column(DateTime, nullable=True)
+    challenge_id = Column(Integer, ForeignKey("challenges.id", name="fk_challenge_proposals_challenge", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP"))
+
+
+class ChallengeSchedule(Base):
+    """A group challenge that launches itself every month (crud/challenge_schedules.py). Only the definition is
+    stored: the game of a month is worked out from `first_month` and the list of games."""
+
+    __tablename__ = "challenge_schedules"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    label = Column(String(80), nullable=False)
+    kind = Column(String(32), nullable=False)  # the template
+    options = Column(Text, nullable=False)  # the options of the template without the month and the game, JSON
+    games = Column(Text, nullable=True)  # the game ids a game of the month rotates along, JSON
+    participation = Column(String(8), nullable=False, server_default=text("'auto'"))
+    announce = Column(Boolean, nullable=False, server_default=text("0"))  # tell the group when it launches
+    active = Column(Boolean, nullable=False, server_default=text("1"))
+    first_month = Column(Date, nullable=False)  # the first day of the first month it launches for
+    last_month = Column(Date, nullable=True)  # the first day of the last month it was launched for
+    last_status = Column(String(255), nullable=True)
+    created_by = Column(Integer, ForeignKey("users.id", name="fk_challenge_schedules_creator", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP"))
+
+
 class AuditLog(Base):
     """The audit log (see utils/audit.py): one row per successful write of the admin panel, and one per security event."""
 

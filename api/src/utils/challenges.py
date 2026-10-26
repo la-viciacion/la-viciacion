@@ -27,9 +27,26 @@ DUEL = "duel"
 MAX_HOURS = 5000
 MAX_TITLE = 120
 
+AUTO = "auto"  # every active player takes part and may leave
+OPT_IN = "opt_in"  # only who joins takes part
+PARTICIPATIONS = (AUTO, OPT_IN)
+# The group templates a player may propose and an admin may schedule: the ones whose options are the same every time
+# (a month and, for the game of the month, a game)
+GROUP_OPTIONS = ("game_id", "month", "min_hours_each", "min_hours_total", "tag", "mode", "min_games_total", "versus")
+PROPOSABLE = ("game_of_month", "themed")
+
 
 class ChallengeError(ValueError):
     """The options of a challenge are not valid (the message is shown to whoever launched it)."""
+
+
+class ChallengeConflict(ChallengeError):
+    """The challenge, proposal or schedule is valid but clashes with what already exists (an answer 409)."""
+
+
+def clean_options(options: dict | None) -> dict:
+    """Only the options a group template knows, whatever else was sent (a player's proposal and a schedule are stored)."""
+    return {key: value for key, value in (options or {}).items() if key in GROUP_OPTIONS and value is not None}
 
 
 @dataclass
@@ -99,10 +116,27 @@ def status_of(challenge: models.Challenge, today: datetime.date) -> str:
     return "active" if today <= challenge.ends_on else "finished"
 
 
-def fingerprint(kind: str, built: Built, owner_user_id: int | None) -> str:
-    """What makes two challenges the same: the template, its options, the period and whose it is."""
+def month_start(day: datetime.date) -> datetime.date:
+    """The first day of the month of a day."""
+    return day.replace(day=1)
+
+
+def next_month(day: datetime.date) -> datetime.date:
+    """The first day of the month after the one of `day`."""
+    return (day.replace(day=1) + datetime.timedelta(days=31)).replace(day=1)
+
+
+def months_between(first: datetime.date, later: datetime.date) -> int:
+    """Whole months from the month of `first` to the month of `later` (negative if it is before)."""
+    return (later.year - first.year) * 12 + later.month - first.month
+
+
+def fingerprint(kind: str, built: Built, owner_user_id: int | None, participation: str = AUTO) -> str:
+    """What makes two challenges the same: the template, its options, the period, whose it is and, when it is not the
+    usual one, who takes part (an old challenge keeps the fingerprint it had)."""
     canonical = json.dumps(
-        [kind, built.params, built.game_id, built.starts_on.isoformat(), built.ends_on.isoformat(), owner_user_id],
+        [kind, built.params, built.game_id, built.starts_on.isoformat(), built.ends_on.isoformat(), owner_user_id]
+        + ([participation] if participation != AUTO else []),
         sort_keys=True, ensure_ascii=False,
     )
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
