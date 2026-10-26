@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { installApi, installDom, installStorage, json, settle, text } from './dom.js';
+import { installApi as install, installDom, installStorage, json, settle, text } from './dom.js';
 
 installStorage();
 const window = installDom('<main id="main"></main>', 'http://localhost/');
@@ -8,6 +8,9 @@ globalThis.location = window.location;
 globalThis.history = window.history;
 const recap = await import('../js/pages/recap/index.js');
 
+// the page asks first whether the period can be chosen; the tests look at the recap requests
+const installApi = (routes, selectable = true) => install({ 'GET /statistics/recap-access': { selectable }, ...routes });
+const first = (calls) => calls.find((call) => call.path.startsWith('/statistics/recap/'));
 const main = () => document.getElementById('main');
 const HOUR = 3600;
 const ME = { id: 1, username: 'ana', is_admin: false };
@@ -36,7 +39,7 @@ test('it opens on the asked month and tells the player their figures against the
   const calls = installApi({ 'GET /statistics/recap/2026-09?username=ana': DATA });
   await recap.render({ user: ME, main: main() });
   await settle();
-  assert.equal(calls[0].path, '/statistics/recap/2026-09?username=ana');
+  assert.equal(first(calls).path, '/statistics/recap/2026-09?username=ana');
   const body = main().querySelector('#rcBody').textContent;
   assert.match(body, /Has jugado/);
   assert.match(body, /4 h/);
@@ -89,7 +92,7 @@ test('only an admin can look at another player', async () => {
   const calls = installApi({ 'GET /statistics/recap/2026-09?': DATA });
   await recap.render({ user: ME, main: main() });
   await settle();
-  assert.equal(calls[0].path, '/statistics/recap/2026-09?username=ana');
+  assert.equal(first(calls).path, '/statistics/recap/2026-09?username=ana');
   window.location.hash = '#/recap/2026-09/biel';
   await recap.render({ user: { ...ME, is_admin: true }, main: main() });
   await settle();
@@ -143,7 +146,7 @@ test('an address naming the running season still opens it as annual (the Decembe
   const calls = installApi({ [`GET /statistics/recap/${year}?`]: { ...DATA, period: String(year), kind: 'year', complete: false } });
   await recap.render({ user: ME, main: main() });
   await settle();
-  assert.equal(calls[0].path, `/statistics/recap/${year}?username=ana`);
+  assert.equal(first(calls).path, `/statistics/recap/${year}?username=ana`);
   assert.equal(document.getElementById('rcKind').value, 'year');
   assert.equal(document.getElementById('rcMonth'), null);
   assert.match(main().textContent, /todavía no ha terminado/);
@@ -192,7 +195,7 @@ test('a period that does not exist yet is moved to one that does', async () => {
   const calls = installApi({ 'GET /statistics/recap/': DATA });
   await recap.render({ user: ME, main: main() });
   await settle();
-  assert.equal(calls[0].path.includes(String(new Date().getFullYear() + 1)), false);
+  assert.equal(first(calls).path.includes(String(new Date().getFullYear() + 1)), false);
   // the running year, unless today is in January: March has not happened yet there either, so it falls back further
   const year = new Date().getMonth() === 0 ? new Date().getFullYear() - 1 : new Date().getFullYear();
   assert.equal(document.getElementById('rcYear').value, String(year));
@@ -205,13 +208,13 @@ test('without an address the recap is the one of the month that has just ended, 
   let calls = installApi({ 'GET /statistics/recap/': DATA });
   await recap.render({ user: ME, main: main() });
   await settle();
-  assert.equal(calls[0].path, `/statistics/recap/${last}?username=ana`);
+  assert.equal(first(calls).path, `/statistics/recap/${last}?username=ana`);
   assert.equal(window.location.hash, '#/recap', 'the address stays as it was: the month is the default, not a choice');
   window.location.hash = '#/recap/2025-03';
   calls = installApi({ 'GET /statistics/recap/': DATA });
   await recap.render({ user: ME, main: main() });
   await settle();
-  assert.equal(calls[0].path, '/statistics/recap/2025-03?username=ana');
+  assert.equal(first(calls).path, '/statistics/recap/2025-03?username=ana');
   assert.equal(window.location.hash, '#/recap/2025-03');
 });
 
@@ -223,7 +226,7 @@ test('the running month cannot be seen: an address naming it falls back to the o
   const calls = installApi({ 'GET /statistics/recap/': DATA });
   await recap.render({ user: ME, main: main() });
   await settle();
-  assert.equal(calls[0].path, `/statistics/recap/${last}?username=ana`);
+  assert.equal(first(calls).path, `/statistics/recap/${last}?username=ana`);
   assert.equal(window.location.hash, `#/recap/${last}`);
 });
 
@@ -238,4 +241,13 @@ test('choosing a period on the page is what puts it in the address', async () =>
   kind.dispatchEvent(new window.Event('change', { bubbles: true }));
   await settle();
   assert.equal(window.location.hash, `#/recap/${document.getElementById('rcYear').value}`);
+});
+
+test('a player without the recaps open sees the one on offer and no way to change it', async () => {
+  window.location.hash = '#/recap/2026-09';
+  installApi({ 'GET /statistics/recap/2026-09?': DATA }, false);
+  await recap.render({ user: ME, main: main() });
+  await settle();
+  assert.equal(document.querySelector('.rc-picker'), null);
+  assert.match(main().querySelector('#rcBody').textContent, /Has jugado/);
 });

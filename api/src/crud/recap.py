@@ -17,6 +17,7 @@ from . import games as games_crud
 from . import time_entries
 
 TOP_GAMES = 3
+WINDOW_DAYS = 5  # the first days of a month (or of January, for the season) in which a finished recap can be opened
 TOP_PLAYER_GAMES = 5
 TOP_GENRES = 5
 PERIOD_FORMAT = re.compile(r"^(\d{4})(?:-(\d{2}))?$")
@@ -71,6 +72,20 @@ def season_locked(period: Period, unlocked_year: int, today: datetime.date | Non
     A finished season, or a month, is never locked by this (`period_problem` covers those)."""
     today = today or datetime.date.today()
     return period.kind == "year" and period.end > today and unlocked_year != period.start.year
+
+
+def recap_closed(period: Period, always_available: bool, today: datetime.date | None = None) -> bool:
+    """Whether a finished recap can no longer be opened by a player: it is only there in the first days of the month
+    after it (`WINDOW_DAYS`), and in January also the season that ended with December. `always_available` (panel)
+    lifts that. The running season is not judged here: `season_locked` already decides it."""
+    today = today or datetime.date.today()
+    if always_available or period.end > today:
+        return False
+    if today.day > WINDOW_DAYS:
+        return True
+    if period.kind == "month":
+        return period.end != today.replace(day=1)
+    return not (today.month == 1 and period.end == today.replace(day=1))
 
 
 def parse_period(text: str) -> Period:

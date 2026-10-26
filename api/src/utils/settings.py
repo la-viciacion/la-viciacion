@@ -150,6 +150,8 @@ REGISTRY: dict[str, Spec] = {
     # unlocked for, so it locks itself again once that year is no longer the running one. Set by hand from the
     # panel, or automatically the moment its notice reaches the group (utils/recap_notices.announce_recap).
     "annual.unlocked_year": Spec("int", 0),
+    # Off: a player opens a recap only in the first days after it (crud.recap.recap_closed); on: any finished one, always
+    "recap.always_available": Spec("bool", False),
     # Web Push (utils/push.py). The keys are generated from the panel, never typed.
     "push.enabled": Spec("bool", True),
     "push.contact": Spec("str", None, check=_contact),

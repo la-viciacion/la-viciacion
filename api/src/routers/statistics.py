@@ -181,6 +181,13 @@ def get_user_statistics(
     return response
 
 
+@router.get("/recap-access")
+def get_recap_access(active_user: models.User = Depends(auth.get_current_active_user)):
+    """Whether the caller may choose the period of the recap (type, year and month): an admin always, a player only while
+    the panel keeps the recaps open (`recap.always_available`). Otherwise the page shows the one period on offer."""
+    return {"selectable": bool(active_user.is_admin or settings.get("recap.always_available"))}
+
+
 @router.get("/recap/{period}")
 def get_recap(
     period: str,
@@ -192,7 +199,8 @@ def get_recap(
 
     A season still running gives what there is so far (`complete` is false), but stays locked (`season_locked`)
     for anybody but an admin until it is unlocked (panel, or its notice reaching the group); a month still running
-    is refused outright (`period_problem`) until it ends. Only the player themselves or an admin can ask for a
+    is refused outright (`period_problem`) until it ends. A finished one is only open to players in the first days
+    after it (`recap_closed`) unless the panel setting `recap.always_available` is on; admins always see it. Only the player themselves or an admin can ask for a
     player's recap."""
     try:
         parsed = recap.parse_period(period)
@@ -205,6 +213,8 @@ def get_recap(
         raise HTTPException(status_code=400, detail=messages.RECAP_PERIOD_RUNNING)
     if not active_user.is_admin and recap.season_locked(parsed, settings.get("annual.unlocked_year")):
         raise HTTPException(status_code=400, detail=messages.RECAP_SEASON_LOCKED)
+    if not active_user.is_admin and recap.recap_closed(parsed, settings.get("recap.always_available")):
+        raise HTTPException(status_code=400, detail=messages.RECAP_CLOSED)
     user_id = None
     if username is not None:
         auth.ensure_self_or_admin(active_user, username=username)
