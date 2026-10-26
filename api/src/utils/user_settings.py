@@ -19,6 +19,7 @@ MIN_TIMER_NOTICE_MINUTES = 10
 MAX_TIMER_NOTICE_MINUTES = 120
 DEFAULT_SHOW_PLAYING = True
 DEFAULT_FORGOTTEN_TIMER_CHANNEL = True
+DEFAULT_WISHLIST_RELEASE_CHANNEL = True
 PLACE_COLUMNS = ("place_name", "place_latitude", "place_longitude")
 EARLIEST_BIRTH_DATE = datetime.date(1900, 1, 1)
 
@@ -65,15 +66,22 @@ def forgotten_timer_hours(db: Session, user_id: int) -> int:
     return row.forgotten_timer_hours
 
 
+def _channels(db: Session, user_id: int, notice: str, default: bool) -> tuple[bool, bool]:
+    """(telegram, push): where this user wants a notice (their own choice per channel or the default)."""
+    row = db.get(models.UserSettings, user_id)
+    telegram = getattr(row, f"{notice}_telegram") if row else None
+    push = getattr(row, f"{notice}_push") if row else None
+    return (default if telegram is None else bool(telegram), default if push is None else bool(push))
+
+
 def forgotten_timer_channels(db: Session, user_id: int) -> tuple[bool, bool]:
     """(telegram, push): where this user wants the forgotten-timer notice. Both off means no notice."""
-    row = db.get(models.UserSettings, user_id)
-    telegram = row.forgotten_timer_telegram if row else None
-    push = row.forgotten_timer_push if row else None
-    return (
-        DEFAULT_FORGOTTEN_TIMER_CHANNEL if telegram is None else bool(telegram),
-        DEFAULT_FORGOTTEN_TIMER_CHANNEL if push is None else bool(push),
-    )
+    return _channels(db, user_id, "forgotten_timer", DEFAULT_FORGOTTEN_TIMER_CHANNEL)
+
+
+def wishlist_release_channels(db: Session, user_id: int) -> tuple[bool, bool]:
+    """(telegram, push): where this user wants the notice of the day a game of their wishlist comes out. Both off means no notice."""
+    return _channels(db, user_id, "wishlist_release", DEFAULT_WISHLIST_RELEASE_CHANNEL)
 
 
 def timer_notice_minutes(db: Session, user_id: int) -> int:
@@ -101,6 +109,8 @@ def get(db: Session, user_id: int) -> dict:
         "show_playing": None if row is None or row.show_playing is None else bool(row.show_playing),
         "forgotten_timer_telegram": None if row is None or row.forgotten_timer_telegram is None else bool(row.forgotten_timer_telegram),
         "forgotten_timer_push": None if row is None or row.forgotten_timer_push is None else bool(row.forgotten_timer_push),
+        "wishlist_release_telegram": None if row is None or row.wishlist_release_telegram is None else bool(row.wishlist_release_telegram),
+        "wishlist_release_push": None if row is None or row.wishlist_release_push is None else bool(row.wishlist_release_push),
         "place_name": row.place_name if row else None,
         "place_latitude": None if row is None or row.place_latitude is None else float(row.place_latitude),
         "place_longitude": None if row is None or row.place_longitude is None else float(row.place_longitude),
@@ -108,6 +118,8 @@ def get(db: Session, user_id: int) -> dict:
         "defaults": {
             "forgotten_timer_telegram": DEFAULT_FORGOTTEN_TIMER_CHANNEL,
             "forgotten_timer_push": DEFAULT_FORGOTTEN_TIMER_CHANNEL,
+            "wishlist_release_telegram": DEFAULT_WISHLIST_RELEASE_CHANNEL,
+            "wishlist_release_push": DEFAULT_WISHLIST_RELEASE_CHANNEL,
             "forgotten_timer_hours": DEFAULT_FORGOTTEN_TIMER_HOURS,
             "timer_notice_minutes": DEFAULT_TIMER_NOTICE_MINUTES,
             "show_playing": DEFAULT_SHOW_PLAYING,
@@ -127,7 +139,7 @@ def update(db: Session, user_id: int, changes: dict) -> dict:
         row.timer_notice_minutes = changes["timer_notice_minutes"]
     if "show_playing" in changes:
         row.show_playing = changes["show_playing"]
-    for column in ("forgotten_timer_telegram", "forgotten_timer_push", *PLACE_COLUMNS, "birth_date"):
+    for column in ("forgotten_timer_telegram", "forgotten_timer_push", "wishlist_release_telegram", "wishlist_release_push", *PLACE_COLUMNS, "birth_date"):
         if column in changes:
             setattr(row, column, changes[column])
     db.commit()

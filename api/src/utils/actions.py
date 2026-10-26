@@ -18,10 +18,6 @@ from .logger import LogManager
 log_manager = LogManager()
 logger = log_manager.get_logger()
 
-# Off: for now the wishlist releases are announced only to the group, the day before (announce_wishlist_eve).
-# The private notice of the release day (check_wishlist, wishlist_release_message) stays: turning this on brings it back.
-WISHLIST_PRIVATE_NOTICE = False
-
 config = Config()
 achievements = Achievements()
 
@@ -458,19 +454,22 @@ def wishlist_release_message(releases: list[tuple[str, list[str], str | None]]) 
 
 async def check_wishlist(db: Session, today: datetime.date) -> str:
     """Daily: refresh the release date of the games somebody is waiting for (they slip), then tell each player
-    which of the games they wished come out today (while WISHLIST_PRIVATE_NOTICE is on). Nothing is remembered:
-    a game comes out on one day only."""
+    which of the games they wished come out today, through the channels each one left on (both off: no notice).
+    Nothing is remembered: a game comes out on one day only."""
     changed = await asyncio.to_thread(rawg_sync.refresh_release_dates, db, wishlist.to_refresh(db, today))
-    if not WISHLIST_PRIVATE_NOTICE:
-        return f"{len(changed)} dates changed"
     per_user: dict[int, tuple[models.User, list]] = {}
     for user, game, others in wishlist.releases_on(db, today):
         per_user.setdefault(user.id, (user, []))[1].append((game.name, [w["name"] for w in others], game.slug))
+    told = 0
     for user, releases in per_user.values():
-        if user.telegram_id is None and not push_has_devices(user.id):
+        telegram_on, push_on = user_settings.wishlist_release_channels(db, user.id)
+        if not ((telegram_on and user.telegram_id is not None) or (push_on and push_has_devices(user.id))):
             continue
-        await utils.send_message_to_user(user.telegram_id, wishlist_release_message(releases), user_id=user.id)
-    return f"{len(changed)} dates changed, {len(per_user)} users told"
+        await utils.send_message_to_user(
+            user.telegram_id, wishlist_release_message(releases), user_id=user.id, telegram_on=telegram_on, push_on=push_on
+        )
+        told += 1
+    return f"{len(changed)} dates changed, {told} users told"
 
 
 def wishlist_eve_message(releases: list[tuple[str, list[str], str | None]]) -> str:
