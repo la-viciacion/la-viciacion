@@ -1,4 +1,5 @@
 import datetime
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -55,12 +56,15 @@ def get_debt(
 
 @router.get("")
 def get_challenges(
+    status: Literal["active"] | None = None,
     current_user: models.User = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    """Every challenge the caller can see with its progress (derived; only the definition is stored)."""
+    """Every challenge the caller can see with its progress (derived; only the definition is stored). `status=active`
+    keeps those running today, so a page that only needs those (the Home) does not work out the progress of every
+    challenge there ever was."""
     today = datetime.date.today()
-    return [crud.view(db, challenge, current_user.id, today) for challenge in crud.visible(db, current_user.id)]
+    return [crud.view(db, challenge, current_user.id, today) for challenge in crud.visible(db, current_user.id, today if status == "active" else None)]
 
 
 @router.get("/player/{player_id}")

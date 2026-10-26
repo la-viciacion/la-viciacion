@@ -161,6 +161,15 @@ class ProgressTests(ChallengesTestCase):
         self.assertEqual(sorted(c["title"] for c in body), ["Juego del mes: Celeste", "Juego del mes: Hades"])
         self.assertTrue(all("progress" in c and c["taking_part"] for c in body))
 
+    def test_the_list_can_keep_only_the_running_ones(self):
+        self.launch()
+        self.launch(game_id="celeste", month=this_month(TODAY() + timedelta(days=40)))
+        everything = self.api("GET", "/challenges", as_user="ana").json()
+        running = self.api("GET", "/challenges?status=active", as_user="ana").json()
+        self.assertEqual(len(everything), 2)
+        self.assertEqual([c["title"] for c in running], ["Juego del mes: Hades"])
+        self.assertEqual(self.api("GET", "/challenges?status=finished", as_user="ana").status_code, 422)
+
     def test_an_unknown_challenge_is_a_404(self):
         self.assertEqual(self.api("GET", "/challenges/999", as_user="ana").status_code, 404)
 

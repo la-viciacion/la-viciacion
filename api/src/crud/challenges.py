@@ -94,14 +94,13 @@ def view(db: Session, challenge: models.Challenge, viewer_id: int, today: dateti
     }
 
 
-def visible(db: Session, viewer_id: int) -> list[models.Challenge]:
-    """The challenges the viewer can see: every public one and their own; the latest period first."""
-    return (
-        db.query(models.Challenge)
-        .filter((models.Challenge.visibility == "public") | (models.Challenge.owner_user_id == viewer_id))
-        .order_by(models.Challenge.starts_on.desc(), models.Challenge.id.desc())
-        .all()
-    )
+def visible(db: Session, viewer_id: int, running_on: datetime.date | None = None) -> list[models.Challenge]:
+    """The challenges the viewer can see: every public one and their own; the latest period first. With `running_on`,
+    only those whose period includes that day."""
+    query = db.query(models.Challenge).filter((models.Challenge.visibility == "public") | (models.Challenge.owner_user_id == viewer_id))
+    if running_on is not None:
+        query = query.filter(models.Challenge.starts_on <= running_on, models.Challenge.ends_on >= running_on)
+    return query.order_by(models.Challenge.starts_on.desc(), models.Challenge.id.desc()).all()
 
 
 def outcome(progress: dict, user_id: int) -> dict:
