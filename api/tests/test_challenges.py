@@ -196,5 +196,49 @@ class DebtReductionTests(unittest.TestCase):
         self.assertEqual(challenges.debt_reduction_result(None, "", {"mode": "games", "games": 1}, {}, {}, set()), {"players": []})
 
 
+class StreakTests(unittest.TestCase):
+    DAYS = [datetime.date(2026, 10, d) for d in (1, 2, 3, 5, 6, 9)]
+
+    def test_consecutive_counts_the_longest_run_and_days_counts_every_one(self):
+        run = challenges.streak_result(1, "Ana", "consecutive", 4, self.DAYS, datetime.date(2026, 10, 31))
+        self.assertEqual(run["players"][0], {"user_id": 1, "name": "Ana", "count": 3, "target_count": 4, "unit": "days", "done": False})
+        days = challenges.streak_result(1, "Ana", "days", 6, self.DAYS, datetime.date(2026, 10, 31))
+        self.assertEqual((days["players"][0]["count"], days["players"][0]["done"]), (6, True))
+
+    def test_no_day_played_is_a_zero(self):
+        self.assertEqual(challenges.streak_result(1, "Ana", "consecutive", 2, [], datetime.date(2026, 10, 31))["players"][0]["count"], 0)
+
+    def test_the_options_are_checked_against_the_length_of_the_period(self):
+        today = datetime.date(2026, 10, 1)
+        week = challenges.build_streak(None, {"mode": "consecutive", "days": 7, "duration": "week"}, today)
+        self.assertEqual((week.title, week.ends_on), ("Racha de 7 días", datetime.date(2026, 10, 7)))
+        self.assertEqual(challenges.build_streak(None, {"mode": "days", "days": "10"}, today).title, "Jugar 10 días distintos")
+        for options in ({"mode": "x", "days": 3}, {"mode": "days", "days": 1}, {"mode": "days", "days": 8, "duration": "week"},
+                        {"mode": "days", "days": 2.5}, {"mode": "days", "days": True}, {"mode": "days", "days": 3, "duration": "year"}):
+            with self.assertRaises(ChallengeError, msg=options):
+                challenges.build_streak(None, options, today)
+
+
+class LongSessionsTests(unittest.TestCase):
+    def test_the_title_says_how_many_and_how_long(self):
+        today = datetime.date(2026, 10, 1)
+        self.assertEqual(challenges.build_long_sessions(None, {"sessions": 1, "minutes": 90}, today).title, "1 sesión de 90 min o más")
+        self.assertEqual(challenges.build_long_sessions(None, {"sessions": 3, "minutes": 60, "duration": "quarter"}, today).ends_on, datetime.date(2026, 12, 29))
+
+    def test_the_limits(self):
+        for options in ({"sessions": 0, "minutes": 60}, {"sessions": 101, "minutes": 60}, {"sessions": 2, "minutes": 14}, {"sessions": 2, "minutes": 601}, {"sessions": 2}):
+            with self.assertRaises(ChallengeError, msg=options):
+                challenges.build_long_sessions(None, options, datetime.date(2026, 10, 1))
+
+
+class VarietyTests(unittest.TestCase):
+    def test_a_games_time_counts_in_each_of_its_genres_and_a_genre_needs_the_minimum(self):
+        rows = [("Action, RPG", 3600), ("action", 1800), ("Puzzle", 600), (None, 99999), ("", 99999)]
+        self.assertEqual(challenges.genres_reached(rows, 3600), 2)  # Action 5400, RPG 3600; Puzzle falls short
+        self.assertEqual(challenges.genres_reached(rows, 1), 3)
+        self.assertEqual(challenges.genres_reached(rows, 6000), 0)
+        self.assertEqual(challenges.genres_reached([], 1), 0)
+
+
 if __name__ == "__main__":
     unittest.main()
