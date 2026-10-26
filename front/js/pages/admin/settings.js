@@ -135,6 +135,19 @@ function view(values, jobs, pushDevices, mail, aiUses, aiModel, chat) {
         <div class="adm-sub">Si el servidor está apagado a esa hora, se envía al volver siempre que no hayan pasado más de 6 horas. ${lastRun(jobs.weekly_summary)}</div>
       </section>`,
 
+    challenges: html`
+      <section class="adm-set-card">
+        <h3>Retos</h3>
+        ${check('challenges.private_notices', 'Avisos privados de retos', 'Lo que afecta a cada jugador, por mensaje privado (Telegram o app, según elija cada uno en su perfil): que le han retado a un duelo, que le han rechazado uno, cómo se ha contestado una propuesta suya y cómo han terminado sus retos. Los retos personales y los duelos nunca se avisan al grupo.')}
+        ${check('challenges.result_notice', 'Avisar al grupo de cómo ha terminado un reto de grupo', 'Un solo mensaje por reto, al día siguiente de su final: cuántos cumplieron su parte, si se llegó al total y quién ganó si era una competición.')}
+        ${check('challenges.reminders', 'Permitir los recordatorios de retos', 'Un mensaje privado cuando a un reto le quedan 2 días, a quien no lo ha cumplido. Cada jugador lo tiene desactivado hasta que lo activa en su perfil; apagado aquí, no se envía a nadie.')}
+        <div class="adm-set-row">
+          <label>Hora de los resultados <input class="adm-input" type="time" name="challenges.results_time" required /></label>
+          <label>Hora de los recordatorios <input class="adm-input" type="time" name="challenges.reminders_time" required /></label>
+        </div>
+        <div class="adm-sub">Necesitan las notificaciones activadas. Si el servidor está apagado a esa hora, se envían al volver siempre que no hayan pasado más de 3 horas. Resultados: ${lastRun(jobs.challenge_results)} Recordatorios: ${lastRun(jobs.challenge_reminders)}</div>
+      </section>`,
+
     wishlist: html`
       <section class="adm-set-card">
         <h3>Juegos deseados que salen</h3>

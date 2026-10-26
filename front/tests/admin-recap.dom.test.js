@@ -120,7 +120,7 @@ test('saving sends the month and the day together', async () => {
 
 test('the schedules are with the other sends, and the recap tab only previews', async () => {
   const { ENTITIES } = await import('../js/pages/admin/entities.js');
-  assert.deepEqual(ENTITIES.sends.sections, ['notifications', 'inbox', 'wishlist', 'weekly', 'monthly', 'annual', 'access']);
+  assert.deepEqual(ENTITIES.sends.sections, ['notifications', 'inbox', 'challenges', 'wishlist', 'weekly', 'monthly', 'annual', 'access']);
   assert.equal(ENTITIES.recap.label, 'Probar resumen');
   assert.equal(ENTITIES.recap.custom, 'recap');
 });
@@ -232,4 +232,24 @@ test('saving other fields leaves the lock untouched when the checkbox was not ch
   panel().querySelector('#admSettings').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
   await settle();
   assert.deepEqual(saved.values, { 'annual.enabled': true });
+});
+
+test('the challenges card has the three switches and the hours of the two jobs, and saves only what changed', async () => {
+  let saved;
+  const challengeValues = { ...VALUES, 'challenges.private_notices': true, 'challenges.result_notice': true, 'challenges.reminders': true, 'challenges.results_time': '09:30', 'challenges.reminders_time': '10:00' };
+  installApi(routes({
+    'GET /manage/settings': { values: challengeValues, jobs: { challenge_results: { last_run_at: '2026-10-27T09:30:00', last_status: 'ok: 2 told, 1 to the group' } }, push_devices: { devices: 0, users: 0 }, mail: { configured: false, missing: [] }, ai_uses: [], ai_model: { provider: 'google', model: 'gemini-test' }, chat: { provider: null, model: null, default_prompt: '', customized: false } },
+    'PUT /manage/settings': ({ body }) => { saved = body; return { changed: Object.keys(body.values), values: challengeValues }; },
+  }));
+  await settings.render(panel(), { entity: { sections: ['challenges'] } });
+  await settle();
+  assert.deepEqual(['challenges.private_notices', 'challenges.result_notice', 'challenges.reminders'].map((name) => field(name).checked), [true, true, true]);
+  assert.equal(field('challenges.results_time').value, '09:30');
+  assert.equal(field('challenges.reminders_time').value, '10:00');
+  assert.match(panel().textContent, /Resultados: Último envío: .* \(ok: 2 told, 1 to the group\)/);
+  field('challenges.reminders').checked = false;
+  change(field('challenges.results_time'), '11:15');
+  panel().querySelector('#admSettings').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+  await settle();
+  assert.deepEqual(saved.values, { 'challenges.reminders': false, 'challenges.results_time': '11:15' });
 });

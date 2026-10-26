@@ -12,7 +12,7 @@ La Viciación avisa por dos canales: **Telegram** (un grupo y un bot) y las **no
 - Cambios en los rankings de horas y de juegos.
 - Rachas perdidas (cada día a las 05:00 se anuncian las del día anterior).
 - El día antes de un lanzamiento deseado.
-- El resumen mensual o anual y los retos del grupo.
+- El resumen mensual o anual y los retos del grupo: cuando se lanza uno, cuando el grupo llega al total y, al día siguiente de que acabe, cómo ha terminado.
 
 Los textos pueden estar escritos por una IA para que sean más graciosos, si el administrador la ha configurado.
 
@@ -20,6 +20,8 @@ Los textos pueden estar escritos por una IA para que sean más graciosos, si el 
 
 - El **resumen semanal**, si el administrador lo tiene activado.
 - Un aviso de **timer olvidado**, una sola vez por timer.
+- **Tus retos**: que te han retado a un duelo, que te han rechazado uno, cómo se ha contestado una propuesta tuya y cómo han terminado los retos en los que participas (un solo mensaje al día, con todos). Los retos personales y los duelos **nunca** se avisan al grupo.
+- Un **recordatorio** cuando a un reto tuyo le quedan 2 días y aún no lo has cumplido (viene **desactivado**: lo activas en **Perfil → Ajustes → Notificaciones**).
 - Los logros secretos que consigues, completos.
 
 ## Telegram

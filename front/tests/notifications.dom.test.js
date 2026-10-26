@@ -6,7 +6,10 @@ installStorage();
 installDom('<div id="el"></div>');
 const { initNotifications } = await import('../js/pages/profile/notifications.js');
 
-const DEFAULTS = { forgotten_timer_telegram: true, forgotten_timer_push: true, wishlist_release_telegram: true, wishlist_release_push: true, forgotten_timer_hours: 4 };
+const DEFAULTS = {
+  forgotten_timer_telegram: true, forgotten_timer_push: true, wishlist_release_telegram: true, wishlist_release_push: true, forgotten_timer_hours: 4,
+  challenge_notices_telegram: true, challenge_notices_push: true, challenge_reminders_telegram: false, challenge_reminders_push: false,
+};
 const settings = (own = {}) => ({ forgotten_timer_hours: null, forgotten_timer_telegram: null, forgotten_timer_push: null, wishlist_release_telegram: null, wishlist_release_push: null, ...own, defaults: DEFAULTS });
 
 const show = async (own, patch = () => settings()) => {
@@ -116,4 +119,20 @@ test('saving without changes sends the same hours and says it is saved', async (
   await settle();
   assert.deepEqual(calls.at(-1).body, { forgotten_timer_hours: 6 });
   assert.match(el.querySelector('.pf-msg').textContent, /Guardado/);
+});
+
+test('the challenge notices are on by default and the reminders are off until the player turns them on', async () => {
+  const { el, calls } = await show();
+  const box = (notice, channel) => el.querySelector(`input[name="${notice}_${channel}"]`);
+  assert.deepEqual([box('challenge_notices', 'telegram').checked, box('challenge_notices', 'push').checked], [true, true]);
+  assert.deepEqual([box('challenge_reminders', 'telegram').checked, box('challenge_reminders', 'push').checked], [false, false]);
+  await toggle(box('challenge_reminders', 'push'));
+  assert.deepEqual(calls.at(-1).body, { challenge_reminders_telegram: false, challenge_reminders_push: true });
+});
+
+test('what the player chose for the challenge notices is what is shown', async () => {
+  const { el } = await show({ challenge_notices_telegram: false, challenge_reminders_telegram: true });
+  const box = (notice, channel) => el.querySelector(`input[name="${notice}_${channel}"]`);
+  assert.deepEqual([box('challenge_notices', 'telegram').checked, box('challenge_notices', 'push').checked], [false, true]);
+  assert.equal(box('challenge_reminders', 'telegram').checked, true);
 });

@@ -11,6 +11,8 @@ import { html, mount } from '../../lib/html.js';
 const NOTICES = [
   { id: 'forgotten_timer', name: 'Timer olvidado', hint: 'Un recordatorio si dejas un timer activo demasiado tiempo', options: true },
   { id: 'wishlist_release', name: 'Sale un juego deseado', hint: 'Te avisamos el día que sale un juego de tu lista de deseados' },
+  { id: 'challenge_notices', name: 'Tus retos', hint: 'Te retan a un duelo, te contestan una propuesta o terminan retos en los que participas (un solo mensaje al día)' },
+  { id: 'challenge_reminders', name: 'Recordatorio de retos', hint: 'Cuando a un reto tuyo le quedan 2 días y aún no lo has cumplido (viene desactivado: actívalo si lo quieres)' },
 ];
 
 export async function initNotifications(el, { path }) {
