@@ -157,13 +157,8 @@ class HistoryTests(DuelTestCase):
         self.assertEqual((won["scope"], won["done"], won["tied"]), ("duel", True, False))
         self.assertEqual((lost["done"], lost["tied"]), (False, False))
 
-    def test_a_duel_won_against_nobody_is_not_contested(self):
-        self.finished(ana=60)
-        self.assertEqual((self.history(self.ana)[0]["done"], self.history(self.ana)[0]["contested"]), (True, False))
-
-    def test_a_played_duel_is_contested_and_the_history_can_start_from_a_year(self):
+    def test_the_history_can_start_from_a_year(self):
         self.finished(ana=60, bea=30)
-        self.assertTrue(self.history(self.ana)[0]["contested"])
         with database.SessionLocal() as db:
             self.assertEqual(len(crud.history(db, self.ana, TODAY(), TODAY().year)), 1)
             self.assertEqual(crud.history(db, self.ana, TODAY(), TODAY().year + 1), [])

@@ -19,7 +19,7 @@ Los que se acumulan (horas totales, días jugados, juegos jugados, juegos comple
 
 ### Logros de los retos
 
-Hay logros **lifetime** por cumplir [retos](descubrir.md#retos) (uno cuenta cuando ha terminado y has llegado a tu parte): el primero, 5 y 15 retos cumplidos, uno de **cada tipo personal** (*Todoterreno*) y un reto **de grupo** en el que cumples tu parte y el grupo llega al total (*Misión cumplida entre todos*). Se fechan el día en que acabó el reto y se consiguen en la primera comprobación después de su final, por ejemplo al terminar tu siguiente sesión, nunca mientras el reto sigue en marcha. Solo cuentan los retos que empezaron en 2027 o después.
+Hay logros **lifetime** por cumplir [retos](descubrir.md#retos) (uno cuenta cuando ha terminado y has llegado a tu parte): el primero, 5 y 15 retos cumplidos, uno de **cada tipo personal** (*Todoterreno*) y un reto **de grupo** en el que cumples tu parte y el grupo llega al total (*Misión cumplida entre todos*). Se fechan el día en que acabó el reto y se consiguen en la primera comprobación después de su final, por ejemplo al terminar tu siguiente sesión, nunca mientras el reto sigue en marcha. Solo cuentan los retos que empezaron en 2027 o después, y **los duelos no cuentan** por ahora.
 
 ## Secretos y especiales
 
