@@ -42,7 +42,10 @@ DATA_TABLES = (
 )
 
 # the follow-ups the routers schedule with BackgroundTasks, replaced by recorders
-BACKGROUND = ("after_timer_start", "after_timer_stop", "after_session_change", "after_completion", "after_challenge_launch")
+BACKGROUND = (
+    "after_timer_start", "after_timer_stop", "after_session_change", "after_completion", "after_challenge_launch",
+    "after_duel_launch", "after_duel_decline", "after_proposal_made", "after_proposal_decided",
+)
 
 _shared: dict = {}
 

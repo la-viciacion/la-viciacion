@@ -122,16 +122,18 @@ def approve_proposal(
         raise HTTPException(status_code=400, detail=str(e))
     if body.announce:
         background_tasks.add_task(actions.after_challenge_launch, challenge.id)
+    background_tasks.add_task(actions.after_proposal_decided, proposal.id)
     return proposals_crud.view(db, proposal)
 
 
 @router.post("/challenge-proposals/{proposal_id}/reject")
-def reject_proposal(proposal_id: int, body: Decision = Decision(), admin: models.User = Depends(auth.require_admin), db: Session = Depends(get_db)):
+def reject_proposal(proposal_id: int, background_tasks: BackgroundTasks, body: Decision = Decision(), admin: models.User = Depends(auth.require_admin), db: Session = Depends(get_db)):
     """Turn a proposal down; the note is what the proposer reads."""
     try:
         proposal = proposals_crud.reject(db, _proposal(db, proposal_id), admin, body.note)
     except challenges_utils.ChallengeConflict as e:
         raise HTTPException(status_code=409, detail=str(e))
+    background_tasks.add_task(actions.after_proposal_decided, proposal.id)
     return proposals_crud.view(db, proposal)
 
 

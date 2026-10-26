@@ -20,6 +20,10 @@ what nothing else can trigger remains here:
   wishlist_week     every Sunday at `wishlist.time`, tells the group which wished games come out in the next 7 days.
                     Only one of wishlist_eve and wishlist_week runs: `wishlist.group_notice`
   inbox_purge       every day at 04:00, deletes the inbox notices older than `inbox.retention_days`
+  challenge_results every day at `challenges.results_time` (09:30), tells who took part how the challenges that ended
+                    yesterday went, and the group how each group challenge did
+  challenge_reminders  every day at `challenges.reminders_time` (10:00), reminds (only whoever turned it on) of the
+                    challenges with two days left that they have not met
   challenge_schedules  every day at 06:00, launches the challenge of the running month of each schedule that has not
                     done it yet (a month is launched once; a day the API was down is made up for the next one)
 
@@ -39,7 +43,7 @@ from sqlalchemy.orm import Session
 from ..crud import challenge_schedules, users
 from ..database import models
 from ..database.database import SessionLocal
-from . import actions, inbox, push, recap_notices, settings
+from . import actions, challenge_notices, inbox, push, recap_notices, settings
 from .logger import LogManager
 
 log_manager = LogManager()
@@ -200,6 +204,14 @@ async def _challenge_schedules(db: Session) -> str:
     return f"{len(launched)} launched"
 
 
+async def _challenge_results(db: Session) -> str:
+    return await challenge_notices.announce_results(db, datetime.date.today())
+
+
+async def _challenge_reminders(db: Session) -> str:
+    return await challenge_notices.send_reminders(db, datetime.date.today())
+
+
 async def _inbox_purge(db: Session) -> str:
     return f"{inbox.purge(db)} deleted"
 
@@ -247,6 +259,16 @@ def tick(now: datetime.datetime | None = None) -> None:
         slot = daily_slot(now, INBOX_PURGE_HOUR)
         if is_due(now, slot, _last_run(db, "inbox_purge"), DAILY_GRACE) and _claim(db, "inbox_purge", slot, now):
             _run(db, "inbox_purge", lambda: _inbox_purge(db))
+
+        if notifications and (settings.get("challenges.private_notices") or settings.get("challenges.result_notice")):
+            slot = daily_slot(now, *(int(part) for part in settings.get("challenges.results_time").split(":")))
+            if is_due(now, slot, _last_run(db, "challenge_results"), DAILY_GRACE) and _claim(db, "challenge_results", slot, now):
+                _run(db, "challenge_results", lambda: _challenge_results(db))
+
+        if notifications and settings.get("challenges.reminders"):
+            slot = daily_slot(now, *(int(part) for part in settings.get("challenges.reminders_time").split(":")))
+            if is_due(now, slot, _last_run(db, "challenge_reminders"), DAILY_GRACE) and _claim(db, "challenge_reminders", slot, now):
+                _run(db, "challenge_reminders", lambda: _challenge_reminders(db))
 
         slot = daily_slot(now, CHALLENGE_SCHEDULES_HOUR)
         if is_due(now, slot, _last_run(db, "challenge_schedules"), DAILY_GRACE) and _claim(db, "challenge_schedules", slot, now):

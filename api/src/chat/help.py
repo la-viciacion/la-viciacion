@@ -123,7 +123,9 @@ TOPICS = (
         "completar uno, en una semana, un mes o tres; solo cuentan juegos de ese género que no estuvieran ya en la biblioteca) y Bajar la deuda (un objetivo "
         "sobre la deuda, que es lo que falta para terminar los juegos empezados, en porcentaje o en número de juegos), Racha (días seguidos o distintos jugando), Sesiones largas (un número de sesiones de al menos X minutos), Variar de género (varios géneros distintos con unas horas en cada uno) y Cumplir deseados (empezar o completar juegos que ya estaban en la lista de deseados al lanzar el reto). También hay duelos: un jugador reta a otro a jugar más horas (en total o a un juego); empieza al lanzarlo, el retado puede rechazarlo durante 48 horas y gana quien más juegue (si empatan, los dos). Un reto del grupo puede ser además una competición, con medallas, o voluntario (hay que apuntarse con «Apuntarme»). Cualquier jugador puede proponer al grupo un juego del mes o un temático "
     "(«Proponer al grupo», hasta 3 a la vez): un administrador lo aprueba o lo rechaza con una nota, y el jugador ve el estado en «Tus propuestas». Algunos retos del grupo se lanzan solos cada mes (programados por "
-    "un administrador). Cada reto dice al jugador cómo va "
+    "un administrador). Avisos de retos: lo que te afecta (te retan a un duelo, te rechazan uno, contestan una propuesta tuya y cómo terminan tus retos, un mensaje al día) llega "
+    "solo a ti por Telegram o push, según elijas en tu perfil; el recordatorio de «te quedan 2 días» viene desactivado hasta que lo actives; al grupo solo llegan los retos del grupo, nunca los personales ni los duelos. "
+    "Cada reto dice al jugador cómo va "
         "(cumplido, va bien, por detrás del ritmo o, en los últimos días, lo que le falta; solo dentro de la app) y el Inicio tiene una tarjeta Mis "
         "retos con los que están en marcha. Los retos terminados quedan en Perfil → "
         "Resumen → Retos.",

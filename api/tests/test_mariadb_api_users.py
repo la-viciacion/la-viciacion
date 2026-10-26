@@ -159,7 +159,8 @@ class SettingsTests(UsersTestCase):
     def test_without_choices_every_value_is_the_default(self):
         body = self.api("GET", "/users/ana/settings", as_user="ana").json()
         self.assertEqual((body["forgotten_timer_hours"], body["timer_notice_minutes"]), (None, None))
-        self.assertEqual(body["defaults"], {"forgotten_timer_hours": 4, "timer_notice_minutes": 10, "show_playing": True, "forgotten_timer_telegram": True, "forgotten_timer_push": True, "wishlist_release_telegram": True, "wishlist_release_push": True})
+        self.assertEqual(body["defaults"], {"forgotten_timer_hours": 4, "timer_notice_minutes": 10, "show_playing": True, "forgotten_timer_telegram": True, "forgotten_timer_push": True, "wishlist_release_telegram": True, "wishlist_release_push": True,
+                                          "challenge_notices_telegram": True, "challenge_notices_push": True, "challenge_reminders_telegram": False, "challenge_reminders_push": False})
         self.assertIsNone(body["show_playing"])
 
     def test_a_value_can_be_set_and_reset_with_null(self):

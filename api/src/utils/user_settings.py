@@ -20,6 +20,10 @@ MAX_TIMER_NOTICE_MINUTES = 120
 DEFAULT_SHOW_PLAYING = True
 DEFAULT_FORGOTTEN_TIMER_CHANNEL = True
 DEFAULT_WISHLIST_RELEASE_CHANNEL = True
+DEFAULT_CHALLENGE_NOTICES_CHANNEL = True
+# Off: a reminder is the one notice that can come when nobody asked, so each player turns it on
+DEFAULT_CHALLENGE_REMINDERS_CHANNEL = False
+CHALLENGE_COLUMNS = ("challenge_notices_telegram", "challenge_notices_push", "challenge_reminders_telegram", "challenge_reminders_push")
 PLACE_COLUMNS = ("place_name", "place_latitude", "place_longitude")
 EARLIEST_BIRTH_DATE = datetime.date(1900, 1, 1)
 
@@ -84,6 +88,17 @@ def wishlist_release_channels(db: Session, user_id: int) -> tuple[bool, bool]:
     return _channels(db, user_id, "wishlist_release", DEFAULT_WISHLIST_RELEASE_CHANNEL)
 
 
+def challenge_notices_channels(db: Session, user_id: int) -> tuple[bool, bool]:
+    """(telegram, push): where this user wants what concerns them in their challenges (a duel, a proposal, how they
+    ended). Both off means no notice."""
+    return _channels(db, user_id, "challenge_notices", DEFAULT_CHALLENGE_NOTICES_CHANNEL)
+
+
+def challenge_reminders_channels(db: Session, user_id: int) -> tuple[bool, bool]:
+    """(telegram, push): where this user wants the reminder of a challenge about to end. Both off means no notice."""
+    return _channels(db, user_id, "challenge_reminders", DEFAULT_CHALLENGE_REMINDERS_CHANNEL)
+
+
 def timer_notice_minutes(db: Session, user_id: int) -> int:
     """Minutes between refreshes of this user's running-timer notification (their own or the default)."""
     row = db.get(models.UserSettings, user_id)
@@ -111,6 +126,7 @@ def get(db: Session, user_id: int) -> dict:
         "forgotten_timer_push": None if row is None or row.forgotten_timer_push is None else bool(row.forgotten_timer_push),
         "wishlist_release_telegram": None if row is None or row.wishlist_release_telegram is None else bool(row.wishlist_release_telegram),
         "wishlist_release_push": None if row is None or row.wishlist_release_push is None else bool(row.wishlist_release_push),
+        **{column: None if row is None or getattr(row, column) is None else bool(getattr(row, column)) for column in CHALLENGE_COLUMNS},
         "place_name": row.place_name if row else None,
         "place_latitude": None if row is None or row.place_latitude is None else float(row.place_latitude),
         "place_longitude": None if row is None or row.place_longitude is None else float(row.place_longitude),
@@ -120,6 +136,10 @@ def get(db: Session, user_id: int) -> dict:
             "forgotten_timer_push": DEFAULT_FORGOTTEN_TIMER_CHANNEL,
             "wishlist_release_telegram": DEFAULT_WISHLIST_RELEASE_CHANNEL,
             "wishlist_release_push": DEFAULT_WISHLIST_RELEASE_CHANNEL,
+            "challenge_notices_telegram": DEFAULT_CHALLENGE_NOTICES_CHANNEL,
+            "challenge_notices_push": DEFAULT_CHALLENGE_NOTICES_CHANNEL,
+            "challenge_reminders_telegram": DEFAULT_CHALLENGE_REMINDERS_CHANNEL,
+            "challenge_reminders_push": DEFAULT_CHALLENGE_REMINDERS_CHANNEL,
             "forgotten_timer_hours": DEFAULT_FORGOTTEN_TIMER_HOURS,
             "timer_notice_minutes": DEFAULT_TIMER_NOTICE_MINUTES,
             "show_playing": DEFAULT_SHOW_PLAYING,
@@ -139,7 +159,7 @@ def update(db: Session, user_id: int, changes: dict) -> dict:
         row.timer_notice_minutes = changes["timer_notice_minutes"]
     if "show_playing" in changes:
         row.show_playing = changes["show_playing"]
-    for column in ("forgotten_timer_telegram", "forgotten_timer_push", "wishlist_release_telegram", "wishlist_release_push", *PLACE_COLUMNS, "birth_date"):
+    for column in ("forgotten_timer_telegram", "forgotten_timer_push", "wishlist_release_telegram", "wishlist_release_push", *CHALLENGE_COLUMNS, *PLACE_COLUMNS, "birth_date"):
         if column in changes:
             setattr(row, column, changes[column])
     db.commit()
