@@ -3,6 +3,7 @@ import { html, mount } from '../../lib/html.js';
 import { ensurePlatforms } from '../../lib/platforms.js';
 import { closeAllModals } from '../../ui/modal.js';
 import { openCompletion } from './completion.js';
+import { showMyChallenges } from './challenges.js';
 import { initGamePicker, startTimerFlow } from './game-picker.js';
 import { initHistory, loadHistory, onHistoryClick, onHistoryKey } from './history.js';
 import { initSessions, openManualSession, openSessionForm } from './sessions.js';
@@ -30,6 +31,8 @@ export async function render({ user, main, isCurrent }) {
     <section id="timerSection" aria-label="Timer">
       <div class="loading-spinner">Cargando timer...</div>
     </section>
+
+    <section id="myChallenges" aria-label="Mis retos"></section>
 
     <div class="section-header sessions-head">
       <h2 class="section-title">Mis sesiones</h2>
@@ -64,6 +67,7 @@ export async function render({ user, main, isCurrent }) {
 
   // Everything is asked at once; the history is drawn once the timer (it decides whether "Seguir" is enabled) and
   // the platforms (it names them) are known.
+  showMyChallenges(main.querySelector('#myChallenges'), user.id);
   const ready = Promise.all([ensurePlatforms(), loadTimerCard()]);
   await Promise.all([ready.then(() => isCurrent() && syncManualButton()), loadHistory(true, ready)]);
   if (!isCurrent()) return;

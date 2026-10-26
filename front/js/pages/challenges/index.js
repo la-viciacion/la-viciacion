@@ -3,7 +3,7 @@
 // player takes part (any may leave it) and an admin launches and deletes it from the admin panel (Gestión de datos →
 // Retos). From this page a player launches and deletes only their own, personal challenges.
 import { api, jsonRequest } from '../../lib/api.js';
-import { DURATIONS, amountLabel, blocks, debtPreview, partTarget, partValue, percent, periodLine, summaryLine, timeLeft, totalPart } from '../../lib/challenges.js';
+import { DURATIONS, amountLabel, blocks, debtPreview, digest, digestLine, partTarget, partValue, percent, periodLine, standing, summaryLine, timeLeft, totalPart } from '../../lib/challenges.js';
 import { html, mount } from '../../lib/html.js';
 import { gameHref } from '../../lib/links.js';
 import { modalHeader, openModal } from '../../ui/modal.js';
@@ -30,6 +30,11 @@ const totalRow = (part) => html`
     <span class="pf-sub">${amountLabel(part)}${part.done ? ' ✓' : ''}</span>
   </div>`;
 
+const standingLine = (c) => {
+  const s = standing(c, user.id);
+  return s ? html`<div class="ch-standing ${s.tone}" data-standing="${s.tone}">${s.text}</div>` : '';
+};
+
 function card(c) {
   const mine = c.scope === 'user' && c.owner?.id === user.id;
   const total = totalPart(c.progress);
@@ -44,6 +49,7 @@ function card(c) {
         <span class="${c.status === 'active' ? 'pf-tag' : 'pf-tag muted'}">${timeLeft(c)}</span>
       </div>
       <div class="pf-sub">${summaryLine(c)}</div>
+      ${standingLine(c)}
       ${c.taking_part || c.scope === 'user' ? parts : html`<div class="pf-empty">No participas en este reto.</div>`}
       <div class="ch-actions">
         ${c.can_opt_out
@@ -59,6 +65,8 @@ const section = ({ title, list, empty }) => html`
   ${list.length ? html`<div class="ch-list">${list.map(card)}</div>` : html`<div class="pf-empty">${empty}</div>`}`;
 
 function draw(challenges) {
+  const line = digestLine(digest(challenges, user.id));
+  mount(main.querySelector('#chDigest'), html`${line ? html`<p class="ch-digest" data-digest>${line}</p>` : ''}`);
   mount(main.querySelector('#chLists'), html`${blocks(challenges, user.id).map(section)}`);
 }
 
@@ -183,6 +191,7 @@ export async function render(ctx) {
       <button class="pf-btn primary" type="button" id="chNew">Nuevo reto</button>
     </div>
     <p class="pf-sub cal-intro">Objetivos con fecha de fin. Los del grupo los lanza un administrador y cada uno puede salirse; los tuyos los lanzas tú y los ven los demás.</p>
+    <div id="chDigest"></div>
     <div id="chLists"><div class="loading-spinner">Cargando los retos...</div></div>`);
   main.querySelector('#chNew').addEventListener('click', launchChallenge);
   main.querySelector('#chLists').addEventListener('click', (e) => {

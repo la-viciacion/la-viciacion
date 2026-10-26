@@ -111,6 +111,69 @@ export function totalPart(progress) {
   return null;
 }
 
+/** What is left of a part, in words: "Te faltan 1,5 h", "Te falta 1 juego", "Te falta saldar un 12,5 % más". */
+export function remainingLabel(part) {
+  if (isCount(part)) {
+    const left = part.target_count - part.count;
+    return left === 1 ? 'Te falta 1 juego' : `Te faltan ${left} juegos`;
+  }
+  if (isPercent(part)) return `Te falta saldar un ${number(Math.round((part.target_percent - part.percent) * 10) / 10)} % más`;
+  return `Te faltan ${hoursLabel(part.target_seconds - part.seconds)}`;
+}
+
+// Where a player's part stands, from the sessions already counted: a part is "behind" when what it has reached trails
+// the share of the period that has gone by, and "urgent" in the last days. A goal of a single game is just pending: a
+// pace means nothing when it is all or nothing.
+const URGENT_DAYS = 2;
+const PACE_FROM = 0.3;
+const PACE_GAP = 0.2;
+
+/** How the viewer is doing in a challenge, for the notice the card shows: { tone, text }, or null when they do not
+ * take part or it has not begun. Tones: done, failed, urgent, behind, ok, pending. */
+export function standing(challenge, meId, today = new Date()) {
+  const part = challenge.taking_part ? challenge.progress.players.find((p) => p.user_id === meId) : null;
+  if (!part || challenge.status === 'upcoming') return null;
+  if (challenge.status === 'finished') {
+    return part.done ? { tone: 'done', text: challenge.scope === 'user' ? 'Lo conseguiste' : 'Cumpliste tu parte' } : { tone: 'failed', text: 'No se cumplió' };
+  }
+  if (part.done) return { tone: 'done', text: 'Ya has cumplido tu parte' };
+  const left = remainingLabel(part);
+  const days = daysUntil(challenge.ends_on, today);
+  if (days <= URGENT_DAYS) return { tone: 'urgent', text: `${days <= 0 ? 'Último día' : days === 1 ? 'Queda 1 día' : `Quedan ${days} días`}: ${left.toLowerCase()}` };
+  if (isCount(part) && part.target_count === 1) return { tone: 'pending', text: left };
+  const length = daysUntil(challenge.ends_on, parseDay(challenge.starts_on)) + 1;
+  const elapsed = (length - days) / length;
+  const reached = partValue(part) / partTarget(part);
+  if (elapsed >= PACE_FROM && reached < elapsed - PACE_GAP) return { tone: 'behind', text: `Vas por detrás del ritmo: ${left.toLowerCase()}` };
+  return { tone: 'ok', text: `Vas bien: ${left.toLowerCase()}` };
+}
+
+const TONE_ORDER = { urgent: 0, behind: 1, pending: 2, ok: 3, done: 4 };
+
+/** The viewer's running challenges with how they stand, the ones that need attention first:
+ * { items: [{ challenge, standing }], done, urgent } (what the Home card and the top of the page say). */
+export function digest(challenges, meId, today = new Date()) {
+  const items = challenges
+    .filter((c) => c.status === 'active')
+    .map((challenge) => ({ challenge, standing: standing(challenge, meId, today) }))
+    .filter((item) => item.standing)
+    .sort((a, b) => TONE_ORDER[a.standing.tone] - TONE_ORDER[b.standing.tone]);
+  return {
+    items,
+    done: items.filter((i) => i.standing.tone === 'done').length,
+    urgent: items.filter((i) => i.standing.tone === 'urgent').length,
+  };
+}
+
+/** "3 retos en marcha · 1 cumplido · 1 con poco tiempo" (empty when there are none). */
+export function digestLine({ items, done, urgent }) {
+  if (!items.length) return '';
+  const parts = [items.length === 1 ? '1 reto en marcha' : `${items.length} retos en marcha`];
+  if (done) parts.push(done === 1 ? '1 cumplido' : `${done} cumplidos`);
+  if (urgent) parts.push(`${urgent} con poco tiempo`);
+  return parts.join(' · ');
+}
+
 const ORDER ={ active: 0, upcoming: 1, finished: 2 };
 const FINISHED_SHOWN = 5;
 
