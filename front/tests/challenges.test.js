@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { amountLabel, blocks, daysUntil, debtPreview, hoursLabel, launchMonths, partTarget, partValue, percent, resultLine, summaryLine, timeLeft, totalPart } from '../js/lib/challenges.js';
+import { amountLabel, blocks, daysUntil, debtPreview, digest, digestLine, hoursLabel, launchMonths, partTarget, partValue, percent, remainingLabel, resultLine, standing, summaryLine, timeLeft, totalPart } from '../js/lib/challenges.js';
 
 const TODAY = new Date(2026, 9, 15, 12, 0); // 15 October 2026
 
@@ -114,4 +114,64 @@ test('the preview of a debt goal tells the hours of a percentage and checks the 
   assert.match(debtPreview('games', 1, { ...debt, open_games: 1 }), /Tienes 1 juego sin terminar; cerrar 1 es completar uno/);
   assert.match(debtPreview('games', 9, debt), /Solo tienes 5 juegos sin terminar/);
   assert.match(debtPreview('percent', 10, { seconds: 0, games: 0, open_games: 0 }), /no hay deuda que saldar/);
+});
+
+const DAY_MS = 86400000;
+const iso = (offset) => {
+  const d = new Date(TODAY.getTime() + offset * DAY_MS);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+const running = (part, { starts = -10, ends = 10, scope = 'group', taking_part = true } = {}) => ({
+  id: 1, scope, status: 'active', taking_part, starts_on: iso(starts), ends_on: iso(ends),
+  progress: { players: [{ user_id: 7, name: 'Yo', ...part }] },
+});
+
+test('what is left of a part is told in hours, games or a share of the debt', () => {
+  assert.equal(remainingLabel({ seconds: 3600, target_seconds: 9000 }), 'Te faltan 1,5 h');
+  assert.equal(remainingLabel({ count: 0, target_count: 1 }), 'Te falta 1 juego');
+  assert.equal(remainingLabel({ count: 1, target_count: 3 }), 'Te faltan 2 juegos');
+  assert.equal(remainingLabel({ percent: 12.5, target_percent: 25 }), 'Te falta saldar un 12,5 % más');
+});
+
+test('a part that is reached says so, running or finished', () => {
+  const done = { seconds: 7200, target_seconds: 7200, done: true };
+  assert.deepEqual(standing(running(done), 7, TODAY), { tone: 'done', text: 'Ya has cumplido tu parte' });
+  assert.equal(standing({ ...running(done), status: 'finished' }, 7, TODAY).text, 'Cumpliste tu parte');
+  assert.equal(standing({ ...running(done, { scope: 'user' }), status: 'finished' }, 7, TODAY).text, 'Lo conseguiste');
+  assert.deepEqual(standing({ ...running({ seconds: 0, target_seconds: 7200, done: false }), status: 'finished' }, 7, TODAY), { tone: 'failed', text: 'No se cumplió' });
+});
+
+test('the last days are urgent whatever the pace', () => {
+  const part = { seconds: 3600, target_seconds: 7200, done: false };
+  assert.deepEqual(standing(running(part, { ends: 2 }), 7, TODAY), { tone: 'urgent', text: 'Quedan 2 días: te faltan 1 h' });
+  assert.equal(standing(running(part, { ends: 1 }), 7, TODAY).text, 'Queda 1 día: te faltan 1 h');
+  assert.equal(standing(running(part, { ends: 0 }), 7, TODAY).text, 'Último día: te faltan 1 h');
+});
+
+test('a part behind the share of time gone by is told so, one in step is not, and a single game is only pending', () => {
+  // 20 days long, 10 gone: half the time
+  assert.equal(standing(running({ seconds: 3600, target_seconds: 36000, done: false }), 7, TODAY).tone, 'behind');
+  assert.equal(standing(running({ seconds: 18000, target_seconds: 36000, done: false }), 7, TODAY).tone, 'ok');
+  assert.equal(standing(running({ count: 0, target_count: 1, done: false }), 7, TODAY).tone, 'pending');
+  // too early to judge a pace
+  assert.equal(standing(running({ seconds: 0, target_seconds: 36000, done: false }, { starts: -2, ends: 18 }), 7, TODAY).tone, 'ok');
+});
+
+test('nothing is said of a challenge the viewer does not take part in or that has not begun', () => {
+  const part = { seconds: 0, target_seconds: 7200, done: false };
+  assert.equal(standing(running(part, { taking_part: false }), 7, TODAY), null);
+  assert.equal(standing({ ...running(part), status: 'upcoming' }, 7, TODAY), null);
+});
+
+test('the digest keeps the running ones that count for the viewer, the ones that need attention first', () => {
+  const ok = running({ seconds: 18000, target_seconds: 36000, done: false });
+  const urgent = { ...running({ seconds: 0, target_seconds: 7200, done: false }, { ends: 1 }), id: 2 };
+  const done = { ...running({ seconds: 7200, target_seconds: 7200, done: true }), id: 3 };
+  const finished = { ...running({ seconds: 0, target_seconds: 7200, done: false }), id: 4, status: 'finished' };
+  const result = digest([done, ok, finished, urgent], 7, TODAY);
+  assert.deepEqual(result.items.map((i) => i.challenge.id), [2, 1, 3]);
+  assert.equal(result.done, 1);
+  assert.equal(result.urgent, 1);
+  assert.equal(digestLine(result), '3 retos en marcha · 1 cumplido · 1 con poco tiempo');
+  assert.equal(digestLine(digest([], 7, TODAY)), '');
 });

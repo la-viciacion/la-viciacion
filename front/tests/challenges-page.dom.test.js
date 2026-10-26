@@ -265,3 +265,19 @@ test('a debt challenge shows its share of the debt paid', async () => {
   assert.match(text('.ch-row')[0], /12,5 % \/ 25 %/);
   assert.match(main().textContent, /saldar el 25 % de lo que te quedaba por jugar al empezar/);
 });
+
+test('each challenge tells the viewer how they stand and the top of the page counts the running ones', async () => {
+  installApi({ 'GET /challenges': [challenge(), personal({ owner: { id: 2, name: 'Bea' }, taking_part: false })] });
+  await page.render({ main: main(), user: ANA });
+  await settle();
+  assert.deepEqual([...document.querySelectorAll('[data-standing]')].map((el) => el.dataset.standing), ['done']); // Ana's part is reached; Bea's challenge is not Ana's
+  assert.match(document.querySelector('.ch-standing').textContent, /Ya has cumplido tu parte/);
+  assert.equal(document.querySelector('[data-digest]').textContent, '1 reto en marcha · 1 cumplido');
+});
+
+test('a viewer with nothing running gets no summary line', async () => {
+  installApi({ 'GET /challenges': [] });
+  await page.render({ main: main(), user: ANA });
+  await settle();
+  assert.equal(document.querySelector('[data-digest]'), null);
+});
