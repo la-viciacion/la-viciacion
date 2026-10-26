@@ -281,3 +281,37 @@ test('a viewer with nothing running gets no summary line', async () => {
   await settle();
   assert.equal(document.querySelector('[data-digest]'), null);
 });
+
+test('each new personal kind sends its own options', async () => {
+  document.body.innerHTML = '<main id="main"></main>';
+  const calls = installApi({ 'GET /challenges/debt': DEBT, 'GET /challenges/genres': [], 'GET /challenges': [], 'POST /challenges': personal() });
+  await page.render({ main: main(), user: ANA });
+  await settle();
+  const launch = async (kind, values) => {
+    document.querySelector('#chNew').click();
+    await settle();
+    const form = document.querySelector('.modal-content form');
+    form.elements.kind.value = kind;
+    form.elements.kind.dispatchEvent(new window.Event('change', { bubbles: true }));
+    assert.equal(form.querySelector(`[data-kind="${kind}"]`).hidden, false);
+    for (const [name, value] of Object.entries(values)) form.elements[name].value = value;
+    form.elements.duration.value = 'week';
+    form.requestSubmit();
+    await settle();
+    return calls.filter((c) => c.method === 'POST').at(-1).body;
+  };
+  assert.deepEqual(await launch('streak', { streakMode: 'days', streakDays: '4' }), { kind: 'streak', options: { mode: 'days', days: 4, duration: 'week' } });
+  assert.deepEqual(await launch('long_sessions', { longSessions: '2', longMinutes: '90' }), { kind: 'long_sessions', options: { sessions: 2, minutes: 90, duration: 'week' } });
+  assert.deepEqual(await launch('variety', { varietyGenres: '4', varietyHours: '1.5' }), { kind: 'variety', options: { genres: 4, hours: 1.5, duration: 'week' } });
+  assert.deepEqual(await launch('wishlist', { wishMode: 'complete', wishGames: '2' }), { kind: 'wishlist', options: { mode: 'complete', games: 2, duration: 'week' } });
+});
+
+test('a challenge counted in days says so on its bar and its notice', async () => {
+  document.body.innerHTML = '<main id="main"></main>';
+  const progress = { players: [{ user_id: 1, name: 'Ana', count: 3, target_count: 7, unit: 'days', done: false }] };
+  installApi({ 'GET /challenges': [personal({ kind: 'streak', label: 'Racha', title: 'Racha de 7 días', params: { mode: 'consecutive', days: 7, duration: 'month' }, progress })] });
+  await page.render({ main: main(), user: ANA });
+  await settle();
+  assert.match(document.querySelector('.ch-players').textContent, /3 \/ 7 días/);
+  assert.match(main().textContent, /jugar 7 días seguidos/);
+});

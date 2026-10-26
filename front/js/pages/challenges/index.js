@@ -3,7 +3,7 @@
 // player takes part (any may leave it) and an admin launches and deletes it from the admin panel (Gestión de datos →
 // Retos). From this page a player launches and deletes only their own, personal challenges.
 import { api, jsonRequest } from '../../lib/api.js';
-import { DURATIONS, amountLabel, blocks, debtPreview, digest, digestLine, partTarget, partValue, percent, periodLine, standing, summaryLine, timeLeft, totalPart } from '../../lib/challenges.js';
+import { DURATIONS, PERSONAL_KINDS, amountLabel, blocks, debtPreview, digest, digestLine, partTarget, partValue, percent, periodLine, standing, summaryLine, timeLeft, totalPart } from '../../lib/challenges.js';
 import { html, mount } from '../../lib/html.js';
 import { gameHref } from '../../lib/links.js';
 import { modalHeader, openModal } from '../../ui/modal.js';
@@ -88,6 +88,16 @@ async function change(id, path, options) {
   }
 }
 
+// What each kind asks of the form: the options it sends (the duration is added to all of them)
+const OPTIONS = {
+  new_genre: (el) => ({ genre: el.genre?.value, mode: el.mode?.value, ...(el.mode?.value === 'play' ? { hours: Number(el.hours.value) } : {}) }),
+  debt_reduction: (el) => ({ mode: el.debtMode.value, [el.debtMode.value === 'percent' ? 'percent' : 'games']: Number(el.debtValue.value) }),
+  streak: (el) => ({ mode: el.streakMode.value, days: Number(el.streakDays.value) }),
+  long_sessions: (el) => ({ sessions: Number(el.longSessions.value), minutes: Number(el.longMinutes.value) }),
+  variety: (el) => ({ genres: Number(el.varietyGenres.value), hours: Number(el.varietyHours.value) }),
+  wishlist: (el) => ({ mode: el.wishMode.value, games: Number(el.wishGames.value) }),
+};
+
 /** The form to launch a personal challenge: pick the kind, then its options. */
 async function launchChallenge() {
   let genres;
@@ -102,8 +112,7 @@ async function launchChallenge() {
     ${modalHeader('Nuevo reto')}
     <form class="adm-form" novalidate>
       <label>Tipo de reto<select class="adm-input" name="kind">
-        <option value="new_genre">Probar un género</option>
-        <option value="debt_reduction">Bajar la deuda</option>
+        ${PERSONAL_KINDS.map(([value, label]) => html`<option value="${value}">${label}</option>`)}
       </select></label>
 
       <div data-kind="new_genre">
@@ -129,6 +138,36 @@ async function launchChallenge() {
         </select></label>
         <label><span data-debt-label>Porcentaje de la deuda</span><input class="adm-input" type="number" name="debtValue" min="1" step="1" value="25" /></label>
         <p class="adm-sub" id="chDebtPreview" aria-live="polite"></p>
+      </div>
+
+      <div data-kind="streak" hidden>
+        <p class="adm-sub">Un día cuenta cuando juegas al menos 10 minutos seguidos, como en las rachas y los logros.</p>
+        <label>Objetivo<select class="adm-input" name="streakMode">
+          <option value="consecutive">Días seguidos</option>
+          <option value="days">Días distintos</option>
+        </select></label>
+        <label>Días<input class="adm-input" type="number" name="streakDays" min="2" max="90" step="1" value="5" /></label>
+      </div>
+
+      <div data-kind="long_sessions" hidden>
+        <p class="adm-sub">Cuenta cada sesión terminada que dure al menos lo que pidas, sea del juego que sea.</p>
+        <label>Sesiones<input class="adm-input" type="number" name="longSessions" min="1" max="100" step="1" value="3" /></label>
+        <label>Minutos mínimos de cada una<input class="adm-input" type="number" name="longMinutes" min="15" max="600" step="5" value="60" /></label>
+      </div>
+
+      <div data-kind="variety" hidden>
+        <p class="adm-sub">Juega a géneros distintos: un género cuenta cuando le dedicas las horas que pidas. El tiempo de un juego cuenta en cada uno de sus géneros.</p>
+        <label>Géneros distintos<input class="adm-input" type="number" name="varietyGenres" min="2" max="10" step="1" value="3" /></label>
+        <label>Horas mínimas en cada uno<input class="adm-input" type="number" name="varietyHours" min="0.5" step="0.5" value="1" /></label>
+      </div>
+
+      <div data-kind="wishlist" hidden>
+        <p class="adm-sub">Solo cuentan los juegos que ya tenías en deseados (y no en tu biblioteca) el día que lanzas el reto. Si quitas uno de la lista, deja de contar.</p>
+        <label>Objetivo<select class="adm-input" name="wishMode">
+          <option value="start">Empezar juegos de mis deseados</option>
+          <option value="complete">Completar juegos de mis deseados</option>
+        </select></label>
+        <label>Juegos<input class="adm-input" type="number" name="wishGames" min="1" step="1" value="1" /></label>
       </div>
 
       <label>Duración<select class="adm-input" name="duration">
@@ -160,17 +199,8 @@ async function launchChallenge() {
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const duration = el.duration.value;
-    let body;
-    if (el.kind.value === 'new_genre') {
-      const options = { genre: el.genre?.value, mode: el.mode?.value, duration };
-      if (options.mode === 'play') options.hours = Number(el.hours.value);
-      body = { kind: 'new_genre', options };
-    } else {
-      const options = { mode: el.debtMode.value, duration };
-      options[options.mode === 'percent' ? 'percent' : 'games'] = Number(el.debtValue.value);
-      body = { kind: 'debt_reduction', options };
-    }
+    const kind = el.kind.value;
+    const body = { kind, options: { ...OPTIONS[kind](el), duration: el.duration.value } };
     try {
       await api('/challenges', jsonRequest('POST', body));
       m.close();
