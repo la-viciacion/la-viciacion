@@ -315,3 +315,88 @@ test('a challenge counted in days says so on its bar and its notice', async () =
   assert.match(document.querySelector('.ch-players').textContent, /3 \/ 7 días/);
   assert.match(main().textContent, /jugar 7 días seguidos/);
 });
+
+const duelCard = (extra = {}) => ({
+  id: 21, kind: 'duel_hours', label: 'Duelo de horas', scope: 'duel', title: 'Duelo de horas', status: 'active', declined: false,
+  starts_on: '2026-10-01', ends_on: '2026-10-30', params: { opponent_id: 2, duration: 'month' }, game: null,
+  owner: { id: 2, name: 'Bea' }, opponent: { id: 1, name: 'Ana' }, taking_part: true, can_opt_out: true,
+  progress: { players: [
+    { user_id: 2, name: 'Bea', seconds: 7200, target_seconds: 7200, versus: true, position: 1, winner: true, done: true },
+    { user_id: 1, name: 'Ana', seconds: 3600, target_seconds: 7200, versus: true, position: 2, winner: false, done: false },
+  ] },
+  ...extra,
+});
+
+test('a duel shows both players with their hours and medals, and the challenged one can decline it', async () => {
+  document.body.innerHTML = '<main id="main"></main>';
+  const calls = installApi({ 'GET /challenges': [duelCard()], 'PUT /challenges/21/participation': duelCard({ taking_part: false, declined: true }) });
+  await page.render({ main: main(), user: ANA });
+  await settle();
+  assert.deepEqual(text('.section-title'), ['Del grupo', 'Tuyos', 'Duelos']);
+  assert.match(document.querySelector('.ch-card .pf-sub').textContent, /Bea contra Ana/);
+  assert.deepEqual(text('.ch-players .ch-name'), ['🥇 Bea', '🥈 Ana (tú)']);
+  assert.deepEqual(text('.ch-players .pf-sub'), ['2 h ✓', '1 h']); // the leader is the one who is winning
+  assert.match(main().textContent, /Vas perdiendo contra Bea por 1 h/);
+  assert.match(main().textContent, /Puedes rechazarlo durante las 48 horas/);
+  assert.equal(document.querySelector('[data-delete]'), null); // only the challenger deletes it
+  const button = document.querySelector('[data-part]');
+  assert.equal(button.textContent.trim(), 'Rechazar duelo');
+  button.click();
+  await settle();
+  assert.ok(calls.some((c) => c.method === 'PUT' && c.path.includes('/21/participation?joined=false')));
+});
+
+test('a declined duel says so and the challenger can delete it', async () => {
+  document.body.innerHTML = '<main id="main"></main>';
+  const declined = duelCard({
+    owner: { id: 1, name: 'Ana' }, opponent: { id: 2, name: 'Bea' }, declined: true, can_opt_out: false,
+    progress: { players: [{ user_id: 1, name: 'Ana', seconds: 0, target_seconds: 0, versus: true, position: 1, winner: false, done: false }] },
+  });
+  installApi({ 'GET /challenges': [declined] });
+  await page.render({ main: main(), user: ANA });
+  await settle();
+  assert.match(document.querySelector('.pf-tag').textContent, /Rechazado/);
+  assert.match(main().textContent, /Bea ha rechazado el duelo/);
+  assert.notEqual(document.querySelector('[data-delete]'), null);
+});
+
+test('a duel is launched against a player of the list, with a game for a duel in a game', async () => {
+  document.body.innerHTML = '<main id="main"></main>';
+  const players = [
+    { user_id: 1, name: 'Ana', is_active: true, is_me: true }, { user_id: 2, name: 'Bea', is_active: true, is_me: false },
+    { user_id: 3, name: 'Cris', is_active: false, is_me: false },
+  ];
+  const calls = installApi({
+    'GET /challenges/debt': DEBT, 'GET /challenges/genres': [], 'GET /challenges': [], 'GET /group/players': players,
+    'GET /games/catalog?q=hades&limit=8': { items: [{ id: 'hades', name: 'Hades' }] }, 'POST /challenges': duelCard(),
+  });
+  await page.render({ main: main(), user: ANA });
+  await settle();
+  document.querySelector('#chNew').click();
+  await settle();
+  const form = document.querySelector('.modal-content form');
+  assert.deepEqual(text('select[name="duelOpponent"] option'), ['Bea']); // neither oneself nor a player who is not active
+  form.elements.kind.value = 'duel_hours';
+  form.elements.kind.dispatchEvent(new window.Event('change', { bubbles: true }));
+  assert.equal(form.querySelector('[data-kind="duel_hours duel_game"]').hidden, false);
+  assert.equal(form.querySelector('[data-kind="duel_game"]').hidden, true);
+  form.requestSubmit();
+  await settle();
+  assert.deepEqual(calls.find((c) => c.method === 'POST').body, { kind: 'duel_hours', options: { opponent_id: 2, duration: 'month' } });
+
+  document.querySelector('#chNew').click();
+  await settle();
+  const second = document.querySelector('.modal-content form');
+  second.elements.kind.value = 'duel_game';
+  second.elements.kind.dispatchEvent(new window.Event('change', { bubbles: true }));
+  assert.equal(second.querySelector('[data-kind="duel_game"]').hidden, false);
+  second.elements.duelGameQuery.value = 'hades';
+  second.elements.duelGameQuery.dispatchEvent(new window.Event('input', { bubbles: true }));
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  await settle();
+  second.querySelector('[data-game-id="hades"]').click();
+  assert.match(second.querySelector('#chGameChosen').textContent, /Juego elegido: Hades/);
+  second.requestSubmit();
+  await settle();
+  assert.deepEqual(calls.filter((c) => c.method === 'POST').at(-1).body, { kind: 'duel_game', options: { opponent_id: 2, game_id: 'hades', duration: 'month' } });
+});

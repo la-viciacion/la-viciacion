@@ -367,3 +367,5 @@
 .nt-date { margin-top: 4px; font-size: 0.8rem; color: var(--text-muted); }
 .nt-remove { position: absolute; top: 6px; right: 6px; font: inherit; font-size: 1.1rem; line-height: 1; padding: 2px 7px; background: transparent; border: 0; border-radius: var(--radius-sm); color: var(--text-muted); cursor: pointer; }
 .nt-remove:hover { color: #fca5a5; background: rgba(239, 68, 68, 0.15); }
+.ch-game-results { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+.ch-game-results:empty { display: none; }

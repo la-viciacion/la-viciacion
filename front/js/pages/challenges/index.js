@@ -3,7 +3,7 @@
 // player takes part (any may leave it) and an admin launches and deletes it from the admin panel (Gestión de datos →
 // Retos). From this page a player launches and deletes only their own, personal challenges.
 import { api, jsonRequest } from '../../lib/api.js';
-import { DURATIONS, PERSONAL_KINDS, amountLabel, blocks, debtPreview, digest, digestLine, partTarget, partValue, percent, periodLine, standing, summaryLine, timeLeft, totalPart } from '../../lib/challenges.js';
+import { DURATIONS, PERSONAL_KINDS, amountLabel, blocks, debtPreview, digest, digestLine, medal, partTarget, partValue, percent, periodLine, standing, summaryLine, timeLeft, totalPart } from '../../lib/challenges.js';
 import { html, mount } from '../../lib/html.js';
 import { gameHref } from '../../lib/links.js';
 import { modalHeader, openModal } from '../../ui/modal.js';
@@ -16,9 +16,9 @@ let user;
 
 const bar = (part) => html`<div class="ch-bar${part.done ? ' ok' : ''}"><i style="width:${percent(partValue(part), partTarget(part))}%"></i></div>`;
 
-const partRow = (p, me) => html`
+const partRow = (p, me, ranked) => html`
   <div class="ch-row">
-    <span class="ch-name">${p.name}${p.user_id === me ? ' (tú)' : ''}</span>
+    <span class="ch-name">${ranked && p.position ? `${medal(p.position)} ` : ''}${p.name}${p.user_id === me ? ' (tú)' : ''}</span>
     ${bar(p)}
     <span class="pf-sub">${amountLabel(p)}${p.done ? ' ✓' : ''}</span>
   </div>`;
@@ -35,26 +35,38 @@ const standingLine = (c) => {
   return s ? html`<div class="ch-standing ${s.tone}" data-standing="${s.tone}">${s.text}</div>` : '';
 };
 
+const sub = (c) => {
+  if (c.scope === 'duel') return `${c.owner?.name} contra ${c.opponent?.name} · ${periodLine(c)}`;
+  return `${c.scope === 'user' && c.owner?.id !== user.id ? `${c.owner?.name ?? 'Alguien'} · ` : ''}${periodLine(c)}`;
+};
+
+// the button of whoever can change their part: leave a group challenge, or turn a duel down (and take that back)
+const partButton = (c) => {
+  if (!c.can_opt_out) return '';
+  const label = c.scope === 'duel' ? (c.taking_part ? 'Rechazar duelo' : 'Aceptar duelo') : (c.taking_part ? 'Dejar de participar' : 'Volver a participar');
+  return html`<button class="pf-btn" type="button" data-part="${c.taking_part ? 'leave' : 'join'}">${label}</button>`;
+};
+
 function card(c) {
-  const mine = c.scope === 'user' && c.owner?.id === user.id;
+  const mine = c.scope !== 'group' && c.owner?.id === user.id;
   const total = totalPart(c.progress);
-  const parts = html`<div class="ch-players">${c.progress.players.map((p) => partRow(p, user.id))}</div>${total ? totalRow(total) : ''}`;
+  const ranked = Boolean(c.params?.versus) || c.scope === 'duel';
+  const parts = html`<div class="ch-players">${c.progress.players.map((p) => partRow(p, user.id, ranked))}</div>${total ? totalRow(total) : ''}`;
   return html`
     <article class="pf-card ch-card" data-challenge="${c.id}">
       <div class="ch-head">
         <div class="ch-title">
           ${c.game ? html`<a class="game-link" href="${gameHref(c.game.id)}">${c.title}</a>` : c.title}
-          <div class="pf-sub">${c.scope === 'user' && !mine ? `${c.owner?.name ?? 'Alguien'} · ` : ''}${periodLine(c)}</div>
+          <div class="pf-sub">${sub(c)}</div>
         </div>
-        <span class="${c.status === 'active' ? 'pf-tag' : 'pf-tag muted'}">${timeLeft(c)}</span>
+        <span class="${c.status === 'active' && !c.declined ? 'pf-tag' : 'pf-tag muted'}">${c.declined ? 'Rechazado' : timeLeft(c)}</span>
       </div>
       <div class="pf-sub">${summaryLine(c)}</div>
       ${standingLine(c)}
-      ${c.taking_part || c.scope === 'user' ? parts : html`<div class="pf-empty">No participas en este reto.</div>`}
+      ${c.taking_part || c.scope !== 'group' ? parts : html`<div class="pf-empty">No participas en este reto.</div>`}
+      ${c.scope === 'duel' && c.can_opt_out && c.taking_part ? html`<div class="pf-sub">Puedes rechazarlo durante las 48 horas siguientes a su lanzamiento.</div>` : ''}
       <div class="ch-actions">
-        ${c.can_opt_out
-          ? html`<button class="pf-btn" type="button" data-part="${c.taking_part ? 'leave' : 'join'}">${c.taking_part ? 'Dejar de participar' : 'Volver a participar'}</button>`
-          : ''}
+        ${partButton(c)}
         ${mine ? html`<button class="pf-btn" type="button" data-delete>Borrar</button>` : ''}
       </div>
     </article>`;
@@ -90,6 +102,8 @@ async function change(id, path, options) {
 
 // What each kind asks of the form: the options it sends (the duration is added to all of them)
 const OPTIONS = {
+  duel_hours: (el) => ({ opponent_id: Number(el.duelOpponent.value) }),
+  duel_game: (el, state) => ({ opponent_id: Number(el.duelOpponent.value), game_id: state.game?.id }),
   new_genre: (el) => ({ genre: el.genre?.value, mode: el.mode?.value, ...(el.mode?.value === 'play' ? { hours: Number(el.hours.value) } : {}) }),
   debt_reduction: (el) => ({ mode: el.debtMode.value, [el.debtMode.value === 'percent' ? 'percent' : 'games']: Number(el.debtValue.value) }),
   streak: (el) => ({ mode: el.streakMode.value, days: Number(el.streakDays.value) }),
@@ -102,8 +116,9 @@ const OPTIONS = {
 async function launchChallenge() {
   let genres;
   let debt;
+  let players;
   try {
-    [genres, debt] = await Promise.all([api('/challenges/genres'), api('/challenges/debt')]);
+    [genres, debt, players] = await Promise.all([api('/challenges/genres'), api('/challenges/debt'), api('/group/players').catch(() => [])]); // without the players only the duels cannot be launched
   } catch (err) {
     toast(err.message, 'err');
     return;
@@ -138,6 +153,19 @@ async function launchChallenge() {
         </select></label>
         <label><span data-debt-label>Porcentaje de la deuda</span><input class="adm-input" type="number" name="debtValue" min="1" step="1" value="25" /></label>
         <p class="adm-sub" id="chDebtPreview" aria-live="polite"></p>
+      </div>
+
+      <div data-kind="duel_hours duel_game" hidden>
+        <p class="adm-sub">Quien juegue más gana. Empieza hoy, y el otro jugador puede rechazarlo durante 48 horas.</p>
+        <label>Retar a<select class="adm-input" name="duelOpponent">
+          ${(players ?? []).filter((p) => p.is_active && !p.is_me).map((p) => html`<option value="${p.user_id}">${p.name}</option>`)}
+        </select></label>
+      </div>
+
+      <div data-kind="duel_game" hidden>
+        <label>Juego<input class="adm-input" type="search" name="duelGameQuery" placeholder="Buscar juego..." autocomplete="off" /></label>
+        <div class="ch-game-results" id="chGameResults"></div>
+        <p class="adm-sub" id="chGameChosen" aria-live="polite">Elige un juego de la lista.</p>
       </div>
 
       <div data-kind="streak" hidden>
@@ -185,7 +213,7 @@ async function launchChallenge() {
 
   const refresh = () => {
     const kind = el.kind.value;
-    form.querySelectorAll('[data-kind]').forEach((box) => { box.hidden = box.dataset.kind !== kind; });
+    form.querySelectorAll('[data-kind]').forEach((box) => { box.hidden = !box.dataset.kind.split(' ').includes(kind); });
     const hoursField = form.querySelector('[data-for="play"]');
     if (hoursField) hoursField.hidden = el.mode?.value !== 'play';
     const percent = el.debtMode.value === 'percent';
@@ -193,6 +221,29 @@ async function launchChallenge() {
     el.debtValue.max = percent ? '100' : String(Math.max(1, debt.open_games));
     preview.textContent = debtPreview(el.debtMode.value, Number(el.debtValue.value), debt);
   };
+  const state = { game: null };
+  const results = form.querySelector('#chGameResults');
+  let timer;
+  el.duelGameQuery.addEventListener('input', () => {
+    clearTimeout(timer);
+    timer = setTimeout(async () => {
+      const query = el.duelGameQuery.value.trim();
+      if (query.length < 2) return mount(results, html``);
+      try {
+        const found = await api(`/games/catalog?q=${encodeURIComponent(query)}&limit=8`);
+        mount(results, html`${found.items.map((g) => html`<button type="button" class="pf-btn" data-game-id="${g.id}" data-game-name="${g.name}">${g.name}</button>`)}`);
+      } catch (err) {
+        mount(results, html`<div class="pf-empty">${err.message}</div>`);
+      }
+    }, 250);
+  });
+  results.addEventListener('click', (e) => {
+    const pick = e.target.closest('[data-game-id]');
+    if (!pick) return;
+    state.game = { id: pick.dataset.gameId, name: pick.dataset.gameName };
+    form.querySelector('#chGameChosen').textContent = `Juego elegido: ${state.game.name}`;
+    mount(results, html``);
+  });
   form.addEventListener('input', refresh);
   form.addEventListener('change', refresh);
   refresh();
@@ -200,7 +251,7 @@ async function launchChallenge() {
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const kind = el.kind.value;
-    const body = { kind, options: { ...OPTIONS[kind](el), duration: el.duration.value } };
+    const body = { kind, options: { ...OPTIONS[kind](el, state), duration: el.duration.value } };
     try {
       await api('/challenges', jsonRequest('POST', body));
       m.close();
