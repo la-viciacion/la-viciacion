@@ -240,5 +240,46 @@ class VarietyTests(unittest.TestCase):
         self.assertEqual(challenges.genres_reached([], 1), 0)
 
 
+class VersusTests(unittest.TestCase):
+    def test_the_positions_are_shared_on_a_tie_and_only_the_first_with_something_done_wins(self):
+        players = challenges.rank_players([{"seconds": 3600}, {"seconds": 7200}, {"seconds": 3600}, {"seconds": 0}])
+        self.assertEqual([(p["position"], p["winner"]) for p in players], [(2, False), (1, True), (2, False), (3, False)])
+
+    def test_nobody_wins_when_nothing_was_done(self):
+        players = challenges.rank_players([{"count": 0}, {"count": 0}])
+        self.assertEqual([(p["position"], p["winner"]) for p in players], [(1, False), (1, False)])
+
+    def test_it_ranks_counts_and_shares_of_the_debt_too(self):
+        self.assertEqual([p["position"] for p in challenges.rank_players([{"count": 1}, {"count": 3}])], [2, 1])
+        self.assertEqual([p["position"] for p in challenges.rank_players([{"percent": 50.0}, {"percent": 12.5}])], [1, 2])
+
+    def test_a_group_challenge_is_a_contest_only_when_it_says_so(self):
+        self.assertEqual(challenges._versus({"versus": True}), {"versus": True})
+        self.assertEqual(challenges._versus({"versus": "true"}), {"versus": True})
+        self.assertEqual(challenges._versus({"versus": False}), {})
+        self.assertEqual(challenges._versus({}), {})
+
+
+class DuelTests(unittest.TestCase):
+    NAMES = {1: "Ana", 2: "Bea"}
+
+    def test_whoever_played_more_wins_and_the_bar_is_against_the_leader(self):
+        result = challenges.duel_result(self.NAMES, {1: 3600, 2: 7200})
+        self.assertEqual([(p["name"], p["position"], p["done"], p["target_seconds"], p["versus"]) for p in result["players"]],
+                         [("Bea", 1, True, 7200, True), ("Ana", 2, False, 7200, True)])
+
+    def test_a_tie_is_won_by_both_but_not_when_nobody_played(self):
+        tie = challenges.duel_result(self.NAMES, {1: 600, 2: 600})
+        self.assertEqual([p["done"] for p in tie["players"]], [True, True])
+        nothing = challenges.duel_result(self.NAMES, {})
+        self.assertEqual([(p["seconds"], p["done"]) for p in nothing["players"]], [(0, False), (0, False)])
+
+    def test_a_duel_declined_has_one_player_who_wins_nothing_by_default(self):
+        self.assertEqual([p["done"] for p in challenges.duel_result({1: "Ana"}, {1: 0})["players"]], [False])
+
+    def test_the_duel_templates_are_the_only_ones_of_that_scope(self):
+        self.assertEqual({k for k, t in challenges.TEMPLATES.items() if t.scope == challenges.DUEL}, {"duel_hours", "duel_game"})
+
+
 if __name__ == "__main__":
     unittest.main()

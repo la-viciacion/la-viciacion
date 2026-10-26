@@ -52,6 +52,7 @@ class NewGroupChallenge(BaseModel):
     tag: Optional[str] = None
     mode: Optional[str] = None
     min_games_total: Optional[int] = None
+    versus: Optional[bool] = None  # also rank who got furthest
     announce: bool = True  # tell the group (Telegram and push) that it was launched
 
 

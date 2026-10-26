@@ -22,6 +22,7 @@ from . import seasons, streaks
 
 GROUP = "group"
 USER = "user"
+DUEL = "duel"
 
 MAX_HOURS = 5000
 MAX_TITLE = 120
@@ -45,7 +46,7 @@ class Built:
 @dataclass
 class Template:
     label: str
-    scope: str  # GROUP: launched by an admin for everybody; USER: by a player for themselves
+    scope: str  # GROUP: launched by an admin for everybody; USER: by a player for themselves; DUEL: by a player against another
     build: Callable[[Session, dict, datetime.date, int | None], Built]  # (db, options, today, whoever launches it)
     progress: Callable[[Session, models.Challenge, list[int]], dict]
     # the notices of a group challenge: what is asked when it is launched, and the group's total reached
@@ -110,6 +111,11 @@ def fingerprint(kind: str, built: Built, owner_user_id: int | None) -> str:
 # ── Juego del mes ───────────────────────────────────────────────
 
 
+def _versus(options: dict) -> dict:
+    """{"versus": True} when a group challenge is also a contest (who got furthest is ranked), nothing otherwise."""
+    return {"versus": True} if options.get("versus") in (True, "true", 1) else {}
+
+
 def build_game_of_month(db: Session, options: dict, today: datetime.date, user_id: int | None = None) -> Built:
     """Options: game_id, month ("YYYY-MM"), min_hours_each, min_hours_total."""
     game = db.get(models.Game, str(options.get("game_id") or ""))
@@ -124,7 +130,7 @@ def build_game_of_month(db: Session, options: dict, today: datetime.date, user_i
         raise ChallengeError("El mínimo total no puede ser menor que el de cada jugador")
     return Built(
         title=f"Juego del mes: {game.name}"[:MAX_TITLE],
-        params={"min_hours_each": each, "min_hours_total": total},
+        params={"min_hours_each": each, "min_hours_total": total, **_versus(options)},
         starts_on=starts_on,
         ends_on=ends_on,
         game_id=game.id,
@@ -182,6 +188,7 @@ def summary_game_of_month(challenge: models.Challenge) -> str:
     return (
         f"Mínimo {hours_text(params['min_hours_each'])} h cada uno y {hours_text(params['min_hours_total'])} h entre todos, "
         f"del {spanish_date(challenge.starts_on)} al {spanish_date(challenge.ends_on)}."
+        + (" Gana quien más juegue." if params.get("versus") else "")
     )
 
 
@@ -322,7 +329,7 @@ def build_themed(db: Session, options: dict, today: datetime.date, user_id: int 
     mode = options.get("mode")
     if mode not in ("play", "complete"):
         raise ChallengeError("Elige si hay que jugar o completar")
-    params: dict = {"tag": name, "mode": mode}
+    params: dict = {"tag": name, "mode": mode, **_versus(options)}
     if mode == "play":
         each = hours(options.get("min_hours_each"), "El mínimo por jugador")
         params["min_hours_each"] = each
@@ -738,6 +745,109 @@ def progress_wishlist(db: Session, challenge: models.Challenge, participant_ids:
     return _count_part(user_id, _player(db, user_id), len(found), params["games"], "games")
 
 
+# ── Versus: who got further ─────────────────────────────────────
+
+
+def part_value(part: dict) -> float:
+    """What a part has reached, whatever it counts (seconds, games or a share of the debt)."""
+    return part.get("seconds", part.get("count", part.get("percent", 0)))
+
+
+def rank_players(players: list[dict]) -> list[dict]:
+    """Give each part a `position` (1 is the best; those with the same amount share it) and a `winner` flag (first and
+    with something done), in place and in the order they come (pure). It is what a versus challenge shows: it ranks
+    what each one has reached, so it can be read while the challenge runs and is final when it ends."""
+    values = sorted({part_value(p) for p in players}, reverse=True)
+    for part in players:
+        part["position"] = values.index(part_value(part)) + 1
+        part["winner"] = part["position"] == 1 and part_value(part) > 0
+    return players
+
+
+# ── Duelo (1 vs 1) ──────────────────────────────────────────────
+
+DECLINE_HOURS = 48  # how long the challenged player has to decline it, counting from its launch
+
+
+def _opponent(db: Session, options: dict, user_id: int | None) -> int:
+    try:
+        opponent_id = int(options.get("opponent_id"))
+    except (ValueError, TypeError):
+        raise ChallengeError("Elige a quién retar")
+    if opponent_id == user_id:
+        raise ChallengeError("No puedes retarte a ti mismo")
+    opponent = db.get(models.User, opponent_id)
+    if opponent is None or not opponent.is_active or opponent.username == models.GOD_USERNAME:
+        raise ChallengeError("Elige a un jugador activo")
+    return opponent_id
+
+
+def build_duel_hours(db: Session, options: dict, today: datetime.date, user_id: int | None = None) -> Built:
+    """Options: opponent_id (another active player) and duration ("week", "month" or "quarter"; it starts today).
+    Whoever plays more hours, of any game, in sessions that began within the period wins."""
+    duration, length = _duration(options)
+    return Built(
+        title="Duelo de horas",
+        params={"opponent_id": _opponent(db, options, user_id), "duration": duration},
+        starts_on=today,
+        ends_on=today + datetime.timedelta(days=length - 1),
+    )
+
+
+def build_duel_game(db: Session, options: dict, today: datetime.date, user_id: int | None = None) -> Built:
+    """Like `build_duel_hours` (plus game_id: a game of the catalogue), but only the hours of that game count."""
+    duration, length = _duration(options)
+    game = db.get(models.Game, str(options.get("game_id") or ""))
+    if game is None:
+        raise ChallengeError("Elige un juego que exista")
+    return Built(
+        title=f"Duelo en {game.name}"[:MAX_TITLE],
+        params={"opponent_id": _opponent(db, options, user_id), "duration": duration},
+        starts_on=today,
+        ends_on=today + datetime.timedelta(days=length - 1),
+        game_id=game.id,
+    )
+
+
+def duel_result(names: dict[int, str], seconds: dict[int, int]) -> dict:
+    """The progress of a duel from the seconds each of the two played (pure). Each part carries the leader's seconds as
+    its target, so the bar shows how far behind it is; whoever plays more wins and a tie with something played is
+    won by both."""
+    leader = max(seconds.values(), default=0)
+    players = [
+        {"user_id": user_id, "name": name, "seconds": seconds.get(user_id, 0), "target_seconds": leader, "versus": True}
+        for user_id, name in names.items()
+    ]
+    rank_players(players)
+    for part in players:
+        part["done"] = part["winner"]
+    players.sort(key=lambda p: (p["position"], p["name"].lower()))
+    return {"players": players}
+
+
+def progress_duel(db: Session, challenge: models.Challenge, participant_ids: list[int]) -> dict:
+    names = {
+        user_id: name or username
+        for user_id, username, name in db.query(models.User.id, models.User.username, models.User.name).filter(models.User.id.in_(participant_ids))
+    }
+    if challenge.game_id:
+        played = seconds_in_game(db, participant_ids, challenge.game_id, challenge.starts_on, challenge.ends_on)
+    else:
+        start, end = _window(challenge)
+        rows = (
+            db.query(models.GameTimer.user_id, func.sum(models.GameTimer.duration_seconds))
+            .filter(
+                models.GameTimer.user_id.in_(participant_ids),
+                models.GameTimer.is_active == False,  # noqa: E712
+                models.GameTimer.start_time >= start,
+                models.GameTimer.start_time < end,
+            )
+            .group_by(models.GameTimer.user_id)
+        )
+        played = {user_id: int(seconds or 0) for user_id, seconds in rows}  # MariaDB returns SUM() as Decimal
+    return duel_result(names, played)
+
+
 TEMPLATES: dict[str, Template] = {
     "game_of_month": Template("Juego del mes", GROUP, build_game_of_month, progress_game_of_month, summary_game_of_month, reached_game_of_month),
     "themed": Template("Temático", GROUP, build_themed, progress_themed, summary_themed, reached_themed),
@@ -747,4 +857,6 @@ TEMPLATES: dict[str, Template] = {
     "long_sessions": Template("Sesiones largas", USER, build_long_sessions, progress_long_sessions),
     "variety": Template("Variar de género", USER, build_variety, progress_variety),
     "wishlist": Template("Cumplir deseados", USER, build_wishlist, progress_wishlist),
+    "duel_hours": Template("Duelo de horas", DUEL, build_duel_hours, progress_duel),
+    "duel_game": Template("Duelo en un juego", DUEL, build_duel_game, progress_duel),
 }
