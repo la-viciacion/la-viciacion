@@ -52,7 +52,7 @@ En cada logro de un jugador, **Editar** cambia la fecha en que lo consiguió y *
 
 ## Notificaciones
 
-- **Envíos**: el interruptor general de notificaciones, el de avisos a administradores, y los envíos programados: resumen semanal (día y hora), resumen mensual y resumen anual (apagados por defecto).
+- **Envíos**: el interruptor general de notificaciones, el de avisos a administradores, y los envíos programados: resumen semanal (día y hora), resumen mensual y resumen anual (apagados por defecto). En **Retos**: los avisos privados de retos (duelos, propuestas y resultados), avisar al grupo de cómo ha terminado un reto de grupo y permitir los recordatorios (cada jugador los activa en su perfil), con la hora de los resultados (09:30) y de los recordatorios (10:00). Los retos personales y los duelos nunca se avisan al grupo. Las propuestas nuevas llegan a la bandeja de avisos de los administradores.
 - **Canales**: Telegram (si está configurado y el mensaje de prueba) y avisos en la app (push: el interruptor y cuántos dispositivos hay suscritos). Lo que se configura en el `.env` se ve en **Sistema → Servicios**.
 - **IA**: el interruptor de la IA, **Probar la IA** y los avisos que la usan, cada uno con su interruptor e instrucciones. El proveedor, la clave y el modelo se ven en **Sistema → Servicios**.
 - **Probar resumen**: previsualiza el resumen de cualquier mes o temporada para cualquier jugador, enseña el aviso tal como saldría (sin enviarlo) y permite enviarlo ahora solo a ti o al grupo.
