@@ -95,7 +95,8 @@ def launch_challenge(
     current_user: models.User = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    """Launch a **personal** challenge from a template, for the caller. The group's challenges are the app's, not a
+    """Launch a **personal** challenge from a template, for the caller (or a **duel** against another player: it starts
+    at once and the other player may decline it for a couple of days). The group's challenges are the app's, not a
     player's: an admin launches them from the admin panel (`POST /manage/challenges`), and this refuses them for
     everybody, admins included."""
     template = TEMPLATES.get(body.kind)
@@ -118,10 +119,11 @@ def set_participation(
     current_user: models.User = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    """Stop taking part in a group challenge, or take part again. It is about the caller only."""
+    """Stop taking part in a group challenge, or take part again. It is about the caller only. In a duel it is how the
+    challenged player declines it (and takes that back), only during the first hours after it was launched."""
     challenge = _challenge(db, challenge_id, current_user)
     today = datetime.date.today()
-    if not crud.can_opt_out(challenge, today):
+    if not crud.can_opt_out(challenge, today, current_user.id):
         raise HTTPException(status_code=409, detail="En este reto no se puede cambiar la participación")
     crud.opt(db, challenge, current_user.id, joined)
     return crud.view(db, challenge, current_user.id, today)

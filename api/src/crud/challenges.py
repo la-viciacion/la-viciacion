@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from ..database import models
 from ..utils import challenges
-from ..utils.challenges import ChallengeError, GROUP, TEMPLATES, USER
+from ..utils.challenges import DECLINE_HOURS, DUEL, ChallengeError, GROUP, TEMPLATES, USER, rank_players
 
 
 def create(db: Session, creator: models.User, kind: str, options: dict, today: datetime.date) -> models.Challenge:
@@ -18,7 +18,7 @@ def create(db: Session, creator: models.User, kind: str, options: dict, today: d
     if template is None:
         raise ChallengeError("Ese tipo de reto no existe")
     built = template.build(db, options or {}, today, creator.id)
-    owner_id = creator.id if template.scope == USER else None
+    owner_id = creator.id if template.scope in (USER, DUEL) else None
     digest = challenges.fingerprint(kind, built, owner_id)
     if db.query(models.Challenge.id).filter(models.Challenge.fingerprint == digest).first() is not None:
         raise ChallengeError("Ya existe un reto igual")
@@ -36,8 +36,21 @@ def create(db: Session, creator: models.User, kind: str, options: dict, today: d
     return challenge
 
 
+def opponent_id(challenge: models.Challenge) -> int | None:
+    """The player a duel challenges."""
+    return json.loads(challenge.params).get("opponent_id") if challenge.scope == DUEL else None
+
+
+def declined(db: Session, challenge: models.Challenge) -> bool:
+    """Has the challenged player turned the duel down? It is the same row as leaving a group challenge."""
+    return challenge.scope == DUEL and db.get(models.ChallengeOptOut, (challenge.id, opponent_id(challenge))) is not None
+
+
 def participants(db: Session, challenge: models.Challenge) -> list[int]:
-    """Who takes part: a personal challenge its owner, a group one every active player that has not opted out."""
+    """Who takes part: a personal challenge its owner, a duel its owner and the challenged player (alone, if they
+    declined it), a group one every active player that has not opted out."""
+    if challenge.scope == DUEL:
+        return [challenge.owner_user_id] if declined(db, challenge) else [challenge.owner_user_id, opponent_id(challenge)]
     if challenge.scope == USER:
         return [challenge.owner_user_id] if challenge.owner_user_id is not None else []
     left = db.query(models.ChallengeOptOut.user_id).filter(models.ChallengeOptOut.challenge_id == challenge.id)
@@ -45,8 +58,13 @@ def participants(db: Session, challenge: models.Challenge) -> list[int]:
     return [user_id for (user_id,) in rows.order_by(models.User.id)]
 
 
-def can_opt_out(challenge: models.Challenge, today: datetime.date) -> bool:
-    """Only a group challenge that has not finished can be left or rejoined."""
+def can_opt_out(challenge: models.Challenge, today: datetime.date, viewer_id: int | None = None, now: datetime.datetime | None = None) -> bool:
+    """Who can change whether they take part: in a group challenge that has not finished, anybody; in a duel, only the
+    challenged player and only during the first DECLINE_HOURS after it was launched (they may turn it down and take it
+    back in that time; later it stands, so nobody dodges a duel they are losing)."""
+    if challenge.scope == DUEL:
+        launched = challenge.created_at or datetime.datetime.now()
+        return viewer_id == opponent_id(challenge) and today <= challenge.ends_on and (now or datetime.datetime.now()) < launched + datetime.timedelta(hours=DECLINE_HOURS)
     return challenge.scope == GROUP and challenge.participation == "auto" and today <= challenge.ends_on
 
 
@@ -75,6 +93,11 @@ def view(db: Session, challenge: models.Challenge, viewer_id: int, today: dateti
     taking_part = participants(db, challenge)
     game = db.get(models.Game, challenge.game_id) if challenge.game_id else None
     owner = db.get(models.User, challenge.owner_user_id) if challenge.owner_user_id else None
+    opponent = db.get(models.User, opponent_id(challenge)) if challenge.scope == DUEL else None
+    if progress is None:
+        progress = template.progress(db, challenge, taking_part)
+        if json.loads(challenge.params).get("versus"):
+            rank_players(progress["players"])
     return {
         "id": challenge.id,
         "kind": challenge.kind,
@@ -88,9 +111,11 @@ def view(db: Session, challenge: models.Challenge, viewer_id: int, today: dateti
         "game": {"id": game.id, "name": game.name, "image_url": game.image_url} if game else None,
         "owner": {"id": owner.id, "name": owner.name or owner.username} if owner else None,
         "visibility": challenge.visibility,
+        "opponent": {"id": opponent.id, "name": opponent.name or opponent.username} if opponent else None,
+        "declined": declined(db, challenge),
         "taking_part": viewer_id in taking_part,
-        "can_opt_out": can_opt_out(challenge, today),
-        "progress": progress if progress is not None else template.progress(db, challenge, taking_part),
+        "can_opt_out": can_opt_out(challenge, today, viewer_id),
+        "progress": progress,
     }
 
 
@@ -106,7 +131,8 @@ def visible(db: Session, viewer_id: int, running_on: datetime.date | None = None
 def outcome(progress: dict, user_id: int) -> dict:
     """How a player did in a challenge (from its progress): whether they reached their part and whether the group did."""
     mine = next((p for p in progress["players"] if p["user_id"] == user_id), None)
-    return {"done": bool(mine and mine["done"]), "group_done": progress.get("total_done")}
+    firsts = [p for p in progress["players"] if p.get("position") == 1]
+    return {"done": bool(mine and mine["done"]), "group_done": progress.get("total_done"), "tied": len(firsts) > 1 and any(p["winner"] for p in firsts)}
 
 
 def history(db: Session, player_id: int, today: datetime.date) -> list[dict]:
@@ -118,9 +144,11 @@ def history(db: Session, player_id: int, today: datetime.date) -> list[dict]:
         .order_by(models.Challenge.ends_on.desc(), models.Challenge.id.desc())
     ):
         taking_part = participants(db, challenge)
-        if player_id not in taking_part:
+        if player_id not in taking_part or declined(db, challenge):
             continue
         progress = TEMPLATES[challenge.kind].progress(db, challenge, taking_part)
+        if json.loads(challenge.params).get("versus"):
+            rank_players(progress["players"])
         found.append({
             "id": challenge.id, "kind": challenge.kind, "label": TEMPLATES[challenge.kind].label, "scope": challenge.scope,
             "title": challenge.title, "starts_on": challenge.starts_on, "ends_on": challenge.ends_on,
