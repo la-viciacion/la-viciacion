@@ -515,22 +515,23 @@ class AchievementsElems(Enum):
         "message": "*{}* ha completado 1000 juegos distintos en total, sumando todas las temporadas. Mil juegos terminados. Ya no queda nada por ver.",
     }
 
-    # About the challenges: one counts once it is over and the player met their part (see docs/desarrollo/features.md)
+    # About the challenges: one counts once it is over and the player met their part (see docs/desarrollo/features.md). The
+    # tiers count the group's challenges only: a personal one is chosen by the player, so it could be made as easy as wished
     CHALLENGES_1_LIFETIME = {
         "since": 2027,
         "title": "Reto superado",
-        "message": "*{}* cumple su primer reto. Desde hoy ya no vale decir que no se puede.",
+        "message": "*{}* cumple su primer reto del grupo. Desde hoy ya no vale decir que no se puede.",
     }
     CHALLENGES_5_LIFETIME = {
         "since": 2027,
         "title": "Aficionado a los retos",
-        "message": "*{}* ya lleva 5 retos cumplidos. Esto empieza a ser un hábito.",
+        "message": "*{}* ya lleva 5 retos del grupo cumplidos. Esto empieza a ser un hábito.",
     }
     CHALLENGES_15_LIFETIME = {
         "since": 2027,
         "special": 1,
         "title": "Cazarretos",
-        "message": "*{}* suma 15 retos cumplidos. Si hay un reto por ahí, seguro que ya le ha echado el ojo.",
+        "message": "*{}* suma 15 retos del grupo cumplidos. Si hay un reto del grupo, seguro que ya le ha echado el ojo.",
     }
     ALL_ROUNDER_LIFETIME = {
         "since": 2027,
