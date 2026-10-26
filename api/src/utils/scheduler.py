@@ -16,7 +16,9 @@ what nothing else can trigger remains here:
   daily_streaks     every day at 05:00, announces the streaks lost the day before
   daily_wishlist    every day at 09:00, refreshes the release date of the games somebody waits for
                     and, while actions.WISHLIST_PRIVATE_NOTICE is on (off), tells who wished a game that comes out today
-  wishlist_eve      every day at 12:30, tells the group which wished games come out tomorrow
+  wishlist_eve      every day at `wishlist.time` (12:30), tells the group which wished games come out tomorrow
+  wishlist_week     every Sunday at `wishlist.time`, tells the group which wished games come out in the next 7 days.
+                    Only one of wishlist_eve and wishlist_week runs: `wishlist.group_notice`
   inbox_purge       every day at 04:00, deletes the inbox notices older than `inbox.retention_days`
 
 Every run is recorded in `job_runs`, so a restart never repeats a run and a job
@@ -52,8 +54,8 @@ DAILY_GRACE = datetime.timedelta(hours=3)
 DAILY_STREAKS_HOUR = 5
 INBOX_PURGE_HOUR = 4
 DAILY_WISHLIST_HOUR = 9
-# After the 09:00 refresh, so a date that slipped overnight is already corrected when the group is told
-WISHLIST_EVE_TIME = (12, 30)
+# The week the weekly wishlist notice tells about starts the day after (Monday to Sunday)
+WISHLIST_WEEKLY_WEEKDAY = 6
 # Off: the notification is shown once, when the timer starts. The job, the per-user interval
 # (user_settings.timer_notice_minutes) and its column stay, so turning this on brings the refresh back.
 TIMER_NOTICE_REFRESH = False
@@ -195,6 +197,10 @@ async def _wishlist_eve(db: Session) -> str:
     return await actions.announce_wishlist_eve(db, datetime.date.today() + datetime.timedelta(days=1))
 
 
+async def _wishlist_week(db: Session, slot: datetime.datetime) -> str:
+    return await actions.announce_wishlist_week(db, slot.date())
+
+
 # ── the loop ────────────────────────────────────────────────
 def tick(now: datetime.datetime | None = None) -> None:
     """Run whatever is due. Called every TICK_SECONDS by the scheduler thread."""
@@ -239,10 +245,17 @@ def tick(now: datetime.datetime | None = None) -> None:
         if is_due(now, slot, _last_run(db, "daily_wishlist"), DAILY_GRACE) and _claim(db, "daily_wishlist", slot, now):
             _run(db, "daily_wishlist", lambda: _daily_wishlist(db))
 
-        if notifications:
-            slot = daily_slot(now, *WISHLIST_EVE_TIME)
+        # One mode at a time (wishlist.group_notice): the day before, or once a week, never both
+        wishlist_notice = settings.get("wishlist.group_notice")
+        if notifications and wishlist_notice == "eve":
+            slot = daily_slot(now, *(int(part) for part in settings.get("wishlist.time").split(":")))
             if is_due(now, slot, _last_run(db, "wishlist_eve"), DAILY_GRACE) and _claim(db, "wishlist_eve", slot, now):
                 _run(db, "wishlist_eve", lambda: _wishlist_eve(db))
+
+        if notifications and wishlist_notice == "weekly":
+            slot = weekly_slot(now, WISHLIST_WEEKLY_WEEKDAY, settings.get("wishlist.time"))
+            if is_due(now, slot, _last_run(db, "wishlist_week"), WEEKLY_GRACE) and _claim(db, "wishlist_week", slot, now):
+                _run(db, "wishlist_week", lambda: _wishlist_week(db, slot))
 
 
 _thread: threading.Thread | None = None

@@ -386,9 +386,9 @@ ENTITIES.announce = { label: 'Redactar aviso', description: 'Escribe un aviso y 
 ENTITIES.recap = { label: 'Probar resumen', description: 'Mira el resumen de cualquier mes o temporada, con el aviso que se enviaría, y mándalo ahora.', custom: 'recap' };
 ENTITIES.sends = {
   label: 'Envíos',
-  description: 'Interruptor general de notificaciones y cuándo se envían el resumen semanal, el mensual y el anual.',
+  description: 'Interruptor general de notificaciones y cuándo se envían el resumen semanal, el aviso de estrenos, el mensual y el anual.',
   custom: 'settings',
-  sections: ['notifications', 'inbox', 'weekly', 'monthly', 'annual'],
+  sections: ['notifications', 'inbox', 'weekly', 'wishlist', 'monthly', 'annual'],
 };
 ENTITIES.channels = {
   label: 'Canales',

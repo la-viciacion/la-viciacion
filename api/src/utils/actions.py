@@ -487,9 +487,35 @@ def wishlist_eve_message(releases: list[tuple[str, list[str], str | None]]) -> s
 async def announce_wishlist_eve(db: Session, tomorrow: datetime.date) -> str:
     """The day before a game comes out, tell the group which wished games do (one message for all of them).
     The AI may rewrite it (`wishlist_release`). Nothing is remembered: a game comes out on one day only."""
-    releases = [(game.name, waiting, game.slug) for game, waiting in wishlist.wished_releases_on(db, tomorrow)]
+    releases = [(game.name, waiting, game.slug) for game, waiting in wishlist.wished_releases_between(db, tomorrow, tomorrow)]
     if releases:
         await utils.send_message(wishlist_eve_message(releases), False, ai_use="wishlist_release")
+    return f"{len(releases)} games"
+
+
+WEEKDAY_NAMES = ("lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo")
+
+
+def wishlist_week_message(releases: list[tuple[str, datetime.date, list[str], str | None]]) -> str:
+    """The notice for the group once a week: (game, day it comes out, players who wait for it, slug) for each game
+    coming out in the days that follow."""
+    blocks = []
+    for game_name, day, waiting, slug in releases:
+        blocks.append(
+            f"El {WEEKDAY_NAMES[day.weekday()]} {day.day} sale {_game_text(game_name, slug)}. "
+            f"Está en la lista de deseados de {utils.escape_markdown(join_names(waiting))}."
+        )
+    return "\n\n".join(blocks)
+
+
+async def announce_wishlist_week(db: Session, today: datetime.date) -> str:
+    """Once a week, tell the group which wished games come out in the next 7 days, from tomorrow (one message for all
+    of them). The AI may rewrite it (`wishlist_week`). Nothing is remembered: a game comes out on one day only."""
+    first = today + datetime.timedelta(days=1)
+    found = wishlist.wished_releases_between(db, first, first + datetime.timedelta(days=6))
+    releases = [(game.name, game.release_date, waiting, game.slug) for game, waiting in found]
+    if releases:
+        await utils.send_message(wishlist_week_message(releases), False, ai_use="wishlist_week")
     return f"{len(releases)} games"
 
 
