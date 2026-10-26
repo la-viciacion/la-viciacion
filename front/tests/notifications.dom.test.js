@@ -96,3 +96,15 @@ test('the wishlist notice shows the channels the user chose', async () => {
   const [telegram, push] = el.querySelectorAll('[data-notice="wishlist_release"] input');
   assert.deepEqual([telegram.checked, push.checked], [false, true]);
 });
+
+test('one Guardar button at the end of the card belongs to the hours and hides with them', async () => {
+  const { el, telegram, push, options } = await show();
+  const save = el.querySelector('[data-save="forgotten_timer"]');
+  assert.equal(save.querySelector('button').getAttribute('form'), options.id);
+  assert.equal(el.querySelectorAll('button[type="submit"]').length, 1);
+  assert.equal(el.querySelector('.pf-notices').lastElementChild.previousElementSibling.previousElementSibling, save);
+  assert.equal(save.hidden, false);
+  await toggle(telegram);
+  await toggle(push);
+  assert.equal(save.hidden, true);
+});
