@@ -121,7 +121,7 @@ TOPICS = (
         "jugador y un total entre todos) y Temático (una etiqueta de juegos, un mes, y jugar unas horas o completar un juego). Se puede dejar de participar y "
         "volver mientras no termine. Personales (los lanza cada jugador con «Nuevo reto»; sin avisos): Probar un género (jugar unas horas, 2 por defecto, o "
         "completar uno, en una semana, un mes o tres; solo cuentan juegos de ese género que no estuvieran ya en la biblioteca) y Bajar la deuda (un objetivo "
-        "sobre la deuda, que es lo que falta para terminar los juegos empezados, en porcentaje o en número de juegos). Cada reto dice al jugador cómo va "
+        "sobre la deuda, que es lo que falta para terminar los juegos empezados, en porcentaje o en número de juegos), Racha (días seguidos o distintos jugando), Sesiones largas (un número de sesiones de al menos X minutos), Variar de género (varios géneros distintos con unas horas en cada uno) y Cumplir deseados (empezar o completar juegos que ya estaban en la lista de deseados al lanzar el reto). Cada reto dice al jugador cómo va "
         "(cumplido, va bien, por detrás del ritmo o, en los últimos días, lo que le falta; solo dentro de la app) y el Inicio tiene una tarjeta Mis "
         "retos con los que están en marcha. Los retos terminados quedan en Perfil → "
         "Resumen → Retos.",

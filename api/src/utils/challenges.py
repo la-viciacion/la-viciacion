@@ -18,6 +18,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..database import models
+from . import seasons, streaks
 
 GROUP = "group"
 USER = "user"
@@ -527,9 +528,223 @@ def progress_debt_reduction(db: Session, challenge: models.Challenge, participan
     return debt_reduction_result(user_id, (user.name or user.username) if user else "", json.loads(challenge.params), start_debt, played, completed)
 
 
+# ── Racha, sesiones largas, variedad y deseados (personal) ──────
+# The count parts of these carry a `unit` (days, sessions, genres; games when it has none) that the front names.
+
+def _duration(options: dict) -> tuple[str, int]:
+    """The duration a personal challenge was asked for and how many days it covers."""
+    duration = options.get("duration") or "month"
+    if duration not in DURATIONS:
+        raise ChallengeError("Elige una duración: una semana, un mes o tres meses")
+    return duration, DURATIONS[duration]
+
+
+def _whole(value, name: str, low: int, high: int) -> int:
+    """A whole number within limits."""
+    try:
+        number = int(value)
+        if isinstance(value, bool) or number != float(value):
+            raise ValueError
+    except (ValueError, TypeError):
+        raise ChallengeError(f"{name} no es un número entero")
+    if not low <= number <= high:
+        raise ChallengeError(f"{name} debe estar entre {low} y {high}")
+    return number
+
+
+def _window(challenge: models.Challenge) -> tuple[datetime.datetime, datetime.datetime]:
+    """The period as moments: from its first instant to the first one after its last day."""
+    return (
+        datetime.datetime.combine(challenge.starts_on, datetime.time.min),
+        datetime.datetime.combine(challenge.ends_on + datetime.timedelta(days=1), datetime.time.min),
+    )
+
+
+def _player(db: Session, user_id: int) -> str:
+    user = db.get(models.User, user_id)
+    return (user.name or user.username) if user else ""
+
+
+def _count_part(user_id: int, name: str, count: int, target: int, unit: str) -> dict:
+    return {"players": [{"user_id": user_id, "name": name, "count": count, "target_count": target, "unit": unit, "done": count >= target}]}
+
+
+def build_streak(db: Session, options: dict, today: datetime.date, user_id: int | None = None) -> Built:
+    """Options: mode ("consecutive": a run of days in a row, or "days": different days), days (2 up to the length of
+    the period) and duration ("week", "month" or "quarter"; it starts today). A played day is the one of the
+    streaks and the achievements (a session of 10 minutes or more)."""
+    mode = options.get("mode")
+    if mode not in ("consecutive", "days"):
+        raise ChallengeError("Elige si quieres jugar días seguidos o días distintos")
+    duration, length = _duration(options)
+    days = _whole(options.get("days"), "Los días", 2, length)
+    return Built(
+        title=f"Racha de {days} días" if mode == "consecutive" else f"Jugar {days} días distintos",
+        params={"mode": mode, "days": days, "duration": duration},
+        starts_on=today,
+        ends_on=today + datetime.timedelta(days=length - 1),
+    )
+
+
+def streak_result(user_id: int, name: str, mode: str, target: int, played_days: list[datetime.date], last_day: datetime.date) -> dict:
+    """The progress of a streak challenge from the days played within its period (pure, oldest first): the longest
+    run of days in a row ("consecutive") or how many days there are ("days")."""
+    count = streaks.streak_summary(played_days, last_day, last_day.year)[1] if mode == "consecutive" else len(played_days)
+    return _count_part(user_id, name, count, target, "days")
+
+
+def progress_streak(db: Session, challenge: models.Challenge, participant_ids: list[int]) -> dict:
+    from ..crud import time_entries  # that module imports the ones that import this one
+
+    if not participant_ids:
+        return {"players": []}
+    user_id = participant_ids[0]
+    params = json.loads(challenge.params)
+    every_day = time_entries.played_days_by_user(db, seasons.ALL, [user_id]).get(user_id, [])
+    within = [day for day in every_day if challenge.starts_on <= day <= challenge.ends_on]
+    return streak_result(user_id, _player(db, user_id), params["mode"], params["days"], within, challenge.ends_on)
+
+
+def build_long_sessions(db: Session, options: dict, today: datetime.date, user_id: int | None = None) -> Built:
+    """Options: sessions (how many, 1 to 100), minutes (each lasts at least that, 15 to 600) and duration."""
+    duration, length = _duration(options)
+    count = _whole(options.get("sessions"), "Las sesiones", 1, 100)
+    minutes = _whole(options.get("minutes"), "Los minutos", 15, 600)
+    return Built(
+        title=f"{count} {'sesión' if count == 1 else 'sesiones'} de {minutes} min o más",
+        params={"sessions": count, "minutes": minutes, "duration": duration},
+        starts_on=today,
+        ends_on=today + datetime.timedelta(days=length - 1),
+    )
+
+
+def progress_long_sessions(db: Session, challenge: models.Challenge, participant_ids: list[int]) -> dict:
+    if not participant_ids:
+        return {"players": []}
+    user_id = participant_ids[0]
+    params = json.loads(challenge.params)
+    start, end = _window(challenge)
+    count = (
+        db.query(func.count(models.GameTimer.id))
+        .filter(
+            models.GameTimer.user_id == user_id,
+            models.GameTimer.is_active == False,  # noqa: E712
+            models.GameTimer.duration_seconds >= params["minutes"] * 60,
+            models.GameTimer.start_time >= start,
+            models.GameTimer.start_time < end,
+        )
+        .scalar()
+    )
+    return _count_part(user_id, _player(db, user_id), int(count or 0), params["sessions"], "sessions")
+
+
+def build_variety(db: Session, options: dict, today: datetime.date, user_id: int | None = None) -> Built:
+    """Options: genres (how many different ones, 2 to 10 and no more than the database has), hours (at least that
+    many in each, 1 by default) and duration. The time of a game counts in each of its genres."""
+    duration, length = _duration(options)
+    existing = len(available_genres(db))
+    if existing < 2:
+        raise ChallengeError("Todavía no hay géneros suficientes en la base de datos")
+    count = _whole(options.get("genres"), "Los géneros", 2, min(10, existing))
+    each = hours(1 if options.get("hours") in (None, "") else options["hours"], "Las horas de cada género")
+    return Built(
+        title=f"Variar de género: {count} géneros",
+        params={"genres": count, "hours": each, "duration": duration},
+        starts_on=today,
+        ends_on=today + datetime.timedelta(days=length - 1),
+    )
+
+
+def genres_reached(seconds_by_genres: list[tuple[str | None, int]], minimum_seconds: int) -> int:
+    """How many genres got at least `minimum_seconds` (pure): the rows are the seconds played in games with that
+    comma separated list of genres, and a game's time counts in each of its genres."""
+    per_genre: dict[str, int] = {}
+    for genres, seconds in seconds_by_genres:
+        for genre in {g.casefold() for g in split_genres(genres)}:
+            per_genre[genre] = per_genre.get(genre, 0) + seconds
+    return sum(1 for seconds in per_genre.values() if seconds >= minimum_seconds)
+
+
+def progress_variety(db: Session, challenge: models.Challenge, participant_ids: list[int]) -> dict:
+    if not participant_ids:
+        return {"players": []}
+    user_id = participant_ids[0]
+    params = json.loads(challenge.params)
+    start, end = _window(challenge)
+    rows = (
+        db.query(models.Game.genres, func.sum(models.GameTimer.duration_seconds))
+        .join(models.Game, models.Game.id == models.GameTimer.game_id)
+        .filter(
+            models.GameTimer.user_id == user_id,
+            models.GameTimer.is_active == False,  # noqa: E712
+            models.GameTimer.start_time >= start,
+            models.GameTimer.start_time < end,
+        )
+        .group_by(models.Game.genres)
+    )
+    seconds = [(genres, int(total or 0)) for genres, total in rows]  # MariaDB returns SUM() as Decimal
+    return _count_part(user_id, _player(db, user_id), genres_reached(seconds, round(params["hours"] * 3600)), params["genres"], "genres")
+
+
+def wishes_at(db: Session, user_id: int, day: datetime.date) -> set[str]:
+    """The games a player was waiting to play on a day: those on their wishlist by then (added that day or before)
+    that were not in their library yet."""
+    had = db.query(models.UserGame.game_id).filter(models.UserGame.user_id == user_id, models.UserGame.started_date < day)
+    rows = db.query(models.UserWishlist.game_id).filter(
+        models.UserWishlist.user_id == user_id,
+        models.UserWishlist.added_at < datetime.datetime.combine(day + datetime.timedelta(days=1), datetime.time.min),
+        ~models.UserWishlist.game_id.in_(had),
+    )
+    return {game_id for (game_id,) in rows}
+
+
+def build_wishlist(db: Session, options: dict, today: datetime.date, user_id: int | None = None) -> Built:
+    """Options: mode ("start" playing or "complete"), games (1 up to the wishes they have pending) and duration.
+    Only the games they were already waiting to play the day it begins count."""
+    mode = options.get("mode")
+    if mode not in ("start", "complete"):
+        raise ChallengeError("Elige si quieres empezar o completar tus deseados")
+    duration, length = _duration(options)
+    pending = len(wishes_at(db, user_id, today)) if user_id is not None else 0
+    if not pending:
+        raise ChallengeError("No tienes deseados pendientes: añade juegos a tu lista de deseados primero")
+    games = _whole(options.get("games"), "Los juegos", 1, pending)
+    verb = "Empezar" if mode == "start" else "Completar"
+    return Built(
+        title=f"{verb} {games} {'deseado' if games == 1 else 'deseados'}",
+        params={"mode": mode, "games": games, "duration": duration},
+        starts_on=today,
+        ends_on=today + datetime.timedelta(days=length - 1),
+    )
+
+
+def progress_wishlist(db: Session, challenge: models.Challenge, participant_ids: list[int]) -> dict:
+    """The wishes the player had the day it began (`wishes_at`) that they have started (the `started_date`
+    of the entry) or completed (its `completed_date`) within the period. A wish they remove from the list afterwards
+    stops counting, like any figure derived from what is there."""
+    if not participant_ids:
+        return {"players": []}
+    user_id = participant_ids[0]
+    params = json.loads(challenge.params)
+    wished = wishes_at(db, user_id, challenge.starts_on)
+    found = set()
+    if wished:
+        rows = db.query(models.UserGame.game_id).filter(models.UserGame.user_id == user_id, models.UserGame.game_id.in_(wished))
+        if params["mode"] == "start":
+            rows = rows.filter(models.UserGame.started_date >= challenge.starts_on, models.UserGame.started_date <= challenge.ends_on)
+        else:
+            rows = rows.filter(models.UserGame.completed == 1, models.UserGame.completed_date >= challenge.starts_on, models.UserGame.completed_date <= challenge.ends_on)
+        found = {game_id for (game_id,) in rows}
+    return _count_part(user_id, _player(db, user_id), len(found), params["games"], "games")
+
+
 TEMPLATES: dict[str, Template] = {
     "game_of_month": Template("Juego del mes", GROUP, build_game_of_month, progress_game_of_month, summary_game_of_month, reached_game_of_month),
     "themed": Template("Temático", GROUP, build_themed, progress_themed, summary_themed, reached_themed),
     "new_genre": Template("Probar un género", USER, build_new_genre, progress_new_genre),
     "debt_reduction": Template("Bajar la deuda", USER, build_debt_reduction, progress_debt_reduction),
+    "streak": Template("Racha", USER, build_streak, progress_streak),
+    "long_sessions": Template("Sesiones largas", USER, build_long_sessions, progress_long_sessions),
+    "variety": Template("Variar de género", USER, build_variety, progress_variety),
+    "wishlist": Template("Cumplir deseados", USER, build_wishlist, progress_wishlist),
 }
