@@ -515,6 +515,36 @@ class AchievementsElems(Enum):
         "message": "*{}* ha completado 1000 juegos distintos en total, sumando todas las temporadas. Mil juegos terminados. Ya no queda nada por ver.",
     }
 
+    # About the challenges: one counts once it is over and the player met their part (see docs/desarrollo/features.md)
+    CHALLENGES_1_LIFETIME = {
+        "since": 2027,
+        "title": "Reto superado",
+        "message": "*{}* cumple su primer reto. Desde hoy ya no vale decir que no se puede.",
+    }
+    CHALLENGES_5_LIFETIME = {
+        "since": 2027,
+        "title": "Aficionado a los retos",
+        "message": "*{}* ya lleva 5 retos cumplidos. Esto empieza a ser un hábito.",
+    }
+    CHALLENGES_15_LIFETIME = {
+        "since": 2027,
+        "special": 1,
+        "title": "Cazarretos",
+        "message": "*{}* suma 15 retos cumplidos. Si hay un reto por ahí, seguro que ya le ha echado el ojo.",
+    }
+    ALL_ROUNDER_LIFETIME = {
+        "since": 2027,
+        "special": 2,
+        "title": "Todoterreno",
+        "message": "*{}* ha cumplido al menos un reto de cada tipo personal. Ni el más raro se le resiste.",
+    }
+    TEAM_CHALLENGE_LIFETIME = {
+        "since": 2027,
+        "special": 1,
+        "title": "Misión cumplida entre todos",
+        "message": "*{}* ha cumplido su parte y el grupo ha llegado al total de un reto de grupo. Así da gusto.",
+    }
+
     # About the world outside the app: the weather, the calendar, the sky and the age of a game. All of them are hidden,
     # have no season limit and count from 2027 (see docs/desarrollo/features.md)
     STORM_LIFETIME = {

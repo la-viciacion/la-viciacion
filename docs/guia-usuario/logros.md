@@ -17,6 +17,10 @@ Cada tarjeta muestra el logro, su descripción y quién lo tiene. Los que aún n
 
 Los que se acumulan (horas totales, días jugados, juegos jugados, juegos completados, horas en un solo juego y la racha actual) muestran una barra, por ejemplo «35 / 100». Los que dependen de un momento concreto (jugar a ciertas horas, una fecha…) no tienen barra.
 
+### Logros de los retos
+
+Hay logros **lifetime** por cumplir [retos](descubrir.md#retos) (uno cuenta cuando ha terminado y has llegado a tu parte): el primero, 5 y 15 retos cumplidos, uno de **cada tipo personal** (*Todoterreno*) y un reto **de grupo** en el que cumples tu parte y el grupo llega al total (*Misión cumplida entre todos*). Se fechan el día en que acabó el reto y se consiguen en la primera comprobación después de su final, por ejemplo al terminar tu siguiente sesión, nunca mientras el reto sigue en marcha. Solo cuentan los retos que empezaron en 2027 o después.
+
 ## Secretos y especiales
 
 - **Logro oculto**: algunos no enseñan nada hasta que los consigues, ni título, ni descripción, ni imagen. Cuando alguien desbloquea uno, al grupo solo le llega «*Fulano* ha desbloqueado un logro oculto» (por Telegram, por aviso push, en los Avisos y en la Actividad, también para quien lo tiene); se dice quién lo ha sacado, pero no cuál es. El protagonista recibe el aviso completo en privado. En la lista de logros, quien no lo tiene solo ve cuántos lo han conseguido; los nombres los ven los que ya lo han desbloqueado. Un oculto **de temporada** solo se ve entero en la temporada en que lo conseguiste (o en la pestaña **Resumen**, que junta todas las temporadas y dice en cuáles lo conseguiste): en las demás vuelve a aparecer como «Logro oculto», incluso para ti, y en el perfil de otros jugadores nunca se enseña cuál es (solo «+N logros ocultos»). Los ocultos *lifetime* no pertenecen a ninguna temporada, así que los ves siempre.
