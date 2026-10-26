@@ -1300,29 +1300,37 @@ class ChallengeAchievementTests(unittest.IsolatedAsyncioTestCase):
         )
         return {key: date for key, date in rows}
 
-    def entry(self, number, kind="streak", scope="user", done=True, group_done=None, year=YEAR):
+    def entry(self, number, kind="streak", scope="user", done=True, group_done=None, year=YEAR, contested=True):
         """A finished challenge of the history, the `number`-th of the player, ending on the 1st of that month."""
         return {
-            "id": number, "kind": kind, "scope": scope, "title": "t", "done": done, "group_done": group_done,
+            "id": number, "kind": kind, "scope": scope, "title": "t", "done": done, "group_done": group_done, "contested": contested,
             "starts_on": datetime.date(year, 1, 1), "ends_on": datetime.date(year, 1, number),
         }
 
     async def check(self, entries):
-        with mock.patch("src.crud.challenges.history", return_value=entries):
+        with mock.patch("src.crud.challenges.history", return_value=entries) as history:
             await self.view.challenges_met(self.db, USER)
+        self.asked = history.call_args.args[3]
 
     async def test_the_tiers_are_dated_the_end_of_the_challenge_that_reached_them(self):
         await self.check([self.entry(n) for n in range(1, 6)])
         self.assertEqual(self.awarded(), {"CHALLENGES_1_LIFETIME": datetime.date(YEAR, 1, 1), "CHALLENGES_5_LIFETIME": datetime.date(YEAR, 1, 5)})
         self.assertEqual(self.sent.await_count, 2)
 
-    async def test_a_challenge_that_was_not_met_or_began_before_the_season_does_not_count(self):
+    async def test_a_challenge_that_was_not_met_does_not_count_and_the_history_is_asked_from_the_season(self):
         self.view = Achievements(season=seasons.ALL, since=YEAR)
         self.db.query(models.Achievement).update({"valid_from_season": YEAR})  # a lifetime view only awards what counts from its own season
         self.db.commit()
-        await self.check([self.entry(1, done=False), self.entry(2, year=YEAR - 1)])
+        await self.check([self.entry(1, done=False)])  # the ones that began before the season never arrive: history(since_year) leaves them out
         self.assertEqual(self.awarded(), {})
         await self.check([self.entry(3)])
+        self.assertEqual(set(self.awarded()), {"CHALLENGES_1_LIFETIME"})
+        self.assertEqual(self.asked, YEAR)
+
+    async def test_a_duel_won_against_nobody_does_not_count(self):
+        await self.check([self.entry(1, kind="duel_hours", scope="duel", contested=False)])
+        self.assertEqual(self.awarded(), {})
+        await self.check([self.entry(1, kind="duel_hours", scope="duel", contested=True)])
         self.assertEqual(set(self.awarded()), {"CHALLENGES_1_LIFETIME"})
 
     async def test_nothing_met_is_nothing_and_what_is_earned_is_not_announced_twice(self):

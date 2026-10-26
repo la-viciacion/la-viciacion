@@ -42,13 +42,11 @@ const sub = (c) => {
   return `${c.scope === 'user' && c.owner?.id !== user.id ? `${c.owner?.name ?? 'Alguien'} · ` : ''}${periodLine(c)}`;
 };
 
-// the button of whoever can change their part: leave a group challenge, or turn a duel down (and take that back)
+// the button of whoever can change their part: leave (or join) a group challenge, or turn a duel down (final)
 const partButton = (c) => {
   if (!c.can_opt_out) return '';
   const voluntary = c.participation === 'opt_in';
-  const label = c.scope === 'duel'
-    ? (c.taking_part ? 'Rechazar duelo' : 'Aceptar duelo')
-    : (c.taking_part ? 'Dejar de participar' : voluntary ? 'Apuntarme' : 'Volver a participar');
+  const label = c.scope === 'duel' ? 'Rechazar duelo' : (c.taking_part ? 'Dejar de participar' : voluntary ? 'Apuntarme' : 'Volver a participar');
   return html`<button class="pf-btn" type="button" data-part="${c.taking_part ? 'leave' : 'join'}">${label}</button>`;
 };
 
@@ -94,7 +92,7 @@ async function load() {
   } catch (err) {
     mount(main.querySelector('#chLists'), html`<div class="pf-empty">Error cargando los retos: ${err.message}</div>`);
   }
-  await showProposals(main.querySelector('#chProposals'), load);
+  await showProposals(main.querySelector('#chProposals'));
 }
 
 async function change(id, path, options) {

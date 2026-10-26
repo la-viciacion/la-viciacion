@@ -185,14 +185,16 @@ def set_participation(
     db: Session = Depends(get_db),
 ):
     """Stop taking part in a group challenge, or take part again. It is about the caller only. In a duel it is how the
-    challenged player declines it (and takes that back), only during the first hours after it was launched."""
+    challenged player declines it (a decline is final), only during the first hours after it was launched."""
     challenge = _challenge(db, challenge_id, current_user)
     today = datetime.date.today()
     if not crud.can_opt_out(challenge, today, current_user.id):
         raise HTTPException(status_code=409, detail="En este reto no se puede cambiar la participación")
+    if challenge.scope == DUEL and joined:
+        raise HTTPException(status_code=409, detail="Un duelo solo se puede rechazar: no hace falta aceptarlo, empieza al lanzarlo")
     already_declined = crud.declined(db, challenge)
     crud.opt(db, challenge, current_user.id, joined)
-    if challenge.scope == DUEL and not joined and not already_declined:  # asking twice tells nobody twice
+    if challenge.scope == DUEL and not already_declined:  # a decline is final: it is told once
         background_tasks.add_task(actions.after_duel_decline, challenge.id)
     return crud.view(db, challenge, current_user.id, today)
 

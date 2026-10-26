@@ -4,7 +4,7 @@ from unittest import mock
 
 from src.crud import wishlist
 from src.database import models
-from src.utils import actions, rawg_sync
+from src.utils import actions, my_utils, rawg_sync
 from tests.sqlite_db import make_session
 
 TODAY = datetime.date(2026, 10, 4)
@@ -125,9 +125,9 @@ class WishlistQueryTests(unittest.TestCase):
 
 class ReleaseNoticeTests(unittest.TestCase):
     def test_names_are_joined_in_spanish(self):
-        self.assertEqual(actions.join_names(["Ana"]), "Ana")
-        self.assertEqual(actions.join_names(["Ana", "Bea"]), "Ana y Bea")
-        self.assertEqual(actions.join_names(["Ana", "Bea", "Cai"]), "Ana, Bea y Cai")
+        self.assertEqual(my_utils.join_names(["Ana"]), "Ana")
+        self.assertEqual(my_utils.join_names(["Ana", "Bea"]), "Ana y Bea")
+        self.assertEqual(my_utils.join_names(["Ana", "Bea", "Cai"]), "Ana, Bea y Cai")
 
     def test_the_notice_says_who_else_waits_for_each_game(self):
         message = actions.wishlist_release_message([("Hades II", ["Bea"], None), ("Celeste", [], None), ("Hollow", ["Bea", "Cai"], None)])

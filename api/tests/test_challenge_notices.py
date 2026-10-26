@@ -4,7 +4,7 @@ import types
 import unittest
 
 from src.utils import challenge_notices as notices
-from src.utils import challenges, user_settings
+from src.utils import challenges, my_utils, user_settings
 from tests.sqlite_db import make_session
 
 
@@ -50,7 +50,7 @@ class MessageTests(unittest.TestCase):
         self.assertEqual(notices.reminders_message(["x", "y", "z"]).splitlines()[0], "⏰ Te quedan 2 días en 3 retos")
 
     def test_names_are_joined_in_spanish(self):
-        self.assertEqual([notices.join_names(n) for n in (["A"], ["A", "B"], ["A", "B", "C"])], ["A", "A y B", "A, B y C"])
+        self.assertEqual([my_utils.join_names(n) for n in (["A"], ["A", "B"], ["A", "B", "C"])], ["A", "A y B", "A, B y C"])
 
 
 class ResultLineTests(unittest.TestCase):

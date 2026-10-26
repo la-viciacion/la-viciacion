@@ -45,11 +45,6 @@ def _count(n: int, one: str, many: str) -> str:
     return f"{n} {one if n == 1 else many}"
 
 
-def join_names(names: list[str]) -> str:
-    """"A", "A y B", "A, B y C" (already formatted)."""
-    return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " y " + names[-1]
-
-
 def duel_invite_message(challenger: str, title: str, ends_on: datetime.date, decline_hours: int) -> str:
     return (
         f"⚔️ {_bold(challenger)} te ha retado a un duelo\n"
@@ -125,7 +120,7 @@ def group_result_message(challenge: models.Challenge, progress: dict) -> str:
     text += "."
     winners = [p["name"] for p in players if p.get("winner")]
     if winners:
-        text += f"\n🥇 {'Gana' if len(winners) == 1 else 'Ganan'} {join_names([_bold(name) for name in winners])}."
+        text += f"\n🥇 {'Gana' if len(winners) == 1 else 'Ganan'} {utils.join_names([_bold(name) for name in winners])}."
     return text
 
 
@@ -142,10 +137,6 @@ async def tell(db: Session, user: models.User, message: str, reminder: bool = Fa
         user.telegram_id, message, user_id=user.id, telegram_on=channels[0], push_on=channels[1], in_inbox=not reminder
     )
     return True
-
-
-def _names(db: Session, ids) -> dict[int, str]:
-    return {i: name or username for i, username, name in db.query(models.User.id, models.User.username, models.User.name).filter(models.User.id.in_(list(ids)))}
 
 
 def _progress(db: Session, challenge: models.Challenge, taking: list[int]) -> dict:
@@ -234,7 +225,7 @@ async def announce_results(db: Session, today: datetime.date) -> str:
         if not taking or challenges_crud.declined(db, challenge):
             continue
         progress = _progress(db, challenge, taking)
-        names = _names(db, taking)
+        names = challenges.names_of(db, taking)
         for user_id in taking:
             lines.setdefault(user_id, []).append(result_line(challenge, progress, user_id, names))
         if challenge.scope == challenges.GROUP:
@@ -265,7 +256,7 @@ async def send_reminders(db: Session, today: datetime.date) -> str:
         if not taking or challenges_crud.declined(db, challenge):
             continue
         progress = _progress(db, challenge, taking)
-        names = _names(db, taking)
+        names = challenges.names_of(db, taking)
         for part in progress["players"]:
             if challenge.scope == challenges.DUEL:
                 other = next((p for p in progress["players"] if p["user_id"] != part["user_id"]), None)

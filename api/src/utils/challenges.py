@@ -18,7 +18,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..database import models
-from . import seasons, streaks
+from . import streaks
 
 GROUP = "group"
 USER = "user"
@@ -209,10 +209,7 @@ def game_of_month_result(played: dict[int, int], names: dict[int, str], each_hou
 
 def progress_game_of_month(db: Session, challenge: models.Challenge, participant_ids: list[int]) -> dict:
     params = json.loads(challenge.params)
-    names = {
-        user_id: name or username
-        for user_id, username, name in db.query(models.User.id, models.User.username, models.User.name).filter(models.User.id.in_(participant_ids))
-    }
+    names = names_of(db, participant_ids)
     played = seconds_in_game(db, participant_ids, challenge.game_id, challenge.starts_on, challenge.ends_on)
     return game_of_month_result(played, names, params["min_hours_each"], params["min_hours_total"])
 
@@ -412,10 +409,7 @@ def themed_result(names: dict[int, str], mode: str, amounts: dict[int, int], par
 
 def progress_themed(db: Session, challenge: models.Challenge, participant_ids: list[int]) -> dict:
     params = json.loads(challenge.params)
-    names = {
-        user_id: name or username
-        for user_id, username, name in db.query(models.User.id, models.User.username, models.User.name).filter(models.User.id.in_(participant_ids))
-    }
+    names = names_of(db, participant_ids)
     tag = params["tag"].casefold()
     has_tag = lambda tags: tag in {t.casefold() for t in split_genres(tags)}  # noqa: E731
     amounts: dict[int, int] = {}
@@ -601,6 +595,12 @@ def _window(challenge: models.Challenge) -> tuple[datetime.datetime, datetime.da
     )
 
 
+def names_of(db: Session, user_ids) -> dict[int, str]:
+    """{user id: the name they go by} for those ids."""
+    rows = db.query(models.User.id, models.User.username, models.User.name).filter(models.User.id.in_(list(user_ids)))
+    return {user_id: name or username for user_id, username, name in rows}
+
+
 def _player(db: Session, user_id: int) -> str:
     user = db.get(models.User, user_id)
     return (user.name or user.username) if user else ""
@@ -641,8 +641,7 @@ def progress_streak(db: Session, challenge: models.Challenge, participant_ids: l
         return {"players": []}
     user_id = participant_ids[0]
     params = json.loads(challenge.params)
-    every_day = time_entries.played_days_by_user(db, seasons.ALL, [user_id]).get(user_id, [])
-    within = [day for day in every_day if challenge.starts_on <= day <= challenge.ends_on]
+    within = time_entries.played_days_between(db, user_id, challenge.starts_on, challenge.ends_on)
     return streak_result(user_id, _player(db, user_id), params["mode"], params["days"], within, challenge.ends_on)
 
 
@@ -860,10 +859,7 @@ def duel_result(names: dict[int, str], seconds: dict[int, int]) -> dict:
 
 
 def progress_duel(db: Session, challenge: models.Challenge, participant_ids: list[int]) -> dict:
-    names = {
-        user_id: name or username
-        for user_id, username, name in db.query(models.User.id, models.User.username, models.User.name).filter(models.User.id.in_(participant_ids))
-    }
+    names = names_of(db, participant_ids)
     if challenge.game_id:
         played = seconds_in_game(db, participant_ids, challenge.game_id, challenge.starts_on, challenge.ends_on)
     else:
