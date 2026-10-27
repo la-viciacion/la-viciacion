@@ -1,5 +1,5 @@
-// What the world outside says about a game, on its page: a few small facts under the title (Metacritic, Steam's reviews,
-// the age rating, the official site) and a folded "Multimedia" card with the description in Spanish, the trailer and
+// What the world outside says about a game, on its page: a few small facts under the title (Metacritic, the age rating,
+// the official site) and a folded "Multimedia" card with the description in Spanish, the trailer and
 // screenshots. GET /games/{id}/extras asks Steam and RAWG (the API keeps the answer for a day), so it is loaded apart,
 // after the page is drawn; a game neither knows, or a failure, shows nothing. The card starts folded and the trailer
 // only loads when it is played, so opening a game costs no video.
@@ -15,12 +15,11 @@ const safe = (url) => (typeof url === 'string' && url.startsWith('https://') ? u
 
 const facts = (x) => [
   x.metacritic ? html`<span class="pf-tag muted" title="Nota de la crítica en Metacritic">Metacritic ${x.metacritic}</span>` : '',
-  x.steam_reviews ? html`<span class="pf-tag muted" title="Según ${x.steam_reviews.total} reseñas de Steam">${x.steam_reviews.percent} % reseñas positivas en Steam</span>` : '',
   x.esrb ? html`<span class="pf-tag muted" title="Clasificación por edades (ESRB)">${x.esrb}</span>` : '',
   safe(x.website) ? html`<a class="game-link" href="${x.website}" target="_blank" rel="noopener noreferrer">Web oficial ↗</a>` : '',
 ];
 
-const hasFacts = (x) => x.metacritic || x.steam_reviews || x.esrb || safe(x.website);
+const hasFacts = (x) => x.metacritic || x.esrb || safe(x.website);
 const hasMedia = (x) => x.description || (x.trailer && safe(x.trailer.url)) || x.screenshots?.length;
 
 function trailerButton(trailer) {
