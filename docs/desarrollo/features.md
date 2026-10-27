@@ -241,7 +241,7 @@ The **Actividad** page (menu → Principal, `#/activity`) lists what everybody h
 - **Sin tocar**: games somebody has and **nobody has ever played**, the most owned first, with the total.
 - **Por género** and **Por plataforma**: how many games of the libraries have each genre (a game counts in each of its genres, with the hours put into them) and each platform (with its players), ten at most, the most games first. Only platforms that entries name are listed.
 
-The header has the distinct games, the players who have any and the hours played in them.
+The header has the distinct games, the players who have any and the hours played in them. Under it a row of **pills** (one per section, with how many items it has) reaches every section at once, unfolding it if it was folded and scrolling to it, and each section **folds** on its own with the button of its header; what the viewer folded is remembered in that browser (`localStorage`, only a convenience: without it every section starts open).
 
 ## Game page
 

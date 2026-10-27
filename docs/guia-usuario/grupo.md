@@ -51,7 +51,7 @@ Al pulsar un juego abres **su página**: portada, géneros, desarrollador, fecha
 - **Sin tocar**: juegos que alguien tiene y que nadie ha jugado nunca.
 - **Por género** y **por plataforma**: cuántos juegos de las bibliotecas hay de cada género y de cada plataforma.
 
-Cada juego enlaza a su página.
+Cada juego enlaza a su página. Arriba hay una fila de **botones**, uno por sección, que te lleva directo a ella (y la abre si estaba plegada), y cada sección se puede **plegar** pulsando su título; el navegador recuerda lo que has plegado.
 
 ## Calendario
 

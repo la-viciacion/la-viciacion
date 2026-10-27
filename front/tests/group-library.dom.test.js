@@ -63,3 +63,52 @@ test('an error loading is shown', async () => {
   await settle();
   assert.match(main().textContent, /Error cargando la biblioteca del grupo: Sin conexión/);
 });
+
+const SECTIONS = ['gems', 'graveyard', 'rarities', 'untouched', 'genres', 'platforms'];
+const scrolled = [];
+window.Element.prototype.scrollIntoView = function scrollIntoView() { scrolled.push(this.id); };
+
+test('a row of pills reaches every section from the start, each with how many items it has', async () => {
+  await open();
+  const pills = [...document.querySelectorAll('.gl-pills [data-go]')];
+  assert.deepEqual(pills.map((p) => p.dataset.go), SECTIONS);
+  assert.deepEqual(pills.map((p) => p.textContent.replace(/\s+/g, ' ').trim()), ['Joyas ocultas 1', 'El cementerio 1', 'Rarezas 14', 'Sin tocar 1', 'Por género 2', 'Por plataforma 2']);
+  pills[2].click();
+  assert.deepEqual(scrolled.at(-1), 'gl-rarities');
+});
+
+test('each section folds on its own, and a pill opens one that was folded', async () => {
+  localStorage.removeItem('gl-folded');
+  await open();
+  const fold = (key) => document.querySelector(`[data-fold="${key}"]`);
+  const sectionOf = (key) => document.getElementById(`gl-${key}`);
+  assert.deepEqual(SECTIONS.map((key) => fold(key).getAttribute('aria-expanded')), Array(6).fill('true')); // all open at first
+  fold('graveyard').click();
+  assert.equal(sectionOf('graveyard').classList.contains('folded'), true);
+  assert.equal(fold('graveyard').getAttribute('aria-expanded'), 'false');
+  assert.equal(sectionOf('gems').classList.contains('folded'), false); // the others are as they were
+  document.querySelector('[data-go="graveyard"]').click();
+  assert.equal(sectionOf('graveyard').classList.contains('folded'), false);
+  assert.equal(fold('graveyard').getAttribute('aria-expanded'), 'true');
+  assert.equal(scrolled.at(-1), 'gl-graveyard');
+  fold('graveyard').click();
+  fold('graveyard').click();
+  assert.equal(sectionOf('graveyard').classList.contains('folded'), false); // a second press opens it again
+});
+
+test('what was folded is remembered, and a browser without storage still works', async () => {
+  localStorage.removeItem('gl-folded');
+  await open();
+  document.querySelector('[data-fold="genres"]').click();
+  assert.deepEqual(JSON.parse(localStorage.getItem('gl-folded')), ['genres']);
+  await open();
+  assert.equal(document.getElementById('gl-genres').classList.contains('folded'), true);
+  const original = localStorage.getItem;
+  localStorage.getItem = (key) => { // only what the page remembers is blocked: the session still reads its own
+    if (key === 'gl-folded') throw new Error('blocked');
+    return original(key);
+  };
+  await open();
+  assert.equal(document.getElementById('gl-genres').classList.contains('folded'), false);
+  localStorage.getItem = original;
+});
