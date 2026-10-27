@@ -111,12 +111,15 @@ function draw(data) {
         ${paceLines(data.pace).map((line, i) => (i === 0 ? html`<strong>${line}</strong>` : html`<span class="pf-sub">${line}</span>`))}
       </div>` : ''}
 
-    <div class="section-header"><h2 class="section-title">Quién lo juega</h2><div class="section-line"></div></div>
-    ${players.length
-      ? html`<ul class="gm-players pf-card">${players.map(playerRow)}</ul>`
-      : html`<div class="pf-empty">Nadie del grupo lo tiene todavía.</div>`}
-
-    <div id="gmSaga"></div>`); // last: a long saga would push who plays the game far down
+    <div class="gm-lower">
+      <div>
+        <div class="section-header"><h2 class="section-title">Quién lo juega</h2><div class="section-line"></div></div>
+        ${players.length
+          ? html`<ul class="gm-players pf-card">${players.map(playerRow)}</ul>`
+          : html`<div class="pf-empty">Nadie del grupo lo tiene todavía.</div>`}
+      </div>
+      <div id="gmSaga"></div>
+    </div>`); // the saga after who plays the game: below it on a phone, beside it on a wide screen
 
   hydratePhotos(main);
   main.querySelector('#gmMoreTags')?.addEventListener('click', () => mount(main.querySelector('.gm-tags'), html`${tagPills(tags)}`));

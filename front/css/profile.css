@@ -423,6 +423,15 @@
 /* A long description (RAWG's can be a page) would push everything down: a few lines, the rest one tap away */
 .gm-desc:not(.open) { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; cursor: pointer; }
 @media (min-width: 1000px) { .gm-desc:not(.open) { -webkit-line-clamp: 6; } }
+.gm-lower { margin-top: 4px; }
+@media (min-width: 1000px) {
+  /* Who plays the game on the left, its saga on the right (always open: there is room); without a saga the list has the width */
+  .gm-lower.has-saga { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; align-items: start; }
+  .gm-lower.has-saga #gmSaga { margin-top: 0; } /* level with the list's heading, not below it */
+  #gmSagaBlock .ach-content { display: block; }
+  #gmSagaBlock .ach-fold { pointer-events: none; }
+  #gmSagaBlock .ach-chevron { display: none; }
+}
 .gm-details, .gm-publisher { margin: 6px 0; line-height: 1.5; } /* the same 6px as the pills above and below */
 .pf-tag.gm-platform { background: var(--bg-card-hover); color: var(--text-secondary); }
 .gm-trailer { position: relative; display: block; width: 100%; max-width: 560px; aspect-ratio: 16 / 9; padding: 0; border: 0; border-radius: var(--radius-sm); background: var(--bg-surface); overflow: hidden; cursor: pointer; }

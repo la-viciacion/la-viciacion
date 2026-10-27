@@ -189,6 +189,17 @@ test('the saga comes after who plays the game, so a long one does not push them 
   assert.ok(players.compareDocumentPosition(saga) & window.Node.DOCUMENT_POSITION_FOLLOWING);
 });
 
+test('a saga gives the lower part of the page two columns, and no saga leaves it as it was', async () => {
+  installApi({ 'GET /games/celeste/series': SAGA, 'GET /games/celeste/overview': OVERVIEW, 'GET /users/photo/': json({ detail: 'no' }, 404) });
+  await page.render({ main: main(), user: { id: 1, username: 'ana' } });
+  await settle();
+  assert.equal(document.querySelector('.gm-lower').classList.contains('has-saga'), true);
+  installApi({ 'GET /games/celeste/series': { available: false, games: [] }, 'GET /games/celeste/overview': OVERVIEW, 'GET /users/photo/': json({ detail: 'no' }, 404) });
+  await page.render({ main: main(), user: { id: 1, username: 'ana' } });
+  await settle();
+  assert.equal(document.querySelector('.gm-lower').classList.contains('has-saga'), false);
+});
+
 test('the saga folds, says how many games it has and remembers it', async () => {
   localStorage.removeItem('gm-saga-folded');
   const open = async () => {
