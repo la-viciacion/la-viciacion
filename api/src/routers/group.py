@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from .. import auth
 from ..auth import get_db
-from ..crud import group, library_compare, wishlist
+from ..crud import group, group_library, library_compare, wishlist
 from ..database import models
 from ..utils import seasons
 
@@ -54,6 +54,17 @@ def get_player(
     if found is None:
         raise HTTPException(status_code=404, detail="Player not found")
     return found
+
+
+@router.get("/library")
+def get_group_library(
+    current_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """The group's library as a whole: hidden gems, the graveyard (games players gave up), rarities (games one player
+    has), what nobody has touched and the coverage by genre and platform. Derived from the libraries, the sessions and
+    the ratings; readable by every logged-in user on purpose, like the game pages it is made of."""
+    return group_library.library(db)
 
 
 @router.get("/players/{player_id}/compare")

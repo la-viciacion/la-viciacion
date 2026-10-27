@@ -25,7 +25,7 @@ TOPICS = (
         "Se entra con el email o el usuario y la contraseña. Si se olvida, «¿Has olvidado tu contraseña?» manda un enlace al correo "
         "(vale 1 hora) y, sin correo configurado, un administrador puede poner otra. Tras 5 intentos fallidos seguidos la cuenta se bloquea "
         "un rato; cambiar la contraseña cierra la sesión en todos los dispositivos, y la sesión dura unos 7 días mientras se use. "
-        "El botón de arriba a la izquierda abre el menú lateral: Principal (Inicio, Actividad), Explorar (Juegos, Calendario, Logros, "
+        "El botón de arriba a la izquierda abre el menú lateral: Principal (Inicio, Actividad), Explorar (Juegos, Biblioteca del grupo con joyas ocultas, cementerio, rarezas y juegos sin tocar, Calendario, Logros, "
         "Jugadores, Estadísticas, aún en construcción), Tú (Mi perfil, Resumen, Deseados, Recomendados, Retos, Ajustes) y, solo para "
         "administradores, Administración. Es una PWA: se instala desde el menú del navegador (Android: «Instalar aplicación»; iPhone/iPad: "
         "compartir → «Añadir a pantalla de inicio», imprescindible para las notificaciones; ordenador: icono de instalar). Ya instalada, "
