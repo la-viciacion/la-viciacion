@@ -116,3 +116,18 @@ test('it shows the genres and the tags, without repeating a genre among the tags
   assert.deepEqual(text('.gm-tags .pf-tag'), ['Singleplayer', 'Pixel <i>']);
   assert.equal(document.querySelectorAll('.gm-tags i').length, 0);
 });
+
+test('the pace card tells the time of the viewer against the group and HowLongToBeat, and is absent without a pace', async () => {
+  installApi({
+    'GET /games/celeste/overview': { ...OVERVIEW, pace: { seconds: 3600, completed: false, group_mean: 7200, group_count: 1, group_share: 50, avg_time: 30000, avg_share: 12 } },
+    'GET /users/photo/': json({ detail: 'no' }, 404),
+  });
+  await page.render({ main: main(), user: { id: 1, username: 'ana' } });
+  await settle();
+  assert.match(document.querySelector('#gmPace').textContent, /Llevas 1 h de juego\./);
+  assert.match(document.querySelector('#gmPace').textContent, /Es el 50 % de lo que ha tardado el resto del grupo/);
+  installApi({ 'GET /games/celeste/overview': { ...OVERVIEW, pace: null }, 'GET /users/photo/': json({ detail: 'no' }, 404) });
+  await page.render({ main: main(), user: { id: 1, username: 'ana' } });
+  await settle();
+  assert.equal(document.querySelector('#gmPace'), null);
+});

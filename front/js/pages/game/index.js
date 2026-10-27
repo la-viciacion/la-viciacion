@@ -3,6 +3,7 @@
 import { api } from '../../lib/api.js';
 import { formatDate, formatDuration, formatRelative } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
+import { paceLines } from '../../lib/pace.js';
 import { wantedBy } from '../../lib/wishlist.js';
 import { hydratePhotos, playerAvatar } from '../../ui/avatar.js';
 import { scoreBadge } from '../../ui/score-badge.js';
@@ -85,6 +86,11 @@ function draw(data) {
       <div class="pf-card gm-mine">
         <div>${mine.score == null ? html`<span class="pf-sub">Todavía no lo has puntuado.</span>` : html`Tu nota ${scoreBadge(mine.score)}`}</div>
         <button class="pf-btn" type="button" id="gmRate">${mine.score == null ? 'Puntuar' : 'Cambiar nota'}</button>
+      </div>` : ''}
+
+    ${paceLines(data.pace).length ? html`
+      <div class="pf-card gm-pace" id="gmPace">
+        ${paceLines(data.pace).map((line, i) => (i === 0 ? html`<strong>${line}</strong>` : html`<span class="pf-sub">${line}</span>`))}
       </div>` : ''}
 
     <div class="section-header"><h2 class="section-title">Quién lo juega</h2><div class="section-line"></div></div>
