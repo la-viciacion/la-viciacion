@@ -54,23 +54,26 @@ function draw(data) {
 
   mount(main, html`
     <button class="pf-btn gm-back" type="button" id="gmBack">← Volver</button>
-    <div class="gm-head">
-      ${game.image_url
-        ? html`<img src="${game.image_url}" alt="" class="gm-cover" />`
-        : html`<div class="gm-cover gm-cover-placeholder" aria-hidden="true">🎮</div>`}
-      <div>
-        <h1 class="pf-title">${game.name}</h1>
-        ${game.is_dlc ? html`
-          <div class="gm-dlc">
-            <span class="pf-tag dlc">DLC</span>
-            ${game.parent ? html`<span class="pf-sub">Contenido adicional de <a href="#/game/${encodeURIComponent(game.parent.id)}">${game.parent.name}</a></span>` : ''}
-          </div>` : ''}
-        <div class="gm-genres">${game.genres.map((genre) => html`<span class="pf-tag muted">${genre}</span>`)}</div>
-        ${tags.length ? html`<div class="gm-genres gm-tags" aria-label="Etiquetas">${tags.map((tag) => html`<span class="pf-tag muted">${tag}</span>`)}</div>` : ''}
-        ${details ? html`<div class="pf-sub">${details}</div>` : ''}
-        <div id="gmOutside"></div>
-        ${game.slug ? html`<div class="gm-rawg"><a class="pf-btn gm-rawg-btn" href="https://rawg.io/games/${encodeURIComponent(game.slug)}" target="_blank" rel="noopener noreferrer">Ver en RAWG <span aria-hidden="true">↗</span></a></div>` : ''}
+    <div class="gm-top">
+      <div class="gm-head">
+        ${game.image_url
+          ? html`<img src="${game.image_url}" alt="" class="gm-cover" />`
+          : html`<div class="gm-cover gm-cover-placeholder" aria-hidden="true">🎮</div>`}
+        <div>
+          <h1 class="pf-title">${game.name}</h1>
+          ${game.is_dlc ? html`
+            <div class="gm-dlc">
+              <span class="pf-tag dlc">DLC</span>
+              ${game.parent ? html`<span class="pf-sub">Contenido adicional de <a href="#/game/${encodeURIComponent(game.parent.id)}">${game.parent.name}</a></span>` : ''}
+            </div>` : ''}
+          <div class="gm-genres">${game.genres.map((genre) => html`<span class="pf-tag muted">${genre}</span>`)}</div>
+          ${tags.length ? html`<div class="gm-genres gm-tags" aria-label="Etiquetas">${tags.map((tag) => html`<span class="pf-tag muted">${tag}</span>`)}</div>` : ''}
+          ${details ? html`<div class="pf-sub">${details}</div>` : ''}
+          <div id="gmOutside"></div>
+          ${game.slug ? html`<div class="gm-rawg"><a class="pf-btn gm-rawg-btn" href="https://rawg.io/games/${encodeURIComponent(game.slug)}" target="_blank" rel="noopener noreferrer">Ver en RAWG <span aria-hidden="true">↗</span></a></div>` : ''}
+        </div>
       </div>
+      <div id="gmMedia"></div>
     </div>
 
     <section class="pf-stats" aria-label="El grupo y este juego">
@@ -97,8 +100,6 @@ function draw(data) {
       <div class="pf-card gm-pace" id="gmPace">
         ${paceLines(data.pace).map((line, i) => (i === 0 ? html`<strong>${line}</strong>` : html`<span class="pf-sub">${line}</span>`))}
       </div>` : ''}
-
-    <div id="gmMedia"></div>
 
     <div class="section-header"><h2 class="section-title">Quién lo juega</h2><div class="section-line"></div></div>
     ${players.length
