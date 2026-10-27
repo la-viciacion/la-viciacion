@@ -43,6 +43,15 @@ El código no trae proveedor ni modelo por defecto, y desde el panel no se puede
 
 ![La IA en el panel](../assets/screens/admin-ai.webp){ .screenshot }
 
+### Cuánto ha gastado la IA (solo OpenAI)
+
+OpenAI no dice por API cuánto crédito queda, pero sí cuánto se ha facturado. Para verlo en **Sistema → Uso de IA** hace falta una segunda clave, distinta de `AI_API_KEY`:
+
+1. En platform.openai.com → Settings → Organization → **Admin keys** (solo un propietario de la organización las ve), crea una clave de administración. También sirve una clave restringida con solo el permiso de lectura de uso (`api.usage.read`), que es más segura porque no puede hacer nada más.
+2. Ponla en el `.env` como `OPENAI_ADMIN_KEY=` y reinicia la API.
+
+El panel enseña el gasto del **último año** (OpenAI no guarda más): el total, mes a mes, por concepto (modelo, entrada y salida) y, al elegir un mes, día a día. Es el gasto de **toda la organización de OpenAI**, no solo el de esta app. Con Google (Gemini) no hay nada equivalente, así que ahí no se ve. No es el saldo que queda: ese solo está en platform.openai.com → Billing.
+
 ## Chat de la app
 
 El botón flotante de abajo a la derecha abre un asistente que responde sobre videojuegos y los datos del grupo. **Usa el mismo proveedor y la misma clave** que la IA de los avisos (`AI_PROVIDER`, `AI_API_KEY`), así que si la IA ya está configurada no hace falta nada más. Solo hay una variable propia, opcional: el modelo.

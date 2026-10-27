@@ -28,6 +28,7 @@ routers/           HTTP layer only: validation, auth, calling crud/utils, mappin
 crud/              DB access and queries (users, games, timers, time_entries, rankings, achievements, ...)
 utils/             domain logic and integrations (see below)
 clients/google_ai.py, open_ai.py  one function per AI provider, each with the provider's official SDK (`google-genai`, `openai`); utils/ai.py picks one from the settings
+clients/openai_usage.py            OpenAI's Costs API (what was billed, by day; an admin key, `OPENAI_ADMIN_KEY`); utils/ai_usage.py sums it by month and line item and keeps it in memory for 10 minutes (nothing stored); GET /manage/ai-usage, panel Sistema -> Uso de IA
 chat/              the chat assistant (pydantic-ai): model.py (provider from the ai.* settings), tools.py (read-only lookups), agent.py (instructions, limits, history)
 ```
 

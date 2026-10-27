@@ -502,6 +502,11 @@ ENTITIES.chat = {
   custom: 'settings',
   sections: ['chat'],
 };
+ENTITIES.aiusage = {
+  label: 'Uso de IA',
+  description: 'Cuánto ha facturado OpenAI en el último año (lo que conserva): el total, mes a mes y por concepto.',
+  custom: 'ai-usage',
+};
 ENTITIES.services = {
   label: 'Servicios',
   description: 'Lo que se configura en el .env del servidor y la app usa: la IA, Telegram, los avisos en la app y el correo.',
