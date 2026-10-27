@@ -6,6 +6,7 @@
 // achievement once, in full if the viewer has earned it in any season, with the seasons they did.
 // GET /group/achievements (derived, nothing stored).
 import { API_BASE, api } from '../../lib/api.js';
+import { createFolds, toggleFold } from '../../lib/fold.js';
 import { formatDate, formatPlayers } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
 import * as seasons from '../../lib/seasons.js';
@@ -80,7 +81,7 @@ const BLOCKS = [
 ];
 
 let shown = seasons.current(); // the season on screen in the season block
-const folded = new Set(); // the titles of the blocks the viewer has folded: they start open, and stay as left when a season changes
+const folded = createFolds(); // the titles of the blocks the viewer has folded: they start open, and stay as left when a season changes
 
 const pills = () => html`
   <div class="pf-season ach-seasons" role="group" aria-label="Temporada">
@@ -125,10 +126,7 @@ export async function render({ main }) {
   main.querySelector('#achList').addEventListener('click', (e) => {
     const fold = e.target.closest('[data-fold]');
     if (fold) {
-      const title = fold.dataset.fold;
-      if (!folded.delete(title)) folded.add(title);
-      fold.closest('.ach-block').classList.toggle('folded', folded.has(title));
-      fold.setAttribute('aria-expanded', String(!folded.has(title)));
+      toggleFold(folded, fold.dataset.fold, fold.closest('.ach-block'), fold);
       return;
     }
     const pill = e.target.closest('[data-season]');
