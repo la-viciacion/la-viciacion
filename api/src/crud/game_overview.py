@@ -6,7 +6,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..database import models
-from . import games, time_entries, wishlist
+from . import game_prices, games, time_entries, wishlist
 
 
 def pace(seconds: int, completed: bool, others_seconds: list[int], avg_time: int | None) -> dict | None:
@@ -124,6 +124,8 @@ def overview(db: Session, game_id: str, viewer_id: int) -> dict | None:
             mine["played_seconds"] if mine else 0, bool(mine and mine["completed"]),
             [r["played_seconds"] for r in rows if r["completed"] and not r["is_me"] and r["played_seconds"] > 0], game.avg_time,
         ),
+        # the group's mean cost per hour of the game, only when at least three players contribute to it (never per player)
+        "cost_per_hour": game_prices.game_value(db, game_id),
         "wished": game_id in wished,
         "wanted_by": wishlist.wanters(db, [game_id], exclude_user_id=viewer_id).get(game_id, []),
     }

@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 
 from .. import auth
 from ..auth import get_db
-from ..crud import data_export, games, scores, users, wishlist
+from ..crud import data_export, game_prices, games, scores, users, wishlist
 from ..database import models, schemas
 from ..utils import actions, audit, images, places
 from ..utils import messages as msg
@@ -365,6 +365,38 @@ def remove_game_score(
     scores.clear_score(db, user.id, game_id)
     db.commit()
     return {"game_id": game_id, "score": None}
+
+
+@router.put("/{username}/games/{game_id}/price")
+def set_game_price(
+    username: str,
+    game_id: str,
+    body: schemas.PriceUpdate,
+    active_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Note what you paid for a game on a platform (in euros), or take the price off with a null amount. One price per
+    game and platform, only for a game you have on it. Your prices are yours (and an administrator's): nobody else reads
+    them, and the group only sees a mean cost per hour of a game when at least three players contribute to it."""
+    auth.ensure_self_or_admin(active_user, username=username)
+    user = _target_user(db, active_user, username)
+    try:
+        cents = game_prices.set_price(db, user.id, game_id, body.platform, body.amount)
+    except game_prices.PriceError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"game_id": game_id, "platform": body.platform, "amount_cents": cents}
+
+
+@router.get("/{username}/value")
+def get_value(
+    username: str,
+    active_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """What you have spent on your games and what it comes to per hour, in total and game by game."""
+    auth.ensure_self_or_admin(active_user, username=username)
+    user = _target_user(db, active_user, username)
+    return game_prices.value(db, user.id)
 
 
 @router.put("/{username}/wishlist/{game_id}")

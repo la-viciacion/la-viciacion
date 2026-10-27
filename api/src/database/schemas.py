@@ -66,6 +66,13 @@ class ScoreUpdate(BaseModel):
     score: int = Field(ge=1, le=100)
 
 
+class PriceUpdate(BaseModel):
+    """What was paid for a game on a platform, in euros (a number, or text with a comma); null takes the price off."""
+
+    platform: str = Field(min_length=1, max_length=255)
+    amount: float | str | None = None
+
+
 class PasswordChange(BaseModel):
     current_password: str
     new_password: str
@@ -291,6 +298,12 @@ class ExportScore(BaseModel):
     score: int = Field(ge=1, le=100)
 
 
+class ExportPrice(BaseModel):
+    game_id: str = Field(min_length=1, max_length=255)
+    platform: str = Field(min_length=1, max_length=255)
+    amount_cents: int = Field(ge=0, le=1_000_000)
+
+
 class ExportWish(BaseModel):
     game_id: str = Field(min_length=1, max_length=255)
 
@@ -303,4 +316,5 @@ class ExportFile(BaseModel):
     library: list[ExportLibraryEntry] = Field(default=[], max_length=10000)
     sessions: list[ExportSession] = Field(default=[], max_length=50000)
     scores: list[ExportScore] = Field(default=[], max_length=5000)
+    prices: list[ExportPrice] = Field(default=[], max_length=10000)
     wishlist: list[ExportWish] = Field(default=[], max_length=5000)

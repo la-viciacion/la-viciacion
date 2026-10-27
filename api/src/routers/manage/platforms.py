@@ -35,6 +35,7 @@ def _platform_usage(db: Session, platform_id: str) -> dict:
     return {
         "sesiones": db.query(models.GameTimer).filter_by(platform=platform_id).count(),
         "biblioteca": db.query(models.UserGame).filter_by(platform=platform_id).count(),
+        "precios": db.query(models.UserGamePrice).filter_by(platform=platform_id).count(),
     }
 
 

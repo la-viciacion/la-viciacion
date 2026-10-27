@@ -2,6 +2,8 @@ import datetime
 import json
 import unittest
 
+from pydantic import ValidationError
+
 from src.crud import data_export
 from src.database import models, schemas
 from src.utils import messages as msg
@@ -65,6 +67,13 @@ class ExportTests(DataTestCase):
     def export(self):
         return data_export.export_user(self.db, self.ana, D(YEAR, 6, 1, 12, 30, 15, 999))
 
+    def test_the_players_own_prices_are_in_the_file_with_their_game_and_platform(self):
+        self.db.add_all([models.UserGamePrice(user_id=1, game_id="doom", platform="pc", amount_cents=1999), models.UserGamePrice(user_id=2, game_id="hades", platform="pc", amount_cents=777)])
+        self.db.commit()
+        out = self.export()
+        self.assertEqual(out["prices"], [{"game_id": "doom", "platform": "pc", "amount_cents": 1999}])  # not anybody else's
+        self.assertIn("doom", {g["id"] for g in out["games"]})
+
     def test_it_holds_only_what_is_the_players_and_names_the_format(self):
         out = self.export()
         self.assertEqual((out["format"], out["version"], out["exported_at"]), ("laviciacion-export", 1, f"{YEAR}-06-01T12:30:15"))
@@ -97,6 +106,40 @@ class ExportTests(DataTestCase):
 
 
 class ImportSessionsTests(DataTestCase):
+    LIBRARY = {"game_id": "doom", "platform": "pc", "started_date": f"{YEAR}-01-02"}
+
+    def test_the_prices_come_with_their_game_and_platform_and_are_only_added_for_what_the_player_has(self):
+        report = self.run_import(parse(
+            library=[self.LIBRARY],
+            prices=[
+                {"game_id": "doom", "platform": "pc", "amount_cents": 1999},
+                {"game_id": "hades", "platform": "pc", "amount_cents": 500},  # a game that is not in the library
+                {"game_id": "nope", "platform": "pc", "amount_cents": 500},  # a game that does not exist
+                {"game_id": "doom", "platform": "nowhere", "amount_cents": 500},  # a platform that cannot be created for a player
+            ],
+        ))
+        self.assertEqual(report["prices"], {"imported": 1, "existing": 0, "skipped": 3})
+        saved = self.db.query(models.UserGamePrice).one()
+        self.assertEqual((saved.user_id, saved.game_id, saved.platform, saved.amount_cents), (1, "doom", "pc", 1999))
+        reasons = {p["reason"] for p in report["problems"] if p["kind"] == "prices"}
+        self.assertEqual(reasons, {msg.IMPORT_NOT_IN_LIBRARY, msg.IMPORT_UNKNOWN_GAME, msg.IMPORT_UNKNOWN_PLATFORM})
+
+    def test_a_price_that_is_already_there_is_kept_and_a_dry_run_adds_nothing(self):
+        data = parse(library=[self.LIBRARY], prices=[{"game_id": "doom", "platform": "pc", "amount_cents": 1999}])
+        self.assertEqual(self.run_import(data, dry_run=True)["prices"]["imported"], 1)
+        self.assertEqual(self.count(models.UserGamePrice), 0)
+        self.run_import(data)
+        self.db.query(models.UserGamePrice).update({"amount_cents": 4000})
+        self.db.commit()
+        again = self.run_import(data)
+        self.assertEqual(again["prices"], {"imported": 0, "existing": 1, "skipped": 0})
+        self.assertEqual(self.db.query(models.UserGamePrice).one().amount_cents, 4000)  # what the player had is not overwritten
+
+    def test_an_absurd_price_is_refused_by_the_format(self):
+        for bad in (-1, 1_000_001):
+            with self.assertRaises(ValidationError, msg=bad):
+                parse(prices=[{"game_id": "doom", "platform": "pc", "amount_cents": bad}])
+
     def test_sessions_are_added_with_their_library_entry_and_a_recomputed_duration(self):
         body = session(start=at(2, 10), hours=2)
         body["duration_seconds"] = 5  # a lie: the file's value is never trusted
