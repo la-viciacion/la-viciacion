@@ -4,9 +4,9 @@ from sqlalchemy.orm import Session
 
 from .. import auth
 from ..auth import get_db
-from ..crud import game_catalog, game_overview, games
+from ..crud import game_catalog, game_overview, game_series, games
 from ..database import models, schemas
-from ..utils import messages
+from ..utils import messages, rawg_series
 from ..utils import my_utils as utils
 from ..utils.logger import LogManager
 
@@ -81,6 +81,25 @@ def get_game_overview(
     if found is None:
         raise HTTPException(status_code=404, detail="Game not exists")
     return found
+
+
+@router.get("/{game_id}/series")
+async def get_game_series(
+    game_id: str,
+    current_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """The saga of a game: the other games of its RAWG series and the game itself in order of release, each with what
+    you have of it and how many players have it. RAWG is asked (and the answer kept in memory for a day, see
+    utils/rawg_series.py), so it is a request of its own: `available` is false when the game has no RAWG id or RAWG
+    cannot be asked, and the page shows no saga then."""
+    game = await run_in_threadpool(db.get, models.Game, game_id)
+    if game is None:
+        raise HTTPException(status_code=404, detail="Game not exists")
+    series = await rawg_series.series_of(game.rawg_id) if game.rawg_id else None
+    if series is None:
+        return {"available": False, "games": []}
+    return {"available": True, "games": await run_in_threadpool(game_series.saga, db, game, current_user.id, series)}
 
 
 @router.post("/", response_model=schemas.Game, status_code=201)

@@ -83,7 +83,7 @@ TOPICS = (
         "perfil_ajustes", "Perfil y ajustes", ("perfil", "ajustes", "foto", "ciudad", "nacimiento", "datos", "exportar", "descargar", "cifras", "biblioteca"),
         "perfil.md",
         "Mi perfil tiene Resumen (horas, días, juegos, completados, rachas y logros por temporada, más jugados, retos y la lista de juegos con sus botones), "
-        "En la página de otro jugador, «Tu biblioteca y la de ese jugador» (juegos de los dos, solo tuyos y solo suyos), y en la página de un juego, tu ritmo frente al grupo y a HowLongToBeat. Mis juegos (toda la biblioteca con filtros por estado: en curso, pausado, pendiente, completado, abandonado; una tarjeta «¿Qué juego sigo?» con los casi terminados, los olvidados y los cortos; y «Puntuar al azar») y Ajustes. En Ajustes: los datos propios (nombre, usuario, email, Telegram ID, "
+        "En la página de otro jugador, «Tu biblioteca y la de ese jugador» (juegos de los dos, solo tuyos y solo suyos), y en la página de un juego, tu ritmo frente al grupo y a HowLongToBeat y, si es de una saga, las entregas en orden con lo que tienes de cada una. Mis juegos (toda la biblioteca con filtros por estado: en curso, pausado, pendiente, completado, abandonado; una tarjeta «¿Qué juego sigo?» con los casi terminados, los olvidados y los cortos; y «Puntuar al azar») y Ajustes. En Ajustes: los datos propios (nombre, usuario, email, Telegram ID, "
         "ciudad y fecha de nacimiento; estas dos solo sirven para algunos logros secretos y las ven solo uno mismo y los administradores), la contraseña, las "
         "notificaciones y «Descargar mis datos», un .json con las sesiones, la biblioteca, las notas, la lista de deseados y los logros. La foto se cambia "
         "con «Cambiar foto» (PNG o JPG).",
