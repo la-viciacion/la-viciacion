@@ -74,8 +74,9 @@ function draw(data) {
           <div class="gm-genres">${game.genres.map((genre) => html`<span class="pf-tag muted">${genre}</span>`)}</div>
           ${tags.length ? html`<div class="gm-genres gm-tags" aria-label="Etiquetas">${tagPills(tags.slice(0, TAGS_SHOWN))}${tags.length > TAGS_SHOWN
             ? html`<button type="button" class="pf-tag muted gm-more" id="gmMoreTags" title="Ver todas las etiquetas">+${tags.length - TAGS_SHOWN}</button>` : ''}</div>` : ''}
-          ${details ? html`<div class="pf-sub">${details}</div>` : ''}
+          ${details ? html`<div class="pf-sub gm-details">${details}</div>` : ''}
           <div id="gmMeta"></div>
+          <div id="gmPlatforms"></div>
           <div class="gm-actions" id="gmActions">
             <span id="gmOutside" class="gm-outside"></span>
             ${game.slug ? html`<a class="pf-btn gm-rawg-btn" href="https://rawg.io/games/${encodeURIComponent(game.slug)}" target="_blank" rel="noopener noreferrer">Ver en RAWG <span aria-hidden="true">↗</span></a>` : ''}
@@ -119,7 +120,7 @@ function draw(data) {
 
   hydratePhotos(main);
   main.querySelector('#gmMoreTags')?.addEventListener('click', () => mount(main.querySelector('.gm-tags'), html`${tagPills(tags)}`));
-  showExtras({ head: main.querySelector('#gmOutside'), desc: main.querySelector('#gmDesc'), meta: main.querySelector('#gmMeta'), media: main.querySelector('#gmMedia') }, game); // Steam and RAWG too
+  showExtras({ head: main.querySelector('#gmOutside'), desc: main.querySelector('#gmDesc'), meta: main.querySelector('#gmMeta'), platforms: main.querySelector('#gmPlatforms'), media: main.querySelector('#gmMedia') }, game); // Steam and RAWG too
   showSaga(main.querySelector('#gmSaga'), game.id); // RAWG may take a while: the page does not wait for it
   main.querySelector('#gmBack').addEventListener('click', back);
   main.querySelector('#gmWish')?.addEventListener('click', () => toggleWish(game.id, data.wished));

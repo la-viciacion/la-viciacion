@@ -25,13 +25,7 @@ const facts = (x) => [
 ];
 
 // The publisher only when it is not the developer too ("Rockstar Games" under "Rockstar Studios" says something; "Hades" by itself does not)
-const metaLines = (x, dev) => {
-  const publishers = (x.publishers || []).filter((p) => !dev || !dev.toLowerCase().includes(p.toLowerCase()));
-  return [
-    publishers.length ? `Editor: ${publishers.join(', ')}` : '',
-    x.platforms?.length ? `Disponible en: ${x.platforms.join(' · ')}` : '',
-  ].filter(Boolean);
-};
+const publishersOf = (x, dev) => (x.publishers || []).filter((p) => !dev || !dev.toLowerCase().includes(p.toLowerCase()));
 
 const hasFacts = (x) => x.metacritic || x.esrb;
 const hasMedia = (x) => (x.trailer && safe(x.trailer.url)) || x.screenshots?.some((s) => safe(s.full));
@@ -46,7 +40,7 @@ function trailerButton(trailer) {
 }
 
 /** Fills `head` (the small facts) and `media` (the card) for the game; nothing at all when there is nothing to say. */
-export async function showExtras({ head, desc, meta, media }, game) {
+export async function showExtras({ head, desc, meta, platforms, media }, game) {
   let x;
   try {
     x = await api(`/games/${encodeURIComponent(game.id)}/extras`);
@@ -59,8 +53,9 @@ export async function showExtras({ head, desc, meta, media }, game) {
     mount(desc, html`<p class="gm-desc" title="Pulsa para ver todo el texto">${x.description_lang === 'en' ? html`<span class="pf-tag muted" title="RAWG la tiene solo en inglés">En inglés</span> ` : ''}${x.description}</p>`);
     desc.onclick = () => desc.firstElementChild.classList.add('open');
   }
-  const lines = metaLines(x, game.dev);
-  if (lines.length) mount(meta, html`<div class="pf-sub gm-meta">${lines.map((line) => html`<div>${line}</div>`)}</div>`);
+  const publishers = publishersOf(x, game.dev);
+  if (publishers.length) mount(meta, html`<div class="pf-sub gm-publisher">Editor: ${publishers.join(', ')}</div>`);
+  if (x.platforms?.length) mount(platforms, html`<div class="gm-genres gm-platforms" aria-label="Plataformas">${x.platforms.map((name) => html`<span class="pf-tag gm-platform">${name}</span>`)}</div>`);
   if (!hasMedia(x)) return;
 
   const trailer = x.trailer && safe(x.trailer.url) ? x.trailer : null;

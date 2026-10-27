@@ -410,7 +410,7 @@
   #gmMediaBlock .gm-carousel { grid-column: 1 / -1; grid-row: 2; }
   #gmMediaBlock .gm-credit { grid-column: 1 / -1; grid-row: 3; }
 }
-.gm-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-top: 10px; }
+.gm-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-top: 6px; }
 .gm-outside { display: contents; }
 .gm-fact { display: inline-flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-secondary); }
 .gm-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 38px; height: 38px; padding: 0 6px; border-radius: 8px; font-size: 1.05rem; font-weight: 800; color: #0a0a14; }
@@ -423,7 +423,8 @@
 /* A long description (RAWG's can be a page) would push everything down: a few lines, the rest one tap away */
 .gm-desc:not(.open) { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; cursor: pointer; }
 @media (min-width: 1000px) { .gm-desc:not(.open) { -webkit-line-clamp: 6; } }
-.gm-meta { margin: 6px 0; line-height: 1.5; }
+.gm-details, .gm-publisher { margin: 6px 0; line-height: 1.5; } /* the same 6px as the pills above and below */
+.pf-tag.gm-platform { background: var(--bg-card-hover); color: var(--text-secondary); }
 .gm-trailer { position: relative; display: block; width: 100%; max-width: 560px; aspect-ratio: 16 / 9; padding: 0; border: 0; border-radius: var(--radius-sm); background: var(--bg-surface); overflow: hidden; cursor: pointer; }
 .gm-trailer img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .gm-play { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 2.2rem; color: #fff; background: rgba(0, 0, 0, 0.35); }

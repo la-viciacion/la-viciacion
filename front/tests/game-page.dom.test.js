@@ -323,12 +323,13 @@ test('Metacritic is green from 75, yellow from 50 and red below, and an unknown 
   assert.match(document.querySelector('#gmOutside').textContent, /Algo raro/);
 });
 
-test('the publisher (unless it is the developer) and the platforms are one small block under the details', async () => {
+test('the publisher (unless it is the developer) is a line and the platforms are small pills under the details', async () => {
   await openWithExtras(EXTRAS);
-  const lines = [...document.querySelectorAll('#gmMeta .gm-meta div')].map((d) => d.textContent);
-  assert.deepEqual(lines, ['Editor: Extremely OK Games', 'Disponible en: PC · Nintendo Switch']); // "maddy" is the developer ("Maddy")
+  assert.equal(document.querySelector('#gmMeta').textContent, 'Editor: Extremely OK Games'); // "maddy" is the developer ("Maddy")
+  assert.deepEqual([...document.querySelectorAll('#gmPlatforms .gm-platform')].map((p) => p.textContent), ['PC', 'Nintendo Switch']);
   await openWithExtras({ ...EXTRAS, publishers: [], platforms: [] });
   assert.equal(document.querySelector('#gmMeta').children.length, 0);
+  assert.equal(document.querySelector('#gmPlatforms').children.length, 0);
 });
 
 test('a description in English is marked as such and one in Spanish is not', async () => {
