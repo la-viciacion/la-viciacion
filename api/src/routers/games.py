@@ -6,7 +6,7 @@ from .. import auth
 from ..auth import get_db
 from ..crud import game_catalog, game_overview, game_series, games
 from ..database import models, schemas
-from ..utils import messages, rawg_series
+from ..utils import game_extras, messages, rawg_series
 from ..utils import my_utils as utils
 from ..utils.logger import LogManager
 
@@ -100,6 +100,25 @@ async def get_game_series(
     if series is None:
         return {"available": False, "games": []}
     return {"available": True, "games": await run_in_threadpool(game_series.saga, db, game, current_user.id, series)}
+
+
+@router.get("/{game_id}/extras")
+async def get_game_extras(
+    game_id: str,
+    current_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """What Steam and RAWG say about a game: trailer, screenshots, a short description in Spanish, Metacritic, the
+    share of positive Steam reviews, the age rating and the official site. They are asked (and the answer kept in memory
+    for a day, see utils/game_extras.py), so it is a request of its own: `available` is false when the game has neither
+    a Steam nor a RAWG id or nobody can be asked, and the page shows no card then."""
+    game = await run_in_threadpool(db.get, models.Game, game_id)
+    if game is None:
+        raise HTTPException(status_code=404, detail="Game not exists")
+    extras = await game_extras.extras_of(game.rawg_id, game.steam_id)
+    if extras is None:
+        return {"available": False}
+    return {"available": True, **extras}
 
 
 @router.post("/", response_model=schemas.Game, status_code=201)
