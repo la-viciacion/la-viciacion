@@ -401,7 +401,8 @@
 .gm-top > #gmMedia .ach-block { margin-bottom: 16px; }
 @media (min-width: 1000px) {
   /* The trailer sits beside the header and the screenshots run below it, so the media block dissolves into the grid */
-  .gm-top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 440px); gap: 8px 24px; align-items: start; }
+  .gm-top { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px 24px; align-items: start; }
+  .gm-top.has-trailer { grid-template-columns: minmax(0, 1fr) minmax(300px, 440px); }
   .gm-top .gm-head { align-items: flex-start; grid-column: 1; grid-row: 1; }
   .gm-top > #gmMedia, #gmMediaBlock, #gmMediaBlock .ach-content, #gmMediaBlock .gm-media { display: contents; }
   #gmMediaBlock .ach-fold { display: none; }
@@ -419,10 +420,10 @@
 .gm-badge.age { background: transparent; border: 2px solid var(--text-secondary); color: var(--text-primary); font-size: 0.95rem; }
 .gm-media { display: flex; flex-direction: column; gap: 12px; }
 .gm-desc { margin: 4px 0 8px; line-height: 1.5; color: var(--text-secondary); }
-@media (max-width: 999px) {
-  /* A long description would push everything down on a phone: four lines, the rest one tap away */
-  .gm-desc:not(.open) { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; cursor: pointer; }
-}
+/* A long description (RAWG's can be a page) would push everything down: a few lines, the rest one tap away */
+.gm-desc:not(.open) { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; cursor: pointer; }
+@media (min-width: 1000px) { .gm-desc:not(.open) { -webkit-line-clamp: 6; } }
+.gm-meta { margin: 6px 0; line-height: 1.5; }
 .gm-trailer { position: relative; display: block; width: 100%; max-width: 560px; aspect-ratio: 16 / 9; padding: 0; border: 0; border-radius: var(--radius-sm); background: var(--bg-surface); overflow: hidden; cursor: pointer; }
 .gm-trailer img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .gm-play { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 2.2rem; color: #fff; background: rgba(0, 0, 0, 0.35); }
