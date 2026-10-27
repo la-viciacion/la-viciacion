@@ -131,3 +131,39 @@ test('the pace card tells the time of the viewer against the group and HowLongTo
   await settle();
   assert.equal(document.querySelector('#gmPace'), null);
 });
+
+const SAGA = {
+  available: true,
+  games: [
+    { rawg_id: 100, name: 'Celeste <b>', slug: 'celeste', image_url: null, released: '2018-01-25', game_id: 'celeste', current: true, next: false, mine: { has: true, completed: true, seconds: 7200 }, players: 2 },
+    { rawg_id: 300, name: 'Celeste Remix', slug: 'celeste-remix', image_url: null, released: '2020-01-01', game_id: null, current: false, next: true, mine: null, players: 0 },
+    { rawg_id: 400, name: 'Celeste 2', slug: null, image_url: null, released: null, game_id: 'celeste-2', current: false, next: false, mine: null, players: 1 },
+  ],
+};
+
+test('the saga card lists the games in order with what you have, links the catalogue and RAWG, and flags the next one', async () => {
+  installApi({ 'GET /games/celeste/series': SAGA, 'GET /games/celeste/overview': OVERVIEW, 'GET /users/photo/': json({ detail: 'no' }, 404) });
+  await page.render({ main: main(), user: { id: 1, username: 'ana' } });
+  await settle();
+  const rows = [...document.querySelectorAll('#gmSaga .sg-game')];
+  assert.equal(rows.length, 3);
+  assert.match(document.querySelector('#gmSaga').textContent, /Has completado 1 de 3\. Siguiente: Celeste Remix\./);
+  assert.equal(rows[0].classList.contains('current'), true);
+  assert.equal(rows[0].querySelectorAll('b').length, 0); // text, never markup
+  assert.match(rows[0].textContent, /2018.*Esta página.*Completado.*2 jugadores lo tienen/s);
+  assert.equal(rows[1].querySelector('a').getAttribute('href'), 'https://rawg.io/games/celeste-remix');
+  assert.equal(rows[1].querySelector('a').getAttribute('target'), '_blank');
+  assert.match(rows[1].textContent, /Siguiente.*No está en la biblioteca del grupo/s);
+  assert.equal(rows[2].querySelector('a').getAttribute('href'), '#/game/celeste-2');
+  assert.match(rows[2].textContent, /—.*No lo tienes.*1 jugador lo tiene/s);
+});
+
+test('with no saga, or RAWG not available, the card is not there and the page works the same', async () => {
+  for (const answer of [{ available: false, games: [] }, { available: true, games: [] }, () => { throw new Error('boom'); }]) {
+    installApi({ 'GET /games/celeste/series': answer, 'GET /games/celeste/overview': OVERVIEW, 'GET /users/photo/': json({ detail: 'no' }, 404) });
+    await page.render({ main: main(), user: { id: 1, username: 'ana' } });
+    await settle();
+    assert.equal(document.querySelector('#gmSaga').children.length, 0);
+    assert.equal(document.querySelector('h1').textContent, 'Celeste <b>');
+  }
+});
