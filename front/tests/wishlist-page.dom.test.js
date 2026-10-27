@@ -48,6 +48,15 @@ test('it names who else wants a game', () => {
   assert.deepEqual(text('.gc-body .pf-sub'), ['Lo quiere Bea']);
 });
 
+test('a game already in your library stays on the list with a tag', async () => {
+  lists = { upcoming: [GAME('early', 'Early', { in_library: true })], wanted: [GAME('out', 'Out', { in_library: false })] };
+  await page.render({ main: main(), user: { id: 1, username: 'ana' } });
+  await settle();
+  assert.deepEqual(text('.gc-tags .pf-tag.done'), ['Ya en tu biblioteca']);
+  assert.equal(document.querySelectorAll('.gc-card')[0].querySelectorAll('.pf-tag.done').length, 1);
+  assert.equal(document.querySelectorAll('.gc-card')[1].querySelectorAll('.pf-tag.done').length, 0);
+});
+
 test('removing a game asks the API and redraws the list', async () => {
   document.querySelector('[data-remove="soon"]').click();
   await settle();

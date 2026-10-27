@@ -54,12 +54,23 @@ class WishlistQueryTests(unittest.TestCase):
         self.assertEqual([g["id"] for g in body["wanted"]], ["today", "out"])
         self.assertEqual(body["upcoming"][0]["days_until"], 58)
 
-    def test_a_game_that_is_in_the_library_leaves_the_list_by_itself(self):
+    def test_a_game_that_is_in_the_library_stays_on_the_list_and_says_so(self):
         self.wish(1, "out")
+        self.wish(1, "later")
         self.db.add(models.UserGame(user_id=1, game_id="out", started_date=TODAY, platform=None))
         self.db.commit()
-        self.assertEqual(wishlist.wishlist(self.db, 1, TODAY), {"upcoming": [], "wanted": []})
-        self.assertEqual(wishlist.wished_ids(self.db, 1), set())
+        body = wishlist.wishlist(self.db, 1, TODAY)
+        self.assertEqual([(g["id"], g["in_library"]) for g in body["upcoming"] + body["wanted"]], [("later", False), ("out", True)])
+        self.assertEqual(wishlist.wished_ids(self.db, 1), {"out", "later"})
+
+    def test_a_player_who_already_plays_it_still_counts_for_who_wants_a_game_and_in_the_calendar(self):
+        self.wish(1, "soon")
+        self.wish(2, "soon")
+        self.db.add(models.UserGame(user_id=2, game_id="soon", started_date=TODAY, platform=None))
+        self.db.commit()
+        self.assertEqual([w["name"] for w in wishlist.wishlist(self.db, 1, TODAY)["upcoming"][0]["wanted_by"]], ["Bea"])
+        soon = next(g for g in wishlist.releases(self.db, 1, 2026, 12, TODAY)["releases"] if g["id"] == "soon")
+        self.assertEqual([w["name"] for w in soon["wanted_by"]], ["Ana", "Bea"])
 
     def test_it_says_who_else_wants_a_game_but_not_inactive_players_nor_the_viewer(self):
         for user in (1, 2, 3):
@@ -85,12 +96,13 @@ class WishlistQueryTests(unittest.TestCase):
             self.wish(1, game)
         self.assertEqual({g.id for g in wishlist.to_refresh(self.db, TODAY)}, {"soon", "tba", "today"})
 
-    def test_a_game_nobody_still_waits_for_is_not_refreshed(self):
+    def test_a_game_nobody_waits_for_is_not_refreshed_but_one_already_played_by_its_wisher_is(self):
         self.wish(3, "soon")  # an inactive player
+        self.assertEqual(wishlist.to_refresh(self.db, TODAY), [])
         self.wish(2, "later")
         self.db.add(models.UserGame(user_id=2, game_id="later", started_date=TODAY, platform=None))
         self.db.commit()
-        self.assertEqual(wishlist.to_refresh(self.db, TODAY), [])
+        self.assertEqual([g.id for g in wishlist.to_refresh(self.db, TODAY)], ["later"])
 
     def test_the_calendar_lists_every_game_of_the_month_wanted_or_not(self):
         self.wish(1, "soon")
@@ -183,6 +195,27 @@ class EveNoticeTests(unittest.TestCase):
         db.commit()
         found = wishlist.wished_releases_between(db, tomorrow, tomorrow)
         self.assertEqual([(g.id, names) for g, names in found], [("a", ["Bea"]), ("b", ["Ana", "Bea"])])
+
+    def test_the_notices_keep_the_players_who_already_have_the_game(self):
+        db = make_session()
+        tomorrow = TODAY + datetime.timedelta(days=1)
+        db.add_all([
+            models.User(id=1, username="ana", name="Ana", is_active=1),
+            models.User(id=2, username="bea", name="Bea", is_active=1),
+            models.Game(id="a", name="Alpha", release_date=tomorrow, rawg_id=1),
+            models.Game(id="b", name="Bravo", release_date=tomorrow, rawg_id=2),
+        ])
+        db.commit()
+        for user_id, game_id in ((1, "a"), (2, "a"), (1, "b")):
+            wishlist.add(db, user_id, game_id)
+        db.add_all([
+            models.UserGame(user_id=1, game_id="a", platform="PC", completed=0, started_date=TODAY),
+            models.UserGame(user_id=1, game_id="b", platform="PC", completed=0, started_date=TODAY),
+        ])
+        db.commit()
+        found = wishlist.wished_releases_between(db, tomorrow, tomorrow)
+        self.assertEqual([(g.id, names) for g, names in found], [("a", ["Ana", "Bea"]), ("b", ["Ana"])])
+        self.assertEqual([(user.id, game.id) for user, game, _ in wishlist.releases_on(db, tomorrow)], [(1, "a"), (1, "b"), (2, "a")])
 
     def test_a_range_lists_the_wished_releases_by_date_and_leaves_out_the_days_around_it(self):
         db = make_session()

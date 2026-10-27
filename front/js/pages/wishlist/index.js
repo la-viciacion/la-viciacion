@@ -1,5 +1,5 @@
 // Wishlist page (#/wishlist): the games you want to play, with the ones that are not out yet first (the nearest
-// release on top). GET /group/wishlist; only the wish is stored, a game leaves the list when you start playing it.
+// release on top). GET /group/wishlist; only the wish is stored: a game stays until you remove it, tagged when it already is in your library.
 // A game is added from RAWG with the same search as the Juegos page, so an announced game is there too.
 import { api } from '../../lib/api.js';
 import { html, mount } from '../../lib/html.js';
@@ -22,7 +22,7 @@ const card = (g) => html`
         : html`<div class="gc-cover gc-cover-placeholder" aria-hidden="true">🎮</div>`}
       <div class="gc-body">
         <div class="gc-name">${g.name}</div>
-        <div class="gc-tags">${g.genres.slice(0, 2).map((genre) => html`<span class="pf-tag muted">${genre}</span>`)}</div>
+        <div class="gc-tags">${g.in_library ? html`<span class="pf-tag done">Ya en tu biblioteca</span>` : ''}${g.genres.slice(0, 2).map((genre) => html`<span class="pf-tag muted">${genre}</span>`)}</div>
         <div class="gc-meta"><span>${releaseLine(g)}</span></div>
         ${g.wanted_by.length ? html`<div class="pf-sub">${wantedBy(g.wanted_by)}</div>` : ''}
       </div>
