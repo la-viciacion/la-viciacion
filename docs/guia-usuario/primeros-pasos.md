@@ -27,7 +27,7 @@ El botón de la esquina superior izquierda abre el **menú lateral**, con todas 
 - **Administración**: solo si eres administrador.
 - **Cerrar sesión**, al final.
 
-En la barra superior tienes siempre el acceso a **Inicio** y a tu **perfil**, y a la derecha de la marca, el aviso de [quién está jugando ahora](grupo.md).
+En la barra superior tienes siempre el acceso a **Inicio**, a tu **perfil** y a la campana de **[Avisos](notificaciones.md#avisos-dentro-de-la-app)** (con un número cuando tienes alguno sin leer), y a la derecha de la marca, el aviso de [quién está jugando ahora](grupo.md).
 
 </div>
 </div>

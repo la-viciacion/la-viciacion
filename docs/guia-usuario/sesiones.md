@@ -6,7 +6,7 @@ Una **sesión** es un rato jugando a un juego en una plataforma. Es lo único qu
 
 Es la forma habitual: pulsas al empezar y paras al terminar.
 
-1. En **Inicio**, pulsa **Nuevo timer**.
+1. En **Inicio**, pulsa **Nuevo timer**. Si ya has jugado antes, la tarjeta te ofrece primero **Seguir donde lo dejaste**: tu último juego, cuánto hace que lo jugaste y las horas que llevas, con un botón **Continuar** que arranca el timer con la misma plataforma de un toque. **+ Nuevo timer** sigue a mano para otro juego.
 2. Busca el juego en el catálogo del grupo y elígelo.
 3. Elige la **plataforma**. Si ya lo habías jugado, la que usaste la última vez aparece la primera.
 4. El timer empieza a correr. Cuando termines, pulsa **Detener**; si te has equivocado y no quieres que cuente, **Cancelar**.
