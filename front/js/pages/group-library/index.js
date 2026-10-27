@@ -4,6 +4,7 @@
 // A row of pills at the top reaches every section at once (it unfolds the section and scrolls to it), and each section
 // folds on its own; what the viewer folded is remembered in this browser.
 import { api } from '../../lib/api.js';
+import { createFolds, showFold, toggleFold } from '../../lib/fold.js';
 import { formatDuration } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
 import { gameHref } from '../../lib/links.js';
@@ -16,25 +17,7 @@ export const active = 'library';
 let main;
 let data;
 let value = null; // the group's cost per hour (GET /group/value), or null when it could not be loaded
-const FOLDED_KEY = 'gl-folded';
-let folded = new Set(); // the keys of the sections the viewer has folded: they start open
-
-// Per-viewer convenience only: a browser that refuses storage just forgets.
-function loadFolded() {
-  try {
-    return new Set(JSON.parse(localStorage.getItem(FOLDED_KEY) || '[]'));
-  } catch {
-    return new Set();
-  }
-}
-
-function saveFolded() {
-  try {
-    localStorage.setItem(FOLDED_KEY, JSON.stringify([...folded]));
-  } catch {
-    // nothing to do: it is not remembered
-  }
-}
+let folded = createFolds('gl-folded'); // the sections the viewer has folded: they start open
 
 const tile = (label, value) => html`<div class="pf-stat"><div class="pf-stat-value">${value}</div><div class="pf-stat-label">${label}</div></div>`;
 
@@ -143,27 +126,19 @@ function draw(d) {
 function onClick(e) {
   const fold = e.target.closest('[data-fold]');
   if (fold) {
-    const key = fold.dataset.fold;
-    if (!folded.delete(key)) folded.add(key);
-    fold.closest('.gl-section').classList.toggle('folded', folded.has(key));
-    fold.setAttribute('aria-expanded', String(!folded.has(key)));
-    saveFolded();
+    toggleFold(folded, fold.dataset.fold, fold.closest('.gl-section'), fold);
     return;
   }
   const go = e.target.closest('[data-go]');
   if (!go) return;
   const target = main.querySelector(`#gl-${go.dataset.go}`);
-  if (folded.delete(go.dataset.go)) { // a folded section opens when it is asked for
-    target.classList.remove('folded');
-    target.querySelector('[data-fold]').setAttribute('aria-expanded', 'true');
-    saveFolded();
-  }
+  if (folded.set(go.dataset.go, false)) showFold(target, target.querySelector('[data-fold]'), false); // a folded section opens when it is asked for
   target.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 export async function render(ctx) {
   main = ctx.main;
-  folded = loadFolded();
+  folded = createFolds('gl-folded');
   main.onclick = onClick;
   mount(main, html`<div class="loading-spinner">Cargando la biblioteca...</div>`);
   try {

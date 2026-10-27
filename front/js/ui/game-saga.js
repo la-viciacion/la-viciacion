@@ -3,29 +3,13 @@
 // drawn; when there is no saga, or it cannot be loaded, the card is simply not there. It folds (a long saga is long),
 // and the choice is remembered in this browser.
 import { api } from '../lib/api.js';
+import { createFolds, toggleFold } from '../lib/fold.js';
 import { html, mount } from '../lib/html.js';
 import { gameHref } from '../lib/links.js';
 import { newestFirst, releaseYear, sagaSummary, standing } from '../lib/saga.js';
 import { iconChevron } from './icons.js';
 
-const FOLDED_KEY = 'gm-saga-folded';
-
-// Per-viewer convenience only: a browser that refuses storage just starts open.
-const isFolded = () => {
-  try {
-    return localStorage.getItem(FOLDED_KEY) === '1';
-  } catch {
-    return false;
-  }
-};
-
-const rememberFolded = (folded) => {
-  try {
-    localStorage.setItem(FOLDED_KEY, folded ? '1' : '0');
-  } catch {
-    // nothing to do: it is not remembered
-  }
-};
+const KEY = 'saga';
 
 function row(g) {
   const state = standing(g);
@@ -56,7 +40,8 @@ export async function showSaga(el, gameId) {
     return;
   }
   if (!data?.available || !data.games.length) return;
-  const folded = isFolded();
+  const folds = createFolds('gm-saga-folded');
+  const folded = folds.has(KEY);
   mount(el, html`
     <section class="ach-block ${folded ? 'folded' : ''}" id="gmSagaBlock">
       <button type="button" class="section-header ach-fold" data-fold aria-expanded="${String(!folded)}">
@@ -72,10 +57,6 @@ export async function showSaga(el, gameId) {
   el.onclick = (e) => {
     const fold = e.target.closest('[data-fold]');
     if (!fold) return;
-    const block = el.querySelector('#gmSagaBlock');
-    const nowFolded = !block.classList.contains('folded');
-    block.classList.toggle('folded', nowFolded);
-    fold.setAttribute('aria-expanded', String(!nowFolded));
-    rememberFolded(nowFolded);
+    toggleFold(folds, KEY, el.querySelector('#gmSagaBlock'), fold);
   };
 }

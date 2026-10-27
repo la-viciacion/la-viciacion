@@ -207,7 +207,7 @@ test('the saga folds, says how many games it has and remembers it', async () => 
   assert.equal(block().classList.contains('folded'), true); // remembered
   document.querySelector('#gmSaga [data-fold]').click();
   assert.equal(block().classList.contains('folded'), false);
-  assert.equal(localStorage.getItem('gm-saga-folded'), '0');
+  assert.deepEqual(JSON.parse(localStorage.getItem('gm-saga-folded')), []);
 });
 
 test('the cost per hour of the group is a figure of the game when the API gives it, and not otherwise', async () => {
