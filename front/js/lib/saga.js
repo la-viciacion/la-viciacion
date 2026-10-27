@@ -4,6 +4,12 @@ import { formatDuration } from './format.js';
 /** The year of a "YYYY-MM-DD" date, or "" when there is none. */
 export const releaseYear = (released) => (released ? released.slice(0, 4) : '');
 
+/** The games of the saga from the most recent to the oldest, the ones without a date last (the API sends them oldest first,
+ * which is what "next" is worked out from). */
+export function newestFirst(games) {
+  return [...games].sort((a, b) => (!a.released - !b.released) || (b.released || '').localeCompare(a.released || '') || a.name.localeCompare(b.name));
+}
+
 /** Where the viewer stands in one game of the saga: { label, tone } (tone is a pf-tag class: done, live or muted). */
 export function standing(game) {
   if (game.mine?.completed) return { label: 'Completado', tone: 'done' };

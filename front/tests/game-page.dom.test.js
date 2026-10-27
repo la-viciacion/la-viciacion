@@ -141,19 +141,21 @@ const SAGA = {
   ],
 };
 
-test('the saga card lists the games in order with what you have, links the catalogue and RAWG, and flags the next one', async () => {
+test('the saga card lists the games from the newest, with what you have, links the catalogue and RAWG, and flags the next one', async () => {
   installApi({ 'GET /games/celeste/series': SAGA, 'GET /games/celeste/overview': OVERVIEW, 'GET /users/photo/': json({ detail: 'no' }, 404) });
   await page.render({ main: main(), user: { id: 1, username: 'ana' } });
   await settle();
   const rows = [...document.querySelectorAll('#gmSaga .sg-game')];
   assert.equal(rows.length, 3);
   assert.match(document.querySelector('#gmSaga').textContent, /Has completado 1 de 3\. Siguiente: Celeste Remix\./);
-  assert.equal(rows[0].classList.contains('current'), true);
-  assert.equal(rows[0].querySelectorAll('b').length, 0); // text, never markup
-  assert.match(rows[0].textContent, /2018.*Esta página.*Completado.*2 jugadores lo tienen/s);
-  assert.equal(rows[1].querySelector('a').getAttribute('href'), 'https://rawg.io/games/celeste-remix');
-  assert.equal(rows[1].querySelector('a').getAttribute('target'), '_blank');
-  assert.match(rows[1].textContent, /Siguiente.*No está en la biblioteca del grupo/s);
+  // the newest first (2020, then 2018), the one without a date last
+  assert.deepEqual(rows.map((r) => r.dataset.rawg), ['300', '100', '400']);
+  assert.equal(rows[1].classList.contains('current'), true);
+  assert.equal(rows[1].querySelectorAll('b').length, 0); // text, never markup
+  assert.match(rows[1].textContent, /2018.*Esta página.*Completado.*2 jugadores lo tienen/s);
+  assert.equal(rows[0].querySelector('a').getAttribute('href'), 'https://rawg.io/games/celeste-remix');
+  assert.equal(rows[0].querySelector('a').getAttribute('target'), '_blank');
+  assert.match(rows[0].textContent, /Siguiente.*No está en la biblioteca del grupo/s);
   assert.equal(rows[2].querySelector('a').getAttribute('href'), '#/game/celeste-2');
   assert.match(rows[2].textContent, /—.*No lo tienes.*1 jugador lo tiene/s);
 });

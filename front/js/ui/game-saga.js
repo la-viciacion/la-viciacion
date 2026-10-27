@@ -5,7 +5,7 @@
 import { api } from '../lib/api.js';
 import { html, mount } from '../lib/html.js';
 import { gameHref } from '../lib/links.js';
-import { releaseYear, sagaSummary, standing } from '../lib/saga.js';
+import { newestFirst, releaseYear, sagaSummary, standing } from '../lib/saga.js';
 import { iconChevron } from './icons.js';
 
 const FOLDED_KEY = 'gm-saga-folded';
@@ -65,7 +65,7 @@ export async function showSaga(el, gameId) {
       <div class="ach-content">
         <div class="pf-card">
           <div class="pf-sub sg-summary">${sagaSummary(data.games)}</div>
-          <ol class="sg-games">${data.games.map(row)}</ol>
+          <ol class="sg-games">${newestFirst(data.games).map(row)}</ol>
         </div>
       </div>
     </section>`);
