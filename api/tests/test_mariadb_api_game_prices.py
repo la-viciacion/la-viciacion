@@ -1,7 +1,9 @@
 """The prices of the games through real requests (MariaDB required, see api_support.py): who can note and read them, what is
 derived and, above all, what the group can and cannot see."""
 import json
+from unittest import mock
 
+from src.crud import game_prices
 from src.database import database, models
 from tests import clock
 from tests.api_support import ApiTestCase
@@ -44,6 +46,19 @@ class NotingTests(PriceTestCase):
         self.assertEqual(self.price(amount=24.99).json(), {"game_id": "hades", "platform": "pc", "amount_cents": 2499})
         self.assertEqual(self.price(amount="29,5").json()["amount_cents"], 2950)  # a comma works, and a second call changes it
         self.assertEqual([tuple(r) for r in self.stored()], [(self.ana, "hades", "pc", 2950)])
+
+    def test_the_same_price_saved_at_the_same_moment_is_updated_not_an_error(self):
+        self.library_entry(self.ana, "hades", TODAY(), "pc")
+        real = game_prices.cents_of
+
+        def rival(amount):  # another request saves its price after this one found none and before it writes
+            with database.SessionLocal() as db:
+                db.add(models.UserGamePrice(user_id=self.ana, game_id="hades", platform="pc", amount_cents=1000))
+                db.commit()
+            return real(amount)
+        with mock.patch.object(game_prices, "cents_of", rival):
+            self.assertEqual(self.price(amount=24.99).status_code, 200)
+        self.assertEqual([tuple(r) for r in self.stored()], [(self.ana, "hades", "pc", 2499)])
 
     def test_each_platform_has_its_own_price_and_a_free_game_is_zero(self):
         self.library_entry(self.ana, "hades", TODAY(), "pc")

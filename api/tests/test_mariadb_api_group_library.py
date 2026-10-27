@@ -2,6 +2,7 @@
 import datetime
 
 from src.database import database, models
+from src.utils import ttl_cache
 from tests import clock
 from tests.api_support import ApiTestCase
 from tests.clock import ago
@@ -34,6 +35,14 @@ class GroupLibraryTests(ApiTestCase):
         with database.SessionLocal() as db:
             db.get(models.UserGame, entry).abandoned_at = when
             db.commit()
+
+    def test_the_answer_is_kept_for_a_while_and_recomputed_after(self):
+        self.library_entry(self.ana, "celeste", TODAY(), "pc")
+        self.assertEqual(self.library().json()["summary"]["games"], 1)
+        self.library_entry(self.bea, "hades", TODAY(), "pc")
+        self.assertEqual(self.library().json()["summary"]["games"], 1)  # still the kept one
+        ttl_cache.clear_all()  # what the passing of the time does
+        self.assertEqual(self.library().json()["summary"]["games"], 2)
 
     def test_it_needs_a_login_and_an_empty_group_has_empty_lists(self):
         self.assertEqual(self.api("GET", "/group/library").status_code, 401)
