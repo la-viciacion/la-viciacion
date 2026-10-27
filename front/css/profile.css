@@ -380,3 +380,11 @@
 .lc-games { list-style: none; margin: 8px 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .lc-side { margin-right: 12px; }
 .gm-pace { display: flex; flex-direction: column; gap: 4px; }
+.gl-note { margin: 0 0 8px; }
+.gl-games { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.gl-game { display: flex; gap: 10px; align-items: center; }
+.gl-bars { display: flex; flex-direction: column; gap: 8px; }
+.gl-bar-row { display: grid; grid-template-columns: 110px minmax(0, 1fr) auto; gap: 10px; align-items: center; font-size: 0.85rem; }
+.gl-bar-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gl-bar { height: 8px; border-radius: 4px; background: var(--bg-surface); overflow: hidden; }
+.gl-bar > i { display: block; height: 100%; background: var(--accent-teal); }
