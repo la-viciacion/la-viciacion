@@ -251,7 +251,7 @@ const openWithExtras = async (extras) => {
   await settle();
 };
 
-test('the outside facts go under the title and the Multimedia card starts folded', async () => {
+test('the outside facts go under the title and the Multimedia card starts open and folds', async () => {
   await openWithExtras(EXTRAS);
   const facts = document.querySelector('#gmOutside').textContent;
   assert.match(facts, /92Metacritic/);
@@ -261,6 +261,9 @@ test('the outside facts go under the title and the Multimedia card starts folded
   // the facts and the RAWG button share one row
   assert.equal(document.querySelector('#gmOutside').parentElement.querySelector('.gm-rawg-btn') !== null, true);
   const block = document.querySelector('#gmMediaBlock');
+  assert.equal(block.classList.contains('folded'), false);
+  assert.equal(document.querySelector('#gmMedia [data-fold]').getAttribute('aria-expanded'), 'true');
+  document.querySelector('#gmMedia [data-fold]').click();
   assert.equal(block.classList.contains('folded'), true);
   document.querySelector('#gmMedia [data-fold]').click();
   assert.equal(block.classList.contains('folded'), false);

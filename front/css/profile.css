@@ -215,8 +215,15 @@
 .ach-block { margin-bottom: 28px; }
 .ach-note { margin: 0 0 12px; }
 .ach-fold { width: 100%; padding: 0; background: none; border: 0; font: inherit; color: inherit; cursor: pointer; text-align: left; }
-.ach-chevron { display: flex; color: var(--text-muted); transition: transform 0.2s ease; }
-.ach-block.folded .ach-chevron { transform: rotate(-90deg); }
+/* The toggle of every foldable section (achievements, group library, saga, media): a labelled pill, so it reads as a control
+   on a phone too. The label follows the state, the arrow points where the section will go: down opens it, up closes it. */
+.ach-chevron { display: inline-flex; align-items: center; gap: 4px; flex: none; padding: 5px 10px 5px 12px; border: 1px solid var(--border); border-radius: var(--radius-pill); background: var(--bg-card); color: var(--text-secondary); font-size: 0.75rem; font-weight: 700; transition: border-color 0.2s ease, color 0.2s ease; }
+.ach-chevron::before { content: 'Ocultar'; }
+.ach-block.folded .ach-chevron::before { content: 'Mostrar'; }
+.ach-chevron svg { width: 18px; height: 18px; transition: transform 0.2s ease; transform: rotate(180deg); }
+.ach-block.folded .ach-chevron svg { transform: none; }
+.ach-fold:hover .ach-chevron, .ach-fold:focus-visible .ach-chevron { border-color: var(--border-accent); color: var(--accent-teal); }
+.ach-fold:focus-visible { outline: 2px solid var(--accent-teal); outline-offset: 4px; border-radius: var(--radius-sm); }
 .ach-block.folded .ach-content { display: none; }
 .ach-block.folded .ach-fold { margin-bottom: 0; }
 .ach-progress { display: flex; flex-direction: column; gap: 4px; }

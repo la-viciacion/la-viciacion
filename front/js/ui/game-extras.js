@@ -2,9 +2,9 @@
 // English, when Steam has none), the publisher and the platforms, a few small facts (Metacritic and the age rating, beside
 // the RAWG button) and a "Multimedia" card with the trailer and a carousel of screenshots.
 // On a wide screen the trailer sits beside the header and the carousel runs below it (profile.css); on a phone the
-// card is one folded block. GET /games/{id}/extras asks Steam and RAWG (the API keeps the answer for a day), so it is loaded apart,
-// after the page is drawn; a game neither knows, or a failure, shows nothing. The card starts folded and the trailer
-// only loads when it is played, so opening a game costs no video.
+// card is one block that folds. GET /games/{id}/extras asks Steam and RAWG (the API keeps the answer for a day), so it is loaded apart,
+// after the page is drawn; a game neither knows, or a failure, shows nothing. The card starts open (on a phone it
+// can be folded, and the choice is not remembered) and the trailer only loads when it is played, so opening a game costs no video.
 import { api } from '../lib/api.js';
 import { createFolds, toggleFold } from '../lib/fold.js';
 import { html, mount } from '../lib/html.js';
@@ -62,10 +62,9 @@ export async function showExtras({ head, desc, meta, platforms, media }, game) {
   if (trailer) media.closest('.gm-top')?.classList.add('has-trailer'); // only then the wide header makes room for it
   const shots = (x.screenshots || []).filter((s) => safe(s.full));
   const folds = createFolds();
-  folds.set(KEY, true); // folded until asked for
   mount(media, html`
-    <section class="ach-block folded" id="gmMediaBlock">
-      <button type="button" class="section-header ach-fold" data-fold aria-expanded="false">
+    <section class="ach-block" id="gmMediaBlock">
+      <button type="button" class="section-header ach-fold" data-fold aria-expanded="true">
         <h2 class="section-title">Multimedia</h2><div class="section-line"></div><span class="ach-chevron" aria-hidden="true">${iconChevron()}</span>
       </button>
       <div class="ach-content">
