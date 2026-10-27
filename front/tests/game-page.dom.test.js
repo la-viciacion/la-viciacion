@@ -167,3 +167,33 @@ test('with no saga, or RAWG not available, the card is not there and the page wo
     assert.equal(document.querySelector('h1').textContent, 'Celeste <b>');
   }
 });
+
+test('the saga comes after who plays the game, so a long one does not push them down', async () => {
+  installApi({ 'GET /games/celeste/series': SAGA, 'GET /games/celeste/overview': OVERVIEW, 'GET /users/photo/': json({ detail: 'no' }, 404) });
+  await page.render({ main: main(), user: { id: 1, username: 'ana' } });
+  await settle();
+  const players = document.querySelector('.gm-players');
+  const saga = document.querySelector('#gmSaga');
+  assert.ok(players.compareDocumentPosition(saga) & window.Node.DOCUMENT_POSITION_FOLLOWING);
+});
+
+test('the saga folds, says how many games it has and remembers it', async () => {
+  localStorage.removeItem('gm-saga-folded');
+  const open = async () => {
+    installApi({ 'GET /games/celeste/series': SAGA, 'GET /games/celeste/overview': OVERVIEW, 'GET /users/photo/': json({ detail: 'no' }, 404) });
+    await page.render({ main: main(), user: { id: 1, username: 'ana' } });
+    await settle();
+  };
+  await open();
+  const block = () => document.querySelector('#gmSagaBlock');
+  assert.equal(document.querySelector('#gmSaga .sg-count').textContent, '3');
+  assert.equal(block().classList.contains('folded'), false);
+  document.querySelector('#gmSaga [data-fold]').click();
+  assert.equal(block().classList.contains('folded'), true);
+  assert.equal(document.querySelector('#gmSaga [data-fold]').getAttribute('aria-expanded'), 'false');
+  await open();
+  assert.equal(block().classList.contains('folded'), true); // remembered
+  document.querySelector('#gmSaga [data-fold]').click();
+  assert.equal(block().classList.contains('folded'), false);
+  assert.equal(localStorage.getItem('gm-saga-folded'), '0');
+});
