@@ -30,6 +30,12 @@ class MediaUrlTests(unittest.TestCase):
 
 
 class ParseSteamTests(unittest.TestCase):
+    def test_a_movie_listed_only_as_streams_uses_its_mp4_path(self):
+        movie = {"id": 256706951, "highlight": True, "thumbnail": "https://shared.akamai.steamstatic.com/p.jpg", "dash_h264": "https://video.akamai.steamstatic.com/a.mpd", "hls_h264": "https://video.akamai.steamstatic.com/a.m3u8"}
+        out = game_extras.parse_steam({"movies": [movie]}, None)
+        self.assertEqual(out["trailer"], {"url": "https://cdn.akamai.steamstatic.com/steam/apps/256706951/movie480.mp4", "poster": "https://shared.akamai.steamstatic.com/p.jpg"})
+        self.assertIsNone(game_extras.parse_steam({"movies": [{"id": 1}]}, None)["trailer"])  # not a Steam movie entry
+
     def test_it_reads_the_description_the_highlighted_trailer_and_the_trusted_screenshots(self):
         out = game_extras.parse_steam(STEAM_PAGE, {"query_summary": {"total_positive": 90, "total_negative": 10}})
         self.assertIn("de culto", out["description"])
