@@ -1,5 +1,5 @@
 // What the world outside says about a game, on its page: the description in Spanish under the title, a few small facts
-// (Metacritic, the age rating, the official site) and a "Multimedia" card with the trailer and a carousel of screenshots.
+// (Metacritic and the age rating, beside the RAWG button) and a "Multimedia" card with the trailer and a carousel of screenshots.
 // On a wide screen the trailer sits beside the header and the carousel runs below it (profile.css); on a phone the
 // card is one folded block. GET /games/{id}/extras asks Steam and RAWG (the API keeps the answer for a day), so it is loaded apart,
 // after the page is drawn; a game neither knows, or a failure, shows nothing. The card starts folded and the trailer
@@ -14,13 +14,16 @@ const KEY = 'media';
 // The API only sends https links from the hosts it trusts; this keeps the page safe whatever it is given
 const safe = (url) => (typeof url === 'string' && url.startsWith('https://') ? url : null);
 
+// Metacritic's own bands: green from 75, yellow from 50, red below
+const metaTone = (score) => (score >= 75 ? 'good' : score >= 50 ? 'mid' : 'bad');
+const ESRB_CODES = { Everyone: 'E', 'Everyone 10+': 'E10+', Teen: 'T', Mature: 'M', 'Adults Only': 'AO', 'Rating Pending': 'RP' };
+
 const facts = (x) => [
-  x.metacritic ? html`<span class="pf-tag muted" title="Nota de la crítica en Metacritic">Metacritic ${x.metacritic}</span>` : '',
-  x.esrb ? html`<span class="pf-tag muted" title="Clasificación por edades (ESRB)">${x.esrb}</span>` : '',
-  safe(x.website) ? html`<a class="game-link" href="${x.website}" target="_blank" rel="noopener noreferrer">Web oficial ↗</a>` : '',
+  x.metacritic ? html`<span class="gm-fact" title="Nota de la crítica en Metacritic"><b class="gm-badge ${metaTone(x.metacritic)}">${x.metacritic}</b><span>Metacritic</span></span>` : '',
+  x.esrb ? html`<span class="gm-fact" title="Clasificación por edades (ESRB)"><b class="gm-badge age">${ESRB_CODES[x.esrb] || '?'}</b><span>${x.esrb}</span></span>` : '',
 ];
 
-const hasFacts = (x) => x.metacritic || x.esrb || safe(x.website);
+const hasFacts = (x) => x.metacritic || x.esrb;
 const hasMedia = (x) => (x.trailer && safe(x.trailer.url)) || x.screenshots?.some((s) => safe(s.full));
 
 function trailerButton(trailer) {
@@ -41,7 +44,7 @@ export async function showExtras({ head, desc, media }, gameId) {
     return;
   }
   if (!x?.available) return;
-  if (hasFacts(x)) mount(head, html`<div class="gm-outside">${facts(x)}</div>`);
+  if (hasFacts(x)) mount(head, html`${facts(x)}`);
   if (x.description) {
     mount(desc, html`<p class="gm-desc">${x.description}</p>`);
     desc.onclick = () => desc.firstElementChild.classList.add('open');

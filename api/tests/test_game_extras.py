@@ -57,17 +57,16 @@ class ParseSteamTests(unittest.TestCase):
 class ParseRawgTests(unittest.TestCase):
     def test_it_reads_the_rating_the_site_and_survives_nulls(self):
         out = game_extras.parse_rawg(
-            {"metacritic": 77, "esrb_rating": {"name": "Mature"}, "website": " https://example.com "},
+            {"metacritic": 77, "esrb_rating": {"name": "Mature"}},
             {"results": [{"preview": "https://media.rawg.io/p.jpg", "data": {"480": "https://media.rawg.io/v.mp4"}}]},
             {"results": [{"image": "https://media.rawg.io/s.jpg"}, None]},
         )
         self.assertEqual(out["metacritic"], 77)
         self.assertEqual(out["esrb"], "Mature")
-        self.assertEqual(out["website"], "https://example.com")
         self.assertEqual(out["trailer"], {"url": "https://media.rawg.io/v.mp4", "poster": "https://media.rawg.io/p.jpg"})
         self.assertEqual(out["screenshots"], [{"thumb": "https://media.rawg.io/s.jpg", "full": "https://media.rawg.io/s.jpg"}])
-        empty = game_extras.parse_rawg({"metacritic": None, "esrb_rating": None, "website": "javascript:x"}, None, None)
-        self.assertEqual(empty, {"trailer": None, "screenshots": [], "metacritic": None, "esrb": None, "website": None})
+        empty = game_extras.parse_rawg({"metacritic": None, "esrb_rating": None}, None, None)
+        self.assertEqual(empty, {"trailer": None, "screenshots": [], "metacritic": None, "esrb": None})
 
 
 class MergeTests(unittest.TestCase):

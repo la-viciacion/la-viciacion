@@ -75,8 +75,10 @@ function draw(data) {
           ${tags.length ? html`<div class="gm-genres gm-tags" aria-label="Etiquetas">${tagPills(tags.slice(0, TAGS_SHOWN))}${tags.length > TAGS_SHOWN
             ? html`<button type="button" class="pf-tag muted gm-more" id="gmMoreTags" title="Ver todas las etiquetas">+${tags.length - TAGS_SHOWN}</button>` : ''}</div>` : ''}
           ${details ? html`<div class="pf-sub">${details}</div>` : ''}
-          <div id="gmOutside"></div>
-          ${game.slug ? html`<div class="gm-rawg"><a class="pf-btn gm-rawg-btn" href="https://rawg.io/games/${encodeURIComponent(game.slug)}" target="_blank" rel="noopener noreferrer">Ver en RAWG <span aria-hidden="true">↗</span></a></div>` : ''}
+          <div class="gm-actions" id="gmActions">
+            <span id="gmOutside" class="gm-outside"></span>
+            ${game.slug ? html`<a class="pf-btn gm-rawg-btn" href="https://rawg.io/games/${encodeURIComponent(game.slug)}" target="_blank" rel="noopener noreferrer">Ver en RAWG <span aria-hidden="true">↗</span></a>` : ''}
+          </div>
         </div>
       </div>
       <div id="gmMedia"></div>

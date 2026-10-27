@@ -109,7 +109,7 @@ async def get_game_extras(
     db: Session = Depends(get_db),
 ):
     """What Steam and RAWG say about a game: trailer, screenshots, a short description in Spanish, Metacritic, the
-    age rating and the official site. They are asked (and the answer kept in memory
+    age rating. They are asked (and the answer kept in memory
     for a day, see utils/game_extras.py), so it is a request of its own: `available` is false when the game has neither
     a Steam nor a RAWG id or nobody can be asked, and the page shows no card then."""
     game = await run_in_threadpool(db.get, models.Game, game_id)
