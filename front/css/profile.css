@@ -164,7 +164,7 @@
 
 /* Game page */
 .gm-back { margin-bottom: 14px; }
-.gm-head { display: flex; gap: 16px; align-items: center; margin-bottom: 16px; }
+.gm-head { display: flex; gap: 16px; align-items: flex-start; margin-bottom: 16px; }
 .gm-cover { width: 96px; height: 96px; border-radius: var(--radius-md); object-fit: cover; flex: none; }
 .gm-cover-placeholder { display: flex; align-items: center; justify-content: center; background: var(--bg-card); font-size: 2rem; }
 .gm-wanted { margin: 0 0 8px; }
@@ -400,25 +400,38 @@
 .sg-count { margin-left: 6px; }
 .gm-top > #gmMedia .ach-block { margin-bottom: 16px; }
 @media (min-width: 1000px) {
-  /* Room beside the title: the media sit on the right, open, and the stats start below them */
-  .gm-top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 440px); gap: 24px; align-items: start; }
-  .gm-top .gm-head { align-items: flex-start; }
-  #gmMediaBlock .ach-content { display: block; }
-  #gmMediaBlock .ach-fold { pointer-events: none; }
-  #gmMediaBlock .ach-chevron { display: none; }
-  #gmMediaBlock .gm-trailer { max-width: none; }
-  #gmMediaBlock .gm-shots a:nth-child(n + 5) { display: none; } /* a shorter column: the rest are one fold away on a phone */
+  /* The trailer sits beside the header and the screenshots run below it, so the media block dissolves into the grid */
+  .gm-top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 440px); gap: 8px 24px; align-items: start; }
+  .gm-top .gm-head { align-items: flex-start; grid-column: 1; grid-row: 1; }
+  .gm-top > #gmMedia, #gmMediaBlock, #gmMediaBlock .ach-content, #gmMediaBlock .gm-media { display: contents; }
+  #gmMediaBlock .ach-fold { display: none; }
+  #gmMediaBlock .gm-trailer { grid-column: 2; grid-row: 1; max-width: none; }
+  #gmMediaBlock .gm-carousel { grid-column: 1 / -1; grid-row: 2; }
+  #gmMediaBlock .gm-credit { grid-column: 1 / -1; grid-row: 3; }
 }
 .gm-outside { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-top: 8px; }
 .gm-media { display: flex; flex-direction: column; gap: 12px; }
-.gm-desc { margin: 0; line-height: 1.5; }
+.gm-desc { margin: 4px 0 8px; line-height: 1.5; color: var(--text-secondary); }
+@media (max-width: 999px) {
+  /* A long description would push everything down on a phone: four lines, the rest one tap away */
+  .gm-desc:not(.open) { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; cursor: pointer; }
+}
 .gm-trailer { position: relative; display: block; width: 100%; max-width: 560px; aspect-ratio: 16 / 9; padding: 0; border: 0; border-radius: var(--radius-sm); background: var(--bg-surface); overflow: hidden; cursor: pointer; }
 .gm-trailer img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .gm-play { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 2.2rem; color: #fff; background: rgba(0, 0, 0, 0.35); }
 .gm-trailer:focus-visible { outline: 2px solid var(--accent-teal); outline-offset: 2px; }
 video.gm-trailer { cursor: auto; background: #000; }
-.gm-shots { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+.gm-carousel { position: relative; }
+.gm-shots { display: flex; gap: 8px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: thin; padding-bottom: 4px; }
+.gm-shots a { flex: 0 0 min(280px, 78%); scroll-snap-align: start; }
 .gm-shots img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 6px; display: block; }
+.gm-nav { display: none; position: absolute; top: calc(50% - 18px); width: 36px; height: 36px; padding: 0; border: 0; border-radius: 50%; background: rgba(0, 0, 0, 0.6); color: #fff; font-size: 1.4rem; line-height: 1; cursor: pointer; }
+.gm-nav.prev { left: 6px; }
+.gm-nav.next { right: 6px; }
+.gm-nav:focus-visible { outline: 2px solid var(--accent-teal); outline-offset: 2px; }
+@media (hover: hover) and (min-width: 700px) { .gm-nav { display: block; } }
+.gm-more { cursor: pointer; font: inherit; font-size: 0.72rem; font-weight: 700; }
+.gm-more:hover { color: var(--text-primary); }
 .gm-credit { font-size: 0.75rem; }
 .gm-rawg { margin-top: 10px; }
 .gm-rawg-btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 0.85rem; text-decoration: none; border-color: var(--border-accent); color: var(--accent-teal); }

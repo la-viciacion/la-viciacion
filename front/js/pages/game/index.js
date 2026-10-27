@@ -43,6 +43,10 @@ function playerRow(p) {
     </li>`;
 }
 
+// RAWG gives dozens of tags, the most popular first: a few say what the game is, the rest are one press away
+const TAGS_SHOWN = 6;
+const tagPills = (list) => list.map((tag) => html`<span class="pf-tag muted">${tag}</span>`);
+
 function draw(data) {
   const { game, summary, players } = data;
   // RAWG repeats some genres among its tags (Indie, Action...): showing them twice says nothing more
@@ -61,13 +65,15 @@ function draw(data) {
           : html`<div class="gm-cover gm-cover-placeholder" aria-hidden="true">🎮</div>`}
         <div>
           <h1 class="pf-title">${game.name}</h1>
+          <div id="gmDesc"></div>
           ${game.is_dlc ? html`
             <div class="gm-dlc">
               <span class="pf-tag dlc">DLC</span>
               ${game.parent ? html`<span class="pf-sub">Contenido adicional de <a href="#/game/${encodeURIComponent(game.parent.id)}">${game.parent.name}</a></span>` : ''}
             </div>` : ''}
           <div class="gm-genres">${game.genres.map((genre) => html`<span class="pf-tag muted">${genre}</span>`)}</div>
-          ${tags.length ? html`<div class="gm-genres gm-tags" aria-label="Etiquetas">${tags.map((tag) => html`<span class="pf-tag muted">${tag}</span>`)}</div>` : ''}
+          ${tags.length ? html`<div class="gm-genres gm-tags" aria-label="Etiquetas">${tagPills(tags.slice(0, TAGS_SHOWN))}${tags.length > TAGS_SHOWN
+            ? html`<button type="button" class="pf-tag muted gm-more" id="gmMoreTags" title="Ver todas las etiquetas">+${tags.length - TAGS_SHOWN}</button>` : ''}</div>` : ''}
           ${details ? html`<div class="pf-sub">${details}</div>` : ''}
           <div id="gmOutside"></div>
           ${game.slug ? html`<div class="gm-rawg"><a class="pf-btn gm-rawg-btn" href="https://rawg.io/games/${encodeURIComponent(game.slug)}" target="_blank" rel="noopener noreferrer">Ver en RAWG <span aria-hidden="true">↗</span></a></div>` : ''}
@@ -109,7 +115,8 @@ function draw(data) {
     <div id="gmSaga"></div>`); // last: a long saga would push who plays the game far down
 
   hydratePhotos(main);
-  showExtras({ head: main.querySelector('#gmOutside'), media: main.querySelector('#gmMedia') }, game.id); // Steam and RAWG too
+  main.querySelector('#gmMoreTags')?.addEventListener('click', () => mount(main.querySelector('.gm-tags'), html`${tagPills(tags)}`));
+  showExtras({ head: main.querySelector('#gmOutside'), desc: main.querySelector('#gmDesc'), media: main.querySelector('#gmMedia') }, game.id); // Steam and RAWG too
   showSaga(main.querySelector('#gmSaga'), game.id); // RAWG may take a while: the page does not wait for it
   main.querySelector('#gmBack').addEventListener('click', back);
   main.querySelector('#gmWish')?.addEventListener('click', () => toggleWish(game.id, data.wished));
