@@ -77,7 +77,7 @@ class RankingNoticeTests(unittest.TestCase):
 class WishlistNoticeTests(unittest.TestCase):
     def test_it_names_each_game_and_everybody_who_waits_for_it_and_says_tomorrow(self):
         msg = actions.wishlist_eve_message([("Hades II", ["Ana", "Bea"], None), ("Silksong", ["Cai"], None)])
-        self.assertTrue(msg.startswith("📅 *Mañana salen 2 juegos deseados*"))  # the prompt asks to keep the first line
+        self.assertTrue(msg.startswith("📅 *Mañana salen 2 juegos*"))  # the prompt asks to keep the first line
         for name in ("Hades II", "Silksong", "Ana y Bea", "Cai"):
             self.assertIn(name, msg)
 
@@ -93,7 +93,7 @@ class WishlistWeekNoticeTests(unittest.TestCase):
         self.assertIn("Domingo 15: Silksong", plain)
         self.assertIn("Ana y Bea", msg)
         self.assertIn("Cai", msg)
-        self.assertTrue(msg.startswith("📅 *Esta semana salen 2 juegos deseados*"))  # the prompt asks to keep the first line
+        self.assertTrue(msg.startswith("📅 *Esta semana salen 2 juegos*"))  # the prompt asks to keep the first line
 
 
 class PromptsAskForWhatTheNoticesCarryTests(unittest.TestCase):

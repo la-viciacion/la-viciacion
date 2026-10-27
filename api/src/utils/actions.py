@@ -470,7 +470,7 @@ async def check_wishlist(db: Session, today: datetime.date) -> str:
 
 def _wishlist_header(when: str, count: int) -> str:
     """The first line of a group notice about the wished games (a push shows it as its title): when, and how many."""
-    return f"📅 *{when} {'sale 1 juego deseado' if count == 1 else f'salen {count} juegos deseados'}*"
+    return f"📅 *{when} {'sale 1 juego' if count == 1 else f'salen {count} juegos'}*"
 
 
 def _wishlist_names(waiting: list[str]) -> str:

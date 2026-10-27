@@ -152,18 +152,18 @@ class EveNoticeTests(unittest.TestCase):
     def test_the_group_notice_has_a_header_and_a_line_per_game_with_who_waits_for_it(self):
         message = actions.wishlist_eve_message([("Hades II", ["Ana"], None), ("Snake_Pass", ["Ana", "Bea", "Cai"], None)])
         self.assertEqual(message, (
-            "📅 *Mañana salen 2 juegos deseados*\n\n"
+            "📅 *Mañana salen 2 juegos*\n\n"
             "*Hades II* (Ana)\n"
             "*Snake\\_Pass* (Ana, Bea y Cai)"
         ))
 
     def test_a_single_game_is_told_in_the_singular(self):
-        self.assertEqual(actions.wishlist_eve_message([("Hades II", ["Ana", "Bea"], None)]), "📅 *Mañana sale 1 juego deseado*\n\n*Hades II* (Ana y Bea)")
+        self.assertEqual(actions.wishlist_eve_message([("Hades II", ["Ana", "Bea"], None)]), "📅 *Mañana sale 1 juego*\n\n*Hades II* (Ana y Bea)")
 
     def test_the_same_day_notice_is_the_same_with_today(self):
         message = actions.wishlist_day_message([("Hades II", ["Ana"], None), ("Celeste", ["Bea"], None)])
-        self.assertEqual(message, "📅 *Hoy salen 2 juegos deseados*\n\n*Hades II* (Ana)\n*Celeste* (Bea)")
-        self.assertEqual(actions.wishlist_day_message([("Hades II", ["Ana"], None)]).splitlines()[0], "📅 *Hoy sale 1 juego deseado*")
+        self.assertEqual(message, "📅 *Hoy salen 2 juegos*\n\n*Hades II* (Ana)\n*Celeste* (Bea)")
+        self.assertEqual(actions.wishlist_day_message([("Hades II", ["Ana"], None)]).splitlines()[0], "📅 *Hoy sale 1 juego*")
 
     def test_the_wished_releases_of_a_day_are_grouped_by_game(self):
         db = make_session()
@@ -208,19 +208,19 @@ class WeekNoticeTests(unittest.TestCase):
             ("Snake_Pass", D(2026, 12, 13), ["Ana", "Bea", "Cai"], "snake-pass"),
         ])
         self.assertEqual(message, (
-            "📅 *Esta semana salen 2 juegos deseados*\n\n"
+            "📅 *Esta semana salen 2 juegos*\n\n"
             "Lunes 7: *Hades II* (Ana)\n"
             "Domingo 13: [Snake\\_Pass](https://rawg.io/games/snake-pass) (Ana, Bea y Cai)"
         ))
 
     def test_a_single_game_is_told_in_the_singular(self):
         message = actions.wishlist_week_message([("Hades II", D(2026, 12, 7), ["Ana", "Bea"], None)])
-        self.assertEqual(message, "📅 *Esta semana sale 1 juego deseado*\n\nLunes 7: *Hades II* (Ana y Bea)")
+        self.assertEqual(message, "📅 *Esta semana sale 1 juego*\n\nLunes 7: *Hades II* (Ana y Bea)")
 
     def test_the_header_is_what_a_push_shows_as_its_title(self):
         message = actions.wishlist_week_message([("Hades II", D(2026, 12, 7), ["Ana"], None), ("Celeste", D(2026, 12, 8), ["Bea"], None)])
         payload = push.build_payload(message)
-        self.assertEqual(payload["title"], "📅 Esta semana salen 2 juegos deseados")
+        self.assertEqual(payload["title"], "📅 Esta semana salen 2 juegos")
         self.assertEqual(payload["body"], "Lunes 7: Hades II (Ana) · Martes 8: Celeste (Bea)")
 
 
