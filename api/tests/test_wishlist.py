@@ -199,19 +199,19 @@ class WeekNoticeTests(unittest.TestCase):
         ])
         self.assertEqual(message, (
             "📅 *Esta semana salen 2 juegos deseados*\n\n"
-            "Lunes 7: *Hades II* (lo espera Ana)\n"
-            "Domingo 13: [Snake\\_Pass](https://rawg.io/games/snake-pass) (lo esperan Ana, Bea y Cai)"
+            "Lunes 7: *Hades II* (Ana)\n"
+            "Domingo 13: [Snake\\_Pass](https://rawg.io/games/snake-pass) (Ana, Bea y Cai)"
         ))
 
     def test_a_single_game_is_told_in_the_singular(self):
         message = actions.wishlist_week_message([("Hades II", D(2026, 12, 7), ["Ana", "Bea"], None)])
-        self.assertEqual(message, "📅 *Esta semana sale 1 juego deseado*\n\nLunes 7: *Hades II* (lo esperan Ana y Bea)")
+        self.assertEqual(message, "📅 *Esta semana sale 1 juego deseado*\n\nLunes 7: *Hades II* (Ana y Bea)")
 
     def test_the_header_is_what_a_push_shows_as_its_title(self):
         message = actions.wishlist_week_message([("Hades II", D(2026, 12, 7), ["Ana"], None), ("Celeste", D(2026, 12, 8), ["Bea"], None)])
         payload = push.build_payload(message)
         self.assertEqual(payload["title"], "📅 Esta semana salen 2 juegos deseados")
-        self.assertEqual(payload["body"], "Lunes 7: Hades II (lo espera Ana) · Martes 8: Celeste (lo espera Bea)")
+        self.assertEqual(payload["body"], "Lunes 7: Hades II (Ana) · Martes 8: Celeste (Bea)")
 
 
 class RefreshReleaseDatesTests(unittest.TestCase):

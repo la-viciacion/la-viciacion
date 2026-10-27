@@ -494,15 +494,14 @@ WEEKDAY_NAMES = ("lunes", "martes", "miércoles", "jueves", "viernes", "sábado"
 def wishlist_week_message(releases: list[tuple[str, datetime.date, list[str], str | None]]) -> str:
     """The notice for the group once a week: (game, day it comes out, players who wait for it, slug) for each game
     coming out in the days that follow. A header with how many (it is also what a push shows as its title) and one
-    line per game, by date: the weekday and day, the game and who waits for it."""
+    line per game, by date: the weekday and day, the game and, in brackets, who waits for it."""
     count = len(releases)
     header = f"📅 *Esta semana {'sale 1 juego deseado' if count == 1 else f'salen {count} juegos deseados'}*"
     lines = []
     for game_name, day, waiting, slug in releases:
-        verb = "lo espera" if len(waiting) == 1 else "lo esperan"
         lines.append(
             f"{WEEKDAY_NAMES[day.weekday()].capitalize()} {day.day}: {_game_text(game_name, slug)} "
-            f"({verb} {utils.escape_markdown(utils.join_names(waiting))})"
+            f"({utils.escape_markdown(utils.join_names(waiting))})"
         )
     return header + "\n\n" + "\n".join(lines)
 
