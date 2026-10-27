@@ -88,10 +88,12 @@ class WishlistWeekNoticeTests(unittest.TestCase):
             ("Hades II", datetime.date(2026, 3, 9), ["Ana", "Bea"], None),
             ("Silksong", datetime.date(2026, 3, 15), ["Cai"], None),
         ])
-        self.assertIn("El lunes 9 sale Hades II", msg.replace("*", ""))
-        self.assertIn("El domingo 15 sale Silksong", msg.replace("*", ""))
+        plain = msg.replace("*", "")
+        self.assertIn("Lunes 9: Hades II", plain)
+        self.assertIn("Domingo 15: Silksong", plain)
         self.assertIn("Ana y Bea", msg)
         self.assertIn("Cai", msg)
+        self.assertTrue(msg.startswith("📅 *Esta semana salen 2 juegos deseados*"))  # the prompt asks to keep the first line
 
 
 class PromptsAskForWhatTheNoticesCarryTests(unittest.TestCase):
@@ -148,7 +150,7 @@ class PromptsAskForWhatTheNoticesCarryTests(unittest.TestCase):
 
     def test_the_weekly_wishlist_asks_for_every_game_every_person_and_the_weekday(self):
         text = self.prompt("wishlist_week")
-        for wanted in ("nombre de cada juego", "todas las personas", "día de la semana", "todos"):
+        for wanted in ("primera línea del mensaje original", "nombre de cada juego", "todas las personas", "día de la semana", "todos"):
             self.assertIn(wanted, text)
 
     def test_the_recommendation_asks_for_the_game_alone_never_for_who_has_it(self):

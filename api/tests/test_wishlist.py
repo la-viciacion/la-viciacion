@@ -4,7 +4,7 @@ from unittest import mock
 
 from src.crud import wishlist
 from src.database import models
-from src.utils import actions, my_utils, rawg_sync
+from src.utils import actions, my_utils, push, rawg_sync
 from tests.sqlite_db import make_session
 
 TODAY = datetime.date(2026, 10, 4)
@@ -192,15 +192,26 @@ class EveNoticeTests(unittest.TestCase):
 
 
 class WeekNoticeTests(unittest.TestCase):
-    def test_the_group_notice_names_the_weekday_the_date_and_who_waits_for_it(self):
+    def test_the_group_notice_has_a_header_and_a_line_per_game_with_the_day_and_who_waits_for_it(self):
         message = actions.wishlist_week_message([
             ("Hades II", D(2026, 12, 7), ["Ana"], None),
             ("Snake_Pass", D(2026, 12, 13), ["Ana", "Bea", "Cai"], "snake-pass"),
         ])
         self.assertEqual(message, (
-            "El lunes 7 sale *Hades II*. Está en la lista de deseados de Ana.\n\n"
-            "El domingo 13 sale [Snake\\_Pass](https://rawg.io/games/snake-pass). Está en la lista de deseados de Ana, Bea y Cai."
+            "📅 *Esta semana salen 2 juegos deseados*\n\n"
+            "Lunes 7: *Hades II* (lo espera Ana)\n"
+            "Domingo 13: [Snake\\_Pass](https://rawg.io/games/snake-pass) (lo esperan Ana, Bea y Cai)"
         ))
+
+    def test_a_single_game_is_told_in_the_singular(self):
+        message = actions.wishlist_week_message([("Hades II", D(2026, 12, 7), ["Ana", "Bea"], None)])
+        self.assertEqual(message, "📅 *Esta semana sale 1 juego deseado*\n\nLunes 7: *Hades II* (lo esperan Ana y Bea)")
+
+    def test_the_header_is_what_a_push_shows_as_its_title(self):
+        message = actions.wishlist_week_message([("Hades II", D(2026, 12, 7), ["Ana"], None), ("Celeste", D(2026, 12, 8), ["Bea"], None)])
+        payload = push.build_payload(message)
+        self.assertEqual(payload["title"], "📅 Esta semana salen 2 juegos deseados")
+        self.assertEqual(payload["body"], "Lunes 7: Hades II (lo espera Ana) · Martes 8: Celeste (lo espera Bea)")
 
 
 class RefreshReleaseDatesTests(unittest.TestCase):
