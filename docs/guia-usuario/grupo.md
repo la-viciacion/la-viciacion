@@ -22,7 +22,7 @@ Un timer de más de 6 horas se muestra atenuado con «¿Un timer olvidado?» y n
 
 ![Los jugadores del grupo](../assets/screens/players.webp){ .screenshot }
 
-Al pulsar uno ves **su página**: sus cifras por temporada, sus juegos más jugados con sus notas y sus últimos logros. En la de otro jugador aparece también la **afinidad contigo**, un porcentaje que dice cuánto se parecen vuestros gustos: juegos en común (50 %), notas parecidas en los juegos que ambos habéis puntuado (30 %) y el tiempo que dedicáis a los mismos géneros (20 %). Con menos de 3 juegos en común dice que hay pocos datos.
+Al pulsar uno ves **su página**: sus cifras por temporada, sus juegos más jugados con sus notas y sus últimos logros. En la de otro jugador aparece también la **afinidad contigo**, un porcentaje que dice cuánto se parecen vuestros gustos: juegos en común (50 %), notas parecidas en los juegos que ambos habéis puntuado (30 %) y el tiempo que dedicáis a los mismos géneros (20 %). Con menos de 3 juegos en común dice que hay pocos datos. Debajo, **Tu biblioteca y la de ese jugador** separa los juegos que **tenéis los dos** (con las horas, si lo completó y la nota de cada uno), los que **solo tienes tú** y los que **solo tiene él o ella**, cada lista del más jugado al menos.
 
 ![La página de otro jugador](../assets/screens/player.webp){ .screenshot }
 
@@ -34,7 +34,7 @@ Al pulsar uno ves **su página**: sus cifras por temporada, sus juegos más juga
 
 Puedes buscar por nombre, ordenar (actividad reciente, más jugados, mejor nota, más jugadores, fecha de lanzamiento, nombre) y filtrar por género o por lo que tienes tú. **Añadir juego** busca en RAWG y lleva a la página del juego recién creado.
 
-Al pulsar un juego abres **su página**: portada, géneros, desarrollador, fecha de lanzamiento, tiempo medio para completarlo, las cifras del grupo, tu nota (que puedes poner o cambiar ahí mismo) y la lista de quién lo tiene con sus horas, completados y notas. Si es un DLC o una expansión lo indica con la marca **DLC** y enlaza al juego base.
+Al pulsar un juego abres **su página**: portada, géneros, desarrollador, fecha de lanzamiento, tiempo medio para completarlo, las cifras del grupo, tu nota (que puedes poner o cambiar ahí mismo) y la lista de quién lo tiene con sus horas, completados y notas. Si ya lo has jugado, una tarjeta compara **tu ritmo**: lo que tardaste (o llevas) frente a lo que ha tardado el resto del grupo en completarlo y frente al tiempo medio de HowLongToBeat. Si es un DLC o una expansión lo indica con la marca **DLC** y enlaza al juego base.
 
 ![La página de un juego](../assets/screens/game.webp){ .screenshot }
 

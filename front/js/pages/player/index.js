@@ -7,6 +7,7 @@ import { gameHref } from '../../lib/links.js';
 import * as seasons from '../../lib/seasons.js';
 import { hydratePhotos, playerAvatar } from '../../ui/avatar.js';
 import { showChallengesHistory } from '../../ui/challenges-history.js';
+import { showLibraryCompare } from '../../ui/library-compare.js';
 import { achievementsView, sectionTitle, seasonName, seasonPills, seasonSuffix, statsView, topView } from '../../ui/profile-summary.js';
 
 export const active = null; // it belongs to no item of the top bar
@@ -47,6 +48,9 @@ function draw(d) {
     <section class="pf-stats" aria-label="Estadísticas: ${seasonName(d)}">${statsView(d)}</section>
 
     ${affinityView(d.affinity)}
+    ${d.is_me ? '' : html`
+      ${sectionTitle(`Tu biblioteca y la de ${d.user.name}`)}
+      <div class="pf-card" id="plCompare"><div class="pf-sub">Cargando...</div></div>`}
 
     <div class="pf-cols">
       <div>
@@ -63,6 +67,7 @@ function draw(d) {
     <div class="pf-card" id="plChallenges"></div>`);
   hydratePhotos(main);
   showChallengesHistory(main.querySelector('#plChallenges'), d.user.id, d.is_me);
+  if (!d.is_me) showLibraryCompare(main.querySelector('#plCompare'), d.user.id);
   main.querySelector('#plBack').addEventListener('click', back);
   main.querySelector('#plSeasons').addEventListener('click', (e) => {
     const pill = e.target.closest('[data-season]');
