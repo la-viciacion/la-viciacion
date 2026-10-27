@@ -403,3 +403,11 @@
 .gm-rawg-btn:hover { background: rgba(61,217,179,0.1); }
 .gm-rawg-btn:focus-visible { outline: 2px solid var(--accent-teal); outline-offset: 2px; }
 #gmSaga { margin-top: 28px; }
+.pf-price-form { align-items: center; }
+.pf-price-field { display: inline-flex; align-items: center; gap: 6px; font-size: 0.85rem; }
+.pf-price-input { width: 90px; }
+.pf-value { margin-bottom: 14px; }
+.pf-value summary { cursor: pointer; }
+.pv-lists { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin: 10px 0; }
+.pv-list h3 { margin: 0 0 6px; font-size: 0.95rem; color: var(--accent-teal); }
+.pv-item { margin-bottom: 8px; }

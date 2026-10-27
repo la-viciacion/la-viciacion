@@ -134,3 +134,85 @@ test('the card is not drawn when there is nothing to suggest, and it is only in 
   await open();
   assert.equal(document.querySelector('.pf-next'), null);
 });
+
+// ── prices ──
+const withPlatforms = (g, platforms) => ({ ...g, platforms });
+const PRICED = [
+  withPlatforms(entry(21, { game_name: 'Hades' }), [{ id: 'pc', name: 'PC', price_cents: 2499 }, { id: 'switch', name: 'Switch', price_cents: null }]),
+  withPlatforms(entry(22, { game_name: 'Celeste' }), [{ id: 'pc', name: 'PC', price_cents: null }]),
+];
+const plain = (t) => t.replace(/\u00a0/g, ' ');
+
+test('a row says what was paid, and the price button opens one box per platform with what is noted', async () => {
+  await open({ 'GET /users/ana/library': { season: 2026, total: 2, items: PRICED } });
+  assert.match(plain(document.querySelector('.pf-game[data-id="21"] .pf-sub').textContent), /Pagado: 24,99 €/);
+  assert.doesNotMatch(document.querySelector('.pf-game[data-id="22"] .pf-sub').textContent, /Pagado/);
+  document.querySelector('.pf-game[data-id="21"] [data-action="price"]').click();
+  const boxes = [...document.querySelectorAll('.pf-game[data-id="21"] input[data-platform]')];
+  assert.deepEqual(boxes.map((b) => [b.dataset.platform, b.value]), [['pc', '24,99'], ['switch', '']]);
+  assert.equal(document.querySelector('.pf-game[data-id="21"] [data-action="price"]'), null); // the form replaces the buttons
+  document.querySelector('[data-action="cancel-price"]').click();
+  assert.equal(document.querySelector('[data-price-form]'), null);
+});
+
+test('saving the prices sends only what changed, an empty box takes the price off and the list is refreshed', async () => {
+  const calls = await open({
+    'GET /users/ana/library': { season: 2026, total: 2, items: PRICED },
+    'PUT /users/ana/games/g21/price': { ok: true },
+  });
+  document.querySelector('.pf-game[data-id="21"] [data-action="price"]').click();
+  const [pc, switchBox] = document.querySelectorAll('.pf-game[data-id="21"] input[data-platform]');
+  pc.value = ''; // takes the PC price off
+  switchBox.value = '39,5';
+  document.querySelector('[data-price-form]').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+  await settle();
+  const puts = calls.filter((c) => c.method === 'PUT');
+  assert.deepEqual(puts.map((c) => c.body), [{ platform: 'pc', amount: null }, { platform: 'switch', amount: 39.5 }]);
+  assert.equal(calls.filter((c) => c.method === 'GET' && c.path.startsWith('/users/ana/library')).length >= 2, true); // reloaded
+  assert.match(document.querySelector('.pf-msg').textContent, /Precio guardado/);
+});
+
+test('a box that did not change sends nothing, and something that is not a price is refused without asking the API', async () => {
+  const calls = await open({ 'GET /users/ana/library': { season: 2026, total: 2, items: PRICED } });
+  document.querySelector('.pf-game[data-id="21"] [data-action="price"]').click();
+  document.querySelector('[data-price-form]').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+  await settle();
+  assert.equal(calls.some((c) => c.method === 'PUT'), false);
+  assert.match(document.querySelector('.pf-msg').textContent, /Nada que guardar/);
+  document.querySelector('.pf-game[data-id="21"] [data-action="price"]').click();
+  document.querySelector('.pf-game[data-id="21"] input[data-platform="switch"]').value = 'mucho';
+  document.querySelector('[data-price-form]').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+  await settle();
+  assert.equal(calls.some((c) => c.method === 'PUT'), false);
+  assert.match(document.querySelector('.pf-msg').textContent, /número, por ejemplo 29,99/);
+});
+
+test('an error of the API stays in the list and the price form stays open', async () => {
+  await open({
+    'GET /users/ana/library': { season: 2026, total: 2, items: PRICED },
+    'PUT /users/ana/games/g21/price': () => { throw new Error('No tienes este juego en esa plataforma'); },
+  });
+  document.querySelector('.pf-game[data-id="21"] [data-action="price"]').click();
+  document.querySelector('.pf-game[data-id="21"] input[data-platform="switch"]').value = '10';
+  document.querySelector('[data-price-form]').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+  await settle();
+  assert.match(document.querySelector('.pf-msg').textContent, /No tienes este juego en esa plataforma/);
+  assert.notEqual(document.querySelector('[data-price-form]'), null);
+});
+
+test('"Lo que has gastado" shows the totals and the cheapest and dearest per hour, only for a player with prices', async () => {
+  const VALUE = {
+    spent_cents: 7000, priced_games: 7, counted_games: 6, counted_seconds: 360000, per_hour_cents: 70,
+    games: ['A', 'B', 'C', 'D', 'E', 'F'].map((name, i) => ({ game_id: `v${i}`, game_name: name, image_url: null, price_cents: 1000, seconds: 36000, per_hour_cents: 100 + i * 10 })).concat([{ game_id: 'v9', game_name: 'Sin tiempo', image_url: null, price_cents: 500, seconds: 60, per_hour_cents: null }]),
+  };
+  await open({ 'GET /users/ana/library': { season: 2026, total: 2, items: PRICED }, 'GET /users/ana/value': VALUE });
+  const card = document.querySelector('.pf-value');
+  assert.match(plain(card.textContent), /Solo lo ves tú/);
+  assert.deepEqual(text('.pf-value .pf-stat-value').map(plain), ['70 €', '7', '0,70 €/h']);
+  assert.deepEqual(text('.pf-value .pv-list:first-child .game-link'), ['A', 'B', 'C', 'D', 'E']); // the cheapest per hour first
+  assert.deepEqual(text('.pf-value .pv-list:last-child .game-link'), ['F', 'E', 'D', 'C', 'B']); // and the dearest
+  assert.equal(document.querySelectorAll('.pf-value .game-link').length, 10);
+  assert.doesNotMatch(card.textContent, /Sin tiempo/); // too little played: no cost per hour
+  await open({ 'GET /users/ana/library': { season: 2026, total: 2, items: PRICED }, 'GET /users/ana/value': { spent_cents: 0, priced_games: 0, counted_games: 0, counted_seconds: 0, per_hour_cents: null, games: [] } });
+  assert.equal(document.querySelector('.pf-value'), null);
+});

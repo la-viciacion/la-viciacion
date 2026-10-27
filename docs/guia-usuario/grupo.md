@@ -50,6 +50,7 @@ Al pulsar un juego abres **su página**: portada, géneros, desarrollador, fecha
 - **Rarezas**: juegos que solo tiene una persona, los más jugados primero.
 - **Sin tocar**: juegos que alguien tiene y que nadie ha jugado nunca.
 - **Por género** y **por plataforma**: cuántos juegos de las bibliotecas hay de cada género y de cada plataforma.
+- **Rentabilidad**: cuánto cuesta de media cada hora de un juego, los más baratos y los más caros. Sale de los precios que apuntan los jugadores, pero **solo aparece un juego si al menos 3 jugadores han puesto su precio y lo han jugado**, y nunca se enseña el precio ni la identidad de nadie (las horas de cada uno sí son públicas, y con ellas se podría deducir lo que pagó). En la página del juego sale como **Coste por hora**.
 
 Cada juego enlaza a su página. Arriba hay una fila de **botones**, uno por sección, que te lleva directo a ella (y la abre si estaba plegada), y cada sección se puede **plegar** pulsando su título; el navegador recuerda lo que has plegado.
 

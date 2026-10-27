@@ -8,8 +8,11 @@ const KINDS = [
   ['sessions', 'sesiones'],
   ['library', 'juegos en la biblioteca'],
   ['scores', 'puntuaciones'],
+  ['prices', 'precios'],
   ['wishlist', 'deseados'],
 ];
+
+const NOTHING = { imported: 0, existing: 0, skipped: 0 };
 
 /** The export a text holds, or an Error saying why it is not one. */
 export function parseExport(text, size = text.length) {
@@ -34,7 +37,7 @@ export function describeFile(data) {
 export function summarize(report) {
   const lines = [];
   for (const [key, label] of KINDS) {
-    const { imported, existing, skipped } = report[key];
+    const { imported, existing, skipped } = report[key] ?? NOTHING; // a report from an API without that kind
     const parts = [];
     if (imported) parts.push(`${imported} ${imported === 1 ? 'nueva' : 'nuevas'}`);
     if (existing) parts.push(`${existing} que ya tenías`);
@@ -49,4 +52,4 @@ export function summarize(report) {
 }
 
 /** Whether the import would add anything at all. */
-export const addsSomething = (report) => KINDS.some(([key]) => report[key].imported > 0) || report.created.games > 0 || report.created.platforms > 0;
+export const addsSomething = (report) => KINDS.some(([key]) => (report[key] ?? NOTHING).imported > 0) || report.created.games > 0 || report.created.platforms > 0;

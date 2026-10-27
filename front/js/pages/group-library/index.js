@@ -7,6 +7,7 @@ import { api } from '../../lib/api.js';
 import { formatDuration } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
 import { gameHref } from '../../lib/links.js';
+import { perHour } from '../../lib/money.js';
 import { iconChevron } from '../../ui/icons.js';
 import { scoreBadge } from '../../ui/score-badge.js';
 
@@ -14,6 +15,7 @@ export const active = 'library';
 
 let main;
 let data;
+let value = null; // the group's cost per hour (GET /group/value), or null when it could not be loaded
 const FOLDED_KEY = 'gl-folded';
 let folded = new Set(); // the keys of the sections the viewer has folded: they start open
 
@@ -79,7 +81,19 @@ const sectionsOf = (d) => [
   ['untouched', 'Sin tocar', d.untouched.total],
   ['genres', 'Por género', d.genres.length],
   ['platforms', 'Por plataforma', d.platforms.length],
+  ...(value ? [['value', 'Rentabilidad', value.games]] : []),
 ];
+
+/** The cheapest and the dearest per hour of the group (never a player, never a price): `value` is GET /group/value. */
+function valueView(v) {
+  if (!v.games) return html`<div class="pf-empty">Todavía ningún juego tiene precio de ${v.min_contributors} jugadores o más.</div>`;
+  const list = (title, games) => html`
+    <div class="pv-list"><h3>${title}</h3>
+      ${games.map((g) => html`<div class="pv-item"><a class="game-link" href="${gameHref(g.game_id)}">${g.game_name}</a>
+        <div class="pf-sub">${perHour(g.per_hour_cents)} · ${plural(g.contributors, 'jugador', 'jugadores')}</div></div>`)}
+    </div>`;
+  return html`<div class="pv-lists">${list('Más baratos por hora', v.cheapest)}${v.games > v.cheapest.length ? list('Más caros por hora', v.priciest) : ''}</div>`;
+}
 
 const more = (total, shown) => (total > shown ? html`<div class="pf-sub">y ${total - shown} más</div>` : '');
 
@@ -120,7 +134,10 @@ function draw(d) {
         'Cuántos juegos de las bibliotecas tienen cada género (un juego cuenta en cada uno de los suyos).')}</div>
       <div>${section('platforms', 'Por plataforma', count.platforms, d.platforms.length ? bars(d.platforms, (r) => r.platform_name, (r) => r.games, (r) => ` · ${plural(r.players, 'jugador', 'jugadores')}`) : html`<div class="pf-empty">Sin datos de plataformas todavía.</div>`,
         'Cuántos juegos se han tenido en cada plataforma.')}</div>
-    </div>`);
+    </div>
+
+    ${value ? section('value', 'Rentabilidad', count.value, valueView(value),
+      `Cuánto cuesta de media cada hora de un juego, según lo que han apuntado los jugadores. Solo salen los juegos con al menos ${value.min_contributors} jugadores con precio y tiempo jugado, y nunca se enseña el de nadie.`) : ''}`);
 }
 
 function onClick(e) {
@@ -150,7 +167,7 @@ export async function render(ctx) {
   main.onclick = onClick;
   mount(main, html`<div class="loading-spinner">Cargando la biblioteca...</div>`);
   try {
-    data = await api('/group/library');
+    [data, value] = await Promise.all([api('/group/library'), api('/group/value').catch(() => null)]); // the rest works without it
     if (data) draw(data);
   } catch (err) {
     mount(main, html`<div class="pf-empty">Error cargando la biblioteca del grupo: ${err.message}</div>`);

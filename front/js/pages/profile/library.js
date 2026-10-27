@@ -21,10 +21,12 @@ import { formatDate, formatDateTime, formatDuration, formatRelative } from '../.
 import { html, mount, raw } from '../../lib/html.js';
 import { NO_FILTERS, NO_PLATFORM, STATES, entryPlatforms, entryState, filterEntries, nextUp, unratedGames } from '../../lib/library-filter.js';
 import { gameHref } from '../../lib/links.js';
+import { inputValue, paidText, parseEuros } from '../../lib/money.js';
 import { platformName } from '../../lib/platforms.js';
 import { SCORE_HINT, SCORE_MAX, SCORE_MIN, parseScore, saveScore } from '../../lib/score.js';
 import * as seasons from '../../lib/seasons.js';
 import { iconCalendar, iconCircleCheck, iconClock, iconFlag, iconStar, iconUndo } from '../../ui/icons.js';
+import { showValue } from '../../ui/library-value.js';
 import { scoreBadge } from '../../ui/score-badge.js';
 import { initSessions, openSessionForm } from '../home/sessions.js';
 import { openRandomRating } from './random-rating.js';
@@ -101,6 +103,22 @@ const select = (key, label, options, value) => html`
     ${options.map(([v, text]) => html`<option value="${v}" ${String(v) === String(value) ? 'selected' : ''}>${text}</option>`)}
   </select>`;
 
+// The price of a game: one box per platform the player has it on (a game bought twice is two prices). An empty box takes
+// the price off. Only the owner sees it (and an administrator, like the rest of their library).
+const euroIcon = () => html`<span aria-hidden="true">€</span>`;
+
+function priceForm(g) {
+  return html`
+    <form class="pf-date-form pf-price-form" data-price-form data-id="${g.id}">
+      ${(g.platforms ?? []).map((p) => html`
+        <label class="pf-price-field">${p.name}
+          <input class="adm-input pf-price-input" type="text" inputmode="decimal" name="price" data-platform="${p.id}" data-was="${p.price_cents ?? ''}" value="${inputValue(p.price_cents)}" placeholder="—" aria-label="Precio en ${p.name}" /> €
+        </label>`)}
+      <button class="pf-btn primary" type="submit">Guardar precio</button>
+      <button class="pf-btn" type="button" data-action="cancel-price">Ahora no</button>
+    </form>`;
+}
+
 // "¿Qué juego sigo?": three short lists of the games worth going back to (see nextUp in lib/library-filter.js)
 const NEXT_UP = [
   ['almost', 'Casi terminados', (g) => `Llevas ${formatDuration(g.played_time)} de unas ${formatDuration(g.avg_time)}${g.left > 0 ? ` · te quedan ${formatDuration(g.left)}` : ''}`],
@@ -144,6 +162,7 @@ export function createLibrary(el, options) {
   let filters = { ...NO_FILTERS };
   let editing = null; // id of the entry whose date is being edited
   let rating = null; // id of the entry whose rating is being edited
+  let pricing = null; // id of the entry whose price is being edited
   let sessions = new Map(); // entry id -> its sessions, for the entries that are expanded
   let list = el; // where the rows go: the whole element, or below the filters
 
@@ -163,6 +182,7 @@ export function createLibrary(el, options) {
     visible = step;
     editing = null;
     rating = null;
+    pricing = null;
     sessions = new Map();
   }
 
@@ -187,6 +207,7 @@ export function createLibrary(el, options) {
       if (filterable) {
         drawBar();
         mount(el.querySelector('.pf-lib-next'), nextUpCard(items));
+        showValue(el.querySelector('.pf-lib-value'), username); // its own request: the list does not wait for it
       }
       draw();
     } catch (err) {
@@ -196,7 +217,7 @@ export function createLibrary(el, options) {
 
   async function init() {
     if (filterable) {
-      mount(el, html`<div class="pf-lib-next"></div><div class="adm-toolbar pf-lib-bar"></div><div class="pf-lib-list"></div>`);
+      mount(el, html`<div class="pf-lib-next"></div><div class="pf-lib-value"></div><div class="adm-toolbar pf-lib-bar"></div><div class="pf-lib-list"></div>`);
       list = el.querySelector('.pf-lib-list');
       el.addEventListener('input', onFilter);
     }
@@ -295,12 +316,14 @@ export function createLibrary(el, options) {
           <div class="pf-sub">
             ${entryPlatforms(g).map((p) => p.name).join(' · ') || 'Sin plataforma'} · Temporada ${g.season} · ${formatDuration(g.played_time)}
             ${g.last_played ? ` · Última sesión: ${formatRelative(g.last_played)}` : ''}
+            ${paidText(g.platforms) ? ` · Pagado: ${paidText(g.platforms)}` : ''}
           </div>
           ${g.complete_blocked ? html`<div class="pf-lock">🔒 ${blockedReason(g, season)}</div>` : ''}
           ${editing === g.id ? dateForm(g) : ''}
           ${rating === g.id ? scoreForm(g) : ''}
+          ${pricing === g.id ? priceForm(g) : ''}
         </div>
-        <div class="pf-game-actions">${editing === g.id || rating === g.id ? '' : actions(g)}</div>
+        <div class="pf-game-actions">${editing === g.id || rating === g.id || pricing === g.id ? '' : html`${actions(g)}${filterable && (g.platforms ?? []).length ? act('price', g.id, euroIcon, 'Precio') : ''}`}</div>
         ${sessionList(g)}
       </div>`;
   }
@@ -391,6 +414,30 @@ export function createLibrary(el, options) {
     }
   }
 
+  // Save the prices of a game: only the boxes that changed are sent, an empty one takes its price off.
+  async function savePrices(id, form) {
+    flash('');
+    const entry = items.find((g) => g.id === id);
+    const changes = [];
+    for (const box of form.querySelectorAll('input[data-platform]')) {
+      const typed = parseEuros(box.value);
+      if (Number.isNaN(typed)) return flash('El precio debe ser un número, por ejemplo 29,99');
+      const was = box.dataset.was === '' ? null : Number(box.dataset.was);
+      const cents = typed == null ? null : Math.round(typed * 100);
+      if (cents !== was) changes.push({ platform: box.dataset.platform, amount: typed });
+    }
+    try {
+      for (const { platform, amount } of changes) {
+        await api(`/users/${encodeURIComponent(username)}/games/${encodeURIComponent(entry.game_id)}/price`, jsonRequest('PUT', { platform, amount }));
+      }
+      pricing = null;
+      await load();
+      flash(changes.length ? 'Precio guardado' : 'Nada que guardar', true);
+    } catch (err) {
+      flash(err.message);
+    }
+  }
+
   // The random rating: the games without a rating, one after another; the list is refreshed when it closes.
   function rateAtRandom() {
     openRandomRating({
@@ -452,6 +499,15 @@ export function createLibrary(el, options) {
       case 'rate':
         rating = id;
         editing = null;
+        pricing = null;
+        return draw();
+      case 'price':
+        pricing = id;
+        editing = null;
+        rating = null;
+        return draw();
+      case 'cancel-price':
+        pricing = null;
         return draw();
       case 'cancel-rate':
         rating = null;
@@ -465,6 +521,7 @@ export function createLibrary(el, options) {
     const form = e.target.closest('.pf-date-form');
     if (!form) return;
     e.preventDefault();
+    if (form.dataset.priceForm !== undefined) return savePrices(Number(form.dataset.id), form);
     if (form.dataset.scoreForm !== undefined) {
       const score = parseScore(form.score.value);
       if (score == null || Number.isNaN(score)) return flash(SCORE_HINT);
