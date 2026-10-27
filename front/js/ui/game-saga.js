@@ -54,6 +54,7 @@ export async function showSaga(el, gameId) {
         </div>
       </div>
     </section>`);
+  el.closest('.gm-lower')?.classList.add('has-saga'); // only then the wide page makes a column for it
   el.onclick = (e) => {
     const fold = e.target.closest('[data-fold]');
     if (!fold) return;
