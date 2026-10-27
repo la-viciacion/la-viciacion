@@ -228,7 +228,6 @@ const EXTRAS = {
   trailer: { url: 'https://video.fastly.steamstatic.com/t.mp4', poster: 'https://video.fastly.steamstatic.com/p.jpg' },
   screenshots: [{ thumb: 'https://shared.steamstatic.com/t.jpg', full: 'https://shared.steamstatic.com/f.jpg' }, { thumb: 'https://shared.steamstatic.com/t2.jpg', full: 'javascript:alert(1)' }],
   metacritic: 92,
-  steam_reviews: { percent: 97, total: 1200 },
   esrb: 'Everyone 10+',
   website: 'https://www.celestegame.com',
 };
@@ -243,7 +242,6 @@ test('the outside facts go under the title and the Multimedia card starts folded
   await openWithExtras(EXTRAS);
   const facts = document.querySelector('#gmOutside').textContent;
   assert.match(facts, /Metacritic 92/);
-  assert.match(facts, /97 % reseñas positivas en Steam/);
   assert.match(facts, /Everyone 10\+/);
   assert.equal(document.querySelector('#gmOutside a').getAttribute('href'), 'https://www.celestegame.com');
   const block = document.querySelector('#gmMediaBlock');
@@ -264,7 +262,7 @@ test('the trailer is only loaded when it is played', async () => {
 });
 
 test('with nothing to say, or Steam and RAWG not available, nothing is added and the page works the same', async () => {
-  for (const answer of [{ available: false }, { available: true, description: null, trailer: null, screenshots: [], metacritic: null, steam_reviews: null, esrb: null, website: null }, () => { throw new Error('boom'); }]) {
+  for (const answer of [{ available: false }, { available: true, description: null, trailer: null, screenshots: [], metacritic: null, esrb: null, website: null }, () => { throw new Error('boom'); }]) {
     await openWithExtras(answer);
     assert.equal(document.querySelector('#gmOutside').children.length, 0);
     assert.equal(document.querySelector('#gmMedia').children.length, 0);
@@ -273,7 +271,7 @@ test('with nothing to say, or Steam and RAWG not available, nothing is added and
 });
 
 test('the card only shows what there is: a game with just a Metacritic score has no Multimedia card', async () => {
-  await openWithExtras({ available: true, description: null, trailer: null, screenshots: [], metacritic: 80, steam_reviews: null, esrb: null, website: null });
+  await openWithExtras({ available: true, description: null, trailer: null, screenshots: [], metacritic: 80, esrb: null, website: null });
   assert.match(document.querySelector('#gmOutside').textContent, /Metacritic 80/);
   assert.equal(document.querySelector('#gmMedia').children.length, 0);
 });

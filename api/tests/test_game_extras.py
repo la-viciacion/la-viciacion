@@ -32,27 +32,26 @@ class MediaUrlTests(unittest.TestCase):
 class ParseSteamTests(unittest.TestCase):
     def test_a_movie_listed_only_as_streams_uses_its_mp4_path(self):
         movie = {"id": 256706951, "highlight": True, "thumbnail": "https://shared.akamai.steamstatic.com/p.jpg", "dash_h264": "https://video.akamai.steamstatic.com/a.mpd", "hls_h264": "https://video.akamai.steamstatic.com/a.m3u8"}
-        out = game_extras.parse_steam({"movies": [movie]}, None)
+        out = game_extras.parse_steam({"movies": [movie]})
         self.assertEqual(out["trailer"], {"url": "https://cdn.akamai.steamstatic.com/steam/apps/256706951/movie480.mp4", "poster": "https://shared.akamai.steamstatic.com/p.jpg"})
-        self.assertIsNone(game_extras.parse_steam({"movies": [{"id": 1}]}, None)["trailer"])  # not a Steam movie entry
+        self.assertIsNone(game_extras.parse_steam({"movies": [{"id": 1}]})["trailer"])  # not a Steam movie entry
 
     def test_it_reads_the_description_the_highlighted_trailer_and_the_trusted_screenshots(self):
-        out = game_extras.parse_steam(STEAM_PAGE, {"query_summary": {"total_positive": 90, "total_negative": 10}})
+        out = game_extras.parse_steam(STEAM_PAGE)
         self.assertIn("de culto", out["description"])
         self.assertNotIn("<", out["description"])
         self.assertEqual(out["trailer"], {"url": "https://video.fastly.steamstatic.com/m480.mp4", "poster": "https://video.fastly.steamstatic.com/p.jpg"})
         self.assertEqual(out["screenshots"], [{"thumb": "https://shared.steamstatic.com/t1.jpg", "full": "https://shared.steamstatic.com/f1.jpg"}])
         self.assertEqual(out["metacritic"], 88)
-        self.assertEqual(out["steam_reviews"], {"percent": 90, "total": 100})
 
-    def test_few_reviews_say_nothing_and_missing_data_is_empty(self):
-        out = game_extras.parse_steam(None, {"query_summary": {"total_positive": 5, "total_negative": 1}})
-        self.assertEqual(out, {"description": None, "trailer": None, "screenshots": [], "metacritic": None, "steam_reviews": None})
-        self.assertIsNone(game_extras.parse_steam({"metacritic": {"score": 0}}, None)["metacritic"])
+    def test_missing_data_is_empty(self):
+        out = game_extras.parse_steam(None)
+        self.assertEqual(out, {"description": None, "trailer": None, "screenshots": [], "metacritic": None})
+        self.assertIsNone(game_extras.parse_steam({"metacritic": {"score": 0}})["metacritic"])
 
     def test_the_screenshots_are_capped(self):
         shots = [{"path_full": f"https://x.steamstatic.com/{i}.jpg"} for i in range(20)]
-        self.assertEqual(len(game_extras.parse_steam({"screenshots": shots}, None)["screenshots"]), game_extras.MAX_SCREENSHOTS)
+        self.assertEqual(len(game_extras.parse_steam({"screenshots": shots})["screenshots"]), game_extras.MAX_SCREENSHOTS)
 
 
 class ParseRawgTests(unittest.TestCase):
@@ -73,7 +72,7 @@ class ParseRawgTests(unittest.TestCase):
 
 class MergeTests(unittest.TestCase):
     def test_steam_leads_and_rawg_fills_in(self):
-        steam = game_extras.parse_steam({"short_description": "hola"}, None)
+        steam = game_extras.parse_steam({"short_description": "hola"})
         rawg = game_extras.parse_rawg({"metacritic": 70, "esrb_rating": {"name": "Teen"}}, {"results": [{"data": {"max": "https://media.rawg.io/v.mp4"}}]}, None)
         out = game_extras.merge(steam, rawg)
         self.assertEqual((out["description"], out["metacritic"], out["esrb"]), ("hola", 70, "Teen"))
@@ -95,10 +94,10 @@ class FetchTests(unittest.IsolatedAsyncioTestCase):
         self.fail = set()
 
     def serve(self, **pages):
-        """Answers by the kind of URL (appdetails, appreviews, movies, screenshots, or the RAWG game itself)."""
+        """Answers by the kind of URL (appdetails, movies, screenshots, or the RAWG game itself)."""
         async def get(url, params, timeout):
             self.calls.append(url)
-            name = next((n for n in ("appdetails", "appreviews", "movies", "screenshots") if n in url), "game")
+            name = next((n for n in ("appdetails", "movies", "screenshots") if n in url), "game")
             if name in self.fail:
                 return mock.Mock(ok=False, status_code=500, content=b"")
             body = pages.get(name, {})
@@ -108,10 +107,10 @@ class FetchTests(unittest.IsolatedAsyncioTestCase):
         self.addCleanup(patcher.stop)
 
     async def test_a_steam_game_asks_rawg_for_videos_and_pictures_only_when_steam_lacks_them(self):
-        self.serve(appdetails={"10": {"data": STEAM_PAGE}}, appreviews={"query_summary": {"total_positive": 30, "total_negative": 0}}, game={"metacritic": 90})
+        self.serve(appdetails={"10": {"data": STEAM_PAGE}}, game={"metacritic": 90})
         out = await game_extras.extras_of(5, "10")
         self.assertEqual(out["trailer"]["url"], "https://video.fastly.steamstatic.com/m480.mp4")
-        self.assertEqual((out["metacritic"], out["steam_reviews"]["percent"]), (90, 100))
+        self.assertEqual(out["metacritic"], 90)  # RAWG's first, then Steam's (88)
         self.assertFalse(any(u.endswith("/movies") or u.endswith("/screenshots") for u in self.calls))
 
     async def test_without_steam_media_rawg_provides_the_videos_and_pictures(self):
@@ -148,11 +147,11 @@ class FetchTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_one_source_failing_still_gives_the_other_and_all_failing_is_none_for_a_few_minutes(self):
         self.serve(game={"metacritic": 60})
-        self.fail = {"appdetails", "appreviews"}
+        self.fail = {"appdetails"}
         out = await game_extras.extras_of(5, "10")
         self.assertEqual(out["metacritic"], 60)
         game_extras.clear()
-        self.fail = {"appdetails", "appreviews", "game"}
+        self.fail = {"appdetails", "game"}
         self.calls.clear()
         self.assertIsNone(await game_extras.extras_of(5, "10"))
         asked = len(self.calls)
@@ -175,7 +174,7 @@ class FetchTests(unittest.IsolatedAsyncioTestCase):
             return mock.Mock(ok=True, status_code=200, content=b"", json=lambda: {})
         with mock.patch.object(game_extras.my_utils, "_http_get", new=slow):
             await asyncio.gather(*(game_extras.extras_of(None, "10") for _ in range(4)))
-        self.assertEqual(len(self.calls), 2)  # appdetails and appreviews, once
+        self.assertEqual(len(self.calls), 1)  # appdetails, once
         self.assertEqual(game_extras._asking, {})
 
 

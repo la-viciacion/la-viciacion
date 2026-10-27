@@ -1,5 +1,5 @@
-"""What the world outside says about a game (a trailer, screenshots, a short description in Spanish, Metacritic, the share
-of positive reviews on Steam, the age rating and the official site), asked to Steam and RAWG when a game's page opens and
+"""What the world outside says about a game (a trailer, screenshots, a short description in Spanish, Metacritic, the age
+rating and the official site), asked to Steam and RAWG when a game's page opens and
 kept in memory for a day.
 
 Nothing is stored in the database: it is outside data that changes rarely, so each worker keeps the answers it got for
@@ -25,12 +25,10 @@ CACHE_SECONDS = 24 * 3600
 FAILURE_SECONDS = 5 * 60
 MAX_CACHED = 500  # games kept; the one that expires first goes when there are more
 MAX_SCREENSHOTS = 8
-MIN_REVIEWS = 20  # a percentage of fewer reviews says nothing
 MEDIA_HOSTS = ("steamstatic.com", "akamaihd.net", "rawg.io")  # where the videos and pictures may come from
 
 STEAM_MOVIE = "https://cdn.akamai.steamstatic.com/steam/apps/{movie_id}/movie480.mp4"  # what a plain <video> can play
 STEAM_DETAILS = "https://store.steampowered.com/api/appdetails"
-STEAM_REVIEWS = "https://store.steampowered.com/appreviews/{steam_id}"
 RAWG_GAME = "https://api.rawg.io/api/games/{rawg_id}"
 
 _cache: dict[tuple, tuple[float, dict | None]] = {}  # (rawg id, steam id) -> (when it expires, the extras or None if nothing answered)
@@ -67,9 +65,9 @@ def _trailer(video: dict, poster) -> dict | None:
     return {"url": url, "poster": media_url(poster)} if url else None
 
 
-def parse_steam(details, reviews) -> dict:
-    """The parts of Steam's store page and review summary the app uses (both can be None or empty)."""
-    out = {"description": None, "trailer": None, "screenshots": [], "metacritic": None, "steam_reviews": None}
+def parse_steam(details) -> dict:
+    """The parts of Steam's store page the app uses (it can be None or empty)."""
+    out = {"description": None, "trailer": None, "screenshots": [], "metacritic": None}
     data = details if isinstance(details, dict) else {}
     out["description"] = clean_text(data.get("short_description"))
     movies = [m for m in data.get("movies") or [] if isinstance(m, dict)]
@@ -85,11 +83,6 @@ def parse_steam(details, reviews) -> dict:
     metacritic = data.get("metacritic")
     score = metacritic.get("score") if isinstance(metacritic, dict) else None
     out["metacritic"] = score if isinstance(score, int) and score > 0 else None
-    summary = (reviews or {}).get("query_summary") if isinstance(reviews, dict) else None
-    if isinstance(summary, dict):
-        positive, negative = summary.get("total_positive") or 0, summary.get("total_negative") or 0
-        if positive + negative >= MIN_REVIEWS:
-            out["steam_reviews"] = {"percent": round(100 * positive / (positive + negative)), "total": positive + negative}
     return out
 
 
@@ -124,7 +117,6 @@ def merge(steam: dict, rawg: dict) -> dict:
         "trailer": steam["trailer"] or rawg["trailer"],
         "screenshots": steam["screenshots"] or rawg["screenshots"],
         "metacritic": rawg["metacritic"] or steam["metacritic"],
-        "steam_reviews": steam["steam_reviews"],
         "esrb": rawg["esrb"],
         "website": rawg["website"],
     }
@@ -176,12 +168,11 @@ async def _fetch_once(key: tuple) -> dict | None:
 async def _fetch(rawg_id: int | None, steam_id: str | None) -> dict | None:
     rawg_params = {"key": config.RAWG_API_KEY}
     # no coroutine for what cannot be asked: None stands for "not asked", {} would stand for an answer
-    steam_details, steam_reviews, rawg_detail = await asyncio.gather(
+    steam_details, rawg_detail = await asyncio.gather(
         _get_json(STEAM_DETAILS, {"appids": steam_id, "l": "spanish"}) if steam_id else _none(),
-        _get_json(STEAM_REVIEWS.format(steam_id=steam_id), {"json": 1, "language": "all", "purchase_type": "all", "num_per_page": 0}) if steam_id else _none(),
         _get_json(RAWG_GAME.format(rawg_id=rawg_id), rawg_params) if rawg_id else _none(),
     )
-    steam = parse_steam(((steam_details or {}).get(steam_id) or {}).get("data") if steam_id else None, steam_reviews)
+    steam = parse_steam(((steam_details or {}).get(steam_id) or {}).get("data") if steam_id else None)
     # RAWG's videos and pictures only when Steam had none: they are a fallback, and each is a call
     wants_trailer = rawg_id and not steam["trailer"]
     wants_shots = rawg_id and not steam["screenshots"]
@@ -191,7 +182,7 @@ async def _fetch(rawg_id: int | None, steam_id: str | None) -> dict | None:
     )
     rawg = parse_rawg(rawg_detail, movies, shots)
     extras = merge(steam, rawg)
-    answered = any(answer is not None for answer in (steam_details, steam_reviews, rawg_detail))
+    answered = any(answer is not None for answer in (steam_details, rawg_detail))
     if not answered:
         _remember((rawg_id, steam_id), None, FAILURE_SECONDS)
         return None
