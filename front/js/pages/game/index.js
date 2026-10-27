@@ -94,12 +94,12 @@ function draw(data) {
         ${paceLines(data.pace).map((line, i) => (i === 0 ? html`<strong>${line}</strong>` : html`<span class="pf-sub">${line}</span>`))}
       </div>` : ''}
 
-    <div id="gmSaga"></div>
-
     <div class="section-header"><h2 class="section-title">Quién lo juega</h2><div class="section-line"></div></div>
     ${players.length
       ? html`<ul class="gm-players pf-card">${players.map(playerRow)}</ul>`
-      : html`<div class="pf-empty">Nadie del grupo lo tiene todavía.</div>`}`);
+      : html`<div class="pf-empty">Nadie del grupo lo tiene todavía.</div>`}
+
+    <div id="gmSaga"></div>`); // last: a long saga would push who plays the game far down
 
   hydratePhotos(main);
   showSaga(main.querySelector('#gmSaga'), game.id); // RAWG may take a while: the page does not wait for it
