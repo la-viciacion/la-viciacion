@@ -176,6 +176,8 @@ REGISTRY: dict[str, Spec] = {
     "ai.provider": Spec("str", None, env="AI_PROVIDER", env_only=True),  # "google" or "openai" (utils/ai.py PROVIDERS)
     "ai.api_key": Spec("str", None, secret=True, env_only=True, env="AI_API_KEY"),
     "ai.model": Spec("str", None, env="AI_MODEL", env_only=True),  # no default in the code: without it the AI does not write
+    # Admin key of OpenAI, only to read what the organization has spent (utils/ai_usage.py); it cannot write text
+    "ai.openai_admin_key": Spec("str", None, secret=True, env_only=True, env="OPENAI_ADMIN_KEY"),
     # The chat assistant (chat/): its own switch and instructions. It talks to the same provider with the same key as the
     # notices (ai.provider, ai.api_key); only the model may be its own (CHAT_AI_MODEL, optional: without it, ai.model).
     "chat.enabled": Spec("bool", True),
