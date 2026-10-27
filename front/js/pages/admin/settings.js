@@ -31,7 +31,9 @@ const ANNUAL_MONTHS = [[12, 'Diciembre'], [1, 'Enero']];
 export const ANNUAL_DAYS = { 12: [20, 28], 1: [1, 5] };
 
 // how the group hears about the wished games that come out (api/src/utils/settings.py WISHLIST_GROUP_NOTICES)
-const WISHLIST_NOTICES = [['eve', 'La víspera de cada estreno'], ['weekly', 'Una vez por semana'], ['off', 'Ninguno']];
+const WISHLIST_NOTICES = [['eve', 'La víspera de cada estreno'], ['day', 'El mismo día del estreno'], ['weekly', 'Una vez por semana'], ['off', 'Ninguno']];
+
+const WISHLIST_JOBS = { eve: 'wishlist_eve', day: 'wishlist_day', weekly: 'wishlist_week' }; // the job each mode runs
 
 const WEEKDAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
@@ -154,9 +156,9 @@ function view(values, jobs, pushDevices, mail, aiUses, aiModel, chat) {
         <label>Aviso al grupo
           <select class="adm-input" name="wishlist.group_notice">${WISHLIST_NOTICES.map(([value, label]) => html`<option value="${value}">${label}</option>`)}</select>
         </label>
-        <div class="adm-sub">Solo uno a la vez. Necesita las notificaciones activadas. La víspera se envía cada día, y el semanal cada domingo con los juegos que salen en los 7 días siguientes.</div>
+        <div class="adm-sub">Solo uno a la vez. Necesita las notificaciones activadas. La víspera y el mismo día se envían cada día, y el semanal cada domingo con los juegos que salen en los 7 días siguientes.</div>
         <label>Hora <input class="adm-input" type="time" name="wishlist.time" required /></label>
-        <div class="adm-sub">Mejor después de las 09:00, cuando se actualizan las fechas de salida. Si el servidor está apagado a esa hora, se envía al volver siempre que no hayan pasado más de 3 horas (la víspera) o 6 (el semanal). ${lastRun(values['wishlist.group_notice'] === 'weekly' ? jobs.wishlist_week : jobs.wishlist_eve)}</div>
+        <div class="adm-sub">Mejor después de las 09:00, cuando se actualizan las fechas de salida. Si el servidor está apagado a esa hora, se envía al volver siempre que no hayan pasado más de 3 horas (la víspera y el mismo día) o 6 (el semanal). ${lastRun(jobs[WISHLIST_JOBS[values['wishlist.group_notice']]])}</div>
       </section>`,
 
     monthly: html`

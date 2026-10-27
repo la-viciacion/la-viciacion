@@ -73,8 +73,27 @@ WISHLIST_RELEASE_PROMPT = """
 Reescribe el mensaje proporcionado, un aviso para un grupo de amigos que juegan a videojuegos: mañana sale a la
 venta un juego (o varios) que alguien tiene en su lista de deseados.
 
-Empieza por lo importante: di el nombre de cada juego, tal como aparece en el mensaje original (con su enlace, si lo
-hay, tal como viene: [Texto](enlace)), y que sale mañana.
+Empieza por lo importante: deja la primera línea del mensaje original (la cabecera, con cuántos juegos salen) tal
+cual. Debajo di el nombre de cada juego, tal como aparece en el mensaje original (con su enlace, si lo hay, tal como
+viene: [Texto](enlace)), y que sale mañana.
+Si hay varios juegos, menciónalos todos, sin dejarte ninguno.
+Menciona también a todas las personas que lo esperan, pero de pasada y con naturalidad, dentro de la frase (por
+ejemplo, "Ana y Bea ya lo tienen apuntado"): sin repetir "para Fulano" ni hacer una lista aparte.
+Después, como mucho, una frase corta con un toque de humor (si conoces alguna broma de alguno de los juegos, puedes
+usarla).
+
+Sé breve: una frase por juego y la del humor. No expliques nada ni te alargues.
+No hables de logros ni de horas jugadas: solo se trata de un estreno.
+El texto debe ser Markdown válido: deja los nombres de los juegos con el formato del mensaje original (*así*).
+"""
+
+WISHLIST_DAY_PROMPT = """
+Reescribe el mensaje proporcionado, un aviso para un grupo de amigos que juegan a videojuegos: hoy sale a la venta
+un juego (o varios) que alguien tiene en su lista de deseados.
+
+Empieza por lo importante: deja la primera línea del mensaje original (la cabecera, con cuántos juegos salen) tal
+cual. Debajo di el nombre de cada juego, tal como aparece en el mensaje original (con su enlace, si lo hay, tal como
+viene: [Texto](enlace)), y que sale hoy.
 Si hay varios juegos, menciónalos todos, sin dejarte ninguno.
 Menciona también a todas las personas que lo esperan, pero de pasada y con naturalidad, dentro de la frase (por
 ejemplo, "Ana y Bea ya lo tienen apuntado"): sin repetir "para Fulano" ni hacer una lista aparte.
@@ -171,6 +190,11 @@ USES: dict[str, Use] = {
         "Sale un juego deseado",
         "Aviso al grupo, el día antes, cuando sale un juego que alguien tiene en su lista de deseados.",
         WISHLIST_RELEASE_PROMPT,
+    ),
+    "wishlist_day": Use(
+        "Sale hoy un juego deseado",
+        "Aviso al grupo, el mismo día, cuando sale un juego que alguien tiene en su lista de deseados.",
+        WISHLIST_DAY_PROMPT,
     ),
     "wishlist_week": Use(
         "Salen juegos deseados esta semana",

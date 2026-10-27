@@ -77,7 +77,7 @@ class RankingNoticeTests(unittest.TestCase):
 class WishlistNoticeTests(unittest.TestCase):
     def test_it_names_each_game_and_everybody_who_waits_for_it_and_says_tomorrow(self):
         msg = actions.wishlist_eve_message([("Hades II", ["Ana", "Bea"], None), ("Silksong", ["Cai"], None)])
-        self.assertEqual(msg.count("Mañana sale"), 2)
+        self.assertTrue(msg.startswith("📅 *Mañana salen 2 juegos deseados*"))  # the prompt asks to keep the first line
         for name in ("Hades II", "Silksong", "Ana y Bea", "Cai"):
             self.assertIn(name, msg)
 
@@ -115,7 +115,7 @@ class PromptsAskForWhatTheNoticesCarryTests(unittest.TestCase):
         self.assertIn("tercera persona", self.prompt("completed_game_recommendation"))
 
     def test_every_prompt_asks_to_be_brief_and_to_start_with_the_message_itself(self):
-        for use in ("new_game", "completed_game", "completed_game_recommendation", "ranking_players", "ranking_games", "wishlist_release", "wishlist_week"):
+        for use in ("new_game", "completed_game", "completed_game_recommendation", "ranking_players", "ranking_games", "wishlist_release", "wishlist_day", "wishlist_week"):
             text = self.prompt(use)
             if use == "completed_game_recommendation":
                 self.assertIn("No te alargues", text, use)  # it only adds one last short sentence
@@ -145,7 +145,12 @@ class PromptsAskForWhatTheNoticesCarryTests(unittest.TestCase):
 
     def test_the_wishlist_asks_for_every_game_every_person_and_tomorrow(self):
         text = self.prompt("wishlist_release")
-        for wanted in ("nombre de cada juego", "todas las personas", "mañana", "todos"):
+        for wanted in ("primera línea del mensaje original", "nombre de cada juego", "todas las personas", "mañana", "todos"):
+            self.assertIn(wanted, text)
+
+    def test_the_same_day_wishlist_asks_for_every_game_every_person_and_today(self):
+        text = self.prompt("wishlist_day")
+        for wanted in ("primera línea del mensaje original", "nombre de cada juego", "todas las personas", "hoy", "todos"):
             self.assertIn(wanted, text)
 
     def test_the_weekly_wishlist_asks_for_every_game_every_person_and_the_weekday(self):
