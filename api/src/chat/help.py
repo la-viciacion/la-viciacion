@@ -143,8 +143,9 @@ TOPICS = (
         "notificaciones", "Notificaciones, Telegram y avisos", ("notificacion", "notificaciones", "aviso", "avisos", "telegram", "push", "bot", "activate", "menu", "semanal"),
         "notificaciones.md",
         "Hay dos canales: Telegram (un grupo y un bot) y las notificaciones push del móvil o del navegador. Al grupo se avisa de logros (los secretos sin "
-        "detalle), juegos completados o empezados, cambios en los rankings, rachas perdidas, el día antes de un lanzamiento deseado, el resumen y los retos. En "
-        "privado: el resumen semanal (si el administrador lo activa), el timer olvidado y los logros secretos propios. Para vincular Telegram: tener un @usuario "
+        "detalle), juegos completados o empezados, cambios en los rankings, rachas perdidas, los lanzamientos deseados (el día antes o un resumen cada domingo, según el administrador), el resumen y los retos. En "
+        "privado: el resumen semanal (si el administrador lo activa), el timer olvidado, el juego deseado que sale hoy y los logros secretos propios. "
+        "La campana de la barra superior abre Avisos, la bandeja de la app con lo dicho al grupo y a ti (se borra con la × o con Vaciar todo). Para vincular Telegram: tener un @usuario "
         "de Telegram, que un administrador ponga el mismo usuario en la app y escribir /activate en el grupo. El bot (/menu) consulta estadísticas, rankings y "
         "recomendados, y es de solo lectura. Push: instalar la PWA (en iPhone es obligatorio) y aceptar el permiso; en la tarjeta de dispositivos se elige "
         "cuáles reciben también los avisos del grupo. Qué se recibe y por qué canal se elige en Perfil → Ajustes → Notificaciones.",
