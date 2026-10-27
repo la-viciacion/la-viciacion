@@ -7,6 +7,7 @@ import { paceLines } from '../../lib/pace.js';
 import { wantedBy } from '../../lib/wishlist.js';
 import { hydratePhotos, playerAvatar } from '../../ui/avatar.js';
 import { scoreBadge } from '../../ui/score-badge.js';
+import { showSaga } from '../../ui/game-saga.js';
 import { toast } from '../../ui/toast.js';
 import { openRating } from '../home/rating.js';
 
@@ -93,12 +94,15 @@ function draw(data) {
         ${paceLines(data.pace).map((line, i) => (i === 0 ? html`<strong>${line}</strong>` : html`<span class="pf-sub">${line}</span>`))}
       </div>` : ''}
 
+    <div id="gmSaga"></div>
+
     <div class="section-header"><h2 class="section-title">Quién lo juega</h2><div class="section-line"></div></div>
     ${players.length
       ? html`<ul class="gm-players pf-card">${players.map(playerRow)}</ul>`
       : html`<div class="pf-empty">Nadie del grupo lo tiene todavía.</div>`}`);
 
   hydratePhotos(main);
+  showSaga(main.querySelector('#gmSaga'), game.id); // RAWG may take a while: the page does not wait for it
   main.querySelector('#gmBack').addEventListener('click', back);
   main.querySelector('#gmWish')?.addEventListener('click', () => toggleWish(game.id, data.wished));
   main.querySelector('#gmRate')?.addEventListener('click', () => openRating({

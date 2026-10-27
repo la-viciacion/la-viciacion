@@ -388,3 +388,8 @@
 .gl-bar-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gl-bar { height: 8px; border-radius: 4px; background: var(--bg-surface); overflow: hidden; }
 .gl-bar > i { display: block; height: 100%; background: var(--accent-teal); }
+.sg-games { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.sg-game { display: flex; gap: 12px; align-items: flex-start; }
+.sg-game.current { border-left: 3px solid var(--accent-teal); padding-left: 8px; }
+.sg-year { width: 40px; flex-shrink: 0; }
+.sg-summary { margin-bottom: 4px; }
