@@ -96,7 +96,9 @@ TOPICS = (
         "completados, notas y logros). Jugadores lista a los miembros con sus cifras, y en la página de otro jugador aparece la afinidad con uno mismo: "
         "juegos en común (50 %), notas parecidas (30 %) y tiempo en los mismos géneros (20 %); con menos de 3 juegos en común dice que hay pocos datos. "
         "Juegos es el catálogo compartido (buscar, ordenar, filtrar, añadir desde RAWG) y la página de cada juego tiene portada, géneros, el tiempo medio para "
-        "completarlo (de HowLongToBeat), las cifras del grupo, la nota propia y quién lo tiene. Calendario pone en un mes todos los juegos con fecha de "
+        "completarlo (de HowLongToBeat), las cifras del grupo, la nota propia y quién lo tiene. Si Steam o RAWG lo conocen, bajo el título salen la nota de Metacritic, "
+        "el porcentaje de reseñas positivas de Steam, la clasificación por edades y la web oficial, y una tarjeta plegada «Multimedia» con la descripción en español, "
+        "el tráiler (se carga al pulsarlo) y capturas; los juegos que ninguno conoce, como muchos de Nintendo, no la tienen. Calendario pone en un mes todos los juegos con fecha de "
         "lanzamiento.",
     ),
     Topic(

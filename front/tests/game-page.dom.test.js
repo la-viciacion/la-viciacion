@@ -221,3 +221,59 @@ test('the cost per hour of the group is a figure of the game when the API gives 
   await settle();
   assert.deepEqual(text('.pf-stat-label'), ['Jugadores', 'Horas del grupo', 'Completados', 'Nota media (2)']);
 });
+
+const EXTRAS = {
+  available: true,
+  description: 'Un plataformas <b>duro</b>.',
+  trailer: { url: 'https://video.fastly.steamstatic.com/t.mp4', poster: 'https://video.fastly.steamstatic.com/p.jpg' },
+  screenshots: [{ thumb: 'https://shared.steamstatic.com/t.jpg', full: 'https://shared.steamstatic.com/f.jpg' }, { thumb: 'https://shared.steamstatic.com/t2.jpg', full: 'javascript:alert(1)' }],
+  metacritic: 92,
+  steam_reviews: { percent: 97, total: 1200 },
+  esrb: 'Everyone 10+',
+  website: 'https://www.celestegame.com',
+};
+
+const openWithExtras = async (extras) => {
+  installApi({ 'GET /games/celeste/extras': extras, 'GET /games/celeste/overview': OVERVIEW, 'GET /users/photo/': json({ detail: 'no' }, 404) });
+  await page.render({ main: main(), user: { id: 1, username: 'ana' } });
+  await settle();
+};
+
+test('the outside facts go under the title and the Multimedia card starts folded', async () => {
+  await openWithExtras(EXTRAS);
+  const facts = document.querySelector('#gmOutside').textContent;
+  assert.match(facts, /Metacritic 92/);
+  assert.match(facts, /97 % reseñas positivas en Steam/);
+  assert.match(facts, /Everyone 10\+/);
+  assert.equal(document.querySelector('#gmOutside a').getAttribute('href'), 'https://www.celestegame.com');
+  const block = document.querySelector('#gmMediaBlock');
+  assert.equal(block.classList.contains('folded'), true);
+  document.querySelector('#gmMedia [data-fold]').click();
+  assert.equal(block.classList.contains('folded'), false);
+  assert.equal(document.querySelector('.gm-desc').querySelectorAll('b').length, 0); // text, never markup
+  assert.deepEqual([...document.querySelectorAll('.gm-shots a')].map((a) => a.getAttribute('href')), ['https://shared.steamstatic.com/f.jpg']); // an unsafe link is left out
+});
+
+test('the trailer is only loaded when it is played', async () => {
+  await openWithExtras(EXTRAS);
+  assert.equal(document.querySelector('#gmMedia video'), null);
+  document.querySelector('#gmMedia [data-trailer]').click();
+  const video = document.querySelector('#gmMedia video');
+  assert.equal(video.getAttribute('src'), 'https://video.fastly.steamstatic.com/t.mp4');
+  assert.equal(document.querySelector('#gmMedia [data-trailer]'), null);
+});
+
+test('with nothing to say, or Steam and RAWG not available, nothing is added and the page works the same', async () => {
+  for (const answer of [{ available: false }, { available: true, description: null, trailer: null, screenshots: [], metacritic: null, steam_reviews: null, esrb: null, website: null }, () => { throw new Error('boom'); }]) {
+    await openWithExtras(answer);
+    assert.equal(document.querySelector('#gmOutside').children.length, 0);
+    assert.equal(document.querySelector('#gmMedia').children.length, 0);
+    assert.equal(document.querySelector('h1').textContent, 'Celeste <b>');
+  }
+});
+
+test('the card only shows what there is: a game with just a Metacritic score has no Multimedia card', async () => {
+  await openWithExtras({ available: true, description: null, trailer: null, screenshots: [], metacritic: 80, steam_reviews: null, esrb: null, website: null });
+  assert.match(document.querySelector('#gmOutside').textContent, /Metacritic 80/);
+  assert.equal(document.querySelector('#gmMedia').children.length, 0);
+});

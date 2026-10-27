@@ -8,6 +8,7 @@ import { perHour } from '../../lib/money.js';
 import { wantedBy } from '../../lib/wishlist.js';
 import { hydratePhotos, playerAvatar } from '../../ui/avatar.js';
 import { scoreBadge } from '../../ui/score-badge.js';
+import { showExtras } from '../../ui/game-extras.js';
 import { showSaga } from '../../ui/game-saga.js';
 import { toast } from '../../ui/toast.js';
 import { openRating } from '../home/rating.js';
@@ -67,6 +68,7 @@ function draw(data) {
         <div class="gm-genres">${game.genres.map((genre) => html`<span class="pf-tag muted">${genre}</span>`)}</div>
         ${tags.length ? html`<div class="gm-genres gm-tags" aria-label="Etiquetas">${tags.map((tag) => html`<span class="pf-tag muted">${tag}</span>`)}</div>` : ''}
         ${details ? html`<div class="pf-sub">${details}</div>` : ''}
+        <div id="gmOutside"></div>
         ${game.slug ? html`<div class="gm-rawg"><a class="pf-btn gm-rawg-btn" href="https://rawg.io/games/${encodeURIComponent(game.slug)}" target="_blank" rel="noopener noreferrer">Ver en RAWG <span aria-hidden="true">↗</span></a></div>` : ''}
       </div>
     </div>
@@ -96,6 +98,8 @@ function draw(data) {
         ${paceLines(data.pace).map((line, i) => (i === 0 ? html`<strong>${line}</strong>` : html`<span class="pf-sub">${line}</span>`))}
       </div>` : ''}
 
+    <div id="gmMedia"></div>
+
     <div class="section-header"><h2 class="section-title">Quién lo juega</h2><div class="section-line"></div></div>
     ${players.length
       ? html`<ul class="gm-players pf-card">${players.map(playerRow)}</ul>`
@@ -104,6 +108,7 @@ function draw(data) {
     <div id="gmSaga"></div>`); // last: a long saga would push who plays the game far down
 
   hydratePhotos(main);
+  showExtras({ head: main.querySelector('#gmOutside'), media: main.querySelector('#gmMedia') }, game.id); // Steam and RAWG too
   showSaga(main.querySelector('#gmSaga'), game.id); // RAWG may take a while: the page does not wait for it
   main.querySelector('#gmBack').addEventListener('click', back);
   main.querySelector('#gmWish')?.addEventListener('click', () => toggleWish(game.id, data.wished));
