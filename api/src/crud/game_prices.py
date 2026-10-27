@@ -8,13 +8,16 @@ price away): it is never given per player."""
 import datetime
 
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..database import models
+from ..utils.ttl_cache import TtlCache
 
 MIN_CONTRIBUTORS = 3  # players needed for the group's cost per hour of a game to be shown
 MIN_SECONDS = 1800  # a game played less than this has no cost per hour (the figure would mean nothing)
 MAX_CENTS = 1_000_000  # 10,000 euros: more is a typing mistake
+_group_cache = TtlCache(120)  # the group's cost per hour: a figure a couple of minutes old is fine
 
 
 class PriceError(ValueError):
@@ -61,9 +64,14 @@ def set_price(db: Session, user_id: int, game_id: str, platform: str, amount) ->
     cents = cents_of(amount)
     if row is None:
         db.add(models.UserGamePrice(user_id=user_id, game_id=game_id, platform=platform, amount_cents=cents))
-    else:
-        row.amount_cents = cents
-        row.updated_at = datetime.datetime.now()
+        try:
+            db.commit()
+            return cents
+        except IntegrityError:  # the same price was saved at the same moment (two tabs, a double click): update that one
+            db.rollback()
+            row = db.query(models.UserGamePrice).filter_by(user_id=user_id, game_id=game_id, platform=platform).one()
+    row.amount_cents = cents
+    row.updated_at = datetime.datetime.now()
     db.commit()
     return cents
 
@@ -101,9 +109,12 @@ def group_rows(prices: dict[tuple[int, str], int], seconds: dict[tuple[int, str]
     return sorted(rows, key=lambda r: (r["per_hour_cents"], -r["contributors"], r["game_id"]))
 
 
-def _totals_by_player_and_game(db: Session, user_ids: set[int]) -> dict[tuple[int, str], int]:
+def _totals_by_player_and_game(db: Session, user_ids: set[int], game_id: str | None = None) -> dict[tuple[int, str], int]:
     totals: dict[tuple[int, str], int] = {}
-    for user_id, game_id, cents in db.query(models.UserGamePrice.user_id, models.UserGamePrice.game_id, models.UserGamePrice.amount_cents):
+    query = db.query(models.UserGamePrice.user_id, models.UserGamePrice.game_id, models.UserGamePrice.amount_cents)
+    if game_id is not None:
+        query = query.filter(models.UserGamePrice.game_id == game_id)  # one game's prices, not the whole table
+    for user_id, game_id, cents in query:
         if user_id in user_ids:
             totals[(user_id, game_id)] = totals.get((user_id, game_id), 0) + cents
     return totals
@@ -115,7 +126,11 @@ def _players(db: Session) -> set[int]:
 
 def group_value(db: Session, limit: int = 10) -> dict:
     """The group's cost per hour of the games with enough contributors: the cheapest and the most expensive per hour
-    (`limit` each), and how many games there are. No player, no price."""
+    (`limit` each), and how many games there are. No player, no price. Kept for a couple of minutes."""
+    return _group_cache.get(limit, lambda: _group_value(db, limit))
+
+
+def _group_value(db: Session, limit: int) -> dict:
     prices = _totals_by_player_and_game(db, _players(db))
     rows = group_rows(prices, _seconds(db, game_ids={game for _, game in prices}))
     names = {game.id: game for game in db.query(models.Game).filter(models.Game.id.in_([r["game_id"] for r in rows] or [""]))}
@@ -130,7 +145,7 @@ def group_value(db: Session, limit: int = 10) -> dict:
 
 def game_value(db: Session, game_id: str) -> dict | None:
     """The group's mean cost per hour of one game, or None when fewer than MIN_CONTRIBUTORS players contribute to it."""
-    prices = {key: cents for key, cents in _totals_by_player_and_game(db, _players(db)).items() if key[1] == game_id}
+    prices = _totals_by_player_and_game(db, _players(db), game_id)
     rows = group_rows(prices, _seconds(db, game_ids=[game_id]))
     return {"per_hour_cents": rows[0]["per_hour_cents"], "contributors": rows[0]["contributors"]} if rows else None
 

@@ -5,12 +5,14 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..database import models
+from ..utils.ttl_cache import TtlCache
 from . import games, users
 
 LIST_SIZE = 10  # items of each list
 HIDDEN_MAX_PLAYERS = 2  # a hidden gem is had by this many players at most...
 HIDDEN_MIN_SCORE = 80  # ...and rated this well (the mean of the ratings) at least
 COVERAGE_SIZE = 10  # genres and platforms listed
+_cache = TtlCache(120)  # the whole group's library changes slowly and costs a scan of every library: a couple of minutes old is fine
 
 
 # ── the lists (pure, from the facts) ────────────────────────────
@@ -134,7 +136,11 @@ def _facts(db: Session) -> dict:
 
 
 def library(db: Session) -> dict:
-    """The group's library: totals and the lists above (see the module's docstring)."""
+    """The group's library: totals and the lists above (see the module's docstring). Kept for a couple of minutes."""
+    return _cache.get("library", lambda: _library(db))
+
+
+def _library(db: Session) -> dict:
     facts = _facts(db)
     meta = facts["meta"]
     names = {user_id: name or username for user_id, username, name in db.query(models.User.id, models.User.username, models.User.name)}

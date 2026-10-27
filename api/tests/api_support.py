@@ -27,7 +27,7 @@ from src import auth
 from src.crud.achievements import Achievements
 from src.database import database, models
 from src.routers import basic
-from src.utils import actions, my_utils, settings
+from src.utils import actions, my_utils, settings, ttl_cache
 from tests.app_routes import BASE, ROUTERS
 from tests.mariadb_db import MariaDBTestCase
 
@@ -120,6 +120,7 @@ class ApiTestCase(MariaDBTestCase):
         ):
             limiter._failures.clear()
         settings._cache.clear()  # settings are cached for a few seconds in the process
+        ttl_cache.clear_all()  # so are the group's library and cost per hour
         self.background = {}
         self.real_actions = {name: getattr(actions, name) for name in BACKGROUND}  # for tests of the work itself
         for name in BACKGROUND:
