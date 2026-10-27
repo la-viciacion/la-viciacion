@@ -11,7 +11,7 @@ class GameExtrasTests(ApiTestCase):
         self.ana = self.user("ana")
         self.game("hades", "Hades", rawg_id=100, steam_id="1145360")
         self.game("alone", "Alone")  # no RAWG nor Steam id
-        self.extras = mock.AsyncMock(return_value={"description": "Un juego", "trailer": None, "screenshots": [], "metacritic": 93, "esrb": None, "website": None})
+        self.extras = mock.AsyncMock(return_value={"description": "Un juego", "trailer": None, "screenshots": [], "metacritic": 93, "esrb": None})
         patcher = mock.patch.object(game_extras, "extras_of", self.extras)
         patcher.start()
         self.addCleanup(patcher.stop)

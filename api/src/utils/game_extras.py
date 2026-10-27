@@ -1,5 +1,5 @@
 """What the world outside says about a game (a trailer, screenshots, a short description in Spanish, Metacritic, the age
-rating and the official site), asked to Steam and RAWG when a game's page opens and
+rating), asked to Steam and RAWG when a game's page opens and
 kept in memory for a day.
 
 Nothing is stored in the database: it is outside data that changes rarely, so each worker keeps the answers it got for
@@ -88,15 +88,12 @@ def parse_steam(details) -> dict:
 
 def parse_rawg(detail, movies, screenshots) -> dict:
     """The parts of RAWG's game page, trailers and screenshots the app uses (RAWG sends explicit nulls for some fields)."""
-    out = {"trailer": None, "screenshots": [], "metacritic": None, "esrb": None, "website": None}
+    out = {"trailer": None, "screenshots": [], "metacritic": None, "esrb": None}
     data = detail if isinstance(detail, dict) else {}
     score = data.get("metacritic")
     out["metacritic"] = score if isinstance(score, int) and score > 0 else None
     esrb = data.get("esrb_rating")
     out["esrb"] = esrb.get("name") if isinstance(esrb, dict) and esrb.get("name") else None
-    website = data.get("website")
-    if isinstance(website, str) and urlparse(website.strip()).scheme in ("http", "https"):
-        out["website"] = website.strip()
     for movie in (movies or {}).get("results") or []:
         out["trailer"] = _trailer(movie, movie.get("preview")) if isinstance(movie, dict) else None
         if out["trailer"]:
@@ -118,7 +115,6 @@ def merge(steam: dict, rawg: dict) -> dict:
         "screenshots": steam["screenshots"] or rawg["screenshots"],
         "metacritic": rawg["metacritic"] or steam["metacritic"],
         "esrb": rawg["esrb"],
-        "website": rawg["website"],
     }
 
 

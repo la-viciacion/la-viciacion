@@ -229,7 +229,6 @@ const EXTRAS = {
   screenshots: [{ thumb: 'https://shared.steamstatic.com/t.jpg', full: 'https://shared.steamstatic.com/f.jpg' }, { thumb: 'https://shared.steamstatic.com/t2.jpg', full: 'javascript:alert(1)' }],
   metacritic: 92,
   esrb: 'Everyone 10+',
-  website: 'https://www.celestegame.com',
 };
 
 const openWithExtras = async (extras) => {
@@ -241,9 +240,12 @@ const openWithExtras = async (extras) => {
 test('the outside facts go under the title and the Multimedia card starts folded', async () => {
   await openWithExtras(EXTRAS);
   const facts = document.querySelector('#gmOutside').textContent;
-  assert.match(facts, /Metacritic 92/);
+  assert.match(facts, /92Metacritic/);
   assert.match(facts, /Everyone 10\+/);
-  assert.equal(document.querySelector('#gmOutside a').getAttribute('href'), 'https://www.celestegame.com');
+  assert.equal(document.querySelector('#gmOutside .gm-badge.good').textContent, '92'); // 75 and up is green
+  assert.equal(document.querySelector('#gmOutside .gm-badge.age').textContent, 'E10+');
+  // the facts and the RAWG button share one row
+  assert.equal(document.querySelector('#gmOutside').parentElement.querySelector('.gm-rawg-btn') !== null, true);
   const block = document.querySelector('#gmMediaBlock');
   assert.equal(block.classList.contains('folded'), true);
   document.querySelector('#gmMedia [data-fold]').click();
@@ -262,7 +264,7 @@ test('the trailer is only loaded when it is played', async () => {
 });
 
 test('with nothing to say, or Steam and RAWG not available, nothing is added and the page works the same', async () => {
-  for (const answer of [{ available: false }, { available: true, description: null, trailer: null, screenshots: [], metacritic: null, esrb: null, website: null }, () => { throw new Error('boom'); }]) {
+  for (const answer of [{ available: false }, { available: true, description: null, trailer: null, screenshots: [], metacritic: null, esrb: null }, () => { throw new Error('boom'); }]) {
     await openWithExtras(answer);
     assert.equal(document.querySelector('#gmOutside').children.length, 0);
     assert.equal(document.querySelector('#gmMedia').children.length, 0);
@@ -272,13 +274,14 @@ test('with nothing to say, or Steam and RAWG not available, nothing is added and
 });
 
 test('the card only shows what there is: a game with just a Metacritic score has no Multimedia card', async () => {
-  await openWithExtras({ available: true, description: null, trailer: null, screenshots: [], metacritic: 80, esrb: null, website: null });
-  assert.match(document.querySelector('#gmOutside').textContent, /Metacritic 80/);
+  await openWithExtras({ available: true, description: null, trailer: null, screenshots: [], metacritic: 80, esrb: null });
+  assert.match(document.querySelector('#gmOutside').textContent, /Metacritic/);
+  assert.equal(document.querySelector('#gmOutside .gm-badge.good').textContent, '80');
   assert.equal(document.querySelector('#gmMedia').children.length, 0);
 });
 
 test('the description goes under the name even with no trailer or screenshots, and then there is no Multimedia card', async () => {
-  await openWithExtras({ available: true, description: 'Solo texto.', trailer: null, screenshots: [], metacritic: null, esrb: null, website: null });
+  await openWithExtras({ available: true, description: 'Solo texto.', trailer: null, screenshots: [], metacritic: null, esrb: null });
   assert.equal(document.querySelector('#gmDesc .gm-desc').textContent, 'Solo texto.');
   document.querySelector('#gmDesc').click(); // on a phone it is clamped until tapped
   assert.equal(document.querySelector('#gmDesc .gm-desc').classList.contains('open'), true);
@@ -306,4 +309,13 @@ test('only the first tags are shown and the rest are one press away', async () =
   document.querySelector('#gmMoreTags').click();
   assert.equal(document.querySelectorAll('.gm-tags .pf-tag').length, 10);
   assert.equal(document.querySelector('#gmMoreTags'), null);
+});
+
+test('Metacritic is green from 75, yellow from 50 and red below, and an unknown age rating still shows', async () => {
+  for (const [score, tone] of [[75, 'good'], [74, 'mid'], [50, 'mid'], [49, 'bad']]) {
+    await openWithExtras({ available: true, description: null, trailer: null, screenshots: [], metacritic: score, esrb: 'Algo raro' });
+    assert.equal(document.querySelector('#gmOutside .gm-badge:not(.age)').className, `gm-badge ${tone}`);
+  }
+  assert.equal(document.querySelector('#gmOutside .gm-badge.age').textContent, '?');
+  assert.match(document.querySelector('#gmOutside').textContent, /Algo raro/);
 });

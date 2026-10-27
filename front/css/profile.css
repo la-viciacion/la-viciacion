@@ -409,7 +409,14 @@
   #gmMediaBlock .gm-carousel { grid-column: 1 / -1; grid-row: 2; }
   #gmMediaBlock .gm-credit { grid-column: 1 / -1; grid-row: 3; }
 }
-.gm-outside { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-top: 8px; }
+.gm-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-top: 10px; }
+.gm-outside { display: contents; }
+.gm-fact { display: inline-flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-secondary); }
+.gm-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 38px; height: 38px; padding: 0 6px; border-radius: 8px; font-size: 1.05rem; font-weight: 800; color: #0a0a14; }
+.gm-badge.good { background: var(--live-green); }
+.gm-badge.mid { background: var(--accent-gold); }
+.gm-badge.bad { background: #f87171; }
+.gm-badge.age { background: transparent; border: 2px solid var(--text-secondary); color: var(--text-primary); font-size: 0.95rem; }
 .gm-media { display: flex; flex-direction: column; gap: 12px; }
 .gm-desc { margin: 4px 0 8px; line-height: 1.5; color: var(--text-secondary); }
 @media (max-width: 999px) {
@@ -433,7 +440,6 @@ video.gm-trailer { cursor: auto; background: #000; }
 .gm-more { cursor: pointer; font: inherit; font-size: 0.72rem; font-weight: 700; }
 .gm-more:hover { color: var(--text-primary); }
 .gm-credit { font-size: 0.75rem; }
-.gm-rawg { margin-top: 10px; }
 .gm-rawg-btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 0.85rem; text-decoration: none; border-color: var(--border-accent); color: var(--accent-teal); }
 .gm-rawg-btn:hover { background: rgba(61,217,179,0.1); }
 .gm-rawg-btn:focus-visible { outline: 2px solid var(--accent-teal); outline-offset: 2px; }
