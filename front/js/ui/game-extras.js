@@ -1,5 +1,6 @@
-// What the world outside says about a game, on its page: the description in Spanish under the title, a few small facts
-// (Metacritic and the age rating, beside the RAWG button) and a "Multimedia" card with the trailer and a carousel of screenshots.
+// What the world outside says about a game, on its page: the description under the title (Steam's, in Spanish; RAWG's, in
+// English, when Steam has none), the publisher and the platforms, a few small facts (Metacritic and the age rating, beside
+// the RAWG button) and a "Multimedia" card with the trailer and a carousel of screenshots.
 // On a wide screen the trailer sits beside the header and the carousel runs below it (profile.css); on a phone the
 // card is one folded block. GET /games/{id}/extras asks Steam and RAWG (the API keeps the answer for a day), so it is loaded apart,
 // after the page is drawn; a game neither knows, or a failure, shows nothing. The card starts folded and the trailer
@@ -23,6 +24,15 @@ const facts = (x) => [
   x.esrb ? html`<span class="gm-fact" title="Clasificación por edades (ESRB)"><b class="gm-badge age">${ESRB_CODES[x.esrb] || '?'}</b><span>${x.esrb}</span></span>` : '',
 ];
 
+// The publisher only when it is not the developer too ("Rockstar Games" under "Rockstar Studios" says something; "Hades" by itself does not)
+const metaLines = (x, dev) => {
+  const publishers = (x.publishers || []).filter((p) => !dev || !dev.toLowerCase().includes(p.toLowerCase()));
+  return [
+    publishers.length ? `Editor: ${publishers.join(', ')}` : '',
+    x.platforms?.length ? `Disponible en: ${x.platforms.join(' · ')}` : '',
+  ].filter(Boolean);
+};
+
 const hasFacts = (x) => x.metacritic || x.esrb;
 const hasMedia = (x) => (x.trailer && safe(x.trailer.url)) || x.screenshots?.some((s) => safe(s.full));
 
@@ -36,22 +46,25 @@ function trailerButton(trailer) {
 }
 
 /** Fills `head` (the small facts) and `media` (the card) for the game; nothing at all when there is nothing to say. */
-export async function showExtras({ head, desc, media }, gameId) {
+export async function showExtras({ head, desc, meta, media }, game) {
   let x;
   try {
-    x = await api(`/games/${encodeURIComponent(gameId)}/extras`);
+    x = await api(`/games/${encodeURIComponent(game.id)}/extras`);
   } catch {
     return;
   }
   if (!x?.available) return;
   if (hasFacts(x)) mount(head, html`${facts(x)}`);
   if (x.description) {
-    mount(desc, html`<p class="gm-desc">${x.description}</p>`);
+    mount(desc, html`<p class="gm-desc" title="Pulsa para ver todo el texto">${x.description_lang === 'en' ? html`<span class="pf-tag muted" title="RAWG la tiene solo en inglés">En inglés</span> ` : ''}${x.description}</p>`);
     desc.onclick = () => desc.firstElementChild.classList.add('open');
   }
+  const lines = metaLines(x, game.dev);
+  if (lines.length) mount(meta, html`<div class="pf-sub gm-meta">${lines.map((line) => html`<div>${line}</div>`)}</div>`);
   if (!hasMedia(x)) return;
 
   const trailer = x.trailer && safe(x.trailer.url) ? x.trailer : null;
+  if (trailer) media.closest('.gm-top')?.classList.add('has-trailer'); // only then the wide header makes room for it
   const shots = (x.screenshots || []).filter((s) => safe(s.full));
   const folds = createFolds();
   folds.set(KEY, true); // folded until asked for

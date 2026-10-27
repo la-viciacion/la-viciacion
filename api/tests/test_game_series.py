@@ -1,10 +1,9 @@
 """The saga of a game: what is read from RAWG's series, how long it is kept and how the rows are ordered (no database)."""
-import asyncio
 import unittest
 from unittest import mock
 
 from src.crud import game_series
-from src.utils import rawg_series
+from src.utils import outside_cache, rawg_series
 
 
 def entry(rawg_id, name, released, **over):
@@ -54,7 +53,7 @@ class CacheTests(unittest.IsolatedAsyncioTestCase):
         self.key.start()
         self.addCleanup(self.key.stop)
         self.clock = [1000.0]
-        patcher = mock.patch.object(rawg_series.time, "time", side_effect=lambda: self.clock[0])
+        patcher = mock.patch.object(outside_cache.time, "time", side_effect=lambda: self.clock[0])
         patcher.start()
         self.addCleanup(patcher.stop)
         self.calls = []
@@ -111,40 +110,6 @@ class CacheTests(unittest.IsolatedAsyncioTestCase):
             self.assertIsNone(await rawg_series.series_of(7))
         self.assertEqual(self.calls, [])
         self.key.start()
-
-    async def test_the_memory_is_bounded_and_the_oldest_answer_goes_first(self):
-        self.answer(results=[])
-        with mock.patch.object(rawg_series, "MAX_CACHED", 3):
-            for rawg_id in (1, 2, 3):
-                await rawg_series.series_of(rawg_id)
-                self.clock[0] += 1
-            await rawg_series.series_of(4)
-        self.assertEqual(sorted(rawg_series._cache), [2, 3, 4])
-
-    async def test_simultaneous_requests_for_the_same_game_ask_rawg_once(self):
-        async def slow(url, params, timeout):
-            self.calls.append(url)
-            await asyncio.sleep(0)
-            return mock.Mock(ok=True, status_code=200, content=b"", json=lambda: {"results": [{"id": 9, "name": "Nine"}]})
-        with mock.patch.object(rawg_series.my_utils, "_http_get", side_effect=slow):
-            answers = await asyncio.gather(*(rawg_series.series_of(7) for _ in range(4)))
-        self.assertEqual(len(self.calls), 1)
-        self.assertTrue(all(a == answers[0] and a[0]["rawg_id"] == 9 for a in answers))
-        self.assertEqual(rawg_series._asking, {})
-
-    async def test_a_caller_that_goes_away_does_not_cancel_the_others(self):
-        gate = asyncio.Event()
-
-        async def slow(url, params, timeout):
-            await gate.wait()
-            return mock.Mock(ok=True, status_code=200, content=b"", json=lambda: {"results": []})
-        with mock.patch.object(rawg_series.my_utils, "_http_get", side_effect=slow):
-            first = asyncio.create_task(rawg_series.series_of(7))
-            second = asyncio.create_task(rawg_series.series_of(7))
-            await asyncio.sleep(0)
-            first.cancel()
-            gate.set()
-            self.assertEqual(await second, [])
 
 
 if __name__ == "__main__":

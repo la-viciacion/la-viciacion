@@ -229,6 +229,9 @@ const EXTRAS = {
   screenshots: [{ thumb: 'https://shared.steamstatic.com/t.jpg', full: 'https://shared.steamstatic.com/f.jpg' }, { thumb: 'https://shared.steamstatic.com/t2.jpg', full: 'javascript:alert(1)' }],
   metacritic: 92,
   esrb: 'Everyone 10+',
+  description_lang: 'es',
+  publishers: ['Extremely OK Games', 'maddy'],
+  platforms: ['PC', 'Nintendo Switch'],
 };
 
 const openWithExtras = async (extras) => {
@@ -318,4 +321,19 @@ test('Metacritic is green from 75, yellow from 50 and red below, and an unknown 
   }
   assert.equal(document.querySelector('#gmOutside .gm-badge.age').textContent, '?');
   assert.match(document.querySelector('#gmOutside').textContent, /Algo raro/);
+});
+
+test('the publisher (unless it is the developer) and the platforms are one small block under the details', async () => {
+  await openWithExtras(EXTRAS);
+  const lines = [...document.querySelectorAll('#gmMeta .gm-meta div')].map((d) => d.textContent);
+  assert.deepEqual(lines, ['Editor: Extremely OK Games', 'Disponible en: PC · Nintendo Switch']); // "maddy" is the developer ("Maddy")
+  await openWithExtras({ ...EXTRAS, publishers: [], platforms: [] });
+  assert.equal(document.querySelector('#gmMeta').children.length, 0);
+});
+
+test('a description in English is marked as such and one in Spanish is not', async () => {
+  await openWithExtras({ ...EXTRAS, description_lang: 'en' });
+  assert.match(document.querySelector('#gmDesc').textContent, /En inglés/);
+  await openWithExtras(EXTRAS);
+  assert.doesNotMatch(document.querySelector('#gmDesc').textContent, /En inglés/);
 });

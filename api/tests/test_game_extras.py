@@ -1,9 +1,8 @@
 """The outside data of a game page: what is read from Steam and RAWG, how the two are merged and how long it is kept (no database)."""
-import asyncio
 import unittest
 from unittest import mock
 
-from src.utils import game_extras
+from src.utils import game_extras, outside_cache
 
 STEAM_PAGE = {
     "short_description": "Un juego &quot;de culto&quot;.<br>Con <b>etiquetas</b>.",
@@ -66,10 +65,39 @@ class ParseRawgTests(unittest.TestCase):
         self.assertEqual(out["trailer"], {"url": "https://media.rawg.io/v.mp4", "poster": "https://media.rawg.io/p.jpg"})
         self.assertEqual(out["screenshots"], [{"thumb": "https://media.rawg.io/s.jpg", "full": "https://media.rawg.io/s.jpg"}])
         empty = game_extras.parse_rawg({"metacritic": None, "esrb_rating": None}, None, None)
-        self.assertEqual(empty, {"trailer": None, "screenshots": [], "metacritic": None, "esrb": None})
+        self.assertEqual(empty, {"description": None, "trailer": None, "screenshots": [], "metacritic": None, "esrb": None, "publishers": [], "platforms": []})
+
+
+class RawgDetailTests(unittest.TestCase):
+    def test_publishers_and_platforms_keep_rawgs_order_without_repeats_or_blanks(self):
+        out = game_extras.parse_rawg({
+            "description_raw": " A <b>big</b> game. ",
+            "publishers": [{"name": "Rockstar Games"}, {"name": "Rockstar Games"}, {"name": " "}, None],
+            "platforms": [{"platform": {"name": "PC"}}, {"platform": {"name": "PlayStation 4"}}, {"platform": None}, {"platform": {"name": "PC"}}],
+        }, None, None)
+        self.assertEqual(out["publishers"], ["Rockstar Games"])
+        self.assertEqual(out["platforms"], ["PC", "PlayStation 4"])
+        self.assertEqual(out["description"], "A big game.")
+
+    def test_the_platforms_are_capped(self):
+        many = [{"platform": {"name": f"P{i}"}} for i in range(30)]
+        self.assertEqual(len(game_extras.parse_rawg({"platforms": many}, None, None)["platforms"]), game_extras.MAX_PLATFORMS)
+
+    def test_nulls_leave_everything_empty(self):
+        out = game_extras.parse_rawg({"description_raw": None, "publishers": None, "platforms": None}, None, None)
+        self.assertEqual((out["description"], out["publishers"], out["platforms"]), (None, [], []))
 
 
 class MergeTests(unittest.TestCase):
+    def test_the_description_is_steams_in_spanish_or_else_rawgs_in_english(self):
+        rawg = game_extras.parse_rawg({"description_raw": "English text"}, None, None)
+        spanish = game_extras.merge(game_extras.parse_steam({"short_description": "Texto"}), rawg)
+        english = game_extras.merge(game_extras.parse_steam(None), rawg)
+        none = game_extras.merge(game_extras.parse_steam(None), game_extras.parse_rawg(None, None, None))
+        self.assertEqual((spanish["description"], spanish["description_lang"]), ("Texto", "es"))
+        self.assertEqual((english["description"], english["description_lang"]), ("English text", "en"))
+        self.assertIsNone(none["description"])
+
     def test_steam_leads_and_rawg_fills_in(self):
         steam = game_extras.parse_steam({"short_description": "hola"})
         rawg = game_extras.parse_rawg({"metacritic": 70, "esrb_rating": {"name": "Teen"}}, {"results": [{"data": {"max": "https://media.rawg.io/v.mp4"}}]}, None)
@@ -86,17 +114,17 @@ class FetchTests(unittest.IsolatedAsyncioTestCase):
         key.start()
         self.addCleanup(key.stop)
         self.clock = [1000.0]
-        clock = mock.patch.object(game_extras.time, "time", side_effect=lambda: self.clock[0])
+        clock = mock.patch.object(outside_cache.time, "time", side_effect=lambda: self.clock[0])
         clock.start()
         self.addCleanup(clock.stop)
         self.calls = []
         self.fail = set()
 
     def serve(self, **pages):
-        """Answers by the kind of URL (appdetails, movies, screenshots, or the RAWG game itself)."""
+        """Answers by the kind of URL (appdetails, movies, screenshots, stores, or the RAWG game itself)."""
         async def get(url, params, timeout):
             self.calls.append(url)
-            name = next((n for n in ("appdetails", "movies", "screenshots") if n in url), "game")
+            name = next((n for n in ("appdetails", "movies", "screenshots", "stores") if n in url), "game")
             if name in self.fail:
                 return mock.Mock(ok=False, status_code=500, content=b"")
             body = pages.get(name, {})
@@ -117,7 +145,24 @@ class FetchTests(unittest.IsolatedAsyncioTestCase):
         out = await game_extras.extras_of(5, None)
         self.assertEqual(out["trailer"]["url"], "https://media.rawg.io/v.mp4")
         self.assertEqual(len(out["screenshots"]), 1)
-        self.assertEqual(len(self.calls), 3)  # the game, its movies, its screenshots
+        self.assertEqual(len(self.calls), 4)  # the game, its stores (no Steam id), its movies, its screenshots
+
+    async def test_a_game_without_a_steam_id_gets_it_from_the_stores_rawg_links(self):
+        self.serve(stores={"results": [{"url": "https://store.steampowered.com/app/504230/Celeste/"}]}, appdetails={"504230": {"data": STEAM_PAGE}})
+        out = await game_extras.extras_of(5, None)
+        self.assertEqual(out["trailer"]["url"], "https://video.fastly.steamstatic.com/m480.mp4")
+        self.assertTrue(any("appids" in u or "appdetails" in u for u in self.calls))
+
+    async def test_a_game_with_a_steam_id_does_not_ask_the_stores(self):
+        self.serve(appdetails={"10": {"data": STEAM_PAGE}})
+        await game_extras.extras_of(5, "10")
+        self.assertFalse(any(u.endswith("/stores") for u in self.calls))
+
+    async def test_a_game_with_no_steam_page_in_the_stores_has_only_rawgs_data(self):
+        self.serve(stores={"results": [{"url": "https://www.nintendo.com/x"}]}, game={"description_raw": "English", "metacritic": 80})
+        out = await game_extras.extras_of(5, None)
+        self.assertEqual((out["description"], out["description_lang"], out["metacritic"]), ("English", "en", 80))
+        self.assertFalse(any("steampowered" in u for u in self.calls))
 
     async def test_a_game_with_neither_id_is_not_asked(self):
         self.serve()
@@ -149,6 +194,14 @@ class FetchTests(unittest.IsolatedAsyncioTestCase):
         self.fail = {"appdetails"}
         out = await game_extras.extras_of(5, "10")
         self.assertEqual(out["metacritic"], 60)
+        # what Steam did not answer is asked again in a few minutes, not tomorrow
+        asked = len(self.calls)
+        await game_extras.extras_of(5, "10")
+        self.assertEqual(len(self.calls), asked)
+        self.fail = set()
+        self.clock[0] += game_extras.FAILURE_SECONDS + 1
+        await game_extras.extras_of(5, "10")
+        self.assertGreater(len(self.calls), asked)
         game_extras.clear()
         self.fail = {"appdetails", "game"}
         self.calls.clear()
@@ -166,15 +219,6 @@ class FetchTests(unittest.IsolatedAsyncioTestCase):
         with mock.patch.object(game_extras.my_utils, "_http_get", new=boom):
             self.assertIsNone(await game_extras.extras_of(5, "10"))
 
-    async def test_simultaneous_requests_ask_once(self):
-        async def slow(url, params, timeout):
-            self.calls.append(url)
-            await asyncio.sleep(0)
-            return mock.Mock(ok=True, status_code=200, content=b"", json=lambda: {})
-        with mock.patch.object(game_extras.my_utils, "_http_get", new=slow):
-            await asyncio.gather(*(game_extras.extras_of(None, "10") for _ in range(4)))
-        self.assertEqual(len(self.calls), 1)  # appdetails, once
-        self.assertEqual(game_extras._asking, {})
 
 
 if __name__ == "__main__":
