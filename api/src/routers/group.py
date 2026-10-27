@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from .. import auth
 from ..auth import get_db
-from ..crud import group, group_library, library_compare, wishlist
+from ..crud import game_prices, group, group_library, library_compare, wishlist
 from ..database import models
 from ..utils import seasons
 
@@ -65,6 +65,17 @@ def get_group_library(
     has), what nobody has touched and the coverage by genre and platform. Derived from the libraries, the sessions and
     the ratings; readable by every logged-in user on purpose, like the game pages it is made of."""
     return group_library.library(db)
+
+
+@router.get("/value")
+def get_group_value(
+    current_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """The group's cost per hour: the games that are cheapest and dearest per hour to play, from the prices players noted.
+    A game only counts when at least three players contribute to it, and the answer never has a player or a price in it
+    (the hours of each player in a game are public, so a cost per hour of one player would give their price away)."""
+    return game_prices.group_value(db)
 
 
 @router.get("/players/{player_id}/compare")

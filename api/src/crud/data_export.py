@@ -55,6 +55,7 @@ def export_user(db: Session, user: models.User, now: datetime.datetime) -> dict:
     )
     library = db.query(models.UserGame).filter_by(user_id=user.id).order_by(models.UserGame.started_date, models.UserGame.id).all()
     scores = db.query(models.GameScore).filter_by(user_id=user.id).order_by(models.GameScore.id).all()
+    prices = db.query(models.UserGamePrice).filter_by(user_id=user.id).order_by(models.UserGamePrice.id).all()
     wishes = db.query(models.UserWishlist).filter_by(user_id=user.id).order_by(models.UserWishlist.id).all()
     awards = (
         db.query(models.UserAchievement, models.Achievement.key)
@@ -64,8 +65,8 @@ def export_user(db: Session, user: models.User, now: datetime.datetime) -> dict:
         .all()
     )
 
-    game_ids = {r.game_id for r in (*sessions, *library, *scores, *wishes)} | {a.game_id for a, _ in awards if a.game_id}
-    platform_ids = {r.platform for r in (*sessions, *library) if r.platform}
+    game_ids = {r.game_id for r in (*sessions, *library, *scores, *prices, *wishes)} | {a.game_id for a, _ in awards if a.game_id}
+    platform_ids = {r.platform for r in (*sessions, *library, *prices) if r.platform}
     games = db.query(models.Game).filter(models.Game.id.in_(game_ids)).order_by(models.Game.name).all() if game_ids else []
     platforms = db.query(models.PlatformTag).filter(models.PlatformTag.id.in_(platform_ids)).order_by(models.PlatformTag.name).all() if platform_ids else []
 
@@ -98,6 +99,8 @@ def export_user(db: Session, user: models.User, now: datetime.datetime) -> dict:
             for s in sessions
         ],
         "scores": [{"game_id": s.game_id, "score": s.score} for s in scores],
+        # what the player paid, per game and platform: their own data, like the rest of the file
+        "prices": [{"game_id": p.game_id, "platform": p.platform, "amount_cents": p.amount_cents} for p in prices],
         "wishlist": [{"game_id": w.game_id, "added_at": _day(w.added_at)} for w in wishes],
         "achievements": [{"key": key, "date": _day(a.date), "game_id": a.game_id} for a, key in awards],
     }
@@ -114,7 +117,7 @@ def is_supported(data) -> bool:
 class Report:
     """What an import did, counted per kind of row, with the first problems worded for the person."""
 
-    KINDS = ("sessions", "library", "scores", "wishlist")
+    KINDS = ("sessions", "library", "scores", "prices", "wishlist")
 
     def __init__(self, dry_run: bool):
         self.dry_run = dry_run
@@ -146,7 +149,7 @@ def _when(value) -> str:
 def _resolve_platforms(db: Session, data, creator_is_admin: bool, report: Report) -> dict:
     """Platform id of the file -> id in this database (None when it has no counterpart and cannot be created)."""
     wanted = {p.id: p.name for p in data.platforms}
-    for row in (*data.library, *data.sessions):
+    for row in (*data.library, *data.sessions, *data.prices):
         if row.platform:
             wanted.setdefault(row.platform, None)
     if not wanted:
@@ -174,7 +177,7 @@ def _resolve_platforms(db: Session, data, creator_is_admin: bool, report: Report
 def _resolve_games(db: Session, data, creator_is_admin: bool, report: Report) -> dict:
     """Game id of the file -> id in this database: the same id, else the game with the same name."""
     mentioned = {g.id: g for g in data.games}
-    for collection in (data.library, data.sessions, data.scores, data.wishlist):
+    for collection in (data.library, data.sessions, data.scores, data.prices, data.wishlist):
         for row in collection:
             mentioned.setdefault(row.game_id, None)
     ids = list(mentioned)
@@ -315,6 +318,24 @@ def import_data(db: Session, actor: models.User, user: models.User, data, dry_ru
             db.add(models.GameScore(user_id=user.id, game_id=game, score=row.score))
             rated.add(game)
             report.imported("scores")
+
+    # ── prices: only for a game the player has on that platform
+    priced = {(p.game_id, p.platform) for p in db.query(models.UserGamePrice).filter_by(user_id=user.id)}
+    owned_on = {(g, p) for g, p, _ in entries}
+    for row in data.prices:
+        game, platform = game_map.get(row.game_id), platform_map.get(row.platform)
+        if game is None:
+            report.skipped("prices", game_label(row.game_id), msg.IMPORT_UNKNOWN_GAME)
+        elif platform is None:
+            report.skipped("prices", game_label(row.game_id), msg.IMPORT_UNKNOWN_PLATFORM)
+        elif (game, platform) in priced:
+            report.existing("prices")
+        elif (game, platform) not in owned_on:
+            report.skipped("prices", game_label(row.game_id), msg.IMPORT_NOT_IN_LIBRARY)
+        else:
+            db.add(models.UserGamePrice(user_id=user.id, game_id=game, platform=platform, amount_cents=row.amount_cents))
+            priced.add((game, platform))
+            report.imported("prices")
 
     wished = {w.game_id for w in db.query(models.UserWishlist.game_id).filter_by(user_id=user.id)}
     for row in data.wishlist:

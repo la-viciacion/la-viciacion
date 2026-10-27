@@ -139,6 +139,22 @@ class UserGame(Base):
     )
 
 
+class UserGamePrice(Base):
+    """What a player paid for a game on a platform (a game bought on two platforms is two purchases). Only the price is
+    stored: the cost per hour is derived (crud/game_prices.py)."""
+
+    __tablename__ = "users_game_prices"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id", name="fk_game_prices_user", ondelete="CASCADE"), nullable=False)
+    game_id = Column(String(255), ForeignKey("games.id", name="fk_game_prices_game", ondelete="CASCADE"), nullable=False)
+    platform = Column(String(255), ForeignKey("platform_tags.id", name="fk_game_prices_platform"), nullable=False)
+    amount_cents = Column(Integer, nullable=False)  # euro cents, 0 for a free game
+    updated_at = Column(DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP"))
+
+    __table_args__ = (UniqueConstraint("user_id", "game_id", "platform", name="uq_game_prices_purchase"),)
+
+
 class UserWishlist(Base):
     """A game a player wants to play (or is waiting for). Only the wish is stored: whether the game is
     upcoming, whether the wish is still pending (the game is not in the player's library yet) and who else
