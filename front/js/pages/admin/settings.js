@@ -14,7 +14,7 @@ import { errorState } from './components.js';
 import { confirmDialog } from './dialogs.js';
 
 const SECRETS = []; // never loaded back: sent only when something is typed (the keys of outside services are not: they are in the server's .env)
-const LOCKED = ['telegram.token', 'telegram.group_id', 'telegram.admin_chat_id', 'ai.api_key', 'ai.provider', 'ai.model', 'chat.model']; // shown only as set or not, never editable
+const LOCKED = ['telegram.token', 'telegram.group_id', 'telegram.admin_chat_id', 'ai.api_key', 'ai.openai_admin_key', 'ai.provider', 'ai.model', 'chat.model']; // shown only as set or not, never editable
 // the questions the chat answers, per player and for the whole group (api/src/utils/settings.py chat.limit_*)
 const CHAT_LIMITS = [
   ['chat.limit_user_minute', 'Por jugador, por minuto'],
@@ -223,10 +223,12 @@ function view(values, jobs, pushDevices, mail, aiUses, aiModel, chat) {
         <h3>Inteligencia artificial</h3>
         <label>Proveedor <input class="adm-input adm-ai-provider" type="text" value="${AI_PROVIDERS.find(([id]) => id === aiModel.provider)?.[1] ?? aiModel.provider ?? 'Sin configurar'}" disabled /></label>
         <label>Clave de la API <input class="adm-input" type="text" value="${state('ai.api_key')}" disabled /></label>
+        <label>Clave de administración de OpenAI <input class="adm-input" type="text" value="${state('ai.openai_admin_key')}" disabled /></label>
         <label>Modelo de los avisos <input class="adm-input adm-ai-model" type="text" value="${aiModel.model || 'Sin configurar'}" disabled /></label>
         <label>Modelo del chat <input class="adm-input adm-chat-model" type="text" value="${chat.model || 'Sin configurar'}" disabled /></label>
         ${aiMissing(values, aiModel).length ? html`<div class="adm-warn">Falta <code>${aiMissing(values, aiModel).join(', ')}</code> en el .env del servidor: la aplicación no tiene ningún proveedor ni modelo por defecto, así que la IA no escribe ningún aviso hasta que los definas (y reinicies la API).</div>` : ''}
         <div class="adm-sub">El proveedor (<code>AI_PROVIDER</code>), la clave (<code>AI_API_KEY</code>) y el modelo (<code>AI_MODEL</code>) están en el .env del servidor y los comparten los avisos y el chat: desde el panel solo se ven. El modelo debe ser uno del proveedor.</div>
+        <div class="adm-sub">La clave de administración (<code>OPENAI_ADMIN_KEY</code>, opcional) solo sirve para leer el gasto en Sistema → Uso de IA; no escribe nada.</div>
         <div class="adm-sub">El chat usa <code>CHAT_AI_MODEL</code> si está en el .env${chat.own_model ? '' : html` (ahora no lo está: usa <code>AI_MODEL</code>)`}, para darle un modelo distinto del de los avisos.</div>
       </section>`,
 

@@ -8,7 +8,7 @@ globalThis.location = window.location;
 const { render } = await import('../js/pages/admin/settings.js');
 
 const VALUES = {
-  'ai.enabled': true, 'ai.provider': { is_set: true }, 'ai.api_key': { is_set: true }, 'ai.model': { is_set: true },
+  'ai.enabled': true, 'ai.provider': { is_set: true }, 'ai.api_key': { is_set: true }, 'ai.openai_admin_key': { is_set: false }, 'ai.model': { is_set: true },
   'ai.use.completed_game': true, 'ai.use.new_game': false, 'chat.enabled': true, 'chat.model': { is_set: true }, 'chat.prompt': 'd',
   'chat.limit_user_minute': 5, 'chat.limit_user_hour': 30, 'chat.limit_user_day': 100, 'chat.limit_group_minute': 10, 'chat.limit_group_day': 300, 'completed_game.recommend': true,
   'telegram.token': { is_set: false }, 'telegram.group_id': { is_set: false }, 'telegram.admin_chat_id': { is_set: false }, 'push.vapid_private': { is_set: true },
@@ -98,7 +98,7 @@ test('Sistema → Servicios shows the AI provider, key and models read only, the
   assert.equal(panel().querySelector('.adm-ai-provider').value, 'Google (Gemini)');
   assert.equal(panel().querySelector('.adm-ai-model').value, 'gemini-test');
   assert.equal(panel().querySelector('.adm-chat-model').value, 'gpt-chat');
-  assert.equal(panel().querySelectorAll('input:disabled').length, 4);
+  assert.equal(panel().querySelectorAll('input:disabled').length, 5);
   assert.equal(panel().querySelector('select[name="ai.provider"]'), null);
   assert.equal(panel().querySelector('.adm-warn'), null);
   assert.match(panel().textContent, /CHAT_AI_MODEL si está en el \.env/);
