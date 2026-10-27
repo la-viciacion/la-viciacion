@@ -645,6 +645,7 @@ def _library_query(user_id: int, entry_id: int | None = None, game_id: str | Non
             func.coalesce(entry_time.c.played_time, 0).label("played_time"),
             models.Game.name.label("game_name"),
             models.Game.image_url.label("image_url"),
+            models.Game.avg_time.label("avg_time"),
             models.PlatformTag.name.label("platform_name"),
             last.c.last_played.label("last_played"),
         )
@@ -708,6 +709,9 @@ def _library_item(row, completed_keys: set, current_season: int, ratings: dict, 
         "game_id": entry.game_id,
         "game_name": row.game_name,
         "image_url": row.image_url,
+        # the average time to complete the game (HowLongToBeat's main story, seconds), None when it has none: the
+        # app tells which games are nearly finished or short from it
+        "avg_time": row.avg_time or None,
         "platform_id": entry.platform,
         "platform_name": row.platform_name,
         # every platform the game was played on that season: the row stands for all of them

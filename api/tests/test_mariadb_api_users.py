@@ -7,6 +7,7 @@ from datetime import timedelta
 from PIL import Image
 from sqlalchemy import text
 
+from src.database import database, models
 from src.utils import images, messages, seasons
 from tests.api_support import PASSWORD, ApiTestCase
 from tests import clock
@@ -239,6 +240,14 @@ class LibraryTests(UsersTestCase):
         self.assertEqual((body["season"], body["total"]), (seasons.current(), 3))
         self.assertEqual([i["game_id"] for i in body["items"][:2]], ["hades", "celeste"])
         self.assertEqual(body["items"][-1]["game_id"], "tetris")
+
+    def test_an_item_carries_the_average_time_of_its_game_or_none(self):
+        with database.SessionLocal() as db:
+            db.query(models.Game).filter_by(id="celeste").update({"avg_time": 7200})
+            db.query(models.Game).filter_by(id="hades").update({"avg_time": 0})
+            db.commit()
+        by_game = {i["game_id"]: i["avg_time"] for i in self.get()["items"]}
+        self.assertEqual((by_game["celeste"], by_game["hades"]), (7200, None))  # 0 is "unknown", like None
 
     def test_an_item_carries_what_the_page_needs(self):
         item = next(i for i in self.get()["items"] if i["game_id"] == "celeste")
