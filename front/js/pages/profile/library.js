@@ -19,7 +19,7 @@ import { api, jsonRequest } from '../../lib/api.js';
 import { blockedReason } from '../../lib/completion.js';
 import { formatDate, formatDateTime, formatDuration, formatRelative } from '../../lib/format.js';
 import { html, mount, raw } from '../../lib/html.js';
-import { NO_FILTERS, NO_PLATFORM, STATES, entryPlatforms, entryState, filterEntries, unratedGames } from '../../lib/library-filter.js';
+import { NO_FILTERS, NO_PLATFORM, STATES, entryPlatforms, entryState, filterEntries, nextUp, unratedGames } from '../../lib/library-filter.js';
 import { gameHref } from '../../lib/links.js';
 import { platformName } from '../../lib/platforms.js';
 import { SCORE_HINT, SCORE_MAX, SCORE_MIN, parseScore, saveScore } from '../../lib/score.js';
@@ -48,6 +48,10 @@ function status(g) {
     // an unfinished game of a closed season is no longer "in progress"
     case 'unfinished':
       return html`<span class="pf-tag muted">Sin completar</span>`;
+    case 'paused':
+      return html`<span class="pf-tag muted">Pausado</span>`;
+    case 'backlog':
+      return html`<span class="pf-tag muted">Pendiente</span>`;
     default:
       return html`<span class="pf-tag">En curso</span>`;
   }
@@ -96,6 +100,33 @@ const select = (key, label, options, value) => html`
     <option value="">${label}: todos</option>
     ${options.map(([v, text]) => html`<option value="${v}" ${String(v) === String(value) ? 'selected' : ''}>${text}</option>`)}
   </select>`;
+
+// "¿Qué juego sigo?": three short lists of the games worth going back to (see nextUp in lib/library-filter.js)
+const NEXT_UP = [
+  ['almost', 'Casi terminados', (g) => `Llevas ${formatDuration(g.played_time)} de unas ${formatDuration(g.avg_time)}${g.left > 0 ? ` · te quedan ${formatDuration(g.left)}` : ''}`],
+  ['forgotten', 'Olvidados', (g) => `Sin tocar ${formatRelative(g.last_played)} · llevas ${formatDuration(g.played_time)}`],
+  ['short', 'Cortos', (g) => `${g.played_time ? `Te quedan ${formatDuration(g.left)}` : `Duran unas ${formatDuration(g.avg_time)}`} según HowLongToBeat`],
+];
+const NEXT_UP_SHOWN = 4;
+
+function nextUpCard(entries) {
+  const found = nextUp(entries);
+  const lists = NEXT_UP.filter(([key]) => found[key].length);
+  if (!lists.length) return html``;
+  return html`
+    <details class="pf-card pf-next" open>
+      <summary><strong>¿Qué juego sigo?</strong> <span class="pf-sub">Juegos que merece la pena retomar</span></summary>
+      <div class="pf-next-lists">
+        ${lists.map(([key, title, detail]) => html`
+          <div class="pf-next-list" data-next="${key}">
+            <h3>${title}</h3>
+            ${found[key].slice(0, NEXT_UP_SHOWN).map((g) => html`
+              <div class="pf-next-item"><a class="game-link" href="${gameHref(g.game_id)}">${g.game_name}</a><div class="pf-sub">${detail(g)}</div></div>`)}
+            ${found[key].length > NEXT_UP_SHOWN ? html`<div class="pf-sub">y ${found[key].length - NEXT_UP_SHOWN} más</div>` : ''}
+          </div>`)}
+      </div>
+    </details>`;
+}
 
 /**
  * A list of the library of `username`. Options: season (a year, or seasons.ALL), filterable, userId,
@@ -153,7 +184,10 @@ export function createLibrary(el, options) {
       const page = await fetchEntries(count);
       if (!page) return;
       ({ season, total, items } = page);
-      if (filterable) drawBar();
+      if (filterable) {
+        drawBar();
+        mount(el.querySelector('.pf-lib-next'), nextUpCard(items));
+      }
       draw();
     } catch (err) {
       mount(list, html`<div class="pf-empty">Error cargando tus juegos: ${err.message}</div>`);
@@ -162,7 +196,7 @@ export function createLibrary(el, options) {
 
   async function init() {
     if (filterable) {
-      mount(el, html`<div class="adm-toolbar pf-lib-bar"></div><div class="pf-lib-list"></div>`);
+      mount(el, html`<div class="pf-lib-next"></div><div class="adm-toolbar pf-lib-bar"></div><div class="pf-lib-list"></div>`);
       list = el.querySelector('.pf-lib-list');
       el.addEventListener('input', onFilter);
     }

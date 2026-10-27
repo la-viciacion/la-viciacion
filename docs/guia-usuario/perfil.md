@@ -27,6 +27,10 @@ Toda tu biblioteca, de todas las temporadas, con filtros por nombre, temporada, 
 
 ![Tu biblioteca completa](../assets/screens/profile-games.webp){ .screenshot }
 
+Cada juego sin terminar tiene un **estado**: *En curso*, *Pausado* (llevas más de 30 días sin jugarlo), *Pendiente* (lo tienes pero nunca lo has jugado), *Completado*, *Abandonado* o *Sin completar* (se quedó a medias en una temporada ya cerrada). Se puede filtrar por cualquiera.
+
+Encima de la lista, **¿Qué juego sigo?** propone a qué volver: los **casi terminados** (llevas al menos el 70 % de lo que suele durar), los **olvidados** (más de 60 días sin tocarlos) y los **cortos** (te quedan 4 horas o menos, o duran eso y aún no los has jugado). Usa el tiempo medio de HowLongToBeat, así que un juego sin tiempo medio solo puede salir como olvidado.
+
 **Puntuar al azar** abre un juego de los que todavía no has puntuado: pones la nota, y con cada una te sale el siguiente hasta que no queden. **Omitir, ver otro** pasa al siguiente y **Dejar de puntuar** cierra la ventana.
 
 ## Ajustes

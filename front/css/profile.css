@@ -370,3 +370,8 @@
 .ch-game-results { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
 .ch-game-results:empty { display: none; }
 .ch-head-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.pf-next { margin-bottom: 14px; }
+.pf-next summary { cursor: pointer; }
+.pf-next-lists { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-top: 10px; }
+.pf-next-list h3 { margin: 0 0 6px; font-size: 0.95rem; color: var(--accent-teal); }
+.pf-next-item { margin-bottom: 8px; }
