@@ -266,6 +266,7 @@ test('with nothing to say, or Steam and RAWG not available, nothing is added and
     await openWithExtras(answer);
     assert.equal(document.querySelector('#gmOutside').children.length, 0);
     assert.equal(document.querySelector('#gmMedia').children.length, 0);
+    assert.equal(document.querySelector('#gmDesc').children.length, 0);
     assert.equal(document.querySelector('h1').textContent, 'Celeste <b>');
   }
 });
@@ -274,4 +275,35 @@ test('the card only shows what there is: a game with just a Metacritic score has
   await openWithExtras({ available: true, description: null, trailer: null, screenshots: [], metacritic: 80, esrb: null, website: null });
   assert.match(document.querySelector('#gmOutside').textContent, /Metacritic 80/);
   assert.equal(document.querySelector('#gmMedia').children.length, 0);
+});
+
+test('the description goes under the name even with no trailer or screenshots, and then there is no Multimedia card', async () => {
+  await openWithExtras({ available: true, description: 'Solo texto.', trailer: null, screenshots: [], metacritic: null, esrb: null, website: null });
+  assert.equal(document.querySelector('#gmDesc .gm-desc').textContent, 'Solo texto.');
+  document.querySelector('#gmDesc').click(); // on a phone it is clamped until tapped
+  assert.equal(document.querySelector('#gmDesc .gm-desc').classList.contains('open'), true);
+  assert.equal(document.querySelector('#gmMedia').children.length, 0);
+});
+
+test('the screenshots are a carousel whose arrows scroll the row', async () => {
+  await openWithExtras(EXTRAS);
+  const row = document.querySelector('#gmMedia .gm-shots');
+  const scrolls = [];
+  row.scrollBy = (options) => scrolls.push(options.left);
+  Object.defineProperty(row, 'clientWidth', { value: 500 });
+  document.querySelector('#gmMedia [data-shots="1"]').click();
+  document.querySelector('#gmMedia [data-shots="-1"]').click();
+  assert.deepEqual(scrolls, [400, -400]);
+});
+
+test('only the first tags are shown and the rest are one press away', async () => {
+  const tags = Array.from({ length: 10 }, (_, i) => `Etiqueta ${i}`);
+  installApi({ 'GET /games/celeste/overview': { ...OVERVIEW, game: { ...OVERVIEW.game, tags } }, 'GET /users/photo/': json({ detail: 'no' }, 404) });
+  await page.render({ main: main(), user: { id: 1, username: 'ana' } });
+  await settle();
+  assert.equal(document.querySelectorAll('.gm-tags .pf-tag').length, 7); // 6 and the "+4" button
+  assert.equal(document.querySelector('#gmMoreTags').textContent, '+4');
+  document.querySelector('#gmMoreTags').click();
+  assert.equal(document.querySelectorAll('.gm-tags .pf-tag').length, 10);
+  assert.equal(document.querySelector('#gmMoreTags'), null);
 });
