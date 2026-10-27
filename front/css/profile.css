@@ -398,6 +398,17 @@
 .gl-count { margin-left: 6px; }
 .gl-fold .gl-count, .gl-section .section-header .gl-count { white-space: nowrap; }
 .sg-count { margin-left: 6px; }
+.gm-top > #gmMedia .ach-block { margin-bottom: 16px; }
+@media (min-width: 1000px) {
+  /* Room beside the title: the media sit on the right, open, and the stats start below them */
+  .gm-top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 440px); gap: 24px; align-items: start; }
+  .gm-top .gm-head { align-items: flex-start; }
+  #gmMediaBlock .ach-content { display: block; }
+  #gmMediaBlock .ach-fold { pointer-events: none; }
+  #gmMediaBlock .ach-chevron { display: none; }
+  #gmMediaBlock .gm-trailer { max-width: none; }
+  #gmMediaBlock .gm-shots a:nth-child(n + 5) { display: none; } /* a shorter column: the rest are one fold away on a phone */
+}
 .gm-outside { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-top: 8px; }
 .gm-media { display: flex; flex-direction: column; gap: 12px; }
 .gm-desc { margin: 0; line-height: 1.5; }
