@@ -25,7 +25,7 @@ TOPICS = (
         "Se entra con el email o el usuario y la contraseña. Si se olvida, «¿Has olvidado tu contraseña?» manda un enlace al correo "
         "(vale 1 hora) y, sin correo configurado, un administrador puede poner otra. Tras 5 intentos fallidos seguidos la cuenta se bloquea "
         "un rato; cambiar la contraseña cierra la sesión en todos los dispositivos, y la sesión dura unos 7 días mientras se use. "
-        "El botón de arriba a la izquierda abre el menú lateral: Principal (Inicio, Actividad), Explorar (Juegos, Calendario, Logros, "
+        "El botón de arriba a la izquierda abre el menú lateral: Principal (Inicio, Actividad), Explorar (Juegos, Biblioteca del grupo con joyas ocultas, cementerio, rarezas y juegos sin tocar, Calendario, Logros, "
         "Jugadores, Estadísticas, aún en construcción), Tú (Mi perfil, Resumen, Deseados, Recomendados, Retos, Ajustes) y, solo para "
         "administradores, Administración. Es una PWA: se instala desde el menú del navegador (Android: «Instalar aplicación»; iPhone/iPad: "
         "compartir → «Añadir a pantalla de inicio», imprescindible para las notificaciones; ordenador: icono de instalar). Ya instalada, "
@@ -83,7 +83,7 @@ TOPICS = (
         "perfil_ajustes", "Perfil y ajustes", ("perfil", "ajustes", "foto", "ciudad", "nacimiento", "datos", "exportar", "descargar", "cifras", "biblioteca"),
         "perfil.md",
         "Mi perfil tiene Resumen (horas, días, juegos, completados, rachas y logros por temporada, más jugados, retos y la lista de juegos con sus botones), "
-        "Mis juegos (toda la biblioteca con filtros y «Puntuar al azar») y Ajustes. En Ajustes: los datos propios (nombre, usuario, email, Telegram ID, "
+        "En la página de otro jugador, «Tu biblioteca y la de ese jugador» (juegos de los dos, solo tuyos y solo suyos), y en la página de un juego, tu ritmo frente al grupo y a HowLongToBeat y, si es de una saga, las entregas en orden con lo que tienes de cada una. Cada jugador puede apuntar el precio de sus juegos por plataforma (solo lo ve él; del grupo solo se enseña el coste medio por hora de un juego cuando al menos 3 jugadores lo han apuntado, nunca por jugador). Mis juegos (toda la biblioteca con filtros por estado: en curso, pausado, pendiente, completado, abandonado; una tarjeta «¿Qué juego sigo?» con los casi terminados, los olvidados y los cortos; y «Puntuar al azar») y Ajustes. En Ajustes: los datos propios (nombre, usuario, email, Telegram ID, "
         "ciudad y fecha de nacimiento; estas dos solo sirven para algunos logros secretos y las ven solo uno mismo y los administradores), la contraseña, las "
         "notificaciones y «Descargar mis datos», un .json con las sesiones, la biblioteca, las notas, la lista de deseados y los logros. La foto se cambia "
         "con «Cambiar foto» (PNG o JPG).",

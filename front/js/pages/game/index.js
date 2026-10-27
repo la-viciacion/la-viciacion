@@ -3,9 +3,12 @@
 import { api } from '../../lib/api.js';
 import { formatDate, formatDuration, formatRelative } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
+import { paceLines } from '../../lib/pace.js';
+import { perHour } from '../../lib/money.js';
 import { wantedBy } from '../../lib/wishlist.js';
 import { hydratePhotos, playerAvatar } from '../../ui/avatar.js';
 import { scoreBadge } from '../../ui/score-badge.js';
+import { showSaga } from '../../ui/game-saga.js';
 import { toast } from '../../ui/toast.js';
 import { openRating } from '../home/rating.js';
 
@@ -64,7 +67,7 @@ function draw(data) {
         <div class="gm-genres">${game.genres.map((genre) => html`<span class="pf-tag muted">${genre}</span>`)}</div>
         ${tags.length ? html`<div class="gm-genres gm-tags" aria-label="Etiquetas">${tags.map((tag) => html`<span class="pf-tag muted">${tag}</span>`)}</div>` : ''}
         ${details ? html`<div class="pf-sub">${details}</div>` : ''}
-        ${game.slug ? html`<div class="pf-sub"><a class="game-link" href="https://rawg.io/games/${encodeURIComponent(game.slug)}" target="_blank" rel="noopener noreferrer">Ver en RAWG</a></div>` : ''}
+        ${game.slug ? html`<div class="gm-rawg"><a class="pf-btn gm-rawg-btn" href="https://rawg.io/games/${encodeURIComponent(game.slug)}" target="_blank" rel="noopener noreferrer">Ver en RAWG <span aria-hidden="true">↗</span></a></div>` : ''}
       </div>
     </div>
 
@@ -73,6 +76,7 @@ function draw(data) {
       ${tile('Horas del grupo', formatDuration(summary.played_seconds))}
       ${tile('Completados', summary.completed_by)}
       ${tile(summary.score_count ? `Nota media (${summary.score_count})` : 'Nota media', summary.score_count ? scoreBadge(Math.round(summary.score_mean)) : '—')}
+      ${data.cost_per_hour ? tile(`Coste por hora (${data.cost_per_hour.contributors})`, perHour(data.cost_per_hour.per_hour_cents)) : ''}
     </section>
 
     ${data.wanted_by.length ? html`<div class="pf-sub gm-wanted">${wantedBy(data.wanted_by)}</div>` : ''}
@@ -87,12 +91,20 @@ function draw(data) {
         <button class="pf-btn" type="button" id="gmRate">${mine.score == null ? 'Puntuar' : 'Cambiar nota'}</button>
       </div>` : ''}
 
+    ${paceLines(data.pace).length ? html`
+      <div class="pf-card gm-pace" id="gmPace">
+        ${paceLines(data.pace).map((line, i) => (i === 0 ? html`<strong>${line}</strong>` : html`<span class="pf-sub">${line}</span>`))}
+      </div>` : ''}
+
     <div class="section-header"><h2 class="section-title">Quién lo juega</h2><div class="section-line"></div></div>
     ${players.length
       ? html`<ul class="gm-players pf-card">${players.map(playerRow)}</ul>`
-      : html`<div class="pf-empty">Nadie del grupo lo tiene todavía.</div>`}`);
+      : html`<div class="pf-empty">Nadie del grupo lo tiene todavía.</div>`}
+
+    <div id="gmSaga"></div>`); // last: a long saga would push who plays the game far down
 
   hydratePhotos(main);
+  showSaga(main.querySelector('#gmSaga'), game.id); // RAWG may take a while: the page does not wait for it
   main.querySelector('#gmBack').addEventListener('click', back);
   main.querySelector('#gmWish')?.addEventListener('click', () => toggleWish(game.id, data.wished));
   main.querySelector('#gmRate')?.addEventListener('click', () => openRating({

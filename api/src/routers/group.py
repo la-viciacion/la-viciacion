@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from .. import auth
 from ..auth import get_db
-from ..crud import group, wishlist
+from ..crud import game_prices, group, group_library, library_compare, wishlist
 from ..database import models
 from ..utils import seasons
 
@@ -54,6 +54,45 @@ def get_player(
     if found is None:
         raise HTTPException(status_code=404, detail="Player not found")
     return found
+
+
+@router.get("/library")
+def get_group_library(
+    current_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """The group's library as a whole: hidden gems, the graveyard (games players gave up), rarities (games one player
+    has), what nobody has touched and the coverage by genre and platform. Derived from the libraries, the sessions and
+    the ratings; readable by every logged-in user on purpose, like the game pages it is made of."""
+    return group_library.library(db)
+
+
+@router.get("/value")
+def get_group_value(
+    current_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """The group's cost per hour: the games that are cheapest and dearest per hour to play, from the prices players noted.
+    A game only counts when at least three players contribute to it, and the answer never has a player or a price in it
+    (the hours of each player in a game are public, so a cost per hour of one player would give their price away)."""
+    return game_prices.group_value(db)
+
+
+@router.get("/players/{player_id}/compare")
+def compare_libraries(
+    player_id: int,
+    current_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Your library and another player's side by side: the games you both have (with the hours and the rating of
+    each), the ones only you have and the ones only they have, and your affinity. Readable by every logged-in user on
+    purpose: it is what each game's page already says (who has it, with their hours and rating), grouped by pair."""
+    if player_id == current_user.id:
+        raise HTTPException(status_code=400, detail="Elige a otro jugador para comparar")
+    player = db.get(models.User, player_id)
+    if player is None or player.username == models.GOD_USERNAME:
+        raise HTTPException(status_code=404, detail="Player not found")
+    return library_compare.compare(db, current_user.id, player)
 
 
 @router.get("/releases")

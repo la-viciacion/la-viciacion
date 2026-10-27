@@ -29,6 +29,7 @@ const ROUTES = [
   { prefix: '#/recap', load: () => import('./pages/recap/index.js') },
   { prefix: '#/stats', load: () => import('./pages/stats/index.js') },
   { prefix: '#/games', load: () => import('./pages/games/index.js') },
+  { prefix: '#/library', load: () => import('./pages/group-library/index.js') },
   { prefix: '#/recommendations', load: () => import('./pages/recommendations/index.js') },
   { prefix: '#/challenges', load: () => import('./pages/challenges/index.js') },
   { prefix: '#/calendar', load: () => import('./pages/calendar/index.js') },

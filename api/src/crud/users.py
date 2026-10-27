@@ -17,7 +17,7 @@ from ..database import models, schemas
 from ..utils import my_utils as utils
 from ..utils import seasons, settings, streaks
 from ..utils.logger import LogManager
-from . import games, scores
+from . import game_prices, games, scores
 
 # from sqlalchemy.util import immutabledict
 
@@ -645,6 +645,7 @@ def _library_query(user_id: int, entry_id: int | None = None, game_id: str | Non
             func.coalesce(entry_time.c.played_time, 0).label("played_time"),
             models.Game.name.label("game_name"),
             models.Game.image_url.label("image_url"),
+            models.Game.avg_time.label("avg_time"),
             models.PlatformTag.name.label("platform_name"),
             last.c.last_played.label("last_played"),
         )
@@ -692,7 +693,7 @@ def is_abandoned(entry: models.UserGame, last_played: datetime.datetime | None) 
     return last_played is None or last_played <= entry.abandoned_at
 
 
-def _library_item(row, completed_keys: set, current_season: int, ratings: dict, platforms: dict) -> dict:
+def _library_item(row, completed_keys: set, current_season: int, ratings: dict, platforms: dict, prices: dict | None = None) -> dict:
     entry = row.UserGame
     done = bool(entry.completed)
     abandoned = is_abandoned(entry, row.last_played)
@@ -708,10 +709,14 @@ def _library_item(row, completed_keys: set, current_season: int, ratings: dict, 
         "game_id": entry.game_id,
         "game_name": row.game_name,
         "image_url": row.image_url,
+        # the average time to complete the game (HowLongToBeat's main story, seconds), None when it has none: the
+        # app tells which games are nearly finished or short from it
+        "avg_time": row.avg_time or None,
         "platform_id": entry.platform,
         "platform_name": row.platform_name,
         # every platform the game was played on that season: the row stands for all of them
-        "platforms": platforms.get((entry.game_id, entry.season), []),
+        # (each with what the player paid for the game on it, in cents, or None: a price belongs to the purchase, not to the season)
+        "platforms": [{**p, "price_cents": (prices or {}).get((entry.game_id, p["id"]))} for p in platforms.get((entry.game_id, entry.season), [])],
         "season": entry.season,
         "started_date": entry.started_date,
         "last_played": row.last_played,
@@ -743,10 +748,11 @@ def get_library(
     keys = _completed_keys(db, user_id)
     ratings = scores.user_scores(db, user_id)
     platforms = _platforms_by_group(db, user_id, game_id)
+    prices = game_prices.prices_of(db, user_id)
     return {
         "season": season,
         "total": total,
-        "items": [_library_item(r, keys, season, ratings, platforms) for r in rows],
+        "items": [_library_item(r, keys, season, ratings, platforms, prices) for r in rows],
     }
 
 
@@ -756,7 +762,7 @@ def get_library_item(db: Session, user_id: int, entry_id: int) -> dict | None:
         return None
     return _library_item(
         row, _completed_keys(db, user_id), seasons.current(), scores.user_scores(db, user_id),
-        _platforms_by_group(db, user_id, row.UserGame.game_id),
+        _platforms_by_group(db, user_id, row.UserGame.game_id), game_prices.prices_of(db, user_id),
     )
 
 

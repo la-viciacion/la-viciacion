@@ -10,6 +10,7 @@ export function menuSections(user) {
     ] },
     { label: 'Explorar', items: [
       { id: 'games', label: 'Juegos', href: '#/games', icon: 'iconGamepad' },
+      { id: 'library', label: 'Biblioteca del grupo', href: '#/library', icon: 'iconStar' },
       { id: 'calendar', label: 'Calendario', href: '#/calendar', icon: 'iconCalendar' },
       { id: 'achievements', label: 'Logros', href: '#/achievements', icon: 'iconTrophy' },
       { id: 'players', label: 'Jugadores', href: '#/players', icon: 'iconPerson' },
@@ -36,6 +37,7 @@ const PAGES = [
   ['#/activity', 'activity'],
   ['#/stats', 'stats'],
   ['#/games', 'games'],
+  ['#/library', 'library'],
   ['#/wishlist', 'wishlist'],
   ['#/calendar', 'calendar'],
   ['#/challenges', 'challenges'],
