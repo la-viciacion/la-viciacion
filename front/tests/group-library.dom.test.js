@@ -112,3 +112,35 @@ test('what was folded is remembered, and a browser without storage still works',
   assert.equal(document.getElementById('gl-genres').classList.contains('folded'), false);
   localStorage.getItem = original;
 });
+
+const VALUE = {
+  min_contributors: 3, games: 3,
+  cheapest: [{ game_id: 'hades', game_name: 'Hades', image_url: null, contributors: 4, per_hour_cents: 120 }],
+  priciest: [{ game_id: 'doom', game_name: 'Doom', image_url: null, contributors: 3, per_hour_cents: 950 }],
+};
+const openWithValue = async (value) => {
+  installApi({ 'GET /group/library': DATA, 'GET /group/value': value });
+  await page.render({ main: main() });
+  await settle();
+};
+
+test('the cost per hour of the group is a section with its pill, never with a player or a price', async () => {
+  localStorage.removeItem('gl-folded');
+  await openWithValue(VALUE);
+  assert.ok(document.querySelector('.gl-pills [data-go="value"]'));
+  assert.deepEqual(text('#gl-value .game-link'), ['Hades', 'Doom']);
+  assert.match(document.querySelector('#gl-value').textContent.replace(/\u00a0/g, ' '), /1,20 €\/h · 4 jugadores/);
+  assert.match(document.querySelector('#gl-value').textContent, /al menos 3 jugadores con precio/);
+  assert.match(document.querySelector('#gl-value').textContent.replace(/\u00a0/g, ' '), /9,50 €\/h · 3 jugadores/);
+});
+
+test('with no game that enough players priced the section says so, and without the data there is no section', async () => {
+  await openWithValue({ min_contributors: 3, games: 0, cheapest: [], priciest: [] });
+  assert.match(document.querySelector('#gl-value').textContent, /Todavía ningún juego tiene precio de 3 jugadores o más/);
+  installApi({ 'GET /group/library': DATA, 'GET /group/value': () => { throw new Error('boom'); } });
+  await page.render({ main: main() });
+  await settle();
+  assert.equal(document.querySelector('#gl-value'), null);
+  assert.equal(document.querySelector('.gl-pills [data-go="value"]'), null);
+  assert.deepEqual(text('.pf-stat-value'), ['40', '4', '100 h']); // the rest of the page is as it was
+});

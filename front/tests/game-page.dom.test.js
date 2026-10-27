@@ -209,3 +209,15 @@ test('the saga folds, says how many games it has and remembers it', async () => 
   assert.equal(block().classList.contains('folded'), false);
   assert.equal(localStorage.getItem('gm-saga-folded'), '0');
 });
+
+test('the cost per hour of the group is a figure of the game when the API gives it, and not otherwise', async () => {
+  installApi({ 'GET /games/celeste/overview': { ...OVERVIEW, cost_per_hour: { per_hour_cents: 275, contributors: 3 } }, 'GET /users/photo/': json({ detail: 'no' }, 404) });
+  await page.render({ main: main(), user: { id: 1, username: 'ana' } });
+  await settle();
+  assert.ok(text('.pf-stat-label').includes('Coste por hora (3)'));
+  assert.match(document.querySelector('.pf-stats').textContent.replace(/\u00a0/g, ' '), /2,75 €\/h/);
+  installApi({ 'GET /games/celeste/overview': { ...OVERVIEW, cost_per_hour: null }, 'GET /users/photo/': json({ detail: 'no' }, 404) });
+  await page.render({ main: main(), user: { id: 1, username: 'ana' } });
+  await settle();
+  assert.deepEqual(text('.pf-stat-label'), ['Jugadores', 'Horas del grupo', 'Completados', 'Nota media (2)']);
+});

@@ -4,6 +4,7 @@ import { api } from '../../lib/api.js';
 import { formatDate, formatDuration, formatRelative } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
 import { paceLines } from '../../lib/pace.js';
+import { perHour } from '../../lib/money.js';
 import { wantedBy } from '../../lib/wishlist.js';
 import { hydratePhotos, playerAvatar } from '../../ui/avatar.js';
 import { scoreBadge } from '../../ui/score-badge.js';
@@ -75,6 +76,7 @@ function draw(data) {
       ${tile('Horas del grupo', formatDuration(summary.played_seconds))}
       ${tile('Completados', summary.completed_by)}
       ${tile(summary.score_count ? `Nota media (${summary.score_count})` : 'Nota media', summary.score_count ? scoreBadge(Math.round(summary.score_mean)) : '—')}
+      ${data.cost_per_hour ? tile(`Coste por hora (${data.cost_per_hour.contributors})`, perHour(data.cost_per_hour.per_hour_cents)) : ''}
     </section>
 
     ${data.wanted_by.length ? html`<div class="pf-sub gm-wanted">${wantedBy(data.wanted_by)}</div>` : ''}

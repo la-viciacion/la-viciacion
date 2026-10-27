@@ -40,3 +40,10 @@ test('an import that finds nothing new adds nothing', () => {
   assert.equal(addsSomething(report({ wishlist: counts(1) })), true);
   assert.equal(addsSomething(report({ created: { games: 1, platforms: 0 } })), true);
 });
+
+test('the prices of the file are counted and a report without them is fine', () => {
+  assert.match(describeFile({ prices: [{}, {}] }), /2 precios/);
+  const report = { sessions: { imported: 0, existing: 0, skipped: 0 }, library: { imported: 0, existing: 0, skipped: 0 }, scores: { imported: 0, existing: 0, skipped: 0 }, wishlist: { imported: 0, existing: 0, skipped: 0 }, created: { games: 0, platforms: 0 }, dry_run: false };
+  assert.deepEqual(summarize(report), []);
+  assert.deepEqual(summarize({ ...report, prices: { imported: 3, existing: 1, skipped: 0 } }), ['Precios: 3 nuevas, 1 que ya tenías']);
+});
