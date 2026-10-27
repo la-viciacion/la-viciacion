@@ -398,3 +398,7 @@
 .gl-count { margin-left: 6px; }
 .gl-fold .gl-count, .gl-section .section-header .gl-count { white-space: nowrap; }
 .sg-count { margin-left: 6px; }
+.gm-rawg { margin-top: 10px; }
+.gm-rawg-btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 0.85rem; text-decoration: none; border-color: var(--border-accent); color: var(--accent-teal); }
+.gm-rawg-btn:hover { background: rgba(61,217,179,0.1); }
+.gm-rawg-btn:focus-visible { outline: 2px solid var(--accent-teal); outline-offset: 2px; }

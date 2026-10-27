@@ -37,10 +37,20 @@ test('it asks for the game of the address and shows its name as text', () => {
   assert.equal(document.querySelectorAll('h1 b').length, 0);
 });
 
-test('the game links to its RAWG page, in a new tab, when it has a slug', async () => {
-  const link = () => main().querySelector('.gm-head a.game-link');
+test('the game links to its RAWG page with a button, in a new tab, when it has a slug', async () => {
+  const link = () => main().querySelector('.gm-head a.gm-rawg-btn');
   assert.equal(link().getAttribute('href'), 'https://rawg.io/games/celeste');
   assert.equal(link().getAttribute('target'), '_blank');
+  assert.equal(link().getAttribute('rel'), 'noopener noreferrer');
+  assert.match(link().textContent, /Ver en RAWG/);
+  assert.ok(link().classList.contains('pf-btn')); // it looks like a button, not like a link in the text
+});
+
+test('without a slug there is no RAWG button', async () => {
+  installApi({ 'GET /games/celeste/overview': { ...OVERVIEW, game: { ...OVERVIEW.game, slug: null } }, 'GET /users/photo/': json({ detail: 'no' }, 404) });
+  await page.render({ main: main(), user: { id: 1, username: 'ana' } });
+  await settle();
+  assert.equal(main().querySelector('.gm-rawg-btn'), null);
 });
 
 test('the figures of the group and the players, the most played first, with who plays now', () => {

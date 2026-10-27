@@ -66,7 +66,7 @@ function draw(data) {
         <div class="gm-genres">${game.genres.map((genre) => html`<span class="pf-tag muted">${genre}</span>`)}</div>
         ${tags.length ? html`<div class="gm-genres gm-tags" aria-label="Etiquetas">${tags.map((tag) => html`<span class="pf-tag muted">${tag}</span>`)}</div>` : ''}
         ${details ? html`<div class="pf-sub">${details}</div>` : ''}
-        ${game.slug ? html`<div class="pf-sub"><a class="game-link" href="https://rawg.io/games/${encodeURIComponent(game.slug)}" target="_blank" rel="noopener noreferrer">Ver en RAWG</a></div>` : ''}
+        ${game.slug ? html`<div class="gm-rawg"><a class="pf-btn gm-rawg-btn" href="https://rawg.io/games/${encodeURIComponent(game.slug)}" target="_blank" rel="noopener noreferrer">Ver en RAWG <span aria-hidden="true">↗</span></a></div>` : ''}
       </div>
     </div>
 
