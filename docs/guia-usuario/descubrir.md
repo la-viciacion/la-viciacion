@@ -15,7 +15,7 @@ Tiene dos mitades:
 
 Cada tarjeta dice qué otros jugadores quieren el mismo juego («Lo quieren Bea y Cai») y tiene una ✕ para quitarlo. Para añadir uno, pulsa **Añadir juego** (el mismo buscador que en Juegos) o, en la página de un juego que no tengas en tu biblioteca, **Añadir a mi lista**.
 
-Un juego sale de la lista **solo** cuando empiezas a jugarlo. Cada día se vuelve a consultar la fecha de salida de los juegos que se esperan, y el día antes de un lanzamiento el grupo recibe un aviso con quién lo espera.
+Un juego se queda en la lista hasta que lo quites tú con la ✕, aunque ya lo estés jugando (por ejemplo, por un acceso anticipado): su tarjeta lleva entonces la etiqueta **Ya en tu biblioteca**, y sigue contando en el calendario y en los avisos. Cada día se vuelve a consultar la fecha de salida de los juegos que se esperan, y el día antes de un lanzamiento el grupo recibe un aviso con quién lo espera.
 
 ## Recomendados
 

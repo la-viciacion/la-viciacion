@@ -64,10 +64,12 @@ class WishlistTests(ApiTestCase):
         self.assertIsNone(body["upcoming"][1]["days_until"])
         self.assertEqual([g["id"] for g in body["wanted"]], ["out"])
 
-    def test_playing_a_wished_game_takes_it_off_the_list(self):
+    def test_playing_a_wished_game_keeps_it_on_the_list_marked_as_in_the_library(self):
         self.wish("out")
+        self.assertFalse(self.wishlist()["wanted"][0]["in_library"])
         self.library_entry(self.ana, "out", TODAY(), "pc")
-        self.assertEqual(self.wishlist(), {"upcoming": [], "wanted": []})
+        wanted = self.wishlist()["wanted"]
+        self.assertEqual([(g["id"], g["in_library"]) for g in wanted], [("out", True)])
 
     def test_the_list_and_the_game_page_say_who_else_wants_it(self):
         self.wish("soon")

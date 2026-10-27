@@ -1,11 +1,10 @@
 """The wishlist: the games a player wants to play, among them the ones that are not released yet.
 
-Only the wish is stored (`users_wishlist`). Whether a game is upcoming, whether a wish is still pending
-(the game is not in the player's library yet: once they play it, it leaves the list by itself) and who else
-wants a game are derived when asked. Only active players count (never the emergency account)."""
+Only the wish is stored (`users_wishlist`). Whether a game is upcoming, whether it is in the player's library and
+who else wants it are derived when asked. A wish stays until the player removes it, played or not (an early access,
+say). Only active players count (never the emergency account)."""
 import datetime
 
-from sqlalchemy import exists
 from sqlalchemy.orm import Session
 
 from ..database import models
@@ -20,15 +19,6 @@ def is_upcoming(release_date: datetime.date | None, today: datetime.date) -> boo
 def days_until(release_date: datetime.date | None, today: datetime.date) -> int | None:
     """0 when it comes out today; None without a date or once it is out."""
     return None if release_date is None or release_date < today else (release_date - today).days
-
-
-def _pending():
-    """Condition on a wish: the player does not have the game in their library (any season or platform)."""
-    in_library = exists().where(
-        models.UserGame.user_id == models.UserWishlist.user_id,
-        models.UserGame.game_id == models.UserWishlist.game_id,
-    )
-    return ~in_library
 
 
 def add(db: Session, user_id: int, game_id: str) -> None:
@@ -47,25 +37,20 @@ def in_library(db: Session, user_id: int, game_id: str) -> bool:
 
 
 def wished_ids(db: Session, user_id: int) -> set[str]:
-    """The games the user wants and does not have yet."""
-    rows = db.query(models.UserWishlist.game_id).filter(models.UserWishlist.user_id == user_id, _pending())
+    """The games the user wants."""
+    rows = db.query(models.UserWishlist.game_id).filter(models.UserWishlist.user_id == user_id)
     return {game_id for (game_id,) in rows}
 
 
 def wanters(db: Session, game_ids: list[str], exclude_user_id: int | None = None) -> dict[str, list[dict]]:
-    """game_id -> the players of the group who want it and do not have it, by name."""
+    """game_id -> the players of the group who want it, by name."""
     found: dict[str, list[dict]] = {}
     if not game_ids:
         return found
     query = (
         db.query(models.UserWishlist.game_id, models.User.id, models.User.username, models.User.name)
         .join(models.User, models.UserWishlist.user_id == models.User.id)
-        .filter(
-            models.UserWishlist.game_id.in_(game_ids),
-            models.User.is_active == 1,
-            models.not_god(),
-            _pending(),
-        )
+        .filter(models.UserWishlist.game_id.in_(game_ids), models.User.is_active == 1, models.not_god())
         .order_by(models.UserWishlist.added_at, models.User.id)
     )
     if exclude_user_id is not None:
@@ -77,14 +62,16 @@ def wanters(db: Session, game_ids: list[str], exclude_user_id: int | None = None
 
 def wishlist(db: Session, viewer_id: int, today: datetime.date) -> dict:
     """The viewer's list in two parts: `upcoming` (not released: the nearest first, the ones without a date last)
-    and `wanted` (released: the latest wish first), each game with the other players who want it."""
+    and `wanted` (released: the latest wish first), each game with the other players who want it and whether it
+    already is in the viewer's library."""
     rows = (
         db.query(models.UserWishlist.added_at, models.Game)
         .join(models.Game, models.UserWishlist.game_id == models.Game.id)
-        .filter(models.UserWishlist.user_id == viewer_id, _pending())
+        .filter(models.UserWishlist.user_id == viewer_id)
         .all()
     )
     others = wanters(db, [game.id for _, game in rows], exclude_user_id=viewer_id)
+    owned = {game_id for (game_id,) in db.query(models.UserGame.game_id).filter(models.UserGame.user_id == viewer_id)}
     upcoming, wanted = [], []
     for added_at, game in rows:
         item = {
@@ -95,6 +82,7 @@ def wishlist(db: Session, viewer_id: int, today: datetime.date) -> dict:
             "release_date": game.release_date,
             "days_until": days_until(game.release_date, today),
             "added_at": added_at,
+            "in_library": game.id in owned,
             "wanted_by": others.get(game.id, []),
         }
         (upcoming if is_upcoming(game.release_date, today) else wanted).append(item)
@@ -119,7 +107,7 @@ def releases(db: Session, viewer_id: int, year: int, month: int, today: datetime
     wished = (
         db.query(models.UserWishlist.game_id)
         .join(models.User, models.UserWishlist.user_id == models.User.id)
-        .filter(models.User.is_active == 1, models.not_god(), _pending())
+        .filter(models.User.is_active == 1, models.not_god())
     )
     rows = (
         db.query(models.Game)
@@ -162,7 +150,6 @@ def to_refresh(db: Session, today: datetime.date) -> list[models.Game]:
             (models.Game.release_date.is_(None)) | (models.Game.release_date >= today),
             models.User.is_active == 1,
             models.not_god(),
-            _pending(),
         )
         .distinct()
         .all()
@@ -170,14 +157,14 @@ def to_refresh(db: Session, today: datetime.date) -> list[models.Game]:
 
 
 def wished_releases_between(db: Session, first: datetime.date, last: datetime.date) -> list[tuple[models.Game, list[str]]]:
-    """The games that come out from `first` to `last` (both included) that somebody still waits for, with the names of
-    those players, by date and then by name."""
+    """The games that come out from `first` to `last` (both included) that somebody wished, with the names of those
+    players, by date and then by name."""
     game_ids = [
         game_id
         for (game_id,) in db.query(models.Game.id)
         .join(models.UserWishlist, models.UserWishlist.game_id == models.Game.id)
         .join(models.User, models.UserWishlist.user_id == models.User.id)
-        .filter(models.Game.release_date.between(first, last), models.User.is_active == 1, models.not_god(), _pending())
+        .filter(models.Game.release_date.between(first, last), models.User.is_active == 1, models.not_god())
         .distinct()
     ]
     waiting = wanters(db, game_ids)
@@ -192,7 +179,7 @@ def releases_on(db: Session, day: datetime.date) -> list[tuple[models.User, mode
         db.query(models.User, models.Game)
         .join(models.UserWishlist, models.UserWishlist.user_id == models.User.id)
         .join(models.Game, models.UserWishlist.game_id == models.Game.id)
-        .filter(models.Game.release_date == day, models.User.is_active == 1, models.not_god(), _pending())
+        .filter(models.Game.release_date == day, models.User.is_active == 1, models.not_god())
         .order_by(models.User.id, models.Game.name)
         .all()
     )

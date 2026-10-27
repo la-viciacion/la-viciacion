@@ -157,8 +157,8 @@ class UserGamePrice(Base):
 
 class UserWishlist(Base):
     """A game a player wants to play (or is waiting for). Only the wish is stored: whether the game is
-    upcoming, whether the wish is still pending (the game is not in the player's library yet) and who else
-    wants it are derived when asked (crud/wishlist.py)."""
+    upcoming, whether it is in the player's library and who else wants it are derived when asked
+    (crud/wishlist.py). A wish stays until the player removes it."""
 
     __tablename__ = "users_wishlist"
 

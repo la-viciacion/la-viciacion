@@ -106,7 +106,7 @@ TOPICS = (
         "descubrir.md",
         "Menú → Deseados es la lista de juegos que se quieren jugar, también los que aún no han salido, en dos mitades: Próximos lanzamientos (con cuenta "
         "atrás) y Quiero jugar (ya lanzados). Cada tarjeta dice qué otros jugadores quieren el mismo juego. Se añade con «Añadir juego» o con «Añadir a mi "
-        "lista» en la página de un juego, y un juego sale de la lista solo cuando se empieza a jugar. Cada día se consulta la fecha de salida y el día antes de "
+        "lista» en la página de un juego, y un juego se queda en la lista hasta que se quita, aunque ya se esté jugando. Cada día se consulta la fecha de salida y el día antes de "
         "un lanzamiento el grupo recibe un aviso con quién lo espera.",
     ),
     Topic(
