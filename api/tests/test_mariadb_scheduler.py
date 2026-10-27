@@ -279,7 +279,7 @@ class LoopTests(SchedulerTestCase):
 
 
 class WishlistGroupNoticeJobTests(SchedulerTestCase):
-    """The group hears about the wished games that come out the day before or once a week, never both."""
+    """The group hears about the wished games that come out the day before, the same day or once a week, never two."""
 
     def setUp(self):
         super().setUp()
@@ -288,12 +288,17 @@ class WishlistGroupNoticeJobTests(SchedulerTestCase):
             self.calls.append(("wishlist_eve", tomorrow))
             return "0 games"
 
+        async def day(db, today):
+            self.calls.append(("wishlist_day", today))
+            return "0 games"
+
         async def week(db, today):
             self.calls.append(("wishlist_week", today))
             return "0 games"
 
         for patcher in (
             mock.patch.object(actions, "announce_wishlist_eve", new=eve),
+            mock.patch.object(actions, "announce_wishlist_day", new=day),
             mock.patch.object(actions, "announce_wishlist_week", new=week),
         ):
             patcher.start()
@@ -308,6 +313,11 @@ class WishlistGroupNoticeJobTests(SchedulerTestCase):
         # the eve looks at the real "tomorrow" (the pinned clock), not at the moment `tick` is given
         calls = self.wishlist_calls([at(12, 31), at(12, 31, day=6)])
         self.assertEqual([call[0] for call in calls], ["wishlist_eve", "wishlist_eve"])
+
+    def test_the_same_day_notice_goes_out_every_day_at_the_chosen_time_and_looks_at_the_real_today(self):
+        self.set_settings(**{"wishlist.group_notice": "day", "wishlist.time": "18:30"})
+        calls = self.wishlist_calls([at(12, 31), at(18, 31), at(18, 31, day=1)])
+        self.assertEqual([call[0] for call in calls], ["wishlist_day", "wishlist_day"])
 
     def test_weekly_runs_on_the_chosen_day_and_looks_at_the_days_that_follow(self):
         self.set_settings(**{"wishlist.group_notice": "weekly"})
@@ -330,7 +340,7 @@ class WishlistGroupNoticeJobTests(SchedulerTestCase):
         self.assertEqual(self.wishlist_calls([at(12, 31), at(12, 31, day=6)]), [])
 
     def test_notifications_off_sends_neither(self):
-        for mode in ("eve", "weekly"):
+        for mode in ("eve", "day", "weekly"):
             self.set_settings(**{"wishlist.group_notice": mode, "notifications.enabled": False})
             self.assertEqual(self.wishlist_calls([at(12, 31, day=6)]), [], mode)
 

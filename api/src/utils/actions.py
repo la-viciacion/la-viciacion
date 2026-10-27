@@ -468,15 +468,29 @@ async def check_wishlist(db: Session, today: datetime.date) -> str:
     return f"{len(changed)} dates changed, {told} users told"
 
 
+def _wishlist_header(when: str, count: int) -> str:
+    """The first line of a group notice about the wished games (a push shows it as its title): when, and how many."""
+    return f"📅 *{when} {'sale 1 juego deseado' if count == 1 else f'salen {count} juegos deseados'}*"
+
+
+def _wishlist_names(waiting: list[str]) -> str:
+    return utils.escape_markdown(utils.join_names(waiting))
+
+
+def _wishlist_day_message(when: str, releases: list[tuple[str, list[str], str | None]]) -> str:
+    """A header and one line per game: the game and, in brackets, who waits for it."""
+    lines = [f"{_game_text(game_name, slug)} ({_wishlist_names(waiting)})" for game_name, waiting, slug in releases]
+    return _wishlist_header(when, len(lines)) + "\n\n" + "\n".join(lines)
+
+
 def wishlist_eve_message(releases: list[tuple[str, list[str], str | None]]) -> str:
     """The notice for the group the day before: (game, players who wait for it) for each game coming out tomorrow."""
-    blocks = []
-    for game_name, waiting, slug in releases:
-        blocks.append(
-            f"Mañana sale {_game_text(game_name, slug)}. "
-            f"Está en la lista de deseados de {utils.escape_markdown(utils.join_names(waiting))}."
-        )
-    return "\n\n".join(blocks)
+    return _wishlist_day_message("Mañana", releases)
+
+
+def wishlist_day_message(releases: list[tuple[str, list[str], str | None]]) -> str:
+    """The notice for the group the day a game comes out: (game, players who wait for it) for each one coming out today."""
+    return _wishlist_day_message("Hoy", releases)
 
 
 async def announce_wishlist_eve(db: Session, tomorrow: datetime.date) -> str:
@@ -488,6 +502,15 @@ async def announce_wishlist_eve(db: Session, tomorrow: datetime.date) -> str:
     return f"{len(releases)} games"
 
 
+async def announce_wishlist_day(db: Session, today: datetime.date) -> str:
+    """The day a game comes out, tell the group which wished games do (one message for all of them).
+    The AI may rewrite it (`wishlist_day`). Nothing is remembered: a game comes out on one day only."""
+    releases = [(game.name, waiting, game.slug) for game, waiting in wishlist.wished_releases_between(db, today, today)]
+    if releases:
+        await utils.send_message(wishlist_day_message(releases), False, ai_use="wishlist_day")
+    return f"{len(releases)} games"
+
+
 WEEKDAY_NAMES = ("lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo")
 
 
@@ -495,15 +518,11 @@ def wishlist_week_message(releases: list[tuple[str, datetime.date, list[str], st
     """The notice for the group once a week: (game, day it comes out, players who wait for it, slug) for each game
     coming out in the days that follow. A header with how many (it is also what a push shows as its title) and one
     line per game, by date: the weekday and day, the game and, in brackets, who waits for it."""
-    count = len(releases)
-    header = f"📅 *Esta semana {'sale 1 juego deseado' if count == 1 else f'salen {count} juegos deseados'}*"
-    lines = []
-    for game_name, day, waiting, slug in releases:
-        lines.append(
-            f"{WEEKDAY_NAMES[day.weekday()].capitalize()} {day.day}: {_game_text(game_name, slug)} "
-            f"({utils.escape_markdown(utils.join_names(waiting))})"
-        )
-    return header + "\n\n" + "\n".join(lines)
+    lines = [
+        f"{WEEKDAY_NAMES[day.weekday()].capitalize()} {day.day}: {_game_text(game_name, slug)} ({_wishlist_names(waiting)})"
+        for game_name, day, waiting, slug in releases
+    ]
+    return _wishlist_header("Esta semana", len(lines)) + "\n\n" + "\n".join(lines)
 
 
 async def announce_wishlist_week(db: Session, today: datetime.date) -> str:

@@ -66,12 +66,12 @@ def _weekday(value: int) -> str | None:
     return None if 0 <= value <= 6 else "El día debe estar entre 0 (lunes) y 6 (domingo)"
 
 
-# How the group hears about the wished games that come out: the day before, once a week, or not at all
-WISHLIST_GROUP_NOTICES = ("eve", "weekly", "off")
+# How the group hears about the wished games that come out: the day before, the same day, once a week, or not at all
+WISHLIST_GROUP_NOTICES = ("eve", "day", "weekly", "off")
 
 
 def _wishlist_group_notice(value: str) -> str | None:
-    return None if value in WISHLIST_GROUP_NOTICES else "Debe ser eve (la víspera), weekly (semanal) u off (ninguno)"
+    return None if value in WISHLIST_GROUP_NOTICES else "Debe ser eve (la víspera), day (el mismo día), weekly (semanal) u off (ninguno)"
 
 
 def _monthly_day(value: int) -> str | None:
@@ -134,7 +134,7 @@ REGISTRY: dict[str, Spec] = {
     "weekly.time": Spec("str", "09:00", check=_time),
     # The group's notice of the wished games that come out: one mode at a time, so the two never both go out
     "wishlist.group_notice": Spec("str", "eve", check=_wishlist_group_notice),
-    # The time of either one: every day for "eve", on Sundays (scheduler.WISHLIST_WEEKLY_WEEKDAY) for "weekly".
+    # The time of any of them: every day for "eve" and "day", on Sundays (scheduler.WISHLIST_WEEKLY_WEEKDAY) for "weekly".
     # After the 09:00 release-date refresh, so a date that slipped is already corrected when the group is told
     "wishlist.time": Spec("str", "12:30", check=_time),
     # Off until an admin has seen it in the panel (Notificaciones → Probar resumen)

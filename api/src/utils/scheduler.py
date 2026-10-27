@@ -17,8 +17,9 @@ what nothing else can trigger remains here:
   daily_wishlist    every day at 09:00, refreshes the release date of the games somebody waits for
                     and tells who wished a game that comes out today (each user chooses the channels, or switches it off)
   wishlist_eve      every day at `wishlist.time` (12:30), tells the group which wished games come out tomorrow
+  wishlist_day      every day at `wishlist.time`, tells the group which wished games come out today
   wishlist_week     every Sunday at `wishlist.time`, tells the group which wished games come out in the next 7 days.
-                    Only one of wishlist_eve and wishlist_week runs: `wishlist.group_notice`
+                    Only one of wishlist_eve, wishlist_day and wishlist_week runs: `wishlist.group_notice`
   inbox_purge       every day at 04:00, deletes the inbox notices older than `inbox.retention_days`
   challenge_results every day at `challenges.results_time` (09:30), tells who took part how the challenges that ended
                     yesterday went, and the group how each group challenge did
@@ -220,6 +221,10 @@ async def _wishlist_eve(db: Session) -> str:
     return await actions.announce_wishlist_eve(db, datetime.date.today() + datetime.timedelta(days=1))
 
 
+async def _wishlist_day(db: Session) -> str:
+    return await actions.announce_wishlist_day(db, datetime.date.today())
+
+
 async def _wishlist_week(db: Session, slot: datetime.datetime) -> str:
     return await actions.announce_wishlist_week(db, slot.date())
 
@@ -282,12 +287,17 @@ def tick(now: datetime.datetime | None = None) -> None:
         if is_due(now, slot, _last_run(db, "daily_wishlist"), DAILY_GRACE) and _claim(db, "daily_wishlist", slot, now):
             _run(db, "daily_wishlist", lambda: _daily_wishlist(db))
 
-        # One mode at a time (wishlist.group_notice): the day before, or once a week, never both
+        # One mode at a time (wishlist.group_notice): the day before, the same day or once a week, never two
         wishlist_notice = settings.get("wishlist.group_notice")
         if notifications and wishlist_notice == "eve":
             slot = daily_slot(now, *(int(part) for part in settings.get("wishlist.time").split(":")))
             if is_due(now, slot, _last_run(db, "wishlist_eve"), DAILY_GRACE) and _claim(db, "wishlist_eve", slot, now):
                 _run(db, "wishlist_eve", lambda: _wishlist_eve(db))
+
+        if notifications and wishlist_notice == "day":
+            slot = daily_slot(now, *(int(part) for part in settings.get("wishlist.time").split(":")))
+            if is_due(now, slot, _last_run(db, "wishlist_day"), DAILY_GRACE) and _claim(db, "wishlist_day", slot, now):
+                _run(db, "wishlist_day", lambda: _wishlist_day(db))
 
         if notifications and wishlist_notice == "weekly":
             slot = weekly_slot(now, WISHLIST_WEEKLY_WEEKDAY, settings.get("wishlist.time"))

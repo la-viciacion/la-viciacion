@@ -144,16 +144,26 @@ class ReleaseNoticeTests(unittest.TestCase):
 class GameLinkTests(unittest.TestCase):
     def test_both_notices_link_the_game_to_rawg_when_it_has_a_slug(self):
         self.assertIn("¡Hoy sale [Hades II](https://rawg.io/games/hades-ii)!", actions.wishlist_release_message([("Hades II", [], "hades-ii")]))
-        self.assertIn("Mañana sale [Snake\\_Pass](https://rawg.io/games/snake-pass).", actions.wishlist_eve_message([("Snake_Pass", ["Ana"], "snake-pass")]))
+        for message in (actions.wishlist_eve_message([("Snake_Pass", ["Ana"], "snake-pass")]), actions.wishlist_day_message([("Snake_Pass", ["Ana"], "snake-pass")])):
+            self.assertIn("[Snake\\_Pass](https://rawg.io/games/snake-pass) (Ana)", message)
 
 
 class EveNoticeTests(unittest.TestCase):
-    def test_the_group_notice_names_each_game_and_who_waits_for_it(self):
+    def test_the_group_notice_has_a_header_and_a_line_per_game_with_who_waits_for_it(self):
         message = actions.wishlist_eve_message([("Hades II", ["Ana"], None), ("Snake_Pass", ["Ana", "Bea", "Cai"], None)])
         self.assertEqual(message, (
-            "Mañana sale *Hades II*. Está en la lista de deseados de Ana.\n\n"
-            "Mañana sale *Snake\\_Pass*. Está en la lista de deseados de Ana, Bea y Cai."
+            "📅 *Mañana salen 2 juegos deseados*\n\n"
+            "*Hades II* (Ana)\n"
+            "*Snake\\_Pass* (Ana, Bea y Cai)"
         ))
+
+    def test_a_single_game_is_told_in_the_singular(self):
+        self.assertEqual(actions.wishlist_eve_message([("Hades II", ["Ana", "Bea"], None)]), "📅 *Mañana sale 1 juego deseado*\n\n*Hades II* (Ana y Bea)")
+
+    def test_the_same_day_notice_is_the_same_with_today(self):
+        message = actions.wishlist_day_message([("Hades II", ["Ana"], None), ("Celeste", ["Bea"], None)])
+        self.assertEqual(message, "📅 *Hoy salen 2 juegos deseados*\n\n*Hades II* (Ana)\n*Celeste* (Bea)")
+        self.assertEqual(actions.wishlist_day_message([("Hades II", ["Ana"], None)]).splitlines()[0], "📅 *Hoy sale 1 juego deseado*")
 
     def test_the_wished_releases_of_a_day_are_grouped_by_game(self):
         db = make_session()
