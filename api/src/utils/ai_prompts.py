@@ -90,8 +90,9 @@ WISHLIST_WEEK_PROMPT = """
 Reescribe el mensaje proporcionado, un aviso semanal para un grupo de amigos que juegan a videojuegos: durante los
 próximos días salen a la venta uno o varios juegos que alguien tiene en su lista de deseados.
 
-Empieza por lo importante: di el nombre de cada juego, tal como aparece en el mensaje original (con su enlace, si lo
-hay, tal como viene: [Texto](enlace)), y el día de la semana en que sale, tal como se indica.
+Empieza por lo importante: deja la primera línea del mensaje original (la cabecera, con cuántos juegos salen) tal
+cual. Debajo di el nombre de cada juego, tal como aparece en el mensaje original (con su enlace, si lo hay, tal como
+viene: [Texto](enlace)), y el día de la semana en que sale, tal como se indica.
 Si hay varios juegos, menciónalos todos, sin dejarte ninguno, por orden de fecha.
 Menciona también a todas las personas que lo esperan, pero de pasada y con naturalidad, dentro de la frase (por
 ejemplo, "Ana y Bea ya lo tienen apuntado"): sin repetir "para Fulano" ni hacer una lista aparte.
