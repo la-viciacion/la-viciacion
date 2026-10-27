@@ -28,6 +28,7 @@ MAX_SCREENSHOTS = 8
 MIN_REVIEWS = 20  # a percentage of fewer reviews says nothing
 MEDIA_HOSTS = ("steamstatic.com", "akamaihd.net", "rawg.io")  # where the videos and pictures may come from
 
+STEAM_MOVIE = "https://cdn.akamai.steamstatic.com/steam/apps/{movie_id}/movie480.mp4"  # what a plain <video> can play
 STEAM_DETAILS = "https://store.steampowered.com/api/appdetails"
 STEAM_REVIEWS = "https://store.steampowered.com/appreviews/{steam_id}"
 RAWG_GAME = "https://api.rawg.io/api/games/{rawg_id}"
@@ -56,9 +57,13 @@ def clean_text(text) -> str | None:
 
 
 def _trailer(video: dict, poster) -> dict | None:
-    """A video entry of Steam (`mp4`) or RAWG (`data`): the small file when there is one, else the big one."""
+    """A video entry of Steam (`mp4`) or RAWG (`data`): the small file when there is one, else the big one. Steam's
+    answer now only lists streams (DASH, HLS) that a <video> cannot play outside Safari, but the mp4 of the same movie is
+    still served at a path built from its id, so that is used when the answer has no mp4."""
     files = video.get("mp4") or video.get("data") or {}
     url = media_url(files.get("480") or files.get("max"))
+    if not url and isinstance(video.get("id"), int) and video.get("hls_h264"):
+        url = STEAM_MOVIE.format(movie_id=video["id"])
     return {"url": url, "poster": media_url(poster)} if url else None
 
 
