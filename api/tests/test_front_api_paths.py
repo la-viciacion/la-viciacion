@@ -115,9 +115,9 @@ class FrontCallsMatchTheApiTests(unittest.TestCase):
         entities = (FRONT / "pages" / "admin" / "entities.js").read_text(encoding="utf-8")
         endpoints = re.findall(r"endpoint:\s*'([^']+)'", entities)
         self.assertGreaterEqual(len(endpoints), 7)
-        # a table marked `readOnly: true` (the audit log, the challenges and the proposals) is listed but has no edit button
+        # a table marked `readOnly: true` (the audit log, the challenges, the proposals and the polls) is listed but has no edit button
         read_only = set(re.findall(r"endpoint:\s*'([^']+)',(?:(?!endpoint:)[\s\S])*?readOnly:\s*true", entities))
-        self.assertEqual(read_only, {"/manage/audit", "/manage/challenges", "/manage/challenge-proposals"})
+        self.assertEqual(read_only, {"/manage/audit", "/manage/challenges", "/manage/challenge-proposals", "/manage/polls"})
         for endpoint in endpoints:
             with self.subTest(endpoint=endpoint):
                 self.assertTrue(self.exists("GET", endpoint), "the table lists its rows with GET")

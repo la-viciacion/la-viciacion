@@ -11,6 +11,7 @@ const ENTITY = {
   challenges: 'reto',
   'challenge-proposals': 'propuesta de reto',
   'challenge-schedules': 'reto recurrente',
+  polls: 'encuesta',
   achievements: 'logro',
   'user-achievements': 'logro concedido',
 };
@@ -25,6 +26,8 @@ const ACTIONS = [
   ['POST', /^telegram\/announce$/, 'Envió un aviso por Telegram'],
   ['POST', /^challenge-proposals\/\d+\/approve$/, 'Aprobó una propuesta de reto y lo lanzó'],
   ['POST', /^challenge-proposals\/\d+\/reject$/, 'Rechazó una propuesta de reto'],
+  ['POST', /^polls$/, 'Lanzó una encuesta al grupo'],
+  ['POST', /^polls\/\d+\/close$/, 'Cerró una encuesta del grupo'],
   ['POST', /^check-achievements$/, 'Pidió comprobar los logros'],
   ['POST', /^recalculate-achievements$/, 'Pidió recalcular todos los logros'],
   ['POST', /^rawg-sync\//, 'Usó la sincronización con RAWG'],

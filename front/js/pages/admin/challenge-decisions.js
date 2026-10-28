@@ -5,7 +5,7 @@ import { html } from '../../lib/html.js';
 import { modalHeader, openModal } from '../../ui/modal.js';
 import { toast } from '../../ui/toast.js';
 
-function ask({ title, body, submit, run, admin }) {
+export function ask({ title, body, submit, run, admin }) {
   const m = openModal(html`
     ${modalHeader(title)}
     <form class="adm-form" novalidate>
