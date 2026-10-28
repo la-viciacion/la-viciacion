@@ -4,6 +4,7 @@
 //   clearable? (game: a button to leave it empty), checks? (game: the key of a checkbox that choosing a game checks) }
 // Types: text | textarea (rows?) | number | date | datetime | checkbox | select | month | platform | user | game | games | password | image
 // games: a list of games (the value is [{ id, name }], what is sent is the ids): each is added with the same picker as `game`
+// options: a list of short texts (the value is [text, ...]), one input row each, added and removed in the form: { min, max, maxLength }
 // select: { options: [[number, label], ...] }
 // month: the running month and the next ones, as a "YYYY-MM" text (the challenges are launched for a month)
 // choice: { options: [[text, label], ...], default? } a select whose value stays text (select reads it as a number)
@@ -44,6 +45,13 @@ function fieldHtml(f, value, row) {
       return html`<div class="adm-field-games"><span>${f.label}</span>
         <ol class="adm-games" id="${id}">${(Array.isArray(value) ? value : []).map((g) => html`<li data-id="${g.id}"><span>${g.name}</span> <button type="button" class="adm-btn sm" data-gameremove>Quitar</button></li>`)}</ol>
         <button type="button" class="adm-btn sm" data-gameadd="${f.key}">Añadir juego…</button></div>`;
+    case 'options': {
+      const texts = Array.isArray(value) ? [...value] : [];
+      while (texts.length < (f.min ?? 0)) texts.push('');
+      return html`<div class="adm-field-games"><span>${f.label}</span>
+        <ol class="adm-games" id="${id}">${texts.map((text) => html`<li class="adm-option-row"><input class="adm-input" type="text" maxlength="${f.maxLength}" value="${text}" /> <button type="button" class="adm-btn sm" data-optionremove>Quitar</button></li>`)}</ol>
+        <button type="button" class="adm-btn sm" data-optionadd="${f.key}">Añadir opción</button></div>`;
+    }
     case 'platform': {
       const known = platformList();
       return html`<label>${f.label}<select class="adm-input" id="${id}">
@@ -86,6 +94,14 @@ function fieldHtml(f, value, row) {
   }
 }
 
+// The rows of an `options` field say which one they are, and say it again when one goes away.
+function numberOptions(list) {
+  list.querySelectorAll('input').forEach((input, i) => {
+    input.placeholder = `Opción ${i + 1}`;
+    input.setAttribute('aria-label', `Opción ${i + 1}`);
+  });
+}
+
 function readField(f) {
   const el = document.getElementById(inputId(f));
   switch (f.type) {
@@ -95,6 +111,7 @@ function readField(f) {
     case 'datetime': return el.value ? (el.value.length === 16 ? `${el.value}:00` : el.value) : null;
     case 'user': return el.value ? Number(el.value) : null;
     case 'games': return [...el.querySelectorAll('li')].map((li) => li.dataset.id);
+    case 'options': return [...el.querySelectorAll('input')].map((input) => input.value.trim()).filter(Boolean);
     case 'date':
     case 'month':
     case 'choice':
@@ -152,6 +169,38 @@ async function onFormClick(e, modal, fields) {
     }
     return;
   }
+  const addOption = e.target.closest('[data-optionadd]');
+  if (addOption) {
+    const field = fields.find((f) => f.key === addOption.dataset.optionadd);
+    const list = modal.el.querySelector(`#f_${field.key}`);
+    if (list.children.length >= field.max) return;
+    const item = document.createElement('li');
+    item.className = 'adm-option-row';
+    const input = document.createElement('input');
+    input.className = 'adm-input';
+    input.type = 'text';
+    input.maxLength = field.maxLength;
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'adm-btn sm';
+    remove.dataset.optionremove = '';
+    remove.textContent = 'Quitar';
+    item.append(input, ' ', remove);
+    list.append(item);
+    numberOptions(list);
+    addOption.disabled = list.children.length >= field.max;
+    input.focus();
+    return;
+  }
+  const removeOption = e.target.closest('[data-optionremove]');
+  if (removeOption) {
+    const list = removeOption.closest('ol');
+    const add = removeOption.closest('.adm-field-games').querySelector('[data-optionadd]');
+    removeOption.closest('li').remove();
+    numberOptions(list);
+    add.disabled = list.children.length >= fields.find((f) => `f_${f.key}` === list.id).max;
+    return;
+  }
   const removeGame = e.target.closest('[data-gameremove]');
   if (removeGame) {
     removeGame.closest('li').remove();
@@ -179,6 +228,7 @@ export function openForm(entity, row, admin, variant = null) {
       </div>
     </form>`, { wide: true });
 
+  fields.filter((f) => f.type === 'options').forEach((f) => numberOptions(modal.el.querySelector(`#f_${f.key}`)));
   modal.el.addEventListener('click', (e) => onFormClick(e, modal, fields));
   modal.el.querySelector('form').addEventListener('submit', (e) => {
     e.preventDefault();
@@ -214,6 +264,7 @@ async function submit(entity, row, fields, modal, admin, extra = {}) {
     }
     const value = readField(f);
     if (f.required && (value === null || value === '' || (Array.isArray(value) && !value.length))) { errorEl.textContent = `Falta: ${f.label}`; return; }
+    if (f.min && Array.isArray(value) && value.length < f.min) { errorEl.textContent = `Hacen falta al menos ${f.min} opciones`; return; }
     if (f.omitEmpty && value === null) continue;
     body[f.key] = value;
   }

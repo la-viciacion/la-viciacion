@@ -360,7 +360,7 @@ export const ENTITIES = {
         body: {},
         fields: [
           { key: 'question', label: 'Pregunta (hasta 300 caracteres)', type: 'text', required: true },
-          { key: 'options', label: 'Opciones, una por línea (de 2 a 10, hasta 100 caracteres cada una)', type: 'textarea', rows: 6, required: true },
+          { key: 'options', label: 'Opciones de respuesta (de 2 a 10)', type: 'options', min: 2, max: 10, maxLength: 100, required: true },
           { key: 'multiple', label: 'Se pueden elegir varias opciones', type: 'checkbox', default: false },
           { key: 'closes_at', label: 'Fecha límite (opcional; sin ella se cierra a mano)', type: 'datetime' },
         ],
