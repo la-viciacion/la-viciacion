@@ -3,6 +3,7 @@ import datetime
 import time
 
 from .logger import LogManager
+from .redaction import redact_query
 
 logger = LogManager().get_logger()
 
@@ -31,7 +32,7 @@ class RequestLogMiddleware:
             await self.app(scope, receive, send_and_note_status)
         finally:
             duration = datetime.timedelta(seconds=time.perf_counter() - started)
-            query = scope.get("query_string", b"").decode("latin-1")
+            query = redact_query(scope.get("query_string", b"").decode("latin-1"))
             logger.info(
                 f'REQUEST - "{scope["method"]} {scope["path"]}{"?" + query if query else ""}" - {status} - {duration}'
             )
