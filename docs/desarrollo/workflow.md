@@ -43,15 +43,17 @@ CI runs when a pull request exists (`ci.yml` listens to `pull_request` only), ne
 
 ### Which checks run for a change
 
-A pull request only runs the checks its files can affect; the release workflow (on a tag) and the weekly runs always run everything. `ci.yml` starts with a `changes` job that lists the PR's files (GitHub API) and hands them to `.github/scripts/ci_scope.py`, which answers with the checks to run (`api-tests`, `bot-tests`, `front-tests`, `mariadb`) and the images to build. The single required job `CI` counts a skipped job as passed, so a PR that touches only docs shows just `pr-title`, `changes` and `CI`.
+A pull request only runs the checks its files can affect; the release workflow (on a tag) and the weekly runs always run everything. `ci.yml` starts with a `changes` job that lists the PR's files (GitHub API) and hands them to `.github/scripts/ci_scope.py`, which answers with the checks to run (`api-tests`, `bot-tests`, `front-tests`, `mariadb`) and the images to build. The single required job `CI` counts a skipped job as passed, so a PR that touches only a README shows just `pr-title`, `changes` and `CI`.
 
 | The change touches | Runs |
 |---|---|
-| `docs/` (except `docs/guia-usuario/`), `design/`, `*.md` at the root, `LICENSE`, `.gitignore`, `.gitattributes`, the PR template, `dependabot.yml` | nothing but the PR title |
-| `docs/guia-usuario/` | the API tests (one of them checks that the topics of the chat's help name pages of the guide that exist) |
+| `design/`, `docs-demo/`, `*.md` at the root, `LICENSE`, `.gitignore`, `.gitattributes`, the PR template, `dependabot.yml` | nothing but the PR title |
+| `docs/`, `mkdocs.yml`, `requirements-docs.txt`, `docs.yml` | the documentation build (`mkdocs build --strict`: a broken link or a missing page blocks the merge) |
+| `docs/guia-usuario/` | also the API tests (one of them checks that the topics of the chat's help name pages of the guide that exist) |
 | `front/` | front tests and lint, front image; plus the API tests when it is `front/js/` or `front/Dockerfile` (a test reads them) |
 | `api/` | API tests, MariaDB tests, API image |
 | `bot/src/` | bot tests, bot image, API tests and MariaDB tests (the contract test and the `.env.template` check read the bot's code) |
+| `bot/Dockerfile` | bot tests, bot image and the API tests (`test_deployment_pins` reads every Dockerfile) |
 | `bot/` (tests, requirements...) | bot tests, bot image |
 | `.env.template`, `docker-compose.dev.yml` | API tests |
 | `ruff.toml` | API and bot tests (their jobs run the Python lint) |
@@ -93,7 +95,7 @@ Settings → Rules → Rulesets (or Branches → Branch protection rule) for `ma
 - Approvals: **0 while there is a single maintainer**; raise it to 1 when the second person joins (then nobody can approve their own PR). No bypass actors, and no `update` restriction rule (it would also stop merges made through PRs).
 - Block force pushes and deletion.
 
-Settings → Rules → Rulesets → **release tags** (target: tags, pattern `refs/tags/v*`): creation, update, deletion and force pushes of `v*` tags blocked, with the **Admin** repository role as the only bypass. Without it anyone with write access could tag any branch and start a release (and the prod deploy only checks that the checks passed on the tagged commit, not that the commit is on `main`). Tags are immutable once created; an admin can still delete one.
+Settings → Rules → Rulesets → **release tags** (target: tags, pattern `refs/tags/v*`): creation, update, deletion and force pushes of `v*` tags blocked, with the **Admin** repository role as the only bypass. Without it anyone with write access could tag any branch and start a release (the prod deploy also checks that the tagged commit is on `main` and that its release checks passed, but a rule on the tags keeps that from being the only guard). Tags are immutable once created; an admin can still delete one.
 
 When a second person joins: give them the **Write** role (they can branch, open PRs and merge their own once `CI` is green) and raise the approvals of the `main` ruleset to 1, with "Require approval of the most recent reviewable push", so nobody merges their own PR. Do not raise it before: with no bypass and a single maintainer, nobody could approve the PR. Anyone with write access can also start the **Deploy** workflow and, with a PR that edits a workflow, reach the repository secrets of the SSH deploy keys (each key can only run its deploy script on the server): give Write only to people you would trust with a deploy.
 - Do not allow bypassing (applies to admins too).

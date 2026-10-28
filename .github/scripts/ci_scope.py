@@ -12,21 +12,24 @@ because some tests read files outside their own directory (tests/test_ci_scope.p
 import json
 import sys
 
-ALL_CHECKS = ("api-tests", "bot-tests", "front-tests", "mariadb")
+ALL_CHECKS = ("api-tests", "bot-tests", "front-tests", "mariadb", "docs")
 ALL_SERVICES = ("api", "front", "bot")
 
 # Nothing in these is executed, built or read by a test.
-INERT_PREFIXES = ("docs/", "design/", "docs-demo/")
-# ...except what a test reads: the user guide is checked against the chat's help topics (api/src/chat/help.py)
-READ_BY_TESTS = ("docs/guia-usuario/",)
+INERT_PREFIXES = ("design/", "docs-demo/")
 INERT_FILES = {
     "README.md", "CONTRIBUTING.md", "AGENTS.md", "CLAUDE.md", "LICENSE", ".gitignore", ".gitattributes",
-    "mkdocs.yml", "requirements-docs.txt", ".github/workflows/docs.yml",
     ".github/pull_request_template.md", ".github/dependabot.yml", ".github/copilot-instructions.md",
 }
 
 # Checks that run when a path starts with the prefix (or equals the file).
 RULES = (
+    # the documentation site: it is built with --strict, so a broken link or a missing page fails the check (it used to be a
+    # workflow outside the required one, and a red Docs next to a green CI could be merged)
+    ("docs/", {"docs"}, set()),
+    ("mkdocs.yml", {"docs"}, set()),
+    ("requirements-docs.txt", {"docs"}, set()),
+    (".github/workflows/docs.yml", {"docs"}, set()),
     # the user guide: the API test that checks every topic of the chat's help names a page that exists
     ("docs/guia-usuario/", {"api-tests"}, set()),
     # the API: its own tests, the tests on a real MariaDB and the image
@@ -34,6 +37,8 @@ RULES = (
     # the bot: its tests and image; the API tests that use the bot as the real client (test_mariadb_bot_contract)
     # and the one that checks the variables it reads against .env.template
     ("bot/src/", {"bot-tests", "api-tests", "mariadb"}, {"bot"}),
+    # test_deployment_pins reads every Dockerfile: one that drops its image tag must not get through on the bot's tests alone
+    ("bot/Dockerfile", {"bot-tests", "api-tests"}, {"bot"}),
     ("bot/", {"bot-tests"}, {"bot"}),
     # the front: its tests and image; the API test that checks every path the pages call has a route
     ("front/js/", {"front-tests", "api-tests"}, {"front"}),
@@ -52,7 +57,7 @@ def scope(paths):
     checks, services = set(), set()
     for path in paths:
         path = path.strip().replace("\\", "/")
-        if not path or path in INERT_FILES or (path.startswith(INERT_PREFIXES) and not path.startswith(READ_BY_TESTS)):
+        if not path or path in INERT_FILES or path.startswith(INERT_PREFIXES):
             continue
         matched = False
         for prefix, rule_checks, rule_services in RULES:

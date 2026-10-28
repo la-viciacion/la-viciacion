@@ -1,15 +1,10 @@
 name: Docs
 
-# Builds the documentation site (mkdocs.yml, docs/) and publishes it to GitHub Pages. A pull request only
-# builds it, with --strict so a broken link or a missing page fails the check; main also deploys it.
+# Builds the documentation site (mkdocs.yml, docs/) and publishes it to GitHub Pages when main changes. A pull request
+# builds it too, but in CI (checks.yml, the `docs` check, required through the `CI` job): a red build there blocks the
+# merge, which a separate workflow could not.
 # In the repository settings, Pages must use "GitHub Actions" as its source.
 on:
-  pull_request:
-    paths:
-      - docs/**
-      - mkdocs.yml
-      - requirements-docs.txt
-      - .github/workflows/docs.yml
   push:
     branches: [main]
     paths:
