@@ -22,6 +22,7 @@ class PersonalTestCase(base.ChallengesTestCase):
         with database.SessionLocal() as db:
             row = db.get(models.Challenge, challenge_id)
             row.starts_on = row.starts_on - timedelta(days=days)
+            row.created_at = row.created_at - timedelta(days=days)
             db.commit()
 
     def play(self, user, game, days_ago, minutes):
@@ -128,6 +129,8 @@ class WishlistTests(PersonalTestCase):
         self.library_entry(self.ana, "tetris", TODAY(), "pc")
         self.assertEqual(self.part(challenge)["count"], 0)
         self.library_entry(self.ana, "hades", TODAY(), "pc")
+        self.assertEqual(self.part(challenge)["count"], 0)  # a start is only a date: it counts once the game was played since the launch
+        self.played(self.ana, 1, game="hades")
         part = self.part(challenge)
         self.assertEqual((part["count"], part["unit"], part["done"]), (1, "games", True))
 
@@ -136,12 +139,62 @@ class WishlistTests(PersonalTestCase):
         challenge = self.launch_personal("wishlist", mode="complete", games=1, duration="week").json()
         self.assertEqual(challenge["title"], "Completar 1 deseado")
         entry = self.library_entry(self.ana, "hades", TODAY(), "pc")
+        self.played(self.ana, 1, game="hades")
         self.assertEqual(self.part(challenge["id"])["count"], 0)  # started, not completed
         with database.SessionLocal() as db:
             row = db.get(models.UserGame, entry)
             row.completed, row.completed_date = 1, TODAY()
             db.commit()
         self.assertTrue(self.part(challenge["id"])["done"])
+
+
+class LaunchMomentTests(PersonalTestCase):
+    """A personal challenge counts from the moment it was launched: what was done earlier that day is not part of it."""
+
+    def launched_at(self, challenge_id, hour):
+        with database.SessionLocal() as db:
+            row = db.get(models.Challenge, challenge_id)
+            row.created_at = datetime.combine(row.starts_on, datetime.min.time()) + timedelta(hours=hour)
+            db.commit()
+
+    def at(self, hour):
+        return datetime.combine(TODAY(), datetime.min.time()) + timedelta(hours=hour)
+
+    def test_a_session_from_before_the_launch_that_day_does_not_count_and_one_after_it_does(self):
+        challenge = self.launch_personal("long_sessions", sessions=2, minutes=15, duration="week").json()["id"]
+        self.launched_at(challenge, 13)
+        self.library_entry(self.ana, "hades", TODAY(), "pc")
+        self.session(self.ana, "hades", self.at(11), 30)
+        self.assertEqual(self.part(challenge)["count"], 0)
+        self.session(self.ana, "hades", self.at(14), 30)
+        self.assertEqual(self.part(challenge)["count"], 1)
+
+    def test_a_day_played_only_before_the_launch_is_not_a_played_day(self):
+        challenge = self.launch_personal("streak", mode="days", days=2, duration="week").json()["id"]
+        self.launched_at(challenge, 13)
+        self.library_entry(self.ana, "hades", TODAY(), "pc")
+        self.session(self.ana, "hades", self.at(11), 30)
+        self.assertEqual(self.part(challenge)["count"], 0)
+        self.session(self.ana, "hades", self.at(15), 30)
+        self.assertEqual(self.part(challenge)["count"], 1)
+
+    def test_a_wish_started_or_completed_the_day_it_was_launched_counts_only_if_played_since(self):
+        self.wish(self.ana, "hades")
+        challenge = self.launch_personal("wishlist", mode="complete", games=1, duration="week").json()["id"]
+        self.launched_at(challenge, 13)
+        self.library_entry(self.ana, "hades", TODAY(), "pc", completed=1, completed_date=TODAY())
+        self.session(self.ana, "hades", self.at(11), 30)  # played and completed before the launch: already in the library by then
+        self.assertEqual(self.part(challenge)["count"], 0)
+        self.session(self.ana, "hades", self.at(15), 30)  # played after it: started and completed since
+        self.assertEqual(self.part(challenge)["count"], 1)
+
+    def test_a_game_started_that_day_before_the_launch_is_not_a_pending_wish(self):
+        self.wish(self.ana, "hades")
+        self.library_entry(self.ana, "hades", TODAY(), "pc")
+        self.session(self.ana, "hades", self.at(11), 30)
+        response = self.launch_personal("wishlist", mode="start", games=1)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("deseados pendientes", response.json()["detail"])
 
 
 class AchievementTests(PersonalTestCase):
@@ -167,6 +220,7 @@ class AchievementTests(PersonalTestCase):
             for challenge_id in (challenge, personal):
                 row = db.get(models.Challenge, challenge_id)
                 row.starts_on, row.ends_on = TODAY() - timedelta(days=10), TODAY() - timedelta(days=3)
+                row.created_at = datetime.combine(row.starts_on, datetime.min.time())
             db.commit()
         self.play(self.ana, "hades", 5, 45)  # inside the period it has now
         self.assertEqual(self.earned(), {"CHALLENGES_1_LIFETIME"})

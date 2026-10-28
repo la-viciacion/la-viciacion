@@ -36,6 +36,9 @@ class DebtTestCase(base.ChallengesTestCase):
         return self.api("GET", f"/challenges/{challenge_id}", as_user=as_user).json()["progress"]["players"][0]
 
     def complete(self, user, game):
+        """Complete a game today, after a short session that day: a completion is only a date, so it counts for a challenge
+        launched today only when the game was played since the launch (which these tests put at the start of the day)."""
+        self.session(user, game, datetime.datetime.combine(TODAY(), datetime.time.min) + timedelta(hours=11), 1)
         with database.SessionLocal() as db:
             db.execute(text("UPDATE users_games SET completed = 1, completed_date = :d WHERE user_id = :u AND game_id = :g"), {"d": TODAY(), "u": user, "g": game})
             db.commit()

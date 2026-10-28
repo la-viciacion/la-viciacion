@@ -195,7 +195,7 @@ def debt_preview(db: Session, viewer_id: int, today: datetime.date) -> dict:
     to close). The same figures the challenge starts from, so the form can say what a percentage means in hours."""
     from . import debt  # that module imports the ones that import this one
 
-    open_games = debt.games_in_debt_at(db, viewer_id, today)
+    open_games = debt.games_in_debt_at(db, viewer_id, today, datetime.datetime.now())
     return {"seconds": sum(open_games.values()), "games": sum(1 for left in open_games.values() if left), "open_games": len(open_games)}
 
 

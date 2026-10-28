@@ -81,12 +81,22 @@ def user_debt(db: Session, season: int | None = None, is_active: bool | None = N
     return rows
 
 
-def games_in_debt_at(db: Session, user_id: int, day: datetime.date) -> dict[str, int]:
+def games_in_debt_at(db: Session, user_id: int, day: datetime.date, since: datetime.datetime | None = None) -> dict[str, int]:
     """{game_id: seconds still to play} the player had at the start of `day`, over every season: the games they had
     started (a session of 10 minutes or more before it), had not finished and had not abandoned by then, and that
     have an average time. A game already past its average time is there with 0: it is still open. Worked out from
-    what happened before `day`, so it does not drift when the averages are synced again."""
-    cutoff = datetime.datetime.combine(day, datetime.time.min)
+    what happened before `day`, so it does not drift when the averages are synced again.
+
+    `since` is the moment a personal challenge was launched on `day`: what happened before it that day is part of the
+    past. A completion is only a date, so one on `day` was before the launch unless the game was played since."""
+    cutoff = since or datetime.datetime.combine(day, datetime.time.min)
+    played_since = set()
+    if since is not None:
+        played_since = {
+            game_id for (game_id,) in db.query(models.GameTimer.game_id).filter(
+                models.GameTimer.user_id == user_id, models.GameTimer.start_time >= since
+            ).distinct()
+        }
     sessions = time_entries.sessions_subquery()
     long_session = case((sessions.c.duration >= time_entries.MIN_SESSION_SECONDS, 1), else_=0)
     played = db.execute(
@@ -106,7 +116,9 @@ def games_in_debt_at(db: Session, user_id: int, day: datetime.date) -> dict[str,
             models.UserGame.user_id == user_id
         )
     ):
-        finished = bool(completed) and (completed_date is None or completed_date < day)
+        finished = bool(completed) and (
+            completed_date is None or completed_date < day or (since is not None and completed_date == day and game_id not in played_since)
+        )
         entries.append((user_id, game_id, 1 if finished else 0, abandoned_at if abandoned_at is not None and abandoned_at < cutoff else None))
     avg_times = dict(db.execute(select(models.Game.id, models.Game.avg_time).where(models.Game.avg_time > 0)).all())
     counted = _counted_games([tuple(row) for row in played], entries, avg_times)

@@ -111,14 +111,17 @@ class ProgressTests(NewGenreTestCase):
         challenge = self.launch_genre(mode="complete").json()["id"]
         self.assertEqual(self.progress(challenge), {"user_id": self.ana, "name": "Ana", "count": 0, "target_count": 1, "done": False})
         self.library_entry(self.ana, "tetris", TODAY(), "pc", completed=1, completed_date=TODAY())  # another genre
+        self.played(self.ana, 1, game="tetris")
         self.assertFalse(self.progress(challenge)["done"])
         self.library_entry(self.ana, "dead-cells", TODAY(), "pc", completed=1, completed_date=TODAY())
+        self.assertEqual(self.progress(challenge)["count"], 0)  # completed, but not played since the launch: it was done before
+        self.played(self.ana, 1, game="dead-cells")
         self.assertEqual((self.progress(challenge)["count"], self.progress(challenge)["done"]), (1, True))
 
     def test_a_finished_challenge_is_in_the_history_of_its_owner_only(self):
         challenge = self.launch_genre().json()["id"]
         with database.SessionLocal() as db:
-            db.execute(text("UPDATE challenges SET starts_on = :s, ends_on = :e WHERE id = :i"),
+            db.execute(text("UPDATE challenges SET starts_on = :s, created_at = :s, ends_on = :e WHERE id = :i"),
                        {"s": TODAY() - timedelta(days=40), "e": TODAY() - timedelta(days=10), "i": challenge})
             db.commit()
         mine = self.api("GET", f"/challenges/player/{self.ana}", as_user="bea").json()
