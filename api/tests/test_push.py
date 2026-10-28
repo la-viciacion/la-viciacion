@@ -1,5 +1,6 @@
 import base64
 import datetime
+import time
 import unittest
 from unittest import mock
 
@@ -67,10 +68,18 @@ class KeysTests(unittest.TestCase):
 class DeliveryTests(unittest.TestCase):
     def setUp(self):
         _, self.private = push.generate_vapid_keys()
-        self.devices = [(1, "https://push.example/a", "p", "a"), (2, "https://push.example/b", "p", "a"), (3, "https://push.example/c", "p", "a")]
+        self.devices = [(1, "https://fcm.googleapis.com/fcm/send/a", "p", "a"), (2, "https://fcm.googleapis.com/fcm/send/b", "p", "a"), (3, "https://fcm.googleapis.com/fcm/send/c", "p", "a")]
 
-    def deliver(self, side_effect):
-        with mock.patch.object(push, "webpush", side_effect=side_effect):
+    def deliver(self, effects):
+        """What each device answers (None: it takes the push), by the order of the devices: they are reached at the same
+        time, so the answer is chosen by the address and not by which call comes first."""
+        by_endpoint = {device[1]: effect for device, effect in zip(self.devices, effects)}
+
+        def webpush(subscription_info, **kwargs):
+            if by_endpoint[subscription_info["endpoint"]] is not None:
+                raise by_endpoint[subscription_info["endpoint"]]
+
+        with mock.patch.object(push, "webpush", side_effect=webpush):
             return push._deliver(self.devices, {"title": "t"}, self.private, "mailto:a@b.c")
 
     @staticmethod
@@ -88,6 +97,24 @@ class DeliveryTests(unittest.TestCase):
     def test_an_unexpected_error_does_not_stop_the_others(self):
         self.assertEqual(self.deliver([RuntimeError("network"), None, None]), (2, [], 1))
 
+    def test_a_slow_push_service_does_not_make_the_others_wait(self):
+        started = time.monotonic()
+
+        def slow(subscription_info, **kwargs):
+            time.sleep(0.3)
+
+        with mock.patch.object(push, "webpush", side_effect=slow):
+            sent, gone, failed = push._deliver(self.devices, {"title": "t"}, self.private, "mailto:a@b.c")
+        self.assertEqual((sent, gone, failed), (3, [], 0))
+        self.assertLess(time.monotonic() - started, 0.8)  # three in a row would take 0.9
+
+    def test_an_address_that_is_not_a_push_service_is_never_called(self):
+        devices = [(1, "https://internal.example/x", "p", "a"), (2, "https://fcm.googleapis.com/fcm/send/b", "p", "a")]
+        with mock.patch.object(push, "webpush") as sender:
+            result = push._deliver(devices, {"title": "t"}, self.private, "mailto:a@b.c")
+        self.assertEqual(result, (1, [], 1))
+        self.assertEqual(sender.call_count, 1)
+
     def test_the_payload_is_sent_as_json_with_the_contact_and_a_short_ttl(self):
         with mock.patch.object(push, "webpush") as sender:
             push._deliver(self.devices[:1], {"title": "t"}, self.private, "mailto:a@b.c")
@@ -95,6 +122,34 @@ class DeliveryTests(unittest.TestCase):
         self.assertEqual(kwargs["data"], '{"title": "t"}')
         self.assertEqual(kwargs["vapid_claims"], {"sub": "mailto:a@b.c"})
         self.assertEqual(kwargs["ttl"], push.TTL_SECONDS)
+
+
+class PushServiceTests(unittest.TestCase):
+    def test_the_services_the_browsers_use_are_accepted(self):
+        for endpoint in (
+            "https://fcm.googleapis.com/fcm/send/abc",
+            "https://updates.push.services.mozilla.com/wpush/v2/abc",
+            "https://web.push.apple.com/QGk",
+            "https://wns2-par02p.notify.windows.com/w/?token=abc",
+            "https://fcm.googleapis.com:443/fcm/send/abc",
+        ):
+            self.assertTrue(push.is_push_endpoint(endpoint), endpoint)
+
+    def test_anything_else_is_refused(self):
+        for endpoint in (
+            "http://fcm.googleapis.com/fcm/send/abc",  # not https
+            "https://evil.example/fcm.googleapis.com",  # the name only in the path
+            "https://fcm.googleapis.com.evil.example/x",  # a look-alike
+            "https://evilfcm.googleapis.com.example/x",
+            "https://notfcm.googleapis.com/x",
+            "https://user:pw@fcm.googleapis.com/x",  # credentials in the address
+            "https://fcm.googleapis.com:8443/x",  # another port
+            "https://169.254.169.254/latest/meta-data",
+            "https://localhost/x",
+            "https://[::1]/x",
+            "",
+        ):
+            self.assertFalse(push.is_push_endpoint(endpoint), endpoint)
 
 
 class DisabledTests(unittest.TestCase):

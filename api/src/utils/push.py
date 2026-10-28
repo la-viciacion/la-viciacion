@@ -18,6 +18,8 @@ import base64
 import datetime
 import json
 import re
+from concurrent.futures import ThreadPoolExecutor
+from urllib.parse import urlsplit
 
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 from py_vapid import Vapid
@@ -216,13 +218,46 @@ def ensure_vapid_keys(db) -> bool:
     return True
 
 
+# ── which endpoints are push services ───────────────────────
+# The endpoint of a subscription is an address the server will POST to, and the browser decides it. Only the push services
+# the browsers use are accepted (Chrome, Edge, Brave, Opera and Samsung use Google's; Firefox, Mozilla's; Safari, Apple's;
+# Edge on Windows, Microsoft's): anything else would be a way to make the server call a host of the subscriber's choosing.
+PUSH_SERVICE_HOSTS = (
+    "fcm.googleapis.com",
+    "android.googleapis.com",
+    "push.services.mozilla.com",
+    "push.apple.com",
+    "notify.windows.com",
+)
+
+
+def is_push_endpoint(endpoint: str) -> bool:
+    """Whether `endpoint` is an https address on one of the push services (the host itself or a subdomain of it)."""
+    try:
+        parts = urlsplit(endpoint)
+        host, port = (parts.hostname or "").lower(), parts.port
+    except ValueError:
+        return False
+    if parts.scheme != "https" or parts.username or parts.password or port not in (None, 443):
+        return False
+    return any(host == service or host.endswith("." + service) for service in PUSH_SERVICE_HOSTS)
+
+
 # ── delivery ────────────────────────────────────────────────
+DELIVERY_WORKERS = 8  # devices reached at once: a slow push service delays its own devices, not everybody's
+
+
 def _deliver(devices: list[tuple], payload: dict, private_pem: str, subject: str, ttl: int = TTL_SECONDS) -> tuple[int, list[int], int]:
     """Blocking. Returns (sent, ids of subscriptions that no longer exist, failures)."""
     vapid = Vapid.from_pem(private_pem.encode())
     data = json.dumps(payload, ensure_ascii=False)  # UTF-8 as it travels: \u escapes would take 6 bytes per character, 12 per emoji
-    sent, gone, failed = 0, [], 0
-    for device_id, endpoint, p256dh, auth in devices:
+
+    def one(device: tuple) -> tuple[str, int]:
+        """('sent' | 'gone' | 'failed', the device id)"""
+        device_id, endpoint, p256dh, auth = device
+        if not is_push_endpoint(endpoint):  # rows from before the check: never called
+            logger.warning(f"Push to device {device_id} skipped: its address is not a push service")
+            return "failed", device_id
         try:
             webpush(
                 {"endpoint": endpoint, "keys": {"p256dh": p256dh, "auth": auth}},
@@ -232,18 +267,23 @@ def _deliver(devices: list[tuple], payload: dict, private_pem: str, subject: str
                 ttl=ttl,
                 timeout=10,
             )
-            sent += 1
+            return "sent", device_id
         except WebPushException as e:
             status = e.response.status_code if e.response is not None else None
             if status in (404, 410):
-                gone.append(device_id)
-            else:
-                failed += 1
-                logger.warning(f"Push to device {device_id} failed: {e}")
-        except Exception as e:
-            failed += 1
+                return "gone", device_id
             logger.warning(f"Push to device {device_id} failed: {e}")
-    return sent, gone, failed
+        except Exception as e:
+            logger.warning(f"Push to device {device_id} failed: {e}")
+        return "failed", device_id
+
+    with ThreadPoolExecutor(max_workers=min(DELIVERY_WORKERS, len(devices) or 1)) as pool:
+        results = list(pool.map(one, devices))
+    return (
+        sum(1 for outcome, _ in results if outcome == "sent"),
+        [device_id for outcome, device_id in results if outcome == "gone"],
+        sum(1 for outcome, _ in results if outcome == "failed"),
+    )
 
 
 def active_users_only(query):
