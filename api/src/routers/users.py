@@ -24,6 +24,7 @@ from ..utils import actions, audit, images, places
 from ..utils import messages as msg
 from ..utils import my_utils as utils
 from ..utils.logger import LogManager
+from ..utils.rate_limit import AttemptLimiter
 from ..utils import seasons, settings, user_settings
 
 log_manager = LogManager()
@@ -92,7 +93,7 @@ def update_profile(
     active_user: models.User = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    """Edit own name, email and Telegram id"""
+    """Edit own name and email, and unlink the Telegram id (only an admin can set one; a player links it with /activate)"""
     auth.ensure_self_or_admin(active_user, username=username)
     user = _target_user(db, active_user, username)
     data = body.model_dump(exclude_unset=True)
@@ -108,6 +109,9 @@ def update_profile(
             raise HTTPException(status_code=400, detail=msg.EMAIL_INVALID)
         if users.email_in_use(db, data["email"], exclude_user_id=user.id):
             raise HTTPException(status_code=400, detail=msg.EMAIL_IN_USE)
+    if data.get("telegram_id") not in (None, user.telegram_id) and not active_user.is_admin:
+        # whoever types an id owns nothing proving it is theirs: it is linked from the group (the bot's /activate) or by an admin
+        raise HTTPException(status_code=403, detail=msg.TELEGRAM_ID_ONLY_ACTIVATE)
     if data.get("telegram_id") is not None and users.telegram_id_in_use(db, data["telegram_id"], exclude_user_id=user.id):
         raise HTTPException(status_code=400, detail=msg.TELEGRAM_ID_IN_USE)
     previous = {key: getattr(user, key) for key in ("email", "telegram_id") if key in data}
@@ -125,6 +129,9 @@ def update_profile(
     }
 
 
+TELEGRAM_TEST_LIMIT = AttemptLimiter(max_failures=3, window_seconds=5 * 60)
+
+
 @router.post("/{username}/telegram-test")
 async def test_telegram_id(
     username: str,
@@ -132,6 +139,10 @@ async def test_telegram_id(
 ):
     """Send a private test message to the caller's saved Telegram id, to check it is the right one"""
     auth.ensure_self(active_user, username)
+    key = f"telegram-test:{active_user.id}"
+    if TELEGRAM_TEST_LIMIT.retry_after(key):
+        raise HTTPException(status_code=429, detail=msg.TELEGRAM_TEST_TOO_OFTEN)
+    TELEGRAM_TEST_LIMIT.fail(key)  # every try counts: it writes to a chat
     if active_user.telegram_id is None:
         raise HTTPException(status_code=409, detail=msg.TELEGRAM_ID_MISSING)
     if not await run_in_threadpool(settings.get, "telegram.token"):  # a cache miss reads the database

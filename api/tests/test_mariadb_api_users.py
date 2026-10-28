@@ -3,6 +3,7 @@ avatars (MariaDB required, see api_support.py)."""
 import datetime
 import io
 from datetime import timedelta
+from unittest import mock
 
 from PIL import Image
 from sqlalchemy import text
@@ -133,10 +134,31 @@ class UpdateProfileTests(UsersTestCase):
         self.assertEqual(self.patch(email="BEA@example.com").json()["detail"], messages.EMAIL_IN_USE)
         self.assertEqual(self.patch(email="ana@example.com").status_code, 200)
 
-    def test_the_telegram_id_is_unique(self):
-        self.assertEqual(self.patch(as_user="bea", username="bea", telegram_id=111).json()["detail"], messages.TELEGRAM_ID_IN_USE)
-        self.assertEqual(self.patch(as_user="bea", username="bea", telegram_id=222).status_code, 200)
-        self.assertEqual(self.patch(telegram_id=111).status_code, 200)  # their own
+    def test_a_player_cannot_type_a_telegram_id_but_can_keep_or_remove_theirs(self):
+        response = self.patch(as_user="bea", username="bea", telegram_id=222)
+        self.assertEqual((response.status_code, response.json()["detail"]), (403, messages.TELEGRAM_ID_ONLY_ACTIVATE))
+        self.assertEqual(self.patch(telegram_id=111).status_code, 200)  # their own, unchanged (the form sends it back)
+        self.assertEqual(self.patch(telegram_id=999).status_code, 403)
+        self.assertEqual(self.scalar("SELECT telegram_id FROM users WHERE id = :i", i=self.ana), 111)
+        self.assertEqual(self.patch(telegram_id=None).status_code, 200)  # unlinking
+        self.assertIsNone(self.scalar("SELECT telegram_id FROM users WHERE id = :i", i=self.ana))
+
+    def test_an_admin_sets_the_telegram_id_and_it_is_unique(self):
+        self.assertEqual(self.patch(as_user="root", username="bea", telegram_id=111).json()["detail"], messages.TELEGRAM_ID_IN_USE)
+        self.assertEqual(self.patch(as_user="root", username="bea", telegram_id=222).status_code, 200)
+        self.assertEqual(self.scalar("SELECT telegram_id FROM users WHERE username = 'bea'"), 222)
+
+    def test_trying_the_telegram_id_is_limited(self):
+        from src.routers import users as users_router
+        users_router.TELEGRAM_TEST_LIMIT.reset(f"telegram-test:{self.ana}")
+        self.addCleanup(users_router.TELEGRAM_TEST_LIMIT.reset, f"telegram-test:{self.ana}")
+        real_get = users_router.settings.get
+        configured = lambda key, *args: "token" if key == "telegram.token" else real_get(key, *args)  # noqa: E731
+        with mock.patch.object(users_router.utils, "send_test_message_to_user", mock.AsyncMock(return_value=True)), \
+                mock.patch.object(users_router.settings, "get", side_effect=configured):
+            codes = [self.api("POST", "/users/ana/telegram-test", as_user="ana").status_code for _ in range(4)]
+        self.assertEqual(codes[-1], 429)
+        self.assertNotIn(429, codes[:3])
 
     def test_it_only_changes_what_was_sent(self):
         self.patch(name="Only name")
