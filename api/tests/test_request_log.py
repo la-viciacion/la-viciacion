@@ -43,6 +43,11 @@ class RequestLogTests(unittest.TestCase):
         _, lines = self.logged(run(app_returning(200), query=b""))
         self.assertIn('"GET /api/v1/x" - 200', lines[0])
 
+    def test_the_value_of_a_sensitive_parameter_is_masked(self):
+        _, lines = self.logged(run(app_returning(200), query=b"q=doom&token=abc123&api_key=zzz&monkey=1"))
+        self.assertIn("?q=doom&token=***&api_key=***&monkey=1\"", lines[0])
+        self.assertNotIn("abc123", lines[0])
+
     def test_the_keepalive_probe_is_not_logged(self):
         _, lines = self.logged(run(app_returning(200), path="/api/v1/keepalive"))
         self.assertEqual(lines, [])
