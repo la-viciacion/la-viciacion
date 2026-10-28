@@ -21,10 +21,11 @@ from . import (
     challenges,
     notices,
     ai_usage,
+    polls,
 )
 from .common import router
 
 # the modules of the areas, each of which registers its routes on `router` when imported
-AREAS = (overview, achievements, system, users, games, syncs, sessions, platforms, challenges, notices, ai_usage)
+AREAS = (overview, achievements, system, users, games, syncs, sessions, platforms, challenges, notices, ai_usage, polls)
 
 __all__ = ["AREAS", "router"]

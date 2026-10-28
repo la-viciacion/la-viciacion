@@ -423,6 +423,41 @@ class ChallengeSchedule(Base):
     created_at = Column(DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP"))
 
 
+class GroupPoll(Base):
+    """A non-anonymous Telegram poll an admin launched into the group (crud/group_polls.py). The tally and the winner
+    are derived from the votes when asked."""
+
+    __tablename__ = "group_polls"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    question = Column(String(300), nullable=False)
+    options = Column(Text, nullable=False)  # JSON list of the option texts, in the order Telegram shows them
+    multiple = Column(Boolean, nullable=False, server_default=text("0"))  # several answers allowed
+    telegram_poll_id = Column(String(32), nullable=False)  # what an answer of the bot names
+    telegram_message_id = Column(BigInteger, nullable=False)  # what stopping the poll in Telegram needs
+    closes_at = Column(DateTime, nullable=True)  # the deadline; NULL = only by hand
+    closed_at = Column(DateTime, nullable=True)  # NULL = open; once set no answer counts
+    closed_by = Column(Integer, ForeignKey("users.id", name="fk_group_polls_closer", ondelete="SET NULL"), nullable=True)
+    telegram_stopped = Column(Boolean, nullable=False, server_default=text("0"))  # Telegram was told to stop it
+    telegram_voters = Column(Integer, nullable=True)  # the voters Telegram counted when it was stopped
+    created_by = Column(Integer, ForeignKey("users.id", name="fk_group_polls_creator", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP"))
+
+    __table_args__ = (UniqueConstraint("telegram_poll_id", name="uq_group_polls_telegram"),)
+
+
+class GroupPollVote(Base):
+    """What one person has chosen in a poll now (an empty choice is a row deleted). The account is derived from
+    `users.telegram_id` when asked; a voter with no account is just an id."""
+
+    __tablename__ = "group_poll_votes"
+
+    poll_id = Column(Integer, ForeignKey("group_polls.id", name="fk_group_poll_votes_poll", ondelete="CASCADE"), primary_key=True, autoincrement=False)
+    telegram_user_id = Column(BigInteger, primary_key=True, autoincrement=False)
+    option_ids = Column(Text, nullable=False)  # JSON list of the positions chosen
+    updated_at = Column(DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP"))
+
+
 class AuditLog(Base):
     """The audit log (see utils/audit.py): one row per successful write of the admin panel, and one per security event."""
 

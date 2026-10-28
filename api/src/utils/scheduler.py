@@ -25,6 +25,8 @@ what nothing else can trigger remains here:
                     yesterday went, and the group how each group challenge did
   challenge_reminders  every day at `challenges.reminders_time` (10:00), reminds (only whoever turned it on) of the
                     challenges with two days left that they have not met
+  group_polls       every minute while a poll's deadline has passed, closes it (and tells the group the winner)
+  group_poll_stops  every 10 minutes while a poll closed here is not stopped in Telegram yet, tells Telegram again
   challenge_schedules  every day at 06:00, launches the challenge of the running month of each schedule that has not
                     done it yet (a month is launched once; a day the API was down is made up for the next one)
 
@@ -41,10 +43,10 @@ from sqlalchemy import update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from ..crud import challenge_schedules, users
+from ..crud import challenge_schedules, group_polls, users
 from ..database import models
 from ..database.database import SessionLocal
-from . import actions, challenge_notices, inbox, push, recap_notices, settings
+from . import actions, challenge_notices, inbox, polls, push, recap_notices, settings
 from .logger import LogManager
 
 log_manager = LogManager()
@@ -68,6 +70,7 @@ WISHLIST_WEEKLY_WEEKDAY = 6
 # (user_settings.timer_notice_minutes) and its column stay, so turning this on brings the refresh back.
 TIMER_NOTICE_REFRESH = False
 TIMER_NOTICE_GRACE = datetime.timedelta(minutes=2)  # a late refresh is useless: the next one is due soon
+POLL_STOP_RETRY_MINUTES = 10  # how often Telegram is told again to stop a poll that is closed here
 
 
 # ── when is something due (pure) ────────────────────────────
@@ -100,6 +103,10 @@ def annual_slot(now: datetime.datetime, month: int, day: int, hhmm: str) -> date
 def daily_slot(now: datetime.datetime, hour: int, minute: int = 0) -> datetime.datetime:
     slot = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
     return slot - datetime.timedelta(days=1) if slot > now else slot
+
+
+def ten_minute_slot(now: datetime.datetime) -> datetime.datetime:
+    return now.replace(minute=now.minute - now.minute % POLL_STOP_RETRY_MINUTES, second=0, microsecond=0)
 
 
 def hourly_slot(now: datetime.datetime) -> datetime.datetime:
@@ -246,6 +253,14 @@ async def _challenge_reminders(db: Session) -> str:
     return await challenge_notices.send_reminders(db, datetime.date.today())
 
 
+async def _group_polls(db: Session, now: datetime.datetime) -> str:
+    return await polls.close_due(db, now)
+
+
+async def _group_poll_stops(db: Session, now: datetime.datetime) -> str:
+    return await polls.retry_stops(db, now)
+
+
 async def _inbox_purge(db: Session) -> str:
     return f"{inbox.purge(db)} deleted"
 
@@ -294,6 +309,17 @@ def tick(now: datetime.datetime | None = None) -> None:
             previous = _last_run(db, "forgotten_timers")
             if is_due(now, slot, previous, HOURLY_GRACE) and _claim(db, "forgotten_timers", slot, now):
                 _run(db, "forgotten_timers", lambda: _forgotten_timers(db, forgotten_window(slot, previous)))
+
+        # not tied to the notifications switch: closing a poll is a change of state (only the winner's notice is)
+        if group_polls.due(db, now):
+            slot = minute_slot(now)
+            if is_due(now, slot, _last_run(db, "group_polls"), TIMER_NOTICE_GRACE) and _claim(db, "group_polls", slot, now):
+                _run(db, "group_polls", lambda: _group_polls(db, now))
+
+        if group_polls.to_stop(db, now):
+            slot = ten_minute_slot(now)
+            if is_due(now, slot, _last_run(db, "group_poll_stops"), datetime.timedelta(minutes=POLL_STOP_RETRY_MINUTES)) and _claim(db, "group_poll_stops", slot, now):
+                _run(db, "group_poll_stops", lambda: _group_poll_stops(db, now))
 
         slot = daily_slot(now, INBOX_PURGE_HOUR)
         if is_due(now, slot, _last_run(db, "inbox_purge"), DAILY_GRACE) and _claim(db, "inbox_purge", slot, now):
