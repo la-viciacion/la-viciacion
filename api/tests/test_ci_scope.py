@@ -17,11 +17,14 @@ def run(*paths):
 
 
 class ScopeTests(unittest.TestCase):
-    def test_documentation_and_project_files_run_nothing(self):
-        for path in ("docs/desarrollo/features.md", "README.md", "CONTRIBUTING.md", "AGENTS.md", "LICENSE", ".gitignore",
-                     "design/laViciacionLogo.jpg", "docs-demo/demo.py", "mkdocs.yml", "requirements-docs.txt", ".github/workflows/docs.yml",
+    def test_project_files_that_nothing_reads_run_nothing(self):
+        for path in ("README.md", "CONTRIBUTING.md", "AGENTS.md", "LICENSE", ".gitignore", "design/laViciacionLogo.jpg", "docs-demo/demo.py",
                      ".github/pull_request_template.md", ".github/dependabot.yml"):
             self.assertEqual(run(path), (set(), set()), path)
+
+    def test_the_documentation_is_built_so_a_broken_page_cannot_be_merged(self):
+        for path in ("docs/desarrollo/features.md", "docs/index.md", "mkdocs.yml", "requirements-docs.txt", ".github/workflows/docs.yml"):
+            self.assertEqual(run(path), ({"docs"}, set()), path)
 
     def test_the_front_runs_its_tests_and_the_api_test_that_reads_its_sources(self):
         self.assertEqual(run("front/js/pages/home/history.js"), ({"front-tests", "api-tests"}, {"front"}))
@@ -39,11 +42,15 @@ class ScopeTests(unittest.TestCase):
         self.assertEqual(run("bot/src/routes/my_routes.py"), ({"bot-tests", "api-tests", "mariadb"}, {"bot"}))
         self.assertEqual(run("bot/tests/test_gate.py"), ({"bot-tests"}, {"bot"}))
 
-    def test_the_user_guide_runs_the_api_test_that_checks_the_chat_help_against_it_and_the_rest_of_docs_nothing(self):
-        self.assertEqual(run("docs/guia-usuario/sesiones.md"), ({"api-tests"}, set()))
-        self.assertEqual(run("docs/guia-usuario/sesiones.md", "front/css/a.css"), ({"api-tests", "front-tests"}, {"front"}))
+    def test_every_dockerfile_reaches_the_api_test_that_pins_the_base_images(self):
+        for dockerfile in ("front/Dockerfile", "bot/Dockerfile", "api/Dockerfile"):
+            self.assertIn("api-tests", run(dockerfile)[0], dockerfile)
+
+    def test_the_user_guide_also_runs_the_api_test_that_checks_the_chat_help_against_it(self):
+        self.assertEqual(run("docs/guia-usuario/sesiones.md"), ({"api-tests", "docs"}, set()))
+        self.assertEqual(run("docs/guia-usuario/sesiones.md", "front/css/a.css"), ({"api-tests", "docs", "front-tests"}, {"front"}))
         for path in ("docs/desarrollo/features.md", "docs/configuracion/panel-admin.md", "docs/index.md"):
-            self.assertEqual(run(path), (set(), set()), path)
+            self.assertEqual(run(path), ({"docs"}, set()), path)
 
     def test_root_files_the_tests_read(self):
         self.assertEqual(run(".env.template"), ({"api-tests"}, set()))
@@ -57,13 +64,14 @@ class ScopeTests(unittest.TestCase):
             self.assertEqual(run(path), everything, path)
 
     def test_one_unclassified_file_among_inert_ones_runs_everything(self):
-        self.assertEqual(run("docs/a.md", "Makefile")[0], set(ci_scope.ALL_CHECKS))
+        self.assertEqual(run("README.md", "Makefile")[0], set(ci_scope.ALL_CHECKS))
 
     def test_a_mixed_change_runs_the_union(self):
-        self.assertEqual(run("docs/a.md", "front/css/a.css", "bot/tests/t.py"), ({"front-tests", "bot-tests"}, {"front", "bot"}))
+        self.assertEqual(run("docs/a.md", "front/css/a.css", "bot/tests/t.py"), ({"docs", "front-tests", "bot-tests"}, {"front", "bot"}))
 
     def test_output_format(self):
         self.assertEqual(ci_scope.render({"front-tests"}, {"front"}), 'scope=front-tests\nbuild_services=["front"]\n')
+        self.assertEqual(ci_scope.render({"docs", "front-tests"}, {"front"}), 'scope=front-tests,docs\nbuild_services=["front"]\n')
         self.assertEqual(ci_scope.render(set(), set()), "scope=none\nbuild_services=[]\n")
         self.assertEqual(ci_scope.render(set(ci_scope.ALL_CHECKS), set(ci_scope.ALL_SERVICES)), 'scope=all\nbuild_services=["api", "front", "bot"]\n')
 
