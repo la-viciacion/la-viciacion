@@ -144,9 +144,10 @@ def cancel_timer(db: Session, timer_id: int, user_id: int) -> GameTimer:
     # starting it created the library entry of that game/platform/season: do not leave it
     # empty behind unless the user has other sessions, a completion or a score there
     entry = (timer.platform, seasons.of(timer.start_time))
+    day = timer.start_time.date()
     db.delete(timer)
     db.flush()
-    users_crud.drop_empty_entry(db, user_id, timer.game_id, *entry)
+    users_crud.drop_empty_entry(db, user_id, timer.game_id, *entry, created_on=day)
     db.commit()
     return timer
 
@@ -378,13 +379,15 @@ def update_session(db: Session, current_user: User, timer: GameTimer, body: Sess
     """Correct a finished session (platform, start, end, notes); the caller already checked it may."""
     _finished(timer)
     old_entry = (timer.platform, seasons.of(timer.start_time))
+    old_day = timer.start_time.date()
     data = body.model_dump(exclude_unset=True)
     start = data.get("start_time") or timer.start_time
     end = data.get("end_time") or timer.end_time
     # a session of a closed season cannot be edited by its owner, nor moved out of the current one
     _check_season(current_user, timer.start_time)
     lock_sessions(db, timer.user_id)
-    validate_session(db, current_user, timer.user_id, start, end, exclude_id=timer.id)
+    if "start_time" in data or "end_time" in data:  # a note or a platform does not change when it was played
+        validate_session(db, current_user, timer.user_id, start, end, exclude_id=timer.id)
     if "platform" in data:
         timer.platform = _valid_platform(db, data["platform"])
     if "notes" in data:
@@ -395,7 +398,7 @@ def update_session(db: Session, current_user: User, timer: GameTimer, body: Sess
     # moving a session to another platform or season must not leave its old entry empty behind
     db.flush()
     if old_entry != (timer.platform, seasons.of(start)):
-        users_crud.drop_empty_entry(db, timer.user_id, timer.game_id, *old_entry)
+        users_crud.drop_empty_entry(db, timer.user_id, timer.game_id, *old_entry, created_on=old_day)
     _commit_session(db)
     db.refresh(timer)
     return timer
@@ -405,5 +408,9 @@ def delete_session(db: Session, current_user: User, timer: GameTimer) -> None:
     """Remove a finished session; the caller already checked it may."""
     _finished(timer)
     _check_season(current_user, timer.start_time)
+    entry, day = (timer.platform, seasons.of(timer.start_time)), timer.start_time.date()
     db.delete(timer)
+    db.flush()
+    # a session entered on the wrong game must not leave an empty entry that counts as a game played
+    users_crud.drop_empty_entry(db, timer.user_id, timer.game_id, *entry, created_on=day)
     db.commit()

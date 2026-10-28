@@ -197,15 +197,15 @@ class ManualSessionCreate(BaseModel):
     user_id: int | None = None  # default: the logged-in user (admins may pass another)
     game_id: str
     platform: str
-    start_time: datetime.datetime
-    end_time: datetime.datetime
+    start_time: NaiveDatetime  # local time, as the server keeps it: one with a zone would not compare with the clock
+    end_time: NaiveDatetime
     notes: str | None = Field(default=None, max_length=NOTES_MAX)
 
 
 class SessionUpdate(BaseModel):
     platform: str | None = None
-    start_time: datetime.datetime | None = None
-    end_time: datetime.datetime | None = None
+    start_time: NaiveDatetime | None = None
+    end_time: NaiveDatetime | None = None
     notes: str | None = Field(default=None, max_length=NOTES_MAX)
 
 

@@ -113,12 +113,11 @@ class NotingTests(PriceTestCase):
         self.assertEqual(self.api("DELETE", f"/manage/library/{entry}", as_user="root").status_code, 200)
         self.assertEqual([tuple(r)[:2] for r in self.stored()], [(self.ana, "celeste")])
 
-    def test_deleting_the_only_session_drops_the_empty_entry_and_its_price(self):
+    def test_an_entry_with_a_price_survives_losing_its_only_session(self):
         self.own(self.ana, "hades", hours=1.0, cents=1000)
         timer = self.scalar("SELECT id FROM game_timers WHERE user_id = :u", u=self.ana)
         self.assertEqual(self.api("DELETE", f"/timers/{timer}", as_user="ana").status_code, 200)
-        self.assertEqual(self.stored(), [])
-        self.assertEqual(self.api("GET", "/users/ana/value", as_user="ana").json()["spent_cents"], 0)
+        self.assertEqual(len(self.stored()), 1)  # the price keeps the entry it lives in
 
     def test_a_price_stays_while_another_season_still_has_the_game_on_that_platform(self):
         self.own(self.ana, "hades", hours=1.0, cents=1000)

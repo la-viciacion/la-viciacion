@@ -255,15 +255,23 @@ def drop_orphan_price(db: Session, user_id: int, game_id: str, platform: str | N
         db.query(models.UserGamePrice).filter_by(user_id=user_id, game_id=game_id, platform=platform).delete()
 
 
-def drop_empty_entry(db: Session, user_id: int, game_id: str, platform: str | None, season: int) -> bool:
-    """Delete the library entry (game, platform, season) if nothing is left in it: no session
-    (the caller flushed its change first) and no completion. Not committed. See drop_orphan_price."""
+def drop_empty_entry(
+    db: Session, user_id: int, game_id: str, platform: str | None, season: int, created_on: datetime.date | None = None
+) -> bool:
+    """Delete the library entry (game, platform, season) if the session that was just removed or moved was all it had:
+    no other session (the caller flushed its change first), no completion, no abandonment, no rating of the game and,
+    when it is the last entry of the game on that platform, no price the player noted. Not committed.
+
+    `created_on` is the day of that session: an entry that began on another day was not made by it (the player added the
+    game by hand, or an earlier session did), so it stays. Without it the entry goes whenever it is empty."""
     entry = (
         db.query(models.UserGame)
         .filter_by(user_id=user_id, game_id=game_id, platform=platform, season=season)
         .first()
     )
-    if entry is None or entry.completed:
+    if entry is None or entry.completed or entry.abandoned_at is not None:
+        return False
+    if created_on is not None and entry.started_date != created_on:
         return False
     has_sessions = (
         db.query(models.GameTimer.id)
@@ -273,8 +281,15 @@ def drop_empty_entry(db: Session, user_id: int, game_id: str, platform: str | No
     )
     if has_sessions:
         return False
+    if db.query(models.GameScore.id).filter_by(user_id=user_id, game_id=game_id).first() is not None:
+        return False
+    others = db.query(models.UserGame.id).filter(
+        models.UserGame.user_id == user_id, models.UserGame.game_id == game_id, models.UserGame.platform == platform,
+        models.UserGame.id != entry.id,
+    ).first()
+    if others is None and db.query(models.UserGamePrice.id).filter_by(user_id=user_id, game_id=game_id, platform=platform).first() is not None:
+        return False  # a price the player noted needs an entry to live in
     db.delete(entry)
-    drop_orphan_price(db, user_id, game_id, platform)
     return True
 
 
@@ -434,6 +449,13 @@ def add_new_game(
             if "Duplicate" not in str(e):
                 logger.info("Error adding new user game: " + str(e))
                 raise e
+            # somebody made the same entry a moment ago (an admin, a library add): that one is the entry
+            user_game = (
+                db.query(models.UserGame)
+                .filter_by(user_id=user.id, game_id=game_db.id, platform=game.platform)
+                .order_by(models.UserGame.season.desc())
+                .first()
+            )
         logger.info("Game added!")
         return user_game
     except SQLAlchemyError as e:
