@@ -123,6 +123,15 @@ class PlayerStatsTests(unittest.TestCase):
         got = self.stats([played(1, "a", D(2026, 9, day, 10)) for day in days])
         self.assertEqual((got["days"], got["best_streak"]), (5, 3))
 
+    def test_a_session_under_ten_minutes_gives_no_day_and_one_across_midnight_gives_both(self):
+        got = self.stats([
+            played(1, "a", D(2026, 9, 1, 10), 5 / 60),  # five minutes: not a played day
+            played(1, "a", D(2026, 9, 2, 23, 30), 1),  # ends on the 3rd
+            played(1, "a", D(2026, 9, 4, 10)),
+        ])
+        self.assertEqual((got["days"], got["best_streak"]), (3, 3))  # 2nd, 3rd, 4th
+        self.assertEqual(got["sessions"], 3)  # the short one still counts for the hours and the sessions
+
     def test_the_totals(self):
         got = self.stats([played(1, "a", D(2026, 9, 1, 10), 1), played(1, "b", D(2026, 9, 1, 12), 3)])
         self.assertEqual((got["seconds"], got["sessions"], got["games"], got["longest_session"]), (4 * HOUR, 2, 2, 3 * HOUR))

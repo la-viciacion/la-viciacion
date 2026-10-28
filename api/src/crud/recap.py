@@ -123,9 +123,19 @@ def _top(totals: dict) -> tuple | None:
     return min(totals.items(), key=lambda item: (-item[1], item[0])) if totals else None
 
 
+def played_days(played: list[Played], period: Period) -> list[datetime.date]:
+    """The days of the period the player played on, by the rule everything else uses (`time_entries.played_days_by_user`):
+    a session of 10 minutes or more gives the day it began and the day it ended, as long as they fall in the period."""
+    days = set()
+    for session in played:
+        if session.seconds >= time_entries.MIN_SESSION_SECONDS:
+            days.update(day for day in (session.start.date(), session.end.date() if session.end else None) if day and period.start <= day < period.end)
+    return sorted(days)
+
+
 def player_stats(played: list[Played], period: Period) -> dict:
     """What one player did in the period, from their own sessions."""
-    days = sorted({session.start.date() for session in played})
+    days = played_days(played, period)
     star = _top(_sum_by(played, lambda s: s.game_id))
     best_day = _top(_sum_by(played, lambda s: s.start.date()))
     return {
