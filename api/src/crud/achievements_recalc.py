@@ -229,9 +229,10 @@ def _diff(user: models.User, expected: dict[str, Award], stored: list, titles: d
             changes.append(change("add", key, award=award))
             continue
         first, *repeated = rows
+        # the repeated ones go first: moving the first to the season of one of them would clash with its unique key
+        changes.extend(change("revoke", key, row, None, [row.id]) for row in repeated)  # one per season, or one in all
         if (first.date, first.game_id) != (award.date, award.game_id):
             changes.append(change("date", key, first, award, [first.id]))
-        changes.extend(change("revoke", key, row, None, [row.id]) for row in repeated)  # one per season, or one in all
     for key, rows in by_key.items():
         changes.extend(change("revoke", key, row, None, [row.id]) for row in rows)
     return changes

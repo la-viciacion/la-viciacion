@@ -1,4 +1,5 @@
 import datetime
+import types
 import unittest
 from unittest import mock
 
@@ -352,6 +353,13 @@ class RecalculationTests(unittest.TestCase):
         self.award(1, self.LIFETIME_DAYS, D(YEAR, 6, 1))
         got = self.changes(achievement_keys=[self.LIFETIME_DAYS])
         self.assertEqual(set(got), {("revoke", 1, YEAR, self.LIFETIME_DAYS)})
+
+    def test_the_repeated_one_is_revoked_before_the_first_is_moved_so_the_unique_key_never_clashes(self):
+        user = models.User(id=1, name="Ana", username="ana")
+        row = lambda id_, season: types.SimpleNamespace(id=id_, key=self.LIFETIME_DAYS, date=D(season, 3, 1), game_id=None, season=season)
+        expected = {self.LIFETIME_DAYS: Award(1, self.LIFETIME_DAYS, D(PAST, 3, 1), None)}
+        found = recalc._diff(user, expected, [row(1, YEAR), row(2, PAST)], {}, {self.LIFETIME_DAYS})
+        self.assertEqual([c.action for c in found], ["revoke", "date"])  # the first (id 1) moves into the season row 2 holds
 
     def test_their_season_is_not_asked_for_and_the_seasonal_pass_leaves_them_alone(self):
         self.play_a_day_each(1, D(PAST - 1, 1, 1), 60)
