@@ -247,9 +247,17 @@ def ensure_library_entry(
     return True
 
 
+def drop_orphan_price(db: Session, user_id: int, game_id: str, platform: str | None) -> None:
+    """Delete the price noted for a game on a platform once no library entry of it is left (a price is per game and
+    platform, whatever the season, and only a game in the library can have one). Call it after deleting an entry; not committed."""
+    db.flush()
+    if db.query(models.UserGame.id).filter_by(user_id=user_id, game_id=game_id, platform=platform).first() is None:
+        db.query(models.UserGamePrice).filter_by(user_id=user_id, game_id=game_id, platform=platform).delete()
+
+
 def drop_empty_entry(db: Session, user_id: int, game_id: str, platform: str | None, season: int) -> bool:
     """Delete the library entry (game, platform, season) if nothing is left in it: no session
-    (the caller flushed its change first) and no completion. Not committed."""
+    (the caller flushed its change first) and no completion. Not committed. See drop_orphan_price."""
     entry = (
         db.query(models.UserGame)
         .filter_by(user_id=user_id, game_id=game_id, platform=platform, season=season)
@@ -266,6 +274,7 @@ def drop_empty_entry(db: Session, user_id: int, game_id: str, platform: str | No
     if has_sessions:
         return False
     db.delete(entry)
+    drop_orphan_price(db, user_id, game_id, platform)
     return True
 
 

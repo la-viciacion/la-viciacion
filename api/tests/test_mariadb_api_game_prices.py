@@ -106,6 +106,27 @@ class NotingTests(PriceTestCase):
         self.assertEqual(self.api("DELETE", f"/manage/users/{self.bea}", as_user="root", params={"force": True}).status_code, 200)
         self.assertEqual(self.stored(), [])
 
+    def test_the_price_goes_with_the_last_library_entry_of_the_game_on_that_platform(self):
+        self.own(self.ana, "hades", hours=0, cents=1000)
+        self.own(self.ana, "celeste", hours=0, cents=500)
+        entry = self.scalar("SELECT id FROM users_games WHERE user_id = :u AND game_id = 'hades'", u=self.ana)
+        self.assertEqual(self.api("DELETE", f"/manage/library/{entry}", as_user="root").status_code, 200)
+        self.assertEqual([tuple(r)[:2] for r in self.stored()], [(self.ana, "celeste")])
+
+    def test_deleting_the_only_session_drops_the_empty_entry_and_its_price(self):
+        self.own(self.ana, "hades", hours=1.0, cents=1000)
+        timer = self.scalar("SELECT id FROM game_timers WHERE user_id = :u", u=self.ana)
+        self.assertEqual(self.api("DELETE", f"/timers/{timer}", as_user="ana").status_code, 200)
+        self.assertEqual(self.stored(), [])
+        self.assertEqual(self.api("GET", "/users/ana/value", as_user="ana").json()["spent_cents"], 0)
+
+    def test_a_price_stays_while_another_season_still_has_the_game_on_that_platform(self):
+        self.own(self.ana, "hades", hours=1.0, cents=1000)
+        self.library_entry(self.ana, "hades", TODAY().replace(year=TODAY().year - 1), "pc")
+        timer = self.scalar("SELECT id FROM game_timers WHERE user_id = :u", u=self.ana)
+        self.assertEqual(self.api("DELETE", f"/timers/{timer}", as_user="ana").status_code, 200)
+        self.assertEqual(len(self.stored()), 1)
+
     def test_a_platform_with_prices_cannot_be_deleted(self):
         self.own(self.ana, "hades", platform="pc", cents=1000)
         with database.SessionLocal() as db:
