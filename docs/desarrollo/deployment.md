@@ -122,6 +122,12 @@ docker compose up -d                     # recreates the containers whose image 
 docker compose logs --tail=100 laviciacion-api   # look for "Running upgrade ..." and no errors
 ```
 
+**On a server deployed by the workflow, `LAVI_VERSION` is not in `.env`**: the deploy script exports it for that one run. A manual `docker compose up -d` (also `--force-recreate` of a single service after editing `.env`) therefore falls back to `latest`, which can be an old image that does not know the schema the database is already at: the API restarts in a loop (`Can't locate revision ...`) and the site answers 502. Pass the running version explicitly:
+
+```bash
+LAVI_VERSION=$(docker inspect laviciacion-api --format '{{.Config.Image}}' | cut -d: -f2) docker compose up -d --no-deps laviciacion-api
+```
+
 Migrations run automatically on API start, so a deploy that includes a migration is one step. Consequences to keep in mind:
 
 - Take a DB backup **before** deploying a migration (see below); read [migrations.md](migrations.md#operating-migrations) for what to do if it fails. If the API container loops on restart, the migration is failing: check the logs, do not stamp.
