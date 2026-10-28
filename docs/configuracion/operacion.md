@@ -12,6 +12,9 @@ docker compose logs --tail=100 laviciacion-api   # busca «Running upgrade …»
 
 Cuando se publiquen imágenes en GHCR bastará con `docker compose pull && docker compose up -d` (y `LAVI_VERSION` en el `.env` fija una versión concreta).
 
+!!! warning "Si el servidor se despliega desde el workflow"
+    `LAVI_VERSION` no está en su `.env` (el script de despliegue la fija en cada ejecución). Un `docker compose up -d` a mano usaría `latest`, que puede ser una imagen antigua incompatible con la base de datos: la API se reinicia en bucle y la web da 502. Lanza el comando con la versión en marcha delante, por ejemplo `LAVI_VERSION=2.23.1 docker compose up -d`.
+
 Las **migraciones de la base de datos se aplican solas** al arrancar la API, así que actualizar es un solo paso. Eso tiene dos consecuencias:
 
 !!! warning "Haz una copia antes de actualizar"
