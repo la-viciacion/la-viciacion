@@ -277,6 +277,17 @@ export const ENTITIES = {
         ],
       },
       {
+        label: 'Lanzar horas entre todos',
+        body: { kind: 'group_hours' },
+        fields: [
+          { key: 'month', label: 'Mes', type: 'month', required: true },
+          { key: 'min_hours_total', label: 'Horas entre todos (de cualquier juego)', type: 'number', step: '0.5', default: 40, required: true },
+          { key: 'versus', label: 'Además es una competición (gana quien más aporte)', type: 'checkbox', default: false },
+          PARTICIPATION_FIELD,
+          { key: 'announce', label: 'Avisar al grupo (Telegram y notificaciones)', type: 'checkbox', default: true },
+        ],
+      },
+      {
         label: 'Lanzar reto temático',
         body: { kind: 'themed' },
         // the tags are those of the games in the database: loaded when the form opens
