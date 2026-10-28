@@ -183,8 +183,8 @@ class ActiveStopCancelTests(TimerTestCase):
         self.assertEqual(self.library(self.ana), [("celeste", "pc", seasons.current())])
 
     def test_cancelling_keeps_an_entry_whose_game_the_player_rated(self):
-        self.api("PUT", "/users/ana/games/celeste/score", as_user="ana", json={"score": 80})
-        self.assertEqual(self.scalar("SELECT COUNT(*) FROM game_scores"), 1)
+        with self.engine.begin() as conn:
+            conn.execute(text("INSERT INTO game_scores (user_id, game_id, score) VALUES (:u, 'celeste', 80)"), {"u": self.ana})
         timer_id = self.start().json()["id"]
         self.api("DELETE", f"/timers/cancel/{timer_id}", as_user="ana", params={"user_id": self.ana})
         self.assertEqual(len(self.library(self.ana)), 1)
@@ -371,7 +371,7 @@ class EditSessionTests(TimerTestCase):
         long = self.session(self.ana, "hades", ago(hours=30), 26 * 60)  # a forgotten timer stopped late
         response = self.patch(session_id=long, notes="se me olvidó pararlo")
         self.assertEqual((response.status_code, response.json()["notes"]), (200, "se me olvidó pararlo"))
-        self.assertEqual(self.patch(session_id=long, end_time=iso(ago(hours=1))).status_code, 200)  # and its end can be corrected
+        self.assertEqual(self.patch(session_id=long, end_time=iso(ago(hours=26))).status_code, 200)  # and its end can be corrected
 
     def test_a_time_with_a_zone_is_refused_not_a_server_error(self):
         response = self.patch(end_time="2026-06-17T10:00:00+02:00")

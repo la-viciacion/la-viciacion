@@ -73,7 +73,7 @@ class LaunchTests(ChallengesTestCase):
         self.assertEqual(self.launch().status_code, 201)
         with database.SessionLocal() as db:
             old = models.Challenge(
-                kind="game_of_month", scope="group", title="Viejo", params="{}", game_id="hades", starts_on=TODAY() - timedelta(days=90),
+                kind="game_of_month", scope="group", title="Viejo", params='{"min_hours_each": 5, "min_hours_total": 12}', game_id="hades", starts_on=TODAY() - timedelta(days=90),
                 ends_on=TODAY() - timedelta(days=60), fingerprint="old-1", participation="auto",
             )
             db.add(old)
