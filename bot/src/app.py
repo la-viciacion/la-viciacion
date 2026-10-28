@@ -15,6 +15,7 @@ from telegram.ext import (
     ContextTypes,
     ConversationHandler,
     MessageHandler,
+    PollAnswerHandler,
     TypeHandler,
     filters,
 )
@@ -187,6 +188,9 @@ def main() -> None:
         fallbacks=[CommandHandler("menu", basic_routes.menu)],
         per_user=True,
     )
+    # a poll answer carries no chat, so the gate would stop it: it is taken before the gate (group -2). Only the polls
+    # this bot sent reach it, and the API keeps an answer only for a poll it launched
+    app.add_handler(PollAnswerHandler(utils.poll_answer), group=-2)
     # group -1 runs before everything else; the gate stops what is not the app's group or users
     app.add_handler(TypeHandler(Update, utils.gate), group=-1)
     app.add_handler(conv_handler)
@@ -196,7 +200,8 @@ def main() -> None:
     app.add_handler(CommandHandler("start", utils.start))
     # not blocking: the AI can take a while to write it, and the bot keeps answering everybody else meanwhile
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, utils.welcome, block=False))
-    app.run_polling()
+    # asked for by name: the answers of the group's polls are not in the default set of a process that restricted it before
+    app.run_polling(allowed_updates=[Update.MESSAGE, Update.CALLBACK_QUERY, Update.POLL_ANSWER])
 
 
 if __name__ == "__main__":

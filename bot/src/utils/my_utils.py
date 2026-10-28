@@ -208,6 +208,23 @@ class MyUtils:
                 text = None
             await update.message.reply_text(text or msgs.welcome(name, member.username))
 
+    async def poll_answer(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Tell the API what someone chose in one of the group's polls (the bot's second write, with /activate).
+
+        The API keeps it only for a poll it launched and has not closed. Someone who is not in the app is kept as a bare
+        Telegram id, so no account is needed to vote."""
+        answer = update.poll_answer
+        if answer.user is None or answer.user.is_bot:
+            return  # voted as a chat (an anonymous admin): there is no person to count
+        try:
+            await self.fetch_json(
+                "PUT",
+                config.API_URL + "/manage/polls/answers",
+                json={"poll_id": answer.poll_id, "user_id": answer.user.id, "option_ids": list(answer.option_ids)},
+            )
+        except Exception as e:  # the vote is lost for the app; the poll in Telegram still shows it
+            logger.error(f"Could not report the answer of {answer.user.id} to poll {answer.poll_id}: {e}", exc_info=True)
+
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         in_group = update.message.chat.type != access.PRIVATE
         await update.message.reply_text(msgs.start(update.message.from_user.first_name, in_group))

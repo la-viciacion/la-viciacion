@@ -12,7 +12,7 @@ from tests.support import make_context, make_update, user
 
 from telegram import Bot, CallbackQuery, InlineKeyboardMarkup, Message, Update
 from telegram.error import NetworkError
-from telegram.ext import Application, CallbackQueryHandler, CommandHandler, ConversationHandler, TypeHandler
+from telegram.ext import Application, CallbackQueryHandler, CommandHandler, ConversationHandler, PollAnswerHandler, TypeHandler
 
 import app as bot_app
 import utils.keyboard as kb
@@ -183,8 +183,9 @@ class WiringTests(unittest.TestCase):
             def add_handler(self, handler, group=0):
                 cls.handlers.append((handler, group))
 
-            def run_polling(self):
+            def run_polling(self, allowed_updates=None):
                 cls.registered["polled"] = True
+                cls.registered["allowed_updates"] = allowed_updates
 
         cls.FakeApp = FakeApp
         with mock.patch.object(bot_app, "ApplicationBuilder", return_value=Builder()):
@@ -192,11 +193,18 @@ class WiringTests(unittest.TestCase):
         cls.conversation = next(h for h, _ in cls.handlers if isinstance(h, ConversationHandler))
 
     def test_the_gate_runs_before_everything_else_and_the_error_handler_is_the_apps(self):
-        gate, group = self.handlers[0]
-        self.assertIsInstance(gate, TypeHandler)
+        gate, group = next((h, g) for h, g in self.handlers if isinstance(h, TypeHandler))
         self.assertEqual(group, -1)
+        self.assertIsInstance(gate, TypeHandler)
         self.assertIs(self.registered["error_handler"], bot_app.on_error)
         self.assertTrue(self.registered["polled"])
+
+    def test_the_answers_to_polls_are_taken_before_the_gate_and_asked_for_by_name(self):
+        # an answer has no chat, which the gate would stop; only polls this bot sent reach the handler
+        answers = [(h, g) for h, g in self.handlers if isinstance(h, PollAnswerHandler)]
+        self.assertEqual([g for _, g in answers], [-2])
+        self.assertEqual(answers[0][0].callback, utils.poll_answer)
+        self.assertIn(Update.POLL_ANSWER, self.registered["allowed_updates"])
 
     def test_the_commands_are_registered_outside_the_conversation(self):
         commands = {tuple(h.commands) for h, _ in self.handlers if isinstance(h, CommandHandler)}
