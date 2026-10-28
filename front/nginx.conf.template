@@ -7,6 +7,18 @@ server {
     root /usr/share/nginx/html;
     index index.html;
 
+    # Security headers, on every answer (`always`: also the 304, 404 and 5xx). nginx drops the headers of this level inside a
+    # location that has an `add_header` of its own, so no location below uses one: the cache lines are `expires`, which does
+    # not count, and these are inherited everywhere.
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header X-Frame-Options "DENY" always;
+    # The content policy only reports for now (the browser's console says what it would have blocked, nothing is blocked).
+    # The app has no inline script, no iframe and talks only to its own origin; the pictures of the games come from other
+    # https hosts, the avatars are blob: URLs and the elements carry a few style="" attributes. When a release has gone
+    # by with no violation in the console, rename the header to Content-Security-Policy to enforce it.
+    add_header Content-Security-Policy-Report-Only "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data: blob:; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'" always;
+
     # Dotfiles (.env, .git, ...) are never served or proxied; scanners probe them constantly.
     location ~ /\.(?!well-known/) {
         return 404;
@@ -26,6 +38,9 @@ server {
         resolver ${DNS_RESOLVER} valid=10s;
         set $api_upstream ${API_UPSTREAM};
         proxy_pass $api_upstream$request_uri;
+        # a question to the AI chat can chain several model calls (30 s each): nginx's 60 s would cut it with a 504
+        # while the API goes on working
+        proxy_read_timeout 120s;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -34,13 +49,13 @@ server {
 
     # Code is revalidated on every load (cheap 304s); a deploy shows up immediately.
     location ~* \.(html|js|css)$ {
-        add_header Cache-Control "no-cache";
+        expires -1;  # Cache-Control: no-cache
         try_files $uri =404;
     }
 
     # The icons never change under the same name: the browser keeps them for a day
     location /assets/ {
-        add_header Cache-Control "public, max-age=86400";
+        expires 1d;  # Cache-Control: max-age=86400
         try_files $uri =404;
     }
 
