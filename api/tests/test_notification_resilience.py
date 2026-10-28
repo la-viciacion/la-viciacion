@@ -1,3 +1,4 @@
+import asyncio
 import types
 import unittest
 from unittest import mock
@@ -46,6 +47,34 @@ class TelegramSendTests(unittest.IsolatedAsyncioTestCase):
         bot.send_message = mock.AsyncMock(side_effect=telegram.error.BadRequest("chat not found"))
         self.assertFalse(await my_utils._telegram_send(bot, 1, "hola"))
         self.assertEqual(bot.send_message.await_count, 2)
+
+
+class GroupMessageOrderTests(unittest.IsolatedAsyncioTestCase):
+    async def test_telegram_does_not_wait_for_the_devices(self):
+        order = []
+
+        async def slow_push(message, *args, **kwargs):
+            await asyncio.sleep(0.2)
+            order.append("push")
+
+        async def telegram_send(bot, chat_id, text, image=None):
+            order.append("telegram")
+            return True
+
+        class Session:
+            def __init__(self, token):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *exc):
+                return False
+
+        values = {"notifications.enabled": True, "telegram.token": "t", "telegram.group_id": "g"}
+        with mock.patch.object(my_utils.settings, "get", side_effect=lambda key, *a: values.get(key)),                 mock.patch.object(my_utils.inbox, "record_group"),                 mock.patch.object(my_utils.push, "is_ready", return_value=True),                 mock.patch.object(my_utils.push, "notify_group", new=slow_push),                 mock.patch.object(my_utils.telegram, "Bot", new=Session),                 mock.patch.object(my_utils, "_telegram_send", new=telegram_send):
+            await my_utils.send_message("hola", False)
+        self.assertEqual(order, ["telegram", "push"])  # and the push is still waited for before returning
 
 
 class FloodControlTests(unittest.IsolatedAsyncioTestCase):

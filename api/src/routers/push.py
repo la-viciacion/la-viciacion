@@ -67,6 +67,8 @@ def subscribe(
     """Register (or refresh) this device for the caller. A device that changes account moves to it."""
     if not push.is_ready():
         raise HTTPException(status_code=409, detail="Las notificaciones push no están activadas")
+    if not push.is_push_endpoint(body.endpoint):
+        raise HTTPException(status_code=400, detail="La dirección de las notificaciones no es la de un servicio de push conocido")
     row = db.query(models.PushSubscription).filter_by(endpoint=body.endpoint).first()
     if row is None:
         row = models.PushSubscription(endpoint=body.endpoint)

@@ -389,7 +389,7 @@ class UserStatisticsTests(CatalogTestCase):
 
 
 class PushTests(CatalogTestCase):
-    SUBSCRIPTION = {"endpoint": "https://push.example/send/abc", "keys": {"p256dh": "p256", "auth": "auth"}, "user_agent": "Chrome on Android"}
+    SUBSCRIPTION = {"endpoint": "https://fcm.googleapis.com/fcm/send/send/abc", "keys": {"p256dh": "p256", "auth": "auth"}, "user_agent": "Chrome on Android"}
 
     def enable_push(self):
         with database.SessionLocal() as db:
@@ -431,15 +431,18 @@ class PushTests(CatalogTestCase):
     def test_only_the_newest_devices_are_kept(self):
         self.enable_push()
         for n in range(push.MAX_DEVICES_PER_USER + 3):
-            self.subscribe(endpoint=f"https://push.example/send/{n}")
+            self.subscribe(endpoint=f"https://fcm.googleapis.com/fcm/send/send/{n}")
         endpoints = [d["endpoint"] for d in self.api("GET", "/push/config", as_user="ana").json()["devices"]]
         self.assertEqual(len(endpoints), push.MAX_DEVICES_PER_USER)
-        self.assertNotIn("https://push.example/send/0", endpoints)
-        self.assertIn(f"https://push.example/send/{push.MAX_DEVICES_PER_USER + 2}", endpoints)
+        self.assertNotIn("https://fcm.googleapis.com/fcm/send/send/0", endpoints)
+        self.assertIn(f"https://fcm.googleapis.com/fcm/send/send/{push.MAX_DEVICES_PER_USER + 2}", endpoints)
 
     def test_the_subscription_is_validated(self):
         self.enable_push()
         self.assertEqual(self.subscribe(endpoint="http://insecure.example/x").status_code, 422)
+        refused = self.subscribe(endpoint="https://internal.example/send/abc")  # https, but not a push service
+        self.assertEqual(refused.status_code, 400)
+        self.assertEqual(self.subscribe(endpoint="https://169.254.169.254/latest/meta-data").status_code, 400)
         self.assertEqual(self.subscribe(endpoint="").status_code, 422)
         self.assertEqual(self.subscribe(keys={"p256dh": "", "auth": "a"}).status_code, 422)
         self.assertEqual(self.subscribe(endpoint="https://" + "a" * 800).status_code, 422)

@@ -491,21 +491,22 @@ async def send_message(
             push_payload = push.build_payload(msg, url=push_url, tag="group")
         # neither raises: the inbox and a push must not affect Telegram
         inbox.record_group(msg, push_payload)
-        if push_payload:
-            await push.deliver(push_payload, "group")
-        else:
-            await push.notify_group(msg)
-        if not telegram_ready:
-            logger.info("Telegram is not configured. Message sent by push only.")
-            return
+        # the devices and the group are reached at the same time: a slow push service must not hold the Telegram notice back
+        pushing = asyncio.ensure_future(push.deliver(push_payload, "group") if push_payload else push.notify_group(msg))
         try:
-            bot = telegram.Bot(settings.get("telegram.token"))
-            async with bot:
-                logger.info("Sending message to group...")
-                if await _telegram_send(bot, settings.get("telegram.group_id"), msg, image):
-                    logger.info("Message sent successfully!")
-        except Exception as e:  # e.g. Telegram unreachable when the bot session opens
-            logger.error("Error sending telegram message: " + str(e), exc_info=True)
+            if not telegram_ready:
+                logger.info("Telegram is not configured. Message sent by push only.")
+                return
+            try:
+                bot = telegram.Bot(settings.get("telegram.token"))
+                async with bot:
+                    logger.info("Sending message to group...")
+                    if await _telegram_send(bot, settings.get("telegram.group_id"), msg, image):
+                        logger.info("Message sent successfully!")
+            except Exception as e:  # e.g. Telegram unreachable when the bot session opens
+                logger.error("Error sending telegram message: " + str(e), exc_info=True)
+        finally:
+            await pushing  # neither deliver nor notify_group raises
     else:
         logger.info("Silent mode. Message not sent.")
 

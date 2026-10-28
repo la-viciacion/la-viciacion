@@ -316,7 +316,7 @@ class SettingsTests(OpsTestCase):
         self.admin("POST", "/settings/push-keys")
         settings._cache.clear()
         self.api("POST", "/push/subscribe", as_user="ana",
-                 json={"endpoint": "https://push.example/a", "keys": {"p256dh": "p", "auth": "a"}})
+                 json={"endpoint": "https://fcm.googleapis.com/fcm/send/a", "keys": {"p256dh": "p", "auth": "a"}})
         self.assertEqual(self.scalar("SELECT COUNT(*) FROM push_subscriptions"), 1)
         replaced = self.admin("POST", "/settings/push-keys", params={"replace": True})
         self.assertEqual(replaced.status_code, 200)
@@ -342,9 +342,9 @@ class PushAnnouncementTests(OpsTestCase):
     def test_the_audience_summary_counts_devices_users_and_group_preferences(self):
         self.enable_push()
         self.set_settings(**{"telegram.token": TOKEN, "telegram.group_id": "-100123"})
-        self.subscribe("ana", "https://push.example/a1")
-        self.subscribe("ana", "https://push.example/a2", group=False)
-        self.subscribe("root", "https://push.example/r1")
+        self.subscribe("ana", "https://fcm.googleapis.com/fcm/send/a1")
+        self.subscribe("ana", "https://fcm.googleapis.com/fcm/send/a2", group=False)
+        self.subscribe("root", "https://fcm.googleapis.com/fcm/send/r1")
         body = self.admin("GET", "/push/audience").json()
         self.assertTrue(body["ready"])
         self.assertEqual(body["telegram"], {"ready": True, "group": True})
