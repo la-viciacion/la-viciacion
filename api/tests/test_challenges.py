@@ -33,6 +33,39 @@ class PeriodTests(unittest.TestCase):
         self.assertEqual([status(9), status(10), status(20), status(21)], ["upcoming", "active", "active", "finished"])
 
 
+class LaunchMomentTests(unittest.TestCase):
+    DAY = datetime.date(2026, 10, 15)
+    LAUNCHED = datetime.datetime(2026, 10, 15, 13, 30)
+
+    def challenge(self, scope=challenges.USER, created_at=LAUNCHED):
+        return types.SimpleNamespace(scope=scope, starts_on=self.DAY, ends_on=self.DAY + datetime.timedelta(days=6), created_at=created_at)
+
+    def test_a_personal_challenge_or_a_duel_counts_from_the_moment_it_was_launched(self):
+        for scope in (challenges.USER, challenges.DUEL):
+            self.assertEqual(challenges.starts_at(self.challenge(scope)), self.LAUNCHED)
+
+    def test_a_group_challenge_counts_its_whole_first_day(self):
+        self.assertEqual(challenges.starts_at(self.challenge(challenges.GROUP)), datetime.datetime(2026, 10, 15))
+
+    def test_the_window_runs_from_the_launch_to_the_first_instant_after_the_last_day(self):
+        self.assertEqual(challenges._window(self.challenge()), (self.LAUNCHED, datetime.datetime(2026, 10, 22)))
+
+    def test_one_that_begins_after_it_was_launched_waits_for_its_first_day(self):
+        later = self.challenge()
+        later.starts_on = self.DAY + datetime.timedelta(days=2)
+        self.assertEqual(challenges.starts_at(later), datetime.datetime(2026, 10, 17))
+
+    def test_a_date_on_the_launch_day_counts_only_when_the_game_was_played_since(self):
+        challenge = self.challenge()
+        self.assertTrue(challenges.counts_from_launch(challenge, self.DAY, "hades", {"hades"}))
+        self.assertFalse(challenges.counts_from_launch(challenge, self.DAY, "hades", {"celeste"}))
+        self.assertTrue(challenges.counts_from_launch(challenge, self.DAY + datetime.timedelta(days=1), "hades", set()))
+
+    def test_a_group_challenge_and_a_missing_date_have_no_such_limit(self):
+        self.assertTrue(challenges.counts_from_launch(self.challenge(challenges.GROUP), self.DAY, "hades", None))
+        self.assertTrue(challenges.counts_from_launch(self.challenge(), None, "hades", set()))
+
+
 class HoursTests(unittest.TestCase):
     def test_hours_are_rounded_to_a_tenth_and_kept_within_limits(self):
         self.assertEqual(challenges.hours("2.55", "x"), 2.5)  # round() on a float, banker's rounding is fine

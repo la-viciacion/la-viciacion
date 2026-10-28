@@ -171,8 +171,11 @@ def build_game_of_month(db: Session, options: dict, today: datetime.date, user_i
     )
 
 
-def seconds_in_game(db: Session, user_ids: list[int], game_id: str, starts_on: datetime.date, ends_on: datetime.date) -> dict[int, int]:
-    """Seconds each user played a game in sessions that began within the period (finished ones only)."""
+def seconds_in_game(
+    db: Session, user_ids: list[int], game_id: str, starts_on: datetime.date, ends_on: datetime.date, start: datetime.datetime | None = None
+) -> dict[int, int]:
+    """Seconds each user played a game in sessions that began within the period (finished ones only). `start` is the
+    moment the period begins when it is not the first instant of `starts_on` (see `starts_at`)."""
     if not user_ids:
         return {}
     rows = (
@@ -181,7 +184,7 @@ def seconds_in_game(db: Session, user_ids: list[int], game_id: str, starts_on: d
             models.GameTimer.user_id.in_(user_ids),
             models.GameTimer.game_id == game_id,
             models.GameTimer.is_active == False,  # noqa: E712
-            models.GameTimer.start_time >= datetime.datetime.combine(starts_on, datetime.time.min),
+            models.GameTimer.start_time >= (start or datetime.datetime.combine(starts_on, datetime.time.min)),
             models.GameTimer.start_time < datetime.datetime.combine(ends_on + datetime.timedelta(days=1), datetime.time.min),
         )
         .group_by(models.GameTimer.user_id)
@@ -309,8 +312,12 @@ def progress_new_genre(db: Session, challenge: models.Challenge, participant_ids
     user = db.get(models.User, user_id)
     genre = params["genre"].casefold()
     in_genre = lambda genres: genre in {g.casefold() for g in split_genres(genres)}  # noqa: E731
+    after = played_after_launch(db, challenge, user_id)
     had_before = {
-        game_id for (game_id,) in db.query(models.UserGame.game_id).filter(models.UserGame.user_id == user_id, models.UserGame.started_date < challenge.starts_on)
+        game_id for game_id, started in db.query(models.UserGame.game_id, models.UserGame.started_date).filter(
+            models.UserGame.user_id == user_id, models.UserGame.started_date <= challenge.starts_on
+        )
+        if started < challenge.starts_on or not counts_from_launch(challenge, started, game_id, after)
     }
     if params["mode"] == "play":
         rows = (
@@ -319,7 +326,7 @@ def progress_new_genre(db: Session, challenge: models.Challenge, participant_ids
             .filter(
                 models.GameTimer.user_id == user_id,
                 models.GameTimer.is_active == False,  # noqa: E712
-                models.GameTimer.start_time >= datetime.datetime.combine(challenge.starts_on, datetime.time.min),
+                models.GameTimer.start_time >= starts_at(challenge),
                 models.GameTimer.start_time < datetime.datetime.combine(challenge.ends_on + datetime.timedelta(days=1), datetime.time.min),
             )
             .group_by(models.GameTimer.game_id, models.Game.genres)
@@ -327,7 +334,7 @@ def progress_new_genre(db: Session, challenge: models.Challenge, participant_ids
         amount = sum(int(seconds or 0) for game_id, genres, seconds in rows if game_id not in had_before and in_genre(genres))
     else:
         rows = (
-            db.query(models.UserGame.game_id, models.Game.genres)
+            db.query(models.UserGame.game_id, models.Game.genres, models.UserGame.completed_date)
             .join(models.Game, models.Game.id == models.UserGame.game_id)
             .filter(
                 models.UserGame.user_id == user_id,
@@ -336,7 +343,10 @@ def progress_new_genre(db: Session, challenge: models.Challenge, participant_ids
                 models.UserGame.completed_date <= challenge.ends_on,
             )
         )
-        amount = len({game_id for game_id, genres in rows if game_id not in had_before and in_genre(genres)})
+        amount = len({
+            game_id for game_id, genres, done_on in rows
+            if game_id not in had_before and in_genre(genres) and counts_from_launch(challenge, done_on, game_id, after)
+        })
     return new_genre_result(user_id, (user.name or user.username) if user else "", params["mode"], amount, params.get("hours"))
 
 
@@ -490,7 +500,7 @@ def build_debt_reduction(db: Session, options: dict, today: datetime.date, user_
     duration = options.get("duration") or "month"
     if duration not in DURATIONS:
         raise ChallengeError("Elige una duración: una semana, un mes o tres meses")
-    open_games = debt.games_in_debt_at(db, user_id, today) if user_id is not None else {}
+    open_games = debt.games_in_debt_at(db, user_id, today, datetime.datetime.now()) if user_id is not None else {}
     if not open_games:
         raise ChallengeError("No tienes juegos empezados y sin terminar: no hay deuda que saldar")
     params: dict = {"mode": mode, "duration": duration}
@@ -537,8 +547,9 @@ def progress_debt_reduction(db: Session, challenge: models.Challenge, participan
         return {"players": []}
     user_id = participant_ids[0]
     user = db.get(models.User, user_id)
-    start_debt = debt.games_in_debt_at(db, user_id, challenge.starts_on)
-    window_start = datetime.datetime.combine(challenge.starts_on, datetime.time.min)
+    start_debt = debt.games_in_debt_at(db, user_id, challenge.starts_on, starts_at(challenge))
+    after = played_after_launch(db, challenge, user_id)
+    window_start = starts_at(challenge)
     window_end = datetime.datetime.combine(challenge.ends_on + datetime.timedelta(days=1), datetime.time.min)
     played = {
         game_id: int(seconds or 0)  # MariaDB returns SUM() as Decimal
@@ -553,12 +564,13 @@ def progress_debt_reduction(db: Session, challenge: models.Challenge, participan
         .group_by(models.GameTimer.game_id)
     } if start_debt else {}
     completed = {
-        game_id for (game_id,) in db.query(models.UserGame.game_id).filter(
+        game_id for game_id, done_on in db.query(models.UserGame.game_id, models.UserGame.completed_date).filter(
             models.UserGame.user_id == user_id,
             models.UserGame.completed == 1,
             models.UserGame.completed_date >= challenge.starts_on,
             models.UserGame.completed_date <= challenge.ends_on,
         )
+        if counts_from_launch(challenge, done_on, game_id, after)
     } & set(start_debt)
     return debt_reduction_result(user_id, (user.name or user.username) if user else "", json.loads(challenge.params), start_debt, played, completed)
 
@@ -587,10 +599,41 @@ def _whole(value, name: str, low: int, high: int) -> int:
     return number
 
 
+def starts_at(challenge: models.Challenge) -> datetime.datetime:
+    """The moment a challenge begins to count: the first instant of its first day, except for a personal one or a duel,
+    which count from the moment they were launched (what the player did earlier that day is not part of it)."""
+    first = datetime.datetime.combine(challenge.starts_on, datetime.time.min)
+    if challenge.scope == GROUP or challenge.created_at is None:
+        return first
+    return max(first, challenge.created_at)
+
+
+def played_after_launch(db: Session, challenge: models.Challenge, user_id: int) -> set[str] | None:
+    """The games the player has a session of that began after a personal challenge was launched, or None when the
+    challenge counts its whole first day (a group one). A game started or completed is only a date, so on the day a
+    personal challenge was launched it counts only if the player played it since: that is how it is told from what
+    they did before. See `counts_from_launch`."""
+    if challenge.scope == GROUP or challenge.created_at is None:
+        return None
+    return {
+        game_id for (game_id,) in db.query(models.GameTimer.game_id).filter(
+            models.GameTimer.user_id == user_id, models.GameTimer.start_time >= starts_at(challenge)
+        ).distinct()
+    }
+
+
+def counts_from_launch(challenge: models.Challenge, day: datetime.date | None, game_id: str, after: set[str] | None) -> bool:
+    """Whether a game started or completed on `day` (a date, with no hour) counts for the challenge: every day after the
+    one it began does, and that day only when the game was played since the launch (`after`, from `played_after_launch`)."""
+    if day is None or after is None or day != challenge.starts_on:
+        return True
+    return game_id in after
+
+
 def _window(challenge: models.Challenge) -> tuple[datetime.datetime, datetime.datetime]:
-    """The period as moments: from its first instant to the first one after its last day."""
+    """The period as moments: from the moment it begins to count (`starts_at`) to the first one after its last day."""
     return (
-        datetime.datetime.combine(challenge.starts_on, datetime.time.min),
+        starts_at(challenge),
         datetime.datetime.combine(challenge.ends_on + datetime.timedelta(days=1), datetime.time.min),
     )
 
@@ -641,7 +684,7 @@ def progress_streak(db: Session, challenge: models.Challenge, participant_ids: l
         return {"players": []}
     user_id = participant_ids[0]
     params = json.loads(challenge.params)
-    within = time_entries.played_days_between(db, user_id, challenge.starts_on, challenge.ends_on)
+    within = time_entries.played_days_between(db, user_id, challenge.starts_on, challenge.ends_on, starts_at(challenge))
     return streak_result(user_id, _player(db, user_id), params["mode"], params["days"], within, challenge.ends_on)
 
 
@@ -726,16 +769,18 @@ def progress_variety(db: Session, challenge: models.Challenge, participant_ids: 
     return _count_part(user_id, _player(db, user_id), genres_reached(seconds, round(params["hours"] * 3600)), params["genres"], "genres")
 
 
-def wishes_at(db: Session, user_id: int, day: datetime.date) -> set[str]:
+def wishes_at(db: Session, user_id: int, day: datetime.date, at: datetime.datetime | None = None, after: set[str] | None = None) -> set[str]:
     """The games a player was waiting to play on a day: those on their wishlist by then (added that day or before)
-    that were not in their library yet."""
-    had = db.query(models.UserGame.game_id).filter(models.UserGame.user_id == user_id, models.UserGame.started_date < day)
-    rows = db.query(models.UserWishlist.game_id).filter(
-        models.UserWishlist.user_id == user_id,
-        models.UserWishlist.added_at < datetime.datetime.combine(day + datetime.timedelta(days=1), datetime.time.min),
-        ~models.UserWishlist.game_id.in_(had),
+    that were not in their library yet. With `at` (the moment a personal challenge was launched on `day`) they are the
+    wishes added by then, and a game started that day was already in the library only if it has not been played since
+    (`after`, from `played_after_launch`)."""
+    started = db.query(models.UserGame.game_id, models.UserGame.started_date).filter(
+        models.UserGame.user_id == user_id, models.UserGame.started_date <= day
     )
-    return {game_id for (game_id,) in rows}
+    had = {game_id for game_id, on in started if on < day or after is None or game_id not in after}
+    added = models.UserWishlist.added_at <= at if at is not None else models.UserWishlist.added_at < datetime.datetime.combine(day + datetime.timedelta(days=1), datetime.time.min)
+    rows = db.query(models.UserWishlist.game_id).filter(models.UserWishlist.user_id == user_id, added)
+    return {game_id for (game_id,) in rows if game_id not in had}
 
 
 def build_wishlist(db: Session, options: dict, today: datetime.date, user_id: int | None = None) -> Built:
@@ -745,7 +790,7 @@ def build_wishlist(db: Session, options: dict, today: datetime.date, user_id: in
     if mode not in ("start", "complete"):
         raise ChallengeError("Elige si quieres empezar o completar tus deseados")
     duration, length = _duration(options)
-    pending = len(wishes_at(db, user_id, today)) if user_id is not None else 0
+    pending = len(wishes_at(db, user_id, today, datetime.datetime.now())) if user_id is not None else 0
     if not pending:
         raise ChallengeError("No tienes deseados pendientes: añade juegos a tu lista de deseados primero")
     games = _whole(options.get("games"), "Los juegos", 1, pending)
@@ -766,15 +811,21 @@ def progress_wishlist(db: Session, challenge: models.Challenge, participant_ids:
         return {"players": []}
     user_id = participant_ids[0]
     params = json.loads(challenge.params)
-    wished = wishes_at(db, user_id, challenge.starts_on)
+    after = played_after_launch(db, challenge, user_id)
+    wished = wishes_at(db, user_id, challenge.starts_on, starts_at(challenge), after)
     found = set()
     if wished:
-        rows = db.query(models.UserGame.game_id).filter(models.UserGame.user_id == user_id, models.UserGame.game_id.in_(wished))
+        rows = db.query(models.UserGame.game_id, models.UserGame.started_date, models.UserGame.completed_date).filter(
+            models.UserGame.user_id == user_id, models.UserGame.game_id.in_(wished)
+        )
         if params["mode"] == "start":
             rows = rows.filter(models.UserGame.started_date >= challenge.starts_on, models.UserGame.started_date <= challenge.ends_on)
         else:
             rows = rows.filter(models.UserGame.completed == 1, models.UserGame.completed_date >= challenge.starts_on, models.UserGame.completed_date <= challenge.ends_on)
-        found = {game_id for (game_id,) in rows}
+        found = {
+            game_id for game_id, started, done_on in rows
+            if counts_from_launch(challenge, started if params["mode"] == "start" else done_on, game_id, after)
+        }
     return _count_part(user_id, _player(db, user_id), len(found), params["games"], "games")
 
 
@@ -861,7 +912,7 @@ def duel_result(names: dict[int, str], seconds: dict[int, int]) -> dict:
 def progress_duel(db: Session, challenge: models.Challenge, participant_ids: list[int]) -> dict:
     names = names_of(db, participant_ids)
     if challenge.game_id:
-        played = seconds_in_game(db, participant_ids, challenge.game_id, challenge.starts_on, challenge.ends_on)
+        played = seconds_in_game(db, participant_ids, challenge.game_id, challenge.starts_on, challenge.ends_on, starts_at(challenge))
     else:
         start, end = _window(challenge)
         rows = (

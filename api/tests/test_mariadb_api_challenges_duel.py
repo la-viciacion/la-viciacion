@@ -23,6 +23,7 @@ class DuelTestCase(base.ChallengesTestCase):
         with database.SessionLocal() as db:
             row = db.get(models.Challenge, challenge_id)
             row.starts_on = row.starts_on - timedelta(days=days)
+            row.created_at = row.created_at - timedelta(days=days)
             if launched_hours_ago is not None:
                 row.created_at = clock.now() - timedelta(hours=launched_hours_ago)
             db.commit()
@@ -143,6 +144,7 @@ class HistoryTests(DuelTestCase):
         with database.SessionLocal() as db:
             row = db.get(models.Challenge, challenge)
             row.starts_on, row.ends_on = TODAY() - timedelta(days=10), TODAY() - timedelta(days=3)
+            row.created_at = datetime.combine(row.starts_on, datetime.min.time())
             db.commit()
         for user, minutes in plays.items():
             self.play(getattr(self, user), "hades", 5, minutes)

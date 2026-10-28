@@ -1,7 +1,7 @@
 """The challenges through real requests (MariaDB required, see api_support.py): who may launch what, the options and
 duplicates, taking part, the progress and the history, and the notices of the launch and of the total reached."""
 import asyncio
-from datetime import timedelta
+from datetime import datetime, timedelta
 from unittest import mock
 
 from sqlalchemy import text
@@ -28,6 +28,19 @@ class ChallengesTestCase(ApiTestCase):
         self.gone = self.user("gone", active=False)
         self.game("hades", "Hades")
         self.game("celeste", "Celeste")
+
+    def api(self, method, path, **kwargs):
+        """A personal challenge or a duel counts from the moment it is launched, and the clock of the tests is at noon:
+        launched there, the sessions and the games a test plays or completes "today" at noon would come before it. So
+        a challenge launched through the API is moved to the start of its day (what these tests were written for); one
+        that tests the launch moment sets `created_at` itself afterwards."""
+        response = super().api(method, path, **kwargs)
+        if method == "POST" and path == "/challenges" and response.status_code == 201:
+            with database.SessionLocal() as db:
+                row = db.get(models.Challenge, response.json()["id"])
+                row.created_at = datetime.combine(row.starts_on, datetime.min.time())
+                db.commit()
+        return response
 
     def options(self, **changes):
         return {"game_id": "hades", "month": this_month(), "min_hours_each": 5, "min_hours_total": 12, **changes}

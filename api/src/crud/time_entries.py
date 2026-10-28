@@ -108,9 +108,12 @@ def played_days_by_user(
     return {user_id: sorted(values) for user_id, values in days.items()}
 
 
-def played_days_between(db: Session, user_id: int, first: datetime.date, last: datetime.date) -> list[datetime.date]:
+def played_days_between(
+    db: Session, user_id: int, first: datetime.date, last: datetime.date, since: datetime.datetime | None = None
+) -> list[datetime.date]:
     """The days of a period the user played on, oldest first, by the rule of played_days_by_user (a finished session
-    of 10 minutes or more touches the day it began and the day it ended), reading only the sessions that touch it."""
+    of 10 minutes or more touches the day it began and the day it ended), reading only the sessions that touch it.
+    With `since`, only the sessions that began from that moment."""
     sessions = sessions_subquery()
     stmt = select(sessions.c.start, sessions.c.end).where(
         sessions.c.user_id == user_id,
@@ -118,6 +121,8 @@ def played_days_between(db: Session, user_id: int, first: datetime.date, last: d
         sessions.c.start < datetime.datetime.combine(last + datetime.timedelta(days=1), datetime.time.min),
         sessions.c.end >= datetime.datetime.combine(first, datetime.time.min),
     )
+    if since is not None:
+        stmt = stmt.where(sessions.c.start >= since)
     days = {moment.date() for row in db.execute(stmt).all() for moment in row if moment is not None and first <= moment.date() <= last}
     return sorted(days)
 
