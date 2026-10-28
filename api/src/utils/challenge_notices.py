@@ -233,9 +233,13 @@ async def announce_results(db: Session, today: datetime.date) -> str:
     told = 0
     if private:
         for user_id, user_lines in lines.items():
-            user = _active(db, user_id)
-            if user is not None and await tell(db, user, results_message(user_lines)):
-                told += 1
+            try:
+                user = _active(db, user_id)
+                if user is not None and await tell(db, user, results_message(user_lines)):
+                    told += 1
+            except Exception as e:  # one player's notice failing must not cost the others theirs
+                db.rollback()
+                logger.error(f"Challenge result not told to user {user_id}: {e}", exc_info=True)
     if group:
         for message in group_messages:
             await utils.send_message(message, False)
@@ -267,7 +271,11 @@ async def send_reminders(db: Session, today: datetime.date) -> str:
                 lines.setdefault(part["user_id"], []).append(f"{_bold(challenge.title)}: {remaining_text(part)}")
     told = 0
     for user_id, user_lines in lines.items():
-        user = _active(db, user_id)
-        if user is not None and await tell(db, user, reminders_message(user_lines), reminder=True):
-            told += 1
+        try:
+            user = _active(db, user_id)
+            if user is not None and await tell(db, user, reminders_message(user_lines), reminder=True):
+                told += 1
+        except Exception as e:  # one player's reminder failing must not cost the others theirs
+            db.rollback()
+            logger.error(f"Challenge reminder not sent to user {user_id}: {e}", exc_info=True)
     return f"{told} told"

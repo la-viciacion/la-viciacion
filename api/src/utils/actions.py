@@ -14,6 +14,7 @@ from . import challenge_notices, challenges, my_utils as utils
 from . import push, rawg_sync
 from ..utils import seasons, streaks, user_settings
 from .logger import LogManager
+from .redaction import redact_rawg_key
 
 log_manager = LogManager()
 logger = log_manager.get_logger()
@@ -281,7 +282,7 @@ async def announce_lost_streaks(db: Session, today: datetime.date | None = None,
     for user in users.get_users(db):
         lost = streaks.lost_streak(time_entries.get_played_days(db, user.id), today)
         if lost is not None:
-            msg = user.name + " acaba de perder la racha de " + str(lost) + " días."
+            msg = utils.escape_markdown(user.name) + " acaba de perder la racha de " + str(lost) + " días."
             logger.info(msg)
             await utils.send_message(msg, silent)
 
@@ -323,6 +324,7 @@ def position_change(previous: int, current: int) -> tuple[int, str]:
 
 def decorate_name(name: str, climbed: int) -> str:
     """Bold and emoji for a name according to how far it moved."""
+    name = utils.escape_markdown(name)
     if climbed != 0:
         name = "*" + name + "*"
     if climbed > 1:
@@ -402,9 +404,11 @@ async def announce_ranking_changes(db: Session, before: dict, silent: bool):
 ##################
 
 
-async def check_forgotten_timer(db: Session, user: models.User):
+async def check_forgotten_timer(db: Session, user: models.User, crossed_between: tuple[datetime.datetime, datetime.datetime] | None = None):
     """Remind a user about a timer running for too long (the scheduler calls this hourly, and each
-    timer is reminded about once: in the run that follows it crossing the line).
+    timer is reminded about once: in the run whose stretch of time holds the moment it crossed the line).
+    `crossed_between` is that stretch, [first, last): the scheduler gives it from the slots it covers, so a run that
+    is late or a restart neither repeats a reminder nor skips one; without it, the last hour up to now.
 
     "Too long" is the user's own setting, or the default when they never set it. The notice goes
     only through the channels they left on (both off: no notice).
@@ -413,8 +417,11 @@ async def check_forgotten_timer(db: Session, user: models.User):
     if not ((telegram_on and user.telegram_id is not None) or (push_on and push_has_devices(user.id))):
         return
     hours = user_settings.forgotten_timer_hours(db, user.id)
+    if crossed_between is None:
+        now = datetime.datetime.now()
+        crossed_between = (now - datetime.timedelta(hours=1), now)
     forgotten_timer = time_entries.get_forgotten_game_timers(
-        db, user_id=user.id, hours=hours, newly_forgotten=True
+        db, user_id=user.id, hours=hours, crossed_between=crossed_between
     )
     if forgotten_timer:
         logger.info(f"{user.name} has an active timer for more than {hours} hours")
@@ -452,7 +459,12 @@ async def check_wishlist(db: Session, today: datetime.date) -> str:
     """Daily: refresh the release date of the games somebody is waiting for (they slip), then tell each player
     which of the games they wished come out today, through the channels each one left on (both off: no notice).
     Nothing is remembered: a game comes out on one day only."""
-    changed = await asyncio.to_thread(rawg_sync.refresh_release_dates, db, wishlist.to_refresh(db, today))
+    try:
+        changed = await asyncio.to_thread(rawg_sync.refresh_release_dates, db, wishlist.to_refresh(db, today))
+    except Exception as e:  # the dates it has are the ones the notices go by: RAWG failing must not cost the day's notices
+        db.rollback()
+        logger.error(f"Release dates not refreshed: {redact_rawg_key(e)}", exc_info=True)
+        changed = []
     per_user: dict[int, tuple[models.User, list]] = {}
     for user, game, others in wishlist.releases_on(db, today):
         per_user.setdefault(user.id, (user, []))[1].append((game.name, [w["name"] for w in others], game.slug))

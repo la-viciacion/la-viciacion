@@ -31,11 +31,28 @@ class ForgottenTimersTests(unittest.TestCase):
         self.db.commit()
         self.assertEqual(self.found(hours=4), [])
 
-    def test_newly_forgotten_only_returns_timers_that_crossed_the_line_in_the_last_hour(self):
+    def test_only_the_timers_that_crossed_the_line_in_the_stretch_are_returned(self):
         running(self.db, 4.5, game_id="just_crossed")
         running(self.db, 9, game_id="reminded_before")
         self.assertEqual(sorted(self.found(hours=4)), ["just_crossed", "reminded_before"])
-        self.assertEqual(self.found(hours=4, newly_forgotten=True), ["just_crossed"])
+        last_hour = (NOW - datetime.timedelta(hours=1), NOW)
+        self.assertEqual(self.found(hours=4, crossed_between=last_hour), ["just_crossed"])
+
+    def test_consecutive_stretches_hold_every_timer_exactly_once(self):
+        """The reminder of the hourly job must neither repeat nor skip, whatever time the runs happen at."""
+        for minutes in range(0, 5 * 60, 7):  # timers that started at all sorts of moments
+            running(self.db, 4 + minutes / 60, game_id=f"t{minutes}")
+        stretches = [(NOW - datetime.timedelta(hours=h + 1), NOW - datetime.timedelta(hours=h)) for h in range(-1, 6)]
+        found = [game for stretch in stretches for game in self.found(hours=4, crossed_between=stretch)]
+        self.assertEqual(len(found), len(set(found)))
+        self.assertEqual(set(found), {t.game_id for t in time_entries.get_forgotten_game_timers(self.db, hours=4)})
+
+    def test_the_moment_a_timer_crosses_the_line_is_its_start_plus_the_hours_not_the_time_it_is_now(self):
+        running(self.db, 4.5, game_id="a")  # crossed 30 minutes ago
+        crossed_then = (NOW - datetime.timedelta(minutes=40), NOW - datetime.timedelta(minutes=20))
+        self.assertEqual(self.found(hours=4, crossed_between=crossed_then), ["a"])
+        before = (NOW - datetime.timedelta(minutes=80), NOW - datetime.timedelta(minutes=40))
+        self.assertEqual(self.found(hours=4, crossed_between=before), [])
 
     def test_it_can_be_limited_to_one_user(self):
         running(self.db, 5, user_id=1, game_id="mine")

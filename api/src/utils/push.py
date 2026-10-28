@@ -117,7 +117,7 @@ def build_announcement(title: str, body: str | None = None, url: str | None = No
     payload = {"title": title, "body": body, "url": url, "tag": None}
     if image:
         payload["image"] = image
-    if len(json.dumps(payload).encode()) > PAYLOAD_MAX_BYTES:
+    if len(json.dumps(payload, ensure_ascii=False).encode()) > PAYLOAD_MAX_BYTES:
         raise ValueError("El aviso es demasiado grande")
     return payload
 
@@ -220,7 +220,7 @@ def ensure_vapid_keys(db) -> bool:
 def _deliver(devices: list[tuple], payload: dict, private_pem: str, subject: str, ttl: int = TTL_SECONDS) -> tuple[int, list[int], int]:
     """Blocking. Returns (sent, ids of subscriptions that no longer exist, failures)."""
     vapid = Vapid.from_pem(private_pem.encode())
-    data = json.dumps(payload)
+    data = json.dumps(payload, ensure_ascii=False)  # UTF-8 as it travels: \u escapes would take 6 bytes per character, 12 per emoji
     sent, gone, failed = 0, [], 0
     for device_id, endpoint, p256dh, auth in devices:
         try:

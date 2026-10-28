@@ -149,21 +149,45 @@ def _run(db: Session, job: str, coroutine_factory) -> None:
     logger.info(f"Scheduled job {job} starting")
     try:
         status = asyncio.run(coroutine_factory())
-        _finish(db, job, f"ok: {status}" if status else "ok")
+        outcome = f"ok: {status}" if status else "ok"
     except Exception as e:
         logger.error(f"Scheduled job {job} failed: {e}", exc_info=True)
-        _finish(db, job, f"error: {e}")
+        outcome = f"error: {e}"
+    try:
+        db.rollback()  # a job that died on a database error leaves the session unusable until then
+        _finish(db, job, outcome)
+    except Exception as e:  # the status is only a note: not recording it must not stop the jobs that come after
+        logger.error(f"Scheduled job {job}: could not record its status: {e}", exc_info=True)
+
+
+def each_user(db: Session, job: str, action) -> list:
+    """Run `await action(user)` for every user; one that fails is logged and skipped, so it never costs the rest their turn."""
+    async def run():
+        failed = []
+        for user in users.get_users(db):
+            try:
+                await action(user)
+            except Exception as e:
+                db.rollback()
+                failed.append(user.id)
+                logger.error(f"Scheduled job {job} failed for user {user.id}: {e}", exc_info=True)
+        return failed
+    return run()
 
 
 # ── the jobs ────────────────────────────────────────────────
 async def _weekly_summary(db: Session) -> str:
     sent = 0
-    for user in users.get_users(db):
+
+    async def tell(user):
+        nonlocal sent
         if user.telegram_id is None and not actions.push_has_devices(user.id):
-            continue
+            return
         await actions.weekly_resume(db, user, weeks_ago=1, silent=False)
         sent += 1
-    return f"{sent} users"
+
+    failed = await each_user(db, "weekly_summary", tell)
+    return f"{sent} users" + (f", {len(failed)} failed" if failed else "")
 
 
 async def _monthly_recap(db: Session, slot: datetime.datetime) -> str:
@@ -182,10 +206,19 @@ async def _timer_notices(db: Session, slot: datetime.datetime) -> str:
     return await actions.refresh_timer_notices(db, slot)
 
 
-async def _forgotten_timers(db: Session) -> str:
-    for user in users.get_users(db):
-        await actions.check_forgotten_timer(db, user)
-    return ""
+def forgotten_window(slot: datetime.datetime, previous_run: datetime.datetime | None) -> tuple[datetime.datetime, datetime.datetime]:
+    """The stretch of time whose crossings an hourly run of the forgotten timers reminds about (pure): from the slot of the
+    run before it (the hour of when it ran, it runs inside its grace) to this slot, so every moment belongs to exactly one run
+    whatever time the runs happen at, and a restart that skipped some hours is made up for (at most a day of them)."""
+    first = slot - datetime.timedelta(hours=1)
+    if previous_run is not None:
+        first = max(min(hourly_slot(previous_run), first), slot - datetime.timedelta(hours=24))
+    return first, slot
+
+
+async def _forgotten_timers(db: Session, window: tuple[datetime.datetime, datetime.datetime]) -> str:
+    failed = await each_user(db, "forgotten_timers", lambda user: actions.check_forgotten_timer(db, user, window))
+    return f"{len(failed)} failed" if failed else ""
 
 
 async def _daily_streaks(db: Session) -> str:
@@ -258,8 +291,9 @@ def tick(now: datetime.datetime | None = None) -> None:
 
         if notifications:
             slot = hourly_slot(now)
-            if is_due(now, slot, _last_run(db, "forgotten_timers"), HOURLY_GRACE) and _claim(db, "forgotten_timers", slot, now):
-                _run(db, "forgotten_timers", lambda: _forgotten_timers(db))
+            previous = _last_run(db, "forgotten_timers")
+            if is_due(now, slot, previous, HOURLY_GRACE) and _claim(db, "forgotten_timers", slot, now):
+                _run(db, "forgotten_timers", lambda: _forgotten_timers(db, forgotten_window(slot, previous)))
 
         slot = daily_slot(now, INBOX_PURGE_HOUR)
         if is_due(now, slot, _last_run(db, "inbox_purge"), DAILY_GRACE) and _claim(db, "inbox_purge", slot, now):

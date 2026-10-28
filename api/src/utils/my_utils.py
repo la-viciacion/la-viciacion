@@ -397,6 +397,7 @@ async def get_new_game_info(game) -> schemas.NewGame:
 
 
 TELEGRAM_RETRIES = 3
+TELEGRAM_MAX_WAIT_SECONDS = 20  # the most a send waits when Telegram asks to slow down (flood control)
 
 
 async def _telegram_send(bot, chat_id, text: str, image=None) -> bool:
@@ -415,6 +416,10 @@ async def _telegram_send(bot, chat_id, text: str, image=None) -> bool:
             else:
                 await bot.send_photo(chat_id=chat_id, photo=image, caption=text, parse_mode=parse_mode)
             return True
+        except telegram.error.RetryAfter as e:
+            wait = e.retry_after.total_seconds() if hasattr(e.retry_after, "total_seconds") else float(e.retry_after)
+            logger.warning(f"Telegram asks to wait {wait:.0f} s (flood control)")
+            await asyncio.sleep(min(wait, TELEGRAM_MAX_WAIT_SECONDS))
         except telegram.error.BadRequest as e:
             logger.warning("Telegram rejected the message (" + str(e) + ")")
             if parse_mode is not None:
@@ -596,9 +601,10 @@ def get_ach_message(
     ach: AchievementsElems, user: str, db: Session = None, game_id: str = None
 ):
     msg = "🏆" + ach.value["title"] + "🏆\n"
+    user = escape_markdown(user)  # names go into a Markdown message: a `_` or a `[` must not break it
     if game_id is not None:
         game_db = games.get_game_by_id(db, game_id)
-        msg = msg + ach.value["message"].format(user, game_db.name)
+        msg = msg + ach.value["message"].format(user, escape_markdown(game_db.name))
     else:
         msg = msg + ach.value["message"].format(user)
     return msg
