@@ -22,11 +22,35 @@ const poll = (extra = {}) => ({
   ...extra,
 });
 
-test('the polls are listed under the players and launched with a question, its options one per line, a choice of several and a deadline', () => {
-  assert.ok(SECTIONS.find((s) => s.label === 'Jugadores').tabs.includes('polls'));
+test('the polls are listed under the notifications and launched with a question, its options, a choice of several and a deadline', () => {
+  assert.ok(SECTIONS.find((s) => s.label === 'Notificaciones').tabs.includes('polls'));
+  assert.ok(!SECTIONS.find((s) => s.label === 'Jugadores').tabs.includes('polls'));
   const [create] = ENTITIES.polls.creates;
-  assert.deepEqual(create.fields.map((f) => [f.key, f.type]), [['question', 'text'], ['options', 'textarea'], ['multiple', 'checkbox'], ['closes_at', 'datetime']]);
+  assert.deepEqual(create.fields.map((f) => [f.key, f.type]), [['question', 'text'], ['options', 'options'], ['multiple', 'checkbox'], ['closes_at', 'datetime']]);
   assert.deepEqual(create.fields.filter((f) => f.required).map((f) => f.key), ['question', 'options']);
+});
+
+test('the options are rows of the launch form itself, added one by one, and are sent cleaned', async () => {
+  const { openForm } = await import('../js/pages/admin/form.js');
+  const calls = installApi({ 'POST /manage/polls': poll() });
+  openForm(ENTITIES.polls, null, { reload: async () => {} }, ENTITIES.polls.creates[0]);
+  assert.equal(document.querySelectorAll('.modal-overlay').length, 1); // no window over the window
+  const rows = () => document.querySelectorAll('#f_options input');
+  assert.equal(rows().length, 2);
+  document.getElementById('f_question').value = '¿A qué jugamos?';
+  rows()[0].value = ' Hades ';
+  document.querySelector('form').requestSubmit(); // one is not enough
+  assert.match(document.querySelector('.adm-error').textContent, /al menos 2/);
+  document.querySelector('[data-optionadd]').click();
+  assert.equal(rows().length, 3);
+  rows()[1].value = 'Celeste';
+  rows()[2].value = '  ';
+  document.querySelector('[data-optionremove]').click(); // drops Hades
+  assert.equal(rows().length, 2);
+  rows()[1].value = 'Hollow Knight';
+  document.querySelector('form').requestSubmit();
+  await settle();
+  assert.deepEqual(calls[0].body.options, ['Celeste', 'Hollow Knight']);
 });
 
 test('only an open poll can be closed, and a closed one Telegram did not stop can be stopped again', () => {

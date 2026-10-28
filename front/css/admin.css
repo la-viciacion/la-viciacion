@@ -204,6 +204,15 @@
 
 .adm-form label.adm-check { flex-direction: row; }
 
+/* A list typed row by row (a poll's options): space between the label, the rows and the add button */
+.adm-field-games { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+.adm-field-games > span { font-size: 0.85rem; color: var(--text-secondary); font-weight: 600; }
+.adm-field-games .adm-games { align-self: stretch; display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; list-style: none; counter-reset: option; }
+/* a flex row loses its list marker, so the number is a counter */
+.adm-option-row { display: flex; align-items: center; gap: 10px; counter-increment: option; }
+.adm-option-row::before { content: counter(option) "."; flex: none; width: 1.6em; text-align: right; color: var(--text-secondary); font-weight: 600; }
+.adm-option-row .adm-input { flex: 1; min-width: 0; }
+
 /* A block of options to tick (recalculating achievements): a header with its count and all/none, a grid of equal columns */
 .adm-pick { border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-card); }
 .adm-pick-head { display: flex; align-items: center; gap: 10px; padding: 8px 12px; cursor: pointer; list-style: none; user-select: none; }

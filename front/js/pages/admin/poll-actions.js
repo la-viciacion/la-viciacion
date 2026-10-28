@@ -1,4 +1,4 @@
-// Closing a poll of the Telegram group (admin panel → Jugadores → Encuestas). It is closed in the app whatever Telegram
+// Closing a poll of the Telegram group (admin panel → Notificaciones → Encuestas). It is closed in the app whatever Telegram
 // does; asking again for one Telegram did not stop tries once more to stop it there, and announces nothing.
 import { api, jsonRequest } from '../../lib/api.js';
 import { html } from '../../lib/html.js';
