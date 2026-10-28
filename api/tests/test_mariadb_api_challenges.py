@@ -69,6 +69,22 @@ class LaunchTests(ChallengesTestCase):
         self.assertEqual((body["game"]["id"], body["params"]), ("hades", {"min_hours_each": 5.0, "min_hours_total": 12.0}))
         self.assertEqual([p["name"] for p in body["progress"]["players"]], ["Ana", "Bea", "Root"])  # the active ones; Gone is inactive
 
+    def test_the_list_can_ask_for_only_the_latest_finished_ones_and_the_running_ones_always_come(self):
+        self.assertEqual(self.launch().status_code, 201)
+        with database.SessionLocal() as db:
+            old = models.Challenge(
+                kind="game_of_month", scope="group", title="Viejo", params="{}", game_id="hades", starts_on=TODAY() - timedelta(days=90),
+                ends_on=TODAY() - timedelta(days=60), fingerprint="old-1", participation="auto",
+            )
+            db.add(old)
+            db.commit()
+        everything = self.api("GET", "/challenges", as_user="ana").json()
+        self.assertEqual(len(everything), 2)
+        only_running = self.api("GET", "/challenges", as_user="ana", params={"finished_per_block": 0}).json()
+        self.assertEqual([c["status"] for c in only_running], ["active"])
+        self.assertEqual(len(self.api("GET", "/challenges", as_user="ana", params={"finished_per_block": 1}).json()), 2)
+        self.assertEqual(self.api("GET", "/challenges", as_user="ana", params={"finished_per_block": -1}).status_code, 422)
+
     def test_a_player_cannot_launch_a_group_challenge(self):
         self.assertEqual(self.launch(as_user="ana").status_code, 403)
         self.assertEqual(self.scalar("SELECT COUNT(*) FROM challenges"), 0)

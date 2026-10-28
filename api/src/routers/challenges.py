@@ -1,7 +1,7 @@
 import datetime
 from typing import Literal
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -116,14 +116,17 @@ def withdraw_proposal(
 @router.get("")
 def get_challenges(
     status: Literal["active"] | None = None,
+    finished_per_block: int | None = Query(None, ge=0, le=500, description="Only the latest finished ones of each block of the page; default: all of them"),
     current_user: models.User = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db),
 ):
     """Every challenge the caller can see with its progress (derived; only the definition is stored). `status=active`
     keeps those running today, so a page that only needs those (the Home) does not work out the progress of every
-    challenge there ever was."""
+    challenge there ever was. The same goes for `finished_per_block`: the page shows the latest few finished challenges of each
+    of its blocks (the group's, yours, your duels, the others'), so it asks for those and only works out their progress."""
     today = datetime.date.today()
-    return [crud.view(db, challenge, current_user.id, today) for challenge in crud.visible(db, current_user.id, today if status == "active" else None)]
+    visible = crud.visible(db, current_user.id, today if status == "active" else None, finished_per_block, today)
+    return [crud.view(db, challenge, current_user.id, today) for challenge in visible]
 
 
 @router.get("/player/{player_id}")

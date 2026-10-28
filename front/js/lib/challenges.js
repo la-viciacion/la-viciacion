@@ -225,13 +225,13 @@ export function digestLine({ items, done, urgent }) {
 }
 
 const ORDER ={ active: 0, upcoming: 1, finished: 2 };
-const FINISHED_SHOWN = 5;
+export const FINISHED_SHOWN = 5;
 
 /** The page's blocks: the group's challenges, the viewer's own and the other players', each with the running ones
- * first and only the latest finished ones. [{ key, title, list, empty }] (the others' block only when there is one). */
-export function blocks(challenges, meId) {
+ * first and only the latest `shown` finished ones. [{ key, title, list, empty }] (the others' block only when there is one). */
+export function blocks(challenges, meId, shown = FINISHED_SHOWN) {
   const sorted = (list) => [...list].sort((a, b) => ORDER[a.status] - ORDER[b.status]);
-  const cut = (list) => [...sorted(list).filter((c) => c.status !== 'finished'), ...sorted(list).filter((c) => c.status === 'finished').slice(0, FINISHED_SHOWN)];
+  const cut = (list) => [...sorted(list).filter((c) => c.status !== 'finished'), ...sorted(list).filter((c) => c.status === 'finished').slice(0, shown)];
   const group = challenges.filter((c) => c.scope === 'group');
   const mine = challenges.filter((c) => c.scope === 'user' && c.owner?.id === meId);
   const isMyDuel = (c) => c.scope === 'duel' && (c.owner?.id === meId || c.opponent?.id === meId);
