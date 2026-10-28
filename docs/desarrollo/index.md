@@ -13,7 +13,6 @@ For people who change the code:
 - [Conventions and recipes](conventions.md): code conventions, best practices, how to implement common changes, definition of done.
 - [Migrations](migrations.md): **Alembic rules and verification checklist; mandatory for schema changes.**
 - [Git workflow](workflow.md): trunk-based flow, PRs, required CI checks.
-- [GitLab](gitlab.md): the prepared, unused GitLab CI/CD and how to move there.
 - [Roadmap](roadmap.md): pending decisions and known debt.
 
 LLM/agent entry point: [AGENTS.md](https://github.com/la-viciacion/la-viciacion/blob/main/AGENTS.md) (`CLAUDE.md` and `.github/copilot-instructions.md` point to it). Project presentation: [README](https://github.com/la-viciacion/la-viciacion/blob/main/README.md).

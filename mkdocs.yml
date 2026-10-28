@@ -98,5 +98,4 @@ nav:
           - Migraciones: desarrollo/migrations.md
           - Flujo de Git: desarrollo/workflow.md
       - Planes:
-          - GitLab: desarrollo/gitlab.md
           - Roadmap: desarrollo/roadmap.md

@@ -78,7 +78,6 @@ def shots(g, p, month):
     return [
         ("login", "", "#/", D, {}),
         ("home", "bea", "#/", D, {}),
-        ("home-phone", "bea", "#/", P, {}),
         ("home-history", "bea", "#/", D, {"do": click(".history-row"), "full": False}),
         ("menu", "bea", "#/", D, {"do": click("#menuBtn")}),
         ("menu-phone", "bea", "#/", P, {"do": click("#menuBtn")}),
@@ -115,10 +114,8 @@ def shots(g, p, month):
         ("admin-sends", *admin("sends")),
         ("admin-channels", *admin("channels")),
         ("admin-ai", *admin("ai")),
-        ("admin-recap", *admin("recap")),
         ("admin-announce", *admin("announce")),
         ("admin-mail", *admin("mail")),
-        ("admin-backup", *admin("backup")),
         ("admin-audit", *admin("audit")),
     ]
 
