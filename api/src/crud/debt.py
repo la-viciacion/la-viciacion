@@ -12,11 +12,12 @@ from ..utils import seasons
 from . import time_entries, users
 
 
-def _counted_games(sessions: list, entries: list, avg_times: dict) -> dict:
+def _counted_games(sessions: list, entries: list, avg_times: dict, require_average: bool = True) -> dict:
     """{(user_id, game_id): seconds still to play} for the games that count.
 
-    A game counts when the player has a session of 10 minutes or more in it, it has an average time to complete,
-    and it is neither completed nor abandoned. `sessions` are (user_id, game_id, played, long_sessions, last_played)
+    A game counts when the player has a session of 10 minutes or more in it, it has an average time to complete
+    (unless `require_average` is off: then a game without one is there with 0 left), and it is neither completed nor
+    abandoned. `sessions` are (user_id, game_id, played, long_sessions, last_played)
     of the scope asked for (a season or all of them) and `entries` are (user_id, game_id, completed, abandoned_at)
     of the same scope. A game completed in any season of the scope, or whose every entry is abandoned, is left out."""
     entries_by_game: dict = {}
@@ -25,7 +26,7 @@ def _counted_games(sessions: list, entries: list, avg_times: dict) -> dict:
     counted = {}
     for user_id, game_id, played, long_sessions, last_played in sessions:
         average = avg_times.get(game_id)
-        if not average or not long_sessions:
+        if (require_average and not average) or not long_sessions:
             continue
         own = entries_by_game.get((user_id, game_id), [])
         if any(completed for completed, _ in own):
@@ -37,7 +38,7 @@ def _counted_games(sessions: list, entries: list, avg_times: dict) -> dict:
         ]
         if own and all(abandoned):
             continue
-        counted[(user_id, game_id)] = max(0, average - (played or 0))
+        counted[(user_id, game_id)] = max(0, (average or 0) - (played or 0))
     return counted
 
 
@@ -81,14 +82,17 @@ def user_debt(db: Session, season: int | None = None, is_active: bool | None = N
     return rows
 
 
-def games_in_debt_at(db: Session, user_id: int, day: datetime.date, since: datetime.datetime | None = None) -> dict[str, int]:
+def games_in_debt_at(
+    db: Session, user_id: int, day: datetime.date, since: datetime.datetime | None = None, require_average: bool = True
+) -> dict[str, int]:
     """{game_id: seconds still to play} the player had at the start of `day`, over every season: the games they had
     started (a session of 10 minutes or more before it), had not finished and had not abandoned by then, and that
     have an average time. A game already past its average time is there with 0: it is still open. Worked out from
     what happened before `day`, so it does not drift when the averages are synced again.
 
     `since` is the moment a personal challenge was launched on `day`: what happened before it that day is part of the
-    past. A completion is only a date, so one on `day` was before the launch unless the game was played since."""
+    past. A completion is only a date, so one on `day` was before the launch unless the game was played since.
+    With `require_average` off the games with no average time are there too (with 0 left): see `open_games_at`."""
     cutoff = since or datetime.datetime.combine(day, datetime.time.min)
     played_since = set()
     if since is not None:
@@ -121,5 +125,11 @@ def games_in_debt_at(db: Session, user_id: int, day: datetime.date, since: datet
         )
         entries.append((user_id, game_id, 1 if finished else 0, abandoned_at if abandoned_at is not None and abandoned_at < cutoff else None))
     avg_times = dict(db.execute(select(models.Game.id, models.Game.avg_time).where(models.Game.avg_time > 0)).all())
-    counted = _counted_games([tuple(row) for row in played], entries, avg_times)
+    counted = _counted_games([tuple(row) for row in played], entries, avg_times, require_average)
     return {game_id: seconds for (_, game_id), seconds in counted.items()}
+
+
+def open_games_at(db: Session, user_id: int, day: datetime.date, since: datetime.datetime | None = None) -> set[str]:
+    """The games the player had started and not finished or abandoned at the start of `day` (see `games_in_debt_at`),
+    whether or not they have an average time: a game with none is as open as any other."""
+    return set(games_in_debt_at(db, user_id, day, since, require_average=False))

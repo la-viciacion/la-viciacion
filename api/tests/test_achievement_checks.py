@@ -1279,7 +1279,7 @@ LEGACY_2023 = {  # the achievements that existed before the rule 'every new one 
 class ChallengeAchievementTests(unittest.IsolatedAsyncioTestCase):
     """The achievements about the challenges a player met (the history is `crud.challenges.history`, tested with it)."""
 
-    PERSONAL = ("new_genre", "debt_reduction", "streak", "long_sessions", "variety", "wishlist")
+    PERSONAL = ("new_genre", "debt_reduction", "streak", "long_sessions", "variety", "wishlist", "finish_backlog", "finish_first")
 
     def setUp(self):
         self.db = make_session()

@@ -5,6 +5,7 @@ import hashlib
 import json
 import types
 import unittest
+from unittest import mock
 
 from src.utils import challenges
 from src.utils.challenges import Built, ChallengeError
@@ -312,7 +313,119 @@ class DuelTests(unittest.TestCase):
         self.assertEqual([p["done"] for p in challenges.duel_result({1: "Ana"}, {1: 0})["players"]], [False])
 
     def test_the_duel_templates_are_the_only_ones_of_that_scope(self):
-        self.assertEqual({k for k, t in challenges.TEMPLATES.items() if t.scope == challenges.DUEL}, {"duel_hours", "duel_game"})
+        self.assertEqual({k for k, t in challenges.TEMPLATES.items() if t.scope == challenges.DUEL}, {"duel_hours", "duel_game", "duel_completed"})
+
+
+class DuelCompletedTests(unittest.TestCase):
+    NAMES = {1: "Ana", 2: "Bea"}
+
+    def test_whoever_completed_more_games_wins_and_the_parts_are_counts(self):
+        result = challenges.duel_result(self.NAMES, {1: 1, 2: 3}, counted=True)
+        self.assertEqual([(p["name"], p["position"], p["done"], p["count"], p["target_count"], p["unit"]) for p in result["players"]],
+                         [("Bea", 1, True, 3, 3, "games"), ("Ana", 2, False, 1, 3, "games")])
+        self.assertFalse(any("seconds" in p for p in result["players"]))
+
+    def test_a_tie_with_something_completed_is_won_by_both_and_nobody_wins_with_nothing(self):
+        self.assertEqual([p["done"] for p in challenges.duel_result(self.NAMES, {1: 2, 2: 2}, counted=True)["players"]], [True, True])
+        self.assertEqual([p["done"] for p in challenges.duel_result(self.NAMES, {}, counted=True)["players"]], [False, False])
+
+    def test_it_is_built_like_the_other_duels(self):
+        today = datetime.date(2026, 10, 1)
+        db = types.SimpleNamespace(get=lambda model, user_id: types.SimpleNamespace(is_active=True, username="bea"))
+        built_duel = challenges.build_duel_completed(db, {"opponent_id": 2, "duration": "week"}, today, 1)
+        self.assertEqual((built_duel.title, built_duel.params, built_duel.ends_on), ("Duelo de completados", {"opponent_id": 2, "duration": "week"}, datetime.date(2026, 10, 7)))
+        with self.assertRaises(ChallengeError):
+            challenges.build_duel_completed(db, {"opponent_id": 1}, today, 1)  # not against yourself
+
+
+class GroupHoursTests(unittest.TestCase):
+    NAMES = {1: "Ana", 2: "Bea", 3: "Cai"}
+    HOUR = 3600
+
+    def test_it_is_reached_between_everybody_and_met_by_whoever_put_something_in(self):
+        result = challenges.group_hours_result({1: 6 * self.HOUR, 2: 4 * self.HOUR}, self.NAMES, 10)
+        self.assertEqual((result["total_seconds"], result["total_target_seconds"], result["total_done"]), (10 * self.HOUR, 10 * self.HOUR, True))
+        self.assertEqual([(p["name"], p["done"]) for p in result["players"]], [("Ana", True), ("Bea", True), ("Cai", False)])
+        self.assertTrue(all(p["contribution"] and p["target_seconds"] == 10 * self.HOUR for p in result["players"]))
+
+    def test_nobody_meets_a_part_while_the_group_falls_short(self):
+        result = challenges.group_hours_result({1: 9 * self.HOUR}, self.NAMES, 10)
+        self.assertEqual((result["total_done"], [p["done"] for p in result["players"]]), (False, [False, False, False]))
+
+    def test_nobody_taking_part_reaches_nothing(self):
+        self.assertFalse(challenges.group_hours_result({}, {}, 1)["total_done"])
+
+    def test_the_options_are_checked(self):
+        today = datetime.date(2026, 10, 15)
+        built_group = challenges.build_group_hours(None, {"month": "2026-10", "min_hours_total": "40"}, today)
+        self.assertEqual((built_group.title, built_group.params, built_group.game_id, built_group.ends_on), ("Sumar 40 h entre todos", {"min_hours_total": 40.0}, None, datetime.date(2026, 10, 31)))
+        self.assertEqual(challenges.build_group_hours(None, {"month": "2026-11", "min_hours_total": 5, "versus": True}, today).params, {"min_hours_total": 5.0, "versus": True})
+        for options in ({"month": "2026-09", "min_hours_total": 40}, {"month": "2026-10"}, {"month": "2026-10", "min_hours_total": 0.1}, {"min_hours_total": 40}):
+            with self.assertRaises(ChallengeError, msg=options):
+                challenges.build_group_hours(None, options, today)
+
+    def test_the_notices_say_the_total(self):
+        challenge = types.SimpleNamespace(params=json.dumps({"min_hours_total": 40.0}), starts_on=datetime.date(2026, 10, 1), ends_on=datetime.date(2026, 10, 31))
+        self.assertEqual(challenges.summary_group_hours(challenge), "Jugar 40 h entre todos, a lo que sea, del 1 de octubre al 31 de octubre.")
+        progress = challenges.group_hours_result({1: 3600 * 40}, {1: "Ana", 2: "Bea"}, 40)
+        self.assertEqual(challenges.reached_group_hours(challenge, progress), "Entre todos habéis llegado a las 40 h. Han aportado 1 de 2.")
+
+
+class FinishFirstTests(unittest.TestCase):
+    def day(self, n):
+        return datetime.date(2026, 10, n)
+
+    def part(self, completed, started):
+        return challenges.finish_first_result(1, "Ana", [self.day(n) for n in completed], [self.day(n) for n in started])["players"][0]
+
+    def test_it_is_won_by_completing_an_open_game_without_starting_a_new_one_first(self):
+        part = self.part([5], [])
+        self.assertEqual((part["done"], part["failed"], part["count"], part["target_count"]), (True, False, 1, 1))
+
+    def test_it_is_lost_by_starting_a_new_game_before_completing_one(self):
+        for completed in ([], [8]):
+            part = self.part(completed, [6])
+            self.assertEqual((part["done"], part["failed"], part["count"]), (False, True, 0), msg=completed)
+
+    def test_a_new_game_after_the_win_changes_nothing(self):
+        part = self.part([5], [9, 10])
+        self.assertEqual((part["done"], part["failed"]), (True, False))
+
+    def test_on_the_same_day_the_completion_comes_first(self):
+        part = self.part([6], [6])
+        self.assertEqual((part["done"], part["failed"]), (True, False))
+
+    def test_it_is_open_until_something_happens(self):
+        part = self.part([], [])
+        self.assertEqual((part["done"], part["failed"]), (False, False))
+
+    def test_the_first_completion_and_the_first_start_are_the_ones_that_count(self):
+        self.assertTrue(self.part([9, 4], [7])["done"])
+        self.assertTrue(self.part([4, 9], [10, 7])["done"])
+        self.assertTrue(self.part([8], [3, 7])["failed"])
+
+    def test_it_needs_a_game_open_to_begin_with(self):
+        today = datetime.date(2026, 10, 1)
+        with mock.patch("src.crud.debt.open_games_at", return_value=set()):
+            with self.assertRaises(ChallengeError):
+                challenges.build_finish_first(None, {}, today, 1)
+            with self.assertRaises(ChallengeError):
+                challenges.build_finish_backlog(None, {"games": 1}, today, 1)
+        with mock.patch("src.crud.debt.open_games_at", return_value={"a", "b"}):
+            made = challenges.build_finish_first(None, {"duration": "week"}, today, 1)
+            self.assertEqual((made.title, made.params, made.ends_on), ("Terminar antes de empezar otro", {"duration": "week"}, datetime.date(2026, 10, 7)))
+
+
+class FinishBacklogTests(unittest.TestCase):
+    def test_it_asks_for_no_more_games_than_the_player_has_open(self):
+        today = datetime.date(2026, 10, 1)
+        with mock.patch("src.crud.debt.open_games_at", return_value={"a", "b", "c"}):
+            made = challenges.build_finish_backlog(None, {"games": 2, "duration": "quarter"}, today, 1)
+            self.assertEqual((made.title, made.params, made.ends_on), ("Terminar 2 juegos empezados", {"games": 2, "duration": "quarter"}, datetime.date(2026, 12, 29)))
+            self.assertEqual(challenges.build_finish_backlog(None, {"games": 1}, today, 1).title, "Terminar 1 juego empezado")
+            for options in ({"games": 0}, {"games": 4}, {"games": 1.5}, {}, {"games": 1, "duration": "year"}):
+                with self.assertRaises(ChallengeError, msg=options):
+                    challenges.build_finish_backlog(None, options, today, 1)
 
 
 class AuthoringTests(unittest.TestCase):

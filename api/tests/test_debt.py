@@ -26,6 +26,11 @@ class CountedGamesTests(unittest.TestCase):
         self.assertEqual(counted([(1, "g", HOUR, 1, NOW)], [(1, "g", 0, None)], avg={}), {})
         self.assertEqual(counted([(1, "g", HOUR, 1, NOW)], [(1, "g", 0, None)], avg={"g": 0}), {})
 
+    def test_a_game_without_an_average_is_still_open_when_the_average_is_not_required(self):
+        # what the challenges about finishing games read (debt.open_games_at): started and not finished, whatever its average
+        sessions, entries = [(1, "g", HOUR, 1, NOW), (1, "h", 5 * 60, 0, NOW)], [(1, "g", 0, None), (1, "h", 0, None)]
+        self.assertEqual(debt._counted_games(sessions, entries, {}, require_average=False), {(1, "g"): 0})
+
     def test_a_completed_game_does_not_count_even_if_another_platform_is_pending(self):
         entries = [(1, "g", 1, None), (1, "g", 0, None)]
         self.assertEqual(counted([(1, "g", HOUR, 1, NOW)], entries), {})

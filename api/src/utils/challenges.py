@@ -893,13 +893,25 @@ def build_duel_game(db: Session, options: dict, today: datetime.date, user_id: i
     )
 
 
-def duel_result(names: dict[int, str], seconds: dict[int, int]) -> dict:
-    """The progress of a duel from the seconds each of the two played (pure). Each part carries the leader's seconds as
-    its target, so the bar shows how far behind it is; whoever plays more wins and a tie with something played is
-    won by both."""
-    leader = max(seconds.values(), default=0)
+def build_duel_completed(db: Session, options: dict, today: datetime.date, user_id: int | None = None) -> Built:
+    """Like `build_duel_hours`, but whoever completes more games within the period wins."""
+    duration, length = _duration(options)
+    return Built(
+        title="Duelo de completados",
+        params={"opponent_id": _opponent(db, options, user_id), "duration": duration},
+        starts_on=today,
+        ends_on=today + datetime.timedelta(days=length - 1),
+    )
+
+
+def duel_result(names: dict[int, str], amounts: dict[int, int], counted: bool = False) -> dict:
+    """The progress of a duel from what each of the two reached (pure): the seconds they played or, if `counted`, the
+    games they completed. Each part carries the leader's amount as its target, so the bar shows how far behind it is;
+    whoever reaches more wins and a tie with something done is won by both."""
+    leader = max(amounts.values(), default=0)
+    key = "count" if counted else "seconds"
     players = [
-        {"user_id": user_id, "name": name, "seconds": seconds.get(user_id, 0), "target_seconds": leader, "versus": True}
+        {"user_id": user_id, "name": name, key: amounts.get(user_id, 0), f"target_{key}": leader, "versus": True, **({"unit": "games"} if counted else {})}
         for user_id, name in names.items()
     ]
     rank_players(players)
@@ -914,24 +926,189 @@ def progress_duel(db: Session, challenge: models.Challenge, participant_ids: lis
     if challenge.game_id:
         played = seconds_in_game(db, participant_ids, challenge.game_id, challenge.starts_on, challenge.ends_on, starts_at(challenge))
     else:
-        start, end = _window(challenge)
-        rows = (
-            db.query(models.GameTimer.user_id, func.sum(models.GameTimer.duration_seconds))
-            .filter(
-                models.GameTimer.user_id.in_(participant_ids),
-                models.GameTimer.is_active == False,  # noqa: E712
-                models.GameTimer.start_time >= start,
-                models.GameTimer.start_time < end,
-            )
-            .group_by(models.GameTimer.user_id)
-        )
-        played = {user_id: int(seconds or 0) for user_id, seconds in rows}  # MariaDB returns SUM() as Decimal
+        played = seconds_of_players(db, participant_ids, *_window(challenge))
     return duel_result(names, played)
+
+
+def completed_games(db: Session, challenge: models.Challenge, user_id: int, among: set[str] | None = None) -> dict[str, datetime.date]:
+    """{game_id: the day the player completed it first} for the games completed within the challenge's period (those
+    in `among`, if given), counting a completion on the launch day only when the game was played since (see
+    `counts_from_launch`)."""
+    after = played_after_launch(db, challenge, user_id)
+    rows = db.query(models.UserGame.game_id, models.UserGame.completed_date).filter(
+        models.UserGame.user_id == user_id,
+        models.UserGame.completed == 1,
+        models.UserGame.completed_date >= challenge.starts_on,
+        models.UserGame.completed_date <= challenge.ends_on,
+    )
+    found: dict[str, datetime.date] = {}
+    for game_id, done_on in rows:
+        if (among is None or game_id in among) and counts_from_launch(challenge, done_on, game_id, after):
+            found[game_id] = min(done_on, found.get(game_id, done_on))
+    return found
+
+
+def progress_duel_completed(db: Session, challenge: models.Challenge, participant_ids: list[int]) -> dict:
+    names = names_of(db, participant_ids)
+    return duel_result(names, {user_id: len(completed_games(db, challenge, user_id)) for user_id in participant_ids}, counted=True)
+
+
+# ── Horas entre todos (grupo) ───────────────────────────────────
+
+
+def seconds_of_players(db: Session, user_ids: list[int], start: datetime.datetime, end: datetime.datetime) -> dict[int, int]:
+    """Seconds each user played, of any game, in finished sessions that began within [start, end)."""
+    if not user_ids:
+        return {}
+    rows = (
+        db.query(models.GameTimer.user_id, func.sum(models.GameTimer.duration_seconds))
+        .filter(
+            models.GameTimer.user_id.in_(user_ids),
+            models.GameTimer.is_active == False,  # noqa: E712
+            models.GameTimer.start_time >= start,
+            models.GameTimer.start_time < end,
+        )
+        .group_by(models.GameTimer.user_id)
+    )
+    return {user_id: int(seconds or 0) for user_id, seconds in rows}  # MariaDB returns SUM() as Decimal
+
+
+def build_group_hours(db: Session, options: dict, today: datetime.date, user_id: int | None = None) -> Built:
+    """Options: month ("YYYY-MM") and min_hours_total: the hours the whole group has to play between everybody, of any
+    game. Nobody has a minimum of their own."""
+    starts_on, ends_on = month_period(options.get("month"))
+    if ends_on < today:
+        raise ChallengeError("Ese mes ya ha pasado")
+    total = hours(options.get("min_hours_total"), "El total")
+    return Built(
+        title=f"Sumar {hours_text(total)} h entre todos",
+        params={"min_hours_total": total, **_versus(options)},
+        starts_on=starts_on,
+        ends_on=ends_on,
+    )
+
+
+def group_hours_result(played: dict[int, int], names: dict[int, str], total_hours: float) -> dict:
+    """The progress of "hours between everybody" from what each participant played (pure). A part is the share each one
+    put in (its bar is against the group's total); a player meets theirs when the group reaches the total and they
+    put something in, so being there without playing is not enough."""
+    target = round(total_hours * 3600)
+    seconds = sum(played.get(user_id, 0) for user_id in names)
+    reached = bool(names) and seconds >= target
+    players = [
+        {"user_id": user_id, "name": name, "seconds": played.get(user_id, 0), "target_seconds": target, "contribution": True,
+         "done": reached and played.get(user_id, 0) > 0}
+        for user_id, name in names.items()
+    ]
+    players.sort(key=lambda p: (-p["seconds"], p["name"].lower()))
+    return {"players": players, "total_seconds": seconds, "total_target_seconds": target, "total_done": reached}
+
+
+def progress_group_hours(db: Session, challenge: models.Challenge, participant_ids: list[int]) -> dict:
+    played = seconds_of_players(db, participant_ids, *_window(challenge))
+    return group_hours_result(played, names_of(db, participant_ids), json.loads(challenge.params)["min_hours_total"])
+
+
+def summary_group_hours(challenge: models.Challenge) -> str:
+    params = json.loads(challenge.params)
+    return (
+        f"Jugar {hours_text(params['min_hours_total'])} h entre todos, a lo que sea, del {spanish_date(challenge.starts_on)} al {spanish_date(challenge.ends_on)}."
+        + (" Gana quien más juegue." if params.get("versus") else "")
+    )
+
+
+def reached_group_hours(challenge: models.Challenge, progress: dict) -> str:
+    contributed = sum(1 for p in progress["players"] if p["seconds"] > 0)
+    return f"Entre todos habéis llegado a las {hours_text(json.loads(challenge.params)['min_hours_total'])} h. Han aportado {contributed} de {len(progress['players'])}."
+
+
+# ── Terminar lo empezado y Terminar antes de empezar (personal) ─
+
+
+def open_games_for(db: Session, challenge: models.Challenge, user_id: int) -> set[str]:
+    """The games the player had started and not finished or abandoned when the challenge began (`debt.open_games_at`)."""
+    from ..crud import debt  # that module imports the ones that import this one
+
+    return debt.open_games_at(db, user_id, challenge.starts_on, starts_at(challenge))
+
+
+def build_finish_backlog(db: Session, options: dict, today: datetime.date, user_id: int | None = None) -> Built:
+    """Options: games (1 up to how many the player has started and not finished) and duration. Completing one of
+    those games counts; the games started afterwards do not."""
+    from ..crud import debt  # that module imports the ones that import this one
+
+    duration, length = _duration(options)
+    open_games = len(debt.open_games_at(db, user_id, today, datetime.datetime.now())) if user_id is not None else 0
+    if not open_games:
+        raise ChallengeError("No tienes juegos empezados y sin terminar")
+    games = _whole(options.get("games"), "Los juegos", 1, open_games)
+    return Built(
+        title=f"Terminar {games} {'juego empezado' if games == 1 else 'juegos empezados'}",
+        params={"games": games, "duration": duration},
+        starts_on=today,
+        ends_on=today + datetime.timedelta(days=length - 1),
+    )
+
+
+def progress_finish_backlog(db: Session, challenge: models.Challenge, participant_ids: list[int]) -> dict:
+    if not participant_ids:
+        return {"players": []}
+    user_id = participant_ids[0]
+    done = completed_games(db, challenge, user_id, open_games_for(db, challenge, user_id))
+    return _count_part(user_id, _player(db, user_id), len(done), json.loads(challenge.params)["games"], "games")
+
+
+def build_finish_first(db: Session, options: dict, today: datetime.date, user_id: int | None = None) -> Built:
+    """Options: duration. The player must have a game started and not finished: they win by completing one of the
+    games they have open before starting any new game, and lose the moment they start a new one first."""
+    from ..crud import debt  # that module imports the ones that import this one
+
+    duration, length = _duration(options)
+    if user_id is None or not debt.open_games_at(db, user_id, today, datetime.datetime.now()):
+        raise ChallengeError("No tienes juegos empezados y sin terminar: no hay nada que terminar antes de empezar otro")
+    return Built(
+        title="Terminar antes de empezar otro",
+        params={"duration": duration},
+        starts_on=today,
+        ends_on=today + datetime.timedelta(days=length - 1),
+    )
+
+
+def finish_first_result(user_id: int, name: str, completed_on: list[datetime.date], started_on: list[datetime.date]) -> dict:
+    """The progress of "finish before starting" (pure) from the days the player completed a game they had open and
+    the days they started a new one, both within the period. They win with the first completion unless a new game was
+    started on an earlier day; if one was, they have lost, and completing a game afterwards does not undo it. Only the
+    day is known, so on the same day the completion comes first (the benefit of the doubt)."""
+    first_completed = min(completed_on, default=None)
+    first_started = min(started_on, default=None)
+    failed = first_started is not None and (first_completed is None or first_started < first_completed)
+    done = first_completed is not None and not failed
+    return {"players": [{"user_id": user_id, "name": name, "count": int(done), "target_count": 1, "unit": "games", "done": done, "failed": failed}]}
+
+
+def progress_finish_first(db: Session, challenge: models.Challenge, participant_ids: list[int]) -> dict:
+    """A new game is one the player started within the period (the `started_date` of an entry) that they did not have
+    in their library before it: a game they already had, in another season or on another platform, is not new."""
+    if not participant_ids:
+        return {"players": []}
+    user_id = participant_ids[0]
+    after = played_after_launch(db, challenge, user_id)
+    entries = db.query(models.UserGame.game_id, models.UserGame.started_date).filter(
+        models.UserGame.user_id == user_id, models.UserGame.started_date <= challenge.ends_on
+    ).all()
+    is_new = lambda game_id, on: on >= challenge.starts_on and counts_from_launch(challenge, on, game_id, after)  # noqa: E731
+    had_before = {game_id for game_id, on in entries if not is_new(game_id, on)}
+    started_on = [on for game_id, on in entries if is_new(game_id, on) and game_id not in had_before]
+    completed = completed_games(db, challenge, user_id, open_games_for(db, challenge, user_id))
+    return finish_first_result(user_id, _player(db, user_id), list(completed.values()), started_on)
 
 
 TEMPLATES: dict[str, Template] = {
     "game_of_month": Template("Juego del mes", GROUP, build_game_of_month, progress_game_of_month, summary_game_of_month, reached_game_of_month),
     "themed": Template("Temático", GROUP, build_themed, progress_themed, summary_themed, reached_themed),
+    "group_hours": Template("Horas entre todos", GROUP, build_group_hours, progress_group_hours, summary_group_hours, reached_group_hours),
+    "finish_backlog": Template("Terminar lo empezado", USER, build_finish_backlog, progress_finish_backlog),
+    "finish_first": Template("Terminar antes de empezar", USER, build_finish_first, progress_finish_first),
     "new_genre": Template("Probar un género", USER, build_new_genre, progress_new_genre),
     "debt_reduction": Template("Bajar la deuda", USER, build_debt_reduction, progress_debt_reduction),
     "streak": Template("Racha", USER, build_streak, progress_streak),
@@ -940,4 +1117,5 @@ TEMPLATES: dict[str, Template] = {
     "wishlist": Template("Cumplir deseados", USER, build_wishlist, progress_wishlist),
     "duel_hours": Template("Duelo de horas", DUEL, build_duel_hours, progress_duel),
     "duel_game": Template("Duelo en un juego", DUEL, build_duel_game, progress_duel),
+    "duel_completed": Template("Duelo de completados", DUEL, build_duel_completed, progress_duel_completed),
 }

@@ -68,6 +68,11 @@ def proposal_arrived_message(proposer: str, title: str) -> str:
     return f"📝 {_bold(proposer)} ha propuesto un reto\n{_bold(title)}: apruébalo o recházalo en el panel, en Propuestas."
 
 
+def _amount(part: dict, value: int) -> str:
+    """What a duel part is measured in, said for `value`: games completed or hours played."""
+    return _count(value, *UNITS["games"]) if "target_count" in part else _hours(value)
+
+
 def remaining_text(part: dict) -> str:
     """What a player still lacks in a challenge: "te faltan 1,5 h", "te falta 1 juego", "te falta saldar un 12,5 % más"."""
     if "target_count" in part:
@@ -96,13 +101,16 @@ def result_line(challenge: models.Challenge, progress: dict, user_id: int, names
     if challenge.scope == challenges.DUEL:
         other = next((p for p in progress["players"] if p["user_id"] != user_id), None)
         rival = _bold(names[other["user_id"]]) if other else "tu rival"
-        if other is None or (not mine["seconds"] and not other["seconds"]):
-            return f"⚪ {_bold(challenge.title)} contra {rival}: nadie jugó, sin ganador"
-        score = f"{_hours(mine['seconds'])} frente a {_hours(other['seconds'])}"
-        if mine["seconds"] == other["seconds"]:
+        mine_value, other_value = (challenges.part_value(mine), challenges.part_value(other)) if other else (0, 0)
+        if other is None or (not mine_value and not other_value):
+            return f"⚪ {_bold(challenge.title)} contra {rival}: nadie {'completó nada' if 'target_count' in mine else 'jugó'}, sin ganador"
+        score = f"{_amount(mine, mine_value)} frente a {_amount(mine, other_value)}"
+        if mine_value == other_value:
             return f"🤝 {_bold(challenge.title)} contra {rival}: empate ({score})"
         return f"🥇 Ganaste el duelo a {rival} ({score})" if mine["done"] else f"🥈 Perdiste el duelo contra {rival} ({score})"
-    line = f"{'✅' if mine['done'] else '❌'} {_bold(challenge.title)}: " + ("cumpliste tu parte" if mine["done"] else "no se cumplió")
+    line = f"{'✅' if mine['done'] else '❌'} {_bold(challenge.title)}: " + (
+        "cumpliste tu parte" if mine["done"] else "se perdió: empezaste un juego nuevo antes de terminar uno" if mine.get("failed") else "no se cumplió"
+    )
     if challenge.scope == challenges.GROUP and progress.get("total_done"):
         line += " y el grupo llegó al total"
     if mine.get("position"):
@@ -264,10 +272,14 @@ async def send_reminders(db: Session, today: datetime.date) -> str:
         for part in progress["players"]:
             if challenge.scope == challenges.DUEL:
                 other = next((p for p in progress["players"] if p["user_id"] != part["user_id"]), None)
-                if other is None or part["seconds"] >= other["seconds"]:
+                if other is None or challenges.part_value(part) >= challenges.part_value(other):
                     continue
-                lines.setdefault(part["user_id"], []).append(f"{_bold(challenge.title)}: vas perdiendo contra {_bold(names[other['user_id']])} por {_hours(other['seconds'] - part['seconds'])}")
-            elif not part["done"]:
+                gap = _amount(part, challenges.part_value(other) - challenges.part_value(part))
+                lines.setdefault(part["user_id"], []).append(f"{_bold(challenge.title)}: vas perdiendo contra {_bold(names[other['user_id']])} por {gap}")
+            elif part.get("contribution"):
+                if not progress["total_done"]:
+                    lines.setdefault(part["user_id"], []).append(f"{_bold(challenge.title)}: al grupo le faltan {_hours(progress['total_target_seconds'] - progress['total_seconds'])}")
+            elif not part["done"] and not part.get("failed"):  # a lost challenge has nothing left to do
                 lines.setdefault(part["user_id"], []).append(f"{_bold(challenge.title)}: {remaining_text(part)}")
     told = 0
     for user_id, user_lines in lines.items():
