@@ -84,6 +84,20 @@ class ResultLineTests(unittest.TestCase):
         nobody = {"players": [{"user_id": 1, "seconds": 0, "done": False}, {"user_id": 2, "seconds": 0, "done": False}]}
         self.assertIn("nadie jugó", notices.result_line(duel, nobody, 1, self.NAMES))
 
+    def test_a_duel_of_completed_games_counts_games(self):
+        duel = challenge("Duelo de completados", scope="duel")
+        progress = {"players": [
+            {"user_id": 1, "count": 3, "target_count": 3, "done": True}, {"user_id": 2, "count": 1, "target_count": 3, "done": False},
+        ]}
+        self.assertEqual(notices.result_line(duel, progress, 1, self.NAMES), "🥇 Ganaste el duelo a *Bea* (3 juegos frente a 1 juego)")
+        self.assertEqual(notices.result_line(duel, progress, 2, self.NAMES), "🥈 Perdiste el duelo contra *Ana* (1 juego frente a 3 juegos)")
+        nobody = {"players": [{"user_id": 1, "count": 0, "target_count": 0, "done": False}, {"user_id": 2, "count": 0, "target_count": 0, "done": False}]}
+        self.assertIn("nadie completó nada", notices.result_line(duel, nobody, 1, self.NAMES))
+
+    def test_a_challenge_lost_says_so(self):
+        progress = {"players": [{"user_id": 1, "count": 0, "target_count": 1, "done": False, "failed": True}]}
+        self.assertIn("se perdió: empezaste un juego nuevo antes de terminar uno", notices.result_line(challenge(scope="user"), progress, 1, self.NAMES))
+
     def test_the_group_hears_how_many_met_it_the_total_and_who_won(self):
         progress = {
             "players": [{"name": "Ana", "done": True, "winner": True}, {"name": "Bea", "done": False, "winner": False}, {"name": "Cris", "done": True, "winner": False}],
