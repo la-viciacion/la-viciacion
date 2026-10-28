@@ -51,7 +51,11 @@ SNAPSHOTS = {
     "user-achievements": (models.UserAchievement, int),
     "challenge-proposals": (models.ChallengeProposal, int),
     "challenge-schedules": (models.ChallengeSchedule, int),
+    "polls": (models.GroupPoll, int),
 }
+# (method, entity, id) of the writes the bot makes on behalf of the group, which the log does not keep: one row for every
+# vote of the group would bury what the admins change
+UNAUDITED = frozenset({("PUT", "polls", "answers")})
 # never copied into the log: secrets, and pictures that would only make it heavy
 SKIPPED_COLUMNS = {"password", "avatar", "image"}
 
@@ -182,6 +186,8 @@ async def remember(request: Request, admin: models.User = Depends(auth.require_a
     if request.method in READ_ONLY:
         return
     entity, entity_id = target_of(request.url.path)
+    if (request.method, entity, entity_id) in UNAUDITED:
+        return
     before = await run_in_threadpool(_read_snapshot, entity, entity_id) if request.method != "POST" else None
     request.state.audit = Pending(admin.id, admin.username, await _json_body(request), before)
 
