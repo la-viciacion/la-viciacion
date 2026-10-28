@@ -60,6 +60,8 @@ class NoticeTestCase(base.ChallengesTestCase):
             row = db.get(models.Challenge, challenge_id)
             if starts is not None:
                 row.starts_on = TODAY() + timedelta(days=starts)
+                # a personal challenge or a duel counts from the moment it was launched: launched when its period began
+                row.created_at = datetime.combine(min(row.starts_on, TODAY()), datetime.min.time())
             if ends is not None:
                 row.ends_on = TODAY() + timedelta(days=ends)
             db.commit()

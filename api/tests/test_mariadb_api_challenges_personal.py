@@ -151,6 +151,11 @@ class WishlistTests(PersonalTestCase):
 class LaunchMomentTests(PersonalTestCase):
     """A personal challenge counts from the moment it was launched: what was done earlier that day is not part of it."""
 
+    def wish(self, user, game):
+        with database.SessionLocal() as db:
+            db.add(models.UserWishlist(user_id=user, game_id=game, added_at=datetime.combine(TODAY() - timedelta(days=10), datetime.min.time())))
+            db.commit()
+
     def launched_at(self, challenge_id, hour):
         with database.SessionLocal() as db:
             row = db.get(models.Challenge, challenge_id)

@@ -61,41 +61,41 @@ class DeliverFunctionTests(PushTestCase):
 
     def test_it_counts_what_was_sent_what_is_gone_and_what_failed(self):
         self.failures = {
-            "https://p/gone-404": WebPushException("gone", response=Response(404)),
-            "https://p/gone-410": WebPushException("gone", response=Response(410)),
-            "https://p/rejected": WebPushException("bad", response=Response(500)),
-            "https://p/no-response": WebPushException("timeout"),
-            "https://p/crash": RuntimeError("boom"),
+            "https://fcm.googleapis.com/p/gone-404": WebPushException("gone", response=Response(404)),
+            "https://fcm.googleapis.com/p/gone-410": WebPushException("gone", response=Response(410)),
+            "https://fcm.googleapis.com/p/rejected": WebPushException("bad", response=Response(500)),
+            "https://fcm.googleapis.com/p/no-response": WebPushException("timeout"),
+            "https://fcm.googleapis.com/p/crash": RuntimeError("boom"),
         }
-        devices = [(1, "https://p/ok", "k", "a"), (2, "https://p/gone-404", "k", "a"), (3, "https://p/gone-410", "k", "a"),
-                   (4, "https://p/rejected", "k", "a"), (5, "https://p/no-response", "k", "a"), (6, "https://p/crash", "k", "a")]
+        devices = [(1, "https://fcm.googleapis.com/p/ok", "k", "a"), (2, "https://fcm.googleapis.com/p/gone-404", "k", "a"), (3, "https://fcm.googleapis.com/p/gone-410", "k", "a"),
+                   (4, "https://fcm.googleapis.com/p/rejected", "k", "a"), (5, "https://fcm.googleapis.com/p/no-response", "k", "a"), (6, "https://fcm.googleapis.com/p/crash", "k", "a")]
         self.assertEqual(self.deliver(devices), (1, [2, 3], 3))
 
     def test_the_payload_ttl_and_sender_contact_travel_with_every_push(self):
-        self.deliver([(1, "https://p/ok", "k", "a")])
-        self.assertEqual(self.pushed[0], {"endpoint": "https://p/ok", "data": {"title": "T"}, "claims": {"sub": "mailto:a@b.c"}, "ttl": 60})
+        self.deliver([(1, "https://fcm.googleapis.com/p/ok", "k", "a")])
+        self.assertEqual(self.pushed[0], {"endpoint": "https://fcm.googleapis.com/p/ok", "data": {"title": "T"}, "claims": {"sub": "mailto:a@b.c"}, "ttl": 60})
 
 
 class AudienceTests(PushTestCase):
     def setUp(self):
         super().setUp()
-        self.device(self.ana, "https://p/ana-phone")
-        self.device(self.ana, "https://p/ana-tablet", group=False)
-        self.device(self.bea, "https://p/bea-phone")
+        self.device(self.ana, "https://fcm.googleapis.com/p/ana-phone")
+        self.device(self.ana, "https://fcm.googleapis.com/p/ana-tablet", group=False)
+        self.device(self.bea, "https://fcm.googleapis.com/p/bea-phone")
 
     def deliver(self, audience, user_id=None):
         return self.run_async(push.deliver({"title": "T", "body": "B", "url": "/", "tag": None}, audience, user_id))
 
     def test_me_and_user_reach_only_that_user_s_devices(self):
         self.assertEqual(self.deliver("me", self.ana), (2, 0))
-        self.assertEqual(self.endpoints(), ["https://p/ana-phone", "https://p/ana-tablet"])
+        self.assertEqual(self.endpoints(), ["https://fcm.googleapis.com/p/ana-phone", "https://fcm.googleapis.com/p/ana-tablet"])
         self.pushed.clear()
         self.assertEqual(self.deliver("user", self.bea), (1, 0))
-        self.assertEqual(self.endpoints(), ["https://p/bea-phone"])
+        self.assertEqual(self.endpoints(), ["https://fcm.googleapis.com/p/bea-phone"])
 
     def test_the_group_reaches_the_devices_that_want_group_notices(self):
         self.assertEqual(self.deliver("group"), (2, 0))
-        self.assertEqual(self.endpoints(), ["https://p/ana-phone", "https://p/bea-phone"])
+        self.assertEqual(self.endpoints(), ["https://fcm.googleapis.com/p/ana-phone", "https://fcm.googleapis.com/p/bea-phone"])
 
     def test_all_reaches_every_device(self):
         self.assertEqual(self.deliver("all"), (3, 0))
@@ -108,13 +108,13 @@ class AudienceTests(PushTestCase):
         with self.engine.begin() as conn:
             conn.execute(text("UPDATE users SET is_active = 0 WHERE id = :u"), {"u": self.bea})
         self.assertEqual(self.deliver("all"), (2, 0))
-        self.assertNotIn("https://p/bea-phone", self.endpoints())
+        self.assertNotIn("https://fcm.googleapis.com/p/bea-phone", self.endpoints())
 
     def test_expired_subscriptions_are_removed_and_the_rest_counted(self):
-        self.failures = {"https://p/ana-phone": WebPushException("gone", response=Response(410)),
-                         "https://p/bea-phone": WebPushException("bad", response=Response(500))}
+        self.failures = {"https://fcm.googleapis.com/p/ana-phone": WebPushException("gone", response=Response(410)),
+                         "https://fcm.googleapis.com/p/bea-phone": WebPushException("bad", response=Response(500))}
         self.assertEqual(self.deliver("all"), (1, 1))
-        self.assertEqual(self.remaining(), ["https://p/ana-tablet", "https://p/bea-phone"])
+        self.assertEqual(self.remaining(), ["https://fcm.googleapis.com/p/ana-tablet", "https://fcm.googleapis.com/p/bea-phone"])
 
     def test_nothing_is_sent_when_push_is_off(self):
         self.set_settings(**{"push.enabled": False})
@@ -129,18 +129,18 @@ class AudienceTests(PushTestCase):
 class NoticeTests(PushTestCase):
     def setUp(self):
         super().setUp()
-        self.device(self.ana, "https://p/ana-phone")
-        self.device(self.bea, "https://p/bea-phone", group=False)
+        self.device(self.ana, "https://fcm.googleapis.com/p/ana-phone")
+        self.device(self.bea, "https://fcm.googleapis.com/p/bea-phone", group=False)
 
     def test_a_group_notice_goes_to_the_devices_that_want_it_with_the_first_line_as_title(self):
         self.run_async(push.notify_group("*Big news*\nSomething happened"))
-        self.assertEqual(self.endpoints(), ["https://p/ana-phone"])
+        self.assertEqual(self.endpoints(), ["https://fcm.googleapis.com/p/ana-phone"])
         data = self.pushed[0]["data"]
         self.assertEqual((data["title"], data["body"], data["tag"], self.pushed[0]["ttl"]), ("Big news", "Something happened", "group", push.TTL_SECONDS))
 
     def test_a_private_notice_goes_to_one_user_and_reports_the_counts(self):
         self.assertEqual(self.run_async(push.notify_user(self.bea, "Only you", tag="private")), (1, 0))
-        self.assertEqual((self.endpoints(), self.pushed[0]["data"]["tag"]), (["https://p/bea-phone"], "private"))
+        self.assertEqual((self.endpoints(), self.pushed[0]["data"]["tag"]), (["https://fcm.googleapis.com/p/bea-phone"], "private"))
 
     def test_nothing_happens_when_push_is_off(self):
         self.set_settings(**{"push.enabled": False})
