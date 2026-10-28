@@ -426,7 +426,7 @@ class Achievements:
         if not secret:
             await utils.send_message(level + message, silent, image=image)
             return
-        names = [f"*{player.name}*" for player in players]
+        names = [f"*{utils.escape_markdown(player.name)}*" for player in players]
         who = names[0] if len(names) == 1 else ", ".join(names[:-1]) + " y " + names[-1]
         verb = "ha" if len(names) == 1 else "han"
         await utils.send_message(f"{level}🏆 Logro oculto 🏆\n{who} {verb} desbloqueado un logro oculto.", silent)

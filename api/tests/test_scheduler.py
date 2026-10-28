@@ -53,6 +53,31 @@ class SlotTests(unittest.TestCase):
         self.assertEqual(scheduler.minute_slot(D(2026, 9, 29, 13, 47, 12, 345)), D(2026, 9, 29, 13, 47))
         self.assertEqual(scheduler.minute_slot(D(2026, 9, 29, 13, 59, 59)), D(2026, 9, 29, 13, 59))
 
+class ForgottenWindowTests(unittest.TestCase):
+    def at(self, hour, minute=0):
+        return datetime.datetime(2026, 10, 15, hour, minute)
+
+    def test_a_run_covers_the_hour_before_its_slot_when_the_previous_one_ran_in_the_slot_before(self):
+        self.assertEqual(scheduler.forgotten_window(self.at(11), self.at(10, 0)), (self.at(10), self.at(11)))
+        self.assertEqual(scheduler.forgotten_window(self.at(11), self.at(10, 9)), (self.at(10), self.at(11)))  # a late run: same slot
+
+    def test_the_first_run_ever_covers_the_hour_before(self):
+        self.assertEqual(scheduler.forgotten_window(self.at(11), None), (self.at(10), self.at(11)))
+
+    def test_hours_the_scheduler_missed_are_covered_by_the_next_run(self):
+        self.assertEqual(scheduler.forgotten_window(self.at(14), self.at(10, 3)), (self.at(10), self.at(14)))
+
+    def test_what_is_made_up_for_is_at_most_a_day(self):
+        previous = datetime.datetime(2026, 10, 10, 8, 0)
+        self.assertEqual(scheduler.forgotten_window(self.at(14), previous), (self.at(14) - datetime.timedelta(hours=24), self.at(14)))
+
+    def test_consecutive_windows_never_overlap_and_never_leave_a_gap(self):
+        runs = [self.at(10, 0), self.at(11, 8), self.at(14, 1), self.at(15, 0)]  # the third after an outage, the second late
+        windows = [scheduler.forgotten_window(scheduler.hourly_slot(now), previous) for previous, now in zip(runs, runs[1:])]
+        for (_, last), (first, _) in zip(windows, windows[1:]):
+            self.assertEqual(last, first)
+
+
 class DueTests(unittest.TestCase):
     slot = D(2026, 9, 28, 9, 0)
     grace = datetime.timedelta(hours=6)

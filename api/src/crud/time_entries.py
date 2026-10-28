@@ -511,17 +511,18 @@ def get_forgotten_game_timers(
     db: Session,
     user_id: int = None,
     hours: int = user_settings.DEFAULT_FORGOTTEN_TIMER_HOURS,
-    newly_forgotten: bool = False,
+    crossed_between: tuple[datetime.datetime, datetime.datetime] | None = None,
 ) -> list[models.GameTimer]:
-    """Running timers older than `hours`. With `newly_forgotten`, only those that crossed the
-    line during the last hour, so an hourly job reminds about each timer once."""
-    time_threshold = datetime.datetime.now() - datetime.timedelta(hours=hours)
-    query = db.query(models.GameTimer).filter(
-        models.GameTimer.is_active == True,
-        models.GameTimer.start_time < time_threshold,
-    )
-    if newly_forgotten:
-        query = query.filter(models.GameTimer.start_time >= time_threshold - datetime.timedelta(hours=1))
+    """Running timers older than `hours`. With `crossed_between` (first, last), only those that crossed the line in that
+    stretch, [first, last): the moment a timer crosses it is its start plus `hours`, whatever time it is now. Stretches that
+    follow one another therefore hold every timer once, which is what lets an hourly job remind about each of them once."""
+    hours_delta = datetime.timedelta(hours=hours)
+    query = db.query(models.GameTimer).filter(models.GameTimer.is_active == True)  # noqa: E712
+    if crossed_between is None:
+        query = query.filter(models.GameTimer.start_time < datetime.datetime.now() - hours_delta)
+    else:
+        first, last = crossed_between
+        query = query.filter(models.GameTimer.start_time >= first - hours_delta, models.GameTimer.start_time < last - hours_delta)
     if user_id is not None:
         query = query.filter(models.GameTimer.user_id == user_id)
     return query.all()

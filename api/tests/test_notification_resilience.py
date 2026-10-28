@@ -48,6 +48,35 @@ class TelegramSendTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(bot.send_message.await_count, 2)
 
 
+class FloodControlTests(unittest.IsolatedAsyncioTestCase):
+    async def test_telegram_asking_to_wait_is_obeyed_and_the_message_still_goes(self):
+        bot = mock.Mock()
+        bot.send_message = mock.AsyncMock(side_effect=[telegram.error.RetryAfter(3), None])
+        with mock.patch.object(my_utils.asyncio, "sleep", new=mock.AsyncMock()) as sleep:
+            self.assertTrue(await my_utils._telegram_send(bot, 1, "hola"))
+        sleep.assert_awaited_once_with(3)
+        self.assertEqual(bot.send_message.await_count, 2)
+
+    async def test_the_wait_has_a_ceiling(self):
+        bot = mock.Mock()
+        bot.send_message = mock.AsyncMock(side_effect=[telegram.error.RetryAfter(3600), None])
+        with mock.patch.object(my_utils.asyncio, "sleep", new=mock.AsyncMock()) as sleep:
+            await my_utils._telegram_send(bot, 1, "hola")
+        sleep.assert_awaited_once_with(my_utils.TELEGRAM_MAX_WAIT_SECONDS)
+
+
+class NamesInMessagesTests(unittest.TestCase):
+    def test_a_name_with_formatting_characters_cannot_break_or_link_the_achievement_message(self):
+        ach = my_utils.AchievementsElems.LEAP_DAY_LIFETIME
+        text = my_utils.get_ach_message(ach, user="[x](https://evil)_a*")
+        self.assertIn("\\[x](https://evil)\\_a\\*", text)
+        self.assertNotIn("[x](https://evil)_a*", text)
+
+    def test_a_ranking_name_is_escaped_before_it_is_made_bold(self):
+        self.assertEqual(actions.decorate_name("a_b", 1), "⬆️ *a\\_b*")
+        self.assertEqual(actions.decorate_name("a_b", 0), "a\\_b")
+
+
 class EscapeMarkdownTests(unittest.TestCase):
     def test_formatting_characters_are_escaped(self):
         self.assertEqual(my_utils.escape_markdown("a_b*c[d`e"), "a\\_b\\*c\\[d\\`e")

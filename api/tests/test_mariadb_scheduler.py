@@ -29,8 +29,8 @@ class SchedulerTestCase(ApiTestCase):
         async def weekly_resume(db, user, weeks_ago=0, silent=False):
             self.calls.append(("weekly_resume", user.username, weeks_ago, silent))
 
-        async def check_forgotten_timer(db, user):
-            self.calls.append(("forgotten", user.username))
+        async def check_forgotten_timer(db, user, crossed_between=None):
+            self.calls.append(("forgotten", user.username, crossed_between))
 
         async def announce_lost_streaks(db, today=None, silent=False):
             self.calls.append(("daily_streaks", silent))
@@ -149,6 +149,29 @@ class HourlyAndDailyJobTests(SchedulerTestCase):
         self.calls.clear()
         scheduler.tick(at(11, 0, 20))
         self.assertEqual(len([c for c in self.calls if c[0] == "forgotten"]), 2)
+
+    def test_each_hourly_run_covers_the_stretch_since_the_previous_one(self):
+        scheduler.tick(at(10, 0, 20))
+        first = [c[2] for c in self.calls if c[0] == "forgotten"][0]
+        self.assertEqual(first, (at(9), at(10)))
+        self.calls.clear()
+        scheduler.tick(at(13, 4))  # the scheduler was off for two hours
+        second = [c[2] for c in self.calls if c[0] == "forgotten"][0]
+        self.assertEqual(second, (at(10), at(13)))
+
+    def test_one_user_failing_does_not_cost_the_others_their_reminder(self):
+        self.user("bea")
+        seen = []
+
+        async def flaky(db, user, crossed_between=None):
+            if user.username == "ana":
+                raise RuntimeError("ana broke")
+            seen.append(user.username)
+
+        with mock.patch.object(actions, "check_forgotten_timer", new=flaky):
+            scheduler.tick(at(10, 5))
+        self.assertEqual(seen, ["bea"])
+        self.assertEqual(self.jobs()["forgotten_timers"][1], "ok: 1 failed")
 
     def test_the_hourly_check_has_a_short_grace(self):
         scheduler.tick(at(10, 11))

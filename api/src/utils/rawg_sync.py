@@ -85,7 +85,10 @@ class _Client:
             raise RawgFatal(f"RAWG respondió {resp.status_code} (clave o cuota)")
         if not resp.ok:
             raise ConnectionError(f"RAWG respondió {resp.status_code}")
-        return resp.json()
+        try:
+            return resp.json()
+        except ValueError:  # a 200 that is a maintenance page, not JSON
+            raise ConnectionError("RAWG no respondió con JSON")
 
 
 def _search(client: _Client, name: str) -> list[dict]:

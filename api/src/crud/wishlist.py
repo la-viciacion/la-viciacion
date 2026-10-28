@@ -152,6 +152,8 @@ def to_refresh(db: Session, today: datetime.date) -> list[models.Game]:
             models.not_god(),
         )
         .distinct()
+        # the soonest first: the refresh is capped, so what is about to come out is checked before what is far away
+        .order_by(models.Game.release_date.is_(None), models.Game.release_date, models.Game.id)
         .all()
     )
 

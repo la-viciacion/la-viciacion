@@ -9,7 +9,10 @@ from sqlalchemy.orm import Session
 from ..database import models
 from ..utils import challenges
 from ..utils.challenges import ChallengeError
+from ..utils.logger import LogManager
 from . import challenges as challenges_crud
+
+logger = LogManager().get_logger()
 
 MAX_GAMES = 24  # games in a rotation
 MAX_LABEL = 80
@@ -134,8 +137,13 @@ def launch_due(db: Session, schedule: models.ChallengeSchedule, today: datetime.
 def run_due(db: Session, today: datetime.date) -> list[tuple[models.ChallengeSchedule, models.Challenge]]:
     """Launch what is due today for every schedule; the ones that did launch a challenge."""
     launched = []
-    for schedule in db.query(models.ChallengeSchedule).filter_by(active=True).order_by(models.ChallengeSchedule.id):
-        challenge = launch_due(db, schedule, today)
+    for schedule in db.query(models.ChallengeSchedule).filter_by(active=True).order_by(models.ChallengeSchedule.id).all():
+        try:
+            challenge = launch_due(db, schedule, today)
+        except Exception as e:  # one schedule failing must not stop the others from launching theirs
+            db.rollback()
+            logger.error(f"Challenge schedule {schedule.id} not launched: {e}", exc_info=True)
+            continue
         if challenge is not None:
             launched.append((schedule, challenge))
     return launched
