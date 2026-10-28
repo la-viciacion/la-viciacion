@@ -12,6 +12,9 @@ let onChange = () => {};
 let onChoose = () => {};
 let onContinue = () => {};
 let clock = null;
+let loadedAt = 0;
+let listening = false;
+const REFRESH_AFTER_MS = 20_000; // coming back to the tab after longer than this asks the server again
 
 /** True while the user has a running timer (the history disables "Seguir"). */
 export let hasActive = false;
@@ -20,6 +23,13 @@ export let hasActive = false;
 export function initTimer(options) {
   ({ userId, onChange, onChoose, onContinue } = options);
   hasActive = false;
+  if (!listening) {
+    listening = true;
+    // the timer may have been stopped from another device while this tab slept or sat in the background
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && document.getElementById('timerSection') && Date.now() - loadedAt > REFRESH_AFTER_MS) onChange();
+    });
+  }
 }
 
 export function stopClock() {
@@ -48,6 +58,15 @@ const activeCard = (timer, gameName, score) => html`
       <button class="btn-cancel-timer" id="cancelTimerBtn" data-timer-id="${timer.id}">Cancelar</button>
       <button class="btn-stop-timer" id="stopTimerBtn" data-timer-id="${timer.id}">${iconStop()} Detener</button>
     </div>
+  </div>`;
+
+const unknownCard = () => html`
+  <div class="timer-idle">
+    <div class="timer-idle-text">
+      <div class="timer-idle-title">No se ha podido comprobar tu timer</div>
+      <div class="timer-idle-sub">Si tienes uno en marcha, sigue contando. Vuelve a intentarlo.</div>
+    </div>
+    <button class="btn-start-timer" id="retryTimerBtn">Reintentar</button>
   </div>`;
 
 const idleCard = () => html`
@@ -91,21 +110,31 @@ export async function loadTimerCard() {
   const section = document.getElementById('timerSection');
   if (!section) return;
 
-  hasActive = false;
+  const hadActive = hasActive;
+  loadedAt = Date.now();
+  let active;
   try {
-    const active = await api(`/timers/active/${userId}`);
-    if (active?.is_active && active.timer) {
-      hasActive = true;
-      if (!section.isConnected) return; // page was re-rendered meanwhile
-      mount(section, activeCard(active.timer, active.game_name, active.score));
-      document.getElementById('stopTimerBtn').addEventListener('click', (e) => stopTimer(e.currentTarget.dataset.timerId));
-      document.getElementById('cancelTimerBtn').addEventListener('click', (e) => cancelTimer(e.currentTarget.dataset.timerId));
-      startClock(active.timer.start_time);
-      return;
-    }
+    active = await api(`/timers/active/${userId}`);
   } catch (err) {
     console.error('Error fetching timer:', err);
+    // not knowing is not "no timer": a card that offers a new one over a running one would be wrong
+    if (hadActive) return;
+    if (!section.isConnected) return;
+    mount(section, unknownCard());
+    document.getElementById('retryTimerBtn').addEventListener('click', () => onChange());
+    return;
   }
+  hasActive = false;
+  if (active?.is_active && active.timer) {
+    hasActive = true;
+    if (!section.isConnected) return; // page was re-rendered meanwhile
+    mount(section, activeCard(active.timer, active.game_name, active.score));
+    document.getElementById('stopTimerBtn').addEventListener('click', (e) => stopTimer(e.currentTarget.dataset.timerId));
+    document.getElementById('cancelTimerBtn').addEventListener('click', (e) => cancelTimer(e.currentTarget.dataset.timerId));
+    startClock(active.timer.start_time);
+    return;
+  }
+  stopClock();
   const last = await fetchLastGame();
   if (!section.isConnected) return;
   mount(section, last ? resumeCard(last) : idleCard());
@@ -147,6 +176,7 @@ async function cancelTimer(timerId) {
   } catch (err) {
     console.error('Error cancelling timer:', err);
     toast(`Error al cancelar el timer: ${err.message}`, 'err');
+    if (err.status === 404) await onChange(); // already gone (another device): show what is true now
   }
 }
 
@@ -157,5 +187,6 @@ async function stopTimer(timerId) {
   } catch (err) {
     console.error('Error stopping timer:', err);
     toast(`Error al detener el timer: ${err.message}`, 'err');
+    if (err.status === 404) await onChange(); // already stopped (another device): show what is true now
   }
 }

@@ -176,6 +176,19 @@ class ActiveStopCancelTests(TimerTestCase):
         self.api("DELETE", f"/timers/cancel/{timer_id}", as_user="ana", params={"user_id": self.ana})
         self.assertEqual(self.library(self.ana), [("celeste", "pc", seasons.current())])
 
+    def test_cancelling_keeps_an_entry_the_player_added_before_that_day(self):
+        self.library_entry(self.ana, "celeste", datetime.date.today() - timedelta(days=5), "pc")  # the backlog
+        timer_id = self.start().json()["id"]
+        self.api("DELETE", f"/timers/cancel/{timer_id}", as_user="ana", params={"user_id": self.ana})
+        self.assertEqual(self.library(self.ana), [("celeste", "pc", seasons.current())])
+
+    def test_cancelling_keeps_an_entry_whose_game_the_player_rated(self):
+        self.api("PUT", "/users/ana/games/celeste/score", as_user="ana", json={"score": 80})
+        self.assertEqual(self.scalar("SELECT COUNT(*) FROM game_scores"), 1)
+        timer_id = self.start().json()["id"]
+        self.api("DELETE", f"/timers/cancel/{timer_id}", as_user="ana", params={"user_id": self.ana})
+        self.assertEqual(len(self.library(self.ana)), 1)
+
     def test_cancelling_needs_the_owner_or_an_admin(self):
         timer_id = self.start().json()["id"]
         self.assertEqual(self.api("DELETE", f"/timers/cancel/{timer_id}", as_user="bea", params={"user_id": self.ana}).status_code, 403)
@@ -354,6 +367,21 @@ class EditSessionTests(TimerTestCase):
     def patch(self, as_user="ana", session_id=None, **body):
         return self.api("PATCH", f"/timers/{session_id or self.session_id}", as_user=as_user, json=body)
 
+    def test_a_note_can_be_added_to_a_session_longer_than_a_day(self):
+        long = self.session(self.ana, "hades", ago(hours=30), 26 * 60)  # a forgotten timer stopped late
+        response = self.patch(session_id=long, notes="se me olvidó pararlo")
+        self.assertEqual((response.status_code, response.json()["notes"]), (200, "se me olvidó pararlo"))
+        self.assertEqual(self.patch(session_id=long, end_time=iso(ago(hours=1))).status_code, 200)  # and its end can be corrected
+
+    def test_a_time_with_a_zone_is_refused_not_a_server_error(self):
+        response = self.patch(end_time="2026-06-17T10:00:00+02:00")
+        self.assertEqual(response.status_code, 422)
+        manual = self.manual(start=ago(hours=3))
+        self.assertEqual(manual.status_code, 201)
+        aware = self.api("POST", "/timers/manual", as_user="ana", json={
+            "game_id": "hades", "platform": "pc", "start_time": "2026-06-17T08:00:00Z", "end_time": "2026-06-17T09:00:00Z"})
+        self.assertEqual(aware.status_code, 422)
+
     def test_it_changes_times_and_recomputes_the_duration(self):
         response = self.patch(end_time=iso(self.start_at + timedelta(hours=2)))
         self.assertEqual((response.status_code, response.json()["duration_seconds"]), (200, 2 * 3600))
@@ -421,6 +449,29 @@ class DeleteSessionTests(TimerTestCase):
         self.assertEqual(self.scalar("SELECT COUNT(*) FROM game_timers"), 0)
         # the achievements of its season are worked out again: it may have earned some
         self.background["after_session_change"].assert_called_once_with(self.ana, False, recalculate=[seasons.of(self.began)], since=self.began.date())
+
+    def test_deleting_the_only_session_of_a_game_drops_the_empty_entry_it_made(self):
+        self.assertEqual(self.library(self.ana), [("celeste", "pc", seasons.current())])
+        self.api("DELETE", f"/timers/{self.session_id}", as_user="ana")
+        self.assertEqual(self.library(self.ana), [])  # it would count as a game played
+
+    def test_deleting_a_session_keeps_what_it_did_not_make(self):
+        self.api("DELETE", f"/timers/{self.session_id}", as_user="ana")
+        self.library_entry(self.ana, "hades", datetime.date.today() - timedelta(days=3), "pc")  # added by hand
+        other = self.session(self.ana, "hades", ago(hours=8), 30)
+        self.api("DELETE", f"/timers/{other}", as_user="ana")
+        self.assertEqual(self.library(self.ana), [("hades", "pc", seasons.current())])
+        done = self.session(self.ana, "celeste", ago(hours=10), 30)
+        self.library_entry(self.ana, "celeste", datetime.date.today(), "pc", completed=1, completed_date=datetime.date.today())
+        self.api("DELETE", f"/timers/{done}", as_user="ana")
+        self.assertEqual(len(self.library(self.ana)), 2)  # a completed one stays
+
+    def test_deleting_the_only_session_keeps_the_entry_when_it_has_a_price(self):
+        with self.engine.begin() as conn:
+            conn.execute(text("INSERT INTO users_game_prices (user_id, game_id, platform, amount_cents) VALUES (:u, 'celeste', 'pc', 1500)"), {"u": self.ana})
+        self.api("DELETE", f"/timers/{self.session_id}", as_user="ana")
+        self.assertEqual(len(self.library(self.ana)), 1)
+        self.assertEqual(self.scalar("SELECT COUNT(*) FROM users_game_prices"), 1)
 
     def test_only_the_owner_or_an_admin_can_delete(self):
         self.assertEqual(self.api("DELETE", f"/timers/{self.session_id}", as_user="bea").status_code, 403)

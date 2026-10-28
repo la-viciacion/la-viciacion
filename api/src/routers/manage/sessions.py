@@ -128,7 +128,7 @@ class TimerPatch(BaseModel):
     notes: Optional[str] = Field(None, max_length=NOTES_MAX)
 
 
-def _follow_library(db: Session, timer: models.GameTimer, old_entry: tuple) -> None:
+def _follow_library(db: Session, timer: models.GameTimer, old_entry: tuple, old_day: datetime.date) -> None:
     """A session that changed game, platform or season takes its library entry along: the new one is
     created if missing and the old one goes when nothing is left in it (a completed one is kept)."""
     new_entry = (timer.game_id, timer.platform, seasons.of(timer.start_time))
@@ -136,7 +136,7 @@ def _follow_library(db: Session, timer: models.GameTimer, old_entry: tuple) -> N
         return
     users_crud.ensure_library_entry(db, timer.user_id, timer.game_id, timer.platform, timer.start_time)
     db.flush()
-    users_crud.drop_empty_entry(db, timer.user_id, *old_entry)
+    users_crud.drop_empty_entry(db, timer.user_id, *old_entry, created_on=old_day)
 
 
 @router.patch("/timers/{timer_id}")
@@ -151,13 +151,14 @@ def patch_timer(timer_id: int, body: TimerPatch, background_tasks: BackgroundTas
     else:
         get_or_404(db, models.Game, data["game_id"], "Juego")
     old_entry = (timer.game_id, timer.platform, seasons.of(timer.start_time))
+    old_day = timer.start_time.date()
     for k, v in data.items():
         setattr(timer, k, v)
     _check_range(timer.start_time, timer.end_time)
     if timer.end_time is not None:
         timer.duration_seconds = int((timer.end_time - timer.start_time).total_seconds())
         timer.is_active = False
-    _follow_library(db, timer, old_entry)
+    _follow_library(db, timer, old_entry, old_day)
     commit(db, "Sesión")
     if was_running and not timer.is_active:
         # a stuck timer was finished by hand: its pinned notification has to go
@@ -172,7 +173,10 @@ def delete_timer(timer_id: int, background_tasks: BackgroundTasks, db: Session =
     if timer.is_active:
         background_tasks.add_task(actions.after_timer_stop, timer.user_id, timer.game_id, None)
     user_id, season = timer.user_id, seasons.of(timer.start_time)
+    game_id, platform, day = timer.game_id, timer.platform, timer.start_time.date()
     db.delete(timer)
+    db.flush()
+    users_crud.drop_empty_entry(db, user_id, game_id, platform, season, created_on=day)
     db.commit()
     _recheck_achievements(background_tasks, user_id, [season])
     return {"message": "Sesión eliminada"}
