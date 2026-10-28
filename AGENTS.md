@@ -25,7 +25,6 @@ Four services, one `docker-compose.yml`:
 - [docs/desarrollo/configuration.md](docs/desarrollo/configuration.md): `.env`, accounts and login, password recovery, API docs.
 - [docs/desarrollo/features.md](docs/desarrollo/features.md): how the app behaves (seasons, notifications and jobs, push, sessions, achievements, recommendations, AI notices). The product rules live here; read it before changing behaviour.
 - [docs/desarrollo/workflow.md](docs/desarrollo/workflow.md): git workflow (trunk-based, PRs, required CI checks).
-- [docs/desarrollo/gitlab.md](docs/desarrollo/gitlab.md): prepared (unused) GitLab CI/CD, Renovate and the settings to move there if the repo has to be private.
 - [docs/desarrollo/roadmap.md](docs/desarrollo/roadmap.md): pending decisions (branching, versioning, CI) and known debt.
 - `docs/` is also the source of the public MkDocs site (`mkdocs.yml`, published to GitHub Pages): player and operator pages in Spanish, the technical ones in `docs/desarrollo/` in English. See [docs/desarrollo/development.md](docs/desarrollo/development.md#documentation-site).
 - [README.md](README.md): project presentation only (what it is, quick start, links). Documentation goes in `docs/`, not in the README.
