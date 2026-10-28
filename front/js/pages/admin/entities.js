@@ -18,6 +18,7 @@ import { SPECIAL_NAMES, specialClass } from '../../lib/special.js';
 import { badge, seasonYears } from './components.js';
 import { ENTITY_OPTIONS, describe, detailParts } from './audit-labels.js';
 import { approveProposal, rejectProposal } from './challenge-decisions.js';
+import { closePoll } from './poll-actions.js';
 import { closeTimerNow } from './dialogs.js';
 
 const platformField = { key: 'platform', label: 'Plataforma', type: 'platform' };
@@ -333,6 +334,45 @@ export const ENTITIES = {
     name: (r) => r.title,
     canDelete: true,
     deleteNote: 'Se borra la propuesta; el reto que lanzó, si lo hizo, sigue.',
+  },
+
+  polls: {
+    label: 'Encuestas',
+    description: 'Encuestas al grupo de Telegram: no anónimas, así que aquí se ve quién votó qué. Se cierran a mano o al llegar su fecha límite; al cerrarlas se avisa al grupo de la opción ganadora. Si Telegram no deja pararla, la encuesta queda cerrada aquí igualmente (ya no cuentan los votos) y se vuelve a intentar sola durante un día.',
+    endpoint: '/manage/polls',
+    paged: false,
+    readOnly: true,
+    columns: [
+      { label: 'Encuesta', render: (r) => html`<strong>${r.question}</strong><div class="adm-sub">${r.multiple ? 'Varias respuestas' : 'Una respuesta'} · ${r.voters} ${r.voters === 1 ? 'votante' : 'votantes'}</div>` },
+      {
+        label: 'Resultado',
+        render: (r) => html`<ul class="adm-list">${r.options.map((o, i) => html`<li><strong>${o.votes}</strong> ${o.text}${r.winners.includes(i) ? ' 🏆' : ''}${o.voters.length ? html`<div class="adm-sub">${o.voters.map((v) => v.name ?? 'sin cuenta').join(', ')}</div>` : ''}</li>`)}</ul>`,
+      },
+      {
+        label: 'Estado',
+        render: (r) => html`${r.status === 'open' ? badge('Abierta', 'green') : badge('Cerrada', 'gray')}${r.status === 'closed' && !r.telegram_stopped ? badge('Sigue abierta en Telegram', 'orange') : ''}${r.missed_votes ? badge('Faltan votos', 'orange') : ''}`,
+      },
+      { label: 'Límite', render: (r) => (r.closed_at ? html`Cerrada ${formatTimestamp(r.closed_at)}` : r.closes_at ? formatTimestamp(r.closes_at) : 'A mano') },
+    ],
+    creates: [
+      {
+        label: 'Lanzar encuesta',
+        body: {},
+        fields: [
+          { key: 'question', label: 'Pregunta (hasta 300 caracteres)', type: 'text', required: true },
+          { key: 'options', label: 'Opciones, una por línea (de 2 a 10, hasta 100 caracteres cada una)', type: 'textarea', rows: 6, required: true },
+          { key: 'multiple', label: 'Se pueden elegir varias opciones', type: 'checkbox', default: false },
+          { key: 'closes_at', label: 'Fecha límite (opcional; sin ella se cierra a mano)', type: 'datetime' },
+        ],
+      },
+    ],
+    actions: [
+      { label: 'Cerrar…', show: (r) => r.status === 'open', run: (r, admin) => closePoll(r, admin) },
+      { label: 'Cerrar en Telegram', show: (r) => r.status === 'closed' && !r.telegram_stopped, run: (r, admin) => closePoll(r, admin) },
+    ],
+    name: (r) => r.question,
+    canDelete: true,
+    deleteNote: 'Se borra la encuesta con sus votos; el mensaje se queda en el grupo. Solo se puede borrar una encuesta cerrada.',
   },
 
   schedules: {
