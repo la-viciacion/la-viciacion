@@ -3,7 +3,7 @@
 // player takes part (any may leave it) and an admin launches and deletes it from the admin panel (Gestión de datos →
 // Retos). From this page a player launches and deletes only their own, personal challenges.
 import { api, jsonRequest } from '../../lib/api.js';
-import { DURATIONS, PERSONAL_KINDS, amountLabel, blocks, debtPreview, digest, digestLine, medal, partTarget, partValue, percent, periodLine, standing, summaryLine, timeLeft, totalPart } from '../../lib/challenges.js';
+import { DURATIONS, FINISHED_SHOWN, PERSONAL_KINDS, amountLabel, blocks, debtPreview, digest, digestLine, medal, partTarget, partValue, percent, periodLine, standing, summaryLine, timeLeft, totalPart } from '../../lib/challenges.js';
 import { html, mount } from '../../lib/html.js';
 import { gameHref } from '../../lib/links.js';
 import { modalHeader, openModal } from '../../ui/modal.js';
@@ -15,6 +15,7 @@ export const active = null; // it belongs to no item of the top bar
 
 let main;
 let user;
+let showAll = false; // the page asks for the latest finished challenges of each block; "Ver todos" asks for every one
 
 const bar = (part) => html`<div class="ch-bar${part.done ? ' ok' : ''}"><i style="width:${percent(partValue(part), partTarget(part))}%"></i></div>`;
 
@@ -82,12 +83,16 @@ const section = ({ title, list, empty }) => html`
 function draw(challenges) {
   const line = digestLine(digest(challenges, user.id));
   mount(main.querySelector('#chDigest'), html`${line ? html`<p class="ch-digest" data-digest>${line}</p>` : ''}`);
-  mount(main.querySelector('#chLists'), html`${blocks(challenges, user.id).map(section)}`);
+  const shown = blocks(challenges, user.id, showAll ? Infinity : FINISHED_SHOWN);
+  const maybeMore = !showAll && shown.some((b) => b.list.filter((c) => c.status === 'finished').length >= FINISHED_SHOWN);
+  mount(main.querySelector('#chLists'), html`
+    ${shown.map(section)}
+    ${maybeMore ? html`<div class="ch-more"><button class="pf-btn" type="button" data-all>Ver todos los terminados</button></div>` : ''}`);
 }
 
 async function load() {
   try {
-    const challenges = await api('/challenges');
+    const challenges = await api(showAll ? '/challenges' : `/challenges?finished_per_block=${FINISHED_SHOWN}`);
     if (challenges) draw(challenges);
   } catch (err) {
     mount(main.querySelector('#chLists'), html`<div class="pf-empty">Error cargando los retos: ${err.message}</div>`);
@@ -247,6 +252,7 @@ async function launchChallenge() {
 export async function render(ctx) {
   main = ctx.main;
   user = ctx.user;
+  showAll = false;
   mount(main, html`
     <div class="wl-head">
       <h1 class="pf-title">Retos</h1>
@@ -262,6 +268,11 @@ export async function render(ctx) {
   main.querySelector('#chNew').addEventListener('click', launchChallenge);
   main.querySelector('#chPropose').addEventListener('click', () => openProposalForm(load));
   main.querySelector('#chLists').addEventListener('click', (e) => {
+    if (e.target.closest('[data-all]')) {
+      showAll = true;
+      load();
+      return;
+    }
     const id = e.target.closest('[data-challenge]')?.dataset.challenge;
     const part = e.target.closest('[data-part]');
     if (id && part) change(id, `/participation?joined=${part.dataset.part === 'join'}`, { method: 'PUT' });

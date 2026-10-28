@@ -503,3 +503,26 @@ test('an error of the API stays in the proposal form', async () => {
   await settle();
   assert.match(document.querySelector('.modal-content .adm-error').textContent, /Ya hay una propuesta igual/);
 });
+
+test('the page asks only for the latest finished challenges of each block and "Ver todos" asks for every one', async () => {
+  document.body.innerHTML = '<main id="main"></main>';
+  const finished = Array.from({ length: 5 }, (_, i) => personal({ id: 100 + i, title: `Terminado ${i}`, status: 'finished', starts_on: '2026-0' + (i + 1) + '-01' }));
+  const calls = installApi({ 'GET /challenges/proposals': [], 'GET /challenges': [challenge(), ...finished] });
+  await page.render({ main: main(), user: ANA });
+  await settle();
+  assert.equal(calls.find((c) => c.path.startsWith('/challenges?')).path, '/challenges?finished_per_block=5');
+  const button = document.querySelector('[data-all]');
+  assert.ok(button); // a block shows five finished ones: there may be more
+  button.click();
+  await settle();
+  assert.equal(calls.filter((c) => c.method === 'GET' && c.path === '/challenges').length, 1); // and now it asks for all of them
+  assert.equal(document.querySelector('[data-all]'), null);
+});
+
+test('with fewer finished challenges than the page shows there is nothing more to ask for', async () => {
+  document.body.innerHTML = '<main id="main"></main>';
+  installApi({ 'GET /challenges/proposals': [], 'GET /challenges': [challenge(), personal({ status: 'finished' })] });
+  await page.render({ main: main(), user: ANA });
+  await settle();
+  assert.equal(document.querySelector('[data-all]'), null);
+});

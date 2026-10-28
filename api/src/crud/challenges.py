@@ -133,13 +133,47 @@ def view(db: Session, challenge: models.Challenge, viewer_id: int, today: dateti
     }
 
 
-def visible(db: Session, viewer_id: int, running_on: datetime.date | None = None) -> list[models.Challenge]:
+def block_of(challenge: models.Challenge, viewer_id: int) -> str:
+    """Where the challenges page lists a challenge for the viewer: the group's, theirs, the duels they are in or the others'."""
+    if challenge.scope == GROUP:
+        return "group"
+    if challenge.scope == USER and challenge.owner_user_id == viewer_id:
+        return "mine"
+    if challenge.scope == DUEL and viewer_id in (challenge.owner_user_id, opponent_id(challenge)):
+        return "duels"
+    return "others"
+
+
+def limit_finished(rows: list[models.Challenge], viewer_id: int, today: datetime.date, per_block: int) -> list[models.Challenge]:
+    """`rows` (latest first) without the finished challenges beyond the first `per_block` of each block of the page (pure): the
+    page only shows the latest few of those, and working out the progress of every challenge there ever was is the cost
+    of opening it. The challenges that are not over are all kept."""
+    shown: dict[str, int] = {}
+    kept = []
+    for challenge in rows:
+        if challenge.ends_on >= today:
+            kept.append(challenge)
+            continue
+        block = block_of(challenge, viewer_id)
+        if shown.get(block, 0) < per_block:
+            shown[block] = shown.get(block, 0) + 1
+            kept.append(challenge)
+    return kept
+
+
+def visible(
+    db: Session, viewer_id: int, running_on: datetime.date | None = None, finished_per_block: int | None = None, today: datetime.date | None = None,
+) -> list[models.Challenge]:
     """The challenges the viewer can see: every public one and their own; the latest period first. With `running_on`,
-    only those whose period includes that day."""
+    only those whose period includes that day. With `finished_per_block`, only that many finished ones in each block of
+    the page (see limit_finished), as of `today`."""
     query = db.query(models.Challenge).filter((models.Challenge.visibility == "public") | (models.Challenge.owner_user_id == viewer_id))
     if running_on is not None:
         query = query.filter(models.Challenge.starts_on <= running_on, models.Challenge.ends_on >= running_on)
-    return query.order_by(models.Challenge.starts_on.desc(), models.Challenge.id.desc()).all()
+    rows = query.order_by(models.Challenge.starts_on.desc(), models.Challenge.id.desc()).all()
+    if finished_per_block is not None:
+        rows = limit_finished(rows, viewer_id, today or datetime.date.today(), finished_per_block)
+    return rows
 
 
 def outcome(progress: dict, user_id: int) -> dict:
