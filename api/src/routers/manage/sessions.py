@@ -288,7 +288,9 @@ def patch_library(row_id: int, body: LibraryPatch, background_tasks: BackgroundT
 def delete_library(row_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     row = get_or_404(db, models.UserGame, row_id, "Entrada de biblioteca")
     user_id, season = row.user_id, seasons.of(row.started_date)
+    game_id, platform = row.game_id, row.platform
     db.delete(row)
+    users_crud.drop_orphan_price(db, user_id, game_id, platform)
     db.commit()
     _recheck_achievements(background_tasks, user_id, [season])
     return {"message": "Entrada eliminada"}
