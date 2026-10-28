@@ -378,7 +378,7 @@ test('a duel is launched against a player of the list, with a game for a duel in
   assert.deepEqual(text('select[name="duelOpponent"] option'), ['Bea']); // neither oneself nor a player who is not active
   form.elements.kind.value = 'duel_hours';
   form.elements.kind.dispatchEvent(new window.Event('change', { bubbles: true }));
-  assert.equal(form.querySelector('[data-kind="duel_hours duel_game"]').hidden, false);
+  assert.equal(form.querySelector('[data-kind="duel_hours duel_game duel_completed"]').hidden, false);
   assert.equal(form.querySelector('[data-kind="duel_game"]').hidden, true);
   form.requestSubmit();
   await settle();
@@ -399,6 +399,51 @@ test('a duel is launched against a player of the list, with a game for a duel in
   second.requestSubmit();
   await settle();
   assert.deepEqual(calls.filter((c) => c.method === 'POST').at(-1).body, { kind: 'duel_game', options: { opponent_id: 2, game_id: 'hades', duration: 'month' } });
+});
+
+test('the kinds about finishing games and the duel of completed games send their options', async () => {
+  document.body.innerHTML = '<main id="main"></main>';
+  const players = [{ user_id: 1, name: 'Ana', is_active: true, is_me: true }, { user_id: 2, name: 'Bea', is_active: true, is_me: false }];
+  const calls = installApi({
+    'GET /challenges/debt': DEBT, 'GET /challenges/genres': [], 'GET /challenges': [], 'GET /group/players': players, 'POST /challenges': personal(),
+  });
+  await page.render({ main: main(), user: ANA });
+  await settle();
+  const launch = async (kind, set = () => {}) => {
+    document.querySelector('#chNew').click();
+    await settle();
+    const form = document.querySelector('.modal-content form');
+    form.elements.kind.value = kind;
+    form.elements.kind.dispatchEvent(new window.Event('change', { bubbles: true }));
+    set(form.elements);
+    assert.equal(form.querySelector(`[data-kind~="${kind}"]`).hidden, false);
+    form.requestSubmit();
+    await settle();
+    return calls.filter((c) => c.method === 'POST').at(-1).body;
+  };
+  assert.deepEqual(await launch('finish_backlog', (el) => { el.backlogGames.value = '2'; }), { kind: 'finish_backlog', options: { games: 2, duration: 'month' } });
+  assert.deepEqual(await launch('finish_first'), { kind: 'finish_first', options: { duration: 'month' } });
+  assert.deepEqual(await launch('duel_completed'), { kind: 'duel_completed', options: { opponent_id: 2, duration: 'month' } });
+});
+
+test('a lost challenge is marked in its line and a share of the group\'s hours shows only the hours', async () => {
+  const lost = personal({
+    id: 12, kind: 'finish_first', label: 'Terminar antes de empezar', title: 'Terminar antes de empezar otro', params: { duration: 'month' },
+    progress: { players: [{ user_id: 1, name: 'Ana', count: 0, target_count: 1, unit: 'games', done: false, failed: true }] },
+  });
+  const hours = challenge({
+    id: 13, kind: 'group_hours', label: 'Horas entre todos', title: 'Sumar 12 h entre todos', game: null, params: { min_hours_total: 12 },
+    progress: {
+      players: [{ user_id: 1, name: 'Ana', seconds: 18000, target_seconds: 43200, contribution: true, done: false }],
+      total_seconds: 18000, total_target_seconds: 43200, total_done: false,
+    },
+  });
+  installApi({ 'GET /challenges/proposals': [], 'GET /challenges': [lost, hours] });
+  await page.render({ main: main(), user: ANA });
+  await settle();
+  assert.match(text('[data-challenge="12"] .ch-row .pf-sub')[0], /^0 \/ 1 juego ✗ perdido$/);
+  assert.equal(document.querySelector('[data-challenge="12"] [data-standing]').dataset.standing, 'failed');
+  assert.match(text('[data-challenge="13"] .ch-players .pf-sub')[0], /^5 h$/);
 });
 
 test('a voluntary group challenge says so and offers to join, and joining asks the API for the caller only', async () => {

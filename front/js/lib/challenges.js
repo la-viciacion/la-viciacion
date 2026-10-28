@@ -57,9 +57,9 @@ const number = (n) => n.toLocaleString('es-ES');
 const UNITS = { games: ['juego', 'juegos'], days: ['día', 'días'], sessions: ['sesión', 'sesiones'], genres: ['género', 'géneros'] };
 const unitName = (part, n) => (UNITS[part.unit] ?? UNITS.games)[n === 1 ? 0 : 1];
 
-/** "3 / 5 h", "0 / 1 juego", "3 / 7 días" or "12,5 % / 25 %" */
+/** "3 / 5 h", "0 / 1 juego", "3 / 7 días" or "12,5 % / 25 %"; a duel or a share of a group's total says only what was reached */
 export function amountLabel(part) {
-  if (part.versus) return hoursLabel(part.seconds);
+  if (part.versus || part.contribution) return isCount(part) ? `${part.count} ${unitName(part, part.count)}` : hoursLabel(part.seconds);
   if (isCount(part)) return `${part.count} / ${part.target_count} ${unitName(part, part.target_count)}`;
   if (isPercent(part)) return `${number(part.percent)} % / ${number(part.target_percent)} %`;
   return `${hoursLabel(part.seconds)} / ${hoursLabel(part.target_seconds)}`;
@@ -107,6 +107,16 @@ export function summaryLine(challenge) {
     const what = p.mode === 'play' ? `jugar ${hoursLabel(p.hours * 3600)} a` : 'completar';
     return `${challenge.label} · ${what} un juego de ${p.genre} que no tuvieras antes`;
   }
+  if (challenge.kind === 'group_hours') {
+    return `${challenge.label} · jugar ${hoursLabel(p.min_hours_total * 3600)} entre todos, a lo que sea${versusNote(challenge)}`;
+  }
+  if (challenge.kind === 'finish_backlog') {
+    return `${challenge.label} · completar ${p.games} ${p.games === 1 ? 'juego' : 'juegos'} de los que ya tenías empezados`;
+  }
+  if (challenge.kind === 'finish_first') {
+    return `${challenge.label} · completar un juego que ya tenías empezado sin empezar ninguno nuevo antes; si empiezas uno nuevo, se pierde`;
+  }
+  if (challenge.kind === 'duel_completed') return `${challenge.label} · gana quien complete más juegos`;
   if (challenge.kind === 'duel_hours') return `${challenge.label} · gana quien juegue más horas`;
   if (challenge.kind === 'duel_game') return `${challenge.label} · gana quien juegue más a ${challenge.game?.name ?? 'ese juego'}`;
   if (challenge.kind === 'streak') {
@@ -167,22 +177,46 @@ function duelStanding(challenge, meId, today) {
   const rival = (meId === challenge.owner?.id ? challenge.opponent : challenge.owner)?.name ?? 'tu rival';
   if (challenge.declined) return meId === challenge.owner?.id ? { tone: 'failed', text: `${rival} ha rechazado el duelo` } : null;
   if (!me || !other || challenge.status === 'upcoming') return null;
+  const [mine, theirs] = [partValue(me), partValue(other)];
+  const counted = isCount(me);
+  const amount = (n) => (counted ? `${n} ${unitName(me, n)}` : hoursLabel(n));
   if (challenge.status === 'finished') {
-    if (!me.seconds && !other.seconds) return { tone: 'failed', text: 'Nadie jugó: sin ganador' };
-    if (me.seconds === other.seconds) return { tone: 'done', text: 'Empate: ganáis los dos' };
+    if (!mine && !theirs) return { tone: 'failed', text: counted ? 'Nadie completó nada: sin ganador' : 'Nadie jugó: sin ganador' };
+    if (mine === theirs) return { tone: 'done', text: 'Empate: ganáis los dos' };
     return me.done ? { tone: 'done', text: `Ganaste el duelo a ${rival}` } : { tone: 'failed', text: `Perdiste el duelo contra ${rival}` };
   }
-  const gap = me.seconds - other.seconds;
+  const gap = mine - theirs;
   if (gap === 0) return { tone: 'pending', text: `Empatados con ${rival}` };
-  if (gap > 0) return { tone: 'ok', text: `Vas ganando a ${rival} por ${hoursLabel(gap)}` };
+  if (gap > 0) return { tone: 'ok', text: `Vas ganando a ${rival} por ${amount(gap)}` };
   const days = daysUntil(challenge.ends_on, today);
-  return { tone: days <= URGENT_DAYS ? 'urgent' : 'behind', text: `Vas perdiendo contra ${rival} por ${hoursLabel(-gap)}` };
+  return { tone: days <= URGENT_DAYS ? 'urgent' : 'behind', text: `Vas perdiendo contra ${rival} por ${amount(-gap)}` };
+}
+
+/** The viewer's part in a group's total of hours (every part puts something in; the goal is the group's, not theirs). */
+function contributionStanding(challenge, part, today) {
+  const { total_seconds: total, total_target_seconds: target, total_done: reached } = challenge.progress;
+  if (challenge.status === 'finished') {
+    if (part.done) return { tone: 'done', text: 'El grupo llegó al total' };
+    return { tone: 'failed', text: reached ? 'El grupo llegó al total, pero no aportaste' : 'El grupo no llegó al total' };
+  }
+  if (part.done) return { tone: 'done', text: 'El grupo ya ha llegado al total' };
+  if (reached) return { tone: 'pending', text: 'El grupo ya ha llegado al total: aporta algo para que cuente' };
+  const left = hoursLabel(target - total);
+  const days = daysUntil(challenge.ends_on, today);
+  if (days <= URGENT_DAYS) return { tone: 'urgent', text: `${days <= 0 ? 'Último día' : days === 1 ? 'Queda 1 día' : `Quedan ${days} días`}: faltan ${left} al grupo` };
+  const length = daysUntil(challenge.ends_on, parseDay(challenge.starts_on)) + 1;
+  const elapsed = (length - days) / length;
+  return elapsed >= PACE_FROM && total / target < elapsed - PACE_GAP
+    ? { tone: 'behind', text: `El grupo va por detrás del ritmo: faltan ${left}` }
+    : { tone: 'ok', text: `Al grupo le faltan ${left}` };
 }
 
 function baseStanding(challenge, meId, today) {
   if (challenge.scope === 'duel') return duelStanding(challenge, meId, today);
   const part = challenge.taking_part ? challenge.progress.players.find((p) => p.user_id === meId) : null;
   if (!part || challenge.status === 'upcoming') return null;
+  if (part.contribution) return contributionStanding(challenge, part, today);
+  if (part.failed) return { tone: 'failed', text: challenge.status === 'finished' ? 'Se perdió: empezaste un juego nuevo antes de terminar uno' : 'Perdido: empezaste un juego nuevo antes de terminar uno' };
   if (challenge.status === 'finished') {
     return part.done ? { tone: 'done', text: challenge.scope === 'user' ? 'Lo conseguiste' : 'Cumpliste tu parte' } : { tone: 'failed', text: 'No se cumplió' };
   }
@@ -253,8 +287,11 @@ export const PERSONAL_KINDS = [
   ['long_sessions', 'Sesiones largas'],
   ['variety', 'Variar de género'],
   ['wishlist', 'Cumplir deseados'],
+  ['finish_backlog', 'Terminar lo empezado'],
+  ['finish_first', 'Terminar antes de empezar'],
   ['duel_hours', 'Duelo de horas'],
   ['duel_game', 'Duelo en un juego'],
+  ['duel_completed', 'Duelo de completados'],
 ];
 
 /** The group challenges a player can propose, for the form: [value, label]. */

@@ -23,7 +23,7 @@ const partRow = (p, me, ranked) => html`
   <div class="ch-row">
     <span class="ch-name">${ranked && p.position ? `${medal(p.position)} ` : ''}${p.name}${p.user_id === me ? ' (tú)' : ''}</span>
     ${bar(p)}
-    <span class="pf-sub">${amountLabel(p)}${p.done ? ' ✓' : ''}</span>
+    <span class="pf-sub">${amountLabel(p)}${p.done ? ' ✓' : p.failed ? ' ✗ perdido' : ''}</span>
   </div>`;
 
 const totalRow = (part) => html`
@@ -113,6 +113,9 @@ async function change(id, path, options) {
 const OPTIONS = {
   duel_hours: (el) => ({ opponent_id: Number(el.duelOpponent.value) }),
   duel_game: (el, state) => ({ opponent_id: Number(el.duelOpponent.value), game_id: state.game?.id }),
+  duel_completed: (el) => ({ opponent_id: Number(el.duelOpponent.value) }),
+  finish_backlog: (el) => ({ games: Number(el.backlogGames.value) }),
+  finish_first: () => ({}),
   new_genre: (el) => ({ genre: el.genre?.value, mode: el.mode?.value, ...(el.mode?.value === 'play' ? { hours: Number(el.hours.value) } : {}) }),
   debt_reduction: (el) => ({ mode: el.debtMode.value, [el.debtMode.value === 'percent' ? 'percent' : 'games']: Number(el.debtValue.value) }),
   streak: (el) => ({ mode: el.streakMode.value, days: Number(el.streakDays.value) }),
@@ -164,8 +167,8 @@ async function launchChallenge() {
         <p class="adm-sub" id="chDebtPreview" aria-live="polite"></p>
       </div>
 
-      <div data-kind="duel_hours duel_game" hidden>
-        <p class="adm-sub">Quien juegue más gana. Empieza hoy, y el otro jugador puede rechazarlo durante 48 horas.</p>
+      <div data-kind="duel_hours duel_game duel_completed" hidden>
+        <p class="adm-sub">Quien juegue más gana (o, en el duelo de completados, quien complete más juegos). Empieza hoy, y el otro jugador puede rechazarlo durante 48 horas.</p>
         <label>Retar a<select class="adm-input" name="duelOpponent">
           ${(players ?? []).filter((p) => p.is_active && !p.is_me).map((p) => html`<option value="${p.user_id}">${p.name}</option>`)}
         </select></label>
@@ -203,6 +206,15 @@ async function launchChallenge() {
           <option value="complete">Completar juegos de mis deseados</option>
         </select></label>
         <label>Juegos<input class="adm-input" type="number" name="wishGames" min="1" step="1" value="1" /></label>
+      </div>
+
+      <div data-kind="finish_backlog" hidden>
+        <p class="adm-sub">Solo cuentan los juegos que ya tenías empezados y sin terminar al lanzar el reto (una sesión de 10 minutos o más, sin completar ni abandonar), tengan o no tiempo medio. Los juegos que empieces después no cuentan.</p>
+        <label>Juegos a completar<input class="adm-input" type="number" name="backlogGames" min="1" step="1" value="1" /></label>
+      </div>
+
+      <div data-kind="finish_first" hidden>
+        <p class="adm-sub">No puedes empezar ningún juego nuevo sin haber terminado antes uno de los que ya tenías empezados. Ganas al completar uno de ellos; si empiezas un juego nuevo antes de completarlo, pierdes el reto. Si lo completas el mismo día que empiezas otro, cuenta el que completaste.</p>
       </div>
 
       <label>Duración<select class="adm-input" name="duration">

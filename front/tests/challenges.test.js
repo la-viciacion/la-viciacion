@@ -259,3 +259,67 @@ test('a duel result is told as a win, a loss or a tie, and the duels are summari
   const versus = summaryLine({ kind: 'game_of_month', label: 'Juego del mes', params: { min_hours_each: 5, min_hours_total: 12, versus: true } });
   assert.match(versus, /y gana quien más avance$/);
 });
+
+const countDuel = (me, other, extra = {}) => ({
+  ...duel(0, 0),
+  kind: 'duel_completed',
+  label: 'Duelo de completados',
+  progress: { players: [
+    { user_id: 7, name: 'Yo', count: me, target_count: Math.max(me, other), unit: 'games', versus: true, done: me > other },
+    { user_id: 8, name: 'Bea', count: other, target_count: Math.max(me, other), unit: 'games', versus: true, done: other > me },
+  ] },
+  ...extra,
+});
+
+test('a duel of completed games counts games, running or finished', () => {
+  assert.deepEqual(standing(countDuel(3, 1), 7, TODAY), { tone: 'ok', text: 'Vas ganando a Bea por 2 juegos' });
+  assert.deepEqual(standing(countDuel(1, 2), 7, TODAY), { tone: 'behind', text: 'Vas perdiendo contra Bea por 1 juego' });
+  assert.equal(standing(countDuel(0, 1, { ends_on: iso(1) }), 7, TODAY).tone, 'urgent');
+  const done = (me, other) => standing({ ...countDuel(me, other), status: 'finished' }, 7, TODAY);
+  assert.deepEqual(done(2, 1), { tone: 'done', text: 'Ganaste el duelo a Bea' });
+  assert.deepEqual(done(0, 0), { tone: 'failed', text: 'Nadie completó nada: sin ganador' });
+  assert.equal(amountLabel({ count: 1, target_count: 3, unit: 'games', versus: true }), '1 juego');
+  assert.equal(amountLabel({ count: 3, target_count: 3, unit: 'games', versus: true }), '3 juegos');
+});
+
+test('the new kinds are summarised by what they ask', () => {
+  const kind = (k, label, p) => summaryLine({ kind: k, label, params: p });
+  assert.equal(kind('duel_completed', 'Duelo de completados', {}), 'Duelo de completados · gana quien complete más juegos');
+  assert.equal(kind('finish_backlog', 'Terminar lo empezado', { games: 1 }), 'Terminar lo empezado · completar 1 juego de los que ya tenías empezados');
+  assert.equal(kind('finish_backlog', 'Terminar lo empezado', { games: 3 }), 'Terminar lo empezado · completar 3 juegos de los que ya tenías empezados');
+  assert.match(kind('finish_first', 'Terminar antes de empezar', {}), /sin empezar ninguno nuevo antes; si empiezas uno nuevo, se pierde$/);
+  assert.equal(kind('group_hours', 'Horas entre todos', { min_hours_total: 40 }), 'Horas entre todos · jugar 40 h entre todos, a lo que sea');
+  assert.match(kind('group_hours', 'Horas entre todos', { min_hours_total: 40, versus: true }), /y gana quien más avance$/);
+});
+
+test('a challenge lost before it was won says so, running or finished, and the win is the usual one', () => {
+  const lost = { count: 0, target_count: 1, unit: 'games', done: false, failed: true };
+  assert.deepEqual(standing(running(lost, { scope: 'user' }), 7, TODAY), { tone: 'failed', text: 'Perdido: empezaste un juego nuevo antes de terminar uno' });
+  assert.equal(standing({ ...running(lost, { scope: 'user' }), status: 'finished' }, 7, TODAY).text, 'Se perdió: empezaste un juego nuevo antes de terminar uno');
+  const won = { count: 1, target_count: 1, unit: 'games', done: true, failed: false };
+  assert.equal(standing({ ...running(won, { scope: 'user' }), status: 'finished' }, 7, TODAY).text, 'Lo conseguiste');
+  assert.equal(standing(running({ ...won, count: 0, done: false, failed: false }, { scope: 'user' }), 7, TODAY).tone, 'pending');
+});
+
+const hoursChallenge = (part, progress, extra = {}) => ({
+  ...running({ seconds: 0, target_seconds: 40 * 3600, contribution: true, done: false, ...part }),
+  progress: { players: [{ user_id: 7, name: 'Yo', seconds: 0, target_seconds: 40 * 3600, contribution: true, done: false, ...part }], total_seconds: 0, total_target_seconds: 40 * 3600, total_done: false, ...progress },
+  ...extra,
+});
+
+test('the share a player puts in the group\'s hours is read against the group\'s total', () => {
+  assert.equal(amountLabel({ seconds: 5400, target_seconds: 144000, contribution: true }), '1,5 h');
+  // 20 days long, 10 gone: the group has 5 h of 40
+  assert.deepEqual(standing(hoursChallenge({ seconds: 3600 }, { total_seconds: 5 * 3600 }), 7, TODAY), { tone: 'behind', text: 'El grupo va por detrás del ritmo: faltan 35 h' });
+  assert.deepEqual(standing(hoursChallenge({ seconds: 3600 }, { total_seconds: 25 * 3600 }), 7, TODAY), { tone: 'ok', text: 'Al grupo le faltan 15 h' });
+  assert.deepEqual(standing(hoursChallenge({ seconds: 3600 }, { total_seconds: 25 * 3600 }, { ends_on: iso(1) }), 7, TODAY), { tone: 'urgent', text: 'Queda 1 día: faltan 15 h al grupo' });
+  assert.deepEqual(standing(hoursChallenge({ seconds: 3600, done: true }, { total_seconds: 41 * 3600, total_done: true }), 7, TODAY), { tone: 'done', text: 'El grupo ya ha llegado al total' });
+  assert.equal(standing(hoursChallenge({ seconds: 0 }, { total_seconds: 41 * 3600, total_done: true }), 7, TODAY).tone, 'pending');
+});
+
+test('a finished group total is met by whoever put something in', () => {
+  const finished = (part, progress) => ({ ...hoursChallenge(part, progress), status: 'finished' });
+  assert.deepEqual(standing(finished({ seconds: 3600, done: true }, { total_done: true }), 7, TODAY), { tone: 'done', text: 'El grupo llegó al total' });
+  assert.equal(standing(finished({ seconds: 0 }, { total_done: true }), 7, TODAY).text, 'El grupo llegó al total, pero no aportaste');
+  assert.equal(standing(finished({ seconds: 3600 }, { total_done: false }), 7, TODAY).text, 'El grupo no llegó al total');
+});
