@@ -34,6 +34,8 @@ Un juego se queda en la lista hasta que lo quites tú con la ✕, aunque ya lo e
 - **Juego del mes**: un juego, un mes, unas horas mínimas por jugador y un total entre todos. Ves una barra por jugador (verde al llegar a su mínimo) y otra para el grupo.
 - **Temático**: una etiqueta de juegos (Horror, Singleplayer…), un mes y lo que tiene que hacer cada jugador: jugar un número de horas o completar al menos un juego. Cuenta cualquier juego con esa etiqueta.
 
+- **Horas entre todos**: un mes y un total de horas que tiene que sumar el grupo entero, de cualquier juego. No hay mínimo por jugador: cada uno ve cuánto ha aportado, y cumple su parte si el grupo llega al total y él ha jugado algo.
+
 Puedes **dejar de participar** y volver mientras el reto no haya terminado. Cuando el grupo alcanza el total, se avisa una vez. Un administrador puede lanzar un reto del grupo como **voluntario**: no cuenta nadie hasta que se **apunta** (botón *Apuntarme*), y solo cuentan los que se apuntan.
 
 **Proponer un reto al grupo.** Con **Proponer al grupo** sugieres un juego del mes o un reto temático (el juego o la temática, el mes y las horas). Un administrador lo aprueba, y entonces se lanza como un reto del grupo, o lo rechaza con una nota. En **Tus propuestas** ves en qué estado está cada una y puedes **retirar** las que aún esperan respuesta. Puedes tener hasta 3 esperando a la vez.
@@ -48,10 +50,12 @@ Puedes **dejar de participar** y volver mientras el reto no haya terminado. Cuan
 - **Sesiones largas**: haz un número de sesiones de al menos los minutos que elijas, de cualquier juego.
 - **Variar de género**: juega a varios géneros distintos, dedicando a cada uno las horas que pidas. El tiempo de un juego cuenta en cada uno de sus géneros.
 - **Cumplir deseados**: empieza o completa juegos de tu lista de deseados. Solo cuentan los que ya estaban en ella el día que lanzas el reto; si quitas uno de la lista, deja de contar.
+- **Terminar lo empezado**: completa un número de los juegos que ya tenías empezados (con una sesión de 10 minutos o más, sin completar ni abandonar) cuando lanzas el reto. Los juegos que empieces después no cuentan.
+- **Terminar antes de empezar**: no puedes empezar ningún juego nuevo sin haber terminado antes uno de los que ya tenías empezados. **Ganas** al completar uno de ellos y **pierdes** en el momento en que empiezas un juego nuevo sin haber completado antes ninguno. Si lo haces el mismo día, cuenta primero el que completaste. Para lanzarlo necesitas tener al menos un juego empezado y sin terminar.
 
 **Cómo vas.** Cada reto en el que participas te dice, dentro de la propia app, cómo estás: *Ya has cumplido tu parte*, *Vas bien*, *Vas por detrás del ritmo* (llevas menos de lo que toca por el tiempo que ha pasado), o, en los últimos días, *Quedan 2 días: te faltan 1,5 h*. Arriba de la página se cuenta cuántos tienes en marcha, cuántos cumplidos y cuántos con poco tiempo, y en el **Inicio** aparece una tarjeta **Mis retos** con los que están en marcha, los más urgentes primero. Es solo para ti: no se avisa a nadie.
 
-- **Duelo de horas** y **Duelo en un juego**: retas a otro jugador a ver quién juega más (en total o a un juego concreto) durante una semana, un mes o tres meses. **Empieza al lanzarlo**; el retado puede **rechazarlo durante las primeras 48 horas** (el rechazo no se puede deshacer). Pasado ese plazo, el duelo sigue adelante. Gana quien más horas sume y, si empatan, ganan los dos. Un duelo rechazado no cuenta para nadie. Los demás lo ven, pero nadie recibe aviso.
+- **Duelo de horas**, **Duelo en un juego** y **Duelo de completados**: retas a otro jugador a ver quién juega más (en total o a un juego concreto) o quién completa más juegos, durante una semana, un mes o tres meses. **Empieza al lanzarlo**; el retado puede **rechazarlo durante las primeras 48 horas** (el rechazo no se puede deshacer). Pasado ese plazo, el duelo sigue adelante. Gana quien más horas (o más juegos completados) sume y, si empatan, ganan los dos. Un duelo rechazado no cuenta para nadie. Los demás lo ven, pero nadie recibe aviso.
 
 El administrador puede lanzar un reto del grupo (juego del mes o temático) **como competición**: además de cumplir el objetivo, se ve quién va primero, con medallas, y el puesto aparece en tu línea.
 
