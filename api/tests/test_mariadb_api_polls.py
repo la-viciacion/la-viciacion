@@ -20,9 +20,9 @@ class PollsTestCase(ApiTestCase):
         self.stopped = []  # the polls Telegram was asked to stop
         self.stop_result = (True, 2)
 
-        async def send(question, options, multiple):
+        async def send(question, options, multiple, allow_adding_options=False):
             self.sent.append((question, list(options), multiple))
-            return str(500 + len(self.sent)), 70 + len(self.sent)
+            return str(500 + len(self.sent)), 70 + len(self.sent), [f"k{n}" for n in range(len(options))]
 
         async def stop(poll):
             self.stopped.append(poll.id)
@@ -62,6 +62,7 @@ class AccessTests(PollsTestCase):
             ("GET", "/manage/polls", None), ("POST", "/manage/polls", {"question": "¿?", "options": ["a", "b"]}),
             ("POST", f"/manage/polls/{poll}/close", {}), ("DELETE", f"/manage/polls/{poll}", None),
             ("PUT", "/manage/polls/answers", {"poll_id": "501", "user_id": 1, "option_ids": [0]}),
+            ("PUT", "/manage/polls/options", {"key": "k9", "text": "Otra"}),
         ):
             self.assertEqual(self.api(method, path, json=body).status_code, 401, (method, path))
             self.assertEqual(self.api(method, path, as_user="ana", json=body).status_code, 403, (method, path))
@@ -85,7 +86,7 @@ class LaunchTests(PollsTestCase):
         self.assertEqual((self.sent, self.scalar("SELECT COUNT(*) FROM group_polls")), ([], 0))
 
     def test_a_telegram_that_refuses_it_leaves_nothing_behind(self):
-        async def refuse(question, options, multiple):
+        async def refuse(question, options, multiple, allow_adding_options=False):
             raise polls.TelegramFailure("Falta el token del bot o el ID del grupo")
 
         with mock.patch.object(polls, "send", new=refuse):
@@ -136,6 +137,26 @@ class AnswerTests(PollsTestCase):
         self.answer("501", 111, [2])
         self.answer("501", 111, [])
         self.assertEqual(self.scalar("SELECT COUNT(*) FROM group_poll_votes"), 0)
+
+
+class AddedOptionsTests(PollsTestCase):
+    def add_option(self, key="k9", text="Hollow Knight", **body):
+        return self.api("PUT", "/manage/polls/options", as_user="root", json={"key": key, "text": text, **body})
+
+    def test_an_option_the_group_adds_gets_votes_and_can_win(self):
+        poll = self.launch(allow_adding_options=True).json()
+        self.assertTrue(poll["allow_adding_options"])
+        self.assertEqual(self.add_option(message_id=71).json(), {"recorded": True})
+        self.api("PUT", "/manage/polls/answers", as_user="root", json={"poll_id": "501", "user_id": 111, "option_ids": [0], "option_keys": ["k9"]})
+        shown = self.api("GET", "/manage/polls", as_user="root").json()[0]
+        self.assertEqual([(o["text"], o["votes"]) for o in shown["options"]], [("Hades", 0), ("Celeste", 0), ("Tetris", 0), ("Hollow Knight", 1)])
+        self.assertEqual(shown["winners"], [3])
+        self.assertEqual(self.audit_paths(), ["/api/v1/manage/polls"])  # reporting an option is not an admin's change
+
+    def test_a_poll_that_does_not_let_the_group_add_ignores_them(self):
+        self.launch()
+        self.assertEqual(self.add_option().json(), {"recorded": False})
+        self.assertEqual(self.scalar("SELECT options FROM group_polls").count("Hollow"), 0)
 
 
 class CloseTests(PollsTestCase):

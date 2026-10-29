@@ -343,7 +343,7 @@ export const ENTITIES = {
     paged: false,
     readOnly: true,
     columns: [
-      { label: 'Encuesta', render: (r) => html`<strong>${r.question}</strong><div class="adm-sub">${r.multiple ? 'Varias respuestas' : 'Una respuesta'} · ${r.voters} ${r.voters === 1 ? 'votante' : 'votantes'}</div>` },
+      { label: 'Encuesta', render: (r) => html`<strong>${r.question}</strong><div class="adm-sub">${r.multiple ? 'Varias respuestas' : 'Una respuesta'}${r.allow_adding_options ? ' · el grupo puede añadir opciones' : ''} · ${r.voters} ${r.voters === 1 ? 'votante' : 'votantes'}</div>` },
       {
         label: 'Resultado',
         render: (r) => html`<ul class="adm-list">${r.options.map((o, i) => html`<li>${r.winners.includes(i) ? '🏆 ' : ''}${o.text} <span class="adm-sub">· ${o.votes} ${o.votes === 1 ? 'voto' : 'votos'}</span>${o.voters.length ? html`<div class="adm-sub">${o.voters.map((v) => v.name ?? 'sin cuenta').join(', ')}</div>` : ''}</li>`)}</ul>`,
@@ -362,6 +362,7 @@ export const ENTITIES = {
           { key: 'question', label: 'Pregunta (hasta 300 caracteres)', type: 'textarea', grow: true, maxLength: 300, required: true },
           { key: 'options', label: 'Opciones de respuesta (de 2 a 10)', type: 'options', min: 2, max: 10, maxLength: 100, required: true },
           { key: 'multiple', label: 'Se pueden elegir varias opciones', type: 'checkbox', default: false },
+          { key: 'allow_adding_options', label: 'Cualquiera del grupo puede añadir opciones nuevas', type: 'checkbox', default: false },
           { key: 'closes_at', label: 'Fecha límite (opcional; sin ella se cierra a mano)', type: 'datetime' },
         ],
       },

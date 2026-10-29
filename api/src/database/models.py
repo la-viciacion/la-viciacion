@@ -432,7 +432,9 @@ class GroupPoll(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     question = Column(String(300), nullable=False)
     options = Column(Text, nullable=False)  # JSON list of the option texts, in the order Telegram shows them
+    option_keys = Column(Text, nullable=True)  # JSON list of the ids Telegram gave the options, as `options`; NULL = launched before them
     multiple = Column(Boolean, nullable=False, server_default=text("0"))  # several answers allowed
+    allow_adding_options = Column(Boolean, nullable=False, server_default=text("0"))  # the group may add options in Telegram
     telegram_poll_id = Column(String(32), nullable=False)  # what an answer of the bot names
     telegram_message_id = Column(BigInteger, nullable=False)  # what stopping the poll in Telegram needs
     closes_at = Column(DateTime, nullable=True)  # the deadline; NULL = only by hand

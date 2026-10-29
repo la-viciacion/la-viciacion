@@ -220,10 +220,28 @@ class MyUtils:
             await self.fetch_json(
                 "PUT",
                 config.API_URL + "/manage/polls/answers",
-                json={"poll_id": answer.poll_id, "user_id": answer.user.id, "option_ids": list(answer.option_ids)},
+                json={"poll_id": answer.poll_id, "user_id": answer.user.id, "option_ids": list(answer.option_ids), "option_keys": list(answer.option_persistent_ids)},
             )
         except Exception as e:  # the vote is lost for the app; the poll in Telegram still shows it
             logger.error(f"Could not report the answer of {answer.user.id} to poll {answer.poll_id}: {e}", exc_info=True)
+
+    async def poll_option_added(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Tell the API that someone added an option to a poll of the group (the bot's third write, still only a report).
+
+        It carries no sender the gate would know (anybody in the group may add one), so it is taken before the gate and
+        checks the chat itself. The API keeps it only for an open poll that lets the group add options."""
+        message = update.message
+        if message is None or not access.chat_allowed(message.chat.type, message.chat.id, config.TELEGRAM_GROUP_ID) or message.chat.type == access.PRIVATE:
+            return
+        added = message.poll_option_added
+        try:
+            await self.fetch_json(
+                "PUT",
+                config.API_URL + "/manage/polls/options",
+                json={"message_id": added.poll_message.message_id if added.poll_message else None, "key": added.option_persistent_id, "text": added.option_text},
+            )
+        except Exception as e:  # the option is not in the app's poll; its votes will not count until it is
+            logger.error(f"Could not report the option added to a poll: {e}", exc_info=True)
 
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         in_group = update.message.chat.type != access.PRIVATE

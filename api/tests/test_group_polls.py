@@ -113,6 +113,68 @@ class VotesTests(unittest.TestCase):
         self.assertEqual((shown["winners"], shown["voters"]), ([0], 4))
 
 
+class AddedOptionsTests(unittest.TestCase):
+    """Options the group adds in Telegram: they join the poll, and answers are read by the ids Telegram gave."""
+
+    def setUp(self):
+        self.db = make_session()
+
+    def poll(self, allow=True, keys=("k0", "k1", "k2"), **kwargs):
+        return group_polls.create(self.db, None, "¿Cuál?", ["Hades", "Celeste", "Tetris"], False, None, "555", 77, list(keys) if keys else None, allow, **kwargs)
+
+    def test_an_added_option_joins_the_poll_and_gets_votes(self):
+        row = self.poll()
+        self.assertTrue(group_polls.add_option(self.db, 77, "k9", " Hollow Knight "))
+        self.assertEqual(group_polls.option_texts(row), ["Hades", "Celeste", "Tetris", "Hollow Knight"])
+        group_polls.record_answer(self.db, "555", 10, [0], NOW, ["k9"])  # position 0 for Telegram, who has since dropped an option: the id wins
+        shown = group_polls.results(self.db, row)
+        self.assertEqual([(o["text"], o["votes"]) for o in shown["options"]], [("Hades", 0), ("Celeste", 0), ("Tetris", 0), ("Hollow Knight", 1)])
+        self.assertEqual(shown["winners"], [3])
+
+    def test_the_open_poll_takes_it_when_the_message_is_not_known(self):
+        row = self.poll()
+        self.assertTrue(group_polls.add_option(self.db, None, "k9", "Hollow Knight"))
+        self.assertEqual(len(group_polls.option_texts(row)), 4)
+
+    def test_what_does_not_count_is_refused(self):
+        row = self.poll()
+        self.assertFalse(group_polls.add_option(self.db, 99, "k9", "Otro"))  # another message
+        self.assertFalse(group_polls.add_option(self.db, 77, "k1", "Celeste"))  # an option it has
+        self.assertFalse(group_polls.add_option(self.db, 77, "k9", "  "))
+        self.assertFalse(group_polls.add_option(self.db, 77, "k9", "x" * 101))
+        group_polls.close(self.db, row, None, NOW)
+        self.assertFalse(group_polls.add_option(self.db, 77, "k9", "Hollow Knight"))
+        self.assertEqual(len(group_polls.option_texts(row)), 3)
+
+    def test_a_poll_that_does_not_let_the_group_add_ignores_them(self):
+        self.poll(allow=False)
+        self.assertFalse(group_polls.add_option(self.db, 77, "k9", "Hollow Knight"))
+
+    def test_a_poll_from_before_the_ids_has_none_to_add_to(self):
+        self.poll(keys=None)
+        self.assertFalse(group_polls.add_option(self.db, 77, "k9", "Hollow Knight"))
+
+    def test_a_full_poll_takes_no_more(self):
+        row = group_polls.create(self.db, None, "¿?", [str(n) for n in range(10)], False, None, "555", 77, [f"k{n}" for n in range(10)], True)
+        self.assertFalse(group_polls.add_option(self.db, 77, "k99", "once"))
+        self.assertEqual(len(group_polls.option_texts(row)), 10)
+
+    def test_an_answer_with_an_id_that_is_not_an_option_counts_for_nothing(self):
+        row = self.poll()
+        group_polls.record_answer(self.db, "555", 10, [], NOW, ["k1", "nope"])
+        self.assertEqual(json.loads(self.db.get(models.GroupPollVote, (row.id, 10)).option_ids), [1])
+        group_polls.record_answer(self.db, "555", 10, [], NOW, ["nope"])  # the added option it names has not reached us: a vote taken back
+        self.assertIsNone(self.db.get(models.GroupPollVote, (row.id, 10)))
+
+    def test_without_ids_an_answer_is_read_by_position_as_before(self):
+        row = self.poll()
+        group_polls.record_answer(self.db, "555", 10, [2], NOW)
+        self.assertEqual(json.loads(self.db.get(models.GroupPollVote, (row.id, 10)).option_ids), [2])
+        old = group_polls.create(self.db, None, "¿?", ["a", "b"], False, None, "777", 78)
+        group_polls.record_answer(self.db, "777", 10, [1], NOW, ["whatever"])  # a poll with no ids ignores them
+        self.assertEqual(json.loads(self.db.get(models.GroupPollVote, (old.id, 10)).option_ids), [1])
+
+
 class ClosingTests(unittest.TestCase):
     def setUp(self):
         self.db = make_session()
@@ -179,25 +241,30 @@ class ClosingTests(unittest.TestCase):
 class TelegramSendTests(unittest.TestCase):
     """The poll is sent non-anonymous (without it the bot would never hear who voted what)."""
 
-    def send(self, error=None, settings=None):
+    def send(self, error=None, settings=None, allow_adding_options=False):
         bot = mock.MagicMock()
         bot.__aenter__ = mock.AsyncMock(return_value=bot)
         bot.__aexit__ = mock.AsyncMock(return_value=False)
-        bot.send_poll = mock.AsyncMock(return_value=mock.Mock(poll=mock.Mock(id="555"), message_id=77), side_effect=error)
+        options = [mock.Mock(persistent_id="k0"), mock.Mock(persistent_id="k1")]
+        bot.send_poll = mock.AsyncMock(return_value=mock.Mock(poll=mock.Mock(id="555", options=options), message_id=77), side_effect=error)
         values = {"telegram.token": "t", "telegram.group_id": "-1", **(settings or {})}
         with mock.patch.object(polls.settings, "get", side_effect=lambda key: values[key]), mock.patch.object(polls.telegram, "Bot", return_value=bot):
             try:
-                return asyncio.run(polls.send("¿Cuál?", ["Hades", "Celeste"], True)), bot
+                return asyncio.run(polls.send("¿Cuál?", ["Hades", "Celeste"], True, allow_adding_options)), bot
             except polls.TelegramFailure as e:
                 return e, bot
 
     def test_it_is_not_anonymous_and_gives_back_the_ids_that_answers_and_the_stop_need(self):
         sent, bot = self.send()
-        self.assertEqual(sent, ("555", 77))
+        self.assertEqual(sent, ("555", 77, ["k0", "k1"]))  # the ids Telegram gave the options are what answers are read by
         self.assertEqual(
             bot.send_poll.await_args.kwargs,
-            {"chat_id": "-1", "question": "¿Cuál?", "options": ["Hades", "Celeste"], "is_anonymous": False, "allows_multiple_answers": True},
+            {"chat_id": "-1", "question": "¿Cuál?", "options": ["Hades", "Celeste"], "is_anonymous": False, "allows_multiple_answers": True, "allow_adding_options": False},
         )
+
+    def test_the_group_is_let_add_options_only_when_asked(self):
+        _, bot = self.send(allow_adding_options=True)
+        self.assertTrue(bot.send_poll.await_args.kwargs["allow_adding_options"])
 
     def test_a_refusal_of_telegram_is_told_to_the_admin(self):
         failure, _ = self.send(error=polls.telegram.error.BadRequest("Chat not found"))

@@ -55,7 +55,7 @@ SNAPSHOTS = {
 }
 # (method, entity, id) of the writes the bot makes on behalf of the group, which the log does not keep: one row for every
 # vote of the group would bury what the admins change
-UNAUDITED = frozenset({("PUT", "polls", "answers")})
+UNAUDITED = frozenset({("PUT", "polls", "answers"), ("PUT", "polls", "options")})
 # never copied into the log: secrets, and pictures that would only make it heavy
 SKIPPED_COLUMNS = {"password", "avatar", "image"}
 
