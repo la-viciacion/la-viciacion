@@ -191,6 +191,9 @@ def main() -> None:
     # a poll answer carries no chat, so the gate would stop it: it is taken before the gate (group -2). Only the polls
     # this bot sent reach it, and the API keeps an answer only for a poll it launched
     app.add_handler(PollAnswerHandler(utils.poll_answer), group=-2)
+    # an option somebody added to a poll is a service message of the group that the gate would drop (anybody may add one,
+    # linked or not), so it is taken here and checks the chat itself
+    app.add_handler(MessageHandler(filters.StatusUpdate.POLL_OPTION_ADDED, utils.poll_option_added), group=-2)
     # group -1 runs before everything else; the gate stops what is not the app's group or users
     app.add_handler(TypeHandler(Update, utils.gate), group=-1)
     app.add_handler(conv_handler)

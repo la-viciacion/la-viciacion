@@ -26,6 +26,7 @@ class NewPoll(BaseModel):
     question: str
     options: Union[list[str], str]  # the panel's form posts one option per line
     multiple: bool = False  # several answers allowed
+    allow_adding_options: bool = False  # the group may add options of their own in Telegram
     closes_at: Optional[datetime.datetime] = None  # the deadline; without one it is closed by hand
 
 
@@ -42,7 +43,7 @@ def launch_poll(body: NewPoll, admin: models.User = Depends(auth.require_admin),
         raise HTTPException(status_code=400, detail=str(e))
     try:
         # a plain def runs in a worker thread: the loop it starts there is not the one that serves the other requests
-        poll = asyncio.run(polls.launch(db, admin, question, options, body.multiple, body.closes_at))
+        poll = asyncio.run(polls.launch(db, admin, question, options, body.multiple, body.closes_at, body.allow_adding_options))
     except polls.TelegramFailure as e:
         raise HTTPException(status_code=502, detail=str(e))
     return group_polls.view(db, poll)
@@ -75,11 +76,24 @@ def delete_poll(poll_id: int, db: Session = Depends(get_db)):
 class Answer(BaseModel):
     poll_id: str  # Telegram's id of the poll
     user_id: int  # Telegram's id of who answered
-    option_ids: list[int]  # what they chose now; none = they took their vote back
+    option_ids: list[int]  # what they chose now (positions); none = they took their vote back
+    option_keys: Optional[list[str]] = None  # the same by the ids Telegram gave the options: what a poll that has them reads
 
 
 @router.put("/polls/answers")
 def record_answer(body: Answer, db: Session = Depends(get_db)):
     """What the bot reports when someone answers a poll of the group. It is not kept in the audit log (one row per vote would
     bury the changes of the admins). An answer to a poll that is not ours or is closed here counts for nothing."""
-    return {"recorded": group_polls.record_answer(db, body.poll_id, body.user_id, body.option_ids, datetime.datetime.now())}
+    return {"recorded": group_polls.record_answer(db, body.poll_id, body.user_id, body.option_ids, datetime.datetime.now(), body.option_keys)}
+
+
+class AddedOption(BaseModel):
+    message_id: Optional[int] = None  # the poll's message in Telegram, when the service message says which
+    key: str  # the id Telegram gave the option
+    text: str
+
+
+@router.put("/polls/options")
+def add_option(body: AddedOption, db: Session = Depends(get_db)):
+    """What the bot reports when someone adds an option to a poll of the group (not audited, like the answers)."""
+    return {"recorded": group_polls.add_option(db, body.message_id, body.key, body.text)}

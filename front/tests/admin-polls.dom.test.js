@@ -13,7 +13,7 @@ const { describe } = await import('../js/pages/admin/audit-labels.js');
 afterEach(() => closeAllModals());
 
 const poll = (extra = {}) => ({
-  id: 4, question: '¿A qué <b>jugamos</b>?', multiple: false, status: 'open', closes_at: null, closed_at: null, telegram_stopped: false, missed_votes: false,
+  id: 4, question: '¿A qué <b>jugamos</b>?', multiple: false, allow_adding_options: false, status: 'open', closes_at: null, closed_at: null, telegram_stopped: false, missed_votes: false,
   voters: 3, winners: [0],
   options: [
     { text: 'Hades', votes: 2, voters: [{ user_id: 1, name: 'Ana' }, { user_id: null, name: null }] },
@@ -26,7 +26,7 @@ test('the polls are listed under the notifications and launched with a question,
   assert.ok(SECTIONS.find((s) => s.label === 'Notificaciones').tabs.includes('polls'));
   assert.ok(!SECTIONS.find((s) => s.label === 'Jugadores').tabs.includes('polls'));
   const [create] = ENTITIES.polls.creates;
-  assert.deepEqual(create.fields.map((f) => [f.key, f.type]), [['question', 'text'], ['options', 'options'], ['multiple', 'checkbox'], ['closes_at', 'datetime']]);
+  assert.deepEqual(create.fields.map((f) => [f.key, f.type]), [['question', 'textarea'], ['options', 'options'], ['multiple', 'checkbox'], ['allow_adding_options', 'checkbox'], ['closes_at', 'datetime']]);
   assert.deepEqual(create.fields.filter((f) => f.required).map((f) => f.key), ['question', 'options']);
 });
 

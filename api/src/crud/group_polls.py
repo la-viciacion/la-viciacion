@@ -63,9 +63,11 @@ def winners(counts: list[int]) -> list[int]:
 def create(
     db: Session, creator: models.User | None, question: str, options: list[str], multiple: bool,
     closes_at: datetime.datetime | None, telegram_poll_id: str, telegram_message_id: int,
+    option_keys: list[str] | None = None, allow_adding_options: bool = False,
 ) -> models.GroupPoll:
     poll = models.GroupPoll(
         question=question, options=json.dumps(options, ensure_ascii=False), multiple=bool(multiple), closes_at=closes_at,
+        option_keys=json.dumps(option_keys) if option_keys is not None else None, allow_adding_options=bool(allow_adding_options),
         telegram_poll_id=telegram_poll_id, telegram_message_id=telegram_message_id, created_by=creator.id if creator else None,
     )
     db.add(poll)
@@ -82,13 +84,41 @@ def option_texts(poll: models.GroupPoll) -> list[str]:
     return json.loads(poll.options)
 
 
-def record_answer(db: Session, telegram_poll_id: str, telegram_user_id: int, option_ids: list[int], now: datetime.datetime) -> bool:
+def add_option(db: Session, telegram_message_id: int | None, key: str, text: str) -> bool:
+    """Append an option the group added in Telegram to its poll: the one with that message, or the open one when the
+    message is not known (there is only one). False when it counts for nothing: no such open poll, one that does not let
+    the group add options, an option it already has, or one Telegram would not have let in (a full poll, a long text)."""
+    query = db.query(models.GroupPoll).filter(models.GroupPoll.closed_at.is_(None))
+    if telegram_message_id is not None:
+        query = query.filter_by(telegram_message_id=telegram_message_id)
+    poll = query.first()
+    text = str(text or "").strip()
+    if poll is None or not poll.allow_adding_options or poll.option_keys is None or not key or not 1 <= len(text) <= MAX_OPTION:
+        return False
+    texts, keys = option_texts(poll), json.loads(poll.option_keys)
+    if key in keys or len(texts) >= MAX_OPTIONS:
+        return False
+    poll.options = json.dumps(texts + [text], ensure_ascii=False)
+    poll.option_keys = json.dumps(keys + [key])
+    db.commit()
+    return True
+
+
+def record_answer(
+    db: Session, telegram_poll_id: str, telegram_user_id: int, option_ids: list[int], now: datetime.datetime,
+    option_keys: list[str] | None = None,
+) -> bool:
     """Keep what a person chose now in a poll (nothing chosen = they took their vote back). False when it counts for
-    nothing: a poll that is not ours, or one already closed here. Positions that are not an option are dropped."""
+    nothing: a poll that is not ours, or one already closed here. A poll that knows its options' ids reads the answer by
+    them (positions shift in Telegram as options come and go); one that does not, or an answer without them, by position.
+    What is not an option is dropped."""
     poll = db.query(models.GroupPoll).filter_by(telegram_poll_id=str(telegram_poll_id)).first()
     if poll is None or poll.closed_at is not None:
         return False
     total = len(option_texts(poll))
+    if option_keys is not None and poll.option_keys is not None:
+        known = json.loads(poll.option_keys)
+        option_ids = [known.index(key) for key in option_keys if key in known]
     chosen = sorted({position for position in option_ids if isinstance(position, int) and 0 <= position < total})
     if not poll.multiple:
         chosen = chosen[:1]
@@ -167,7 +197,7 @@ def view(db: Session, poll: models.GroupPoll) -> dict:
     """A poll as the panel shows it."""
     shown = results(db, poll)
     return {
-        "id": poll.id, "question": poll.question, "multiple": bool(poll.multiple),
+        "id": poll.id, "question": poll.question, "multiple": bool(poll.multiple), "allow_adding_options": bool(poll.allow_adding_options),
         "status": "open" if poll.closed_at is None else "closed",
         "closes_at": poll.closes_at, "closed_at": poll.closed_at, "created_at": poll.created_at,
         "telegram_stopped": bool(poll.telegram_stopped),

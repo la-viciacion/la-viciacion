@@ -50,17 +50,20 @@ def _bot_and_group() -> tuple[str, str]:
     return token, group
 
 
-async def send(question: str, options: list[str], multiple: bool) -> tuple[str, int]:
-    """Send the poll to the group: (the id of the poll, the id of its message). Not tied to the notifications switch,
-    like a test message: an admin asked for it. Raises TelegramFailure with why."""
+async def send(question: str, options: list[str], multiple: bool, allow_adding_options: bool = False) -> tuple[str, int, list[str]]:
+    """Send the poll to the group: (the id of the poll, the id of its message, the ids Telegram gave its options). Not
+    tied to the notifications switch, like a test message: an admin asked for it. Raises TelegramFailure with why."""
     token, group = _bot_and_group()
     try:
         async with telegram.Bot(token) as bot:
-            message = await bot.send_poll(chat_id=group, question=question, options=options, is_anonymous=False, allows_multiple_answers=multiple)
+            message = await bot.send_poll(
+                chat_id=group, question=question, options=options, is_anonymous=False, allows_multiple_answers=multiple,
+                allow_adding_options=allow_adding_options,
+            )
     except Exception as e:
         logger.error(f"Could not send the poll: {e}", exc_info=True)
         raise TelegramFailure(f"Telegram no aceptó la encuesta: {e}")
-    return message.poll.id, message.message_id
+    return message.poll.id, message.message_id, [option.persistent_id for option in message.poll.options]
 
 
 async def stop(poll: models.GroupPoll) -> tuple[bool, int | None]:
@@ -85,10 +88,11 @@ async def stop(poll: models.GroupPoll) -> tuple[bool, int | None]:
 
 async def launch(
     db: Session, creator: models.User, question: str, options: list[str], multiple: bool, closes_at: datetime.datetime | None,
+    allow_adding_options: bool = False,
 ) -> models.GroupPoll:
     """Send a poll that was already checked (`group_polls.clean`) and keep it."""
-    poll_id, message_id = await send(question, options, multiple)
-    return group_polls.create(db, creator, question, options, multiple, closes_at, poll_id, message_id)
+    poll_id, message_id, keys = await send(question, options, multiple, allow_adding_options)
+    return group_polls.create(db, creator, question, options, multiple, closes_at, poll_id, message_id, keys, allow_adding_options)
 
 
 async def close(db: Session, poll: models.GroupPoll, admin_id: int | None, announce: bool, now: datetime.datetime) -> bool:
