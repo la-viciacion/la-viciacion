@@ -104,9 +104,9 @@ test('the table shows the votes with who gave them (escaped), the winner and wha
     return box;
   };
   const shown = text(result, poll());
-  assert.match(shown.textContent, /2 Hades 🏆/);
+  assert.match(shown.textContent, /🏆 Hades · 2 votos/);
   assert.match(shown.textContent, /Ana, sin cuenta/);
-  assert.doesNotMatch(shown.textContent, /Celeste 🏆/);
+  assert.doesNotMatch(shown.textContent, /🏆 Celeste/);
   assert.equal(text(question, poll()).querySelectorAll('b').length, 0);
   assert.match(text(state, poll()).textContent, /Abierta/);
   assert.match(text(state, poll({ status: 'closed', telegram_stopped: false, missed_votes: true })).textContent, /Cerrada.*Sigue abierta en Telegram.*Faltan votos/);

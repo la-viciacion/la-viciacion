@@ -93,6 +93,14 @@ class LaunchTests(PollsTestCase):
         self.assertEqual((response.status_code, response.json()["detail"]), (502, "Falta el token del bot o el ID del grupo"))
         self.assertEqual(self.scalar("SELECT COUNT(*) FROM group_polls"), 0)
 
+    def test_only_one_poll_can_be_open_at_a_time(self):
+        first = self.launch().json()["id"]
+        refused = self.launch(question="¿Y ahora?")
+        self.assertEqual((refused.status_code, refused.json()["detail"]), (409, "Ya hay una encuesta abierta: ciérrala antes de lanzar otra"))
+        self.assertEqual((len(self.sent), self.scalar("SELECT COUNT(*) FROM group_polls")), (1, 1))  # nothing reached the group
+        self.close(first)
+        self.assertEqual(self.launch(question="¿Y ahora?").status_code, 201)
+
     def test_the_deadline_is_kept(self):
         closes_at = clock.now() + timedelta(days=2)
         self.launch(closes_at=closes_at.isoformat())

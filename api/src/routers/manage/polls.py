@@ -31,7 +31,10 @@ class NewPoll(BaseModel):
 
 @router.post("/polls", status_code=201)
 def launch_poll(body: NewPoll, admin: models.User = Depends(auth.require_admin), db: Session = Depends(get_db)):
-    """Send a non-anonymous poll to the Telegram group. Not tied to the notifications switch: an admin asked for it."""
+    """Send a non-anonymous poll to the Telegram group. Not tied to the notifications switch: an admin asked for it.
+    Only one can be open at a time: the next is launched once the open one is closed."""
+    if group_polls.open_poll(db) is not None:
+        raise HTTPException(status_code=409, detail="Ya hay una encuesta abierta: ciérrala antes de lanzar otra")
     options = body.options.splitlines() if isinstance(body.options, str) else body.options
     try:
         question, options = group_polls.clean(body.question, options, body.closes_at, datetime.datetime.now())
