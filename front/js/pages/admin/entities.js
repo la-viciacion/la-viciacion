@@ -338,7 +338,7 @@ export const ENTITIES = {
 
   polls: {
     label: 'Encuestas',
-    description: 'Encuestas al grupo de Telegram: no anónimas, así que aquí se ve quién votó qué. Se cierran a mano o al llegar su fecha límite; al cerrarlas se avisa al grupo de la opción ganadora. Si Telegram no deja pararla, la encuesta queda cerrada aquí igualmente (ya no cuentan los votos) y se vuelve a intentar sola durante un día.',
+    description: 'Encuestas al grupo de Telegram, de una en una (no se puede lanzar otra mientras haya una abierta): no anónimas, así que aquí se ve quién votó qué. Se cierran a mano o al llegar su fecha límite; al cerrarlas se avisa al grupo de la opción ganadora. Si Telegram no deja pararla, la encuesta queda cerrada aquí igualmente (ya no cuentan los votos) y se vuelve a intentar sola durante un día.',
     endpoint: '/manage/polls',
     paged: false,
     readOnly: true,
@@ -346,7 +346,7 @@ export const ENTITIES = {
       { label: 'Encuesta', render: (r) => html`<strong>${r.question}</strong><div class="adm-sub">${r.multiple ? 'Varias respuestas' : 'Una respuesta'} · ${r.voters} ${r.voters === 1 ? 'votante' : 'votantes'}</div>` },
       {
         label: 'Resultado',
-        render: (r) => html`<ul class="adm-list">${r.options.map((o, i) => html`<li><strong>${o.votes}</strong> ${o.text}${r.winners.includes(i) ? ' 🏆' : ''}${o.voters.length ? html`<div class="adm-sub">${o.voters.map((v) => v.name ?? 'sin cuenta').join(', ')}</div>` : ''}</li>`)}</ul>`,
+        render: (r) => html`<ul class="adm-list">${r.options.map((o, i) => html`<li>${r.winners.includes(i) ? '🏆 ' : ''}${o.text} <span class="adm-sub">· ${o.votes} ${o.votes === 1 ? 'voto' : 'votos'}</span>${o.voters.length ? html`<div class="adm-sub">${o.voters.map((v) => v.name ?? 'sin cuenta').join(', ')}</div>` : ''}</li>`)}</ul>`,
       },
       {
         label: 'Estado',

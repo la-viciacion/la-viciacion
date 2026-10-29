@@ -73,6 +73,11 @@ def create(
     return poll
 
 
+def open_poll(db: Session) -> models.GroupPoll | None:
+    """The poll still open, if any: the group has one at a time."""
+    return db.query(models.GroupPoll).filter(models.GroupPoll.closed_at.is_(None)).first()
+
+
 def option_texts(poll: models.GroupPoll) -> list[str]:
     return json.loads(poll.options)
 
