@@ -86,7 +86,7 @@ function fieldHtml(f, value, row) {
     case 'date':
       return html`<label>${f.label}<input class="adm-input" type="date" id="${id}" value="${String(v).slice(0, 10)}" /></label>`;
     case 'textarea':
-      return html`<label>${f.label}<textarea class="adm-input" id="${id}" rows="${f.rows || 4}">${v}</textarea></label>`;
+      return html`<label>${f.label}<textarea class="adm-input${f.grow ? ' adm-grow' : ''}" id="${id}" rows="${f.rows || (f.grow ? 1 : 4)}" maxlength="${f.maxLength || ''}">${v}</textarea></label>`;
     case 'number':
       return html`<label>${f.label}<input class="adm-input" type="number" step="${f.step || '1'}" id="${id}" value="${v}" /></label>`;
     default:
@@ -100,6 +100,17 @@ function numberOptions(list) {
     input.placeholder = `Opción ${i + 1}`;
     input.setAttribute('aria-label', `Opción ${i + 1}`);
   });
+}
+
+// A one-line text that may run long: the box grows downward instead of scrolling sideways.
+function autoGrow(area) {
+  const fit = () => {
+    area.style.height = 'auto';
+    area.style.height = `${area.scrollHeight}px`;
+  };
+  area.addEventListener('input', fit);
+  area.addEventListener('keydown', (e) => { if (e.key === 'Enter') e.preventDefault(); });
+  fit();
 }
 
 function readField(f) {
@@ -229,6 +240,7 @@ export function openForm(entity, row, admin, variant = null) {
     </form>`, { wide: true });
 
   fields.filter((f) => f.type === 'options').forEach((f) => numberOptions(modal.el.querySelector(`#f_${f.key}`)));
+  modal.el.querySelectorAll('textarea.adm-grow').forEach(autoGrow);
   modal.el.addEventListener('click', (e) => onFormClick(e, modal, fields));
   modal.el.querySelector('form').addEventListener('submit', (e) => {
     e.preventDefault();
