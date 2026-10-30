@@ -84,6 +84,12 @@ def remaining_text(part: dict) -> str:
     return f"te faltan {_hours(part['target_seconds'] - part['seconds'])}"
 
 
+def group_start_message(title: str, summary: str, voluntary: bool, joined: int, players: int) -> str:
+    """The group hears a challenge it already knew about begins today; a voluntary one says how many signed up."""
+    who = f"Se han apuntado {joined} de {players}." if voluntary else "Participáis todos; quien no quiera, puede salirse en Retos."
+    return f"🚦 *Hoy empieza un reto del grupo*\n{_bold(title)}\n{utils.escape_markdown(summary)}\n{who}"
+
+
 def results_message(lines: list[str]) -> str:
     """One message with how the player's challenges that ended yesterday went (the first line is what a push shows)."""
     header = "🏁 Ha terminado uno de tus retos" if len(lines) == 1 else f"🏁 Han terminado {len(lines)} de tus retos"
@@ -222,8 +228,8 @@ async def proposal_decided(db: Session, proposal_id: int) -> str:
 async def announce_results(db: Session, today: datetime.date) -> str:
     """The challenges that ended yesterday: each participant gets one message with how theirs went (what concerns
     them) and the group hears how each group challenge ended (if an admin left that on). A declined duel is nothing."""
-    private, group = settings.get("challenges.private_notices"), settings.get("challenges.result_notice")
-    if not (private or group):
+    private, group, starts = settings.get("challenges.private_notices"), settings.get("challenges.result_notice"), settings.get("challenges.start_notice")
+    if not (private or group or starts):
         return "off"
     lines: dict[int, list[str]] = {}
     group_messages = []
@@ -251,7 +257,25 @@ async def announce_results(db: Session, today: datetime.date) -> str:
     if group:
         for message in group_messages:
             await utils.send_message(message, False)
-    return f"{told} told, {len(group_messages) if group else 0} to the group"
+    started = await announce_starts(db, today) if starts else 0
+    return f"{told} told, {len(group_messages) if group else 0} to the group, {started} started"
+
+
+async def announce_starts(db: Session, today: datetime.date) -> int:
+    """The group challenges that begin today and were launched on an earlier day: one message each to the group (the
+    launch notice said they would; this one says it is time and, if it is voluntary, how many signed up). One launched
+    today already said so when it was launched."""
+    players = db.query(models.User.id).filter(models.User.is_active == 1, models.not_god()).count()
+    sent = 0
+    for challenge in db.query(models.Challenge).filter(models.Challenge.starts_on == today, models.Challenge.scope == challenges.GROUP).order_by(models.Challenge.id):
+        if challenge.created_at is not None and challenge.created_at.date() >= today:
+            continue
+        voluntary = challenge.participation == challenges.OPT_IN
+        joined = len(challenges_crud.participants(db, challenge))
+        summary = challenges.TEMPLATES[challenge.kind].summary(challenge)
+        await utils.send_message(group_start_message(challenge.title, summary, voluntary, joined, players), False)
+        sent += 1
+    return sent
 
 
 async def send_reminders(db: Session, today: datetime.date) -> str:

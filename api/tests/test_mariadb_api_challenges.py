@@ -183,6 +183,22 @@ class ProgressTests(ChallengesTestCase):
         self.assertEqual(body["status"], "upcoming")
         self.assertEqual(body["progress"]["total_seconds"], 0)
 
+    def test_a_challenge_can_have_its_own_dates_and_a_voluntary_one_can_be_joined_before_it_begins(self):
+        starts, ends = TODAY() + timedelta(days=5), TODAY() + timedelta(days=12)
+        launched = self.launch(participation="opt_in", month=None, starts_on=starts.isoformat(), ends_on=ends.isoformat())
+        self.assertEqual(launched.status_code, 201)
+        body = launched.json()
+        self.assertEqual((body["status"], body["starts_on"], body["ends_on"]), ("upcoming", starts.isoformat(), ends.isoformat()))
+        joined = self.api("PUT", f"/challenges/{body['id']}/participation", as_user="ana", params={"joined": True})
+        self.assertEqual(joined.status_code, 200)
+        shown = self.api("GET", f"/challenges/{body['id']}", as_user="ana").json()
+        self.assertEqual([p["name"] for p in shown["progress"]["players"]], ["Ana"])
+
+    def test_dates_that_make_no_sense_are_refused(self):
+        past = (TODAY() - timedelta(days=3)).isoformat()
+        for changes in ({"starts_on": past, "ends_on": past}, {"starts_on": TODAY().isoformat()}, {"starts_on": "2026-12-05", "ends_on": "2026-12-01"}):
+            self.assertEqual(self.launch(**changes).status_code, 400, msg=repr(changes))
+
     def test_the_list_has_every_challenge_with_its_progress(self):
         self.launch()
         self.launch(game_id="celeste")

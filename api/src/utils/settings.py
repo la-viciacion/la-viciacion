@@ -166,6 +166,7 @@ REGISTRY: dict[str, Spec] = {
     "challenges.private_notices": Spec("bool", True),
     "challenges.result_notice": Spec("bool", True),
     "challenges.reminders": Spec("bool", True),
+    "challenges.start_notice": Spec("bool", True),
     "challenges.results_time": Spec("str", "09:30", check=_time),
     "challenges.reminders_time": Spec("str", "10:00", check=_time),
     # Days the app's notification inbox keeps a notice before the scheduler purges it (utils/inbox.py)

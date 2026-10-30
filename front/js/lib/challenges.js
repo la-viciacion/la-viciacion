@@ -36,6 +36,12 @@ export function timeLeft(challenge, today = new Date()) {
   return days === 1 ? 'Queda 1 día' : `Quedan ${days} días`;
 }
 
+/** "Todavía no se ha apuntado nadie", "Se ha apuntado 1 jugador", "Se han apuntado 3 jugadores": who joined a voluntary challenge. */
+export function joinedLine(count) {
+  if (!count) return 'Todavía no se ha apuntado nadie';
+  return count === 1 ? 'Se ha apuntado 1 jugador' : `Se han apuntado ${count} jugadores`;
+}
+
 /** The next months a group challenge can be launched for, from the running one: [{ value: "2026-10", label: "Octubre 2026" }, ...]. */
 export function launchMonths(today = new Date(), count = 4) {
   return Array.from({ length: count }, (_, i) => {

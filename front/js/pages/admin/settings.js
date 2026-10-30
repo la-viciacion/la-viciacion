@@ -142,6 +142,7 @@ function view(values, jobs, pushDevices, mail, aiUses, aiModel, chat) {
         <h3>Retos</h3>
         ${check('challenges.private_notices', 'Avisos privados de retos', 'Lo que afecta a cada jugador, por mensaje privado (Telegram o app, según elija cada uno en su perfil): que le han retado a un duelo, que le han rechazado uno, cómo se ha contestado una propuesta suya y cómo han terminado sus retos. Los retos personales y los duelos nunca se avisan al grupo.')}
         ${check('challenges.result_notice', 'Avisar al grupo de cómo ha terminado un reto de grupo', 'Un solo mensaje por reto, al día siguiente de su final: cuántos cumplieron su parte, si se llegó al total y quién ganó si era una competición.')}
+        ${check('challenges.start_notice', 'Avisar al grupo de que empieza un reto de grupo', 'Un mensaje el día que empieza un reto que se lanzó antes (con las personas apuntadas, si es voluntario). Un reto lanzado el mismo día en que empieza ya lo dijo al lanzarse. Sale a la hora de los resultados.')}
         ${check('challenges.reminders', 'Permitir los recordatorios de retos', 'Un mensaje privado cuando a un reto le quedan 2 días, a quien no lo ha cumplido. Cada jugador lo tiene desactivado hasta que lo activa en su perfil; apagado aquí, no se envía a nadie.')}
         <div class="adm-set-row">
           <label>Hora de los resultados <input class="adm-input" type="time" name="challenges.results_time" required /></label>

@@ -50,6 +50,8 @@ class NewGroupChallenge(BaseModel):
     # the options of the templates, flat (the panel's form posts them as they are); each template reads its own
     game_id: Optional[str] = None
     month: Optional[str] = None
+    starts_on: Optional[str] = None  # free dates instead of a month ("YYYY-MM-DD", both inclusive)
+    ends_on: Optional[str] = None
     min_hours_each: Optional[float] = None
     min_hours_total: Optional[float] = None
     tag: Optional[str] = None

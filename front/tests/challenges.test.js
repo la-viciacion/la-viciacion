@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { amountLabel, blocks, daysUntil, debtPreview, digest, digestLine, hoursLabel, launchMonths, medal, partTarget, partValue, percent, remainingLabel, resultLine, standing, summaryLine, timeLeft, totalPart } from '../js/lib/challenges.js';
+import { amountLabel, blocks, daysUntil, debtPreview, digest, digestLine, hoursLabel, joinedLine, launchMonths, medal, partTarget, partValue, percent, remainingLabel, resultLine, standing, summaryLine, timeLeft, totalPart } from '../js/lib/challenges.js';
 
 const TODAY = new Date(2026, 9, 15, 12, 0); // 15 October 2026
 
@@ -33,6 +33,12 @@ test('the time left says where the challenge is', () => {
   assert.equal(at('upcoming', '2026-10-16', '2026-10-31'), 'Empieza mañana');
   assert.equal(at('upcoming', '2026-11-01', '2026-11-30'), 'Empieza en 17 días');
   assert.equal(at('finished', '2026-09-01', '2026-09-30'), 'Terminado');
+});
+
+test('who joined a voluntary challenge is counted', () => {
+  assert.equal(joinedLine(0), 'Todavía no se ha apuntado nadie');
+  assert.equal(joinedLine(1), 'Se ha apuntado 1 jugador');
+  assert.equal(joinedLine(4), 'Se han apuntado 4 jugadores');
 });
 
 test('the months to launch for start at the running one and cross the year', () => {

@@ -49,6 +49,14 @@ class MessageTests(unittest.TestCase):
         self.assertEqual(notices.reminders_message(["x"]).splitlines()[0], "⏰ Te quedan 2 días en un reto")
         self.assertEqual(notices.reminders_message(["x", "y", "z"]).splitlines()[0], "⏰ Te quedan 2 días en 3 retos")
 
+    def test_the_start_notice_counts_who_signed_up_only_in_a_voluntary_challenge(self):
+        voluntary = notices.group_start_message("Temático: Horror", "Jugar 2 h.", True, 3, 6)
+        self.assertEqual(voluntary.splitlines()[0], "🚦 *Hoy empieza un reto del grupo*")
+        self.assertIn("Se han apuntado 3 de 6.", voluntary)
+        everybody = notices.group_start_message("Temático: Horror", "Jugar 2 h.", False, 6, 6)
+        self.assertNotIn("apuntado", everybody)
+        self.assertIn("Participáis todos", everybody)
+
     def test_names_are_joined_in_spanish(self):
         self.assertEqual([my_utils.join_names(n) for n in (["A"], ["A", "B"], ["A", "B", "C"])], ["A", "A y B", "A, B y C"])
 
