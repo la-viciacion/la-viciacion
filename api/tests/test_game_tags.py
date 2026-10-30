@@ -19,6 +19,9 @@ class CleanTests(unittest.TestCase):
         ]
         self.assertEqual(game_tags.clean(["Horror", *noise, "Co-op"]), "Horror,Co-op")
 
+    def test_a_word_of_the_noise_inside_another_word_does_not_drop_a_theme(self):
+        self.assertEqual(game_tags.clean(["Steampunk", "VR Supported", "Steam Cloud"]), "Steampunk,VR Supported")
+
     def test_a_name_in_another_script_or_in_lower_case_goes(self):
         self.assertEqual(game_tags.clean(["Протагонистка", "2D-платформер", "cooperative", "steam-trading-cards", "nature", "RPG"]), "RPG")
 

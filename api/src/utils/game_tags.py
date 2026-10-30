@@ -15,26 +15,35 @@ IGNORED = frozenset({
     "custom volume controls", "subtitle options", "hdr available", "captions available", "true exclusive",
 })
 
-# Dropped when the name has one of these words in it: the features of the Steam store and of the accessibility menus
-IGNORED_WORDS = re.compile(r"steam|controller|support|available|remote play|captions|subtitle|volume", re.IGNORECASE)
+# Dropped when the name has one of these words: the features of the Steam store and of the accessibility menus. Whole
+# words, so Steampunk stays; "controller" also as the start of a word (translations such as "Controllerunterstützung")
+IGNORED_WORDS = frozenset({"steam", "available", "captions", "subtitle", "volume"})
 
 # Kept whatever the rules say (what the code itself reads, see utils/external_events.py)
-KEPT = frozenset({"horror"})
+KEPT = "horror"
 
-# The letters of English and of the Latin alphabet with accents; a name in another script is the translation of one
-NON_LATIN = re.compile(r"[^\x20-\x7e -ɏ]")
+# The highest character of the Latin alphabets with accents (U+024F); a name with anything above it is in another script
+LAST_LATIN = 0x24F
 
 
 def keeps(name: str) -> bool:
     """Is a tag worth keeping? Not if it is on the list, has one of the words of the Steam features, is in another
     script, or starts in lower case (the tags that people add to RAWG: `cooperative`, `steam-trading-cards`, `nature`,
     which repeat a proper one)."""
-    key = name.strip().casefold()
+    name = name.strip()
+    key = name.casefold()
     if not key:
         return False
-    if key in KEPT or any(word in key for word in KEPT):
+    if KEPT in key:
         return True
-    return not (key in IGNORED or IGNORED_WORDS.search(key) or NON_LATIN.search(key) or name.strip()[0].islower())
+    words = re.findall(r"[a-z]+", key)
+    return not (
+        key in IGNORED
+        or "remote play" in key
+        or any(word in IGNORED_WORDS or word.startswith("controller") for word in words)
+        or max(map(ord, name)) > LAST_LATIN
+        or name[0].islower()
+    )
 
 
 def clean(names) -> str:
