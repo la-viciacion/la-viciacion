@@ -76,7 +76,7 @@ def create(db: Session, admin: models.User, body: dict, today: datetime.date) ->
     kind = body.get("kind")
     if kind not in SCHEDULABLE:
         raise ChallengeError("Solo se pueden programar retos de juego del mes o temáticos")
-    options = {key: value for key, value in challenges.clean_options(body).items() if key not in ("month", "game_id")}
+    options = {key: value for key, value in challenges.clean_options(body).items() if key not in ("month", "starts_on", "ends_on", "game_id")}
     games = _games(db, kind, body.get("games"))
     participation = body.get("participation") or challenges.AUTO
     _check(db, kind, options, games, participation, today)

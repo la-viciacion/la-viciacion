@@ -33,6 +33,11 @@ const seasonSelect = {
 };
 const platformSelect = { key: 'platform', label: 'Plataforma', options: () => [['', 'Plataforma: todas'], ...platformList().map((p) => [p.id, p.name])] };
 
+// Instead of the whole month: a period with its own first and last day (the challenge may begin later, and a voluntary one can be joined meanwhile)
+const PERIOD_FIELDS = [
+  { key: 'starts_on', label: 'Desde (opcional: sustituye al mes)', type: 'date' },
+  { key: 'ends_on', label: 'Hasta (opcional)', type: 'date' },
+];
 const PARTICIPATION_FIELD = { key: 'participation', label: 'Quién participa', type: 'choice', default: 'auto', options: [['auto', 'Todos (pueden salirse)'], ['opt_in', 'Voluntario (hay que apuntarse)']] };
 
 const userColumn = { label: 'Usuario', sort: 'user', render: (r) => r.user || r.user_id, filter: (r) => ({ user_id: r.user_id }) };
@@ -270,6 +275,7 @@ export const ENTITIES = {
         fields: [
           { key: 'game_id', label: 'Juego', type: 'game', required: true },
           { key: 'month', label: 'Mes', type: 'month', required: true },
+          ...PERIOD_FIELDS,
           { key: 'min_hours_each', label: 'Horas mínimas por jugador', type: 'number', step: '0.5', default: 5, required: true },
           { key: 'min_hours_total', label: 'Horas mínimas entre todos', type: 'number', step: '0.5', default: 20, required: true },
           { key: 'versus', label: 'Además es una competición (gana quien más avance)', type: 'checkbox', default: false },
@@ -282,6 +288,7 @@ export const ENTITIES = {
         body: { kind: 'group_hours' },
         fields: [
           { key: 'month', label: 'Mes', type: 'month', required: true },
+          ...PERIOD_FIELDS,
           { key: 'min_hours_total', label: 'Horas entre todos (de cualquier juego)', type: 'number', step: '0.5', default: 40, required: true },
           { key: 'versus', label: 'Además es una competición (gana quien más aporte)', type: 'checkbox', default: false },
           PARTICIPATION_FIELD,
@@ -297,6 +304,7 @@ export const ENTITIES = {
           return [
             { key: 'tag', label: 'Temática (etiqueta de los juegos)', type: 'choice', required: true, options: tags.length ? tags.map((t) => [t.tag, `${t.tag} (${t.games})`]) : [['', 'No hay etiquetas']] },
             { key: 'month', label: 'Mes', type: 'month', required: true },
+          ...PERIOD_FIELDS,
             { key: 'mode', label: 'Objetivo de cada jugador', type: 'choice', required: true, default: 'play', options: [['play', 'Jugar unas horas'], ['complete', 'Completar al menos un juego']] },
             { key: 'min_hours_each', label: 'Horas mínimas por jugador (si hay que jugar)', type: 'number', step: '0.5', default: 2 },
             { key: 'min_hours_total', label: 'Horas entre todos (opcional, si hay que jugar)', type: 'number', step: '0.5' },

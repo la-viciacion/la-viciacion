@@ -22,7 +22,7 @@ what nothing else can trigger remains here:
                     Only one of wishlist_eve, wishlist_day and wishlist_week runs: `wishlist.group_notice`
   inbox_purge       every day at 04:00, deletes the inbox notices older than `inbox.retention_days`
   challenge_results every day at `challenges.results_time` (09:30), tells who took part how the challenges that ended
-                    yesterday went, and the group how each group challenge did
+                    yesterday went, the group how each group challenge did and which ones launched earlier begin today
   challenge_reminders  every day at `challenges.reminders_time` (10:00), reminds (only whoever turned it on) of the
                     challenges with two days left that they have not met
   group_polls       every minute while a poll's deadline has passed, closes it (and tells the group the winner)
@@ -325,7 +325,7 @@ def tick(now: datetime.datetime | None = None) -> None:
         if is_due(now, slot, _last_run(db, "inbox_purge"), DAILY_GRACE) and _claim(db, "inbox_purge", slot, now):
             _run(db, "inbox_purge", lambda: _inbox_purge(db))
 
-        if notifications and (settings.get("challenges.private_notices") or settings.get("challenges.result_notice")):
+        if notifications and (settings.get("challenges.private_notices") or settings.get("challenges.result_notice") or settings.get("challenges.start_notice")):
             slot = daily_slot(now, *(int(part) for part in settings.get("challenges.results_time").split(":")))
             if is_due(now, slot, _last_run(db, "challenge_results"), DAILY_GRACE) and _claim(db, "challenge_results", slot, now):
                 _run(db, "challenge_results", lambda: _challenge_results(db))

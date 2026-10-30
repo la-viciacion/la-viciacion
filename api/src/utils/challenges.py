@@ -32,7 +32,7 @@ OPT_IN = "opt_in"  # only who joins takes part
 PARTICIPATIONS = (AUTO, OPT_IN)
 # The group templates a player may propose and an admin may schedule: the ones whose options are the same every time
 # (a month and, for the game of the month, a game)
-GROUP_OPTIONS = ("game_id", "month", "min_hours_each", "min_hours_total", "tag", "mode", "min_games_total", "versus")
+GROUP_OPTIONS = ("game_id", "month", "starts_on", "ends_on", "min_hours_each", "min_hours_total", "tag", "mode", "min_games_total", "versus")
 PROPOSABLE = ("game_of_month", "themed")
 
 
@@ -83,6 +83,35 @@ def month_period(month) -> tuple[datetime.date, datetime.date]:
         raise ChallengeError("El mes no es válido")
     following = datetime.date(year + (number == 12), number % 12 + 1, 1)
     return first, following - datetime.timedelta(days=1)
+
+
+MAX_PERIOD_DAYS = 366
+
+
+def _day(value, name: str) -> datetime.date:
+    try:
+        return datetime.date.fromisoformat(str(value))
+    except ValueError:
+        raise ChallengeError(f"{name} no es una fecha válida")
+
+
+def group_period(options: dict, today: datetime.date) -> tuple[datetime.date, datetime.date]:
+    """The period of a group challenge: free dates (`starts_on` and `ends_on`, both inclusive) or, without them, the
+    whole `month`. It may begin in the future (the challenge is then upcoming and can be joined) or have begun already,
+    but not be over."""
+    if options.get("starts_on") or options.get("ends_on"):
+        starts_on, ends_on = _day(options.get("starts_on"), "La fecha de inicio"), _day(options.get("ends_on"), "La fecha de fin")
+        if ends_on < starts_on:
+            raise ChallengeError("El reto no puede terminar antes de empezar")
+        if (ends_on - starts_on).days + 1 > MAX_PERIOD_DAYS:
+            raise ChallengeError(f"El reto no puede durar más de {MAX_PERIOD_DAYS} días")
+        if ends_on < today:
+            raise ChallengeError("Ese periodo ya ha pasado")
+        return starts_on, ends_on
+    starts_on, ends_on = month_period(options.get("month"))
+    if ends_on < today:
+        raise ChallengeError("Ese mes ya ha pasado")
+    return starts_on, ends_on
 
 
 def hours(value, name: str, minimum: float = 0.5) -> float:
@@ -151,13 +180,11 @@ def _versus(options: dict) -> dict:
 
 
 def build_game_of_month(db: Session, options: dict, today: datetime.date, user_id: int | None = None) -> Built:
-    """Options: game_id, month ("YYYY-MM"), min_hours_each, min_hours_total."""
+    """Options: game_id, month ("YYYY-MM") or starts_on and ends_on, min_hours_each, min_hours_total."""
     game = db.get(models.Game, str(options.get("game_id") or ""))
     if game is None:
         raise ChallengeError("Elige un juego que exista")
-    starts_on, ends_on = month_period(options.get("month"))
-    if ends_on < today:
-        raise ChallengeError("Ese mes ya ha pasado")
+    starts_on, ends_on = group_period(options, today)
     each = hours(options.get("min_hours_each"), "El mínimo por jugador")
     total = hours(options.get("min_hours_total"), "El mínimo total")
     if total < each:
@@ -356,7 +383,7 @@ MAX_GAMES = 500
 
 
 def build_themed(db: Session, options: dict, today: datetime.date, user_id: int | None = None) -> Built:
-    """Options: tag (one that exists and has games), month ("YYYY-MM"), mode ("play" hours or "complete" a game),
+    """Options: tag (one that exists and has games), month ("YYYY-MM") or starts_on and ends_on, mode ("play" hours or "complete" a game),
     min_hours_each (play only) and, optionally, a total for the whole group: min_hours_total (play) or
     min_games_total (complete). Every game that has the tag counts."""
     tags = available_tags(db)
@@ -364,9 +391,7 @@ def build_themed(db: Session, options: dict, today: datetime.date, user_id: int 
     if wanted not in tags:
         raise ChallengeError("Elige una temática que exista")
     name = tags[wanted][0]
-    starts_on, ends_on = month_period(options.get("month"))
-    if ends_on < today:
-        raise ChallengeError("Ese mes ya ha pasado")
+    starts_on, ends_on = group_period(options, today)
     mode = options.get("mode")
     if mode not in ("play", "complete"):
         raise ChallengeError("Elige si hay que jugar o completar")
@@ -974,11 +999,9 @@ def seconds_of_players(db: Session, user_ids: list[int], start: datetime.datetim
 
 
 def build_group_hours(db: Session, options: dict, today: datetime.date, user_id: int | None = None) -> Built:
-    """Options: month ("YYYY-MM") and min_hours_total: the hours the whole group has to play between everybody, of any
-    game. Nobody has a minimum of their own."""
-    starts_on, ends_on = month_period(options.get("month"))
-    if ends_on < today:
-        raise ChallengeError("Ese mes ya ha pasado")
+    """Options: month ("YYYY-MM") or starts_on and ends_on, and min_hours_total: the hours the whole group has to play
+    between everybody, of any game. Nobody has a minimum of their own."""
+    starts_on, ends_on = group_period(options, today)
     total = hours(options.get("min_hours_total"), "El total")
     return Built(
         title=f"Sumar {hours_text(total)} h entre todos",

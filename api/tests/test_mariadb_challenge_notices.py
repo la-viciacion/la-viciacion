@@ -201,6 +201,33 @@ class ResultsTests(NoticeTestCase):
         self.assertTrue(ana[0][1].startswith("🏁 Han terminado 3 de tus retos"))
         self.assertEqual(len(self.group), 2)  # one for each group challenge, nothing for the duel
 
+    def starting_today(self, challenge_id, launched_days_ago):
+        self.move(challenge_id, starts=0, ends=10)
+        with database.SessionLocal() as db:
+            db.get(models.Challenge, challenge_id).created_at = datetime.combine(TODAY() - timedelta(days=launched_days_ago), datetime.min.time())
+            db.commit()
+
+    def test_a_challenge_launched_earlier_is_told_to_the_group_the_day_it_starts_with_who_signed_up(self):
+        challenge = self.launch(participation="opt_in").json()["id"]
+        self.starting_today(challenge, launched_days_ago=3)
+        self.api("PUT", f"/challenges/{challenge}/participation", as_user="ana", params={"joined": True})
+        self.run_results()
+        self.assertEqual(len(self.group), 1)
+        self.assertIn("Hoy empieza un reto del grupo", self.group[0])
+        self.assertIn("Se han apuntado 1 de", self.group[0])
+        self.assertEqual(self.private, [])
+
+    def test_a_challenge_launched_the_day_it_starts_or_with_the_switch_off_is_not_told_again(self):
+        same_day = self.launch().json()["id"]
+        self.starting_today(same_day, launched_days_ago=0)
+        self.run_results()
+        self.assertEqual(self.group, [])
+        earlier = self.launch(game_id="celeste").json()["id"]
+        self.starting_today(earlier, launched_days_ago=2)
+        self.set_settings(**{"challenges.start_notice": False})
+        self.run_results()
+        self.assertEqual(self.group, [])
+
     def test_a_duel_is_told_to_its_two_players_and_never_to_the_group(self):
         duel = self.duel()["id"]
         self.ended_yesterday(duel)
@@ -357,7 +384,7 @@ class JobTests(NoticeTestCase):
         self.move(closing, starts=-5, ends=2)
         self.prefer(self.ana, challenge_reminders_telegram=True)
         scheduler.tick(at(9, 31))
-        self.assertEqual(self.jobs()["challenge_results"], "ok: 3 told, 1 to the group")
+        self.assertEqual(self.jobs()["challenge_results"], "ok: 3 told, 1 to the group, 0 started")
         self.assertNotIn("challenge_reminders", self.jobs())  # their hour has not come
         scheduler.tick(at(10, 1))
         self.assertEqual(self.jobs()["challenge_reminders"], "ok: 1 told")
@@ -379,7 +406,7 @@ class JobTests(NoticeTestCase):
         scheduler.tick(at(9, 31))
         scheduler.tick(at(10, 1))
         self.assertEqual([name for name in self.jobs() if name.startswith("challenge_re")], [])
-        self.set_settings(**{"notifications.enabled": True, "challenges.private_notices": False, "challenges.result_notice": False, "challenges.reminders": False})
+        self.set_settings(**{"notifications.enabled": True, "challenges.private_notices": False, "challenges.result_notice": False, "challenges.start_notice": False, "challenges.reminders": False})
         scheduler.tick(at(9, 32, day=1))
         scheduler.tick(at(10, 2, day=1))
         self.assertEqual([name for name in self.jobs() if name.startswith("challenge_re")], [])

@@ -10,13 +10,16 @@ import { gameSearch, gameSearchField } from './game-search.js';
 
 const number = (value) => (value === '' || value == null ? undefined : Number(value));
 
+// The period: the chosen dates when there are any (they replace the month), otherwise the whole month
+const period = (el) => (el.startsOn.value || el.endsOn.value ? { starts_on: el.startsOn.value || undefined, ends_on: el.endsOn.value || undefined } : { month: el.month.value });
+
 // What each kind sends: the options the proposal is made of
 const OPTIONS = {
   game_of_month: (el, state) => ({
-    game_id: state.game?.id, month: el.month.value, min_hours_each: number(el.gameEach.value), min_hours_total: number(el.gameTotal.value), versus: el.versus.checked,
+    game_id: state.game?.id, ...period(el), min_hours_each: number(el.gameEach.value), min_hours_total: number(el.gameTotal.value), versus: el.versus.checked,
   }),
   themed: (el) => ({
-    tag: el.tag.value, month: el.month.value, mode: el.mode.value, versus: el.versus.checked,
+    tag: el.tag.value, ...period(el), mode: el.mode.value, versus: el.versus.checked,
     ...(el.mode.value === 'play'
       ? { min_hours_each: number(el.themedEach.value), min_hours_total: number(el.themedTotal.value) }
       : { min_games_total: number(el.themedGames.value) }),
@@ -101,6 +104,9 @@ export async function openProposalForm(onDone) {
       <label>Mes<select class="adm-input" name="month">
         ${months.map((month) => html`<option value="${month.value}">${month.label}</option>`)}
       </select></label>
+      <p class="adm-sub">O, si no es un mes entero, elige los días (sustituyen al mes). Puede empezar más adelante.</p>
+      <label>Desde<input class="adm-input" type="date" name="startsOn" /></label>
+      <label>Hasta<input class="adm-input" type="date" name="endsOn" /></label>
       <label class="adm-check"><input type="checkbox" name="versus" /> Además es una competición: gana quien más avance</label>
       <div class="adm-error" role="alert"></div>
       <div class="adm-actions">

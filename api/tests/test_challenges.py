@@ -28,6 +28,26 @@ class PeriodTests(unittest.TestCase):
             with self.assertRaises(ChallengeError, msg=repr(bad)):
                 challenges.month_period(bad)
 
+    def test_free_dates_replace_the_month_and_may_begin_later(self):
+        today = datetime.date(2026, 10, 15)
+        period = lambda **options: challenges.group_period(options, today)  # noqa: E731
+        self.assertEqual(period(month="2026-10"), (datetime.date(2026, 10, 1), datetime.date(2026, 10, 31)))
+        self.assertEqual(period(month="2026-10", starts_on="2026-11-20", ends_on="2026-11-27"), (datetime.date(2026, 11, 20), datetime.date(2026, 11, 27)))
+        self.assertEqual(period(starts_on="2026-10-10", ends_on="2026-10-15"), (datetime.date(2026, 10, 10), datetime.date(2026, 10, 15)))  # it ends today
+
+    def test_free_dates_that_make_no_sense_are_refused(self):
+        today = datetime.date(2026, 10, 15)
+        for options in (
+            {"starts_on": "2026-11-20"},  # no end
+            {"ends_on": "2026-11-20"},  # no start
+            {"starts_on": "2026-11-20", "ends_on": "2026-11-19"},
+            {"starts_on": "2026-09-01", "ends_on": "2026-10-14"},  # over already
+            {"starts_on": "2026-01-01", "ends_on": "2027-01-02"},  # longer than a year
+            {"starts_on": "x", "ends_on": "2026-11-01"},
+        ):
+            with self.assertRaises(ChallengeError, msg=repr(options)):
+                challenges.group_period(options, today)
+
     def test_the_status_follows_the_period(self):
         challenge = types.SimpleNamespace(starts_on=datetime.date(2026, 10, 10), ends_on=datetime.date(2026, 10, 20))
         status = lambda day: challenges.status_of(challenge, datetime.date(2026, 10, day))  # noqa: E731

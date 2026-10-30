@@ -3,7 +3,7 @@
 // player takes part (any may leave it) and an admin launches and deletes it from the admin panel (Gestión de datos →
 // Retos). From this page a player launches and deletes only their own, personal challenges.
 import { api, jsonRequest } from '../../lib/api.js';
-import { DURATIONS, FINISHED_SHOWN, PERSONAL_KINDS, amountLabel, blocks, debtPreview, digest, digestLine, medal, partTarget, partValue, percent, periodLine, standing, summaryLine, timeLeft, totalPart } from '../../lib/challenges.js';
+import { DURATIONS, FINISHED_SHOWN, PERSONAL_KINDS, amountLabel, blocks, debtPreview, digest, digestLine, joinedLine, medal, partTarget, partValue, percent, periodLine, standing, summaryLine, timeLeft, totalPart } from '../../lib/challenges.js';
 import { html, mount } from '../../lib/html.js';
 import { gameHref } from '../../lib/links.js';
 import { modalHeader, openModal } from '../../ui/modal.js';
@@ -66,6 +66,7 @@ function card(c) {
         <span class="${c.status === 'active' && !c.declined ? 'pf-tag' : 'pf-tag muted'}">${c.declined ? 'Rechazado' : timeLeft(c)}</span>
       </div>
       <div class="pf-sub">${summaryLine(c)}</div>
+      ${c.scope === 'group' && c.participation === 'opt_in' && c.status !== 'finished' ? html`<div class="pf-sub">${joinedLine(c.progress.players.length)}</div>` : ''}
       ${standingLine(c)}
       ${c.taking_part || c.scope !== 'group' ? parts : html`<div class="pf-empty">${c.participation === 'opt_in' ? 'Es un reto voluntario: apúntate si quieres jugarlo.' : 'No participas en este reto.'}</div>`}
       ${c.scope === 'duel' && c.can_opt_out && c.taking_part ? html`<div class="pf-sub">Puedes rechazarlo durante las 48 horas siguientes a su lanzamiento.</div>` : ''}
