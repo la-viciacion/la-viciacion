@@ -54,9 +54,9 @@ test('rejecting sends the note, and none when it is left empty', async () => {
   assert.deepEqual(calls.at(-1).body, { note: null });
 });
 
-test('the panel lists the proposals and the schedules under the players, and only a waiting proposal can be decided', () => {
-  assert.ok(SECTIONS.find((s) => s.label === 'Jugadores').tabs.includes('proposals'));
-  assert.ok(SECTIONS.find((s) => s.label === 'Jugadores').tabs.includes('schedules'));
+test('the panel lists the proposals and the schedules in their own section, apart from the players, and only a waiting proposal can be decided', () => {
+  assert.ok(SECTIONS.find((s) => s.label === 'Retos').tabs.includes('proposals'));
+  assert.ok(SECTIONS.find((s) => s.label === 'Retos').tabs.includes('schedules'));
   const { actions } = ENTITIES.proposals;
   assert.deepEqual(actions.map((a) => a.show({ status: 'pending' })), [true, true]);
   assert.deepEqual(actions.map((a) => a.show({ status: 'approved' })), [false, false]);
