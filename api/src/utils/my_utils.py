@@ -13,7 +13,7 @@ from ..config import Config
 from ..crud import games, users
 from ..database import models, schemas
 from .achievements import AchievementsElems
-from . import ai, ai_prompts, hltb_sync, inbox, push, settings
+from . import ai, ai_prompts, game_tags, hltb_sync, inbox, push, settings
 from .redaction import redact_rawg_key
 from ..utils.logger import LogManager
 
@@ -314,8 +314,8 @@ async def get_game_details_by_rawg_id(rawg_id: int) -> dict | None:
         "steam_id": steam_id or hltb_steam or "",
         "image_url": data.get("background_image"),
         "genres": ",".join(g["name"] for g in data.get("genres", []) if "name" in g),
-        # the tags RAWG has in other languages are the same ones again: only the English ones
-        "tags": ",".join(t["name"] for t in data.get("tags") or [] if t.get("name") and t.get("language") == "eng"),
+        # the tags RAWG has in other languages are the same ones again: only the English ones, and without the noise (game_tags)
+        "tags": game_tags.clean(t["name"] for t in data.get("tags") or [] if t.get("name") and t.get("language") == "eng"),
         "avg_time": int(avg_time) if avg_time else 0,
         # RAWG counts the games this one is an addition of even when asking for them failed
         "is_dlc": bool(data.get("parents_count")),

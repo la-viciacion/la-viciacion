@@ -23,6 +23,7 @@ from sqlalchemy import func, or_
 from ..config import Config
 from ..database import models
 from ..database.database import SessionLocal
+from . import game_tags
 from .logger import LogManager
 from .redaction import redact_rawg_key
 
@@ -157,7 +158,7 @@ def _details(client: _Client, rawg_id: int, need_steam: bool) -> dict:
         "release_date": released,
         "image_url": d.get("background_image"),
         "genres": ",".join(g["name"] for g in d.get("genres") or [] if g.get("name")),
-        "tags": ",".join(t["name"] for t in d.get("tags") or [] if t.get("name") and t.get("language") == "eng"),
+        "tags": game_tags.clean(t["name"] for t in d.get("tags") or [] if t.get("name") and t.get("language") == "eng"),
         "steam_id": steam,
         "is_dlc": bool(d.get("parents_count")),
         "parent_rawg_id": parent_rawg_id,
