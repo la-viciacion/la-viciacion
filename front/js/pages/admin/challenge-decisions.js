@@ -1,4 +1,4 @@
-// What an admin does with a challenge a player proposed (admin panel → Jugadores → Propuestas): approve it, which
+// What an admin does with a challenge a player proposed (admin panel → Retos → Propuestas): approve it, which
 // launches it as a challenge of the group, or reject it with a note the proposer reads.
 import { api, jsonRequest } from '../../lib/api.js';
 import { html } from '../../lib/html.js';
