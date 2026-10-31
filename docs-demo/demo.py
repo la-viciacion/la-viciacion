@@ -357,7 +357,7 @@ def seed():
     month = datetime.date.today().strftime("%Y-%m")
     for body in ({"kind": "game_of_month", "game_id": games_by_name["Hades II"]["id"], "month": month,
                   "min_hours_each": 5, "min_hours_total": 30, "announce": False},
-                 {"kind": "themed", "tag": "Horror", "month": month, "mode": "play", "min_hours_each": 3, "announce": False}):
+                 {"kind": "themed", "theme": "Terror", "month": month, "mode": "play", "min_hours_each": 3, "announce": False}):
         try:
             call("POST", "/manage/challenges", body, token=admin)
         except RuntimeError as e:

@@ -495,7 +495,7 @@ test('a player with no proposals sees no block of them', async () => {
 test('a game of the month is proposed with a game from the search and a themed one with a tag', async () => {
   document.body.innerHTML = '<main id="main"></main>';
   const calls = installApi({
-    'GET /challenges/proposals': [], 'GET /challenges/tags': [{ tag: 'Horror', games: 3 }, { tag: 'Puzzle', games: 1 }], 'GET /challenges': [],
+    'GET /challenges/proposals': [], 'GET /challenges/themes': [{ theme: 'Terror', games: 3 }, { theme: 'Puzles', games: 1 }], 'GET /challenges': [],
     'GET /games/catalog?q=hades&limit=8': { items: [{ id: 'hades', name: 'Hades' }] },
     'POST /challenges/proposals': { id: 1, status: 'pending', kind: 'themed', label: 'Temático', title: 'x' },
   });
@@ -504,7 +504,7 @@ test('a game of the month is proposed with a game from the search and a themed o
   document.querySelector('#chPropose').click();
   await settle();
   const form = document.querySelector('.modal-content form');
-  assert.deepEqual(text('select[name="tag"] option'), ['Horror (3)', 'Puzzle (1)']);
+  assert.deepEqual(text('select[name="theme"] option'), ['Terror (3)', 'Puzles (1)']);
   assert.equal(form.querySelector('[data-kind="themed"]').hidden, true);
   form.elements.gameQuery.value = 'hades';
   form.elements.gameQuery.dispatchEvent(new window.Event('input', { bubbles: true }));
@@ -524,7 +524,7 @@ test('a game of the month is proposed with a game from the search and a themed o
   const second = document.querySelector('.modal-content form');
   second.elements.kind.value = 'themed';
   second.elements.kind.dispatchEvent(new window.Event('change', { bubbles: true }));
-  second.elements.tag.value = 'Puzzle';
+  second.elements.theme.value = 'Puzles';
   second.elements.mode.value = 'complete';
   second.elements.mode.dispatchEvent(new window.Event('change', { bubbles: true }));
   assert.equal(second.querySelector('[data-for="play"]').hidden, true);
@@ -534,12 +534,12 @@ test('a game of the month is proposed with a game from the search and a themed o
   await settle();
   const body = calls.filter((c) => c.method === 'POST' && c.path === '/challenges/proposals').at(-1).body;
   assert.equal(body.kind, 'themed');
-  assert.deepEqual({ ...body.options, month: 'x' }, { tag: 'Puzzle', month: 'x', mode: 'complete', versus: true, min_games_total: 5 });
+  assert.deepEqual({ ...body.options, month: 'x' }, { theme: 'Puzles', month: 'x', mode: 'complete', versus: true, min_games_total: 5 });
 });
 
 test('an error of the API stays in the proposal form', async () => {
   document.body.innerHTML = '<main id="main"></main>';
-  installApi({ 'GET /challenges/proposals': [], 'GET /challenges/tags': [], 'GET /challenges': [], 'POST /challenges/proposals': () => { throw new Error('Ya hay una propuesta igual esperando respuesta'); } });
+  installApi({ 'GET /challenges/proposals': [], 'GET /challenges/themes': [], 'GET /challenges': [], 'POST /challenges/proposals': () => { throw new Error('Ya hay una propuesta igual esperando respuesta'); } });
   await page.render({ main: main(), user: ANA });
   await settle();
   document.querySelector('#chPropose').click();

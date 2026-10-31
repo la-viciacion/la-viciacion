@@ -19,7 +19,7 @@ const OPTIONS = {
     game_id: state.game?.id, ...period(el), min_hours_each: number(el.gameEach.value), min_hours_total: number(el.gameTotal.value), versus: el.versus.checked,
   }),
   themed: (el) => ({
-    tag: el.tag.value, ...period(el), mode: el.mode.value, versus: el.versus.checked,
+    theme: el.theme.value, ...period(el), mode: el.mode.value, versus: el.versus.checked,
     ...(el.mode.value === 'play'
       ? { min_hours_each: number(el.themedEach.value), min_hours_total: number(el.themedTotal.value) }
       : { min_games_total: number(el.themedGames.value) }),
@@ -67,9 +67,9 @@ export async function showProposals(el) {
 
 /** The form to propose a challenge to the group. `onDone` runs after it is sent. */
 export async function openProposalForm(onDone) {
-  let tags;
+  let themes;
   try {
-    tags = await api('/challenges/tags');
+    themes = await api('/challenges/themes');
   } catch (err) {
     toast(err.message, 'err');
     return;
@@ -89,9 +89,9 @@ export async function openProposalForm(onDone) {
         <label>Horas mínimas entre todos<input class="adm-input" type="number" name="gameTotal" min="0.5" step="0.5" value="20" /></label>
       </div>
       <div data-kind="themed" hidden>
-        <p class="adm-sub">Una temática de los juegos (Horror, Singleplayer...) y lo que tiene que hacer cada jugador.</p>
-        <label>Temática<select class="adm-input" name="tag">
-          ${tags.length ? tags.map((t) => html`<option value="${t.tag}">${t.tag} (${t.games})</option>`) : html`<option value="">No hay etiquetas</option>`}
+        <p class="adm-sub">Una temática (Terror, Metroidvania, Medieval...) y lo que tiene que hacer cada jugador: vale cualquier juego de esa temática.</p>
+        <label>Temática<select class="adm-input" name="theme">
+          ${themes.length ? themes.map((t) => html`<option value="${t.theme}">${t.theme} (${t.games})</option>`) : html`<option value="">No hay temáticas</option>`}
         </select></label>
         <label>Objetivo<select class="adm-input" name="mode">
           <option value="play">Jugar unas horas</option>

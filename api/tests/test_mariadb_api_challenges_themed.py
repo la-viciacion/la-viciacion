@@ -4,7 +4,7 @@ import asyncio
 from unittest import mock
 
 from src.database import database
-from src.utils import actions, my_utils
+from src.utils import actions, my_utils, themes
 from tests import test_mariadb_api_challenges as base
 
 TODAY = base.TODAY
@@ -15,7 +15,7 @@ class ThemedTestCase(base.ChallengesTestCase):
         super().setUp()
         self.game("amnesia", "Amnesia", tags="Horror, Singleplayer")
         self.game("alien", "Alien", tags="Atmospheric,Horror")
-        self.game("tetris", "Tetris", tags="Puzzle")
+        self.game("tetris", "Tetris", tags="Logic")
         self.sent = []
 
         async def send(msg, silent, *args, **kwargs):
@@ -26,7 +26,7 @@ class ThemedTestCase(base.ChallengesTestCase):
         self.addCleanup(patcher.stop)
 
     def launch_themed(self, as_user="root", announce=False, **changes):
-        body = {"kind": "themed", "tag": "Horror", "month": base.this_month(), "mode": "play", "min_hours_each": 2, "announce": announce, **changes}
+        body = {"kind": "themed", "theme": "Terror", "month": base.this_month(), "mode": "play", "min_hours_each": 2, "announce": announce, **changes}
         return self.api("POST", "/manage/challenges", as_user=as_user, json=body)
 
     def players(self, challenge_id, as_user="ana"):
@@ -41,29 +41,41 @@ class ThemedTestCase(base.ChallengesTestCase):
 
 
 class LaunchTests(ThemedTestCase):
-    def test_the_tags_to_choose_from_are_those_of_the_games_with_how_many_have_each(self):
-        body = self.api("GET", "/manage/challenges/tags", as_user="root").json()
-        self.assertEqual({t["tag"]: t["games"] for t in body}, {"Atmospheric": 1, "Horror": 2, "Puzzle": 1, "Singleplayer": 1})
-        self.assertEqual(self.api("GET", "/manage/challenges/tags", as_user="ana").status_code, 403)
+    def test_the_themes_to_choose_from_are_those_with_games_the_one_with_most_first(self):
+        body = self.api("GET", "/manage/challenges/themes", as_user="root").json()
+        self.assertEqual(body, [{"theme": "Terror", "games": 2}, {"theme": "Puzles", "games": 1}])  # Atmospheric and Singleplayer are no theme
+        self.assertEqual(self.api("GET", "/manage/challenges/themes", as_user="ana").status_code, 403)
+
+    def test_a_game_counts_once_in_a_theme_however_many_of_its_tags_it_has(self):
+        self.game("lights", "Lights", tags="Horror,Survival Horror,Spooky")
+        body = self.api("GET", "/manage/challenges/themes", as_user="root").json()
+        self.assertEqual(body[0], {"theme": "Terror", "games": 3})
 
     def test_an_admin_launches_a_themed_challenge_for_the_group(self):
-        response = self.launch_themed(tag="horror")
+        response = self.launch_themed(theme="terror")
         self.assertEqual(response.status_code, 201)
         body = response.json()
-        self.assertEqual((body["kind"], body["scope"], body["title"], body["game"]), ("themed", "group", "Temático: Horror", None))
-        self.assertEqual(body["params"], {"tag": "Horror", "mode": "play", "min_hours_each": 2.0})  # the tag as the database writes it, no total
+        self.assertEqual((body["kind"], body["scope"], body["title"], body["game"]), ("themed", "group", "Temático: Terror", None))
+        # the theme as the list writes it with the tags it had then, no total
+        self.assertEqual(body["params"], {"theme": "Terror", "tags": list(themes.THEMES["Terror"]), "mode": "play", "min_hours_each": 2.0})
         self.assertEqual(sorted(body["progress"]["players"][0]), ["done", "name", "seconds", "target_seconds", "user_id"])
         self.assertNotIn("total_done", body["progress"])
 
+    def test_a_challenge_made_with_a_single_tag_still_launches_and_counts(self):
+        body = self.launch_themed(theme=None, tag="horror").json()
+        self.assertEqual((body["title"], body["params"]), ("Temático: Horror", {"tag": "Horror", "mode": "play", "min_hours_each": 2.0}))
+        self.played(self.ana, 2, game="alien")
+        self.assertEqual(self.players(body["id"])["Ana"]["done"], True)
+
     def test_a_player_cannot_and_the_challenges_route_never_makes_it(self):
         self.assertEqual(self.launch_themed(as_user="ana").status_code, 403)
-        sent = {"kind": "themed", "options": {"tag": "Horror", "month": base.this_month(), "mode": "play", "min_hours_each": 2}}
+        sent = {"kind": "themed", "options": {"theme": "Terror", "month": base.this_month(), "mode": "play", "min_hours_each": 2}}
         self.assertEqual(self.api("POST", "/challenges", as_user="root", json=sent).status_code, 403)
         self.assertEqual(self.scalar("SELECT COUNT(*) FROM challenges"), 0)
 
     def test_the_options_are_checked(self):
         for changes, fragment in (
-            ({"tag": "Nope"}, "temática"), ({"tag": ""}, "temática"), ({"mode": "win"}, "jugar o completar"),
+            ({"theme": "Nope"}, "temática"), ({"theme": ""}, "temática"), ({"theme": "Cyberpunk"}, "temática"), ({"mode": "win"}, "jugar o completar"),
             ({"month": "2026-13"}, "mes"), ({"min_hours_each": None}, "mínimo"), ({"min_hours_each": 0}, "mínimo"),
             ({"min_hours_total": 1}, "no puede ser menor"), ({"mode": "complete", "min_games_total": 0}, "juegos"),
             ({"mode": "complete", "min_games_total": 501}, "juegos"),
@@ -81,7 +93,7 @@ class LaunchTests(ThemedTestCase):
 
     def test_a_completion_has_no_hours_and_the_group_is_told_only_if_asked(self):
         body = self.launch_themed(mode="complete", min_hours_each=None, announce=True).json()
-        self.assertEqual(body["params"], {"tag": "Horror", "mode": "complete"})
+        self.assertEqual(body["params"], {"theme": "Terror", "tags": list(themes.THEMES["Terror"]), "mode": "complete"})
         self.background["after_challenge_launch"].assert_called_once()
 
 
@@ -95,6 +107,13 @@ class PlayProgressTests(ThemedTestCase):
         players = self.players(challenge)
         self.assertEqual((players["Ana"]["seconds"], players["Ana"]["done"]), (9000, True))
         self.assertEqual((players["Bea"]["seconds"], players["Bea"]["done"]), (3600, False))
+
+    def test_every_tag_of_the_theme_counts_but_a_game_is_not_counted_twice(self):
+        self.game("lights", "Lights", tags="Horror,Survival Horror,Spooky")
+        challenge = self.launch_themed().json()["id"]
+        self.played(self.ana, 1, game="lights")  # three tags of the theme, one game
+        self.played(self.ana, 1, game="alien")
+        self.assertEqual(self.players(challenge)["Ana"]["seconds"], 7200)
 
     def test_the_tag_matches_a_whole_word_not_a_part_of_one(self):
         self.game("homerun", "Home Run", tags="Horror Comedy")  # one tag, with a space in it
@@ -117,7 +136,7 @@ class PlayProgressTests(ThemedTestCase):
         self.assertEqual(self.announce_totals(), 0)
         self.assertEqual(len(self.sent), 1)
         self.assertIn("Reto cumplido", self.sent[0])
-        self.assertIn("5 h de Horror", self.sent[0])
+        self.assertIn("5 h de Terror", self.sent[0])
         self.assertIn("2 de 3 ya habéis cumplido", self.sent[0])
 
 
@@ -148,7 +167,7 @@ class CompleteProgressTests(ThemedTestCase):
         self.assertEqual(self.announce_totals(), 0)
         self.completed(self.ana, "alien")
         self.assertEqual(self.announce_totals(), 1)
-        self.assertIn("3 juegos completados de Horror", self.sent[0])
+        self.assertIn("3 juegos completados de Terror", self.sent[0])
 
 
 class OptOutTests(ThemedTestCase):

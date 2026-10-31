@@ -18,7 +18,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..database import models
-from . import streaks
+from . import streaks, themes
 
 GROUP = "group"
 USER = "user"
@@ -32,7 +32,7 @@ OPT_IN = "opt_in"  # only who joins takes part
 PARTICIPATIONS = (AUTO, OPT_IN)
 # The group templates a player may propose and an admin may schedule: the ones whose options are the same every time
 # (a month and, for the game of the month, a game)
-GROUP_OPTIONS = ("game_id", "month", "starts_on", "ends_on", "min_hours_each", "min_hours_total", "tag", "mode", "min_games_total", "versus")
+GROUP_OPTIONS = ("game_id", "month", "starts_on", "ends_on", "min_hours_each", "min_hours_total", "theme", "tag", "mode", "min_games_total", "versus")
 PROPOSABLE = ("game_of_month", "themed")
 
 
@@ -293,6 +293,24 @@ def available_tags(db: Session) -> dict[str, tuple[str, int]]:
     return _available(db, models.Game.tags)
 
 
+def available_themes(db: Session) -> dict[str, tuple[str, int]]:
+    """The themes (utils/themes.py) that have at least one game in the database: {lower-cased name: (name, how many games
+    have any of its tags)}."""
+    wanted = {name: {tag.casefold() for tag in tags} for name, tags in themes.THEMES.items()}
+    counts = dict.fromkeys(themes.THEMES, 0)
+    for (tags,) in db.query(models.Game.tags).filter(models.Game.tags.isnot(None), models.Game.tags != ""):
+        owned = {tag.casefold() for tag in split_genres(tags)}
+        for name, theme_tags in wanted.items():
+            if owned & theme_tags:
+                counts[name] += 1
+    return {name.casefold(): (name, count) for name, count in counts.items() if count}
+
+
+def themes_listing(db: Session) -> list[dict]:
+    """What a form offers for a themed challenge: the themes with games, the one with the most games first."""
+    return [{"theme": name, "games": count} for name, count in sorted(available_themes(db).values(), key=lambda item: (-item[1], item[0].casefold()))]
+
+
 def build_new_genre(db: Session, options: dict, today: datetime.date, user_id: int | None = None) -> Built:
     """Options: genre (one that exists and has games), mode ("play" hours or "complete" one game), hours (play only,
     2 by default) and duration ("week", "month" or "quarter"; the period starts today)."""
@@ -383,19 +401,29 @@ MAX_GAMES = 500
 
 
 def build_themed(db: Session, options: dict, today: datetime.date, user_id: int | None = None) -> Built:
-    """Options: tag (one that exists and has games), month ("YYYY-MM") or starts_on and ends_on, mode ("play" hours or "complete" a game),
-    min_hours_each (play only) and, optionally, a total for the whole group: min_hours_total (play) or
-    min_games_total (complete). Every game that has the tag counts."""
-    tags = available_tags(db)
-    wanted = str(options.get("tag") or "").strip().casefold()
-    if wanted not in tags:
-        raise ChallengeError("Elige una temática que exista")
-    name = tags[wanted][0]
+    """Options: theme (one of utils/themes.py that has games), month ("YYYY-MM") or starts_on and ends_on, mode ("play"
+    hours or "complete" a game), min_hours_each (play only) and, optionally, a total for the whole group: min_hours_total
+    (play) or min_games_total (complete). Every game that has any of the tags of the theme counts, and the tags are
+    written in the definition. `tag` (a single tag of the database) is what a theme was before: proposals and schedules
+    made then still carry it and still launch."""
+    if options.get("theme") not in (None, ""):
+        found = available_themes(db).get(str(options["theme"]).strip().casefold())
+        if found is None:
+            raise ChallengeError("Elige una temática que exista")
+        name = found[0]
+        which: dict = {"theme": name, "tags": list(themes.THEMES[name])}
+    else:
+        tags = available_tags(db)
+        wanted = str(options.get("tag") or "").strip().casefold()
+        if wanted not in tags:
+            raise ChallengeError("Elige una temática que exista")
+        name = tags[wanted][0]
+        which = {"tag": name}
     starts_on, ends_on = group_period(options, today)
     mode = options.get("mode")
     if mode not in ("play", "complete"):
         raise ChallengeError("Elige si hay que jugar o completar")
-    params: dict = {"tag": name, "mode": mode, **_versus(options)}
+    params: dict = {**which, "mode": mode, **_versus(options)}
     if mode == "play":
         each = hours(options.get("min_hours_each"), "El mínimo por jugador")
         params["min_hours_each"] = each
@@ -413,6 +441,16 @@ def build_themed(db: Session, options: dict, today: datetime.date, user_id: int 
             raise ChallengeError(f"El total de juegos debe estar entre 1 y {MAX_GAMES}")
         params["min_games_total"] = games
     return Built(title=f"Temático: {name}"[:MAX_TITLE], params=params, starts_on=starts_on, ends_on=ends_on)
+
+
+def themed_tags(params: dict) -> list[str]:
+    """The tags a themed challenge counts a game for: those of its theme, or the single tag of an older one."""
+    return params.get("tags") or [params["tag"]]
+
+
+def themed_label(params: dict) -> str:
+    """What a themed challenge is about, as the players read it."""
+    return params.get("theme") or params["tag"]
 
 
 def themed_result(names: dict[int, str], mode: str, amounts: dict[int, int], params: dict) -> dict:
@@ -445,8 +483,8 @@ def themed_result(names: dict[int, str], mode: str, amounts: dict[int, int], par
 def progress_themed(db: Session, challenge: models.Challenge, participant_ids: list[int]) -> dict:
     params = json.loads(challenge.params)
     names = names_of(db, participant_ids)
-    tag = params["tag"].casefold()
-    has_tag = lambda tags: tag in {t.casefold() for t in split_genres(tags)}  # noqa: E731
+    wanted = {tag.casefold() for tag in themed_tags(params)}
+    has_tag = lambda tags: bool(wanted & {t.casefold() for t in split_genres(tags)})  # noqa: E731
     amounts: dict[int, int] = {}
     if participant_ids and params["mode"] == "play":
         rows = (
@@ -487,16 +525,16 @@ def summary_themed(challenge: models.Challenge) -> str:
     period = f"del {spanish_date(challenge.starts_on)} al {spanish_date(challenge.ends_on)}"
     if params["mode"] == "play":
         total = f" y {hours_text(params['min_hours_total'])} h entre todos" if "min_hours_total" in params else ""
-        return f"Jugar al menos {hours_text(params['min_hours_each'])} h a juegos de {params['tag']}, cada uno{total}, {period}."
+        return f"Jugar al menos {hours_text(params['min_hours_each'])} h a juegos de {themed_label(params)}, cada uno{total}, {period}."
     total = f" (y {params['min_games_total']} entre todos)" if "min_games_total" in params else ""
-    return f"Completar al menos un juego de {params['tag']}{total}, {period}."
+    return f"Completar al menos un juego de {themed_label(params)}{total}, {period}."
 
 
 def reached_themed(challenge: models.Challenge, progress: dict) -> str:
     params = json.loads(challenge.params)
     done = sum(1 for p in progress["players"] if p["done"])
     what = f"las {hours_text(params['min_hours_total'])} h" if params["mode"] == "play" else f"los {params['min_games_total']} juegos completados"
-    return f"Entre todos habéis llegado a {what} de {params['tag']}. {done} de {len(progress['players'])} ya habéis cumplido vuestra parte."
+    return f"Entre todos habéis llegado a {what} de {themed_label(params)}. {done} de {len(progress['players'])} ya habéis cumplido vuestra parte."
 
 
 # ── Bajar la deuda ──────────────────────────────────────────────

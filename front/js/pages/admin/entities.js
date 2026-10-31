@@ -298,11 +298,11 @@ export const ENTITIES = {
       {
         label: 'Lanzar reto temático',
         body: { kind: 'themed' },
-        // the tags are those of the games in the database: loaded when the form opens
+        // the themes that have games in the database: loaded when the form opens
         fields: async () => {
-          const tags = await api('/manage/challenges/tags');
+          const themes = await api('/manage/challenges/themes');
           return [
-            { key: 'tag', label: 'Temática (etiqueta de los juegos)', type: 'choice', required: true, options: tags.length ? tags.map((t) => [t.tag, `${t.tag} (${t.games})`]) : [['', 'No hay etiquetas']] },
+            { key: 'theme', label: 'Temática', type: 'choice', required: true, options: themes.length ? themes.map((t) => [t.theme, `${t.theme} (${t.games})`]) : [['', 'No hay temáticas']] },
             { key: 'month', label: 'Mes', type: 'month', required: true },
           ...PERIOD_FIELDS,
             { key: 'mode', label: 'Objetivo de cada jugador', type: 'choice', required: true, default: 'play', options: [['play', 'Jugar unas horas'], ['complete', 'Completar al menos un juego']] },
@@ -391,7 +391,7 @@ export const ENTITIES = {
     endpoint: '/manage/challenge-schedules',
     paged: false,
     columns: [
-      { label: 'Reto', render: (r) => html`<strong>${r.label}</strong><div class="adm-sub">${r.kind_label}${r.kind === 'themed' ? ` · ${r.options.tag}` : ''}</div>` },
+      { label: 'Reto', render: (r) => html`<strong>${r.label}</strong><div class="adm-sub">${r.kind_label}${r.kind === 'themed' ? ` · ${r.options.theme ?? r.options.tag}` : ''}</div>` },
       {
         label: 'Lanza',
         render: (r) => (r.games
@@ -413,10 +413,10 @@ export const ENTITIES = {
         label: 'Programar un temático',
         body: { kind: 'themed' },
         fields: async () => {
-          const tags = await api('/manage/challenges/tags');
+          const themes = await api('/manage/challenges/themes');
           return [
             { key: 'label', label: 'Nombre', type: 'text', required: true },
-            { key: 'tag', label: 'Temática (etiqueta de los juegos)', type: 'choice', required: true, options: tags.length ? tags.map((t) => [t.tag, `${t.tag} (${t.games})`]) : [['', 'No hay etiquetas']] },
+            { key: 'theme', label: 'Temática', type: 'choice', required: true, options: themes.length ? themes.map((t) => [t.theme, `${t.theme} (${t.games})`]) : [['', 'No hay temáticas']] },
             { key: 'mode', label: 'Objetivo de cada jugador', type: 'choice', required: true, default: 'play', options: [['play', 'Jugar unas horas'], ['complete', 'Completar al menos un juego']] },
             { key: 'min_hours_each', label: 'Horas mínimas por jugador (si hay que jugar)', type: 'number', step: '0.5', default: 2 },
             { key: 'min_hours_total', label: 'Horas entre todos (opcional, si hay que jugar)', type: 'number', step: '0.5' },
