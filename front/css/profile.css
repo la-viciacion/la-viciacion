@@ -349,6 +349,8 @@
 .ch-standing.ok { border-left-color: var(--accent-teal); }
 .ch-standing.behind { border-left-color: var(--accent-gold); }
 .ch-standing.urgent { border-left-color: #f87171; }
+.ch-games > summary { cursor: pointer; font-size: 0.85rem; color: var(--text-secondary); }
+.ch-games-items { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .ch-standing.failed, .ch-standing.pending { color: var(--text-secondary); }
 .ch-mine { display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px; }
 .ch-mine-item { display: flex; flex-direction: column; gap: 4px; color: inherit; text-decoration: none; }

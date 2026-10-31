@@ -3,6 +3,7 @@ progress, and the history of a player. Only the definition and the opt-outs are 
 import datetime
 import json
 
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -130,7 +131,37 @@ def view(db: Session, challenge: models.Challenge, viewer_id: int, today: dateti
         "taking_part": viewer_id in taking_part,
         "can_opt_out": can_opt_out(challenge, today, viewer_id) and not declined(db, challenge),
         "progress": progress,
+        # a themed one that is not over says how many games of its theme the group has and how many the viewer has
+        "theme_games": theme_games_summary(db, challenge, viewer_id, today),
     }
+
+
+def theme_games_summary(db: Session, challenge: models.Challenge, viewer_id: int, today: datetime.date) -> dict | None:
+    if challenge.kind != "themed" or challenges.status_of(challenge, today) == "finished":
+        return None
+    games = theme_games(db, challenge, viewer_id)
+    return {"available": len(games), "mine": sum(1 for game in games if game["mine"])}
+
+
+def theme_games(db: Session, challenge: models.Challenge, viewer_id: int) -> list[dict]:
+    """The games of a themed challenge that are in the group's libraries (any game that has a tag of its theme counts for
+    the challenge, but only a game somebody has can be played): each with how many active players have it and whether the
+    viewer does, theirs first and then the most owned. Derived; nothing is stored."""
+    wanted = {tag.casefold() for tag in challenges.themed_tags(json.loads(challenge.params))}
+    owners = dict(
+        db.query(models.UserGame.game_id, func.count(func.distinct(models.UserGame.user_id)))
+        .join(models.User, models.User.id == models.UserGame.user_id)
+        .filter(models.User.is_active == 1, models.not_god())
+        .group_by(models.UserGame.game_id)
+        .all()
+    )
+    mine = {game_id for (game_id,) in db.query(models.UserGame.game_id).filter(models.UserGame.user_id == viewer_id)}
+    games = [
+        {"id": game_id, "name": name, "image_url": image_url, "owners": owners[game_id], "mine": game_id in mine}
+        for game_id, name, image_url, tags in db.query(models.Game.id, models.Game.name, models.Game.image_url, models.Game.tags).filter(models.Game.id.in_(list(owners)))
+        if wanted & {tag.casefold() for tag in challenges.split_genres(tags)}
+    ]
+    return sorted(games, key=lambda game: (not game["mine"], -game["owners"], game["name"].casefold()))
 
 
 def block_of(challenge: models.Challenge, viewer_id: int) -> str:

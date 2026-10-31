@@ -42,6 +42,17 @@ export function joinedLine(count) {
   return count === 1 ? 'Se ha apuntado 1 jugador' : `Se han apuntado ${count} jugadores`;
 }
 
+/** What a themed challenge says about its games: `theme_games` is { available, mine } (the games of its theme in the
+ * group's libraries, and how many the viewer has). { text, tone }: the tone is "urgent" when the viewer has none, since
+ * then they have to buy one, leave the challenge or not join it. */
+export function themeGamesLine({ available, mine }) {
+  const games = (n) => (n === 1 ? '1 juego' : `${n} juegos`);
+  if (!available) return { text: 'Ningún juego de esta temática está en las bibliotecas del grupo.', tone: 'urgent' };
+  if (!mine) return { text: `El grupo tiene ${games(available)} de esta temática y tú no tienes ninguno.`, tone: 'urgent' };
+  if (mine === available) return { text: available === 1 ? 'Tienes el único juego de esta temática del grupo.' : `Tienes los ${available} juegos de esta temática del grupo.`, tone: 'ok' };
+  return { text: `Tienes ${mine} de los ${available} juegos de esta temática del grupo.`, tone: 'ok' };
+}
+
 /** The next months a group challenge can be launched for, from the running one: [{ value: "2026-10", label: "Octubre 2026" }, ...]. */
 export function launchMonths(today = new Date(), count = 4) {
   return Array.from({ length: count }, (_, i) => {

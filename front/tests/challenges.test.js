@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { amountLabel, blocks, daysUntil, debtPreview, digest, digestLine, hoursLabel, joinedLine, launchMonths, medal, partTarget, partValue, percent, remainingLabel, resultLine, standing, summaryLine, timeLeft, totalPart } from '../js/lib/challenges.js';
+import { amountLabel, blocks, daysUntil, debtPreview, digest, digestLine, hoursLabel, joinedLine, launchMonths, medal, partTarget, partValue, percent, remainingLabel, resultLine, standing, summaryLine, themeGamesLine, timeLeft, totalPart } from '../js/lib/challenges.js';
 
 const TODAY = new Date(2026, 9, 15, 12, 0); // 15 October 2026
 
@@ -33,6 +33,15 @@ test('the time left says where the challenge is', () => {
   assert.equal(at('upcoming', '2026-10-16', '2026-10-31'), 'Empieza mañana');
   assert.equal(at('upcoming', '2026-11-01', '2026-11-30'), 'Empieza en 17 días');
   assert.equal(at('finished', '2026-09-01', '2026-09-30'), 'Terminado');
+});
+
+test('a themed challenge says how many games of its theme the group has and the viewer has', () => {
+  assert.deepEqual(themeGamesLine({ available: 0, mine: 0 }), { text: 'Ningún juego de esta temática está en las bibliotecas del grupo.', tone: 'urgent' });
+  assert.deepEqual(themeGamesLine({ available: 1, mine: 0 }), { text: 'El grupo tiene 1 juego de esta temática y tú no tienes ninguno.', tone: 'urgent' });
+  assert.deepEqual(themeGamesLine({ available: 8, mine: 0 }), { text: 'El grupo tiene 8 juegos de esta temática y tú no tienes ninguno.', tone: 'urgent' });
+  assert.deepEqual(themeGamesLine({ available: 8, mine: 3 }), { text: 'Tienes 3 de los 8 juegos de esta temática del grupo.', tone: 'ok' });
+  assert.deepEqual(themeGamesLine({ available: 1, mine: 1 }), { text: 'Tienes el único juego de esta temática del grupo.', tone: 'ok' });
+  assert.deepEqual(themeGamesLine({ available: 4, mine: 4 }), { text: 'Tienes los 4 juegos de esta temática del grupo.', tone: 'ok' });
 });
 
 test('who joined a voluntary challenge is counted', () => {

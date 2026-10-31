@@ -32,7 +32,7 @@ Un juego se queda en la lista hasta que lo quites tú con la ✕, aunque ya lo e
 **Del grupo** (los lanza un administrador):
 
 - **Juego del mes**: un juego, un mes, unas horas mínimas por jugador y un total entre todos. Ves una barra por jugador (verde al llegar a su mínimo) y otra para el grupo.
-- **Temático**: una temática (un género, una ambientación o un tema: Terror, Metroidvania, Medieval…), un mes y lo que tiene que hacer cada jugador: jugar un número de horas o completar al menos un juego. Cuenta cualquier juego de esa temática.
+- **Temático**: una temática (un género, una ambientación o un tema: Terror, Metroidvania, Medieval…), un mes y lo que tiene que hacer cada jugador: jugar un número de horas o completar al menos un juego. Cuenta cualquier juego de esa temática. En la tarjeta del reto ves cuántos juegos de esa temática tiene el grupo y cuántos tienes tú (en rojo si no tienes ninguno, para que decidas si compras alguno, te sales o no te apuntas), y **Ver los juegos** los lista con quién los tiene.
 
 - **Horas entre todos**: un mes y un total de horas que tiene que sumar el grupo entero, de cualquier juego. No hay mínimo por jugador: cada uno ve cuánto ha aportado, y cumple su parte si el grupo llega al total y él ha jugado algo.
 

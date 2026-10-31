@@ -51,6 +51,32 @@ test('a challenge shows its players and the total, escaped, with a link to the g
   assert.equal(document.querySelector('[data-delete]'), null); // a group challenge is deleted from the admin panel
 });
 
+test('a themed challenge warns when the viewer has none of its games and lists them when opened', async () => {
+  const themed = challenge({ id: 6, kind: 'themed', label: 'Temático', title: 'Temático: Terror', game: null, params: { theme: 'Terror', tags: ['Horror'], mode: 'play', min_hours_each: 2 }, theme_games: { available: 2, mine: 0 } });
+  const games = [{ id: 'alien', name: 'Alien <b>', image_url: null, owners: 3, mine: false }, { id: 'amnesia', name: 'Amnesia', image_url: null, owners: 1, mine: true }];
+  const calls = installApi({ 'GET /challenges/proposals': [], 'GET /challenges/6/games': games, 'GET /challenges': [themed] }); // the first prefix that matches wins
+  await page.render({ main: main(), user: ANA });
+  await settle();
+  assert.match(text('[data-theme-games]')[0], /no tienes ninguno/);
+  assert.equal(document.querySelector('[data-theme-games]').dataset.themeGames, 'urgent');
+  assert.equal(calls.some((c) => c.path === '/challenges/6/games'), false); // not asked until it is opened
+  const details = document.querySelector('details.ch-games');
+  details.open = true;
+  details.dispatchEvent(new window.Event('toggle'));
+  await settle();
+  assert.deepEqual(text('.ch-games-items li').map((t) => t.replace(/\s+/g, ' ').trim()), ['Alien <b> Lo tienen 3 jugadores', 'Amnesia Lo tienes']);
+  assert.equal(document.querySelectorAll('.ch-games-items b').length, 0);
+  assert.equal(document.querySelector('.ch-games-items a').getAttribute('href'), '#/game/alien');
+});
+
+test('a challenge that is not themed, or is over, has no list of games', async () => {
+  installApi({ 'GET /challenges/proposals': [], 'GET /challenges': [challenge({ theme_games: null })] });
+  await page.render({ main: main(), user: ANA });
+  await settle();
+  assert.equal(document.querySelector('[data-theme-games]'), null);
+  assert.equal(document.querySelector('details.ch-games'), null);
+});
+
 test('the challenges are in blocks: the group\'s, the viewer\'s own and the other players\'', async () => {
   const bea = personal({ id: 8, owner: { id: 2, name: 'Bea' }, title: 'Probar un género: RPG' });
   installApi({ 'GET /challenges/proposals': [], 'GET /challenges': [challenge(), personal(), bea] });
