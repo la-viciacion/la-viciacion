@@ -50,9 +50,10 @@ test('who joined a voluntary challenge is counted', () => {
   assert.equal(joinedLine(4), 'Se han apuntado 4 jugadores');
 });
 
-test('the months to launch for start at the running one and cross the year', () => {
-  assert.deepEqual(launchMonths(TODAY, 4).map((m) => m.value), ['2026-10', '2026-11', '2026-12', '2027-01']);
-  assert.equal(launchMonths(TODAY, 1)[0].label, 'Octubre 2026');
+test('the months to launch for start after the running one and cross the year', () => {
+  assert.deepEqual(launchMonths(TODAY, 4).map((m) => m.value), ['2026-11', '2026-12', '2027-01', '2027-02']);
+  assert.equal(launchMonths(TODAY, 1)[0].label, 'Noviembre 2026');
+  assert.equal(launchMonths(new Date(2026, 11, 20), 1)[0].value, '2027-01'); // from December on, January
 });
 
 test('a result is told from the player\'s part and the group\'s total', () => {
