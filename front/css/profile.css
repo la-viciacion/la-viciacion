@@ -303,8 +303,7 @@
 .cal-cell { text-decoration: none; }
 .cal-cell.blank { background: transparent; border-color: transparent; }
 .cal-cell.has { cursor: pointer; border-color: var(--accent-teal); }
-.cal-cell.has:hover, .cal-cell.picked { background: var(--bg-card-hover); }
-.cal-cell.picked { box-shadow: 0 0 0 1px var(--accent-teal); }
+.cal-cell.has:hover { background: var(--bg-card-hover); }
 .cal-day { font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); }
 .cal-cell.has .cal-day { color: var(--accent-teal); }
 .cal-cell.today .cal-day { align-self: flex-start; padding: 0 6px; border-radius: 999px; background: var(--accent-gold); color: #1a1a1f; }
@@ -317,7 +316,7 @@
 .cal-empty { flex: 1; display: flex; align-items: center; justify-content: center; min-height: 120px; text-align: center; color: var(--text-secondary); }
 .cal-side .cal-grid { margin-bottom: 0; }
 .cal-games { display: grid; gap: 10px; }
-.cal-game.picked { border-color: var(--accent-teal); }
+.cal-day-games { padding: 8px 20px 20px; }
 @media (min-width: 1000px) {
   .cal-layout { grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); gap: 16px; align-items: stretch; }
   .cal-cell { min-height: 56px; }

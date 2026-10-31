@@ -1,10 +1,11 @@
 // Release calendar (#/calendar): every game of the catalogue with a release date, by day, wanted by somebody or not. GET /group/releases?month=YYYY-MM; any month, past ones included.
-// A day with one game links to its page; a day with several opens a list. The games with no confirmed date are listed apart. Nothing is stored here: the wishes are the only data.
+// A day with releases opens a modal with its games (one or several, so every day behaves the same). The games with no confirmed date are listed apart. Nothing is stored here: the wishes are the only data.
 import { api } from '../../lib/api.js';
 import { byDay, monthLabel, monthOf, monthWeeks, shiftMonth, waiting } from '../../lib/calendar.js';
 import { formatDate } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
 import { gameHref } from '../../lib/links.js';
+import { modalHeader, openModal } from '../../ui/modal.js';
 import { countdown } from '../../lib/wishlist.js';
 
 export const active = null; // it belongs to no item of the top bar
@@ -15,13 +16,13 @@ let main;
 let current; // the running month, "YYYY-MM"
 let shown; // the month on screen
 let data = null; // the answer for `shown`
-let picked = null; // the day selected, "YYYY-MM-DD"
 let navigation = 0; // only the latest request may draw
 
 const byRelease = (a, b) => a.release_date.localeCompare(b.release_date) || a.name.localeCompare(b.name);
 
-const card = (g, isPicked = false) => html`
-  <a class="gc-card cal-game${isPicked ? ' picked' : ''}" href="${gameHref(g.id)}">
+// inModal: following the link must also close the modal, which the router knows nothing about
+const card = (g, inModal = false) => html`
+  <a class="gc-card cal-game" href="${gameHref(g.id)}" ${inModal ? 'data-close' : ''}>
     ${g.image_url
       ? html`<img src="${g.image_url}" alt="" class="gc-cover" loading="lazy" />`
       : html`<div class="gc-cover gc-cover-placeholder" aria-hidden="true">🎮</div>`}
@@ -35,26 +36,25 @@ const card = (g, isPicked = false) => html`
 
 function cell(day, games, today) {
   if (!day) return html`<div class="cal-cell blank" aria-hidden="true"></div>`;
-  const classes = ['cal-cell', games ? 'has' : '', day === today ? 'today' : '', day === picked ? 'picked' : ''].filter(Boolean).join(' ');
+  const classes = ['cal-cell', games ? 'has' : '', day === today ? 'today' : ''].filter(Boolean).join(' ');
   const number = Number(day.slice(8));
   if (!games) return html`<div class="${classes}"><span class="cal-day">${number}</span></div>`;
   const label = `${number}: ${games.map((g) => g.name).join(', ')}`;
   const thumb = games[0].image_url ? html`<img class="cal-thumb" src="${games[0].image_url}" alt="" loading="lazy" />` : '';
-  // a day with one game goes straight to its page; with several, the day opens and its games are listed below
-  if (games.length === 1) {
-    return html`
-      <a class="${classes}" href="${gameHref(games[0].id)}" title="${[games[0].name, waiting(games[0].wanted_by)].filter(Boolean).join(' · ')}" aria-label="${label}">
-        <span class="cal-day">${number}</span>
-        ${thumb}
-        <span class="cal-count">${games[0].name}</span>
-      </a>`;
-  }
   return html`
-    <button class="${classes}" type="button" data-day="${day}" aria-pressed="${String(day === picked)}" aria-label="${label}">
+    <button class="${classes}" type="button" data-day="${day}" title="${games.map((g) => g.name).join(', ')}" aria-label="${label}">
       <span class="cal-day">${number}</span>
       ${thumb}
-      <span class="cal-count">${games.length} juegos</span>
+      <span class="cal-count">${games.length === 1 ? games[0].name : `${games.length} juegos`}</span>
     </button>`;
+}
+
+function openDay(day) {
+  const games = byDay(data.releases)[day];
+  if (!games) return;
+  openModal(html`
+    ${modalHeader(formatDate(day))}
+    <div class="cal-games cal-day-games">${[...games].sort(byRelease).map((g) => card(g, true))}</div>`);
 }
 
 function draw() {
@@ -80,7 +80,7 @@ function draw() {
       <div class="cal-list">
         <h2 class="cal-list-title">Juegos del mes</h2>
         ${data.releases.length
-          ? html`<div class="cal-games" id="calMonth">${[...data.releases].sort(byRelease).map((g) => card(g, g.release_date === picked))}</div>`
+          ? html`<div class="cal-games" id="calMonth">${[...data.releases].sort(byRelease).map((g) => card(g))}</div>`
           : html`<div class="cal-empty">Ningún lanzamiento este mes.</div>`}
       </div>
     </div>
@@ -98,11 +98,6 @@ async function load(month) {
     if (!answer || mine !== navigation) return;
     shown = month;
     data = answer;
-    // the first day with several games is selected, so the page opens on a list (a day with one game is a link)
-    const days = byDay(data.releases);
-    if (!picked || !picked.startsWith(month) || days[picked]?.length < 2) {
-      picked = Object.keys(days).find((day) => days[day].length > 1) ?? null;
-    }
     draw();
   } catch (err) {
     if (mine === navigation) mount(main.querySelector('#calBody'), html`<div class="pf-empty">Error cargando el calendario: ${err.message}</div>`);
@@ -113,7 +108,6 @@ export async function render(ctx) {
   main = ctx.main;
   current = monthOf(new Date());
   shown = current;
-  picked = null;
   mount(main, html`
     <h1 class="pf-title pg-title">Calendario de lanzamientos</h1>
     <p class="pf-sub cal-intro">Los lanzamientos de todos los juegos del catálogo, los quiera alguien o no.</p>
@@ -130,10 +124,7 @@ export async function render(ctx) {
       return;
     }
     const day = e.target.closest('[data-day]');
-    if (day) {
-      picked = day.dataset.day;
-      draw();
-    }
+    if (day) openDay(day.dataset.day);
   });
   await load(current);
 }
