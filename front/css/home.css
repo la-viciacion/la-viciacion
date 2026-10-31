@@ -1,8 +1,11 @@
 /* Home: timer and per-game history */
 
 .timer-active {
+  /* set by the clock (lib/timer-aura.js); teal until its first tick */
+  --aura: 168 70% 45%;
   background: var(--gradient-card);
-  border: 1px solid var(--border-accent);
+  border: 1px solid hsl(var(--aura) / 0.6);
+  box-shadow: 0 0 0 1px hsl(var(--aura) / 0.55), 0 0 28px 4px hsl(var(--aura) / 0.35), 0 0 70px 12px hsl(var(--aura) / 0.18);
   border-radius: var(--radius-lg);
   padding: 24px;
   display: flex;
@@ -34,7 +37,7 @@
 .timer-duration {
   font-size: 2rem;
   font-weight: 800;
-  color: var(--accent-teal);
+  color: hsl(var(--aura));
   font-family: 'Courier New', monospace;
   letter-spacing: 2px;
 }

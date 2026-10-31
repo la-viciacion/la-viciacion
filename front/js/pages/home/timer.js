@@ -3,6 +3,7 @@
 import { api, jsonRequest } from '../../lib/api.js';
 import { formatClock, formatDuration, formatRelative } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
+import { auraColor } from '../../lib/timer-aura.js';
 import { iconPlay, iconStop } from '../../ui/icons.js';
 import { scoreBadge } from '../../ui/score-badge.js';
 import { toast } from '../../ui/toast.js';
@@ -41,7 +42,9 @@ function startClock(startTime) {
   stopClock();
   const tick = () => {
     const el = document.getElementById('timerDuration');
-    if (el) el.textContent = formatClock((Date.now() - new Date(startTime)) / 1000);
+    const seconds = (Date.now() - new Date(startTime)) / 1000;
+    if (el) el.textContent = formatClock(seconds);
+    document.querySelector('.timer-active')?.style.setProperty('--aura', auraColor(seconds));
   };
   tick();
   clock = setInterval(tick, 1000);
