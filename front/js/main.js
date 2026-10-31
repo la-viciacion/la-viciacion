@@ -18,6 +18,7 @@ import { closeMenu } from './ui/menu.js';
 import { openPlayingSheet } from './ui/playing.js';
 import { inviteToPush } from './ui/push-invite.js';
 import { inviteToRecap } from './ui/recap-invite.js';
+import { mountEasterEggs } from './ui/easter-eggs.js';
 
 const ROUTES = [
   { prefix: '#/admin', load: () => import('./pages/admin/index.js') },
@@ -148,6 +149,8 @@ setUnauthorizedHandler(() => {
 window.addEventListener('hashchange', () => {
   if (session.getToken() || isResetRoute(location.hash)) route();
 });
+
+mountEasterEggs();
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(console.warn));

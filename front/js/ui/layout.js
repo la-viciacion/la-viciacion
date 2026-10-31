@@ -1,6 +1,7 @@
 // Page shell shared by every logged-in page: navbar + <main>.
 import { api, loadAvatarUrl } from '../lib/api.js';
 import { html, mount } from '../lib/html.js';
+import { skinFor } from '../lib/easter-eggs.js';
 import { startPresence } from '../lib/presence.js';
 import { iconBell, iconHome, iconMenu, iconShield } from './icons.js';
 import { mountMenu } from './menu.js';
@@ -42,13 +43,14 @@ export function showAvatar(el, url) {
 
 function navbar(user, active) {
   const initial = (user.name?.[0] || user.username[0]).toUpperCase();
+  const skin = skinFor();
   // an icon on a phone, the icon and the word on a wide screen; the label is always there for screen readers
   const link = (href, id, label, icon) => html`<a href="${href}" class="navbar-link ${active === id ? 'active' : ''}" aria-label="${label}" title="${label}">${icon}<span class="navbar-link-text">${label}</span></a>`;
   return html`
     <nav class="navbar" role="navigation" aria-label="Navegación principal">
       <div class="navbar-left">
         <button class="menu-btn" id="menuBtn" type="button" aria-label="Abrir el menú" aria-haspopup="dialog" aria-expanded="false" aria-controls="menuPanel">${iconMenu()}</button>
-        <a href="#" class="navbar-brand" aria-label="La Viciación inicio">
+        <a href="#" class="navbar-brand ${skin ? `skin-${skin}` : ''}" aria-label="La Viciación inicio">
           <img src="assets/icons/icon-64.png" alt="" class="navbar-logo" aria-hidden="true" />
           La Viciación
         </a>

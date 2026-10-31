@@ -1,0 +1,23 @@
+/* Hidden surprises: the Konami rain and the costumes of the logo */
+
+.konami-rain { position: fixed; inset: 0; z-index: 1999; pointer-events: none; overflow: hidden; }
+.konami-rain span {
+  position: absolute; top: -40px; font-size: 1.8rem;
+  animation: konamiFall linear forwards;
+}
+@keyframes konamiFall {
+  to { transform: translateY(110vh) rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) { .konami-rain { display: none; } }
+
+/* The costume takes the place of the logo. The text of the brand is painted with a gradient clipped to its
+   glyphs, so the emoji takes its own colours back. */
+.navbar-brand.skin-halloween .navbar-logo,
+.navbar-brand.skin-christmas .navbar-logo { display: none; }
+.navbar-brand.skin-halloween::before,
+.navbar-brand.skin-christmas::before {
+  width: 32px; flex-shrink: 0; text-align: center; font-size: 28px; line-height: 32px;
+  -webkit-text-fill-color: initial;
+}
+.navbar-brand.skin-halloween::before { content: '🎃'; }
+.navbar-brand.skin-christmas::before { content: '🎄'; }
