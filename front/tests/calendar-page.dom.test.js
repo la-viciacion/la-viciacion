@@ -36,7 +36,7 @@ test('the running month opens first and the months before it can be reached', as
   assert.equal(document.querySelector('[data-today]'), null, 'no button once back on the running month');
 });
 
-test('a day with releases is marked and shows its games with everybody who waits for them', async () => {
+test('a day with releases is marked and opens its games with everybody who waits for them', async () => {
   installApi({
     [`GET /group/releases?month=${THIS}`]: { month: THIS, releases: [], undated: [] },
     [`GET /group/releases?month=${NEXT}`]: {
@@ -50,17 +50,20 @@ test('a day with releases is marked and shows its games with everybody who waits
   document.querySelector('[data-step="1"]').click();
   await settle();
   assert.equal(document.querySelectorAll('.cal-cell.has').length, 2);
-  assert.equal(document.querySelector(`[data-day="${NEXT}-05"]`).getAttribute('aria-pressed'), 'true'); // the first day with several games is selected
+  assert.equal(document.querySelector('.modal-overlay'), null, 'no day is opened by default');
   assert.deepEqual(text('#calMonth .gc-name'), ['Alpha', 'Beta', 'Gamma']);
   assert.match(text('#calMonth .pf-sub')[0], /Lo quieren tú y Bea <b>/);
   assert.equal(document.querySelectorAll('#calMonth b').length, 0); // escaped
-  // a day with one game is a link to its page, not a button
-  const single = document.querySelector(`a.cal-cell[href="#/game/c"]`);
-  assert.ok(single);
-  assert.equal(document.querySelector(`[data-day="${NEXT}-20"]`), null);
-  assert.match(single.getAttribute('title'), /Gamma · Lo quiere tú/);
-  assert.deepEqual(text('#calMonth .gc-name'), ['Alpha', 'Beta', 'Gamma']);
-  assert.equal(document.querySelector('#calMonth a[href="#/game/a"]') !== null, true);
+  // every day with releases is a button that opens its games, one or several
+  assert.equal(document.querySelector('a.cal-cell'), null);
+  document.querySelector(`[data-day="${NEXT}-20"]`).click();
+  assert.deepEqual(text('.modal-overlay .gc-name'), ['Gamma']);
+  document.querySelector('.modal-overlay [data-close]').click();
+  assert.equal(document.querySelector('.modal-overlay'), null);
+  document.querySelector(`[data-day="${NEXT}-05"]`).click();
+  assert.deepEqual(text('.modal-overlay .gc-name'), ['Alpha', 'Beta']);
+  assert.ok(document.querySelector('.modal-overlay a[href="#/game/a"][data-close]'));
+  document.querySelector('.modal-overlay [data-close]').click();
   assert.deepEqual(text('#calUndated .gc-name'), ['Delta']);
   assert.match(text('#calUndated .gc-meta')[0], /Sin fecha confirmada/);
 });
