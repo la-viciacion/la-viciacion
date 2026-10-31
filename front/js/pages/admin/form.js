@@ -6,7 +6,7 @@
 // games: a list of games (the value is [{ id, name }], what is sent is the ids): each is added with the same picker as `game`
 // options: a list of short texts (the value is [text, ...]), one input row each, added and removed in the form: { min, max, maxLength }
 // select: { options: [[number, label], ...] }
-// month: the running month and the next ones, as a "YYYY-MM" text (the challenges are launched for a month)
+// month: the months after the running one, as a "YYYY-MM" text (the challenges are launched for a month)
 // choice: { options: [[text, label], ...], default? } a select whose value stays text (select reads it as a number)
 // An entity may have several ways to create a row (`creates`: [{ label, fields, body }]): `fields` is the form and
 // `body` what is always sent with it (the kind of challenge, for instance); openForm takes the chosen one as `variant`.

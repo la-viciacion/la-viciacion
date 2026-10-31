@@ -53,10 +53,11 @@ export function themeGamesLine({ available, mine }) {
   return { text: `Tienes ${mine} de los ${available} juegos de esta temática del grupo.`, tone: 'ok' };
 }
 
-/** The next months a group challenge can be launched for, from the running one: [{ value: "2026-10", label: "Octubre 2026" }, ...]. */
+/** The months a group challenge can be launched for, from the next one on (the running one is already under way; for a
+ * period that starts now the form has free dates): [{ value: "2026-11", label: "Noviembre 2026" }, ...]. */
 export function launchMonths(today = new Date(), count = 4) {
   return Array.from({ length: count }, (_, i) => {
-    const date = new Date(today.getFullYear(), today.getMonth() + i, 1);
+    const date = new Date(today.getFullYear(), today.getMonth() + 1 + i, 1);
     const name = date.toLocaleDateString('es-ES', { month: 'long' });
     return { value: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`, label: `${name[0].toUpperCase()}${name.slice(1)} ${date.getFullYear()}` };
   });
