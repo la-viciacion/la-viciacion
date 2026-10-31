@@ -44,13 +44,14 @@ class ThemedTestCase(base.ChallengesTestCase):
 class LaunchTests(ThemedTestCase):
     def test_the_themes_to_choose_from_are_those_with_games_the_one_with_most_first(self):
         body = self.api("GET", "/manage/challenges/themes", as_user="root").json()
-        self.assertEqual(body, [{"theme": "Terror", "games": 2}, {"theme": "Puzles", "games": 1}])  # Atmospheric and Singleplayer are no theme
+        # Atmospheric and Singleplayer are no theme; nobody has a library yet and nothing was launched
+        self.assertEqual(body, [{"theme": "Terror", "games": 2, "players": 0, "members": 3}, {"theme": "Puzles", "games": 1, "players": 0, "members": 3}])
         self.assertEqual(self.api("GET", "/manage/challenges/themes", as_user="ana").status_code, 403)
 
     def test_a_game_counts_once_in_a_theme_however_many_of_its_tags_it_has(self):
         self.game("lights", "Lights", tags="Horror,Survival Horror,Spooky")
         body = self.api("GET", "/manage/challenges/themes", as_user="root").json()
-        self.assertEqual(body[0], {"theme": "Terror", "games": 3})
+        self.assertEqual((body[0]["theme"], body[0]["games"]), ("Terror", 3))
 
     def test_an_admin_launches_a_themed_challenge_for_the_group(self):
         response = self.launch_themed(theme="terror")
@@ -123,6 +124,30 @@ class GamesOfTheThemeTests(ThemedTestCase):
         summary = lambda user: self.api("GET", f"/challenges/{self.challenge}", as_user=user).json()["theme_games"]  # noqa: E731
         self.assertEqual((summary("ana"), summary("bea"), summary("root")), ({"available": 2, "mine": 1}, {"available": 2, "mine": 2}, {"available": 2, "mine": 0}))
         self.assertEqual(self.api("GET", "/challenges", as_user="ana").json()[0]["theme_games"], {"available": 2, "mine": 1})
+
+    def themes(self, as_user="root"):
+        return {t["theme"]: t for t in self.api("GET", "/manage/challenges/themes", as_user=as_user).json()}
+
+    def test_the_themes_say_how_many_active_players_could_take_part_in_each(self):
+        terror, puzzles = self.themes()["Terror"], self.themes()["Puzles"]
+        self.assertEqual((terror["players"], terror["members"]), (2, 3))  # Ana and Bea; the inactive player does not count
+        self.assertEqual(puzzles["players"], 1)  # only Ana has Tetris
+        self.assertEqual({t["theme"]: t["players"] for t in self.api("GET", "/challenges/themes", as_user="ana").json()}, {"Terror": 2, "Puzles": 1})
+
+    def test_a_theme_says_when_it_was_last_used_only_if_it_was(self):
+        themes = self.themes()
+        self.assertEqual(themes["Terror"]["last_used"], base.this_month() + "-01")  # the challenge of setUp, begun this month
+        self.assertNotIn("last_used", themes["Puzles"])
+        upcoming = TODAY() + timedelta(days=40)
+        self.assertEqual(self.launch_themed(theme="Puzles", month=base.this_month(upcoming)).status_code, 201)
+        self.assertNotIn("last_used", self.themes()["Puzles"])  # not begun yet
+
+    def test_a_challenge_made_with_a_single_tag_counts_for_the_theme_that_has_it(self):
+        with database.SessionLocal() as db:
+            row = db.get(models.Challenge, self.challenge)
+            row.params = '{"tag": "Spooky", "mode": "play", "min_hours_each": 2}'
+            db.commit()
+        self.assertEqual(self.themes()["Terror"]["last_used"], base.this_month() + "-01")
 
     def test_only_a_themed_challenge_that_is_not_over_has_games(self):
         other = self.launch().json()

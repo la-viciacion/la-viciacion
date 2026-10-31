@@ -63,9 +63,9 @@ def get_debt(
 
 @router.get("/themes")
 def get_themes(db: Session = Depends(get_db)):
-    """The themes a themed challenge can be about (utils/themes.py, with how many games have each): what a player needs to
-    propose one."""
-    return themes_listing(db)
+    """The themes a themed challenge can be about (utils/themes.py), with how many games have each, how many players could take
+    part and when it was last used (only if it was): what a player needs to propose one."""
+    return themes_listing(db, datetime.date.today())
 
 
 @router.get("/proposals")

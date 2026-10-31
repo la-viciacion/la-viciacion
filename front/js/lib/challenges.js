@@ -53,6 +53,15 @@ export function themeGamesLine({ available, mine }) {
   return { text: `Tienes ${mine} de los ${available} juegos de esta temática del grupo.`, tone: 'ok' };
 }
 
+/** How a theme reads in the selector of a themed challenge: its games, how many players could take part (they have a game of it)
+ * and, only when a challenge about it was launched before, when the last one began: "Terror (12 juegos · 4 de 6 jugadores ·
+ * último reto: octubre de 2026)". `t` is { theme, games, players, members, last_used? } from GET /…/themes. */
+export function themeLabel(t) {
+  const parts = [t.games === 1 ? '1 juego' : `${t.games} juegos`, `${t.players} de ${t.members} jugadores`];
+  if (t.last_used) parts.push(`último reto: ${parseDay(t.last_used).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}`);
+  return `${t.theme} (${parts.join(' · ')})`;
+}
+
 /** The months a group challenge can be launched for, from the next one on (the running one is already under way; for a
  * period that starts now the form has free dates): [{ value: "2026-11", label: "Noviembre 2026" }, ...]. */
 export function launchMonths(today = new Date(), count = 4) {

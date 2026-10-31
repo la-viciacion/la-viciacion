@@ -306,9 +306,46 @@ def available_themes(db: Session) -> dict[str, tuple[str, int]]:
     return {name.casefold(): (name, count) for name, count in counts.items() if count}
 
 
-def themes_listing(db: Session) -> list[dict]:
-    """What a form offers for a themed challenge: the themes with games, the one with the most games first."""
-    return [{"theme": name, "games": count} for name, count in sorted(available_themes(db).values(), key=lambda item: (-item[1], item[0].casefold()))]
+def theme_players(db: Session) -> tuple[dict[str, int], int]:
+    """How many active players could take part in each theme (they have a game of it in their library) and how many
+    active players there are."""
+    owned: dict[int, set[str]] = {}
+    rows = (
+        db.query(models.UserGame.user_id, models.Game.tags)
+        .join(models.Game, models.Game.id == models.UserGame.game_id)
+        .join(models.User, models.User.id == models.UserGame.user_id)
+        .filter(models.User.is_active == 1, models.not_god(), models.Game.tags.isnot(None), models.Game.tags != "")
+        .distinct()
+    )
+    for user_id, tags in rows:
+        owned.setdefault(user_id, set()).update(tag.casefold() for tag in split_genres(tags))
+    counts = {name: sum(1 for tags in owned.values() if tags & {tag.casefold() for tag in theme_tags}) for name, theme_tags in themes.THEMES.items()}
+    members = db.query(models.User.id).filter(models.User.is_active == 1, models.not_god()).count()
+    return counts, members
+
+
+def themes_used(db: Session, today: datetime.date) -> dict[str, datetime.date]:
+    """The theme of each themed challenge that has begun, with the start of the latest one (a challenge made when a theme
+    was a single tag counts for the themes that tag belongs to)."""
+    used: dict[str, datetime.date] = {}
+    for params, starts_on in db.query(models.Challenge.params, models.Challenge.starts_on).filter(models.Challenge.kind == "themed", models.Challenge.starts_on <= today):
+        params = json.loads(params)
+        names = [params["theme"]] if params.get("theme") else [name for name, tags in themes.THEMES.items() if params["tag"].casefold() in {tag.casefold() for tag in tags}]
+        for name in names:
+            used[name] = max(used.get(name, starts_on), starts_on)
+    return used
+
+
+def themes_listing(db: Session, today: datetime.date) -> list[dict]:
+    """What a form offers for a themed challenge: the themes with games, the one with the most games first, each with how
+    many active players could take part (`players` of `members`) and, only if a challenge about it has been launched
+    before, when the latest one began (`last_used`)."""
+    players, members = theme_players(db)
+    used = themes_used(db, today)
+    return [
+        {"theme": name, "games": count, "players": players[name], "members": members, **({"last_used": used[name]} if name in used else {})}
+        for name, count in sorted(available_themes(db).values(), key=lambda item: (-item[1], item[0].casefold()))
+    ]
 
 
 def build_new_genre(db: Session, options: dict, today: datetime.date, user_id: int | None = None) -> Built:

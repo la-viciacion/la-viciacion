@@ -133,7 +133,7 @@ class ProposeTests(ProposalTestCase):
 
     def test_a_themed_one_can_be_proposed_with_the_themes_that_have_games(self):
         themes = self.api("GET", "/challenges/themes", as_user="ana").json()
-        self.assertEqual(themes, [{"theme": "Terror", "games": 1}])  # Singleplayer and Puzzle are no theme
+        self.assertEqual(themes, [{"theme": "Terror", "games": 1, "players": 0, "members": 3}])  # Singleplayer and Puzzle are no theme
         self.assertEqual(self.themed().json()["title"], "Temático: Terror")
 
     def test_the_options_are_checked_like_a_launch(self):

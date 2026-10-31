@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { amountLabel, blocks, daysUntil, debtPreview, digest, digestLine, hoursLabel, joinedLine, launchMonths, medal, partTarget, partValue, percent, remainingLabel, resultLine, standing, summaryLine, themeGamesLine, timeLeft, totalPart } from '../js/lib/challenges.js';
+import { amountLabel, blocks, daysUntil, debtPreview, digest, digestLine, hoursLabel, joinedLine, launchMonths, medal, partTarget, partValue, percent, remainingLabel, resultLine, standing, summaryLine, themeGamesLine, themeLabel, timeLeft, totalPart } from '../js/lib/challenges.js';
 
 const TODAY = new Date(2026, 9, 15, 12, 0); // 15 October 2026
 
@@ -33,6 +33,11 @@ test('the time left says where the challenge is', () => {
   assert.equal(at('upcoming', '2026-10-16', '2026-10-31'), 'Empieza mañana');
   assert.equal(at('upcoming', '2026-11-01', '2026-11-30'), 'Empieza en 17 días');
   assert.equal(at('finished', '2026-09-01', '2026-09-30'), 'Terminado');
+});
+
+test('a theme reads with its games, who could take part and, only if it was used, when', () => {
+  assert.equal(themeLabel({ theme: 'Terror', games: 12, players: 4, members: 6 }), 'Terror (12 juegos · 4 de 6 jugadores)');
+  assert.equal(themeLabel({ theme: 'Cozy', games: 1, players: 0, members: 6, last_used: '2026-10-01' }), 'Cozy (1 juego · 0 de 6 jugadores · último reto: octubre de 2026)');
 });
 
 test('a themed challenge says how many games of its theme the group has and the viewer has', () => {
