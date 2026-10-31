@@ -2,7 +2,7 @@
 // index.js renders the toolbar, table, pager, forms and delete flow from this.
 //
 // Entity: { label, nav? (shorter name for its tab), description? (line under the title), endpoint, search?, filters?, columns, fields, createFields?,
-//           createLabel?, creates? (several ways to create: [{ label, fields | async () => fields, body }]), name(row), actions?, toolbarActions?, canDelete, deleteLabel?, deleteNote?,
+//           createLabel?, creates? (several ways to create: [{ label, choose?, fields | async () => fields, body }]; with more than one, a single createLabel button opens a form that chooses the type by `choose`), name(row), actions?, toolbarActions?, canDelete, deleteLabel?, deleteNote?,
 //           selects?, orders?, defaultSort?, readOnly? (no edit button) }
 //         or a custom page: { label, custom (module in this folder exporting render(panel, { entity, admin })) }
 // Column: { label, render(row) -> html``, filter?(row) -> filters to apply on click, sort? (API sort key) }
@@ -267,10 +267,12 @@ export const ENTITIES = {
       { label: 'Total', render: (r) => (r.total_done ? badge(r.notified ? 'Alcanzado, avisado' : 'Alcanzado', 'green') : '—') },
       { label: 'Lanzado por', render: (r) => r.created_by ?? '—' },
     ],
-    // one way to launch per template of the group (the personal ones are the players')
+    // one type per template of the group (the personal ones are the players'): a single button, the type is chosen in the form
+    createLabel: 'Lanzar reto',
     creates: [
       {
         label: 'Lanzar juego del mes',
+        choose: 'Juego del mes',
         body: { kind: 'game_of_month' },
         fields: [
           { key: 'game_id', label: 'Juego', type: 'game', required: true },
@@ -285,6 +287,7 @@ export const ENTITIES = {
       },
       {
         label: 'Lanzar horas entre todos',
+        choose: 'Horas entre todos',
         body: { kind: 'group_hours' },
         fields: [
           { key: 'month', label: 'Mes', type: 'month', required: true },
@@ -297,6 +300,7 @@ export const ENTITIES = {
       },
       {
         label: 'Lanzar reto temático',
+        choose: 'Reto temático',
         body: { kind: 'themed' },
         // the themes that have games in the database: loaded when the form opens
         fields: async () => {
@@ -408,9 +412,11 @@ export const ENTITIES = {
       PARTICIPATION_FIELD,
       { key: 'games', label: 'Juegos de la rotación (en este orden; cambiar la lista cambia el juego de los próximos meses)', type: 'games' },
     ],
+    createLabel: 'Programar reto',
     creates: [
       {
         label: 'Programar un temático',
+        choose: 'Temático',
         body: { kind: 'themed' },
         fields: async () => {
           const themes = await api('/manage/challenges/themes');
@@ -430,6 +436,7 @@ export const ENTITIES = {
       },
       {
         label: 'Programar un juego del mes con rotación',
+        choose: 'Juego del mes con rotación',
         body: { kind: 'game_of_month' },
         fields: [
           { key: 'label', label: 'Nombre', type: 'text', required: true },
