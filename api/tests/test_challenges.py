@@ -218,6 +218,14 @@ class ThemedTests(unittest.TestCase):
         progress = challenges.themed_result({1: "Ana", 2: "Bea"}, "complete", {1: 3, 2: 2}, {"min_games_total": 5})
         self.assertEqual(template.reached(with_total, progress), "Entre todos habéis llegado a los 5 juegos completados de Horror. 2 de 2 ya habéis cumplido vuestra parte.")
 
+    def test_a_theme_is_read_from_its_tags_and_an_older_challenge_from_its_one_tag(self):
+        theme = {"theme": "Terror", "tags": ["Horror", "Survival Horror"], "mode": "play"}
+        older = {"tag": "Horror", "mode": "play"}
+        self.assertEqual((challenges.themed_tags(theme), challenges.themed_label(theme)), (["Horror", "Survival Horror"], "Terror"))
+        self.assertEqual((challenges.themed_tags(older), challenges.themed_label(older)), (["Horror"], "Horror"))
+        challenge = types.SimpleNamespace(starts_on=datetime.date(2026, 10, 1), ends_on=datetime.date(2026, 10, 31), params=json.dumps({**theme, "min_hours_each": 2}))
+        self.assertIn("a juegos de Terror, cada uno", challenges.TEMPLATES["themed"].summary(challenge))
+
 
 class DebtReductionTests(unittest.TestCase):
     START = {"a": 10 * 3600, "b": 5 * 3600, "c": 0}  # what was left of each open game when it began

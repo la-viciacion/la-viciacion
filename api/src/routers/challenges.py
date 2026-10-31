@@ -11,7 +11,7 @@ from ..crud import challenge_proposals as proposals
 from ..crud import challenges as crud
 from ..database import models
 from ..utils import actions
-from ..utils.challenges import DUEL, GROUP, TEMPLATES, ChallengeConflict, ChallengeError, available_tags
+from ..utils.challenges import DUEL, GROUP, TEMPLATES, ChallengeConflict, ChallengeError, themes_listing
 
 router = APIRouter(
     prefix="/challenges",
@@ -61,11 +61,11 @@ def get_debt(
     return crud.debt_preview(db, current_user.id, datetime.date.today())
 
 
-@router.get("/tags")
-def get_tags(db: Session = Depends(get_db)):
-    """The tags a themed challenge can be about (those of the games in the database, with how many have each): what a
-    player needs to propose one."""
-    return [{"tag": name, "games": count} for _, (name, count) in sorted(available_tags(db).items())]
+@router.get("/themes")
+def get_themes(db: Session = Depends(get_db)):
+    """The themes a themed challenge can be about (utils/themes.py, with how many games have each): what a player needs to
+    propose one."""
+    return themes_listing(db)
 
 
 @router.get("/proposals")

@@ -115,7 +115,7 @@ class ProposalTestCase(AuthoringTestCase):
         return self.api("POST", "/challenges/proposals", as_user=as_user, json={"kind": kind, "options": options})
 
     def themed(self, as_user="ana", **changes):
-        return self.propose(as_user, "themed", game_id=None, min_hours_total=None, tag="Horror", mode="play", **changes)
+        return self.propose(as_user, "themed", game_id=None, min_hours_total=None, theme="Terror", mode="play", **changes)
 
     def decide(self, proposal, action, as_user="root", **body):
         return self.api("POST", f"/manage/challenge-proposals/{proposal}/{action}", as_user=as_user, json={"announce": False, **body})
@@ -131,17 +131,17 @@ class ProposeTests(ProposalTestCase):
         self.assertEqual(self.api("GET", "/challenges/proposals", as_user="bea").json(), [])
         self.assertEqual(self.api("GET", "/challenges", as_user="bea").json(), [])  # not a challenge yet
 
-    def test_a_themed_one_can_be_proposed_with_the_tags_that_exist(self):
-        tags = self.api("GET", "/challenges/tags", as_user="ana").json()
-        self.assertEqual({t["tag"]: t["games"] for t in tags}, {"Singleplayer": 1, "Horror": 1, "Puzzle": 1})
-        self.assertEqual(self.themed().json()["title"], "Temático: Horror")
+    def test_a_themed_one_can_be_proposed_with_the_themes_that_have_games(self):
+        themes = self.api("GET", "/challenges/themes", as_user="ana").json()
+        self.assertEqual(themes, [{"theme": "Terror", "games": 1}])  # Singleplayer and Puzzle are no theme
+        self.assertEqual(self.themed().json()["title"], "Temático: Terror")
 
     def test_the_options_are_checked_like_a_launch(self):
         for changes, kind, fragment in (
             ({"game_id": "nope"}, "game_of_month", "juego"), ({"month": "2020-01"}, "game_of_month", "pasado"),
-            ({"min_hours_total": 1}, "game_of_month", "total"), ({"tag": "Nope"}, "themed", "temática"),
+            ({"min_hours_total": 1}, "game_of_month", "total"), ({"theme": "Nope"}, "themed", "temática"),
         ):
-            options = {"game_id": "hades", "month": base.this_month(), "min_hours_each": 3, "min_hours_total": 10, "tag": "Horror", "mode": "play", **changes}
+            options = {"game_id": "hades", "month": base.this_month(), "min_hours_each": 3, "min_hours_total": 10, "theme": "Terror", "mode": "play", **changes}
             response = self.api("POST", "/challenges/proposals", as_user="ana", json={"kind": kind, "options": options})
             self.assertEqual(response.status_code, 400, changes)
             self.assertIn(fragment, response.json()["detail"].lower(), changes)
@@ -259,7 +259,7 @@ class DecisionTests(ProposalTestCase):
 
 class ScheduleTestCase(AuthoringTestCase):
     def schedule(self, as_user="root", **changes):
-        body = {"label": "Terror mensual", "kind": "themed", "tag": "Horror", "mode": "play", "min_hours_each": 2, **changes}
+        body = {"label": "Terror mensual", "kind": "themed", "theme": "Terror", "mode": "play", "min_hours_each": 2, **changes}
         return self.api("POST", "/manage/challenge-schedules", as_user=as_user, json=body)
 
     def rotation(self, **changes):
@@ -294,7 +294,7 @@ class ScheduleCreateTests(ScheduleTestCase):
 
     def test_what_cannot_be_launched_is_refused_when_it_is_defined(self):
         for changes, fragment in (
-            ({"tag": "Nope"}, "temática"), ({"label": " "}, "nombre"), ({"label": "x" * 81}, "nombre"),
+            ({"theme": "Nope"}, "temática"), ({"label": " "}, "nombre"), ({"label": "x" * 81}, "nombre"),
             ({"kind": "duel_hours"}, "programar"), ({"participation": "maybe"}, "voluntaria"), ({"mode": "win"}, "completar"),
         ):
             response = self.schedule(**changes)

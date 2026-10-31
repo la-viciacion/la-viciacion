@@ -39,10 +39,10 @@ def list_challenges(db: Session = Depends(get_db)):
     return rows
 
 
-@router.get("/challenges/tags")
-def list_challenge_tags(db: Session = Depends(get_db)):
-    """The tags a themed challenge can be about: those of the games in the database, with how many games have each."""
-    return [{"tag": name, "games": count} for _, (name, count) in sorted(challenges_utils.available_tags(db).items())]
+@router.get("/challenges/themes")
+def list_challenge_themes(db: Session = Depends(get_db)):
+    """The themes a themed challenge can be about (utils/themes.py): those that have games, with how many, the most first."""
+    return challenges_utils.themes_listing(db)
 
 
 class NewGroupChallenge(BaseModel):
@@ -54,7 +54,8 @@ class NewGroupChallenge(BaseModel):
     ends_on: Optional[str] = None
     min_hours_each: Optional[float] = None
     min_hours_total: Optional[float] = None
-    tag: Optional[str] = None
+    theme: Optional[str] = None
+    tag: Optional[str] = None  # what a theme was before: an older client or a schedule still sends it
     mode: Optional[str] = None
     min_games_total: Optional[int] = None
     versus: Optional[bool] = None  # also rank who got furthest
@@ -157,7 +158,8 @@ class NewSchedule(BaseModel):
     # the options of the template, flat, without the month and the game (the schedule chooses them each month)
     min_hours_each: Optional[float] = None
     min_hours_total: Optional[float] = None
-    tag: Optional[str] = None
+    theme: Optional[str] = None
+    tag: Optional[str] = None  # what a theme was before: an older client or a schedule still sends it
     mode: Optional[str] = None
     min_games_total: Optional[int] = None
     versus: Optional[bool] = None

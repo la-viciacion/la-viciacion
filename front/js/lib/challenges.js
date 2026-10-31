@@ -100,10 +100,10 @@ export function summaryLine(challenge) {
   if (challenge.kind === 'themed') {
     if (p.mode === 'play') {
       const total = p.min_hours_total ? ` y ${hoursLabel(p.min_hours_total * 3600)} entre todos` : '';
-      return `${challenge.label} · jugar ${hoursLabel(p.min_hours_each * 3600)} cada uno a juegos de ${p.tag}${total}${versusNote(challenge)}`;
+      return `${challenge.label} · jugar ${hoursLabel(p.min_hours_each * 3600)} cada uno a juegos de ${p.theme ?? p.tag}${total}${versusNote(challenge)}`;
     }
     const total = p.min_games_total ? `, ${p.min_games_total} entre todos` : '';
-    return `${challenge.label} · completar un juego de ${p.tag} cada uno${total}${versusNote(challenge)}`;
+    return `${challenge.label} · completar un juego de ${p.theme ?? p.tag} cada uno${total}${versusNote(challenge)}`;
   }
   if (challenge.kind === 'debt_reduction') {
     const what = p.mode === 'percent' ? `saldar el ${number(p.percent)} % de lo que te quedaba por jugar` : `completar ${p.games} ${p.games === 1 ? 'juego' : 'juegos'} de los que tenías empezados`;

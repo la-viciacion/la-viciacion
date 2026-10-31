@@ -410,7 +410,7 @@ async function onClick(e) {
       case 'award-revoke': return deleteRow(ENTITIES.awards, awardRows.get(Number(button.dataset.award)), admin);
       case 'create': {
         const variant = entity.creates?.[Number(button.dataset.create)];
-        // the fields of a variant may need data from the API (the tags of the games): they are loaded when it is opened
+        // the fields of a variant may need data from the API (the themes of the games): they are loaded when it is opened
         return openForm(entity, null, admin, variant ? { ...variant, fields: typeof variant.fields === 'function' ? await variant.fields() : variant.fields } : null);
       }
       case 'edit': return openForm(entity, row, admin);
