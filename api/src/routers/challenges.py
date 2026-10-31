@@ -151,6 +151,19 @@ def get_challenge(
     return crud.view(db, _challenge(db, challenge_id, current_user), current_user.id, datetime.date.today())
 
 
+@router.get("/{challenge_id}/games")
+def get_challenge_games(
+    challenge_id: int,
+    current_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """The games of the group's libraries a themed challenge can be played with, and which of them the caller has."""
+    challenge = _challenge(db, challenge_id, current_user)
+    if challenge.kind != "themed":
+        raise HTTPException(status_code=400, detail="Solo los retos temáticos tienen una lista de juegos")
+    return crud.theme_games(db, challenge, current_user.id)
+
+
 @router.post("", status_code=201)
 def launch_challenge(
     body: NewChallenge,

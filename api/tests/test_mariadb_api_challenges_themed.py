@@ -1,9 +1,10 @@
 """The themed challenge, a group one launched from the admin panel (MariaDB required, see api_support.py): its options,
 what counts for each mode, the optional total of the group and the notice when it is reached."""
 import asyncio
+from datetime import timedelta
 from unittest import mock
 
-from src.database import database
+from src.database import database, models
 from src.utils import actions, my_utils, themes
 from tests import test_mariadb_api_challenges as base
 
@@ -95,6 +96,44 @@ class LaunchTests(ThemedTestCase):
         body = self.launch_themed(mode="complete", min_hours_each=None, announce=True).json()
         self.assertEqual(body["params"], {"theme": "Terror", "tags": list(themes.THEMES["Terror"]), "mode": "complete"})
         self.background["after_challenge_launch"].assert_called_once()
+
+
+class GamesOfTheThemeTests(ThemedTestCase):
+    def setUp(self):
+        super().setUp()
+        self.game("ghost", "Ghost", tags="Horror")  # nobody has it
+        today = TODAY()
+        self.library_entry(self.ana, "amnesia", today)
+        self.library_entry(self.bea, "amnesia", today)
+        self.library_entry(self.bea, "alien", today)
+        self.library_entry(self.gone, "alien", today)  # an inactive player is not the group
+        self.library_entry(self.ana, "tetris", today)  # another theme
+        self.challenge = self.launch_themed().json()["id"]
+
+    def games(self, as_user):
+        return self.api("GET", f"/challenges/{self.challenge}/games", as_user=as_user).json()
+
+    def test_the_games_of_the_theme_that_the_group_has_theirs_first_with_how_many_have_each(self):
+        ana = [(g["name"], g["owners"], g["mine"]) for g in self.games("ana")]
+        self.assertEqual(ana, [("Amnesia", 2, True), ("Alien", 1, False)])  # no Ghost (nobody has it), no Tetris (another theme)
+        root = [(g["name"], g["mine"]) for g in self.games("root")]
+        self.assertEqual(root, [("Amnesia", False), ("Alien", False)])  # the most owned first when none is theirs
+
+    def test_the_challenge_says_how_many_games_the_group_has_and_how_many_the_viewer_has(self):
+        summary = lambda user: self.api("GET", f"/challenges/{self.challenge}", as_user=user).json()["theme_games"]  # noqa: E731
+        self.assertEqual((summary("ana"), summary("bea"), summary("root")), ({"available": 2, "mine": 1}, {"available": 2, "mine": 2}, {"available": 2, "mine": 0}))
+        self.assertEqual(self.api("GET", "/challenges", as_user="ana").json()[0]["theme_games"], {"available": 2, "mine": 1})
+
+    def test_only_a_themed_challenge_that_is_not_over_has_games(self):
+        other = self.launch().json()
+        self.assertIsNone(other["theme_games"])
+        self.assertEqual(self.api("GET", f"/challenges/{other['id']}/games", as_user="ana").status_code, 400)
+        self.assertEqual(self.api("GET", "/challenges/999/games", as_user="ana").status_code, 404)
+        with database.SessionLocal() as db:
+            row = db.get(models.Challenge, self.challenge)
+            row.starts_on, row.ends_on = TODAY() - timedelta(days=40), TODAY() - timedelta(days=2)
+            db.commit()
+        self.assertIsNone(self.api("GET", f"/challenges/{self.challenge}", as_user="ana").json()["theme_games"])
 
 
 class PlayProgressTests(ThemedTestCase):

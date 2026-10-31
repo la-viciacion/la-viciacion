@@ -3,7 +3,7 @@
 // player takes part (any may leave it) and an admin launches and deletes it from the admin panel (Gestión de datos →
 // Retos). From this page a player launches and deletes only their own, personal challenges.
 import { api, jsonRequest } from '../../lib/api.js';
-import { DURATIONS, FINISHED_SHOWN, PERSONAL_KINDS, amountLabel, blocks, debtPreview, digest, digestLine, joinedLine, medal, partTarget, partValue, percent, periodLine, standing, summaryLine, timeLeft, totalPart } from '../../lib/challenges.js';
+import { DURATIONS, FINISHED_SHOWN, PERSONAL_KINDS, amountLabel, blocks, debtPreview, digest, digestLine, joinedLine, medal, partTarget, partValue, percent, periodLine, standing, summaryLine, themeGamesLine, timeLeft, totalPart } from '../../lib/challenges.js';
 import { html, mount } from '../../lib/html.js';
 import { gameHref } from '../../lib/links.js';
 import { modalHeader, openModal } from '../../ui/modal.js';
@@ -32,6 +32,28 @@ const totalRow = (part) => html`
     ${bar(part)}
     <span class="pf-sub">${amountLabel(part)}${part.done ? ' ✓' : ''}</span>
   </div>`;
+
+// a themed challenge says how many games of its theme the group has and how many the viewer has, and lists them when asked
+const themeLine = (c) => {
+  if (!c.theme_games) return '';
+  const { text, tone } = themeGamesLine(c.theme_games);
+  return html`<div class="ch-standing ${tone}" data-theme-games="${tone}">${text}</div>
+    ${c.theme_games.available ? html`<details class="ch-games" data-games="${c.id}"><summary>Ver los juegos</summary><div class="ch-games-list pf-sub">Cargando…</div></details>` : ''}`;
+};
+
+const gameRows = (games) => html`<ul class="ch-games-items">${games.map((g) => html`
+  <li><a class="game-link" href="${gameHref(g.id)}">${g.name}</a> ${g.mine ? html`<span class="pf-tag">Lo tienes</span>` : html`<span class="pf-sub">${g.owners === 1 ? 'Lo tiene 1 jugador' : `Lo tienen ${g.owners} jugadores`}</span>`}</li>`)}</ul>`;
+
+async function loadGames(details) {
+  if (!details.open || details.dataset.loaded) return;
+  const list = details.querySelector('.ch-games-list');
+  try {
+    mount(list, gameRows(await api(`/challenges/${details.dataset.games}/games`)));
+    details.dataset.loaded = '1';
+  } catch (err) {
+    mount(list, html`${err.message}`);
+  }
+}
 
 const standingLine = (c) => {
   const s = standing(c, user.id);
@@ -67,6 +89,7 @@ function card(c) {
       </div>
       <div class="pf-sub">${summaryLine(c)}</div>
       ${c.scope === 'group' && c.participation === 'opt_in' && c.status !== 'finished' ? html`<div class="pf-sub">${joinedLine(c.progress.players.length)}</div>` : ''}
+      ${themeLine(c)}
       ${standingLine(c)}
       ${c.taking_part || c.scope !== 'group' ? parts : html`<div class="pf-empty">${c.participation === 'opt_in' ? 'Es un reto voluntario: apúntate si quieres jugarlo.' : 'No participas en este reto.'}</div>`}
       ${c.scope === 'duel' && c.can_opt_out && c.taking_part ? html`<div class="pf-sub">Puedes rechazarlo durante las 48 horas siguientes a su lanzamiento.</div>` : ''}
@@ -280,6 +303,7 @@ export async function render(ctx) {
     <div id="chProposals"></div>`);
   main.querySelector('#chNew').addEventListener('click', launchChallenge);
   main.querySelector('#chPropose').addEventListener('click', () => openProposalForm(load));
+  main.querySelector('#chLists').addEventListener('toggle', (e) => loadGames(e.target), true); // `toggle` does not bubble
   main.querySelector('#chLists').addEventListener('click', (e) => {
     if (e.target.closest('[data-all]')) {
       showAll = true;
