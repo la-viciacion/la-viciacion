@@ -521,7 +521,7 @@ test('a player with no proposals sees no block of them', async () => {
 test('a game of the month is proposed with a game from the search and a themed one with a tag', async () => {
   document.body.innerHTML = '<main id="main"></main>';
   const calls = installApi({
-    'GET /challenges/proposals': [], 'GET /challenges/themes': [{ theme: 'Terror', games: 3 }, { theme: 'Puzles', games: 1 }], 'GET /challenges': [],
+    'GET /challenges/proposals': [], 'GET /challenges/themes': [{ theme: 'Terror', games: 3, players: 2, members: 3 }, { theme: 'Puzles', games: 1, players: 1, members: 3, last_used: '2026-09-01' }], 'GET /challenges': [],
     'GET /games/catalog?q=hades&limit=8': { items: [{ id: 'hades', name: 'Hades' }] },
     'POST /challenges/proposals': { id: 1, status: 'pending', kind: 'themed', label: 'Temático', title: 'x' },
   });
@@ -530,7 +530,7 @@ test('a game of the month is proposed with a game from the search and a themed o
   document.querySelector('#chPropose').click();
   await settle();
   const form = document.querySelector('.modal-content form');
-  assert.deepEqual(text('select[name="theme"] option'), ['Terror (3)', 'Puzles (1)']);
+  assert.deepEqual(text('select[name="theme"] option'), ['Terror (3 juegos · 2 de 3 jugadores)', 'Puzles (1 juego · 1 de 3 jugadores · último reto: septiembre de 2026)']);
   assert.equal(form.querySelector('[data-kind="themed"]').hidden, true);
   form.elements.gameQuery.value = 'hades';
   form.elements.gameQuery.dispatchEvent(new window.Event('input', { bubbles: true }));

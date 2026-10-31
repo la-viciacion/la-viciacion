@@ -41,8 +41,9 @@ def list_challenges(db: Session = Depends(get_db)):
 
 @router.get("/challenges/themes")
 def list_challenge_themes(db: Session = Depends(get_db)):
-    """The themes a themed challenge can be about (utils/themes.py): those that have games, with how many, the most first."""
-    return challenges_utils.themes_listing(db)
+    """The themes a themed challenge can be about (utils/themes.py): those that have games, the most first, with how many players
+    could take part and when each was last used (only if it was)."""
+    return challenges_utils.themes_listing(db, datetime.date.today())
 
 
 class NewGroupChallenge(BaseModel):

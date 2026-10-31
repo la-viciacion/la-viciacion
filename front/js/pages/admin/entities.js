@@ -10,6 +10,7 @@
 // Orders: [['key:dir', label], ...]   a dropdown that sets the sort (key and dir are the API's sort and order)
 // Action: { label, show?(row), run(row, admin) }   admin = { jumpTo, open, reload }
 import { api } from '../../lib/api.js';
+import { themeLabel } from '../../lib/challenges.js';
 import { formatDate, formatDuration, formatTimestamp } from '../../lib/format.js';
 import { html } from '../../lib/html.js';
 import { gameHref } from '../../lib/links.js';
@@ -306,7 +307,7 @@ export const ENTITIES = {
         fields: async () => {
           const themes = await api('/manage/challenges/themes');
           return [
-            { key: 'theme', label: 'Temática', type: 'choice', required: true, options: themes.length ? themes.map((t) => [t.theme, `${t.theme} (${t.games})`]) : [['', 'No hay temáticas']] },
+            { key: 'theme', label: 'Temática', type: 'choice', required: true, options: themes.length ? themes.map((t) => [t.theme, themeLabel(t)]) : [['', 'No hay temáticas']] },
             { key: 'month', label: 'Mes', type: 'month', required: true },
           ...PERIOD_FIELDS,
             { key: 'mode', label: 'Objetivo de cada jugador', type: 'choice', required: true, default: 'play', options: [['play', 'Jugar unas horas'], ['complete', 'Completar al menos un juego']] },
@@ -422,7 +423,7 @@ export const ENTITIES = {
           const themes = await api('/manage/challenges/themes');
           return [
             { key: 'label', label: 'Nombre', type: 'text', required: true },
-            { key: 'theme', label: 'Temática', type: 'choice', required: true, options: themes.length ? themes.map((t) => [t.theme, `${t.theme} (${t.games})`]) : [['', 'No hay temáticas']] },
+            { key: 'theme', label: 'Temática', type: 'choice', required: true, options: themes.length ? themes.map((t) => [t.theme, themeLabel(t)]) : [['', 'No hay temáticas']] },
             { key: 'mode', label: 'Objetivo de cada jugador', type: 'choice', required: true, default: 'play', options: [['play', 'Jugar unas horas'], ['complete', 'Completar al menos un juego']] },
             { key: 'min_hours_each', label: 'Horas mínimas por jugador (si hay que jugar)', type: 'number', step: '0.5', default: 2 },
             { key: 'min_hours_total', label: 'Horas entre todos (opcional, si hay que jugar)', type: 'number', step: '0.5' },

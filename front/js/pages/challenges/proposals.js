@@ -2,7 +2,7 @@
 // GET/POST/DELETE /challenges/proposals: only the proposal is stored; an admin approves it (it becomes a challenge of
 // the group) or rejects it with a note.
 import { api, jsonRequest } from '../../lib/api.js';
-import { PROPOSAL_KINDS, launchMonths, proposalStatus } from '../../lib/challenges.js';
+import { PROPOSAL_KINDS, launchMonths, proposalStatus, themeLabel } from '../../lib/challenges.js';
 import { html, mount } from '../../lib/html.js';
 import { modalHeader, openModal } from '../../ui/modal.js';
 import { toast } from '../../ui/toast.js';
@@ -91,7 +91,7 @@ export async function openProposalForm(onDone) {
       <div data-kind="themed" hidden>
         <p class="adm-sub">Una temática (Terror, Metroidvania, Medieval...) y lo que tiene que hacer cada jugador: vale cualquier juego de esa temática.</p>
         <label>Temática<select class="adm-input" name="theme">
-          ${themes.length ? themes.map((t) => html`<option value="${t.theme}">${t.theme} (${t.games})</option>`) : html`<option value="">No hay temáticas</option>`}
+          ${themes.length ? themes.map((t) => html`<option value="${t.theme}">${themeLabel(t)}</option>`) : html`<option value="">No hay temáticas</option>`}
         </select></label>
         <label>Objetivo<select class="adm-input" name="mode">
           <option value="play">Jugar unas horas</option>
