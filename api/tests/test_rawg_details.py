@@ -11,7 +11,7 @@ from tests.sqlite_db import make_session
 
 GAME = {"name": "Celeste", "slug": "celeste", "released": "2018-01-25", "background_image": "https://img/c.jpg",
         "genres": [{"name": "Platformer"}], "developers": [], "publishers": [],
-        "tags": [{"name": "Singleplayer", "language": "eng"}, {"name": "Одиночная", "language": "rus"}]}
+        "tags": [{"name": "Metroidvania", "language": "eng"}, {"name": "Steam Cloud", "language": "eng"}, {"name": "Одиночная", "language": "rus"}]}
 
 
 class Sources:
@@ -71,7 +71,7 @@ class GameDetailsTests(unittest.IsolatedAsyncioTestCase):
         sources = Sources(stores=[{"url": "https://store.steampowered.com/app/504230/Celeste/"}], hltb=[hit(seconds=29000)])
         found = await self.details(sources)
         self.assertEqual((found["name"], found["steam_id"], found["avg_time"]), ("Celeste", "504230", 29000))
-        self.assertEqual((found["genres"], found["tags"]), ("Platformer", "Singleplayer"))
+        self.assertEqual((found["genres"], found["tags"]), ("Platformer", "Metroidvania"))
         self.assertEqual(str(found["release_date"]), "2018-01-25")
 
     async def test_howlongtobeat_fills_the_developer_and_the_steam_id_rawg_lacks(self):
