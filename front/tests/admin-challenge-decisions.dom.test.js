@@ -70,3 +70,12 @@ test('a schedule is created as a themed one or as a game of the month that rotat
   assert.ok(rotation.fields.some((f) => f.key === 'start_now'));
   assert.deepEqual(ENTITIES.schedules.fields.map((f) => f.key), ['label', 'active', 'announce', 'participation', 'games']);
 });
+
+test('the challenges and the schedules have one button each and the type is chosen in the form', () => {
+  for (const [entity, label] of [[ENTITIES.challenges, 'Lanzar reto'], [ENTITIES.schedules, 'Programar reto']]) {
+    assert.equal(entity.createLabel, label);
+    assert.ok(entity.creates.length > 1);
+    assert.ok(entity.creates.every((c) => c.choose && c.body.kind), entity.createLabel);
+  }
+  assert.deepEqual(ENTITIES.challenges.creates.map((c) => c.choose), ['Juego del mes', 'Horas entre todos', 'Reto temático']);
+});

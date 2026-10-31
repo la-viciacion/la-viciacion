@@ -142,3 +142,35 @@ test('a list of games that is required cannot be empty', async () => {
   assert.match(document.querySelector('.adm-error').textContent, /Falta: Juegos de la rotación/);
   assert.deepEqual(sent, []);
 });
+
+test('an entity with several ways to create is one form: the type is chosen in it and swaps the fields', async () => {
+  const sent = [];
+  globalThis.fetch = async (url, options = {}) => {
+    sent.push({ path: String(url).replace(/^\/api\/v1/, ''), body: options.body ? JSON.parse(options.body) : undefined });
+    return new Response(JSON.stringify({}), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  };
+  const many = {
+    createLabel: 'Lanzar reto',
+    endpoint: '/manage/challenges',
+    creates: [
+      { label: 'Lanzar uno', choose: 'Uno', body: { kind: 'one' }, fields: [{ key: 'hours', label: 'Horas', type: 'number', default: 5 }] },
+      { label: 'Lanzar dos', choose: 'Dos', body: { kind: 'two' }, fields: async () => [{ key: 'tag', label: 'Etiqueta', type: 'text' }] },
+    ],
+  };
+  const { openCreateForm } = await import('../js/pages/admin/form.js');
+  const reload = async () => {};
+  openCreateForm(many, { reload });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(document.querySelector('.modal-header h3').textContent, 'Lanzar reto');
+  assert.deepEqual([...document.querySelectorAll('select[name="variant"] option')].map((o) => o.textContent.trim()), ['Uno', 'Dos']);
+  assert.ok(document.getElementById('f_hours'));
+  const select = document.querySelector('select[name="variant"]');
+  select.value = '1';
+  select.dispatchEvent(new window.Event('change', { bubbles: true }));
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(document.getElementById('f_hours'), null); // the fields of the other type are gone
+  document.getElementById('f_tag').value = 'Horror';
+  document.querySelector('.modal-content form').requestSubmit();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(sent.find((c) => c.path === '/manage/challenges').body, { tag: 'Horror', kind: 'two' });
+});

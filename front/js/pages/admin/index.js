@@ -9,7 +9,7 @@ import { toast } from '../../ui/toast.js';
 import { errorState, store } from './components.js';
 import { deleteRow, pickGame } from './dialogs.js';
 import { ENTITIES, TABS } from './entities.js';
-import { openForm } from './form.js';
+import { openCreateForm, openForm } from './form.js';
 import { SECTIONS, TAB_IDS, hashFor, sectionOf, tabFromHash } from './nav.js';
 
 export const active = 'admin';
@@ -241,7 +241,9 @@ function toolbarView(entity, st) {
       <span class="adm-spacer"></span>
       ${entity.toolbarActions?.length || entity.creates || entity.createFields ? html`<div class="adm-toolbar-actions">
         ${(entity.toolbarActions || []).map((a) => html`<button class="adm-btn" data-act="${a.act}">${a.label}</button>`)}
-        ${entity.creates
+        ${entity.creates?.length > 1
+          ? html`<button class="adm-btn primary" data-act="create">+ ${entity.createLabel}</button>`
+          : entity.creates
           ? entity.creates.map((c, i) => html`<button class="adm-btn primary" data-act="create" data-create="${i}">+ ${c.label}</button>`)
           : (entity.createFields ? html`<button class="adm-btn primary" data-act="create">+ ${entity.createLabel}</button>` : '')}
       </div>` : ''}
@@ -409,6 +411,7 @@ async function onClick(e) {
       case 'award-edit': return openForm(ENTITIES.awards, awardRows.get(Number(button.dataset.award)), admin);
       case 'award-revoke': return deleteRow(ENTITIES.awards, awardRows.get(Number(button.dataset.award)), admin);
       case 'create': {
+        if (entity.creates?.length > 1) return openCreateForm(entity, admin); // several types: one button, the type is chosen in the form
         const variant = entity.creates?.[Number(button.dataset.create)];
         // the fields of a variant may need data from the API (the themes of the games): they are loaded when it is opened
         return openForm(entity, null, admin, variant ? { ...variant, fields: typeof variant.fields === 'function' ? await variant.fields() : variant.fields } : null);

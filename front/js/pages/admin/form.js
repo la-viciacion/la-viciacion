@@ -8,12 +8,13 @@
 // select: { options: [[number, label], ...] }
 // month: the months after the running one, as a "YYYY-MM" text (the challenges are launched for a month)
 // choice: { options: [[text, label], ...], default? } a select whose value stays text (select reads it as a number)
-// An entity may have several ways to create a row (`creates`: [{ label, fields, body }]): `fields` is the form and
-// `body` what is always sent with it (the kind of challenge, for instance); openForm takes the chosen one as `variant`.
+// An entity may have several ways to create a row (`creates`: [{ label, choose?, fields, body }]): `fields` is the form and
+// `body` what is always sent with it (the kind of challenge, for instance). With one way, openForm takes it as `variant`; with
+// several, openCreateForm opens one form that starts with a Tipo select (`choose` is each type's name) and swaps the fields.
 // image (editing only): { current: (row) => url of the picture or null, upload: (row) => route that takes the new file }
 import { api, jsonRequest } from '../../lib/api.js';
 import { launchMonths } from '../../lib/challenges.js';
-import { html } from '../../lib/html.js';
+import { html, mount } from '../../lib/html.js';
 import { PASSWORD_HINT, generatePassword, isValidPassword } from '../../lib/password.js';
 import { platformList } from '../../lib/platforms.js';
 import { modalHeader, openModal } from '../../ui/modal.js';
@@ -246,6 +247,49 @@ export function openForm(entity, row, admin, variant = null) {
     e.preventDefault();
     submit(entity, row, fields, modal, admin, variant?.body);
   });
+}
+
+/** The form to create a row of an entity that has several ways to create it: one button, and the type is chosen here. The
+ * fields of a type may need data from the API (`fields` as an async function): they are loaded when the type is chosen. */
+export function openCreateForm(entity, admin) {
+  const variants = entity.creates;
+  let current = { fields: [], variant: variants[0] };
+  const modal = openModal(html`
+    ${modalHeader(entity.createLabel)}
+    <form class="adm-form" novalidate>
+      <label>Tipo<select class="adm-input" name="variant">
+        ${variants.map((v, i) => html`<option value="${i}">${v.choose ?? v.label}</option>`)}
+      </select></label>
+      <div data-fields></div>
+      <div class="adm-error" role="alert"></div>
+      <div class="adm-actions">
+        <button type="button" class="adm-btn" data-close>Cancelar</button>
+        <button type="submit" class="adm-btn primary">Crear</button>
+      </div>
+    </form>`, { wide: true });
+  const form = modal.el.querySelector('form');
+  const area = modal.el.querySelector('[data-fields]');
+  const error = modal.el.querySelector('.adm-error');
+
+  const choose = async (variant) => {
+    error.textContent = '';
+    try {
+      const fields = typeof variant.fields === 'function' ? await variant.fields() : variant.fields;
+      current = { variant, fields };
+      mount(area, html`${fields.map((f) => fieldHtml(f, undefined, undefined))}`);
+      fields.filter((f) => f.type === 'options').forEach((f) => numberOptions(modal.el.querySelector(`#f_${f.key}`)));
+      area.querySelectorAll('textarea.adm-grow').forEach(autoGrow);
+    } catch (err) {
+      error.textContent = err.message;
+    }
+  };
+  form.elements.variant.addEventListener('change', () => choose(variants[Number(form.elements.variant.value)]));
+  modal.el.addEventListener('click', (e) => onFormClick(e, modal, current.fields));
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    submit(entity, null, current.fields, modal, admin, current.variant.body);
+  });
+  choose(variants[0]);
 }
 
 async function submit(entity, row, fields, modal, admin, extra = {}) {
