@@ -57,8 +57,32 @@ const SKINS = [
   { name: 'christmas', from: 1224, to: 1231 },
 ];
 
-/** The costume the logo wears on `date` (local time), or '' on any other day. */
-export function skinFor(date = new Date()) {
+/** Is `date` the birthday of someone born on `born` ('YYYY-MM-DD', the year does not matter)? Born on 29 February
+ * celebrates on the 28th in the years with no 29th, as the API does for the achievement. */
+export function isBirthday(born, date = new Date()) {
+  const match = /^\d{4}-(\d{2})-(\d{2})$/.exec(born ?? '');
+  if (!match) return false;
+  const month = Number(match[1]);
+  const leapDay = month === 2 && match[2] === '29' && new Date(date.getFullYear(), 1, 29).getMonth() !== 1;
+  return date.getMonth() + 1 === month && date.getDate() === (leapDay ? 28 : Number(match[2]));
+}
+
+/** The costume the logo wears on `date` (local time), or '' on any other day. The birthday of the player (`born`)
+ * wins over the season: it is only theirs. */
+export function skinFor(date = new Date(), born = null) {
+  if (isBirthday(born, date)) return 'birthday';
   const day = (date.getMonth() + 1) * 100 + date.getDate();
   return SKINS.find((s) => day >= s.from && day <= s.to)?.name ?? '';
+}
+
+const greetedKey = (username) => `birthday-greeted:${username}`;
+const dayOf = (date) => date.toLocaleDateString('sv-SE');
+
+/** Has this device already greeted `username` today? */
+export function hasGreeted(username, date = new Date()) {
+  try { return localStorage.getItem(greetedKey(username)) === dayOf(date); } catch { return false; }
+}
+
+export function markGreeted(username, date = new Date()) {
+  try { localStorage.setItem(greetedKey(username), dayOf(date)); } catch { /* private mode: it greets again on the next visit */ }
 }

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { KONAMI_KEYS, KONAMI_SWIPES, keyStep, sequenceMatcher, skinFor, swipeStep, tapCounter } from '../js/lib/easter-eggs.js';
+import { KONAMI_KEYS, KONAMI_SWIPES, hasGreeted, isBirthday, keyStep, markGreeted, sequenceMatcher, skinFor, swipeStep, tapCounter } from '../js/lib/easter-eggs.js';
+import { installStorage } from './dom.js';
 
 const feed = (matcher, steps) => steps.map((s) => matcher(s));
 
@@ -70,4 +71,31 @@ test('the logo wears a costume only in its week', () => {
   assert.equal(skinFor(new Date(2026, 11, 24)), 'christmas');
   assert.equal(skinFor(new Date(2026, 11, 31)), 'christmas');
   assert.equal(skinFor(new Date(2027, 0, 1)), '');
+});
+
+test('a birthday is the same day every year, and 29 February is celebrated on the 28th when there is no 29th', () => {
+  assert.equal(isBirthday('1990-06-15', new Date(2026, 5, 15)), true);
+  assert.equal(isBirthday('1990-06-15', new Date(2026, 5, 16)), false);
+  assert.equal(isBirthday('2000-02-29', new Date(2027, 1, 28)), true);
+  assert.equal(isBirthday('2000-02-29', new Date(2028, 1, 28)), false);
+  assert.equal(isBirthday('2000-02-29', new Date(2028, 1, 29)), true);
+  assert.equal(isBirthday(null, new Date(2026, 5, 15)), false);
+  assert.equal(isBirthday('', new Date(2026, 5, 15)), false);
+});
+
+test('the birthday costume is for the player and beats the season', () => {
+  assert.equal(skinFor(new Date(2026, 9, 31), '1990-10-31'), 'birthday');
+  assert.equal(skinFor(new Date(2026, 9, 31), '1990-06-15'), 'halloween');
+  assert.equal(skinFor(new Date(2026, 5, 15), '1990-06-15'), 'birthday');
+  assert.equal(skinFor(new Date(2026, 5, 15)), '');
+});
+
+test('a device greets a player once a day, each player on their own', () => {
+  installStorage();
+  const day = new Date(2026, 5, 15);
+  assert.equal(hasGreeted('ana', day), false);
+  markGreeted('ana', day);
+  assert.equal(hasGreeted('ana', day), true);
+  assert.equal(hasGreeted('bea', day), false);
+  assert.equal(hasGreeted('ana', new Date(2027, 5, 15)), false);
 });

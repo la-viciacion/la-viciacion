@@ -1,4 +1,4 @@
-/* Hidden surprises: the Konami rain and the costumes of the logo */
+/* Hidden surprises: the Konami rain, the costumes of the logo and the birthday greeting */
 
 .konami-rain { position: fixed; inset: 0; z-index: 1999; pointer-events: none; overflow: hidden; }
 .konami-rain span {
@@ -13,11 +13,34 @@
 /* The costume takes the place of the logo. The text of the brand is painted with a gradient clipped to its
    glyphs, so the emoji takes its own colours back. */
 .navbar-brand.skin-halloween .navbar-logo,
-.navbar-brand.skin-christmas .navbar-logo { display: none; }
+.navbar-brand.skin-christmas .navbar-logo,
+.navbar-brand.skin-birthday .navbar-logo { display: none; }
 .navbar-brand.skin-halloween::before,
-.navbar-brand.skin-christmas::before {
+.navbar-brand.skin-christmas::before,
+.navbar-brand.skin-birthday::before {
   width: 32px; flex-shrink: 0; text-align: center; font-size: 28px; line-height: 32px;
   -webkit-text-fill-color: initial;
 }
 .navbar-brand.skin-halloween::before { content: '🎃'; }
 .navbar-brand.skin-christmas::before { content: '🎄'; }
+.navbar-brand.skin-birthday::before { content: '🎂'; }
+
+/* The birthday modal: the cake and a few words, with confetti falling over everything */
+.birthday-modal { padding: 28px 24px 24px; text-align: center; }
+.birthday-cake { font-size: 3.2rem; line-height: 1; }
+.birthday-modal h3 { margin: 12px 0 6px; font-size: 1.3rem; font-weight: 700; }
+.birthday-modal p { margin: 0 0 20px; color: var(--text-secondary); line-height: 1.5; }
+
+.birthday-confetti { position: fixed; inset: 0; z-index: 1999; pointer-events: none; overflow: hidden; }
+.birthday-confetti span {
+  position: absolute; top: -16px; width: 8px; height: 14px; border-radius: 2px;
+  animation: confettiFall linear forwards;
+}
+.birthday-confetti span:nth-child(4n + 1) { background: var(--accent-teal); }
+.birthday-confetti span:nth-child(4n + 2) { background: var(--accent-gold); }
+.birthday-confetti span:nth-child(4n + 3) { background: var(--accent-pink); }
+.birthday-confetti span:nth-child(4n) { background: var(--accent-purple); }
+@keyframes confettiFall {
+  to { transform: translate(var(--drift), 110vh) rotate(720deg); }
+}
+@media (prefers-reduced-motion: reduce) { .birthday-confetti { display: none; } }

@@ -18,6 +18,7 @@ import { closeMenu } from './ui/menu.js';
 import { openPlayingSheet } from './ui/playing.js';
 import { inviteToPush } from './ui/push-invite.js';
 import { inviteToRecap } from './ui/recap-invite.js';
+import { celebrateBirthday } from './ui/birthday.js';
 import { mountEasterEggs } from './ui/easter-eggs.js';
 
 const ROUTES = [
@@ -138,6 +139,7 @@ async function route() {
   }
   inviteToPush().catch(() => {}); // optional: never blocks or breaks a page
   inviteToRecap(user).catch(() => {}); // the same
+  celebrateBirthday(user).catch(() => {}); // the same
   import('./ui/chat.js').then((chat) => chat.mountChat()).catch(() => {}); // the same: the button only appears if the API says the chat works
 }
 

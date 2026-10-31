@@ -43,7 +43,7 @@ Encima de la lista, **¿Qué juego sigo?** propone a qué volver: los **casi ter
 
 Los ajustes están en cuatro grupos, que eliges con los botones de arriba: **Perfil**, **Seguridad**, **Notificaciones** y **Tus datos**.
 
-- **Perfil** (Mis datos): tu nombre, tu usuario, tu email, tu **Telegram ID** (con un botón para enviarte un mensaje de prueba), tu **ciudad** y tu **fecha de nacimiento**. La ciudad y la fecha de nacimiento solo sirven para algunos [logros secretos](logros.md) (el tiempo, los eclipses, tu cumpleaños…); nadie más las ve.
+- **Perfil** (Mis datos): tu nombre, tu usuario, tu email, tu **Telegram ID** (con un botón para enviarte un mensaje de prueba), tu **ciudad** y tu **fecha de nacimiento**. La ciudad y la fecha de nacimiento solo sirven para algunos [logros secretos](logros.md) (el tiempo, los eclipses, tu cumpleaños…) y, el día de tu cumpleaños, para que el logo te lo celebre con una tarta y la primera vez que abras la app ese día te salga una felicitación (nunca dice tu edad); nadie más las ve.
 - **Seguridad**: cambia tu contraseña cuando quieras y cierra la sesión en ese dispositivo.
 - **Notificaciones**: qué avisos privados quieres recibir y por qué canal (Telegram y/o móvil), y los dispositivos en los que tienes las notificaciones activadas. Más en [Notificaciones y Telegram](notificaciones.md).
 - **Tus datos**: **Descargar mis datos** te da un archivo `.json` con tus sesiones, tu biblioteca, tus notas, los precios que has apuntado, tu lista de deseados y tus logros.
