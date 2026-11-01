@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { bytes, last, load, money, monthName, monthYear, uptime, linePoints, peak, percent, rate, sharedMax, statusInfo, trafficShare } from '../js/lib/server.js';
+import { bytes, last, load, money, monthName, monthYear, uptime, linePoints, peak, percent, rate, sharedMax, trafficShare } from '../js/lib/server.js';
 
 test('bytes use decimal units and keep decimals only where they matter', () => {
   assert.equal(bytes(0), '0 B');
@@ -15,13 +15,6 @@ test('bytes use decimal units and keep decimals only where they matter', () => {
 test('a percentage has at most one decimal', () => {
   assert.equal(percent(12.34), '12,3 %');
   assert.equal(percent(0), '0 %');
-});
-
-test('the states of a server get a label and a colour, and an unknown one is a warning', () => {
-  assert.deepEqual(statusInfo('running'), { label: 'En marcha', tone: 'ok' });
-  assert.deepEqual(statusInfo('off'), { label: 'Apagado', tone: 'bad' });
-  assert.deepEqual(statusInfo('starting'), { label: 'Arrancando', tone: 'warn' });
-  assert.deepEqual(statusInfo('something-new'), { label: 'Desconocido', tone: 'warn' });
 });
 
 test('the traffic share is out over what the plan includes, never past the whole', () => {

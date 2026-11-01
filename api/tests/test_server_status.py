@@ -216,7 +216,9 @@ class DescribeTests(unittest.TestCase):
         server = make_server()
         server["public_net"] = {"ipv4": {"ip": "203.0.113.9"}}
         shown = server_status.describe(server)
-        self.assertEqual((shown["name"], shown["status"], shown["location"]), ("lavi", "running", "Falkenstein, DE"))
+        self.assertEqual(shown["location"], "Falkenstein, DE")
+        self.assertNotIn("status", shown)  # the page is there, so the server is on
+        self.assertNotIn("name", shown)
         self.assertEqual(shown["traffic"], {"in": 1000, "out": 5 * TB, "included": 20 * TB})
         self.assertNotIn("203.0.113.9", str(shown))
 
@@ -325,7 +327,7 @@ class RouteTests(unittest.TestCase):
             as_admin = route.get_status("24h", False, self.admin, None)
             as_player = route.get_status("24h", False, self.player, None)
         for answer in (as_admin, as_player):
-            self.assertEqual(answer["server"]["status"], "running")
+            self.assertEqual(answer["server"]["type"], "cx22")
             self.assertEqual(answer["cost"]["total"]["since"], "2026-01-01")
             self.assertNotIn("overage", answer)
 

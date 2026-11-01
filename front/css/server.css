@@ -1,11 +1,5 @@
 /* Server page (#/server) */
 .sv-head { gap: 6px; }
-.sv-head-main { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.sv-name { font-size: 1.1rem; }
-.sv-status { font-size: 0.75rem; font-weight: 700; padding: 3px 10px; border-radius: var(--radius-pill); background: var(--bg-card-hover); color: var(--text-secondary); }
-.sv-status.ok { background: rgba(74, 222, 128, 0.15); color: var(--live-green); }
-.sv-status.warn { background: rgba(245, 197, 66, 0.15); color: var(--accent-gold); }
-.sv-status.bad { background: rgba(244, 114, 182, 0.15); color: var(--accent-pink); }
 
 .sv-grid-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin-bottom: 12px; }
 .sv-card { min-width: 0; }
