@@ -126,10 +126,13 @@ def estimate_cost(server: dict, now: datetime.datetime) -> dict:
             before_this_year += amount
         start = _next_month(start)
 
+    # the months of this year still to come, at the monthly price (a whole month always reaches it), without traffic
+    ahead = (12 - now.month) * monthly * (1 + backups)
+
     return {
         "currency": "EUR",
         "month": {"so_far": round(total(so_far), 2), "projected": round(total(projected), 2)},
-        "year": {"so_far": round(before_this_year + total(so_far), 2), "projected": round(before_this_year + total(projected), 2)},
+        "year": {"so_far": round(before_this_year + total(so_far), 2), "projected": round(before_this_year + total(projected) + ahead, 2)},
         "total": {"so_far": round(before_this_month + total(so_far), 2), "since": created.date().isoformat()},
     }
 

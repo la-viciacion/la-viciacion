@@ -90,7 +90,7 @@ class YearAndTotalTests(unittest.TestCase):
     def test_the_year_adds_the_closed_months_to_the_running_one(self):
         cost = server_status.estimate_cost(make_server(), self.NOW)
         self.assertEqual(cost["year"]["so_far"], 46.02)  # nine whole months at 4,90 (a month never costs more) and 1,92
-        self.assertEqual(cost["year"]["projected"], 49.0)  # ten months at their monthly price
+        self.assertEqual(cost["year"]["projected"], 58.8)  # twelve months at their monthly price: it reaches December
 
     def test_the_total_goes_back_to_the_month_the_server_was_created(self):
         cost = server_status.estimate_cost(make_server(), self.NOW)  # created 2025-06-01
@@ -107,8 +107,14 @@ class YearAndTotalTests(unittest.TestCase):
 
     def test_in_january_the_year_is_the_month(self):
         cost = server_status.estimate_cost(make_server(), datetime.datetime(2026, 1, 11, 0, 0, tzinfo=UTC))
-        self.assertEqual(cost["year"], cost["month"])
+        self.assertEqual(cost["year"]["so_far"], cost["month"]["so_far"])  # nothing before January
+        self.assertEqual(cost["year"]["projected"], 58.8)  # but the year goes on to December
         self.assertGreater(cost["total"]["so_far"], cost["year"]["so_far"])
+
+    def test_the_year_projection_adds_the_months_still_to_come_with_their_backups(self):
+        cost = server_status.estimate_cost(make_server(backup_window="22-02"), self.NOW)
+        self.assertEqual(cost["year"]["projected"], round(12 * 4.9 * 1.2, 2))  # 70,56: not just the end of October
+        self.assertGreater(cost["year"]["projected"], cost["month"]["projected"] + cost["year"]["so_far"] - cost["month"]["so_far"])
 
     def test_in_december_the_projection_closes_the_year(self):
         cost = server_status.estimate_cost(make_server(), datetime.datetime(2026, 12, 31, 12, 0, tzinfo=UTC))
