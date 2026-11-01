@@ -25,9 +25,18 @@ const chart = (title, label, series, max, from, to, items) => html`
     ${legend(items)}
   </section>`;
 
+// What the machine is: each characteristic with what it is
+const spec = (label, value) => html`<div class="sv-spec"><dt>${label}</dt><dd>${value}</dd></div>`;
+
 const header = (server) => html`
-  <section class="pf-card sv-head">
-    <div class="pf-sub">${server.type} · ${server.cores} vCPU · ${server.memory_gb} GB RAM · ${server.disk_gb} GB de disco · ${server.location}</div>
+  <section class="pf-card sv-head" aria-label="Características del servidor">
+    <dl class="sv-specs">
+      ${spec('Plan', server.type)}
+      ${spec('CPU', `${server.cores} vCPU`)}
+      ${spec('Memoria', `${server.memory_gb} GB`)}
+      ${spec('Disco', `${server.disk_gb} GB`)}
+      ${spec('Ubicación', server.location)}
+    </dl>
   </section>`;
 
 const traffic = (t) => html`
@@ -109,7 +118,7 @@ function panel(data, range) {
     <div class="sv-section"><h2 class="sv-section-title">Tráfico del mes</h2></div>
     ${traffic(server.traffic)}
     ${data.cost ? costs(data.cost) : ''}
-    <div class="pf-sub sv-foot">Actualizado ${formatRelative(data.fetched_at)}.</div>`;
+    <div class="pf-sub sv-foot">Actualizado ${formatRelative(data.fetched_at).toLowerCase()}.</div>`;
 }
 
 export async function render({ main }) {
