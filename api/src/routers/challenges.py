@@ -84,7 +84,7 @@ def propose_challenge(
     current_user: models.User = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    """Propose a challenge for the whole group (a game of the month or a themed one). It is not launched: an admin
+    """Propose a challenge for the whole group (a game challenge or a themed one). It is not launched: an admin
     approves or rejects it from the panel. A player may have a few waiting at once."""
     try:
         proposal = proposals.propose(db, current_user, body.kind, body.options, datetime.date.today())

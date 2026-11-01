@@ -110,7 +110,7 @@ class VoluntaryTests(AuthoringTestCase):
 
 
 class ProposalTestCase(AuthoringTestCase):
-    def propose(self, as_user="ana", kind="game_of_month", **changes):
+    def propose(self, as_user="ana", kind="game", **changes):
         options = {"game_id": "hades", "month": base.this_month(), "min_hours_each": 3, "min_hours_total": 10, **changes}
         return self.api("POST", "/challenges/proposals", as_user=as_user, json={"kind": kind, "options": options})
 
@@ -138,8 +138,8 @@ class ProposeTests(ProposalTestCase):
 
     def test_the_options_are_checked_like_a_launch(self):
         for changes, kind, fragment in (
-            ({"game_id": "nope"}, "game_of_month", "juego"), ({"month": "2020-01"}, "game_of_month", "pasado"),
-            ({"min_hours_total": 1}, "game_of_month", "total"), ({"theme": "Nope"}, "themed", "temática"),
+            ({"game_id": "nope"}, "game", "juego"), ({"month": "2020-01"}, "game", "pasado"),
+            ({"min_hours_total": 1}, "game", "total"), ({"theme": "Nope"}, "themed", "temática"),
         ):
             options = {"game_id": "hades", "month": base.this_month(), "min_hours_each": 3, "min_hours_total": 10, "theme": "Terror", "mode": "play", **changes}
             response = self.api("POST", "/challenges/proposals", as_user="ana", json={"kind": kind, "options": options})
@@ -263,7 +263,7 @@ class ScheduleTestCase(AuthoringTestCase):
         return self.api("POST", "/manage/challenge-schedules", as_user=as_user, json=body)
 
     def rotation(self, **changes):
-        body = {"label": "Juego del mes", "kind": "game_of_month", "games": ["hades", "celeste"], "min_hours_each": 3, "min_hours_total": 8, **changes}
+        body = {"label": "Juego del mes", "kind": "game", "games": ["hades", "celeste"], "min_hours_each": 3, "min_hours_total": 8, **changes}
         return self.api("POST", "/manage/challenge-schedules", as_user="root", json=body)
 
     def run(self, day):

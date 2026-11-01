@@ -45,7 +45,7 @@ class ChallengesTestCase(ApiTestCase):
     def options(self, **changes):
         return {"game_id": "hades", "month": this_month(), "min_hours_each": 5, "min_hours_total": 12, **changes}
 
-    def launch(self, as_user="root", kind="game_of_month", announce=False, **changes):
+    def launch(self, as_user="root", kind="game", announce=False, **changes):
         """A group challenge, launched from the admin panel's route (the only one that makes them)."""
         return self.api("POST", "/manage/challenges", as_user=as_user, json={"kind": kind, **self.options(**changes), "announce": announce})
 
@@ -65,7 +65,7 @@ class LaunchTests(ChallengesTestCase):
         response = self.launch()
         self.assertEqual(response.status_code, 201)
         body = response.json()
-        self.assertEqual((body["kind"], body["scope"], body["title"], body["status"]), ("game_of_month", "group", "Juego del mes: Hades", "active"))
+        self.assertEqual((body["kind"], body["scope"], body["title"], body["status"]), ("game", "group", "Juego del mes: Hades", "active"))
         self.assertEqual((body["game"]["id"], body["params"]), ("hades", {"min_hours_each": 5.0, "min_hours_total": 12.0}))
         self.assertEqual([p["name"] for p in body["progress"]["players"]], ["Ana", "Bea", "Root"])  # the active ones; Gone is inactive
 
@@ -73,7 +73,7 @@ class LaunchTests(ChallengesTestCase):
         self.assertEqual(self.launch().status_code, 201)
         with database.SessionLocal() as db:
             old = models.Challenge(
-                kind="game_of_month", scope="group", title="Viejo", params='{"min_hours_each": 5, "min_hours_total": 12}', game_id="hades", starts_on=TODAY() - timedelta(days=90),
+                kind="game", scope="group", title="Viejo", params='{"min_hours_each": 5, "min_hours_total": 12}', game_id="hades", starts_on=TODAY() - timedelta(days=90),
                 ends_on=TODAY() - timedelta(days=60), fingerprint="old-1", participation="auto",
             )
             db.add(old)
@@ -91,7 +91,7 @@ class LaunchTests(ChallengesTestCase):
 
     def test_the_challenges_route_never_makes_a_group_challenge_not_even_for_an_admin(self):
         for user in ("root", "ana"):
-            response = self.api("POST", "/challenges", as_user=user, json={"kind": "game_of_month", "options": self.options()})
+            response = self.api("POST", "/challenges", as_user=user, json={"kind": "game", "options": self.options()})
             self.assertEqual(response.status_code, 403, user)
             self.assertIn("panel de administración", response.json()["detail"])
         self.assertEqual(self.scalar("SELECT COUNT(*) FROM challenges"), 0)

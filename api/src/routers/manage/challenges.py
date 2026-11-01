@@ -47,7 +47,7 @@ def list_challenge_themes(db: Session = Depends(get_db)):
 
 
 class NewGroupChallenge(BaseModel):
-    kind: str = "game_of_month"
+    kind: str = "game"
     # the options of the templates, flat (the panel's form posts them as they are); each template reads its own
     game_id: Optional[str] = None
     month: Optional[str] = None
@@ -164,7 +164,7 @@ class NewSchedule(BaseModel):
     mode: Optional[str] = None
     min_games_total: Optional[int] = None
     versus: Optional[bool] = None
-    games: Optional[list[str]] = None  # the rotation of a game of the month
+    games: Optional[list[str]] = None  # the rotation of a game challenge
     participation: Optional[str] = None
     announce: bool = False
     start_now: bool = False  # the running month counts; otherwise it starts next month

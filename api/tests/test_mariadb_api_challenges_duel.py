@@ -186,4 +186,4 @@ class GroupVersusTests(DuelTestCase):
     def test_the_launch_notice_says_the_one_who_plays_most_wins(self):
         self.launch(versus=True)
         with database.SessionLocal() as db:
-            self.assertIn("Gana quien más juegue", challenges.summary_game_of_month(db.query(models.Challenge).one()))
+            self.assertIn("Gana quien más juegue", challenges.summary_game(db.query(models.Challenge).one()))

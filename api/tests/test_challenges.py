@@ -129,18 +129,18 @@ class HoursTests(unittest.TestCase):
 
 class FingerprintTests(unittest.TestCase):
     def test_equal_challenges_have_the_same_fingerprint_whatever_the_order_of_the_options(self):
-        a = challenges.fingerprint("game_of_month", built(params={"min_hours_each": 5, "min_hours_total": 30}), None)
-        b = challenges.fingerprint("game_of_month", built(params={"min_hours_total": 30, "min_hours_each": 5}), None)
+        a = challenges.fingerprint("game", built(params={"min_hours_each": 5, "min_hours_total": 30}), None)
+        b = challenges.fingerprint("game", built(params={"min_hours_total": 30, "min_hours_each": 5}), None)
         self.assertEqual(a, b)
         self.assertEqual(len(a), 64)
 
     def test_anything_that_differs_changes_it(self):
-        base = challenges.fingerprint("game_of_month", built(), None)
+        base = challenges.fingerprint("game", built(), None)
         for other in (
-            challenges.fingerprint("game_of_month", built(game_id="celeste"), None),
-            challenges.fingerprint("game_of_month", built(params={"min_hours_each": 6, "min_hours_total": 30}), None),
-            challenges.fingerprint("game_of_month", built(starts_on=datetime.date(2026, 11, 1), ends_on=datetime.date(2026, 11, 30)), None),
-            challenges.fingerprint("game_of_month", built(), 7),  # a personal one of somebody
+            challenges.fingerprint("game", built(game_id="celeste"), None),
+            challenges.fingerprint("game", built(params={"min_hours_each": 6, "min_hours_total": 30}), None),
+            challenges.fingerprint("game", built(starts_on=datetime.date(2026, 11, 1), ends_on=datetime.date(2026, 11, 30)), None),
+            challenges.fingerprint("game", built(), 7),  # a personal one of somebody
             challenges.fingerprint("themed", built(), None),
         ):
             self.assertNotEqual(base, other)
@@ -150,21 +150,21 @@ class GameOfMonthProgressTests(unittest.TestCase):
     NAMES = {1: "Ana", 2: "Bea", 3: "Cai"}
 
     def test_each_player_has_their_own_part_and_the_group_a_total(self):
-        result = challenges.game_of_month_result({1: 7 * 3600, 2: 3 * 3600}, self.NAMES, 5, 30)
+        result = challenges.game_result({1: 7 * 3600, 2: 3 * 3600}, self.NAMES, 5, 30)
         self.assertEqual([(p["name"], p["seconds"], p["done"]) for p in result["players"]], [("Ana", 25200, True), ("Bea", 10800, False), ("Cai", 0, False)])
         self.assertEqual((result["total_seconds"], result["total_target_seconds"], result["total_done"]), (36000, 108000, False))
 
     def test_the_total_is_reached_whoever_contributes_it(self):
-        result = challenges.game_of_month_result({1: 30 * 3600}, self.NAMES, 5, 30)
+        result = challenges.game_result({1: 30 * 3600}, self.NAMES, 5, 30)
         self.assertTrue(result["total_done"])
         self.assertEqual([p["done"] for p in result["players"]], [True, False, False])
 
     def test_a_player_reaches_their_part_exactly_at_the_minimum(self):
-        self.assertTrue(challenges.game_of_month_result({1: 5 * 3600}, {1: "Ana"}, 5, 5)["players"][0]["done"])
-        self.assertFalse(challenges.game_of_month_result({1: 5 * 3600 - 1}, {1: "Ana"}, 5, 5)["players"][0]["done"])
+        self.assertTrue(challenges.game_result({1: 5 * 3600}, {1: "Ana"}, 5, 5)["players"][0]["done"])
+        self.assertFalse(challenges.game_result({1: 5 * 3600 - 1}, {1: "Ana"}, 5, 5)["players"][0]["done"])
 
     def test_nobody_taking_part_never_reaches_the_total(self):
-        self.assertFalse(challenges.game_of_month_result({}, {}, 5, 0.5)["total_done"])
+        self.assertFalse(challenges.game_result({}, {}, 5, 0.5)["total_done"])
 
 
 class NoticeTests(unittest.TestCase):
@@ -174,12 +174,12 @@ class NoticeTests(unittest.TestCase):
         )
 
     def test_the_launch_says_what_is_asked_and_until_when(self):
-        text = challenges.TEMPLATES["game_of_month"].summary(self.challenge())
+        text = challenges.TEMPLATES["game"].summary(self.challenge())
         self.assertEqual(text, "Mínimo 5 h cada uno y 30 h entre todos, del 1 de octubre al 31 de octubre.")
 
     def test_the_total_notice_says_how_many_met_their_part(self):
-        progress = challenges.game_of_month_result({1: 20 * 3600, 2: 10 * 3600}, {1: "Ana", 2: "Bea", 3: "Cai"}, 5, 30)
-        text = challenges.TEMPLATES["game_of_month"].reached(self.challenge(), progress)
+        progress = challenges.game_result({1: 20 * 3600, 2: 10 * 3600}, {1: "Ana", 2: "Bea", 3: "Cai"}, 5, 30)
+        text = challenges.TEMPLATES["game"].reached(self.challenge(), progress)
         self.assertEqual(text, "Entre todos habéis llegado a las 30 h. 2 de 3 ya habéis cumplido vuestro mínimo.")
 
 
@@ -497,10 +497,10 @@ class AuthoringTests(unittest.TestCase):
 
     def test_an_old_challenge_keeps_its_fingerprint_and_a_voluntary_one_has_another(self):
         one = built()
-        usual = challenges.fingerprint("game_of_month", one, None)
-        self.assertEqual(usual, challenges.fingerprint("game_of_month", one, None, "auto"))
-        self.assertNotEqual(usual, challenges.fingerprint("game_of_month", one, None, "opt_in"))
-        canonical = json.dumps(["game_of_month", one.params, one.game_id, one.starts_on.isoformat(), one.ends_on.isoformat(), None], sort_keys=True, ensure_ascii=False)
+        usual = challenges.fingerprint("game", one, None)
+        self.assertEqual(usual, challenges.fingerprint("game", one, None, "auto"))
+        self.assertNotEqual(usual, challenges.fingerprint("game", one, None, "opt_in"))
+        canonical = json.dumps(["game", one.params, one.game_id, one.starts_on.isoformat(), one.ends_on.isoformat(), None], sort_keys=True, ensure_ascii=False)
         self.assertEqual(usual, hashlib.sha256(canonical.encode("utf-8")).hexdigest())  # what was stored before the participation existed
 
     def test_a_conflict_is_a_challenge_error_too(self):

@@ -1,4 +1,4 @@
-"""Group challenges proposed by players. A player proposes a game of the month or a themed challenge; an admin approves
+"""Group challenges proposed by players. A player proposes a game challenge or a themed challenge; an admin approves
 it, which launches it like any other group challenge (crud/challenges.py), or rejects it with a note. Only the
 proposal is stored; the challenge it becomes is derived as always."""
 import datetime
@@ -19,7 +19,7 @@ PENDING, APPROVED, REJECTED = "pending", "approved", "rejected"
 def _built(db: Session, kind: str, options: dict, today: datetime.date, user_id: int | None) -> tuple[dict, challenges.Built]:
     """The options a proposal keeps and the challenge they would make, checked as if it were launched today."""
     if kind not in challenges.PROPOSABLE:
-        raise ChallengeError("Solo se pueden proponer retos de juego del mes o temáticos")
+        raise ChallengeError("Solo se pueden proponer retos de juego o temáticos")
     cleaned = challenges.clean_options(options)
     return cleaned, challenges.TEMPLATES[kind].build(db, cleaned, today, user_id)
 

@@ -137,7 +137,7 @@ export const medal = (position) => ['🥇', '🥈', '🥉'][position - 1] ?? `${
 /** What a challenge asks, in a line. */
 export function summaryLine(challenge) {
   const p = challenge.params;
-  if (challenge.kind === 'game_of_month') {
+  if (challenge.kind === 'game') {
     return `${challenge.label} · mínimo ${hoursLabel(p.min_hours_each * 3600)} cada uno y ${hoursLabel(p.min_hours_total * 3600)} entre todos${versusNote(challenge)}`;
   }
   if (challenge.kind === 'themed') {
@@ -344,7 +344,7 @@ export const PERSONAL_KINDS = [
 ];
 
 /** The group challenges a player can propose, for the form: [value, label]. */
-export const PROPOSAL_KINDS = [['game_of_month', 'Reto de juego'], ['themed', 'Temático']];
+export const PROPOSAL_KINDS = [['game', 'Reto de juego'], ['themed', 'Temático']];
 
 /** What the player reads of a proposal: { label, detail } (the answer of the admins, if there is one). */
 export function proposalStatus(proposal) {

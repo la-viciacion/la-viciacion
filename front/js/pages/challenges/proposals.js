@@ -13,7 +13,7 @@ const number = (value) => (value === '' || value == null ? undefined : Number(va
 
 // What each kind sends: the options the proposal is made of
 const OPTIONS = {
-  game_of_month: (el, state) => ({
+  game: (el, state) => ({
     game_id: state.game?.id, ...state.period, min_hours_each: number(el.gameEach.value), min_hours_total: number(el.gameTotal.value), versus: el.versus.checked,
   }),
   themed: (el, state) => ({
@@ -79,7 +79,7 @@ export async function openProposalForm(onDone) {
       <label>Tipo de reto<select class="adm-input" name="kind">
         ${PROPOSAL_KINDS.map(([value, label]) => html`<option value="${value}">${label}</option>`)}
       </select></label>
-      <div data-kind="game_of_month">
+      <div data-kind="game">
         <p class="adm-sub">Un juego, un periodo, unas horas mínimas por jugador y un total entre todos.</p>
         ${gameSearchField}
         <label>Horas mínimas por jugador<input class="adm-input" type="number" name="gameEach" min="0.5" step="0.5" value="5" /></label>

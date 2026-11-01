@@ -412,7 +412,7 @@ class ChallengeSchedule(Base):
     label = Column(String(80), nullable=False)
     kind = Column(String(32), nullable=False)  # the template
     options = Column(Text, nullable=False)  # the options of the template without the month and the game, JSON
-    games = Column(Text, nullable=True)  # the game ids a game of the month rotates along, JSON
+    games = Column(Text, nullable=True)  # the game ids a game challenge rotates along, JSON
     participation = Column(String(8), nullable=False, server_default=text("'auto'"))
     announce = Column(Boolean, nullable=False, server_default=text("0"))  # tell the group when it launches
     active = Column(Boolean, nullable=False, server_default=text("1"))

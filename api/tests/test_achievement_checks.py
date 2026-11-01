@@ -1354,7 +1354,7 @@ class ChallengeAchievementTests(unittest.IsolatedAsyncioTestCase):
     async def test_a_group_challenge_needs_the_groups_total_too_for_the_team_achievement(self):
         await self.check([self.entry(1, kind="themed", scope="group", group_done=False)])
         self.assertNotIn("TEAM_CHALLENGE_LIFETIME", self.awarded())
-        await self.check([self.entry(1, kind="themed", scope="group", group_done=False), self.entry(2, kind="game_of_month", scope="group", group_done=True)])
+        await self.check([self.entry(1, kind="themed", scope="group", group_done=False), self.entry(2, kind="game", scope="group", group_done=True)])
         self.assertEqual(self.awarded()["TEAM_CHALLENGE_LIFETIME"], datetime.date(YEAR, 1, 2))
 
     async def test_a_recalculation_only_notes_them(self):
