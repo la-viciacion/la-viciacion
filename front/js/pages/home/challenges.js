@@ -4,6 +4,9 @@ import { api } from '../../lib/api.js';
 import { digest, digestLine } from '../../lib/challenges.js';
 import { html, mount } from '../../lib/html.js';
 
+// Only the ones that need attention most (the digest sorts them): the Home is for the timers, #/challenges has the rest.
+const SHOWN = 2;
+
 /** Fill `el` with the running challenges of the player; nothing at all when there are none (or they fail to load:
  * this card is a courtesy, the Home does not need it). */
 export async function showMyChallenges(el, userId) {
@@ -18,16 +21,17 @@ export async function showMyChallenges(el, userId) {
     mount(el, html``);
     return;
   }
+  const shown = summary.items.slice(0, SHOWN);
+  const hidden = summary.items.length - shown.length;
   mount(el, html`
     <div class="section-header"><h2 class="section-title">Mis retos</h2><div class="section-line"></div></div>
-    <a class="pf-card ch-mine-item" href="#/challenges">
+    <a class="pf-card ch-mine" href="#/challenges">
       <span class="pf-sub">${digestLine(summary)}</span>
-    </a>
-    <div class="ch-mine">
-      ${summary.items.map(({ challenge, standing }) => html`
-        <a class="pf-card ch-mine-item" href="#/challenges" data-challenge="${challenge.id}">
+      ${shown.map(({ challenge, standing }) => html`
+        <div class="ch-mine-item ${standing.tone}" data-challenge="${challenge.id}">
           <strong>${challenge.title}</strong>
-          <span class="ch-standing ${standing.tone}">${standing.text}</span>
-        </a>`)}
-    </div>`);
+          <span>${standing.text}</span>
+        </div>`)}
+      ${hidden ? html`<span class="pf-sub">y ${hidden} más →</span>` : ''}
+    </a>`);
 }
