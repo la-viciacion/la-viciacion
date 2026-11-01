@@ -183,7 +183,7 @@ class HostInStatusTests(unittest.TestCase):
             host = server_status.status(TOKEN, "42", "7d", prometheus_url="http://p:9090")["host"]
         self.assertIsNotNone(host["memory"])
         self.assertEqual(instant.call_count, len(server_status.NOW_QUERIES))
-        self.assertEqual(series.call_count, 2)
+        self.assertEqual(series.call_count, len(server_status.series_queries(1800)))
         _, _, start, end, step = series.call_args.args
         self.assertEqual(((end - start).total_seconds(), step), (7 * 86400, 1800))
 
@@ -200,6 +200,52 @@ class HostInStatusTests(unittest.TestCase):
         with mock.patch.object(server_status.prometheus, "instant", return_value=None), self.assertRaises(PrometheusError) as caught:
             server_status.status(TOKEN, "42", "24h", prometheus_url="http://p:9090")
         self.assertIn("node-exporter", str(caught.exception))
+
+
+class QueriesTests(unittest.TestCase):
+    def test_a_rate_is_taken_over_as_long_as_a_point_of_the_chart_lasts_and_never_less_than_two_scrapes(self):
+        self.assertIn("[60s]", server_status.series_queries(30)["cpu"])
+        self.assertIn("[300s]", server_status.series_queries(300)["cpu"])
+        self.assertIn("[7200s]", server_status.series_queries(7200)["disk_read"])
+
+    def test_the_disk_ignores_the_virtual_devices(self):
+        for key in ("disk_read", "disk_write"):
+            self.assertIn("loop", server_status.series_queries(300)[key])
+
+
+class WhereTheMetricsComeFromTests(unittest.TestCase):
+    def setUp(self):
+        server_status.clear()
+        self.addCleanup(server_status.clear)
+        patch = mock.patch.multiple(server_status.hetzner, server=mock.DEFAULT, metrics=mock.DEFAULT)
+        self.hetzner = patch.start()
+        self.addCleanup(patch.stop)
+        self.hetzner["server"].return_value = make_server()
+        self.hetzner["metrics"].return_value = SERIES
+
+    def prometheus(self):
+        values = iter(NOW_VALUES.values())
+        by_name = {"cpu": [[1000, 3.0]], "disk_read": [[1000, 7.0]], "disk_write": [[1000, 9.0]]}
+        names = iter(server_status.series_queries(300))
+
+        def series(*_):
+            return by_name.get(next(names), [[1000, 50.0]])
+
+        return mock.patch.multiple(server_status.prometheus, instant=mock.Mock(side_effect=lambda *_: next(values)), series=mock.Mock(side_effect=series))
+
+    def test_without_prometheus_hetzner_gives_the_cpu_and_the_disk_too(self):
+        data = server_status.status(TOKEN, "42", "24h")
+        self.assertEqual(self.hetzner["metrics"].call_args.args[5], "cpu,disk,network")
+        self.assertEqual(data["metrics"]["cpu"], [[1000, 12.5], [1060, 7.0]])
+        self.assertEqual(data["metrics"]["net_in"], [[1000, 100.0]])
+
+    def test_with_prometheus_it_gives_the_cpu_and_the_disk_and_hetzner_only_the_network(self):
+        with self.prometheus():
+            data = server_status.status(TOKEN, "42", "24h", prometheus_url="http://p:9090")
+        self.assertEqual(self.hetzner["metrics"].call_args.args[5], "network")
+        self.assertEqual(data["metrics"]["cpu"], [[1000, 3.0]])
+        self.assertEqual((data["metrics"]["disk_read"], data["metrics"]["disk_write"]), ([[1000, 7.0]], [[1000, 9.0]]))
+        self.assertEqual((data["metrics"]["net_in"], data["metrics"]["net_out"]), ([[1000, 100.0]], [[1000, 200.0]]))
 
 
 class DescribeTests(unittest.TestCase):
@@ -248,6 +294,12 @@ class ClientTests(unittest.TestCase):
             hetzner.server(TOKEN, "42")
         self.assertNotIn(TOKEN, str(caught.exception))
 
+    def test_the_metrics_can_ask_for_the_network_alone(self):
+        start, end = datetime.datetime(2026, 10, 1, tzinfo=UTC), datetime.datetime(2026, 10, 2, tzinfo=UTC)
+        with mock.patch.object(hetzner.requests, "get", return_value=answer(body={"metrics": {"time_series": {}}})) as get:
+            hetzner.metrics(TOKEN, 42, start, end, 300, hetzner.NETWORK_ONLY)
+        self.assertEqual(get.call_args.kwargs["params"]["type"], "network")
+
     def test_the_metrics_ask_for_the_three_types_over_the_window(self):
         start, end = datetime.datetime(2026, 10, 1, tzinfo=UTC), datetime.datetime(2026, 10, 2, tzinfo=UTC)
         with mock.patch.object(hetzner.requests, "get", return_value=answer(body={"metrics": {"time_series": SERIES}})) as get:
@@ -277,7 +329,7 @@ class StatusCacheTests(unittest.TestCase):
 
     def test_the_window_sets_how_far_back_and_how_often(self):
         server_status.status(TOKEN, "42", "7d")
-        _, _, start, end, step = self.hetzner["metrics"].call_args.args
+        _, _, start, end, step, _ = self.hetzner["metrics"].call_args.args
         self.assertEqual((end - start).total_seconds(), 7 * 86400)
         self.assertEqual(step, 1800)
 

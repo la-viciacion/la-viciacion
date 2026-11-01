@@ -10,6 +10,7 @@ import requests
 URL = "https://api.hetzner.cloud/v1"
 TIMEOUT_SECONDS = 15
 METRIC_TYPES = "cpu,disk,network"
+NETWORK_ONLY = "network"  # when Prometheus measures the rest
 
 
 class HetznerError(Exception):
@@ -51,7 +52,7 @@ def server(token: str, server_id: str) -> dict:
     return servers[0]
 
 
-def metrics(token: str, server_id: int, start: datetime.datetime, end: datetime.datetime, step: int) -> dict:
+def metrics(token: str, server_id: int, start: datetime.datetime, end: datetime.datetime, step: int, types: str = METRIC_TYPES) -> dict:
     """The time series (`name -> {"values": [[unix seconds, "value"], ...]}`) between two instants, one point per `step` seconds."""
-    params = {"type": METRIC_TYPES, "start": start.isoformat(), "end": end.isoformat(), "step": step}
+    params = {"type": types, "start": start.isoformat(), "end": end.isoformat(), "step": step}
     return _get(token, f"/servers/{server_id}/metrics", params)["metrics"]["time_series"]

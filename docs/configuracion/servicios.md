@@ -63,7 +63,7 @@ Enseña el estado, la CPU, la red y el disco (de 1 hora a 30 días) y el tráfic
 
 ### Memoria, disco y carga (Prometheus)
 
-Para ver también la **memoria**, el **espacio en disco**, la **carga** y el **tiempo encendido** hace falta medirlos dentro de la máquina. El `docker-compose.yml` trae Prometheus y node-exporter, apagados por defecto. Para encenderlos:
+Para ver también la **memoria**, el **espacio en disco**, la **carga** y el **tiempo encendido** hace falta medirlos dentro de la máquina. Con Prometheus encendido, la **CPU** y el **disco (lectura y escritura)** también salen de él; de Hetzner quedan el estado, la red, el tráfico del mes y el gasto. El `docker-compose.yml` trae Prometheus y node-exporter, apagados por defecto. Para encenderlos:
 
 1. Pon en el `.env` `COMPOSE_PROFILES=monitoring` y ejecuta `docker compose up -d`. Esa misma línea le dice a la API dónde está Prometheus; no hace falta nada más. (`PROMETHEUS_URL` en el `.env` solo sirve para un Prometheus que esté en otro sitio.)
 2. Espera uno o dos minutos a que Prometheus recoja los primeros datos. Puedes comprobarlo desde el servidor con `docker compose exec laviciacion-prometheus wget -qO- localhost:9090/api/v1/targets`: el objetivo `node` debe decir `"health":"up"`.
