@@ -3,23 +3,6 @@
 // [what the API is asked for, the button, how many seconds back it goes]
 export const WINDOWS = [['1h', '1 hora', 3600], ['24h', '24 horas', 86400], ['7d', '7 días', 7 * 86400], ['30d', '30 días', 30 * 86400]];
 
-// What Hetzner calls each state of a server, how the panel says it and how it is coloured.
-const STATUS = {
-  running: ['En marcha', 'ok'],
-  off: ['Apagado', 'bad'],
-  initializing: ['Arrancando', 'warn'],
-  starting: ['Arrancando', 'warn'],
-  stopping: ['Apagándose', 'warn'],
-  migrating: ['Migrando', 'warn'],
-  rebuilding: ['Reconstruyéndose', 'warn'],
-  deleting: ['Eliminándose', 'bad'],
-};
-
-export const statusInfo = (status) => {
-  const [label, tone] = STATUS[status] ?? ['Desconocido', 'warn'];
-  return { label, tone };
-};
-
 const UNITS = ['B', 'KB', 'MB', 'GB', 'TB'];
 
 /** 1536 -> "1,5 KB" (decimal units, the ones Hetzner bills traffic in). */

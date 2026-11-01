@@ -18,8 +18,8 @@ const COST = {
 const STATUS = {
   configured: true, window: '24h', step: 300, fetched_at: '2026-10-11T10:00:00+00:00',
   server: {
-    name: 'lavi <b>', status: 'running', created: '2026-01-10T08:00:00+00:00', type: 'cx22', cores: 2, memory_gb: 4, disk_gb: 40,
-    location: 'Falkenstein, DE', traffic: { in: 1_000_000, out: 5_000_000_000_000, included: 20_000_000_000_000 },
+    created: '2026-01-10T08:00:00+00:00', type: 'cx22', cores: 2, memory_gb: 4, disk_gb: 40,
+    location: 'Falkenstein <b>, DE', traffic: { in: 1_000_000, out: 5_000_000_000_000, included: 20_000_000_000_000 },
   },
   metrics: { cpu: line(10), net_in: line(1000), net_out: line(2000), disk_read: [], disk_write: line(5) },
   cost: COST,
@@ -32,14 +32,12 @@ const HOST = {
 
 const main = () => document.getElementById('main');
 
-test('everybody sees the state, the charts, the traffic and the cost, escaped', async () => {
+test('everybody sees the characteristics, the charts, the traffic and the cost, escaped', async () => {
   installApi({ 'GET /server/status?range=24h': STATUS });
   await server.render({ main: main() });
   await settle();
-  assert.equal(text('.sv-name')[0], 'lavi <b>');
-  assert.equal(document.querySelectorAll('.sv-name b').length, 0);
-  assert.equal(text('.sv-status')[0], 'En marcha');
-  assert.match(text('.sv-head .pf-sub')[0], /cx22 · 2 vCPU · 4 GB RAM · 40 GB de disco · Falkenstein, DE/);
+  assert.equal(text('.sv-head')[0], 'cx22 · 2 vCPU · 4 GB RAM · 40 GB de disco · Falkenstein <b>, DE'); // only the characteristics, escaped
+  assert.equal(document.querySelectorAll('.sv-head b').length, 0);
   assert.equal(document.querySelectorAll('.sv-title').length, 5); // CPU, network, disk, traffic and the breakdown
   assert.equal(document.querySelectorAll('.sv-line').length, 5);
   assert.equal(document.querySelector('.sv-line.cpu').getAttribute('points').split(' ').length, 3);

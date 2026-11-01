@@ -139,8 +139,6 @@ def fetch_host(url: str, start: datetime.datetime, end: datetime.datetime, step:
 def describe(server: dict) -> dict:
     kind, place = server["server_type"], _location(server)
     return {
-        "name": server["name"],
-        "status": server["status"],  # running, off, starting, migrating...
         "created": server["created"],
         "type": kind["name"],
         "cores": kind["cores"],

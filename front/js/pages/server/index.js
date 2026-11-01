@@ -4,7 +4,7 @@
 import { api } from '../../lib/api.js';
 import { formatRelative } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
-import { WINDOWS, bytes, load, money, monthYear, last, linePoints, peak, percent, rate, sharedMax, statusInfo, trafficShare, uptime } from '../../lib/server.js';
+import { WINDOWS, bytes, load, money, monthYear, last, linePoints, peak, percent, rate, sharedMax, trafficShare, uptime } from '../../lib/server.js';
 
 export const active = null; // it belongs to no item of the top bar
 
@@ -25,17 +25,10 @@ const chart = (title, label, series, max, from, to, items) => html`
     ${legend(items)}
   </section>`;
 
-const header = (server) => {
-  const { label, tone } = statusInfo(server.status);
-  return html`
-    <section class="pf-card sv-head">
-      <div class="sv-head-main">
-        <span class="sv-status ${tone}">${label}</span>
-        <strong class="sv-name">${server.name}</strong>
-      </div>
-      <div class="pf-sub">${server.type} · ${server.cores} vCPU · ${server.memory_gb} GB RAM · ${server.disk_gb} GB de disco · ${server.location}</div>
-    </section>`;
-};
+const header = (server) => html`
+  <section class="pf-card sv-head">
+    <div class="pf-sub">${server.type} · ${server.cores} vCPU · ${server.memory_gb} GB RAM · ${server.disk_gb} GB de disco · ${server.location}</div>
+  </section>`;
 
 const traffic = (t) => html`
   <section class="pf-card sv-card" aria-label="Tráfico del mes">
