@@ -351,8 +351,14 @@
 .ch-games > summary { cursor: pointer; font-size: 0.85rem; color: var(--text-secondary); }
 .ch-games-items { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .ch-standing.failed, .ch-standing.pending { color: var(--text-secondary); }
-.ch-mine { display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px; }
-.ch-mine-item { display: flex; flex-direction: column; gap: 4px; color: inherit; text-decoration: none; }
+/* Home card: one block with the digest and the (few) challenges that need attention, one line each */
+.ch-mine { gap: 8px; margin-bottom: 18px; color: inherit; text-decoration: none; }
+.ch-mine-item { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; padding-left: 10px; border-left: 3px solid var(--border); font-size: 0.9rem; }
+.ch-mine-item > span { color: var(--text-secondary); font-size: 0.85rem; }
+.ch-mine-item.done { border-left-color: #4ade80; }
+.ch-mine-item.ok { border-left-color: var(--accent-teal); }
+.ch-mine-item.behind { border-left-color: var(--accent-gold); }
+.ch-mine-item.urgent { border-left-color: #f87171; }
 .ch-history { display: flex; flex-direction: column; gap: 8px; }
 .ch-history-item { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 
