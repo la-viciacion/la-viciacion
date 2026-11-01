@@ -1,5 +1,7 @@
 /* Server page (#/server) */
-.sv-head { gap: 6px; }
+.sv-specs { margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px 16px; }
+.sv-spec dt { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); }
+.sv-spec dd { margin: 2px 0 0; font-weight: 700; }
 
 .sv-grid-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin-bottom: 12px; }
 .sv-card { min-width: 0; }

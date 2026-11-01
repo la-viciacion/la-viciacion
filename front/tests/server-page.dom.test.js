@@ -36,8 +36,9 @@ test('everybody sees the characteristics, the charts, the traffic and the cost, 
   installApi({ 'GET /server/status?range=24h': STATUS });
   await server.render({ main: main() });
   await settle();
-  assert.equal(text('.sv-head')[0], 'cx22 · 2 vCPU · 4 GB RAM · 40 GB de disco · Falkenstein <b>, DE'); // only the characteristics, escaped
-  assert.equal(document.querySelectorAll('.sv-head b').length, 0);
+  assert.deepEqual(text('.sv-spec dt'), ['Plan', 'CPU', 'Memoria', 'Disco', 'Ubicación']); // each characteristic says what it is
+  assert.deepEqual(text('.sv-spec dd'), ['cx22', '2 vCPU', '4 GB', '40 GB', 'Falkenstein <b>, DE']);
+  assert.equal(document.querySelectorAll('.sv-head b').length, 0); // escaped
   assert.equal(document.querySelectorAll('.sv-title').length, 5); // CPU, network, disk, traffic and the breakdown
   assert.equal(document.querySelectorAll('.sv-line').length, 5);
   assert.equal(document.querySelector('.sv-line.cpu').getAttribute('points').split(' ').length, 3);
