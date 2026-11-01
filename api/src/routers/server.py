@@ -21,6 +21,16 @@ router = APIRouter(
 )
 
 
+@router.get("/costs")
+def get_costs(year: int = Query(..., ge=2000, le=2100, description="The year whose months are wanted"), db: Session = Depends(get_db)):
+    """The twelve months of a year of costs (see `utils/costs.months`), for the history of the server page. Derived from the
+    recorded rates when asked; only the years that have costs, up to the running one."""
+    items = costs_crud.all_items(db)
+    if year not in costs.years(items, datetime.datetime.now()):
+        raise HTTPException(status_code=404, detail="Ese año no tiene gastos registrados")
+    return {"year": year, "months": costs.months(items, year, datetime.datetime.now())}
+
+
 @router.get("/status")
 def get_status(
     window: str = Query("24h", alias="range", pattern="^(1h|24h|7d|30d)$", description="How far back the charts go"),

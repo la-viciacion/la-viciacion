@@ -8,12 +8,20 @@ globalThis.location = window.location;
 const server = await import('../js/pages/server/index.js');
 
 const line = (base) => [[1000, base], [1300, base * 2], [1600, base]];
+const month = (n, year = 2026, running = 10) => {
+  const state = year < 2026 || n < running ? 'closed' : n === running ? 'running' : 'future';
+  const kinds = state === 'future' ? { server: 0, domain: 0 } : { server: n === running && year === 2026 ? 2 : 4.9, domain: n === running && year === 2026 ? 0.3 : 1 };
+  return { month: `${year}-${String(n).padStart(2, '0')}`, state, kinds, forecast: state === 'closed' ? 0 : state === 'running' ? 3.6 : 5.9 };
+};
+const monthsOf = (year) => Array.from({ length: 12 }, (_, i) => month(i + 1, year));
+
 const COST = {
   currency: 'EUR', month: { so_far: 2.3, projected: 5.88 }, year: { so_far: 40.5, projected: 44.1 }, total: { so_far: 120.25, since: '2023-12-05' },
   kinds: [
     { kind: 'server', month: { so_far: 2, projected: 5.4 }, year: { so_far: 38, projected: 41 }, total: { so_far: 108 } },
     { kind: 'domain', month: { so_far: 0.3, projected: 0.48 }, year: { so_far: 2.5, projected: 3.1 }, total: { so_far: 12.25 } },
   ],
+  years: [2025, 2026], months: monthsOf(2026),
 };
 const STATUS = {
   configured: true, window: '24h', step: 300, fetched_at: '2026-10-11T10:00:00+00:00',
@@ -39,7 +47,7 @@ test('everybody sees the characteristics, the charts, the traffic and the cost, 
   assert.deepEqual(text('.sv-spec dt'), ['Plan', 'CPU', 'Memoria', 'Disco', 'Ubicación']); // each characteristic says what it is
   assert.deepEqual(text('.sv-spec dd'), ['cx22', '2 vCPU', '4 GB', '40 GB', 'Falkenstein <b>, DE']);
   assert.equal(document.querySelectorAll('.sv-head b').length, 0); // escaped
-  assert.equal(document.querySelectorAll('.sv-title').length, 5); // CPU, network, disk, traffic and the breakdown
+  assert.equal(document.querySelectorAll('.sv-title').length, 6); // CPU, network, disk, traffic, the breakdown and the months
   assert.equal(document.querySelectorAll('.sv-line').length, 5);
   assert.equal(document.querySelector('.sv-line.cpu').getAttribute('points').split(' ').length, 3);
   assert.equal(document.querySelectorAll('.sv-line[points=""]').length, 1); // no read of the disk: nothing to draw
@@ -73,11 +81,11 @@ test('with a single kind there is no total row, and a kind the page does not kno
   installApi({ 'GET /server/status?range=24h': { ...STATUS, cost: { ...COST, kinds } } });
   await server.render({ main: main() });
   await settle();
-  assert.equal(document.querySelector('tfoot'), null);
+  assert.equal(document.querySelector('[aria-label="Desglose de costes"] tfoot'), null);
   installApi({ 'GET /server/status?range=24h': { ...STATUS, cost: { ...COST, kinds: [{ ...kinds[0], kind: 'energia' }] } } });
   await server.render({ main: main() });
   await settle();
-  assert.deepEqual(text('tbody th'), ['energia']);
+  assert.deepEqual(text('[aria-label="Desglose de costes"] tbody th'), ['energia']);
 });
 
 test('without any rate yet the page has no costs section', async () => {
@@ -162,4 +170,81 @@ test('a part Prometheus has no data for is left out', async () => {
   assert.ok(document.querySelector('[aria-label="Memoria"]'));
   assert.equal(document.querySelector('[aria-label="Espacio en disco"]'), null);
   assert.doesNotMatch(document.querySelector('[aria-label="Carga de la máquina"]').textContent, /Encendido|núcleos/);
+});
+
+const clean = (t) => t.replace(/\s+/g, ' ').trim();
+const year = () => document.querySelector('#svYear');
+
+test('the costs by month: twelve bars of the running year, the running month selected and its detail below', async () => {
+  installApi({ 'GET /server/status?range=24h': STATUS });
+  await server.render({ main: main() });
+  await settle();
+  assert.deepEqual(text('[data-year]', year()), ['2025', '2026']);
+  assert.equal(year().querySelector('[data-year="2026"]').getAttribute('aria-pressed'), 'true');
+  assert.deepEqual(text('.sv-bar-label', year()), ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']);
+  assert.equal(year().querySelector('[data-month="2026-10"]').getAttribute('aria-pressed'), 'true');
+  assert.deepEqual([...year().querySelectorAll('.sv-bar')].map((bar) => bar.classList.contains('future')), [...Array(10).fill(false), true, true]);
+  assert.ok([...year().querySelectorAll('.sv-bar')].every((bar) => bar.tagName === 'BUTTON')); // real buttons: the keyboard works
+  assert.equal(year().querySelectorAll('.sv-forecast').length, 3); // the rest of October, November and December
+  assert.deepEqual(text('.sv-key', year()), ['Servidor', 'Dominio', 'Previsto']);
+  assert.match(clean(year().querySelector('.sv-cost-total').textContent), /^\d+,\d\d € en 2026 · \d+,\d\d € previstos a fin de año$/);
+  assert.equal(text('.sv-detail-title', year())[0], 'Octubre de 2026');
+  assert.deepEqual(text('.sv-detail tbody tr', year()).map(clean), ['Servidor2,00 €', 'Dominio0,30 €', 'Lo que queda previsto3,60 €']);
+  assert.deepEqual(text('.sv-detail tfoot tr', year()).map(clean), ['Total previsto5,90 €']);
+});
+
+test('pressing a month shows its detail: a closed one is a total, a future one all forecast', async () => {
+  installApi({ 'GET /server/status?range=24h': STATUS });
+  await server.render({ main: main() });
+  await settle();
+  year().querySelector('[data-month="2026-03"]').click();
+  assert.equal(text('.sv-detail-title', year())[0], 'Marzo de 2026');
+  assert.deepEqual(text('.sv-detail tfoot tr', year()).map(clean), ['Total5,90 €']);
+  assert.equal(year().querySelector('.sv-detail .sv-pending'), null);
+  year().querySelector('[data-month="2026-12"]').click();
+  assert.equal(text('.sv-detail-title', year())[0], 'Diciembre de 2026');
+  assert.deepEqual(text('.sv-detail tbody tr', year()).map(clean), ['Lo que queda previsto5,90 €']); // nothing spent yet, only forecast
+  assert.equal(year().querySelector('[data-month="2026-12"]').getAttribute('aria-pressed'), 'true');
+});
+
+test('another year is asked for once, shown whole with no forecast, and the running one comes back without asking again', async () => {
+  const calls = installApi({ 'GET /server/status?range=': STATUS, 'GET /server/costs?year=2025': { year: 2025, months: monthsOf(2025) } });
+  await server.render({ main: main() });
+  await settle();
+  year().querySelector('[data-year="2025"]').click();
+  await settle();
+  assert.equal(year().querySelector('[data-year="2025"]').getAttribute('aria-pressed'), 'true');
+  assert.equal(year().querySelectorAll('.sv-forecast').length, 0);
+  assert.deepEqual(text('.sv-key', year()), ['Servidor', 'Dominio']); // nothing is forecast in a year that is over
+  assert.doesNotMatch(year().querySelector('.sv-cost-total').textContent, /previstos/);
+  assert.equal(text('.sv-detail-title', year())[0], 'Diciembre de 2025');
+  year().querySelector('[data-year="2026"]').click();
+  await settle();
+  year().querySelector('[data-year="2025"]').click();
+  await settle();
+  assert.equal(calls.filter((c) => c.path === '/server/costs?year=2025').length, 1);
+  assert.equal(calls.filter((c) => c.path.startsWith('/server/status')).length, 1);
+});
+
+test('a year that cannot be read says so and the page stays on the one it had', async () => {
+  installApi({ 'GET /server/status?range=': STATUS, 'GET /server/costs?year=2025': json({ detail: 'Ese año no tiene gastos registrados' }, 404) });
+  await server.render({ main: main() });
+  await settle();
+  year().querySelector('[data-year="2025"]').click();
+  await settle();
+  assert.match(year().textContent, /Error consultando los costes de 2025: Ese año no tiene gastos registrados/);
+  assert.equal(year().querySelector('[data-year="2026"]').getAttribute('aria-pressed'), 'true');
+});
+
+test('changing the period of the charts keeps the year and the month being looked at', async () => {
+  installApi({ 'GET /server/status?range=': STATUS, 'GET /server/costs?year=2025': { year: 2025, months: monthsOf(2025) } });
+  await server.render({ main: main() });
+  await settle();
+  year().querySelector('[data-year="2025"]').click();
+  await settle();
+  year().querySelector('[data-month="2025-04"]').click();
+  document.querySelector('[data-window="7d"]').click();
+  await settle();
+  assert.equal(year().querySelector('[data-year="2025"]').getAttribute('aria-pressed'), 'true');
+  assert.equal(text('.sv-detail-title', year())[0], 'Abril de 2025');
 });

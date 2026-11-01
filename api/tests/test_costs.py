@@ -110,6 +110,53 @@ class SummaryTests(unittest.TestCase):
         self.assertEqual(result["year"], {"so_far": 0, "projected": 4.9})
 
 
+class MonthsTests(unittest.TestCase):
+    ITEMS = [server(starts_on=D(2026, 1, 1)), manual(1200, "year", D(2026, 1, 1))]
+
+    def test_there_are_twelve_months_closed_then_the_running_one_then_the_future(self):
+        result = costs.months(self.ITEMS, 2026, NOW)
+        self.assertEqual([m["month"] for m in result], [f"2026-{n:02d}" for n in range(1, 13)])
+        self.assertEqual([m["state"] for m in result], ["closed"] * 9 + ["running"] + ["future"] * 2)
+
+    def test_a_closed_month_is_what_it_cost_by_kind_with_nothing_forecast(self):
+        january = costs.months(self.ITEMS, 2026, NOW)[0]
+        self.assertEqual(january["kinds"], {"server": 4.9, "domain": 1.0})
+        self.assertEqual(january["forecast"], 0)
+
+    def test_the_running_month_is_what_has_been_spent_and_what_is_left_to_forecast(self):
+        october = costs.months(self.ITEMS, 2026, NOW)[9]
+        self.assertEqual(october["kinds"], {"server": 1.92, "domain": 0.32})
+        self.assertEqual(october["forecast"], 3.66)  # 4,90 + 1,00 less what is already counted
+
+    def test_a_future_month_is_all_forecast_and_has_nothing_spent(self):
+        november = costs.months(self.ITEMS, 2026, NOW)[10]
+        self.assertEqual(november["kinds"], {"server": 0, "domain": 0})
+        self.assertEqual(november["forecast"], 5.9)
+
+    def test_the_traffic_beyond_the_plan_is_the_servers_in_the_running_month_only(self):
+        result = costs.months(self.ITEMS, 2026, NOW, extra=2.4)
+        self.assertEqual(result[9]["kinds"]["server"], 4.32)
+        self.assertEqual(result[9]["forecast"], 3.66)  # it is already spent: it does not change what is left
+        self.assertEqual(result[8]["kinds"]["server"], 4.9)
+
+    def test_a_past_year_is_all_closed_and_a_year_before_the_first_rate_is_empty(self):
+        past = costs.months([server()], 2025, NOW)  # since 2025-06-01
+        self.assertEqual({m["state"] for m in past}, {"closed"})
+        self.assertEqual(past[0]["kinds"], {"server": 0})
+        self.assertEqual(past[11]["kinds"], {"server": 4.9})
+        self.assertEqual(sum(m["forecast"] for m in past), 0)
+
+    def test_the_years_go_from_the_first_rate_to_the_running_year(self):
+        self.assertEqual(costs.years([server()], NOW), [2025, 2026])
+        self.assertEqual(costs.years([], NOW), [])
+
+    def test_the_summary_carries_the_years_and_the_months_of_the_running_one(self):
+        result = costs.summary(self.ITEMS, NOW, extra=2.4)
+        self.assertEqual(result["years"], [2026])
+        self.assertEqual(len(result["months"]), 12)
+        self.assertEqual(result["months"][9]["kinds"]["server"], 4.32)
+
+
 class KindsTests(unittest.TestCase):
     ITEMS = [server(starts_on=D(2026, 1, 1)), manual(1200, "year", D(2026, 1, 1)), manual(500, "once", D(2026, 10, 3), kind="other")]
 
