@@ -14,11 +14,11 @@ DT = datetime.datetime
 
 
 def server(starts_on=D(2025, 6, 1), ends_on=None, amount=490, hourly=8000):
-    return {"amount_cents": amount, "hourly_micros": hourly, "period": "month", "starts_on": starts_on, "ends_on": ends_on}
+    return {"kind": "server", "amount_cents": amount, "hourly_micros": hourly, "period": "month", "starts_on": starts_on, "ends_on": ends_on}
 
 
-def manual(amount, period, starts_on, ends_on=None):
-    return {"amount_cents": amount, "hourly_micros": None, "period": period, "starts_on": starts_on, "ends_on": ends_on}
+def manual(amount, period, starts_on, ends_on=None, kind="domain"):
+    return {"kind": kind, "amount_cents": amount, "hourly_micros": None, "period": period, "starts_on": starts_on, "ends_on": ends_on}
 
 
 OCT_1, NOV_1 = DT(2026, 10, 1), DT(2026, 11, 1)
@@ -108,6 +108,36 @@ class SummaryTests(unittest.TestCase):
         result = costs.summary([server(starts_on=D(2026, 12, 1))], NOW)
         self.assertEqual(result["month"], {"so_far": 0, "projected": 0})
         self.assertEqual(result["year"], {"so_far": 0, "projected": 4.9})
+
+
+class KindsTests(unittest.TestCase):
+    ITEMS = [server(starts_on=D(2026, 1, 1)), manual(1200, "year", D(2026, 1, 1)), manual(500, "once", D(2026, 10, 3), kind="other")]
+
+    def test_each_kind_has_its_own_figures_and_the_server_comes_first(self):
+        kinds = costs.summary(self.ITEMS, NOW)["kinds"]
+        self.assertEqual([k["kind"] for k in kinds], ["server", "domain", "other"])
+        server_kind, domain, other = kinds
+        self.assertEqual(server_kind["month"], {"so_far": 1.92, "projected": 4.9})
+        self.assertEqual(domain["year"], {"so_far": 9.32, "projected": 12.0})  # nine whole months of 1,00 and ten days of October
+        self.assertEqual(other["month"], {"so_far": 5.0, "projected": 5.0})
+        self.assertEqual(other["total"], {"so_far": 5.0})
+
+    def test_the_kinds_add_up_to_the_whole(self):
+        result = costs.summary(self.ITEMS, NOW, extra=2.4)
+        for period in ("month", "year", "total"):
+            self.assertAlmostEqual(sum(k[period]["so_far"] for k in result["kinds"]), result[period]["so_far"], places=1, msg=period)
+        self.assertAlmostEqual(sum(k["year"]["projected"] for k in result["kinds"]), result["year"]["projected"], places=1)
+
+    def test_what_the_month_costs_beyond_the_rates_is_the_servers(self):
+        kinds = {k["kind"]: k for k in costs.summary(self.ITEMS, NOW, extra=2.4)["kinds"]}
+        self.assertEqual(kinds["server"]["month"]["so_far"], 4.32)
+        self.assertEqual(kinds["domain"]["month"]["so_far"], 0.32)  # 10 days of 31 of a euro a month
+
+    def test_a_kind_with_no_rate_is_left_out_and_the_kind_does_not_carry_the_since_date(self):
+        result = costs.summary([server()], NOW)
+        self.assertEqual([k["kind"] for k in result["kinds"]], ["server"])
+        self.assertNotIn("since", result["kinds"][0]["total"])
+        self.assertEqual(result["total"]["since"], "2025-06-01")
 
 
 PRICE = {"external_id": "42", "name": "Servidor lavi", "created": D(2025, 6, 1), "amount_cents": 490, "hourly_micros": 8000}
