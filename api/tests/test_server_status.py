@@ -344,6 +344,19 @@ class RouteTests(unittest.TestCase):
                 mock.patch.object(server_status.hetzner, "metrics", return_value=SERIES):
             self.assertIsNone(route.get_status("24h", False, self.player, None)["cost"])
 
+    def test_the_months_of_a_year_come_from_the_recorded_rates(self):
+        with mock.patch.object(route.costs, "years", return_value=[2025, 2026]):
+            answer = route.get_costs(2025, None)
+        self.assertEqual(answer["year"], 2025)
+        self.assertEqual(len(answer["months"]), 12)
+        self.assertEqual({m["state"] for m in answer["months"]}, {"closed"})
+
+    def test_a_year_without_costs_is_a_404(self):
+        for year in (1999 + 2, 2090):
+            with self.assertRaises(HTTPException) as caught:
+                route.get_costs(year, None)
+            self.assertEqual(caught.exception.status_code, 404)
+
     def test_the_address_of_prometheus_goes_with_the_question(self):
         config = mock.Mock(HETZNER_API_TOKEN=TOKEN, HETZNER_SERVER_ID="42", PROMETHEUS_URL="http://p:9090")
         with mock.patch.object(route, "config", config), mock.patch.object(route.server_status, "status", return_value={"overage": 0.0}) as asked:

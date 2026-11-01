@@ -34,6 +34,39 @@ export const load = (value) => value.toLocaleString('es-ES', { minimumFractionDi
 /** An amount in euros always with its cents, so the figures of a table line up: 2 -> "2,00 €". */
 export const money = (amount) => amount.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
 
+/** "2026-03" -> "mar". */
+export const monthShort = (month) => monthName(month).slice(0, 3);
+
+export const KIND_ORDER = ['server', 'domain', 'other'];
+
+export const spent = (month) => Object.values(month.kinds).reduce((sum, value) => sum + value, 0);
+
+/** What a month costs counting what is still forecast: the whole bar. */
+export const monthTotal = (month) => spent(month) + month.forecast;
+
+/** What a year of months has cost so far and will have cost by its end. */
+export const yearTotals = (months) => ({
+  so_far: months.reduce((sum, month) => sum + spent(month), 0),
+  projected: months.reduce((sum, month) => sum + monthTotal(month), 0),
+});
+
+/**
+ * The bars of a year chart as fractions (0 to 1) of the tallest month: each bar the kinds stacked from the bottom
+ * (in KIND_ORDER) and, above them, what is still forecast. A kind with nothing is no segment.
+ */
+export function barLayout(months) {
+  const tallest = Math.max(0.01, ...months.map(monthTotal));
+  return months.map((month) => {
+    const kinds = Object.keys(month.kinds).sort((a, b) => KIND_ORDER.indexOf(a) - KIND_ORDER.indexOf(b));
+    return {
+      month: month.month,
+      state: month.state,
+      segments: kinds.filter((kind) => month.kinds[kind] > 0).map((kind) => ({ kind, share: month.kinds[kind] / tallest })),
+      forecast: month.forecast > 0 ? month.forecast / tallest : null,
+    };
+  });
+}
+
 export const rate = (value) => `${bytes(value)}/s`;
 
 export const percent = (value) => `${(value || 0).toLocaleString('es-ES', { maximumFractionDigits: 1 })} %`;

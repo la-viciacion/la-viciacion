@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { bytes, last, load, money, monthName, monthYear, uptime, linePoints, peak, percent, rate, sharedMax, trafficShare } from '../js/lib/server.js';
+import { barLayout, bytes, last, load, money, monthName, monthShort, monthTotal, monthYear, uptime, yearTotals, linePoints, peak, percent, rate, sharedMax, trafficShare } from '../js/lib/server.js';
 
 test('bytes use decimal units and keep decimals only where they matter', () => {
   assert.equal(bytes(0), '0 B');
@@ -68,4 +68,34 @@ test('an amount always shows its cents', () => {
   assert.equal(money(2).replace(/\s/g, ' '), '2,00 €');
   assert.equal(money(120.25).replace(/\s/g, ' '), '120,25 €');
   assert.equal(money(1234.5).replace(/\s/g, ' '), '1234,50 €');
+});
+
+const m = (month, kinds, forecast = 0, state = 'closed') => ({ month, state, kinds, forecast });
+
+test('a month is short in three letters and counts its forecast in the whole', () => {
+  assert.equal(monthShort('2026-09'), 'sep');
+  assert.equal(monthTotal(m('2026-10', { server: 2, domain: 0.5 }, 3)), 5.5);
+});
+
+test('a year adds what was spent and, with the forecast, what it will have cost', () => {
+  const months = [m('2026-01', { server: 4 }), m('2026-02', { server: 1 }, 3, 'running'), m('2026-03', { server: 0 }, 4, 'future')];
+  assert.deepEqual(yearTotals(months), { so_far: 5, projected: 12 });
+});
+
+test('the bars are shares of the tallest month, the kinds stacked in order and the forecast on top', () => {
+  const months = [m('2026-01', { domain: 1, server: 3 }), m('2026-02', { server: 1 }, 1, 'running'), m('2026-03', { server: 0 }, 0, 'future')];
+  const bars = barLayout(months);
+  assert.equal(bars.length, 3);
+  assert.deepEqual(bars[0].segments, [{ kind: 'server', share: 0.75 }, { kind: 'domain', share: 0.25 }]); // the server first, whatever the order of the keys
+  assert.equal(bars[0].forecast, null);
+  assert.deepEqual(bars[1].segments, [{ kind: 'server', share: 0.25 }]);
+  assert.equal(bars[1].forecast, 0.25);
+  assert.deepEqual(bars[1].state, 'running');
+  assert.deepEqual(bars[2].segments, []); // a month with nothing is no bar
+});
+
+test('with nothing at all the layout does not divide by zero', () => {
+  const [bar] = barLayout([m('2026-01', { server: 0 })]);
+  assert.deepEqual(bar.segments, []);
+  assert.equal(bar.forecast, null);
 });
