@@ -37,6 +37,7 @@ const ROUTES = [
   { prefix: '#/calendar', load: () => import('./pages/calendar/index.js') },
   { prefix: '#/wishlist', load: () => import('./pages/wishlist/index.js') },
   { prefix: '#/achievements', load: () => import('./pages/achievements/index.js') },
+  { prefix: '#/server', load: () => import('./pages/server/index.js') },
   { prefix: '#/players', load: () => import('./pages/players/index.js') },
   { prefix: '#/player/', load: () => import('./pages/player/index.js') },
 ];

@@ -52,6 +52,24 @@ OpenAI no dice por API cuánto crédito queda, pero sí cuánto se ha facturado.
 
 El panel enseña el gasto del **último año** (OpenAI no guarda más): el total, mes a mes, por concepto (modelo, entrada y salida) y, al elegir un mes, día a día. Es el gasto de **toda la organización de OpenAI**, no solo el de esta app. Con Google (Gemini) no hay nada equivalente, así que ahí no se ve. No es el saldo que queda: ese solo está en platform.openai.com → Billing.
 
+## Estado del servidor (Hetzner Cloud)
+
+La página **Servidor** del menú (visible para todos los jugadores) pregunta a Hetzner cómo va la máquina. Solo vale para servidores **Cloud**, no para dedicados.
+
+1. En la consola de Hetzner Cloud → tu proyecto → **Security → API tokens**, crea un token con permiso de **solo lectura**.
+2. Ponlo en el `.env` como `HETZNER_API_TOKEN=` y reinicia la API. Si el proyecto tiene más de un servidor, indica cuál con `HETZNER_SERVER_ID=` (el número que sale en la URL del servidor en la consola).
+
+Enseña el estado, la CPU, la red y el disco (de 1 hora a 30 días) y el tráfico del mes frente al incluido. Hetzner no informa de la memoria ni del espacio de disco usados; para eso mira la sección siguiente. Añade una **estimación del gasto del mes, del año y desde que se creó el servidor**, visible para todos: Hetzner no tiene API de facturación, así que se calcula con el precio por hora del servidor (con tope en el precio mensual), sus copias de seguridad y el exceso de tráfico, con IVA. El año y el total suman los meses anteriores con el precio y las copias de hoy, y el exceso de tráfico solo del mes en curso porque Hetzner no guarda el de los anteriores. No cuenta volúmenes, snapshots ni IPs extra y no sustituye a la factura. Los datos se guardan un minuto en memoria y no se almacena nada.
+
+### Memoria, disco y carga (Prometheus)
+
+Para ver también la **memoria**, el **espacio en disco**, la **carga** y el **tiempo encendido** hace falta medirlos dentro de la máquina. El `docker-compose.yml` trae Prometheus y node-exporter, apagados por defecto. Para encenderlos:
+
+1. Pon en el `.env` `COMPOSE_PROFILES=monitoring` y ejecuta `docker compose up -d`. Esa misma línea le dice a la API dónde está Prometheus; no hace falta nada más. (`PROMETHEUS_URL` en el `.env` solo sirve para un Prometheus que esté en otro sitio.)
+2. Espera uno o dos minutos a que Prometheus recoja los primeros datos. Puedes comprobarlo desde el servidor con `docker compose exec laviciacion-prometheus wget -qO- localhost:9090/api/v1/targets`: el objetivo `node` debe decir `"health":"up"`.
+
+Para apagarlos, quita la línea y ejecuta `docker compose up -d --remove-orphans`. Los dos contenedores viven en la red del stack y no publican ningún puerto, así que no hace falta tocar el cortafuegos del servidor. Con la monitorización encendida, si Prometheus no responde (o aún no tiene datos) la página entera muestra el error en lugar de las gráficas, para que se note enseguida.
+
 ## Chat de la app
 
 El botón flotante de abajo a la derecha abre un asistente que responde sobre videojuegos y los datos del grupo. **Usa el mismo proveedor y la misma clave** que la IA de los avisos (`AI_PROVIDER`, `AI_API_KEY`), así que si la IA ya está configurada no hace falta nada más. Solo hay una variable propia, opcional: el modelo.

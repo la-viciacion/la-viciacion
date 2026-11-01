@@ -14,6 +14,7 @@ export function menuSections(user) {
       { id: 'calendar', label: 'Calendario', href: '#/calendar', icon: 'iconCalendar' },
       { id: 'achievements', label: 'Logros', href: '#/achievements', icon: 'iconTrophy' },
       { id: 'players', label: 'Jugadores', href: '#/players', icon: 'iconPerson' },
+      { id: 'server', label: 'Servidor', href: '#/server', icon: 'iconServer' },
       { id: 'stats', label: 'Estadísticas', href: '#/stats', icon: 'iconChart', wip: true },
     ] },
     { label: 'Tú', items: [
@@ -36,6 +37,7 @@ const PAGES = [
   ['#/admin', 'admin'],
   ['#/activity', 'activity'],
   ['#/stats', 'stats'],
+  ['#/server', 'server'],
   ['#/games', 'games'],
   ['#/library', 'library'],
   ['#/wishlist', 'wishlist'],

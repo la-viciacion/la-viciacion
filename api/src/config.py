@@ -81,3 +81,15 @@ class Config:
     @property
     def RAWG_API_KEY(self) -> str:
         return os.getenv("RAWG_API_KEY", "").strip()
+
+    @property
+    def HETZNER_API_TOKEN(self) -> str:
+        return os.getenv("HETZNER_API_TOKEN", "").strip()
+
+    @property
+    def PROMETHEUS_URL(self) -> str:
+        return os.getenv("PROMETHEUS_URL", "").strip().rstrip("/")
+
+    @property
+    def HETZNER_SERVER_ID(self) -> str:
+        return os.getenv("HETZNER_SERVER_ID", "").strip()

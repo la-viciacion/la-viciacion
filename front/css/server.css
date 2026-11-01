@@ -1,0 +1,39 @@
+/* Server page (#/server) */
+.sv-head { gap: 6px; }
+.sv-head-main { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.sv-name { font-size: 1.1rem; }
+.sv-status { font-size: 0.75rem; font-weight: 700; padding: 3px 10px; border-radius: var(--radius-pill); background: var(--bg-card-hover); color: var(--text-secondary); }
+.sv-status.ok { background: rgba(74, 222, 128, 0.15); color: var(--live-green); }
+.sv-status.warn { background: rgba(245, 197, 66, 0.15); color: var(--accent-gold); }
+.sv-status.bad { background: rgba(244, 114, 182, 0.15); color: var(--accent-pink); }
+
+.sv-grid-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin-bottom: 12px; }
+.sv-card { min-width: 0; }
+.sv-title { margin: 0; font-size: 0.9rem; font-weight: 700; color: var(--text-secondary); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+.sv-chart { width: 100%; height: 80px; display: block; overflow: visible; }
+.sv-grid { stroke: var(--border); stroke-width: 1; stroke-dasharray: 4 4; vector-effect: non-scaling-stroke; }
+.sv-line { fill: none; stroke-width: 2; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.sv-line.cpu, .sv-line.in { stroke: var(--accent-teal); }
+.sv-line.out { stroke: var(--accent-gold); }
+.sv-legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.8rem; color: var(--text-secondary); }
+.sv-key { display: inline-flex; align-items: center; gap: 6px; }
+.sv-key strong { color: var(--text-primary); }
+.sv-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); }
+.sv-key.cpu .sv-dot, .sv-key.in .sv-dot { background: var(--accent-teal); }
+.sv-key.out .sv-dot { background: var(--accent-gold); }
+
+.sv-meter { height: 10px; border-radius: var(--radius-pill); background: var(--bg-card-hover); overflow: hidden; }
+.sv-meter-fill { height: 100%; background: var(--accent-teal); border-radius: var(--radius-pill); }
+.sv-meter-fill.high { background: var(--accent-pink); }
+
+.sv-section { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 18px 0 8px; }
+.sv-section .pf-season { margin: 0; }
+.sv-section-title { margin: 0; font-size: 1.05rem; }
+.sv-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.sv-table th, .sv-table td { padding: 6px 4px; text-align: right; border-bottom: 1px solid var(--border); }
+.sv-table th:first-child { text-align: left; font-weight: 600; color: var(--text-secondary); }
+.sv-table thead th { font-size: 0.75rem; font-weight: 700; color: var(--text-muted); }
+.sv-table tbody tr:last-child th, .sv-table tbody tr:last-child td { border-bottom: 0; }
+.sv-table td { font-weight: 700; }
+.sv-foot { margin-top: 12px; }

@@ -52,6 +52,11 @@ services:
     image: ghcr.io/la-viciacion/laviciacion-api:${LAVI_VERSION:-latest}
     container_name: laviciacion-api
     env_file: .env
+    # Where the server page reads the machine's memory, disk and load from: the monitoring services below when their
+    # profile is on (COMPOSE_PROFILES=monitoring in the .env), or the PROMETHEUS_URL of the .env for a Prometheus elsewhere.
+    # Empty, the page shows only what Hetzner gives.
+    environment:
+      PROMETHEUS_URL: ${PROMETHEUS_URL:-${COMPOSE_PROFILES:+http://laviciacion-prometheus:9090}}
     restart: unless-stopped
     logging: *logging
     volumes:
@@ -109,6 +114,51 @@ services:
       retries: 30
       start_period: 30s
 
+  # --- Server monitoring (OPTIONAL): only started with COMPOSE_PROFILES=monitoring in the .env ---
+  # Prometheus + node-exporter, to see the machine's RAM, disk space, load and CPU with history (the Hetzner API gives none
+  # of the first two). Both live in the stack's network and publish no port, so they need no firewall rule: Prometheus
+  # (prometheus/prometheus.yml) reaches node-exporter by name and the API reaches Prometheus as laviciacion-prometheus.
+  # node-exporter shares the host's PID namespace and sees its root read-only, which is what makes its memory, disk, load
+  # and CPU figures the machine's; its network figures are the container's, so the panel takes the network from Hetzner.
+
+  laviciacion-node-exporter:
+    profiles: [monitoring]
+    image: prom/node-exporter:v1.9.1
+    container_name: laviciacion-node-exporter
+    restart: unless-stopped
+    logging: *logging
+    pid: host
+    command:
+      - --path.rootfs=/host
+    volumes:
+      - /:/host:ro,rslave
+    networks:
+      - la-viciacion
+
+  laviciacion-prometheus:
+    profiles: [monitoring]
+    image: prom/prometheus:v3.5.0
+    container_name: laviciacion-prometheus
+    restart: unless-stopped
+    logging: *logging
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      # the server page shows up to 30 days; a little more so a chart never ends short
+      - --storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-35d}
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - laviciacion_prometheus_data:/prometheus
+    networks:
+      - la-viciacion
+    depends_on:
+      - laviciacion-node-exporter
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
 networks:
   la-viciacion:
     # A fixed range, so FORWARDED_ALLOW_IPS (which names it) keeps matching when the network is recreated, and
@@ -120,3 +170,5 @@ networks:
 volumes:
   # only created when DB_DATA names it (see the db service)
   laviciacion_db_data:
+  # only used by the monitoring profile
+  laviciacion_prometheus_data:

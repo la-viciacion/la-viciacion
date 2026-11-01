@@ -1,0 +1,37 @@
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+from .. import auth
+from ..clients.hetzner import HetznerError
+from ..clients.prometheus import PrometheusError
+from ..config import Config
+from ..database import models
+from ..utils import server_status
+
+config = Config()
+
+router = APIRouter(
+    prefix="/server",
+    tags=["Server"],
+    dependencies=[Depends(auth.get_current_active_user)],
+)
+
+
+@router.get("/status")
+def get_status(
+    window: str = Query("24h", alias="range", pattern="^(1h|24h|7d|30d)$", description="How far back the charts go"),
+    refresh: bool = False,
+    current_user: models.User = Depends(auth.get_current_active_user),
+):
+    """How the server is doing (state, CPU, network, disk, traffic and the estimated cost of the month and the year), for
+    every player. It asks Hetzner (a blocking call: a plain def, so it runs in a worker thread) and keeps the answer
+    a minute; `refresh` asks again."""
+    token = config.HETZNER_API_TOKEN
+    if not token:
+        return {"configured": False}
+    try:
+        data = server_status.status(
+            token, config.HETZNER_SERVER_ID, window, refresh=refresh and bool(current_user.is_admin), prometheus_url=config.PROMETHEUS_URL
+        )
+    except (HetznerError, PrometheusError) as e:
+        raise HTTPException(status_code=502, detail=str(e).replace(token, "***"))
+    return {"configured": True, **data}
