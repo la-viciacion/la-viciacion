@@ -174,3 +174,23 @@ test('an entity with several ways to create is one form: the type is chosen in i
   await new Promise((resolve) => setImmediate(resolve));
   assert.deepEqual(sent.find((c) => c.path === '/manage/challenges').body, { tag: 'Horror', kind: 'two' });
 });
+
+test('a period field sends the period and only the keys it needs, between headings that hold no value', async () => {
+  const sent = [];
+  globalThis.fetch = async (url, options = {}) => {
+    sent.push(options.body ? JSON.parse(options.body) : undefined);
+    return new Response(JSON.stringify({}), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  };
+  openForm({ createLabel: 'Lanzar', endpoint: '/manage/challenges', name: (r) => r.title }, null, { reload: async () => {} }, {
+    label: 'Lanzar', body: { kind: 'group_hours' }, fields: [{ type: 'heading', label: 'Cuándo' }, { key: 'period', type: 'period' }, { key: 'min_hours_total', label: 'Horas', type: 'number', default: 40 }],
+  });
+  assert.equal(document.querySelector('.adm-form-section').textContent, 'Cuándo');
+  const form = document.querySelector('.modal-content form');
+  const period = form.querySelector('[data-period]');
+  period.value = 'week';
+  period.dispatchEvent(new window.Event('change', { bubbles: true }));
+  form.querySelector('[data-period-week]').value = '2099-03-02';
+  form.requestSubmit();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(sent[0], { period: 'week', starts_on: '2099-03-02', min_hours_total: 40, kind: 'group_hours' });
+});

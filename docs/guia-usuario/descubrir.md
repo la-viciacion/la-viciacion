@@ -31,14 +31,14 @@ Un juego se queda en la lista hasta que lo quites tú con la ✕, aunque ya lo e
 
 **Del grupo** (los lanza un administrador):
 
-- **Juego del mes**: un juego, un mes, unas horas mínimas por jugador y un total entre todos. Ves una barra por jugador (verde al llegar a su mínimo) y otra para el grupo.
+- **Reto de juego** (el *juego del mes* cuando dura un mes): un juego, un mes, una semana o unas fechas, unas horas mínimas por jugador y un total entre todos. Ves una barra por jugador (verde al llegar a su mínimo) y otra para el grupo.
 - **Temático**: una temática (un género, una ambientación o un tema: Terror, Metroidvania, Medieval…), un mes y lo que tiene que hacer cada jugador: jugar un número de horas o completar al menos un juego. Cuenta cualquier juego de esa temática. En la tarjeta del reto ves cuántos juegos de esa temática tiene el grupo y cuántos tienes tú (en rojo si no tienes ninguno, para que decidas si compras alguno, te sales o no te apuntas), y **Ver los juegos** los lista con quién los tiene.
 
 - **Horas entre todos**: un mes y un total de horas que tiene que sumar el grupo entero, de cualquier juego. No hay mínimo por jugador: cada uno ve cuánto ha aportado, y cumple su parte si el grupo llega al total y él ha jugado algo.
 
 Puedes **dejar de participar** y volver mientras el reto no haya terminado. Cuando el grupo alcanza el total, se avisa una vez. Un administrador puede lanzar un reto del grupo como **voluntario**: no cuenta nadie hasta que se **apunta** (botón *Apuntarme*), y solo cuentan los que se apuntan.
 
-**Proponer un reto al grupo.** Con **Proponer al grupo** sugieres un juego del mes o un reto temático (el juego o la temática, el mes y las horas). Un administrador lo aprueba, y entonces se lanza como un reto del grupo, o lo rechaza con una nota. En **Tus propuestas** ves en qué estado está cada una y puedes **retirar** las que aún esperan respuesta. Puedes tener hasta 3 esperando a la vez.
+**Proponer un reto al grupo.** Con **Proponer al grupo** sugieres un reto de juego o un reto temático (el juego o la temática, el periodo —un mes, una semana o unas fechas— y las horas). Un administrador lo aprueba, y entonces se lanza como un reto del grupo, o lo rechaza con una nota. En **Tus propuestas** ves en qué estado está cada una y puedes **retirar** las que aún esperan respuesta. Puedes tener hasta 3 esperando a la vez.
 
 **Retos recurrentes.** Algunos retos del grupo los programa un administrador para que se lancen solos cada mes (un temático, o un juego del mes que va cambiando de juego). Para ti son como cualquier otro reto del grupo.
 
@@ -57,7 +57,7 @@ Puedes **dejar de participar** y volver mientras el reto no haya terminado. Cuan
 
 - **Duelo de horas**, **Duelo en un juego** y **Duelo de completados**: retas a otro jugador a ver quién juega más (en total o a un juego concreto) o quién completa más juegos, durante una semana, un mes o tres meses. **Empieza al lanzarlo**; el retado puede **rechazarlo durante las primeras 48 horas** (el rechazo no se puede deshacer). Pasado ese plazo, el duelo sigue adelante. Gana quien más horas (o más juegos completados) sume y, si empatan, ganan los dos. Un duelo rechazado no cuenta para nadie. Los demás lo ven, pero nadie recibe aviso.
 
-El administrador puede lanzar un reto del grupo (juego del mes o temático) **como competición**: además de cumplir el objetivo, se ve quién va primero, con medallas, y el puesto aparece en tu línea.
+El administrador puede lanzar un reto del grupo (de juego o temático) **como competición**: además de cumplir el objetivo, se ve quién va primero, con medallas, y el puesto aparece en tu línea.
 
 Tus retos terminados, con cómo te fue, quedan en **Perfil → Resumen → Retos**.
 

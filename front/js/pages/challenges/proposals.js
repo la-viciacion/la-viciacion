@@ -2,24 +2,22 @@
 // GET/POST/DELETE /challenges/proposals: only the proposal is stored; an admin approves it (it becomes a challenge of
 // the group) or rejects it with a note.
 import { api, jsonRequest } from '../../lib/api.js';
-import { PROPOSAL_KINDS, launchMonths, proposalStatus, themeLabel } from '../../lib/challenges.js';
+import { PROPOSAL_KINDS, proposalStatus, themeLabel } from '../../lib/challenges.js';
 import { html, mount } from '../../lib/html.js';
 import { modalHeader, openModal } from '../../ui/modal.js';
+import { bindPeriod, periodField, readPeriod } from '../../ui/period-field.js';
 import { toast } from '../../ui/toast.js';
 import { gameSearch, gameSearchField } from './game-search.js';
 
 const number = (value) => (value === '' || value == null ? undefined : Number(value));
 
-// The period: the chosen dates when there are any (they replace the month), otherwise the whole month
-const period = (el) => (el.startsOn.value || el.endsOn.value ? { starts_on: el.startsOn.value || undefined, ends_on: el.endsOn.value || undefined } : { month: el.month.value });
-
 // What each kind sends: the options the proposal is made of
 const OPTIONS = {
   game_of_month: (el, state) => ({
-    game_id: state.game?.id, ...period(el), min_hours_each: number(el.gameEach.value), min_hours_total: number(el.gameTotal.value), versus: el.versus.checked,
+    game_id: state.game?.id, ...state.period, min_hours_each: number(el.gameEach.value), min_hours_total: number(el.gameTotal.value), versus: el.versus.checked,
   }),
-  themed: (el) => ({
-    theme: el.theme.value, ...period(el), mode: el.mode.value, versus: el.versus.checked,
+  themed: (el, state) => ({
+    theme: el.theme.value, ...state.period, mode: el.mode.value, versus: el.versus.checked,
     ...(el.mode.value === 'play'
       ? { min_hours_each: number(el.themedEach.value), min_hours_total: number(el.themedTotal.value) }
       : { min_games_total: number(el.themedGames.value) }),
@@ -74,7 +72,6 @@ export async function openProposalForm(onDone) {
     toast(err.message, 'err');
     return;
   }
-  const months = launchMonths();
   const m = openModal(html`
     ${modalHeader('Proponer un reto al grupo')}
     <form class="adm-form" novalidate>
@@ -83,7 +80,7 @@ export async function openProposalForm(onDone) {
         ${PROPOSAL_KINDS.map(([value, label]) => html`<option value="${value}">${label}</option>`)}
       </select></label>
       <div data-kind="game_of_month">
-        <p class="adm-sub">Un juego, un mes, unas horas mínimas por jugador y un total entre todos.</p>
+        <p class="adm-sub">Un juego, un periodo, unas horas mínimas por jugador y un total entre todos.</p>
         ${gameSearchField}
         <label>Horas mínimas por jugador<input class="adm-input" type="number" name="gameEach" min="0.5" step="0.5" value="5" /></label>
         <label>Horas mínimas entre todos<input class="adm-input" type="number" name="gameTotal" min="0.5" step="0.5" value="20" /></label>
@@ -101,12 +98,7 @@ export async function openProposalForm(onDone) {
         <label data-for="play">Horas entre todos (opcional)<input class="adm-input" type="number" name="themedTotal" min="0.5" step="0.5" /></label>
         <label data-for="complete" hidden>Juegos completados entre todos (opcional)<input class="adm-input" type="number" name="themedGames" min="1" step="1" /></label>
       </div>
-      <label>Mes<select class="adm-input" name="month">
-        ${months.map((month) => html`<option value="${month.value}">${month.label}</option>`)}
-      </select></label>
-      <p class="adm-sub">O, si no es un mes entero, elige los días (sustituyen al mes). Puede empezar más adelante.</p>
-      <label>Desde<input class="adm-input" type="date" name="startsOn" /></label>
-      <label>Hasta<input class="adm-input" type="date" name="endsOn" /></label>
+      ${periodField()}
       <label class="adm-check"><input type="checkbox" name="versus" /> Además es una competición: gana quien más avance</label>
       <div class="adm-error" role="alert"></div>
       <div class="adm-actions">
@@ -117,6 +109,7 @@ export async function openProposalForm(onDone) {
   const form = m.el.querySelector('form');
   const state = { game: null };
   gameSearch(form, state);
+  bindPeriod(form.querySelector('[data-period-field]'));
 
   const refresh = () => {
     const kind = form.elements.kind.value;
@@ -130,7 +123,12 @@ export async function openProposalForm(onDone) {
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const kind = form.elements.kind.value;
-    const options = OPTIONS[kind](form.elements, state);
+    const chosen = readPeriod(form.querySelector('[data-period-field]'));
+    if (chosen.error) {
+      form.querySelector('.adm-error').textContent = chosen.error;
+      return;
+    }
+    const options = OPTIONS[kind](form.elements, { ...state, period: chosen.options });
     try {
       await api('/challenges/proposals', jsonRequest('POST', { kind, options }));
       m.close();

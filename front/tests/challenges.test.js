@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { amountLabel, blocks, daysUntil, debtPreview, digest, digestLine, hoursLabel, joinedLine, launchMonths, medal, partTarget, partValue, percent, remainingLabel, resultLine, standing, summaryLine, themeGamesLine, themeLabel, timeLeft, totalPart } from '../js/lib/challenges.js';
+import { amountLabel, blocks, daysUntil, debtPreview, digest, digestLine, hoursLabel, joinedLine, launchMonths, medal, nextMonday, periodOptions, partTarget, partValue, percent, remainingLabel, resultLine, standing, summaryLine, themeGamesLine, themeLabel, timeLeft, totalPart } from '../js/lib/challenges.js';
 
 const TODAY = new Date(2026, 9, 15, 12, 0); // 15 October 2026
 
@@ -343,4 +343,20 @@ test('a finished group total is met by whoever put something in', () => {
   assert.deepEqual(standing(finished({ seconds: 3600, done: true }, { total_done: true }), 7, TODAY), { tone: 'done', text: 'El grupo llegó al total' });
   assert.equal(standing(finished({ seconds: 0 }, { total_done: true }), 7, TODAY).text, 'El grupo llegó al total, pero no aportaste');
   assert.equal(standing(finished({ seconds: 3600 }, { total_done: false }), 7, TODAY).text, 'El grupo no llegó al total');
+});
+
+test('a week starts by default on the first Monday after today', () => {
+  assert.equal(nextMonday(new Date(2026, 10, 1)), '2026-11-02'); // a Sunday
+  assert.equal(nextMonday(new Date(2026, 10, 2)), '2026-11-09'); // a Monday: the next one
+  assert.equal(nextMonday(new Date(2026, 11, 29)), '2027-01-04'); // across the year end
+});
+
+test('each period sends only what it needs and refuses what is missing', () => {
+  assert.deepEqual(periodOptions({ period: 'month', month: '2026-12', week: '2026-12-07', from: '2026-12-01', to: '2026-12-09' }), { options: { period: 'month', month: '2026-12' } });
+  assert.deepEqual(periodOptions({ period: 'week', month: '2026-12', week: '2026-12-07' }), { options: { period: 'week', starts_on: '2026-12-07' } });
+  assert.deepEqual(periodOptions({ period: 'range', from: '2026-12-01', to: '2026-12-09' }), { options: { period: 'range', starts_on: '2026-12-01', ends_on: '2026-12-09' } });
+  assert.ok(periodOptions({ period: 'month' }).error);
+  assert.ok(periodOptions({ period: 'week' }).error);
+  assert.ok(periodOptions({ period: 'range', from: '2026-12-01' }).error);
+  assert.match(periodOptions({ period: 'range', from: '2026-12-09', to: '2026-12-01' }).error, /terminar antes de empezar/);
 });

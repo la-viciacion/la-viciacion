@@ -35,11 +35,11 @@ const seasonSelect = {
 };
 const platformSelect = { key: 'platform', label: 'Plataforma', options: () => [['', 'Plataforma: todas'], ...platformList().map((p) => [p.id, p.name])] };
 
-// Instead of the whole month: a period with its own first and last day (the challenge may begin later, and a voluntary one can be joined meanwhile)
-const PERIOD_FIELDS = [
-  { key: 'starts_on', label: 'Desde (opcional: sustituye al mes)', type: 'date' },
-  { key: 'ends_on', label: 'Hasta (opcional)', type: 'date' },
-];
+// How long a group challenge lasts: a month, a week or free dates (it may begin later, and a voluntary one can be joined meanwhile)
+const PERIOD_FIELD = { key: 'period', type: 'period' };
+const WHEN = { type: 'heading', label: 'Cuándo' };
+const GOAL = { type: 'heading', label: 'Objetivo' };
+const WHO = { type: 'heading', label: 'Quién y aviso' };
 const PARTICIPATION_FIELD = { key: 'participation', label: 'Quién participa', type: 'choice', default: 'auto', options: [['auto', 'Todos (pueden salirse)'], ['opt_in', 'Voluntario (hay que apuntarse)']] };
 
 const COST_KINDS = { server: 'Servidor', domain: 'Dominio', other: 'Otro' };
@@ -304,16 +304,18 @@ export const ENTITIES = {
     createLabel: 'Lanzar reto',
     creates: [
       {
-        label: 'Lanzar juego del mes',
-        choose: 'Juego del mes',
+        label: 'Lanzar reto de juego',
+        choose: 'Reto de juego',
         body: { kind: 'game_of_month' },
         fields: [
           { key: 'game_id', label: 'Juego', type: 'game', required: true },
-          { key: 'month', label: 'Mes', type: 'month', required: true },
-          ...PERIOD_FIELDS,
+          WHEN,
+          PERIOD_FIELD,
+          GOAL,
           { key: 'min_hours_each', label: 'Horas mínimas por jugador', type: 'number', step: '0.5', default: 5, required: true },
           { key: 'min_hours_total', label: 'Horas mínimas entre todos', type: 'number', step: '0.5', default: 20, required: true },
           { key: 'versus', label: 'Además es una competición (gana quien más avance)', type: 'checkbox', default: false },
+          WHO,
           PARTICIPATION_FIELD,
           { key: 'announce', label: 'Avisar al grupo (Telegram y notificaciones)', type: 'checkbox', default: true },
         ],
@@ -323,10 +325,12 @@ export const ENTITIES = {
         choose: 'Horas entre todos',
         body: { kind: 'group_hours' },
         fields: [
-          { key: 'month', label: 'Mes', type: 'month', required: true },
-          ...PERIOD_FIELDS,
+          WHEN,
+          PERIOD_FIELD,
+          GOAL,
           { key: 'min_hours_total', label: 'Horas entre todos (de cualquier juego)', type: 'number', step: '0.5', default: 40, required: true },
           { key: 'versus', label: 'Además es una competición (gana quien más aporte)', type: 'checkbox', default: false },
+          WHO,
           PARTICIPATION_FIELD,
           { key: 'announce', label: 'Avisar al grupo (Telegram y notificaciones)', type: 'checkbox', default: true },
         ],
@@ -340,13 +344,15 @@ export const ENTITIES = {
           const themes = await api('/manage/challenges/themes');
           return [
             { key: 'theme', label: 'Temática', type: 'choice', required: true, options: themes.length ? themes.map((t) => [t.theme, themeLabel(t)]) : [['', 'No hay temáticas']] },
-            { key: 'month', label: 'Mes', type: 'month', required: true },
-          ...PERIOD_FIELDS,
+            WHEN,
+            PERIOD_FIELD,
+            GOAL,
             { key: 'mode', label: 'Objetivo de cada jugador', type: 'choice', required: true, default: 'play', options: [['play', 'Jugar unas horas'], ['complete', 'Completar al menos un juego']] },
             { key: 'min_hours_each', label: 'Horas mínimas por jugador (si hay que jugar)', type: 'number', step: '0.5', default: 2 },
             { key: 'min_hours_total', label: 'Horas entre todos (opcional, si hay que jugar)', type: 'number', step: '0.5' },
             { key: 'min_games_total', label: 'Juegos completados entre todos (opcional, si hay que completar)', type: 'number', step: '1' },
             { key: 'versus', label: 'Además es una competición (gana quien más avance)', type: 'checkbox', default: false },
+            WHO,
             PARTICIPATION_FIELD,
             { key: 'announce', label: 'Avisar al grupo (Telegram y notificaciones)', type: 'checkbox', default: true },
           ];

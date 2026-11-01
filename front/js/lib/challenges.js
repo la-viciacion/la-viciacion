@@ -72,6 +72,28 @@ export function launchMonths(today = new Date(), count = 4) {
   });
 }
 
+/** The ways to give a group challenge its period (the API's `period`, `utils/challenges.group_period`). */
+export const PERIOD_MODES = [['month', 'Un mes completo'], ['week', 'Una semana'], ['range', 'Fechas libres']];
+
+const isoDay = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
+/** Today as a "YYYY-MM-DD" day (the earliest a week or a free range can begin). */
+export const todayIso = (now = new Date()) => isoDay(now);
+
+/** The first Monday after today, where a week starts by default. */
+export function nextMonday(now = new Date()) {
+  return isoDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() + ((8 - now.getDay()) % 7 || 7)));
+}
+
+/** What a period form sends from what was chosen: { options } or { error } (the API checks it again). A week sends only
+ * its first day (it lasts seven), a month only the month, free dates both days. */
+export function periodOptions({ period, month, week, from, to }) {
+  if (period === 'month') return month ? { options: { period, month } } : { error: 'Elige el mes' };
+  if (period === 'week') return week ? { options: { period, starts_on: week } } : { error: 'Elige el primer día de la semana' };
+  if (!from || !to) return { error: 'Elige el primer y el último día' };
+  return to < from ? { error: 'El reto no puede terminar antes de empezar' } : { options: { period: 'range', starts_on: from, ends_on: to } };
+}
+
 /** A part of a challenge is counted in games, in a share of the debt paid or in seconds. */
 export const isCount = (part) => 'target_count' in part;
 export const isPercent = (part) => 'target_percent' in part;
@@ -322,7 +344,7 @@ export const PERSONAL_KINDS = [
 ];
 
 /** The group challenges a player can propose, for the form: [value, label]. */
-export const PROPOSAL_KINDS = [['game_of_month', 'Juego del mes'], ['themed', 'Temático']];
+export const PROPOSAL_KINDS = [['game_of_month', 'Reto de juego'], ['themed', 'Temático']];
 
 /** What the player reads of a proposal: { label, detail } (the answer of the admins, if there is one). */
 export function proposalStatus(proposal) {

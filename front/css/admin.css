@@ -204,6 +204,10 @@
 
 .adm-form label.adm-check { flex-direction: row; }
 
+/* A group of fields in a long form (a challenge's): a small title, and the period's fields together */
+.adm-form-section { margin: 8px 0 -4px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 0.8rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-primary); }
+.adm-period { display: flex; flex-direction: column; gap: 12px; }
+
 /* A list typed row by row (a poll's options): space between the label, the rows and the add button */
 .adm-field-games { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
 .adm-field-games > span { font-size: 0.85rem; color: var(--text-secondary); font-weight: 600; }

@@ -32,7 +32,7 @@ OPT_IN = "opt_in"  # only who joins takes part
 PARTICIPATIONS = (AUTO, OPT_IN)
 # The group templates a player may propose and an admin may schedule: the ones whose options are the same every time
 # (a month and, for the game of the month, a game)
-GROUP_OPTIONS = ("game_id", "month", "starts_on", "ends_on", "min_hours_each", "min_hours_total", "theme", "tag", "mode", "min_games_total", "versus")
+GROUP_OPTIONS = ("game_id", "period", "month", "starts_on", "ends_on", "min_hours_each", "min_hours_total", "theme", "tag", "mode", "min_games_total", "versus")
 PROPOSABLE = ("game_of_month", "themed")
 
 
@@ -95,23 +95,52 @@ def _day(value, name: str) -> datetime.date:
         raise ChallengeError(f"{name} no es una fecha válida")
 
 
-def group_period(options: dict, today: datetime.date) -> tuple[datetime.date, datetime.date]:
-    """The period of a group challenge: free dates (`starts_on` and `ends_on`, both inclusive) or, without them, the
-    whole `month`. It may begin in the future (the challenge is then upcoming and can be joined) or have begun already,
-    but not be over."""
-    if options.get("starts_on") or options.get("ends_on"):
-        starts_on, ends_on = _day(options.get("starts_on"), "La fecha de inicio"), _day(options.get("ends_on"), "La fecha de fin")
-        if ends_on < starts_on:
-            raise ChallengeError("El reto no puede terminar antes de empezar")
-        if (ends_on - starts_on).days + 1 > MAX_PERIOD_DAYS:
-            raise ChallengeError(f"El reto no puede durar más de {MAX_PERIOD_DAYS} días")
-        if ends_on < today:
-            raise ChallengeError("Ese periodo ya ha pasado")
-        return starts_on, ends_on
-    starts_on, ends_on = month_period(options.get("month"))
+PERIODS = ("month", "week", "range")
+WEEK_DAYS = 7
+
+
+def _span(starts_on: datetime.date, ends_on: datetime.date, today: datetime.date) -> tuple[datetime.date, datetime.date]:
+    if ends_on < starts_on:
+        raise ChallengeError("El reto no puede terminar antes de empezar")
+    if (ends_on - starts_on).days + 1 > MAX_PERIOD_DAYS:
+        raise ChallengeError(f"El reto no puede durar más de {MAX_PERIOD_DAYS} días")
     if ends_on < today:
-        raise ChallengeError("Ese mes ya ha pasado")
+        raise ChallengeError("Ese periodo ya ha pasado")
     return starts_on, ends_on
+
+
+def group_period(options: dict, today: datetime.date) -> tuple[datetime.date, datetime.date]:
+    """The period of a group challenge, both ends inclusive. It may begin in the future (the challenge is then upcoming
+    and can be joined) or have begun already, but not be over. `period` says which of the three it is and each takes only
+    what is its own, so nothing is ignored in silence: "month" (`month`, the whole of it), "week" (`starts_on`, seven days
+    from there) or "range" (`starts_on` and `ends_on`). Without `period` (a proposal or a schedule made before it
+    existed) free dates win over the `month`."""
+    period = options.get("period")
+    month, first, last = options.get("month"), options.get("starts_on"), options.get("ends_on")
+    if period is None:
+        if first or last:
+            return _span(_day(first, "La fecha de inicio"), _day(last, "La fecha de fin"), today)
+        period = "month"
+    if period not in PERIODS:
+        raise ChallengeError("El periodo no es válido: mes, semana o fechas libres")
+    if period == "month":
+        if first or last:
+            raise ChallengeError("Un reto de un mes completo no lleva fechas propias")
+        starts_on, ends_on = month_period(month)
+        return _span(starts_on, ends_on, today)
+    if month:
+        raise ChallengeError("Un reto de una semana o de fechas libres no lleva mes")
+    if period == "week":
+        if not first:
+            raise ChallengeError("Elige el día en que empieza la semana")
+        starts_on = _day(first, "La fecha de inicio")
+        ends_on = starts_on + datetime.timedelta(days=WEEK_DAYS - 1)
+        if last and _day(last, "La fecha de fin") != ends_on:
+            raise ChallengeError(f"Una semana dura {WEEK_DAYS} días: el reto termina solo")
+        return _span(starts_on, ends_on, today)
+    if not (first and last):
+        raise ChallengeError("Elige el primer y el último día")
+    return _span(_day(first, "La fecha de inicio"), _day(last, "La fecha de fin"), today)
 
 
 def hours(value, name: str, minimum: float = 0.5) -> float:
@@ -179,8 +208,11 @@ def _versus(options: dict) -> dict:
     return {"versus": True} if options.get("versus") in (True, "true", 1) else {}
 
 
+GAME_TITLES = {"week": "Juego de la semana", "range": "Reto de juego"}  # a month (or no period at all) is "Juego del mes"
+
+
 def build_game_of_month(db: Session, options: dict, today: datetime.date, user_id: int | None = None) -> Built:
-    """Options: game_id, month ("YYYY-MM") or starts_on and ends_on, min_hours_each, min_hours_total."""
+    """Options: game_id, the period (see `group_period`), min_hours_each, min_hours_total."""
     game = db.get(models.Game, str(options.get("game_id") or ""))
     if game is None:
         raise ChallengeError("Elige un juego que exista")
@@ -190,7 +222,7 @@ def build_game_of_month(db: Session, options: dict, today: datetime.date, user_i
     if total < each:
         raise ChallengeError("El mínimo total no puede ser menor que el de cada jugador")
     return Built(
-        title=f"Juego del mes: {game.name}"[:MAX_TITLE],
+        title=f"{GAME_TITLES.get(options.get('period'), 'Juego del mes')}: {game.name}"[:MAX_TITLE],
         params={"min_hours_each": each, "min_hours_total": total, **_versus(options)},
         starts_on=starts_on,
         ends_on=ends_on,
@@ -1074,7 +1106,7 @@ def seconds_of_players(db: Session, user_ids: list[int], start: datetime.datetim
 
 
 def build_group_hours(db: Session, options: dict, today: datetime.date, user_id: int | None = None) -> Built:
-    """Options: month ("YYYY-MM") or starts_on and ends_on, and min_hours_total: the hours the whole group has to play
+    """Options: the period (see `group_period`) and min_hours_total: the hours the whole group has to play
     between everybody, of any game. Nobody has a minimum of their own."""
     starts_on, ends_on = group_period(options, today)
     total = hours(options.get("min_hours_total"), "El total")
@@ -1202,7 +1234,7 @@ def progress_finish_first(db: Session, challenge: models.Challenge, participant_
 
 
 TEMPLATES: dict[str, Template] = {
-    "game_of_month": Template("Juego del mes", GROUP, build_game_of_month, progress_game_of_month, summary_game_of_month, reached_game_of_month),
+    "game_of_month": Template("Reto de juego", GROUP, build_game_of_month, progress_game_of_month, summary_game_of_month, reached_game_of_month),
     "themed": Template("Temático", GROUP, build_themed, progress_themed, summary_themed, reached_themed),
     "group_hours": Template("Horas entre todos", GROUP, build_group_hours, progress_group_hours, summary_group_hours, reached_group_hours),
     "finish_backlog": Template("Terminar lo empezado", USER, build_finish_backlog, progress_finish_backlog),

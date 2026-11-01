@@ -48,6 +48,32 @@ class PeriodTests(unittest.TestCase):
             with self.assertRaises(ChallengeError, msg=repr(options)):
                 challenges.group_period(options, today)
 
+    def test_the_period_says_which_of_the_three_it_is(self):
+        today = datetime.date(2026, 10, 15)
+        period = lambda **options: challenges.group_period(options, today)  # noqa: E731
+        self.assertEqual(period(period="month", month="2026-11"), (datetime.date(2026, 11, 1), datetime.date(2026, 11, 30)))
+        self.assertEqual(period(period="week", starts_on="2026-10-19"), (datetime.date(2026, 10, 19), datetime.date(2026, 10, 25)))
+        self.assertEqual(period(period="week", starts_on="2026-12-28", ends_on="2027-01-03"), (datetime.date(2026, 12, 28), datetime.date(2027, 1, 3)))
+        self.assertEqual(period(period="range", starts_on="2026-11-20", ends_on="2026-11-27"), (datetime.date(2026, 11, 20), datetime.date(2026, 11, 27)))
+
+    def test_a_period_takes_only_what_is_its_own(self):
+        today = datetime.date(2026, 10, 15)
+        for options in (
+            {"period": "month", "month": "2026-11", "starts_on": "2026-11-02"},  # a whole month has no dates of its own
+            {"period": "month", "month": "2026-11", "ends_on": "2026-11-09"},
+            {"period": "month"},
+            {"period": "week", "month": "2026-11", "starts_on": "2026-11-02"},
+            {"period": "week"},  # no first day
+            {"period": "week", "starts_on": "2026-11-02", "ends_on": "2026-11-10"},  # not seven days
+            {"period": "week", "starts_on": "2026-10-01"},  # over already
+            {"period": "range", "month": "2026-11", "starts_on": "2026-11-02", "ends_on": "2026-11-09"},
+            {"period": "range", "starts_on": "2026-11-02"},
+            {"period": "range", "ends_on": "2026-11-09"},
+            {"period": "year", "month": "2026-11"},
+        ):
+            with self.assertRaises(ChallengeError, msg=repr(options)):
+                challenges.group_period(options, today)
+
     def test_the_status_follows_the_period(self):
         challenge = types.SimpleNamespace(starts_on=datetime.date(2026, 10, 10), ends_on=datetime.date(2026, 10, 20))
         status = lambda day: challenges.status_of(challenge, datetime.date(2026, 10, day))  # noqa: E731

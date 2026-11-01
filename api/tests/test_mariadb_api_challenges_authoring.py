@@ -377,7 +377,7 @@ class ScheduleRunTests(ScheduleTestCase):
     def test_the_panel_names_the_game_of_this_month_and_the_next(self):
         self.rotation(start_now=True)
         body = self.api("GET", "/manage/challenge-schedules", as_user="root").json()[0]
-        self.assertEqual((body["this_month"], body["next_month"], body["kind_label"]), ("Hades", "Celeste", "Juego del mes"))
+        self.assertEqual((body["this_month"], body["next_month"], body["kind_label"]), ("Hades", "Celeste", "Reto de juego"))
 
     def test_changing_the_list_changes_the_rotation_and_the_options_stay(self):
         schedule = self.rotation(start_now=True).json()["id"]

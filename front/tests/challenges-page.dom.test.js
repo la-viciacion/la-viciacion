@@ -539,11 +539,12 @@ test('a game of the month is proposed with a game from the search and a themed o
   form.querySelector('[data-game-id="hades"]').click();
   form.elements.gameEach.value = '3';
   form.elements.gameTotal.value = '12';
-  form.elements.month.value = form.elements.month.options[1].value;
+  const month = form.querySelector('[data-period-month]');
+  month.value = month.options[1].value;
   form.requestSubmit();
   await settle();
   const first = calls.find((c) => c.method === 'POST' && c.path === '/challenges/proposals').body;
-  assert.deepEqual(first, { kind: 'game_of_month', options: { game_id: 'hades', month: form.elements.month.options[1].value, min_hours_each: 3, min_hours_total: 12, versus: false } });
+  assert.deepEqual(first, { kind: 'game_of_month', options: { game_id: 'hades', period: 'month', month: month.value, min_hours_each: 3, min_hours_total: 12, versus: false } });
 
   document.querySelector('#chPropose').click();
   await settle();
@@ -560,7 +561,41 @@ test('a game of the month is proposed with a game from the search and a themed o
   await settle();
   const body = calls.filter((c) => c.method === 'POST' && c.path === '/challenges/proposals').at(-1).body;
   assert.equal(body.kind, 'themed');
-  assert.deepEqual({ ...body.options, month: 'x' }, { theme: 'Puzles', month: 'x', mode: 'complete', versus: true, min_games_total: 5 });
+  assert.deepEqual({ ...body.options, month: 'x' }, { theme: 'Puzles', period: 'month', month: 'x', mode: 'complete', versus: true, min_games_total: 5 });
+});
+
+test('a proposal can last a week or free dates, and the period shows only the fields it needs', async () => {
+  document.body.innerHTML = '<main id="main"></main>';
+  const calls = installApi({
+    'GET /challenges/proposals': [], 'GET /challenges/themes': [{ theme: 'Terror', games: 3, players: 2, members: 3 }], 'GET /challenges': [],
+    'POST /challenges/proposals': { id: 1, status: 'pending', kind: 'themed', label: 'Temático', title: 'x' },
+  });
+  await page.render({ main: main(), user: ANA });
+  await settle();
+  document.querySelector('#chPropose').click();
+  await settle();
+  const form = document.querySelector('.modal-content form');
+  const period = form.querySelector('[data-period]');
+  const shown = () => [...form.querySelectorAll('[data-period-for]')].filter((el) => !el.hidden).map((el) => el.dataset.periodFor);
+  assert.deepEqual(shown(), ['month']);
+  period.value = 'week';
+  period.dispatchEvent(new window.Event('change', { bubbles: true }));
+  assert.deepEqual(shown(), ['week']);
+  period.value = 'range';
+  period.dispatchEvent(new window.Event('change', { bubbles: true }));
+  assert.deepEqual(shown(), ['range', 'range']);
+  form.elements.kind.value = 'themed';
+  form.elements.kind.dispatchEvent(new window.Event('change', { bubbles: true }));
+  form.requestSubmit();
+  await settle();
+  assert.match(form.querySelector('.adm-error').textContent, /primer y el último día/); // nothing sent without both days
+  assert.equal(calls.some((c) => c.method === 'POST'), false);
+  form.querySelector('[data-period-from]').value = '2099-03-02';
+  form.querySelector('[data-period-to]').value = '2099-03-09';
+  form.requestSubmit();
+  await settle();
+  const options = calls.find((c) => c.method === 'POST' && c.path === '/challenges/proposals').body.options;
+  assert.deepEqual([options.period, options.starts_on, options.ends_on, options.month], ['range', '2099-03-02', '2099-03-09', undefined]);
 });
 
 test('an error of the API stays in the proposal form', async () => {

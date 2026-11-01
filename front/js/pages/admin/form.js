@@ -6,6 +6,8 @@
 // games: a list of games (the value is [{ id, name }], what is sent is the ids): each is added with the same picker as `game`
 // options: a list of short texts (the value is [text, ...]), one input row each, added and removed in the form: { min, max, maxLength }
 // select: { options: [[number, label], ...] }
+// period: a month, a week or free dates (what a group challenge lasts); it sets several keys of the body at once (ui/period-field.js)
+// heading: a title between groups of fields, it holds no value
 // month: the months after the running one, as a "YYYY-MM" text (the challenges are launched for a month)
 // choice: { options: [[text, label], ...], default? } a select whose value stays text (select reads it as a number)
 // An entity may have several ways to create a row (`creates`: [{ label, choose?, fields, body }]): `fields` is the form and
@@ -18,6 +20,7 @@ import { html, mount } from '../../lib/html.js';
 import { PASSWORD_HINT, generatePassword, isValidPassword } from '../../lib/password.js';
 import { platformList } from '../../lib/platforms.js';
 import { modalHeader, openModal } from '../../ui/modal.js';
+import { bindPeriod, periodField, readPeriod } from '../../ui/period-field.js';
 import { toast } from '../../ui/toast.js';
 import { store } from './components.js';
 import { pickGame } from './dialogs.js';
@@ -34,6 +37,10 @@ function fieldHtml(f, value, row) {
       return html`<label>${f.label}<select class="adm-input" id="${id}">
         ${f.options.map(([value, name]) => html`<option value="${value}" ${String(value) === String(v) ? html`selected` : ''}>${name}</option>`)}
       </select></label>`;
+    case 'period':
+      return periodField();
+    case 'heading':
+      return html`<h3 class="adm-form-section">${f.label}</h3>`;
     case 'month':
       return html`<label>${f.label}<select class="adm-input" id="${id}">
         ${launchMonths().map((m) => html`<option value="${m.value}">${m.label}</option>`)}
@@ -225,6 +232,8 @@ async function onFormClick(e, modal, fields) {
   }
 }
 
+const bindPeriods = (el) => el.querySelectorAll('[data-period-field]').forEach(bindPeriod);
+
 /** Open the create (row = null) or edit form of an entity. */
 export function openForm(entity, row, admin, variant = null) {
   const creating = !row;
@@ -242,6 +251,7 @@ export function openForm(entity, row, admin, variant = null) {
 
   fields.filter((f) => f.type === 'options').forEach((f) => numberOptions(modal.el.querySelector(`#f_${f.key}`)));
   modal.el.querySelectorAll('textarea.adm-grow').forEach(autoGrow);
+  bindPeriods(modal.el);
   modal.el.addEventListener('click', (e) => onFormClick(e, modal, fields));
   modal.el.querySelector('form').addEventListener('submit', (e) => {
     e.preventDefault();
@@ -279,6 +289,7 @@ export function openCreateForm(entity, admin) {
       mount(area, html`${fields.map((f) => fieldHtml(f, undefined, undefined))}`);
       fields.filter((f) => f.type === 'options').forEach((f) => numberOptions(modal.el.querySelector(`#f_${f.key}`)));
       area.querySelectorAll('textarea.adm-grow').forEach(autoGrow);
+      bindPeriods(area);
     } catch (err) {
       error.textContent = err.message;
     }
@@ -300,6 +311,13 @@ async function submit(entity, row, fields, modal, admin, extra = {}) {
   const uploads = [];
 
   for (const f of fields) {
+    if (f.type === 'heading') continue;
+    if (f.type === 'period') {
+      const period = readPeriod(modal.el.querySelector('[data-period-field]'));
+      if (period.error) { errorEl.textContent = period.error; return; }
+      Object.assign(body, period.options);
+      continue;
+    }
     if (f.type === 'image') {
       // A new picture goes to its own route once the rest is saved; no file chosen leaves the current one.
       const file = document.getElementById(inputId(f)).files[0];
