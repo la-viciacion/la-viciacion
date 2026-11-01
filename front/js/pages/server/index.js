@@ -1,10 +1,10 @@
 // Server page (#/server): how the machine the app runs on is doing, the month's traffic and what keeping the app running
-// costs, by kind (server, domain...), for everybody. GET /server/status (Hetzner and Prometheus, the cost derived from the
+// costs, by kind (server, domain...), for the admins. GET /server/status (Hetzner and Prometheus, the cost derived from the
 // recorded rates: nothing is stored by this page).
 import { api } from '../../lib/api.js';
 import { formatRelative } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
-import { KIND_ORDER, WINDOWS, barLayout, bytes, load, money, monthName, monthShort, monthTotal, monthYear, yearTotals, last, linePoints, peak, percent, rate, sharedMax, trafficShare, uptime } from '../../lib/server.js';
+import { KIND_ORDER, LIMITS, WINDOWS, axisTicks, axisTime, barLayout, bytes, load, money, monthName, monthShort, monthTotal, monthYear, yearTotals, last, linePoints, peak, percent, rate, sharedMax, trafficShare, uptime } from '../../lib/server.js';
 
 export const active = null; // it belongs to no item of the top bar
 export const adminOnly = true; // for now: the API refuses everybody else, and the page sends them home
@@ -15,15 +15,23 @@ const HEIGHT = 80;
 const legend = (items) => html`<div class="sv-legend">${items.map(([cls, label, value]) => html`
   <span class="sv-key ${cls}"><span class="sv-dot"></span>${label} <strong>${value}</strong></span>`)}</div>`;
 
-// One chart: every series drawn on the same scale, `max` at the top.
-const chart = (title, label, series, max, from, to, items) => html`
+// One chart: every series drawn on the same scale, `max` at the top, with its vertical axis (`format` writes the values), the time at
+// both ends and, when `limit` is given, a dotted line at the most it should reach.
+const chart = (title, label, series, max, from, to, items, { format, limit = null, range }) => html`
   <section class="pf-card sv-card" aria-label="${title}">
     <h2 class="sv-title">${title}</h2>
-    <svg class="sv-chart" viewBox="0 0 ${WIDTH} ${HEIGHT}" preserveAspectRatio="none" role="img" aria-label="${label}">
-      <line class="sv-grid" x1="0" y1="${HEIGHT / 2}" x2="${WIDTH}" y2="${HEIGHT / 2}" />
-      ${series.map(([cls, points]) => html`<polyline class="sv-line ${cls}" points="${linePoints(points, { width: WIDTH, height: HEIGHT, max, from, to })}" />`)}
-    </svg>
-    ${legend(items)}
+    <div class="sv-plot">
+      <div class="sv-yaxis" aria-hidden="true">${axisTicks(max, format).map((tick) => html`<span>${tick}</span>`)}</div>
+      <div class="sv-plot-area">
+        <svg class="sv-chart" viewBox="0 0 ${WIDTH} ${HEIGHT}" preserveAspectRatio="none" role="img" aria-label="${label}">
+          <line class="sv-grid" x1="0" y1="${HEIGHT / 2}" x2="${WIDTH}" y2="${HEIGHT / 2}" />
+          ${limit !== null && limit <= max ? html`<line class="sv-limit" x1="0" y1="${(HEIGHT - (limit / max) * HEIGHT).toFixed(1)}" x2="${WIDTH}" y2="${(HEIGHT - (limit / max) * HEIGHT).toFixed(1)}" />` : ''}
+          ${series.map(([cls, points]) => html`<polyline class="sv-line ${cls}" points="${linePoints(points, { width: WIDTH, height: HEIGHT, max, from, to })}" />`)}
+        </svg>
+        ${to > 0 ? html`<div class="sv-xaxis" aria-hidden="true"><span>${axisTime(from, range)}</span><span>ahora</span></div>` : ''}
+      </div>
+    </div>
+    ${legend(limit === null ? items : [...items, ['limit', 'Máximo recomendado', format(limit)]])}
   </section>`;
 
 // What the machine is: each characteristic with what it is
@@ -50,8 +58,8 @@ const traffic = (t) => html`
   </section>`;
 
 // Memory and disk space as the percentage used over the period; the numbers are the ones of right now.
-const usage = (title, label, part, range) => chart(title, label, [['cpu', part.series]], 100, range.from, range.to,
-  [['cpu', 'Usado', percent(last(part.series))], ['muted', 'En uso', `${bytes(part.used)} de ${bytes(part.total)}`]]);
+const usage = (title, label, part, span, limit) => chart(title, label, [['cpu', part.series]], 100, span.from, span.to,
+  [['cpu', 'Usado', percent(last(part.series))], ['muted', 'En uso', `${bytes(part.used)} de ${bytes(part.total)}`]], { format: percent, limit, range: span.range });
 
 const machine = (host) => html`
   <section class="pf-card sv-card" aria-label="Carga de la máquina">
@@ -63,8 +71,8 @@ const machine = (host) => html`
 const hostCards = (host, range) => {
   if (!host) return '';
   return html`
-    ${host.memory ? usage('Memoria', 'Memoria usada', host.memory, range) : ''}
-    ${host.disk ? usage('Espacio en disco', 'Espacio de disco usado', host.disk, range) : ''}
+    ${host.memory ? usage('Memoria', 'Memoria usada', host.memory, range, LIMITS.memory) : ''}
+    ${host.disk ? usage('Espacio en disco', 'Espacio de disco usado', host.disk, range, LIMITS.disk) : ''}
     ${machine(host)}`;
 };
 
@@ -179,12 +187,12 @@ function panel(data, range, view) {
       </div>
     </div>
     <div class="sv-grid-cards">
-      ${chart('CPU', 'Uso de CPU', [['cpu', m.cpu]], 100, from, to, [['cpu', 'Ahora', percent(last(m.cpu))], ['muted', 'Máximo', percent(peak(m.cpu))]])}
-      ${hostCards(data.host, { from, to })}
+      ${chart('CPU', 'Uso de CPU', [['cpu', m.cpu]], 100, from, to, [['cpu', 'Ahora', percent(last(m.cpu))], ['muted', 'Máximo', percent(peak(m.cpu))]], { format: percent, limit: LIMITS.cpu, range })}
+      ${hostCards(data.host, { from, to, range })}
       ${chart('Red', 'Tráfico de red', [['in', m.net_in], ['out', m.net_out]], net, from, to,
-        [['in', 'Entrada', rate(last(m.net_in))], ['out', 'Salida', rate(last(m.net_out))]])}
+        [['in', 'Entrada', rate(last(m.net_in))], ['out', 'Salida', rate(last(m.net_out))]], { format: rate, range })}
       ${chart('Disco', 'Lectura y escritura de disco', [['in', m.disk_read], ['out', m.disk_write]], disk, from, to,
-        [['in', 'Lectura', rate(last(m.disk_read))], ['out', 'Escritura', rate(last(m.disk_write))]])}
+        [['in', 'Lectura', rate(last(m.disk_read))], ['out', 'Escritura', rate(last(m.disk_write))]], { format: rate, range })}
     </div>
     <div class="sv-section"><h2 class="sv-section-title">Tráfico del mes</h2></div>
     ${traffic(server.traffic)}

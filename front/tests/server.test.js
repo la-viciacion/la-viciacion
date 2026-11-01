@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { barLayout, bytes, last, load, money, monthName, monthShort, monthTotal, monthYear, uptime, yearTotals, linePoints, peak, percent, rate, sharedMax, trafficShare } from '../js/lib/server.js';
+import { LIMITS, axisTicks, axisTime, barLayout, bytes, last, load, money, monthName, monthShort, monthTotal, monthYear, uptime, yearTotals, linePoints, peak, percent, rate, sharedMax, trafficShare } from '../js/lib/server.js';
 
 test('bytes use decimal units and keep decimals only where they matter', () => {
   assert.equal(bytes(0), '0 B');
@@ -98,4 +98,22 @@ test('with nothing at all the layout does not divide by zero', () => {
   const [bar] = barLayout([m('2026-01', { server: 0 })]);
   assert.deepEqual(bar.segments, []);
   assert.equal(bar.forecast, null);
+});
+
+test('the axis says its maximum, its middle and its zero in the unit of the chart', () => {
+  assert.deepEqual(axisTicks(100, percent), ['100 %', '50 %', '0 %']);
+  assert.deepEqual(axisTicks(4000, rate), ['4 KB/s', '2 KB/s', '0 B/s']);
+});
+
+test('the time axis gives the hour for a day or less and the day for longer', () => {
+  const noon = Date.UTC(2026, 9, 11, 12, 0) / 1000;
+  assert.match(axisTime(noon, '1h'), /^\d\d:\d\d$/);
+  assert.match(axisTime(noon, '24h'), /^\d\d:\d\d$/);
+  assert.match(axisTime(noon, '7d'), /^11 oct/);
+  assert.match(axisTime(noon, '30d'), /^11 oct/);
+});
+
+test('the recommended limits are percentages below the top, for the CPU, the memory and the disk space', () => {
+  assert.deepEqual(Object.keys(LIMITS), ['cpu', 'memory', 'disk']);
+  assert.ok(Object.values(LIMITS).every((limit) => limit > 50 && limit < 100));
 });

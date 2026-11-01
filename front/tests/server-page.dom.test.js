@@ -252,3 +252,43 @@ test('changing the period of the charts keeps the year and the month being looke
   assert.equal(year().querySelector('[data-year="2025"]').getAttribute('aria-pressed'), 'true');
   assert.equal(text('.sv-detail-title', year())[0], 'Abril de 2025');
 });
+
+const card = (name) => document.querySelector(`[aria-label="${name}"]`);
+
+test('every chart has its vertical axis and the time at both ends', async () => {
+  installApi({ 'GET /server/status?range=24h': { ...STATUS, host: HOST } });
+  await server.render({ main: main() });
+  await settle();
+  assert.deepEqual(text('.sv-yaxis span', card('CPU')), ['100 %', '50 %', '0 %']);
+  assert.deepEqual(text('.sv-yaxis span', card('Memoria')), ['100 %', '50 %', '0 %']);
+  assert.deepEqual(text('.sv-yaxis span', card('Red')), ['4 KB/s', '2 KB/s', '0 B/s']); // the highest of both series
+  assert.deepEqual(text('.sv-yaxis span', card('Disco')), ['10 B/s', '5 B/s', '0 B/s']);
+  for (const name of ['CPU', 'Memoria', 'Espacio en disco', 'Red', 'Disco']) {
+    const [from, now] = text('.sv-xaxis span', card(name));
+    assert.match(from, /^\d\d:\d\d$/, name);
+    assert.equal(now, 'ahora', name);
+  }
+});
+
+test('the CPU, the memory and the disk space have a dotted line at the recommended maximum, the network and the disk I/O do not', async () => {
+  installApi({ 'GET /server/status?range=24h': { ...STATUS, host: HOST } });
+  await server.render({ main: main() });
+  await settle();
+  const y = (name) => card(name).querySelector('.sv-limit')?.getAttribute('y1');
+  assert.equal(y('CPU'), '16.0'); // 80 % of an 80 high box, counted from the bottom
+  assert.equal(y('Memoria'), '12.0'); // 85 %
+  assert.equal(y('Espacio en disco'), '12.0');
+  assert.equal(y('Red'), undefined);
+  assert.equal(y('Disco'), undefined);
+  assert.match(text('.sv-legend', card('CPU'))[0].replace(/\s+/g, ' '), /Máximo recomendado 80\s%/);
+  assert.doesNotMatch(card('Red').textContent, /recomendado/);
+});
+
+test('with the period of seven days the axis names days', async () => {
+  installApi({ 'GET /server/status?range=': STATUS });
+  await server.render({ main: main() });
+  await settle();
+  document.querySelector('[data-window="7d"]').click();
+  await settle();
+  assert.match(text('.sv-xaxis span', card('CPU'))[0], /^\d{1,2} \p{L}+/u);
+});
