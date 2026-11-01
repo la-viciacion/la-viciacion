@@ -288,8 +288,9 @@ export const ENTITIES = {
 
   challenges: {
     label: 'Retos',
-    description: 'Los retos del grupo se lanzan y se borran aquí, y solo aquí: son de la app, no de un jugador. Los jugadores lanzan los suyos, personales, desde la página Retos; aquí se ven todos.',
+    description: 'Los retos del grupo se lanzan y se borran aquí, y solo aquí: son de la app, no de un jugador. Los jugadores lanzan los suyos, personales, desde la página Retos; aquí se ven todos. Bajo la tabla están los que se lanzan solos cada mes.',
     endpoint: '/manage/challenges',
+    companion: 'schedules',
     paged: false,
     readOnly: true,
     columns: [
@@ -300,7 +301,8 @@ export const ENTITIES = {
       { label: 'Total', render: (r) => (r.total_done ? badge(r.notified ? 'Alcanzado, avisado' : 'Alcanzado', 'green') : '—') },
       { label: 'Lanzado por', render: (r) => r.created_by ?? '—' },
     ],
-    // one type per template of the group (the personal ones are the players'): a single button, the type is chosen in the form
+    // one type per template of the group (the personal ones are the players'): a single button, the type is chosen in the form;
+    // the last two are not launched but scheduled (a month's challenge that repeats)
     createLabel: 'Lanzar reto',
     creates: [
       {
@@ -357,6 +359,48 @@ export const ENTITIES = {
             { key: 'announce', label: 'Avisar al grupo (Telegram y notificaciones)', type: 'checkbox', default: true },
           ];
         },
+      },
+      // the ones that launch themselves every month (`challenge_schedules`): another endpoint, listed under the table
+      {
+        label: 'Programar un temático cada mes',
+        choose: 'Cada mes: temático',
+        endpoint: '/manage/challenge-schedules',
+        body: { kind: 'themed' },
+        fields: async () => {
+          const themes = await api('/manage/challenges/themes');
+          return [
+            { key: 'label', label: 'Nombre', type: 'text', required: true },
+            { key: 'theme', label: 'Temática', type: 'choice', required: true, options: themes.length ? themes.map((t) => [t.theme, themeLabel(t)]) : [['', 'No hay temáticas']] },
+            GOAL,
+            { key: 'mode', label: 'Objetivo de cada jugador', type: 'choice', required: true, default: 'play', options: [['play', 'Jugar unas horas'], ['complete', 'Completar al menos un juego']] },
+            { key: 'min_hours_each', label: 'Horas mínimas por jugador (si hay que jugar)', type: 'number', step: '0.5', default: 2 },
+            { key: 'min_hours_total', label: 'Horas entre todos (opcional, si hay que jugar)', type: 'number', step: '0.5' },
+            { key: 'min_games_total', label: 'Juegos completados entre todos (opcional, si hay que completar)', type: 'number', step: '1' },
+            { key: 'versus', label: 'Además es una competición (gana quien más avance)', type: 'checkbox', default: false },
+            WHO,
+            PARTICIPATION_FIELD,
+            { key: 'announce', label: 'Avisar al grupo cuando se lance', type: 'checkbox', default: false },
+            { key: 'start_now', label: 'Lanzar ya el de este mes (si no, empieza el mes que viene)', type: 'checkbox', default: false },
+          ];
+        },
+      },
+      {
+        label: 'Programar un reto de juego rotativo cada mes',
+        choose: 'Cada mes: juego rotativo',
+        endpoint: '/manage/challenge-schedules',
+        body: { kind: 'game_of_month' },
+        fields: [
+          { key: 'label', label: 'Nombre', type: 'text', required: true },
+          { key: 'games', label: 'Juegos de la rotación (en este orden; al acabar la lista vuelve a empezar)', type: 'games', required: true },
+          GOAL,
+          { key: 'min_hours_each', label: 'Horas mínimas por jugador', type: 'number', step: '0.5', default: 5, required: true },
+          { key: 'min_hours_total', label: 'Horas mínimas entre todos', type: 'number', step: '0.5', default: 20, required: true },
+          { key: 'versus', label: 'Además es una competición (gana quien más avance)', type: 'checkbox', default: false },
+          WHO,
+          PARTICIPATION_FIELD,
+          { key: 'announce', label: 'Avisar al grupo cuando se lance', type: 'checkbox', default: false },
+          { key: 'start_now', label: 'Lanzar ya el de este mes (si no, empieza el mes que viene)', type: 'checkbox', default: false },
+        ],
       },
     ],
     name: (r) => r.title,
@@ -427,10 +471,10 @@ export const ENTITIES = {
     deleteNote: 'Se borra la encuesta con sus votos; el mensaje se queda en el grupo. Solo se puede borrar una encuesta cerrada.',
   },
 
+  // Not a tab of its own: it is the second table of Retos (`companion`), and its forms are types of the launch form
   schedules: {
-    label: 'Retos recurrentes',
-    nav: 'Recurrentes',
-    description: 'Retos del grupo que se lanzan solos el primer día de cada mes (a las 06:00): un temático con las mismas opciones, o un juego del mes cuyo juego rota por una lista. Cada mes se lanza una sola vez; si no se puede lanzar, aquí se ve por qué. No avisan al grupo salvo que lo marques.',
+    label: 'Se lanzan solos cada mes',
+    description: 'Retos del grupo que se lanzan solos el primer día de cada mes (a las 06:00): un temático con las mismas opciones, o un reto de juego cuyo juego rota por una lista. Cada mes se lanza una sola vez; si no se puede lanzar, aquí se ve por qué. No avisan al grupo salvo que lo marques.',
     endpoint: '/manage/challenge-schedules',
     paged: false,
     columns: [
@@ -450,44 +494,6 @@ export const ENTITIES = {
       { key: 'announce', label: 'Avisar al grupo cuando se lance (Telegram y notificaciones)', type: 'checkbox' },
       PARTICIPATION_FIELD,
       { key: 'games', label: 'Juegos de la rotación (en este orden; cambiar la lista cambia el juego de los próximos meses)', type: 'games' },
-    ],
-    createLabel: 'Programar reto',
-    creates: [
-      {
-        label: 'Programar un temático',
-        choose: 'Temático',
-        body: { kind: 'themed' },
-        fields: async () => {
-          const themes = await api('/manage/challenges/themes');
-          return [
-            { key: 'label', label: 'Nombre', type: 'text', required: true },
-            { key: 'theme', label: 'Temática', type: 'choice', required: true, options: themes.length ? themes.map((t) => [t.theme, themeLabel(t)]) : [['', 'No hay temáticas']] },
-            { key: 'mode', label: 'Objetivo de cada jugador', type: 'choice', required: true, default: 'play', options: [['play', 'Jugar unas horas'], ['complete', 'Completar al menos un juego']] },
-            { key: 'min_hours_each', label: 'Horas mínimas por jugador (si hay que jugar)', type: 'number', step: '0.5', default: 2 },
-            { key: 'min_hours_total', label: 'Horas entre todos (opcional, si hay que jugar)', type: 'number', step: '0.5' },
-            { key: 'min_games_total', label: 'Juegos completados entre todos (opcional, si hay que completar)', type: 'number', step: '1' },
-            { key: 'versus', label: 'Además es una competición (gana quien más avance)', type: 'checkbox', default: false },
-            PARTICIPATION_FIELD,
-            { key: 'announce', label: 'Avisar al grupo cuando se lance', type: 'checkbox', default: false },
-            { key: 'start_now', label: 'Lanzar ya el de este mes (si no, empieza el mes que viene)', type: 'checkbox', default: false },
-          ];
-        },
-      },
-      {
-        label: 'Programar un juego del mes con rotación',
-        choose: 'Juego del mes con rotación',
-        body: { kind: 'game_of_month' },
-        fields: [
-          { key: 'label', label: 'Nombre', type: 'text', required: true },
-          { key: 'games', label: 'Juegos de la rotación (en este orden; al acabar la lista vuelve a empezar)', type: 'games', required: true },
-          { key: 'min_hours_each', label: 'Horas mínimas por jugador', type: 'number', step: '0.5', default: 5, required: true },
-          { key: 'min_hours_total', label: 'Horas mínimas entre todos', type: 'number', step: '0.5', default: 20, required: true },
-          { key: 'versus', label: 'Además es una competición (gana quien más avance)', type: 'checkbox', default: false },
-          PARTICIPATION_FIELD,
-          { key: 'announce', label: 'Avisar al grupo cuando se lance', type: 'checkbox', default: false },
-          { key: 'start_now', label: 'Lanzar ya el de este mes (si no, empieza el mes que viene)', type: 'checkbox', default: false },
-        ],
-      },
     ],
     name: (r) => r.label,
     canDelete: true,

@@ -205,6 +205,7 @@ async function load() {
     const result = await api(`${entity.endpoint}?${queryFor(entity, st)}`);
     if (tab !== current) return; // user switched tab meanwhile
     st.data = Array.isArray(result) ? { total: result.length, items: result } : result;
+    if (entity.companion) st.companionFailed = await loadCompanion(entity);
   } catch (err) {
     if (tab !== current) return;
     st.data = null;
@@ -212,6 +213,30 @@ async function load() {
     return;
   }
   paint(panel, entity, st, false);
+}
+
+// The second table under an entity's (Retos: the ones that launch themselves); true when it could not be loaded.
+async function loadCompanion(entity) {
+  const other = state[entity.companion];
+  try {
+    const result = await api(`${ENTITIES[entity.companion].endpoint}?${queryFor(ENTITIES[entity.companion], other)}`);
+    other.data = Array.isArray(result) ? { total: result.length, items: result } : result;
+    return false;
+  } catch {
+    other.data = null;
+    return true;
+  }
+}
+
+function companionView(entity, st) {
+  const other = ENTITIES[entity.companion];
+  const items = state[entity.companion].data?.items;
+  return html`
+    <h2 class="adm-subtitle">${other.label}</h2>
+    <p class="adm-sub">${other.description}</p>
+    ${st.companionFailed ? html`<div class="adm-error">No se han podido cargar.</div>`
+      : !items?.length ? html`<div class="adm-sub">Ninguno todavía: se crean con «Lanzar reto», en los tipos «Cada mes».</div>`
+      : tableView(other, items, true)}`;
 }
 
 function toolbarView(entity, st) {
@@ -250,19 +275,20 @@ function toolbarView(entity, st) {
     </div>`;
 }
 
-function rowView(entity, r, i) {
+function rowView(entity, r, i, companion = false) {
+  const mark = companion ? html` data-c="1"` : ''; // a row of the companion table: its buttons act on that entity
   const cells = entity.columns.map((c, col) => (c.filter
-    ? html`<td><button class="adm-link" data-act="cell-filter" data-col="${col}" data-i="${i}" title="Filtrar">${c.render(r)}</button></td>`
+    ? html`<td><button class="adm-link" data-act="cell-filter" data-col="${col}" data-i="${i}"${mark} title="Filtrar">${c.render(r)}</button></td>`
     : html`<td>${c.render(r)}</td>`));
   const extras = (entity.actions || []).map((a, index) => (!a.show || a.show(r)
-    ? html`<button class="adm-menu-item" data-act="row-action" data-a="${index}" data-i="${i}">${a.label}</button>`
+    ? html`<button class="adm-menu-item" data-act="row-action" data-a="${index}" data-i="${i}"${mark}>${a.label}</button>`
     : ''));
-  if (entity.canDelete) extras.push(html`<button class="adm-menu-item danger" data-act="delete" data-i="${i}">${entity.deleteLabel || 'Borrar'}</button>`);
+  if (entity.canDelete) extras.push(html`<button class="adm-menu-item danger" data-act="delete" data-i="${i}"${mark}>${entity.deleteLabel || 'Borrar'}</button>`);
   return html`
     <tr>
       ${cells}
       <td class="adm-row-actions">
-        ${entity.readOnly ? '' : html`<button class="adm-btn sm" data-act="edit" data-i="${i}">Editar</button>`}
+        ${entity.readOnly ? '' : html`<button class="adm-btn sm" data-act="edit" data-i="${i}"${mark}>Editar</button>`}
         ${extras.some((x) => x !== '') ? html`
           <details class="adm-menu">
             <summary class="adm-btn sm" aria-label="Más acciones">⋯</summary>
@@ -273,7 +299,7 @@ function rowView(entity, r, i) {
 }
 
 function headerView(column, st) {
-  if (!column.sort) return html`<th>${column.label}</th>`;
+  if (!column.sort || !st) return html`<th>${column.label}</th>`;
   const on = st.sort?.key === column.sort;
   const arrow = on ? (st.sort.dir === 'asc' ? ' ▲' : ' ▼') : '';
   const ariaSort = on ? (st.sort.dir === 'asc' ? 'ascending' : 'descending') : 'none';
@@ -289,7 +315,8 @@ function contentView(entity, st, loading) {
   if (loading || !st.data) return html`<div class="loading-spinner">Cargando...</div>`;
 
   const { items, total } = st.data;
-  if (!items.length) return html`<div class="empty-state"><span>🗂️</span>Sin resultados</div>`;
+  const companion = entity.companion ? companionView(entity, st) : '';
+  if (!items.length) return html`<div class="empty-state"><span>🗂️</span>Sin resultados</div>${companion}`;
 
   const to = st.offset + items.length;
   const pager = entity.paged !== false ? html`
@@ -299,13 +326,17 @@ function contentView(entity, st, loading) {
       <button class="adm-btn sm" data-act="next" ${to >= total ? html`disabled` : ''}>Siguiente →</button>
     </div>` : '';
 
+  return html`${tableView(entity, items, false, st)}${pager}${companion}`;
+}
+
+function tableView(entity, items, companion, st) {
   return html`
     <div class="adm-table-wrap">
       <table class="adm-table">
         <thead><tr>${entity.columns.map((c) => headerView(c, st))}<th></th></tr></thead>
-        <tbody>${items.map((r, i) => rowView(entity, r, i))}</tbody>
+        <tbody>${items.map((r, i) => rowView(entity, r, i, companion))}</tbody>
       </table>
-    </div>${pager}`;
+    </div>`;
 }
 
 // ── Events ──────────────────────────────────────────────────
@@ -380,7 +411,8 @@ async function onClick(e) {
 
   const entity = ENTITIES[current];
   const st = state[current];
-  const row = button.dataset.i != null ? st.data?.items?.[Number(button.dataset.i)] : null;
+  const target = button.dataset.c ? ENTITIES[entity.companion] : entity; // a row of the second table belongs to that entity
+  const row = button.dataset.i != null ? (button.dataset.c ? state[entity.companion] : st).data?.items?.[Number(button.dataset.i)] : null;
   try {
     switch (button.dataset.act) {
       case 'toggle-nav': {
@@ -416,9 +448,9 @@ async function onClick(e) {
         // the fields of a variant may need data from the API (the themes of the games): they are loaded when it is opened
         return openForm(entity, null, admin, variant ? { ...variant, fields: typeof variant.fields === 'function' ? await variant.fields() : variant.fields } : null);
       }
-      case 'edit': return openForm(entity, row, admin);
-      case 'delete': return deleteRow(entity, row, admin);
-      case 'row-action': return entity.actions[Number(button.dataset.a)].run(row, admin);
+      case 'edit': return openForm(target, row, admin);
+      case 'delete': return deleteRow(target, row, admin);
+      case 'row-action': return target.actions[Number(button.dataset.a)].run(row, admin);
       case 'clear-game':
         delete st.filters.game_id;
         delete st.filters.game_name;
