@@ -27,6 +27,8 @@ what nothing else can trigger remains here:
                     challenges with two days left that they have not met
   group_polls       every minute while a poll's deadline has passed, closes it (and tells the group the winner)
   group_poll_stops  every 10 minutes while a poll closed here is not stopped in Telegram yet, tells Telegram again
+  server_costs      every day at 07:00 (and the first tick after a day without it), records the price Hetzner shows
+                    for the server as a rate with its start date, closing the previous one when the price changed
   challenge_schedules  every day at 06:00, launches the challenge of the running month of each schedule that has not
                     done it yet (a month is launched once; a day the API was down is made up for the next one)
 
@@ -43,14 +45,17 @@ from sqlalchemy import update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from ..crud import challenge_schedules, group_polls, users
+from ..clients import hetzner
+from ..config import Config
+from ..crud import challenge_schedules, costs, group_polls, users
 from ..database import models
 from ..database.database import SessionLocal
-from . import actions, challenge_notices, inbox, polls, push, recap_notices, settings
+from . import actions, challenge_notices, inbox, polls, push, recap_notices, server_status, settings
 from .logger import LogManager
 
 log_manager = LogManager()
 logger = log_manager.get_logger()
+config = Config()
 
 TICK_SECONDS = 30
 STARTUP_DELAY_SECONDS = 5
@@ -64,6 +69,9 @@ DAILY_STREAKS_HOUR = 5
 INBOX_PURGE_HOUR = 4
 DAILY_WISHLIST_HOUR = 9
 CHALLENGE_SCHEDULES_HOUR = 6
+SERVER_COSTS_HOUR = 7
+# a rate is worth recording whenever the job gets to run, the sooner the closer to the day the price changed: it catches up all day
+SERVER_COSTS_GRACE = datetime.timedelta(hours=23)
 # The week the weekly wishlist notice tells about starts the day after (Monday to Sunday)
 WISHLIST_WEEKLY_WEEKDAY = 6
 # Off: the notification is shown once, when the timer starts. The job, the per-user interval
@@ -245,6 +253,13 @@ async def _challenge_schedules(db: Session) -> str:
     return f"{len(launched)} launched"
 
 
+async def _server_costs(db: Session) -> str:
+    if not config.HETZNER_API_TOKEN:
+        return "Hetzner is not set up"
+    price = server_status.server_price(hetzner.server(config.HETZNER_API_TOKEN, config.HETZNER_SERVER_ID))
+    return costs.sync_server(db, price, datetime.date.today())
+
+
 async def _challenge_results(db: Session) -> str:
     return await challenge_notices.announce_results(db, datetime.date.today())
 
@@ -338,6 +353,10 @@ def tick(now: datetime.datetime | None = None) -> None:
         slot = daily_slot(now, CHALLENGE_SCHEDULES_HOUR)
         if is_due(now, slot, _last_run(db, "challenge_schedules"), DAILY_GRACE) and _claim(db, "challenge_schedules", slot, now):
             _run(db, "challenge_schedules", lambda: _challenge_schedules(db))
+
+        slot = daily_slot(now, SERVER_COSTS_HOUR)
+        if is_due(now, slot, _last_run(db, "server_costs"), SERVER_COSTS_GRACE) and _claim(db, "server_costs", slot, now):
+            _run(db, "server_costs", lambda: _server_costs(db))
 
         slot = daily_slot(now, DAILY_STREAKS_HOUR)
         if is_due(now, slot, _last_run(db, "daily_streaks"), DAILY_GRACE) and _claim(db, "daily_streaks", slot, now):

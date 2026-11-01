@@ -56,69 +56,20 @@ class MetricsTests(unittest.TestCase):
         self.assertEqual(server_status.shape_metrics(SERIES)["disk_write"], [])
 
 
-class CostTests(unittest.TestCase):
-    NOW = datetime.datetime(2026, 10, 11, 0, 0, tzinfo=UTC)  # 10 days into the month: 240 hours
+class PriceTests(unittest.TestCase):
+    def test_the_rate_is_the_plans_price_in_the_location_of_the_server(self):
+        price = server_status.server_price(make_server())
+        self.assertEqual(price["amount_cents"], 490)  # fsn1's 4,90, not nbg1's 9,99
+        self.assertEqual(price["hourly_micros"], 8000)
+        self.assertEqual((price["external_id"], price["name"], price["created"]), ("42", "Servidor lavi", datetime.date(2025, 6, 1)))
 
-    def test_it_prices_the_hours_of_the_month_at_the_location_of_the_server(self):
-        cost = server_status.estimate_cost(make_server(), self.NOW)
-        self.assertEqual(cost["month"]["so_far"], 1.92)  # 240 h * 0.008 (fsn1, not nbg1's 0.01)
-        self.assertEqual(cost["currency"], "EUR")
-
-    def test_a_server_created_this_month_pays_only_since_then(self):
-        cost = server_status.estimate_cost(make_server(created="2026-10-10T00:00:00+00:00"), self.NOW)
-        self.assertEqual(cost["month"]["so_far"], 0.19)  # 24 h
-
-    def test_the_month_never_costs_more_than_its_monthly_price(self):
-        cost = server_status.estimate_cost(make_server(), datetime.datetime(2026, 10, 31, 23, 0, tzinfo=UTC))
-        self.assertEqual(cost["month"], {"so_far": 4.9, "projected": 4.9})  # 743 h * 0.008 would be 5.94
-
-    def test_the_projection_adds_the_hours_that_are_left(self):
-        cost = server_status.estimate_cost(make_server(), datetime.datetime(2026, 10, 1, 0, 0, tzinfo=UTC))
-        self.assertEqual(cost["month"], {"so_far": 0, "projected": 4.9})
-
-    def test_backups_are_a_fifth_of_the_server_and_only_when_enabled(self):
-        self.assertEqual(server_status.estimate_cost(make_server(backup_window="22-02"), self.NOW)["month"]["so_far"], 2.3)  # 1.92 * 1.2
+    def test_backups_add_a_fifth_to_both_prices(self):
+        price = server_status.server_price(make_server(backup_window="22-02"))
+        self.assertEqual((price["amount_cents"], price["hourly_micros"]), (588, 9600))
 
     def test_only_the_traffic_beyond_the_plan_is_charged(self):
-        cost = server_status.estimate_cost(make_server(outgoing_traffic=22 * TB), self.NOW)
-        self.assertEqual(cost["month"]["so_far"], 4.32)  # 1.92 + 2 TB * 1.20
-
-
-class YearAndTotalTests(unittest.TestCase):
-    NOW = datetime.datetime(2026, 10, 11, 0, 0, tzinfo=UTC)
-
-    def test_the_year_adds_the_closed_months_to_the_running_one(self):
-        cost = server_status.estimate_cost(make_server(), self.NOW)
-        self.assertEqual(cost["year"]["so_far"], 46.02)  # nine whole months at 4,90 (a month never costs more) and 1,92
-        self.assertEqual(cost["year"]["projected"], 58.8)  # twelve months at their monthly price: it reaches December
-
-    def test_the_total_goes_back_to_the_month_the_server_was_created(self):
-        cost = server_status.estimate_cost(make_server(), self.NOW)  # created 2025-06-01
-        self.assertEqual(cost["total"], {"so_far": 80.32, "since": "2025-06-01"})  # 7 months of 2025 more than the year
-
-    def test_a_server_created_this_year_counts_from_the_day_it_was_created(self):
-        cost = server_status.estimate_cost(make_server(created="2026-08-20T00:00:00+00:00"), self.NOW)
-        self.assertEqual(cost["year"]["so_far"], 9.12)  # 12 days of August (2,30), September (4,90) and 1,92
-        self.assertEqual(cost["total"]["so_far"], 9.12)
-
-    def test_backups_weigh_on_every_month_and_the_traffic_only_on_the_running_one(self):
-        cost = server_status.estimate_cost(make_server(backup_window="22-02", outgoing_traffic=22 * TB), self.NOW)
-        self.assertEqual(cost["year"]["so_far"], round(9 * 5.88 + 1.92 * 1.2 + 2.4, 2))
-
-    def test_in_january_the_year_is_the_month(self):
-        cost = server_status.estimate_cost(make_server(), datetime.datetime(2026, 1, 11, 0, 0, tzinfo=UTC))
-        self.assertEqual(cost["year"]["so_far"], cost["month"]["so_far"])  # nothing before January
-        self.assertEqual(cost["year"]["projected"], 58.8)  # but the year goes on to December
-        self.assertGreater(cost["total"]["so_far"], cost["year"]["so_far"])
-
-    def test_the_year_projection_adds_the_months_still_to_come_with_their_backups(self):
-        cost = server_status.estimate_cost(make_server(backup_window="22-02"), self.NOW)
-        self.assertEqual(cost["year"]["projected"], round(12 * 4.9 * 1.2, 2))  # 70,56: not just the end of October
-        self.assertGreater(cost["year"]["projected"], cost["month"]["projected"] + cost["year"]["so_far"] - cost["month"]["so_far"])
-
-    def test_in_december_the_projection_closes_the_year(self):
-        cost = server_status.estimate_cost(make_server(), datetime.datetime(2026, 12, 31, 12, 0, tzinfo=UTC))
-        self.assertEqual(cost["year"]["projected"], 58.8)
+        self.assertEqual(server_status.traffic_overage(make_server(outgoing_traffic=22 * TB)), 2.4)  # 2 TB * 1.20
+        self.assertEqual(server_status.traffic_overage(make_server()), 0)
 
 
 NOW_VALUES = {
@@ -259,8 +210,7 @@ class DescribeTests(unittest.TestCase):
         old = make_server()
         old["datacenter"] = {"location": old.pop("location")}
         self.assertEqual(server_status.describe(old)["location"], "Falkenstein, DE")
-        now = datetime.datetime(2026, 10, 11, 0, 0, tzinfo=UTC)
-        self.assertEqual(server_status.estimate_cost(old, now)["month"]["so_far"], 1.92)
+        self.assertEqual(server_status.server_price(old)["amount_cents"], 490)
 
     def test_it_keeps_what_the_group_may_see_and_not_the_address(self):
         server = make_server()
@@ -347,42 +297,64 @@ class StatusCacheTests(unittest.TestCase):
         self.assertEqual(self.hetzner["server"].call_count, 2)
 
 
+ITEMS = [{
+    "amount_cents": 490, "hourly_micros": 8000, "period": "month", "starts_on": datetime.date(2026, 1, 1), "ends_on": None,
+}]
+
+
 class RouteTests(unittest.TestCase):
     def setUp(self):
         server_status.clear()
         self.addCleanup(server_status.clear)
         self.admin, self.player = mock.Mock(is_admin=1), mock.Mock(is_admin=0)
+        patch = mock.patch.object(route.costs_crud, "all_items", return_value=ITEMS)
+        self.items = patch.start()
+        self.addCleanup(patch.stop)
 
     def configured(self, token=TOKEN):
         return mock.patch.object(route, "config", mock.Mock(HETZNER_API_TOKEN=token, HETZNER_SERVER_ID="42", PROMETHEUS_URL=""))
 
     def test_without_a_token_it_says_it_is_not_configured_and_asks_nobody(self):
         with self.configured(""), mock.patch.object(server_status.hetzner, "server") as asked:
-            self.assertEqual(route.get_status("24h", False, self.player), {"configured": False})
+            self.assertEqual(route.get_status("24h", False, self.player, None), {"configured": False})
         asked.assert_not_called()
 
-    def test_everybody_sees_the_state_and_the_cost(self):
+    def test_everybody_sees_the_state_and_the_cost_derived_from_the_rates(self):
         with self.configured(), mock.patch.object(server_status.hetzner, "server", return_value=make_server()), \
                 mock.patch.object(server_status.hetzner, "metrics", return_value=SERIES):
-            as_admin = route.get_status("24h", False, self.admin)
-            as_player = route.get_status("24h", False, self.player)
+            as_admin = route.get_status("24h", False, self.admin, None)
+            as_player = route.get_status("24h", False, self.player, None)
         for answer in (as_admin, as_player):
             self.assertEqual(answer["server"]["status"], "running")
-            self.assertIn("total", answer["cost"])
+            self.assertEqual(answer["cost"]["total"]["since"], "2026-01-01")
+            self.assertNotIn("overage", answer)
+
+    def test_the_traffic_beyond_the_plan_is_added_to_the_running_month(self):
+        with self.configured(), mock.patch.object(server_status.hetzner, "server", return_value=make_server(outgoing_traffic=22 * TB)), \
+                mock.patch.object(server_status.hetzner, "metrics", return_value=SERIES), \
+                mock.patch.object(route.costs, "summary", return_value={}) as summary:
+            route.get_status("24h", False, self.player, None)
+        self.assertEqual(summary.call_args.args[2], 2.4)
+
+    def test_without_any_rate_yet_there_is_no_cost(self):
+        self.items.return_value = []
+        with self.configured(), mock.patch.object(server_status.hetzner, "server", return_value=make_server()), \
+                mock.patch.object(server_status.hetzner, "metrics", return_value=SERIES):
+            self.assertIsNone(route.get_status("24h", False, self.player, None)["cost"])
 
     def test_the_address_of_prometheus_goes_with_the_question(self):
         config = mock.Mock(HETZNER_API_TOKEN=TOKEN, HETZNER_SERVER_ID="42", PROMETHEUS_URL="http://p:9090")
-        with mock.patch.object(route, "config", config), mock.patch.object(route.server_status, "status", return_value={"cost": {}}) as asked:
-            route.get_status("24h", False, self.player)
+        with mock.patch.object(route, "config", config), mock.patch.object(route.server_status, "status", return_value={"overage": 0.0}) as asked:
+            route.get_status("24h", False, self.player, None)
         self.assertEqual(asked.call_args.kwargs["prometheus_url"], "http://p:9090")
 
     def test_only_an_admin_can_force_a_new_question(self):
         with self.configured(), mock.patch.object(server_status.hetzner, "server", return_value=make_server()) as asked, \
                 mock.patch.object(server_status.hetzner, "metrics", return_value=SERIES):
-            route.get_status("24h", False, self.player)
-            route.get_status("24h", True, self.player)
+            route.get_status("24h", False, self.player, None)
+            route.get_status("24h", True, self.player, None)
             self.assertEqual(asked.call_count, 1)
-            route.get_status("24h", True, self.admin)
+            route.get_status("24h", True, self.admin, None)
             self.assertEqual(asked.call_count, 2)
 
     def test_a_prometheus_failure_is_a_502_too(self):
@@ -390,14 +362,14 @@ class RouteTests(unittest.TestCase):
         with mock.patch.object(route, "config", config), \
                 mock.patch.object(route.server_status, "status", side_effect=PrometheusError("Prometheus no responde (ConnectionError)")), \
                 self.assertRaises(HTTPException) as caught:
-            route.get_status("24h", False, self.player)
+            route.get_status("24h", False, self.player, None)
         self.assertEqual(caught.exception.status_code, 502)
         self.assertIn("Prometheus", caught.exception.detail)
 
     def test_a_failure_is_a_502_that_never_carries_the_token(self):
         with self.configured(), mock.patch.object(server_status.hetzner, "server", side_effect=HetznerError(f"rechazado {TOKEN}")), \
                 self.assertRaises(HTTPException) as caught:
-            route.get_status("24h", False, self.player)
+            route.get_status("24h", False, self.player, None)
         self.assertEqual(caught.exception.status_code, 502)
         self.assertNotIn(TOKEN, caught.exception.detail)
 
