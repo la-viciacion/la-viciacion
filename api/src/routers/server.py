@@ -9,7 +9,6 @@ from ..clients.hetzner import HetznerError
 from ..clients.prometheus import PrometheusError
 from ..config import Config
 from ..crud import costs as costs_crud
-from ..database import models
 from ..utils import costs, server_status
 
 config = Config()
@@ -17,7 +16,7 @@ config = Config()
 router = APIRouter(
     prefix="/server",
     tags=["Server"],
-    dependencies=[Depends(auth.get_current_active_user)],
+    dependencies=[Depends(auth.require_admin)],  # for now: nobody else sees the server
 )
 
 
@@ -35,18 +34,17 @@ def get_costs(year: int = Query(..., ge=2000, le=2100, description="The year who
 def get_status(
     window: str = Query("24h", alias="range", pattern="^(1h|24h|7d|30d)$", description="How far back the charts go"),
     refresh: bool = False,
-    current_user: models.User = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    """How the server is doing (state, CPU, network, disk, traffic and the cost of the month, the year and the whole life, derived from the recorded rates), for
-    every player. It asks Hetzner (a blocking call: a plain def, so it runs in a worker thread) and keeps the answer
-    a minute; `refresh` asks again."""
+    """How the server is doing (CPU, memory, network, disk, traffic and the cost of the month, the year and the whole life,
+    derived from the recorded rates), for the admins. It asks Hetzner (a blocking call: a plain def, so it runs in a worker
+    thread) and keeps the answer a minute; `refresh` asks again."""
     token = config.HETZNER_API_TOKEN
     if not token:
         return {"configured": False}
     try:
         data = server_status.status(
-            token, config.HETZNER_SERVER_ID, window, refresh=refresh and bool(current_user.is_admin), prometheus_url=config.PROMETHEUS_URL
+            token, config.HETZNER_SERVER_ID, window, refresh=refresh, prometheus_url=config.PROMETHEUS_URL
         )
     except (HetznerError, PrometheusError) as e:
         raise HTTPException(status_code=502, detail=str(e).replace(token, "***"))

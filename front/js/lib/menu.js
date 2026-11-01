@@ -1,5 +1,5 @@
 // Structure of the side menu. Pure: no DOM, so it can be tested. Each item is { id, label, href, icon, wip? }
-// (icon is the name of a function of ui/icons.js); `logout` is not a link, the menu draws it apart at the foot.
+// (icon is the name of a function of ui/icons.js; `admin`: only the administrators see it); `logout` is not a link, the menu draws it apart at the foot.
 
 /** The sections of the menu for `user`; an empty section (the admin one for a player) is left out. */
 export function menuSections(user) {
@@ -14,7 +14,7 @@ export function menuSections(user) {
       { id: 'calendar', label: 'Calendario', href: '#/calendar', icon: 'iconCalendar' },
       { id: 'achievements', label: 'Logros', href: '#/achievements', icon: 'iconTrophy' },
       { id: 'players', label: 'Jugadores', href: '#/players', icon: 'iconPerson' },
-      { id: 'server', label: 'Servidor', href: '#/server', icon: 'iconServer' },
+      { id: 'server', label: 'Servidor', href: '#/server', icon: 'iconServer', admin: true },
       { id: 'stats', label: 'Estadísticas', href: '#/stats', icon: 'iconChart', wip: true },
     ] },
     { label: 'Tú', items: [
@@ -27,7 +27,9 @@ export function menuSections(user) {
     { label: 'Administración', items: user?.is_admin ? [
       { id: 'admin', label: 'Panel de administración', href: '#/admin', icon: 'iconShield' },
     ] : [] },
-  ].filter((section) => section.items.length);
+  ]
+    .map((section) => ({ ...section, items: section.items.filter((item) => !item.admin || user?.is_admin) }))
+    .filter((section) => section.items.length);
 }
 
 // The item a page address belongs to, longest prefix first so '#/profile/ajustes' is not just 'profile'.

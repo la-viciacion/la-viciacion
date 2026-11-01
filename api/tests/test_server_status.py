@@ -308,7 +308,6 @@ class RouteTests(unittest.TestCase):
     def setUp(self):
         server_status.clear()
         self.addCleanup(server_status.clear)
-        self.admin, self.player = mock.Mock(is_admin=1), mock.Mock(is_admin=0)
         patch = mock.patch.object(route.costs_crud, "all_items", return_value=ITEMS)
         self.items = patch.start()
         self.addCleanup(patch.stop)
@@ -318,14 +317,14 @@ class RouteTests(unittest.TestCase):
 
     def test_without_a_token_it_says_it_is_not_configured_and_asks_nobody(self):
         with self.configured(""), mock.patch.object(server_status.hetzner, "server") as asked:
-            self.assertEqual(route.get_status("24h", False, self.player, None), {"configured": False})
+            self.assertEqual(route.get_status("24h", False, None), {"configured": False})
         asked.assert_not_called()
 
-    def test_everybody_sees_the_state_and_the_cost_derived_from_the_rates(self):
+    def test_the_answer_has_the_server_and_the_cost_derived_from_the_rates(self):
         with self.configured(), mock.patch.object(server_status.hetzner, "server", return_value=make_server()), \
                 mock.patch.object(server_status.hetzner, "metrics", return_value=SERIES):
-            as_admin = route.get_status("24h", False, self.admin, None)
-            as_player = route.get_status("24h", False, self.player, None)
+            as_admin = route.get_status("24h", False, None)
+            as_player = route.get_status("24h", False, None)
         for answer in (as_admin, as_player):
             self.assertEqual(answer["server"]["type"], "cx22")
             self.assertEqual(answer["cost"]["total"]["since"], "2026-01-01")
@@ -335,14 +334,14 @@ class RouteTests(unittest.TestCase):
         with self.configured(), mock.patch.object(server_status.hetzner, "server", return_value=make_server(outgoing_traffic=22 * TB)), \
                 mock.patch.object(server_status.hetzner, "metrics", return_value=SERIES), \
                 mock.patch.object(route.costs, "summary", return_value={}) as summary:
-            route.get_status("24h", False, self.player, None)
+            route.get_status("24h", False, None)
         self.assertEqual(summary.call_args.args[2], 2.4)
 
     def test_without_any_rate_yet_there_is_no_cost(self):
         self.items.return_value = []
         with self.configured(), mock.patch.object(server_status.hetzner, "server", return_value=make_server()), \
                 mock.patch.object(server_status.hetzner, "metrics", return_value=SERIES):
-            self.assertIsNone(route.get_status("24h", False, self.player, None)["cost"])
+            self.assertIsNone(route.get_status("24h", False, None)["cost"])
 
     def test_the_months_of_a_year_come_from_the_recorded_rates(self):
         with mock.patch.object(route.costs, "years", return_value=[2025, 2026]):
@@ -360,16 +359,16 @@ class RouteTests(unittest.TestCase):
     def test_the_address_of_prometheus_goes_with_the_question(self):
         config = mock.Mock(HETZNER_API_TOKEN=TOKEN, HETZNER_SERVER_ID="42", PROMETHEUS_URL="http://p:9090")
         with mock.patch.object(route, "config", config), mock.patch.object(route.server_status, "status", return_value={"overage": 0.0}) as asked:
-            route.get_status("24h", False, self.player, None)
+            route.get_status("24h", False, None)
         self.assertEqual(asked.call_args.kwargs["prometheus_url"], "http://p:9090")
 
-    def test_only_an_admin_can_force_a_new_question(self):
+    def test_a_refresh_asks_hetzner_again(self):
         with self.configured(), mock.patch.object(server_status.hetzner, "server", return_value=make_server()) as asked, \
                 mock.patch.object(server_status.hetzner, "metrics", return_value=SERIES):
-            route.get_status("24h", False, self.player, None)
-            route.get_status("24h", True, self.player, None)
+            route.get_status("24h", False, None)
+            route.get_status("24h", False, None)
             self.assertEqual(asked.call_count, 1)
-            route.get_status("24h", True, self.admin, None)
+            route.get_status("24h", True, None)
             self.assertEqual(asked.call_count, 2)
 
     def test_a_prometheus_failure_is_a_502_too(self):
@@ -377,14 +376,14 @@ class RouteTests(unittest.TestCase):
         with mock.patch.object(route, "config", config), \
                 mock.patch.object(route.server_status, "status", side_effect=PrometheusError("Prometheus no responde (ConnectionError)")), \
                 self.assertRaises(HTTPException) as caught:
-            route.get_status("24h", False, self.player, None)
+            route.get_status("24h", False, None)
         self.assertEqual(caught.exception.status_code, 502)
         self.assertIn("Prometheus", caught.exception.detail)
 
     def test_a_failure_is_a_502_that_never_carries_the_token(self):
         with self.configured(), mock.patch.object(server_status.hetzner, "server", side_effect=HetznerError(f"rechazado {TOKEN}")), \
                 self.assertRaises(HTTPException) as caught:
-            route.get_status("24h", False, self.player, None)
+            route.get_status("24h", False, None)
         self.assertEqual(caught.exception.status_code, 502)
         self.assertNotIn(TOKEN, caught.exception.detail)
 

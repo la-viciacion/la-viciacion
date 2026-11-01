@@ -26,7 +26,7 @@ TOPICS = (
         "(vale 1 hora) y, sin correo configurado, un administrador puede poner otra. Tras 5 intentos fallidos seguidos la cuenta se bloquea "
         "un rato; cambiar la contraseña cierra la sesión en todos los dispositivos, y la sesión dura unos 7 días mientras se use. "
         "El botón de arriba a la izquierda abre el menú lateral: Principal (Inicio, Actividad), Explorar (Juegos, Biblioteca del grupo con joyas ocultas, cementerio, rarezas y juegos sin tocar, Calendario, Logros, "
-        "Jugadores, Servidor, Estadísticas, aún en construcción), Tú (Mi perfil, Resumen, Deseados, Recomendados, Retos, Ajustes) y, solo para "
+        "Jugadores, Estadísticas, aún en construcción), Tú (Mi perfil, Resumen, Deseados, Recomendados, Retos, Ajustes) y, solo para "
         "administradores, Administración. Es una PWA: se instala desde el menú del navegador (Android: «Instalar aplicación»; iPhone/iPad: "
         "compartir → «Añadir a pantalla de inicio», imprescindible para las notificaciones; ordenador: icono de instalar). Ya instalada, "
         "mantener pulsado el icono da atajos a Nuevo timer, Jugando ahora y Mi perfil.",
@@ -93,7 +93,7 @@ TOPICS = (
         "grupo.md",
         "Principal y Explorar son del grupo entero: se ve lo que hacen los demás (nunca su email, Telegram ni ajustes). La barra superior muestra quién "
         "juega ahora (un timer de más de 6 horas se atenúa como «¿Un timer olvidado?»). Actividad es el muro del grupo (sesiones, juegos empezados y "
-        "completados, notas y logros). Servidor (Explorar → Servidor) enseña la CPU, la red, el disco y el tráfico del mes de la máquina de la app; también enseña el gasto de mantener la app (servidor, dominio y lo que apunte el administrador) en el mes, el año y desde el principio, y mes a mes con selector de año, y, si el administrador ha montado Prometheus, la memoria, el espacio en disco y la carga de la máquina. Jugadores lista a los miembros con sus cifras, y en la página de otro jugador aparece la afinidad con uno mismo: "
+        "completados, notas y logros). Jugadores lista a los miembros con sus cifras, y en la página de otro jugador aparece la afinidad con uno mismo: "
         "juegos en común (50 %), notas parecidas (30 %) y tiempo en los mismos géneros (20 %); con menos de 3 juegos en común dice que hay pocos datos. "
         "Juegos es el catálogo compartido (buscar, ordenar, filtrar, añadir desde RAWG) y la página de cada juego tiene portada, géneros, el tiempo medio para "
         "completarlo (de HowLongToBeat), las cifras del grupo, la nota propia y quién lo tiene. Si Steam o RAWG lo conocen, bajo el título salen la nota de Metacritic, "

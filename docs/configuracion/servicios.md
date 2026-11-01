@@ -54,12 +54,12 @@ El panel enseña el gasto del **último año** (OpenAI no guarda más): el total
 
 ## Estado del servidor (Hetzner Cloud)
 
-La página **Servidor** del menú (visible para todos los jugadores) pregunta a Hetzner cómo va la máquina. Solo vale para servidores **Cloud**, no para dedicados.
+La página **Servidor** (Menú → Explorar, solo para administradores: los jugadores no la ven y la API se la niega) pregunta a Hetzner cómo va la máquina. Solo vale para servidores **Cloud**, no para dedicados.
 
 1. En la consola de Hetzner Cloud → tu proyecto → **Security → API tokens**, crea un token con permiso de **solo lectura**.
 2. Ponlo en el `.env` como `HETZNER_API_TOKEN=` y reinicia la API. Si el proyecto tiene más de un servidor, indica cuál con `HETZNER_SERVER_ID=` (el número que sale en la URL del servidor en la consola).
 
-Enseña la CPU, la red y el disco (de 1 hora a 30 días) y el tráfico del mes frente al incluido. Hetzner no informa de la memoria ni del espacio de disco usados; para eso mira la sección siguiente. Añade el **gasto del mes, del año y desde el principio**, visible para todos. Hetzner no tiene API de facturación, así que la app apunta el precio del servidor cada vez que cambia (un aviso diario lo comprueba) y calcula los totales a partir de esas tarifas; el servidor entra solo, con el precio de hoy desde el día en que se creó, y puedes corregir o añadir tarifas en **Sistema → Gastos** (ver [Panel de administración](panel-admin.md)). Suma también el exceso de tráfico del mes en curso. No cuenta volúmenes, snapshots ni IPs extra salvo que los añadas como gasto, y no sustituye a la factura. Las métricas se guardan un minuto en memoria; las tarifas, en la base de datos.
+Enseña la CPU, la red y el disco (de 1 hora a 30 días) y el tráfico del mes frente al incluido. Hetzner no informa de la memoria ni del espacio de disco usados; para eso mira la sección siguiente. Añade el **gasto del mes, del año y desde el principio**. Hetzner no tiene API de facturación, así que la app apunta el precio del servidor cada vez que cambia (un aviso diario lo comprueba) y calcula los totales a partir de esas tarifas; el servidor entra solo, con el precio de hoy desde el día en que se creó, y puedes corregir o añadir tarifas en **Sistema → Gastos** (ver [Panel de administración](panel-admin.md)). Suma también el exceso de tráfico del mes en curso. No cuenta volúmenes, snapshots ni IPs extra salvo que los añadas como gasto, y no sustituye a la factura. Las métricas se guardan un minuto en memoria; las tarifas, en la base de datos.
 
 ### Memoria, disco y carga (Prometheus)
 

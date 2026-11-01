@@ -7,6 +7,7 @@ import { html, mount } from '../../lib/html.js';
 import { KIND_ORDER, WINDOWS, barLayout, bytes, load, money, monthName, monthShort, monthTotal, monthYear, yearTotals, last, linePoints, peak, percent, rate, sharedMax, trafficShare, uptime } from '../../lib/server.js';
 
 export const active = null; // it belongs to no item of the top bar
+export const adminOnly = true; // for now: the API refuses everybody else, and the page sends them home
 
 const WIDTH = 300;
 const HEIGHT = 80;
