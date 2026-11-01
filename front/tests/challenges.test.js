@@ -360,3 +360,9 @@ test('each period sends only what it needs and refuses what is missing', () => {
   assert.ok(periodOptions({ period: 'range', from: '2026-12-01' }).error);
   assert.match(periodOptions({ period: 'range', from: '2026-12-09', to: '2026-12-01' }).error, /terminar antes de empezar/);
 });
+
+test('a month that repeats is a schedule: no month, and whether the running one counts', () => {
+  assert.deepEqual(periodOptions({ period: 'month', month: '2026-12', repeat: true }), { options: { repeat: true, start_now: false } });
+  assert.deepEqual(periodOptions({ period: 'month', repeat: true, now: true }), { options: { repeat: true, start_now: true } });
+  assert.deepEqual(periodOptions({ period: 'week', week: '2026-12-07', repeat: true }), { options: { period: 'week', starts_on: '2026-12-07' } }); // only a month repeats
+});

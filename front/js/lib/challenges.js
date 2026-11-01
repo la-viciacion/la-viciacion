@@ -86,8 +86,10 @@ export function nextMonday(now = new Date()) {
 }
 
 /** What a period form sends from what was chosen: { options } or { error } (the API checks it again). A week sends only
- * its first day (it lasts seven), a month only the month, free dates both days. */
-export function periodOptions({ period, month, week, from, to }) {
+ * its first day (it lasts seven), a month only the month, free dates both days. A month that `repeat`s is a schedule: no
+ * month (each launch picks its own) and `start_now` says whether the running one counts. */
+export function periodOptions({ period, month, week, from, to, repeat, now }) {
+  if (period === 'month' && repeat) return { options: { repeat: true, start_now: Boolean(now) } };
   if (period === 'month') return month ? { options: { period, month } } : { error: 'Elige el mes' };
   if (period === 'week') return week ? { options: { period, starts_on: week } } : { error: 'Elige el primer día de la semana' };
   if (!from || !to) return { error: 'Elige el primer y el último día' };
