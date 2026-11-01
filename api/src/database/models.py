@@ -460,6 +460,29 @@ class GroupPollVote(Base):
     updated_at = Column(DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP"))
 
 
+class CostItem(Base):
+    """A rate of what the group spends to keep the app running, with the days it applies (utils/costs.py derives what
+    any month, year or the whole life cost from them: nothing about a month is stored). The server's rate is kept up to
+    date by a daily job from Hetzner's price; any other cost (the domain...) is typed in by an admin."""
+
+    __tablename__ = "cost_items"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(100), nullable=False)
+    kind = Column(String(20), nullable=False)  # server | domain | other: how the panel groups it
+    amount_cents = Column(Integer, nullable=False)  # per `period`, VAT included, euros
+    hourly_micros = Column(Integer, nullable=True)  # millionths of a euro per hour: the server, billed by the hour up to the monthly price
+    period = Column(String(10), nullable=False)  # month | year (spread over twelve months) | once (counts in the month of starts_on)
+    starts_on = Column(Date, nullable=False)
+    ends_on = Column(Date, nullable=True)  # the last day it applies; NULL = still applies
+    source = Column(String(20), nullable=False, server_default=text("'manual'"))  # manual | hetzner (kept by the daily job)
+    external_id = Column(String(64), nullable=True)  # the Hetzner server a `hetzner` row follows
+    note = Column(String(255), nullable=True)
+    created_at = Column(DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP"))
+
+    __table_args__ = (Index("ix_cost_items_source", "source", "external_id"),)
+
+
 class AuditLog(Base):
     """The audit log (see utils/audit.py): one row per successful write of the admin panel, and one per security event."""
 

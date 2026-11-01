@@ -1,5 +1,5 @@
 """How the server the app runs on is doing, for the panel everybody can open: its state, CPU, memory, network and disk
-over a window, the traffic of the month and an estimate of what the month, the year and the whole life of the server cost.
+over a window, and the traffic of the month.
 
 Whatever the machine can say about itself comes from the Prometheus of the monitoring profile of docker-compose.yml when
 PROMETHEUS_URL is set (CPU, disk I/O, memory, disk space, load, uptime); Hetzner gives what only it knows (the state and
@@ -7,10 +7,9 @@ type of the server, the network as the hypervisor sees it, the month's traffic, 
 also gives the CPU and the disk I/O.
 
 Nothing is stored (rule 2): it is asked to Hetzner (clients/hetzner.py) and Prometheus and kept in memory for a minute,
-so a panel that opens again and again asks once. The cost is an estimate, not the invoice (Hetzner has no billing API): the server by the
-hour up to its monthly price, its backups (a fifth of the server) and the traffic beyond what the plan includes. Volumes,
-snapshots and extra IPs are not counted. The year and the total add the months before this one the same way, with the
-price the server has today."""
+so a panel that opens again and again asks once. The cost is not here: it is derived from the rates in `cost_items`
+(utils/costs.py). This module only says what the server costs now (`server_price`, which a daily job records when it
+changes) and the traffic beyond the plan this month (`traffic_overage`), the one cost that is not a rate."""
 import datetime
 
 from ..clients import hetzner, prometheus
@@ -90,51 +89,24 @@ def _price(server: dict) -> dict:
     return next((p for p in prices if p["location"] == location), prices[0])
 
 
-def _next_month(day: datetime.datetime) -> datetime.datetime:
-    return (day + datetime.timedelta(days=32)).replace(day=1)
-
-
-def estimate_cost(server: dict, now: datetime.datetime) -> dict:
-    """What the running month, the running year and the whole life of the server have cost so far, and what the month
-    and the year will have cost by their end (VAT included, euros). Pure. Past months use the server's current price and
-    backups, and no traffic beyond the plan (Hetzner only reports the traffic of the running month), so everything but
-    the running month is an approximation."""
+def server_price(server: dict) -> dict:
+    """What the server costs now, as the rate the daily job records: the plan's monthly and hourly price in its location
+    (VAT included, backups at a fifth more when they are on), in cents and millionths of a euro. Pure."""
     price = _price(server)
-    hourly, monthly = float(price["price_hourly"]["gross"]), float(price["price_monthly"]["gross"])
-    created = datetime.datetime.fromisoformat(server["created"]).astimezone(datetime.timezone.utc)
-    backups = BACKUPS_SHARE if server.get("backup_window") else 0
-    over = max((server.get("outgoing_traffic") or 0) - (server.get("included_traffic") or 0), 0)
-    traffic = over / BYTES_PER_TB * float(price["price_per_tb_traffic"]["gross"])
-
-    def server_cost(start: datetime.datetime, end: datetime.datetime) -> float:
-        """The server between two instants, hour by hour up to the monthly price."""
-        return min(max((end - max(start, created)).total_seconds(), 0) / 3600 * hourly, monthly)
-
-    def total(cost: float) -> float:
-        return cost * (1 + backups) + traffic
-
-    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    so_far = server_cost(month_start, now)
-    projected = min(so_far + max((_next_month(month_start) - now).total_seconds(), 0) / 3600 * hourly, monthly)
-
-    before_this_year = before_this_month = 0.0  # the months already closed, without traffic
-    start = created.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    while start < month_start:
-        amount = server_cost(start, _next_month(start)) * (1 + backups)
-        before_this_month += amount
-        if start.year == now.year:
-            before_this_year += amount
-        start = _next_month(start)
-
-    # the months of this year still to come, at the monthly price (a whole month always reaches it), without traffic
-    ahead = (12 - now.month) * monthly * (1 + backups)
-
+    factor = 1 + (BACKUPS_SHARE if server.get("backup_window") else 0)
     return {
-        "currency": "EUR",
-        "month": {"so_far": round(total(so_far), 2), "projected": round(total(projected), 2)},
-        "year": {"so_far": round(before_this_year + total(so_far), 2), "projected": round(before_this_year + total(projected) + ahead, 2)},
-        "total": {"so_far": round(before_this_month + total(so_far), 2), "since": created.date().isoformat()},
+        "external_id": str(server["id"]),
+        "name": f"Servidor {server['name']}",
+        "created": datetime.datetime.fromisoformat(server["created"]).date(),
+        "amount_cents": round(float(price["price_monthly"]["gross"]) * factor * 100),
+        "hourly_micros": round(float(price["price_hourly"]["gross"]) * factor * 1e6),
     }
+
+
+def traffic_overage(server: dict) -> float:
+    """What the running month's outbound traffic beyond the plan costs (euros): the one cost that is not a rate."""
+    over = max((server.get("outgoing_traffic") or 0) - (server.get("included_traffic") or 0), 0)
+    return over / BYTES_PER_TB * float(_price(server)["price_per_tb_traffic"]["gross"])
 
 
 def shape_host(now: dict, charts: dict) -> dict:
@@ -197,7 +169,7 @@ def _fetch(token: str, server_id: str, window: str, now: datetime.datetime, prom
         "server": describe(server),
         "metrics": {**shape_metrics(series), **replaced},
         "host": host,
-        "cost": estimate_cost(server, now),
+        "overage": traffic_overage(server),
     }
 
 

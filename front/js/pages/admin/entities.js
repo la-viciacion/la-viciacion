@@ -14,6 +14,7 @@ import { themeLabel } from '../../lib/challenges.js';
 import { formatDate, formatDuration, formatTimestamp } from '../../lib/format.js';
 import { html } from '../../lib/html.js';
 import { gameHref } from '../../lib/links.js';
+import { euros } from '../../lib/money.js';
 import { platformList, platformName } from '../../lib/platforms.js';
 import { SPECIAL_NAMES, specialClass } from '../../lib/special.js';
 import { badge, seasonYears } from './components.js';
@@ -40,6 +41,18 @@ const PERIOD_FIELDS = [
   { key: 'ends_on', label: 'Hasta (opcional)', type: 'date' },
 ];
 const PARTICIPATION_FIELD = { key: 'participation', label: 'Quién participa', type: 'choice', default: 'auto', options: [['auto', 'Todos (pueden salirse)'], ['opt_in', 'Voluntario (hay que apuntarse)']] };
+
+const COST_KINDS = { server: 'Servidor', domain: 'Dominio', other: 'Otro' };
+const COST_PERIODS = { month: 'al mes', year: 'al año', once: 'una vez' };
+const COST_FIELDS = [
+  { key: 'name', label: 'Concepto', type: 'text', required: true },
+  { key: 'kind', label: 'Tipo', type: 'choice', default: 'other', options: Object.entries(COST_KINDS) },
+  { key: 'amount', label: 'Importe en euros (con IVA)', type: 'number', step: '0.01', required: true },
+  { key: 'period', label: 'Cada cuánto', type: 'choice', default: 'month', options: Object.entries(COST_PERIODS) },
+  { key: 'starts_on', label: 'Desde (el día de pago, si es una sola vez)', type: 'date', required: true },
+  { key: 'ends_on', label: 'Hasta (opcional: el último día que vale)', type: 'date' },
+  { key: 'note', label: 'Nota', type: 'text' },
+];
 
 const userColumn = { label: 'Usuario', sort: 'user', render: (r) => r.user || r.user_id, filter: (r) => ({ user_id: r.user_id }) };
 const gameColumn = { label: 'Juego', sort: 'game', render: (r) => r.game || r.game_id, filter: (r) => ({ game_id: r.game_id, game_name: r.game }) };
@@ -152,6 +165,25 @@ export const ENTITIES = {
     ],
     canDelete: true,
     deleteNote: 'Solo se puede borrar una plataforma que ninguna sesión ni entrada de biblioteca use. Renombrarla no afecta a lo que ya la tiene.',
+  },
+
+  costs: {
+    label: 'Gastos',
+    description: 'Lo que cuesta mantener la app, como tarifas con los días en que valen. El servidor se apunta solo desde Hetzner cuando cambia su precio; el dominio y lo demás se añaden aquí.',
+    endpoint: '/manage/costs',
+    paged: false,
+    columns: [
+      { label: 'Concepto', render: (r) => html`<strong>${r.name}</strong><div class="adm-sub">${COST_KINDS[r.kind]}${r.source === 'hetzner' ? ' · desde Hetzner' : ''}${r.note ? ` · ${r.note}` : ''}</div>` },
+      { label: 'Importe', render: (r) => `${euros(Math.round(r.amount * 100))} ${COST_PERIODS[r.period]}` },
+      { label: 'Desde', render: (r) => formatDate(r.starts_on) },
+      { label: 'Hasta', render: (r) => (r.period === 'once' ? '—' : r.ends_on ? formatDate(r.ends_on) : badge('Vigente', 'green')) },
+    ],
+    fields: COST_FIELDS,
+    createFields: COST_FIELDS,
+    createLabel: 'Nuevo gasto',
+    name: (r) => r.name,
+    canDelete: true,
+    deleteNote: 'Si borras la tarifa abierta del servidor, el aviso diario de Hetzner la vuelve a abrir desde el día en que se creó. Para dejar de contar un servidor que ya no existe, ponle una fecha de fin.',
   },
 
   timers: {

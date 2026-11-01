@@ -10,7 +10,7 @@ export const SECTIONS = [
   { label: 'Jugadores', tabs: ['users', 'timers', 'library', 'scores'] },
   { label: 'Retos', tabs: ['challenges', 'proposals', 'schedules'] },
   { label: 'Notificaciones', tabs: ['sends', 'channels', 'ai', 'recap', 'announce', 'polls'] },
-  { label: 'Sistema', tabs: ['chat', 'aiusage', 'services', 'backup', 'audit'] },
+  { label: 'Sistema', tabs: ['chat', 'aiusage', 'costs', 'services', 'backup', 'audit'] },
 ];
 
 export const TAB_IDS = SECTIONS.flatMap((section) => section.tabs);

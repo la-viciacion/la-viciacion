@@ -12,6 +12,7 @@ const ENTITY = {
   'challenge-proposals': 'propuesta de reto',
   'challenge-schedules': 'reto recurrente',
   polls: 'encuesta',
+  costs: 'gasto',
   achievements: 'logro',
   'user-achievements': 'logro concedido',
 };
