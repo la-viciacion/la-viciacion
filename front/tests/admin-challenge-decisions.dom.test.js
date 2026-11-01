@@ -54,16 +54,17 @@ test('rejecting sends the note, and none when it is left empty', async () => {
   assert.deepEqual(calls.at(-1).body, { note: null });
 });
 
-test('the panel lists the proposals and the schedules in their own section, apart from the players, and only a waiting proposal can be decided', () => {
+test('the panel lists the proposals in their own tab, the schedules under the challenges, and only a waiting proposal can be decided', () => {
   assert.ok(SECTIONS.find((s) => s.label === 'Retos').tabs.includes('proposals'));
-  assert.ok(SECTIONS.find((s) => s.label === 'Retos').tabs.includes('schedules'));
+  assert.ok(!SECTIONS.find((s) => s.label === 'Retos').tabs.includes('schedules'));
+  assert.equal(ENTITIES.challenges.companion, 'schedules');
   const { actions } = ENTITIES.proposals;
   assert.deepEqual(actions.map((a) => a.show({ status: 'pending' })), [true, true]);
   assert.deepEqual(actions.map((a) => a.show({ status: 'approved' })), [false, false]);
 });
 
 test('a schedule is created as a themed one or as a game of the month that rotates, and a rotation needs its games', () => {
-  const [themed, rotation] = ENTITIES.schedules.creates;
+  const [themed, rotation] = ENTITIES.challenges.creates.filter((c) => c.endpoint === '/manage/challenge-schedules');
   assert.deepEqual([themed.body, rotation.body], [{ kind: 'themed' }, { kind: 'game_of_month' }]);
   const games = rotation.fields.find((f) => f.key === 'games');
   assert.deepEqual([games.type, games.required], ['games', true]);
@@ -71,11 +72,11 @@ test('a schedule is created as a themed one or as a game of the month that rotat
   assert.deepEqual(ENTITIES.schedules.fields.map((f) => f.key), ['label', 'active', 'announce', 'participation', 'games']);
 });
 
-test('the challenges and the schedules have one button each and the type is chosen in the form', () => {
-  for (const [entity, label] of [[ENTITIES.challenges, 'Lanzar reto'], [ENTITIES.schedules, 'Programar reto']]) {
-    assert.equal(entity.createLabel, label);
-    assert.ok(entity.creates.length > 1);
-    assert.ok(entity.creates.every((c) => c.choose && c.body.kind), entity.createLabel);
-  }
-  assert.deepEqual(ENTITIES.challenges.creates.map((c) => c.choose), ['Reto de juego', 'Horas entre todos', 'Reto temático']);
+test('the challenges have one button and the type is chosen in the form, with the schedules as two more types', () => {
+  const { createLabel, creates } = ENTITIES.challenges;
+  assert.equal(createLabel, 'Lanzar reto');
+  assert.ok(creates.every((c) => c.choose && c.body.kind));
+  assert.deepEqual(creates.map((c) => c.choose), ['Reto de juego', 'Horas entre todos', 'Reto temático', 'Cada mes: temático', 'Cada mes: juego rotativo']);
+  assert.deepEqual(creates.map((c) => c.endpoint), [undefined, undefined, undefined, '/manage/challenge-schedules', '/manage/challenge-schedules']);
+  assert.equal(ENTITIES.schedules.creates, undefined);
 });

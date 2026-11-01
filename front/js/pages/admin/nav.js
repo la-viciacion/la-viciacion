@@ -1,6 +1,6 @@
 // Structure and addresses of the admin panel. Pure: no DOM, so it can be tested.
 // The sidebar lists SECTIONS; a section with several tabs shows them under its title.
-// Every tab id is a key of ENTITIES (entities.js) and its address is #/admin/<id>.
+// Every tab id is a key of ENTITIES (entities.js) and its address is #/admin/<id> (an entity that is a `companion` of another has no tab).
 
 export const HOME = 'home';
 
@@ -8,7 +8,7 @@ export const SECTIONS = [
   { label: 'Inicio', tabs: [HOME] },
   { label: 'Catálogo', tabs: ['games', 'platforms', 'achievements'] },
   { label: 'Jugadores', tabs: ['users', 'timers', 'library', 'scores'] },
-  { label: 'Retos', tabs: ['challenges', 'proposals', 'schedules'] },
+  { label: 'Retos', tabs: ['challenges', 'proposals'] },
   { label: 'Notificaciones', tabs: ['sends', 'channels', 'ai', 'recap', 'announce', 'polls'] },
   { label: 'Sistema', tabs: ['chat', 'aiusage', 'costs', 'services', 'backup', 'audit'] },
 ];

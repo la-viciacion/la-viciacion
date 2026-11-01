@@ -12,7 +12,8 @@
 // choice: { options: [[text, label], ...], default? } a select whose value stays text (select reads it as a number)
 // An entity may have several ways to create a row (`creates`: [{ label, choose?, fields, body }]): `fields` is the form and
 // `body` what is always sent with it (the kind of challenge, for instance). With one way, openForm takes it as `variant`; with
-// several, openCreateForm opens one form that starts with a Tipo select (`choose` is each type's name) and swaps the fields.
+// several, openCreateForm opens one form that starts with a Tipo select (`choose` is each type's name) and swaps the fields;
+// a type may post to its own `endpoint`.
 // image (editing only): { current: (row) => url of the picture or null, upload: (row) => route that takes the new file }
 import { api, jsonRequest } from '../../lib/api.js';
 import { launchMonths } from '../../lib/challenges.js';
@@ -298,7 +299,7 @@ export function openCreateForm(entity, admin) {
   modal.el.addEventListener('click', (e) => onFormClick(e, modal, current.fields));
   form.addEventListener('submit', (e) => {
     e.preventDefault();
-    submit(entity, null, current.fields, modal, admin, current.variant.body);
+    submit({ ...entity, endpoint: current.variant.endpoint ?? entity.endpoint }, null, current.fields, modal, admin, current.variant.body);
   });
   choose(variants[0]);
 }
