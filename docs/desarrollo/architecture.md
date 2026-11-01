@@ -29,7 +29,7 @@ crud/              DB access and queries (users, games, timers, time_entries, ra
 utils/             domain logic and integrations (see below)
 clients/google_ai.py, open_ai.py  one function per AI provider, each with the provider's official SDK (`google-genai`, `openai`); utils/ai.py picks one from the settings
 clients/openai_usage.py            OpenAI's Costs API (what was billed, by day; an admin key, `OPENAI_ADMIN_KEY`); utils/ai_usage.py sums it by month and line item and keeps it in memory for 10 minutes (nothing stored); GET /manage/ai-usage, panel Sistema -> Uso de IA
-clients/prometheus.py             the Prometheus of the monitoring profile of docker-compose.yml (`PROMETHEUS_URL`): memory, disk space, load and uptime of the machine, which Hetzner cannot see; optional; once `PROMETHEUS_URL` is set its failure is a 502 of the whole server panel, not a gap in it
+clients/prometheus.py             the Prometheus of the monitoring profile of docker-compose.yml (`PROMETHEUS_URL`): everything the machine can say about itself (CPU, disk I/O, memory, disk space, load, uptime), which takes the place of Hetzner's CPU and disk I/O; optional; once `PROMETHEUS_URL` is set its failure is a 502 of the whole server panel, not a gap in it
 clients/hetzner.py                Hetzner Cloud's API (server state, metrics, traffic; a read-only token, `HETZNER_API_TOKEN`); utils/server_status.py shapes it, estimates the month's cost and keeps it in memory for 1 minute (nothing stored); GET /server/status, page #/server
 chat/              the chat assistant (pydantic-ai): model.py (provider from the ai.* settings), tools.py (read-only lookups), agent.py (instructions, limits, history)
 ```

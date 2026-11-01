@@ -1,9 +1,13 @@
-"""How the server the app runs on is doing, for the panel everybody can open: its state, CPU, network and disk over a
-window, the traffic of the month and an estimate of what the month, the year and the whole life of the server cost. What Hetzner cannot see (memory, disk
-space, load) comes from the Prometheus of the monitoring profile of docker-compose.yml when PROMETHEUS_URL is set.
+"""How the server the app runs on is doing, for the panel everybody can open: its state, CPU, memory, network and disk
+over a window, the traffic of the month and an estimate of what the month, the year and the whole life of the server cost.
 
-Nothing is stored (rule 2): it is asked to Hetzner (clients/hetzner.py) and kept in memory for a minute, so a panel that
-opens again and again asks once. The cost is an estimate, not the invoice (Hetzner has no billing API): the server by the
+Whatever the machine can say about itself comes from the Prometheus of the monitoring profile of docker-compose.yml when
+PROMETHEUS_URL is set (CPU, disk I/O, memory, disk space, load, uptime); Hetzner gives what only it knows (the state and
+type of the server, the network as the hypervisor sees it, the month's traffic, the prices). Without Prometheus, Hetzner
+also gives the CPU and the disk I/O.
+
+Nothing is stored (rule 2): it is asked to Hetzner (clients/hetzner.py) and Prometheus and kept in memory for a minute,
+so a panel that opens again and again asks once. The cost is an estimate, not the invoice (Hetzner has no billing API): the server by the
 hour up to its monthly price, its backups (a fifth of the server) and the traffic beyond what the plan includes. Volumes,
 snapshots and extra IPs are not counted. The year and the total add the months before this one the same way, with the
 price the server has today."""
@@ -28,6 +32,7 @@ SERIES = {
 
 # What node-exporter reports about the machine (the monitoring profile of docker-compose.yml); `/` is the host's root, not a container's
 ROOT = '{mountpoint="/",fstype!~"tmpfs|overlay|squashfs|ramfs"}'
+REAL_DISKS = '{device!~"loop.*|ram.*|dm-.*|sr.*"}'
 NOW_QUERIES = {
     "memory_total": "node_memory_MemTotal_bytes",
     "memory_available": "node_memory_MemAvailable_bytes",
@@ -39,10 +44,23 @@ NOW_QUERIES = {
     "cores": 'count(node_cpu_seconds_total{mode="idle"})',
     "uptime": "time() - node_boot_time_seconds",
 }
-SERIES_QUERIES = {
-    "memory": "100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)",
-    "disk": f"100 * (1 - max(node_filesystem_avail_bytes{ROOT}) / max(node_filesystem_size_bytes{ROOT}))",
-}
+MIN_RATE_SECONDS = 60  # a rate needs at least two scrapes (every 30 s) inside its window
+# Over each chart, replacing what Hetzner would say about the same thing
+REPLACED_METRICS = ("cpu", "disk_read", "disk_write")
+
+
+def series_queries(step: int) -> dict[str, str]:
+    """The expressions drawn over time. A rate is taken over as long as a point of the chart lasts, so a peak between two
+    points of a 30-day chart is part of one of them instead of falling in the gap."""
+    window = f"{max(step, MIN_RATE_SECONDS)}s"
+    return {
+        "memory": "100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)",
+        "disk": f"100 * (1 - max(node_filesystem_avail_bytes{ROOT}) / max(node_filesystem_size_bytes{ROOT}))",
+        "cpu": f'100 * (1 - avg(rate(node_cpu_seconds_total{{mode="idle"}}[{window}])))',
+        "disk_read": f"sum(rate(node_disk_read_bytes_total{REAL_DISKS}[{window}]))",
+        "disk_write": f"sum(rate(node_disk_written_bytes_total{REAL_DISKS}[{window}]))",
+    }
+
 
 _cache = TtlCache(CACHE_SECONDS)
 
@@ -133,13 +151,14 @@ def shape_host(now: dict, charts: dict) -> dict:
     }
 
 
-def fetch_host(url: str, start: datetime.datetime, end: datetime.datetime, step: int) -> dict:
-    """Asks Prometheus for the machine's figures. Raises PrometheusError if it does not answer or knows nothing yet."""
+def fetch_host(url: str, start: datetime.datetime, end: datetime.datetime, step: int) -> tuple[dict, dict]:
+    """Asks Prometheus for the machine's figures: (the host section, the series that replace Hetzner's CPU and disk I/O).
+    Raises PrometheusError if it does not answer or knows nothing yet."""
     now = {key: prometheus.instant(url, expression) for key, expression in NOW_QUERIES.items()}
     if now["memory_total"] is None:
         raise PrometheusError("Prometheus todavía no tiene datos de la máquina: ¿está arrancado node-exporter?")
-    charts = {key: prometheus.series(url, expression, start, end, step) for key, expression in SERIES_QUERIES.items()}
-    return shape_host(now, charts)
+    charts = {key: prometheus.series(url, expression, start, end, step) for key, expression in series_queries(step).items()}
+    return shape_host(now, charts), {key: charts[key] for key in REPLACED_METRICS}
 
 
 def describe(server: dict) -> dict:
@@ -165,15 +184,15 @@ def _fetch(token: str, server_id: str, window: str, now: datetime.datetime, prom
     server = hetzner.server(token, server_id)
     seconds, step = WINDOWS[window]
     start = now - datetime.timedelta(seconds=seconds)
-    series = hetzner.metrics(token, server["id"], start, now, step)
-    # Not set up: None. Set up and failing is an error of the whole panel, not a quiet gap in it
-    host = fetch_host(prometheus_url, start, now, step) if prometheus_url else None
+    # Not set up: Hetzner gives everything it can. Set up and failing is an error of the whole panel, not a quiet gap in it
+    host, replaced = fetch_host(prometheus_url, start, now, step) if prometheus_url else (None, {})
+    series = hetzner.metrics(token, server["id"], start, now, step, hetzner.NETWORK_ONLY if prometheus_url else hetzner.METRIC_TYPES)
     return {
         "window": window,
         "step": step,
         "fetched_at": now.isoformat(),
         "server": describe(server),
-        "metrics": shape_metrics(series),
+        "metrics": {**shape_metrics(series), **replaced},
         "host": host,
         "cost": estimate_cost(server, now),
     }
