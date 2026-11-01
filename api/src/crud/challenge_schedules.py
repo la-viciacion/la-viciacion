@@ -37,8 +37,8 @@ def options_for(schedule: models.ChallengeSchedule, month: datetime.date) -> dic
 
 
 def _games(db: Session, kind: str, games) -> list[str] | None:
-    """The rotation of a game of the month (distinct games that exist, in order); the other kinds have none."""
-    if kind != "game_of_month":
+    """The rotation of a game challenge (distinct games that exist, in order); the other kinds have none."""
+    if kind != "game":
         return None
     if not isinstance(games, list) or not games:
         raise ChallengeError("Elige al menos un juego para la rotación")
@@ -75,7 +75,7 @@ def create(db: Session, admin: models.User, body: dict, today: datetime.date) ->
     Raises ChallengeError if it could not be launched."""
     kind = body.get("kind")
     if kind not in SCHEDULABLE:
-        raise ChallengeError("Solo se pueden programar retos de juego del mes o temáticos")
+        raise ChallengeError("Solo se pueden programar retos de juego o temáticos")
     options = {key: value for key, value in challenges.clean_options(body).items() if key not in ("period", "month", "starts_on", "ends_on", "game_id")}
     games = _games(db, kind, body.get("games"))
     participation = body.get("participation") or challenges.AUTO
@@ -92,7 +92,7 @@ def create(db: Session, admin: models.User, body: dict, today: datetime.date) ->
 
 
 def update(db: Session, schedule: models.ChallengeSchedule, body: dict, today: datetime.date) -> models.ChallengeSchedule:
-    """Change the label, whether it is active, whether it announces, who takes part and, for a game of the month, the
+    """Change the label, whether it is active, whether it announces, who takes part and, for a game challenge, the
     list of games (the rotation goes on from the month it is at, so changing the list changes the next game). The
     options of the template are not editable: define another schedule."""
     games = json.loads(schedule.games) if schedule.games else None

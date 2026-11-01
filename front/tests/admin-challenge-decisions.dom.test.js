@@ -65,7 +65,7 @@ test('the panel lists the proposals in their own tab, the schedules under the ch
 
 test('a schedule is created as a themed one or as a game of the month that rotates, and a rotation needs its games', () => {
   const [themed, rotation] = ENTITIES.challenges.creates.filter((c) => c.endpoint === '/manage/challenge-schedules');
-  assert.deepEqual([themed.body, rotation.body], [{ kind: 'themed' }, { kind: 'game_of_month' }]);
+  assert.deepEqual([themed.body, rotation.body], [{ kind: 'themed' }, { kind: 'game' }]);
   const games = rotation.fields.find((f) => f.key === 'games');
   assert.deepEqual([games.type, games.required], ['games', true]);
   assert.ok(rotation.fields.some((f) => f.key === 'start_now'));

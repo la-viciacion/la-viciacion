@@ -98,11 +98,11 @@ class RequestsScheduleTheirNoticesTests(NoticeTestCase):
 
     def test_a_proposal_tells_the_admins_and_its_decision_the_proposer(self):
         options = {"game_id": "hades", "month": base.this_month(), "min_hours_each": 3, "min_hours_total": 10}
-        proposal = self.api("POST", "/challenges/proposals", as_user="ana", json={"kind": "game_of_month", "options": options}).json()["id"]
+        proposal = self.api("POST", "/challenges/proposals", as_user="ana", json={"kind": "game", "options": options}).json()["id"]
         self.background["after_proposal_made"].assert_called_once_with(proposal)
         self.api("POST", f"/manage/challenge-proposals/{proposal}/reject", as_user="root", json={"note": "no"})
         self.background["after_proposal_decided"].assert_called_once_with(proposal)
-        other = self.api("POST", "/challenges/proposals", as_user="ana", json={"kind": "game_of_month", "options": {**options, "game_id": "celeste"}}).json()["id"]
+        other = self.api("POST", "/challenges/proposals", as_user="ana", json={"kind": "game", "options": {**options, "game_id": "celeste"}}).json()["id"]
         self.api("POST", f"/manage/challenge-proposals/{other}/approve", as_user="root", json={"announce": False})
         self.background["after_proposal_decided"].assert_called_with(other)
 
@@ -142,7 +142,7 @@ class EventNoticeTests(NoticeTestCase):
 
     def test_a_decided_proposal_tells_its_proposer_with_the_note_and_a_waiting_one_tells_nobody(self):
         options = {"game_id": "hades", "month": base.this_month(), "min_hours_each": 3, "min_hours_total": 10}
-        proposal = self.api("POST", "/challenges/proposals", as_user="ana", json={"kind": "game_of_month", "options": options}).json()["id"]
+        proposal = self.api("POST", "/challenges/proposals", as_user="ana", json={"kind": "game", "options": options}).json()["id"]
         self.assertEqual(self.run_notice(challenge_notices.proposal_decided, proposal), "skipped")
         self.api("POST", f"/manage/challenge-proposals/{proposal}/reject", as_user="root", json={"note": "Mejor en noviembre"})
         self.run_notice(challenge_notices.proposal_decided, proposal)
@@ -153,7 +153,7 @@ class EventNoticeTests(NoticeTestCase):
     def test_a_new_proposal_reaches_the_admins_inbox_only_and_not_the_proposer(self):
         self.user("second", admin=True)
         options = {"game_id": "hades", "month": base.this_month(), "min_hours_each": 3, "min_hours_total": 10}
-        proposal = self.api("POST", "/challenges/proposals", as_user="ana", json={"kind": "game_of_month", "options": options}).json()["id"]
+        proposal = self.api("POST", "/challenges/proposals", as_user="ana", json={"kind": "game", "options": options}).json()["id"]
         self.run_notice(challenge_notices.proposal_made, proposal)
         self.assertEqual([len(self.inbox(self.root)), len(self.inbox(self.ana)), len(self.inbox(self.bea))], [1, 0, 0])
         self.assertEqual(self.private, [])  # no Telegram and no push
@@ -161,7 +161,7 @@ class EventNoticeTests(NoticeTestCase):
 
     def test_no_proposal_notice_while_the_notifications_are_off(self):
         options = {"game_id": "hades", "month": base.this_month(), "min_hours_each": 3, "min_hours_total": 10}
-        proposal = self.api("POST", "/challenges/proposals", as_user="ana", json={"kind": "game_of_month", "options": options}).json()["id"]
+        proposal = self.api("POST", "/challenges/proposals", as_user="ana", json={"kind": "game", "options": options}).json()["id"]
         self.set_settings(**{"notifications.enabled": False})
         self.run_notice(challenge_notices.proposal_made, proposal)
         self.assertEqual(self.inbox(self.root), [])

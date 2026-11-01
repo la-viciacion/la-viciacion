@@ -117,7 +117,7 @@ TOPICS = (
         "puede dar unos distintos. Al completar un juego, el aviso al grupo también recomienda otro del mismo género.",
     ),
     Topic(
-        "retos", "Retos", ("reto", "retos", "juego del mes", "tematico", "personal", "deuda", "genero"),
+        "retos", "Retos", ("reto", "retos", "juego del mes", "reto de juego", "tematico", "personal", "deuda", "genero"),
         "descubrir.md",
         "Menú → Retos reúne objetivos con fecha de inicio y fin. Del grupo (los lanza un administrador): Reto de juego (un juego, un mes, una semana o unas fechas, unas horas mínimas por "
         "jugador y un total entre todos), Temático (una temática, un periodo, y jugar unas horas o completar un juego) y Horas entre todos (un total de horas del grupo, de cualquier juego). Se puede dejar de participar y "

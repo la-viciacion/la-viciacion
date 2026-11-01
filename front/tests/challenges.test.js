@@ -80,7 +80,7 @@ test('a challenge is summarised by what it asks', () => {
   const base = { label: 'Probar un género', kind: 'new_genre' };
   assert.equal(summaryLine({ ...base, params: { genre: 'RPG', mode: 'play', hours: 2.5 } }), 'Probar un género · jugar 2,5 h a un juego de RPG que no tuvieras antes');
   assert.equal(summaryLine({ ...base, params: { genre: 'RPG', mode: 'complete' } }), 'Probar un género · completar un juego de RPG que no tuvieras antes');
-  assert.match(summaryLine({ kind: 'game_of_month', label: 'Juego del mes', params: { min_hours_each: 5, min_hours_total: 20 } }), /mínimo 5 h cada uno y 20 h entre todos/);
+  assert.match(summaryLine({ kind: 'game', label: 'Juego del mes', params: { min_hours_each: 5, min_hours_total: 20 } }), /mínimo 5 h cada uno y 20 h entre todos/);
 });
 
 test('the page is split into the group\'s, the viewer\'s and the others\', running ones first and few finished', () => {
@@ -277,7 +277,7 @@ test('a duel result is told as a win, a loss or a tie, and the duels are summari
   assert.equal(resultLine({ scope: 'duel', done: true, tied: true }), 'Empate');
   assert.equal(summaryLine({ kind: 'duel_hours', label: 'Duelo de horas', params: {} }), 'Duelo de horas · gana quien juegue más horas');
   assert.equal(summaryLine({ kind: 'duel_game', label: 'Duelo en un juego', game: { name: 'Hades' }, params: {} }), 'Duelo en un juego · gana quien juegue más a Hades');
-  const versus = summaryLine({ kind: 'game_of_month', label: 'Juego del mes', params: { min_hours_each: 5, min_hours_total: 12, versus: true } });
+  const versus = summaryLine({ kind: 'game', label: 'Juego del mes', params: { min_hours_each: 5, min_hours_total: 12, versus: true } });
   assert.match(versus, /y gana quien más avance$/);
 });
 

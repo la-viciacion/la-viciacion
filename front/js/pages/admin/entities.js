@@ -308,7 +308,7 @@ export const ENTITIES = {
       {
         label: 'Lanzar reto de juego',
         choose: 'Reto de juego',
-        body: { kind: 'game_of_month' },
+        body: { kind: 'game' },
         fields: [
           { key: 'game_id', label: 'Juego', type: 'game', required: true },
           WHEN,
@@ -388,7 +388,7 @@ export const ENTITIES = {
         label: 'Programar un reto de juego rotativo cada mes',
         choose: 'Cada mes: juego rotativo',
         endpoint: '/manage/challenge-schedules',
-        body: { kind: 'game_of_month' },
+        body: { kind: 'game' },
         fields: [
           { key: 'label', label: 'Nombre', type: 'text', required: true },
           { key: 'games', label: 'Juegos de la rotación (en este orden; al acabar la lista vuelve a empezar)', type: 'games', required: true },
@@ -411,7 +411,7 @@ export const ENTITIES = {
   proposals: {
     label: 'Propuestas de retos',
     nav: 'Propuestas',
-    description: 'Retos del grupo que proponen los jugadores desde la página Retos (juego del mes o temático). Aprobar una la lanza como un reto del grupo, con las opciones que eligieron; rechazarla deja una nota que ve quien la propuso. Si el mes ya pasó no se puede aprobar: recházala.',
+    description: 'Retos del grupo que proponen los jugadores desde la página Retos (de juego o temático). Aprobar una la lanza como un reto del grupo, con las opciones que eligieron; rechazarla deja una nota que ve quien la propuso. Si el mes ya pasó no se puede aprobar: recházala.',
     endpoint: '/manage/challenge-proposals',
     paged: false,
     readOnly: true,

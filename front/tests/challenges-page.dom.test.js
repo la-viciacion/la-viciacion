@@ -16,7 +16,7 @@ const ROOT = { id: 9, username: 'root', is_admin: true };
 const DEBT = { seconds: 40 * 3600, games: 4, open_games: 5 };
 
 const challenge = (extra = {}) => ({
-  id: 5, kind: 'game_of_month', label: 'Juego del mes', scope: 'group', title: 'Juego del mes: Hades <b>', status: 'active',
+  id: 5, kind: 'game', label: 'Juego del mes', scope: 'group', title: 'Juego del mes: Hades <b>', status: 'active',
   starts_on: '2026-10-01', ends_on: '2026-10-31', params: { min_hours_each: 5, min_hours_total: 12 },
   game: { id: 'hades', name: 'Hades', image_url: null }, owner: null, taking_part: true, can_opt_out: true,
   progress: {
@@ -492,8 +492,8 @@ test('the proposals of the player show how each one stands and a pending one can
   document.body.innerHTML = '<main id="main"></main>';
   const proposals = [
     { id: 1, kind: 'themed', label: 'Temático', title: 'Temático: Horror', status: 'pending', decision_note: null },
-    { id: 2, kind: 'game_of_month', label: 'Juego del mes', title: 'Juego del mes: Hades', status: 'rejected', decision_note: 'Mejor en noviembre' },
-    { id: 3, kind: 'game_of_month', label: 'Juego del mes', title: 'Juego del mes: Celeste', status: 'approved', decision_note: null },
+    { id: 2, kind: 'game', label: 'Juego del mes', title: 'Juego del mes: Hades', status: 'rejected', decision_note: 'Mejor en noviembre' },
+    { id: 3, kind: 'game', label: 'Juego del mes', title: 'Juego del mes: Celeste', status: 'approved', decision_note: null },
   ];
   const calls = installApi({ 'GET /challenges/proposals': proposals, 'DELETE /challenges/proposals/1': { message: 'ok' }, 'GET /challenges': [] });
   await page.render({ main: main(), user: ANA });
@@ -544,7 +544,7 @@ test('a game of the month is proposed with a game from the search and a themed o
   form.requestSubmit();
   await settle();
   const first = calls.find((c) => c.method === 'POST' && c.path === '/challenges/proposals').body;
-  assert.deepEqual(first, { kind: 'game_of_month', options: { game_id: 'hades', period: 'month', month: month.value, min_hours_each: 3, min_hours_total: 12, versus: false } });
+  assert.deepEqual(first, { kind: 'game', options: { game_id: 'hades', period: 'month', month: month.value, min_hours_each: 3, min_hours_total: 12, versus: false } });
 
   document.querySelector('#chPropose').click();
   await settle();

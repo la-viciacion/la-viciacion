@@ -355,7 +355,7 @@ def seed():
 
     print("challenges...")
     month = datetime.date.today().strftime("%Y-%m")
-    for body in ({"kind": "game_of_month", "game_id": games_by_name["Hades II"]["id"], "month": month,
+    for body in ({"kind": "game", "game_id": games_by_name["Hades II"]["id"], "month": month,
                   "min_hours_each": 5, "min_hours_total": 30, "announce": False},
                  {"kind": "themed", "theme": "Terror", "month": month, "mode": "play", "min_hours_each": 3, "announce": False}):
         try:

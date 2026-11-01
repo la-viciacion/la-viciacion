@@ -387,7 +387,7 @@ class ChallengeScheduleJobTests(SchedulerTestCase):
     def schedule(self, announce=False, active=True):
         with database.SessionLocal() as db:
             db.add(models.ChallengeSchedule(
-                label="Mensual", kind="game_of_month", options=json.dumps({"min_hours_each": 2, "min_hours_total": 6}),
+                label="Mensual", kind="game", options=json.dumps({"min_hours_each": 2, "min_hours_total": 6}),
                 games=json.dumps(["hades"]), announce=announce, active=active, first_month=clock.today().replace(day=1),
             ))
             db.commit()
