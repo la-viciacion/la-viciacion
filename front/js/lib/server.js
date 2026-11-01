@@ -67,6 +67,21 @@ export function barLayout(months) {
   });
 }
 
+// The most a chart should reach before it is a worry (percent), drawn as a dotted line. A CPU that stays above 80 % or a memory or
+// disk above 85 % leaves no room for a peak: the common alert thresholds, not a measure of this machine. Network and disk I/O have none.
+export const LIMITS = { cpu: 80, memory: 85, disk: 85 };
+
+/** The labels of the vertical axis, top to bottom: the maximum, half of it and zero. */
+export const axisTicks = (max, format) => [format(max), format(max / 2), format(0)];
+
+/** A moment on the time axis: the hour when the period is a day or less, the day when it is longer. */
+export function axisTime(seconds, range) {
+  const date = new Date(seconds * 1000);
+  return range === '1h' || range === '24h'
+    ? date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+    : date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+}
+
 export const rate = (value) => `${bytes(value)}/s`;
 
 export const percent = (value) => `${(value || 0).toLocaleString('es-ES', { maximumFractionDigits: 1 })} %`;
