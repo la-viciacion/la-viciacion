@@ -20,7 +20,7 @@ docker compose logs -f laviciacion-api
 docker compose down                    # keeps db/data
 ```
 
-**Development stack (`*-dev` names):** `docker-compose.dev.yml` is an override of the main file that builds from the checkout and names images and containers `laviciacion-<service>-dev` (the database keeps the `mariadb` image, container `laviciacion-db-dev`). Always use it together with the main file:
+**Development stack (`*-dev` names):** `docker-compose.dev.yml` is an override of the main file that builds from the checkout and names images and containers `laviciacion-<service>-dev` (the database keeps the `mariadb` image, container `laviciacion-db-dev`; with the `monitoring` profile on, `laviciacion-node-exporter-dev` and `laviciacion-prometheus-dev` use the stock images: a container name is global to the host, so dev and prod can run their monitoring side by side only because of those names). Always use it together with the main file:
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build

@@ -24,3 +24,11 @@ services:
 
   laviciacion-db:
     container_name: laviciacion-db-dev
+
+  # The monitoring profile (COMPOSE_PROFILES=monitoring) names its containers too: dev and prod share a host, and a container
+  # name is global to it, so without these the second stack to start fails with "the container name is already in use".
+  laviciacion-node-exporter:
+    container_name: laviciacion-node-exporter-dev
+
+  laviciacion-prometheus:
+    container_name: laviciacion-prometheus-dev
