@@ -194,3 +194,39 @@ test('a period field sends the period and only the keys it needs, between headin
   await new Promise((resolve) => setImmediate(resolve));
   assert.deepEqual(sent[0], { period: 'week', starts_on: '2099-03-02', min_hours_total: 40, kind: 'group_hours' });
 });
+
+test('a field that depends on another shows only while it has that value, and is neither read nor required otherwise', async () => {
+  const sent = [];
+  globalThis.fetch = async (url, options = {}) => {
+    sent.push({ path: String(url).replace(/^\/api\/v1/, ''), body: options.body ? JSON.parse(options.body) : undefined });
+    return new Response(JSON.stringify({}), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  };
+  const { openCreateForm } = await import('../js/pages/admin/form.js');
+  const type = {
+    label: 'Lanzar', choose: 'Reto', body: { kind: 'game' }, repeat: '/manage/challenge-schedules',
+    fields: [
+      { key: 'game_id', label: 'Juego', type: 'text', required: true, when: { key: 'period', not: 'repeat' } },
+      { key: 'label', label: 'Nombre', type: 'text', required: true, when: { key: 'period', is: 'repeat' } },
+      { key: 'period', type: 'period', repeatable: true },
+    ],
+  };
+  openCreateForm({ createLabel: 'Lanzar reto', endpoint: '/manage/challenges', creates: [type, { ...type, choose: 'Otro' }] }, { reload: async () => {} });
+  await new Promise((resolve) => setImmediate(resolve));
+  const shown = (key) => !document.querySelector(`[data-when="${key}"]`).hidden;
+  assert.deepEqual([shown('game_id'), shown('label')], [true, false]);
+  const form = document.querySelector('.modal-content form');
+  const repeat = form.querySelector('[data-period-repeat]');
+  repeat.checked = true;
+  repeat.dispatchEvent(new window.Event('change', { bubbles: true }));
+  assert.deepEqual([shown('game_id'), shown('label')], [false, true]);
+  assert.equal(form.querySelector('[data-period-month]').closest('label').hidden, true); // each launch picks its own month
+  assert.equal(form.querySelector('[data-period-now]').closest('label').hidden, false);
+  form.requestSubmit();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.match(document.querySelector('.adm-error').textContent, /Falta: Nombre/); // the hidden game is not asked for
+  document.getElementById('f_label').value = 'Cada mes';
+  form.querySelector('[data-period-now]').checked = true;
+  form.requestSubmit();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(sent.at(-1), { path: '/manage/challenge-schedules', body: { label: 'Cada mes', start_now: true, kind: 'game' } });
+});

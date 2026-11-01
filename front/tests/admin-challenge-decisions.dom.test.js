@@ -63,20 +63,20 @@ test('the panel lists the proposals in their own tab, the schedules under the ch
   assert.deepEqual(actions.map((a) => a.show({ status: 'approved' })), [false, false]);
 });
 
-test('a schedule is created as a themed one or as a game of the month that rotates, and a rotation needs its games', () => {
-  const [themed, rotation] = ENTITIES.challenges.creates.filter((c) => c.endpoint === '/manage/challenge-schedules');
-  assert.deepEqual([themed.body, rotation.body], [{ kind: 'themed' }, { kind: 'game' }]);
-  const games = rotation.fields.find((f) => f.key === 'games');
-  assert.deepEqual([games.type, games.required], ['games', true]);
-  assert.ok(rotation.fields.some((f) => f.key === 'start_now'));
+test('a game or a themed challenge can repeat every month, and a rotation needs its games', () => {
+  const [game, , themed] = ENTITIES.challenges.creates;
+  assert.deepEqual([game.repeat, themed.repeat], ['/manage/challenge-schedules', '/manage/challenge-schedules']);
+  const games = game.fields.find((f) => f.key === 'games');
+  assert.deepEqual([games.type, games.required, games.when], ['games', true, { key: 'period', is: 'repeat' }]);
+  assert.deepEqual(game.fields.find((f) => f.key === 'game_id').when, { key: 'period', not: 'repeat' });
+  assert.ok(game.fields.find((f) => f.type === 'period').repeatable);
   assert.deepEqual(ENTITIES.schedules.fields.map((f) => f.key), ['label', 'active', 'announce', 'participation', 'games']);
 });
 
-test('the challenges have one button and the type is chosen in the form, with the schedules as two more types', () => {
+test('the challenges have one button and the type is chosen in the form', () => {
   const { createLabel, creates } = ENTITIES.challenges;
   assert.equal(createLabel, 'Lanzar reto');
   assert.ok(creates.every((c) => c.choose && c.body.kind));
-  assert.deepEqual(creates.map((c) => c.choose), ['Reto de juego', 'Horas entre todos', 'Reto temático', 'Cada mes: temático', 'Cada mes: juego rotativo']);
-  assert.deepEqual(creates.map((c) => c.endpoint), [undefined, undefined, undefined, '/manage/challenge-schedules', '/manage/challenge-schedules']);
+  assert.deepEqual(creates.map((c) => c.choose), ['Reto de juego', 'Horas entre todos', 'Reto temático']);
   assert.equal(ENTITIES.schedules.creates, undefined);
 });
