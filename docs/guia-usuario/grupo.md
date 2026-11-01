@@ -26,6 +26,10 @@ Al pulsar uno ves **su página**: sus cifras por temporada, sus juegos más juga
 
 ![La página de otro jugador](../assets/screens/player.webp){ .screenshot }
 
+## Servidor
+
+**Menú → Servidor** enseña cómo va la máquina en la que corre la app: si está en marcha, su CPU, el tráfico de red y el uso de disco en las últimas horas o días (los botones **1 hora / 24 horas / 7 días / 30 días** cambian el periodo) y cuánto del tráfico mensual incluido en el plan se ha gastado. Sirve para ver de un vistazo si algo va lento porque el servidor está saturado. Si el administrador no lo ha configurado, la página lo dice. Si el administrador ha montado la monitorización, también salen la **memoria**, el **espacio en disco** y la **carga** de la máquina, con cuánto lleva encendida. Los botones de periodo solo cambian las gráficas. Debajo, **Mes en curso** enseña el tráfico del mes y una **estimación del gasto**: lo que va del mes, del año y **desde que se creó el servidor**, con lo previsto a fin de mes y a fin de año. No es la factura, solo una cuenta aproximada con el precio de hoy.
+
 ## Juegos
 
 **Menú → Juegos** es el catálogo compartido, en tarjetas con la portada, los géneros, si lo tienes en tu biblioteca, si alguien lo está jugando, cuántos jugadores lo tienen, las horas del grupo y la nota media.

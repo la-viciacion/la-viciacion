@@ -1,0 +1,9 @@
+# Prometheus for the monitoring profile of docker-compose.yml: it only collects the machine's figures from node-exporter,
+# which lives in the same Docker network.
+global:
+  scrape_interval: 30s
+
+scrape_configs:
+  - job_name: node
+    static_configs:
+      - targets: ["laviciacion-node-exporter:9100"]

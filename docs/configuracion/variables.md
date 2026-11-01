@@ -41,6 +41,9 @@ Detalle en [Telegram](telegram.md).
 | `AI_PROVIDER` | `google` o `openai`. |
 | `AI_API_KEY` | La clave del proveedor de IA. |
 | `AI_MODEL` | Un modelo de ese proveedor. El código no trae ninguno por defecto. |
+| `HETZNER_API_TOKEN` | Opcional. Un token de **solo lectura** de Hetzner Cloud, para la página **Servidor**. Sin él, la página dice que no está configurada. |
+| `PROMETHEUS_URL` | Opcional. La dirección de Prometheus, para que la página **Servidor** añada memoria, espacio en disco, carga y tiempo encendido. Con `COMPOSE_PROFILES=monitoring` la API ya la recibe sola (`http://laviciacion-prometheus:9090`), así que solo hace falta para un Prometheus que esté en otro sitio. Sin Prometheus, la página enseña solo lo que da Hetzner. |
+| `HETZNER_SERVER_ID` | Opcional. El número del servidor en Hetzner; vacío = el único servidor del proyecto. |
 | `OPENAI_ADMIN_KEY` | Opcional. Una clave de **administración** de OpenAI, solo para leer cuánto se ha gastado (**Sistema → Uso de IA**). No escribe avisos. |
 
 Sin las **tres** variables de la IA, esta no escribe nada y los avisos salen como texto normal. Ver [Servicios externos](servicios.md).
