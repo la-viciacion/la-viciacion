@@ -45,12 +45,8 @@ def month_cost(item: dict, month_start: datetime.datetime, until: datetime.datet
     return amount * share / (12 if item["period"] == "year" else 1)
 
 
-def summary(items: list[dict], now: datetime.datetime, extra: float = 0.0) -> dict | None:
-    """The cost of the running month, of the running year and of the whole life, so far and (month and year) by the end,
-    assuming the rates that have no end go on. `extra` is what the running month costs beyond the rates (the traffic
-    over the plan). None while there is no rate at all."""
-    if not items:
-        return None
+def _figures(items: list[dict], now: datetime.datetime, extra: float) -> dict:
+    """Unrounded: the running month and year so far and by their end, and the whole life so far."""
     this_month = _month_start(now)
 
     def in_month(start: datetime.datetime, until: datetime.datetime) -> float:
@@ -59,9 +55,8 @@ def summary(items: list[dict], now: datetime.datetime, extra: float = 0.0) -> di
     so_far = in_month(this_month, now) + extra
     month_end = in_month(this_month, _next_month(this_month)) + extra
 
-    first = min(item["starts_on"] for item in items)
     closed_total = closed_year = 0.0
-    start = _month_start(_midnight(first))
+    start = _month_start(_midnight(min(item["starts_on"] for item in items)))
     while start < this_month:
         amount = in_month(start, _next_month(start))
         closed_total += amount
@@ -76,8 +71,28 @@ def summary(items: list[dict], now: datetime.datetime, extra: float = 0.0) -> di
         start = _next_month(start)
 
     return {
-        "currency": "EUR",
-        "month": {"so_far": round(so_far, PRECISION), "projected": round(month_end, PRECISION)},
-        "year": {"so_far": round(closed_year + so_far, PRECISION), "projected": round(closed_year + month_end + ahead, PRECISION)},
-        "total": {"so_far": round(closed_total + so_far, PRECISION), "since": first.isoformat()},
+        "month": {"so_far": so_far, "projected": month_end},
+        "year": {"so_far": closed_year + so_far, "projected": closed_year + month_end + ahead},
+        "total": {"so_far": closed_total + so_far},
     }
+
+
+def _rounded(figures: dict) -> dict:
+    return {period: {key: round(value, PRECISION) for key, value in values.items()} for period, values in figures.items()}
+
+
+def summary(items: list[dict], now: datetime.datetime, extra: float = 0.0) -> dict | None:
+    """The cost of the running month, of the running year and of the whole life, so far and (month and year) by the end,
+    assuming the rates that have no end go on; and the same split by kind (`kinds`, the server first, only the kinds that
+    have a rate). `extra` is what the running month costs beyond the rates (the traffic over the plan): it is the
+    server's. None while there is no rate at all."""
+    if not items:
+        return None
+    overall = _rounded(_figures(items, now, extra))
+    overall["total"]["since"] = min(item["starts_on"] for item in items).isoformat()
+    kinds = []
+    for kind in KINDS:
+        mine = [item for item in items if item["kind"] == kind]
+        if mine:
+            kinds.append({"kind": kind, **_rounded(_figures(mine, now, extra if kind == "server" else 0.0))})
+    return {"currency": "EUR", **overall, "kinds": kinds}

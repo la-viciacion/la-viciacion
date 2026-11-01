@@ -1,10 +1,10 @@
-// Server page (#/server): how the machine the app runs on is doing (state, CPU, network, disk and the month's traffic)
-// for everybody, plus the month's estimated cost for admins. GET /server/status (Hetzner, nothing stored here).
+// Server page (#/server): how the machine the app runs on is doing, the month's traffic and what keeping the app running
+// costs, by kind (server, domain...), for everybody. GET /server/status (Hetzner and Prometheus, the cost derived from the
+// recorded rates: nothing is stored by this page).
 import { api } from '../../lib/api.js';
 import { formatRelative } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
-import { euros } from '../../lib/money.js';
-import { WINDOWS, bytes, load, monthYear, last, linePoints, peak, percent, rate, sharedMax, statusInfo, trafficShare, uptime } from '../../lib/server.js';
+import { WINDOWS, bytes, load, money, monthYear, last, linePoints, peak, percent, rate, sharedMax, statusInfo, trafficShare, uptime } from '../../lib/server.js';
 
 export const active = null; // it belongs to no item of the top bar
 
@@ -46,8 +46,6 @@ const traffic = (t) => html`
     <div class="pf-sub">Salida ${bytes(t.out)} de ${bytes(t.included)} incluidos · entrada ${bytes(t.in)}</div>
   </section>`;
 
-const cents = (amount) => Math.round(amount * 100);
-
 // Memory and disk space as the percentage used over the period; the numbers are the ones of right now.
 const usage = (title, label, part, range) => chart(title, label, [['cpu', part.series]], 100, range.from, range.to,
   [['cpu', 'Usado', percent(last(part.series))], ['muted', 'En uso', `${bytes(part.used)} de ${bytes(part.total)}`]]);
@@ -67,19 +65,28 @@ const hostCards = (host, range) => {
     ${machine(host)}`;
 };
 
-const row = (label, cost, forecast) => html`
-  <tr><th scope="row">${label}</th><td>${euros(cents(cost))}</td><td>${forecast == null ? '—' : euros(cents(forecast))}</td></tr>`;
+const COST_KINDS = { server: 'Servidor', domain: 'Dominio', other: 'Otros gastos' };
 
-const cost = (c) => html`
-  <section class="pf-card sv-card" aria-label="Gasto estimado">
-    <h2 class="sv-title">Gasto estimado</h2>
+const tile = (label, cost, sub) => html`
+  <div class="pf-card sv-tile"><div class="sv-tile-label">${label}</div><div class="sv-tile-value">${money(cost)}</div><div class="pf-sub">${sub}</div></div>`;
+
+const kindRow = (label, kind) => html`
+  <tr><th scope="row">${label}</th><td>${money(kind.month.so_far)}</td><td>${money(kind.year.so_far)}</td><td>${money(kind.total.so_far)}</td></tr>`;
+
+// What keeping the app running costs: the three figures that matter, and where the money goes
+const costs = (c) => html`
+  <div class="sv-section"><h2 class="sv-section-title">Costes</h2></div>
+  <div class="sv-tiles" aria-label="Costes">
+    ${tile('Este mes', c.month.so_far, `previsto ${money(c.month.projected)}`)}
+    ${tile('Este año', c.year.so_far, `previsto ${money(c.year.projected)}`)}
+    ${tile('Desde el inicio', c.total.so_far, `desde ${monthYear(c.total.since)}`)}
+  </div>
+  <section class="pf-card sv-card" aria-label="Desglose de costes">
+    <h2 class="sv-title">Desglose</h2>
     <table class="sv-table">
-      <thead><tr><th scope="col">Periodo</th><th scope="col">Hasta hoy</th><th scope="col">Previsto al final</th></tr></thead>
-      <tbody>
-        ${row('Este mes', c.month.so_far, c.month.projected)}
-        ${row('Este año', c.year.so_far, c.year.projected)}
-        ${row(`Desde el inicio (${monthYear(c.total.since)})`, c.total.so_far)}
-      </tbody>
+      <thead><tr><th scope="col">Concepto</th><th scope="col">Este mes</th><th scope="col">Este año</th><th scope="col">Desde el inicio</th></tr></thead>
+      <tbody>${c.kinds.map((kind) => kindRow(COST_KINDS[kind.kind] ?? kind.kind, kind))}</tbody>
+      ${c.kinds.length > 1 ? html`<tfoot>${kindRow('Total', c)}</tfoot>` : ''}
     </table>
     <div class="pf-sub">Es una estimación.</div>
   </section>`;
@@ -106,11 +113,9 @@ function panel(data, range) {
       ${chart('Disco', 'Lectura y escritura de disco', [['in', m.disk_read], ['out', m.disk_write]], disk, from, to,
         [['in', 'Lectura', rate(last(m.disk_read))], ['out', 'Escritura', rate(last(m.disk_write))]])}
     </div>
-    <div class="sv-section"><h2 class="sv-section-title">Mes en curso</h2></div>
-    <div class="sv-grid-cards">
-      ${traffic(server.traffic)}
-      ${data.cost ? cost(data.cost) : ''}
-    </div>
+    <div class="sv-section"><h2 class="sv-section-title">Tráfico del mes</h2></div>
+    ${traffic(server.traffic)}
+    ${data.cost ? costs(data.cost) : ''}
     <div class="pf-sub sv-foot">Actualizado ${formatRelative(data.fetched_at)}.</div>`;
 }
 

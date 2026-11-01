@@ -10,6 +10,10 @@ const server = await import('../js/pages/server/index.js');
 const line = (base) => [[1000, base], [1300, base * 2], [1600, base]];
 const COST = {
   currency: 'EUR', month: { so_far: 2.3, projected: 5.88 }, year: { so_far: 40.5, projected: 44.1 }, total: { so_far: 120.25, since: '2023-12-05' },
+  kinds: [
+    { kind: 'server', month: { so_far: 2, projected: 5.4 }, year: { so_far: 38, projected: 41 }, total: { so_far: 108 } },
+    { kind: 'domain', month: { so_far: 0.3, projected: 0.48 }, year: { so_far: 2.5, projected: 3.1 }, total: { so_far: 12.25 } },
+  ],
 };
 const STATUS = {
   configured: true, window: '24h', step: 300, fetched_at: '2026-10-11T10:00:00+00:00',
@@ -36,36 +40,64 @@ test('everybody sees the state, the charts, the traffic and the cost, escaped', 
   assert.equal(document.querySelectorAll('.sv-name b').length, 0);
   assert.equal(text('.sv-status')[0], 'En marcha');
   assert.match(text('.sv-head .pf-sub')[0], /cx22 · 2 vCPU · 4 GB RAM · 40 GB de disco · Falkenstein, DE/);
-  assert.equal(document.querySelectorAll('.sv-title').length, 5);
+  assert.equal(document.querySelectorAll('.sv-title').length, 5); // CPU, network, disk, traffic and the breakdown
   assert.equal(document.querySelectorAll('.sv-line').length, 5);
   assert.equal(document.querySelector('.sv-line.cpu').getAttribute('points').split(' ').length, 3);
   assert.equal(document.querySelectorAll('.sv-line[points=""]').length, 1); // no read of the disk: nothing to draw
   assert.match(main().textContent, /Salida 5 TB de 20 TB incluidos/);
   assert.equal(document.querySelector('.sv-meter').getAttribute('aria-valuenow'), '25');
-  assert.match(document.querySelector('[aria-label="Gasto estimado"]').textContent, /2,30\s€/);
+  assert.match(document.querySelector('[aria-label="Costes"]').textContent, /2,30\s€/);
 });
 
-test('the cost shows the month, the year and the total since the start, with what is forecast', async () => {
+test('the costs have a section of their own: the month, the year and the whole life with what is forecast', async () => {
   installApi({ 'GET /server/status?range=24h': STATUS });
   await server.render({ main: main() });
   await settle();
-  const card = document.querySelector('[aria-label="Gasto estimado"]');
-  const rows = text('tbody tr', card).map((t) => t.replace(/\s/g, ' '));
-  assert.deepEqual(rows, ['Este mes2,30 €5,88 €', 'Este año40,50 €44,10 €', 'Desde el inicio (diciembre de 2023)120,25 €—']);
-  assert.match(card.textContent, /Es una estimación\./);
-  assert.equal(document.querySelector('.sv-months'), null);
+  const tiles = [...document.querySelectorAll('.sv-tile')].map((t) => t.textContent.replace(/\s+/g, ' ').trim());
+  assert.deepEqual(tiles, ['Este mes2,30 €previsto 5,88 €', 'Este año40,50 €previsto 44,10 €', 'Desde el inicio120,25 €desde diciembre de 2023']);
+  assert.match(document.querySelector('[aria-label="Desglose de costes"]').textContent, /Es una estimación\./);
 });
 
-test('the period buttons sit with the charts and the month\'s traffic and cost come apart from them', async () => {
+test('the breakdown gives each kind its month, year and total, and a total row when there are several', async () => {
   installApi({ 'GET /server/status?range=24h': STATUS });
   await server.render({ main: main() });
   await settle();
-  assert.deepEqual(text('.sv-section-title'), ['Rendimiento', 'Mes en curso']);
-  const [charts, month] = document.querySelectorAll('.sv-grid-cards');
+  const card = document.querySelector('[aria-label="Desglose de costes"]');
+  const clean = (t) => t.replace(/\s/g, ' ');
+  assert.deepEqual(text('thead th', card), ['Concepto', 'Este mes', 'Este año', 'Desde el inicio']);
+  assert.deepEqual(text('tbody tr', card).map(clean), ['Servidor2,00 €38,00 €108,00 €', 'Dominio0,30 €2,50 €12,25 €']);
+  assert.deepEqual(text('tfoot tr', card).map(clean), ['Total2,30 €40,50 €120,25 €']);
+});
+
+test('with a single kind there is no total row, and a kind the page does not know keeps its name', async () => {
+  const kinds = [{ kind: 'server', month: { so_far: 2, projected: 5 }, year: { so_far: 38, projected: 41 }, total: { so_far: 108 } }];
+  installApi({ 'GET /server/status?range=24h': { ...STATUS, cost: { ...COST, kinds } } });
+  await server.render({ main: main() });
+  await settle();
+  assert.equal(document.querySelector('tfoot'), null);
+  installApi({ 'GET /server/status?range=24h': { ...STATUS, cost: { ...COST, kinds: [{ ...kinds[0], kind: 'energia' }] } } });
+  await server.render({ main: main() });
+  await settle();
+  assert.deepEqual(text('tbody th'), ['energia']);
+});
+
+test('without any rate yet the page has no costs section', async () => {
+  installApi({ 'GET /server/status?range=24h': { ...STATUS, cost: null } });
+  await server.render({ main: main() });
+  await settle();
+  assert.deepEqual(text('.sv-section-title'), ['Rendimiento', 'Tráfico del mes']);
+});
+
+test('the period buttons sit with the charts only: the traffic and the costs are sections of their own', async () => {
+  installApi({ 'GET /server/status?range=24h': STATUS });
+  await server.render({ main: main() });
+  await settle();
+  assert.deepEqual(text('.sv-section-title'), ['Rendimiento', 'Tráfico del mes', 'Costes']);
+  const [charts] = document.querySelectorAll('.sv-grid-cards');
   assert.deepEqual(text('.sv-title', charts), ['CPU', 'Red', 'Disco']);
-  assert.deepEqual(text('.sv-title', month), ['Tráfico de este mes', 'Gasto estimado']);
   assert.ok(document.querySelector('.sv-section [data-window]'));
-  assert.equal(month.querySelector('[data-window]'), null);
+  assert.equal(document.querySelector('[aria-label="Costes"] [data-window]'), null);
+  assert.ok(document.querySelector('[aria-label="Tráfico del mes"]'));
 });
 
 test('another period asks the API again and marks its button', async () => {

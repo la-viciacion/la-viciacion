@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { bytes, last, load, monthName, monthYear, uptime, linePoints, peak, percent, rate, sharedMax, statusInfo, trafficShare } from '../js/lib/server.js';
+import { bytes, last, load, money, monthName, monthYear, uptime, linePoints, peak, percent, rate, sharedMax, statusInfo, trafficShare } from '../js/lib/server.js';
 
 test('bytes use decimal units and keep decimals only where they matter', () => {
   assert.equal(bytes(0), '0 B');
@@ -69,4 +69,10 @@ test('the time on is days and hours, hours, or minutes', () => {
 test('a load has two decimals', () => {
   assert.equal(load(0.5), '0,50');
   assert.equal(load(12), '12,00');
+});
+
+test('an amount always shows its cents', () => {
+  assert.equal(money(2).replace(/\s/g, ' '), '2,00 €');
+  assert.equal(money(120.25).replace(/\s/g, ' '), '120,25 €');
+  assert.equal(money(1234.5).replace(/\s/g, ' '), '1234,50 €');
 });

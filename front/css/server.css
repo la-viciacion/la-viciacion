@@ -36,4 +36,9 @@
 .sv-table thead th { font-size: 0.75rem; font-weight: 700; color: var(--text-muted); }
 .sv-table tbody tr:last-child th, .sv-table tbody tr:last-child td { border-bottom: 0; }
 .sv-table td { font-weight: 700; }
+.sv-table tfoot th, .sv-table tfoot td { border-top: 1px solid var(--border-accent); border-bottom: 0; color: var(--accent-teal); }
+.sv-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 12px; }
+.sv-tile { gap: 2px; }
+.sv-tile-label { font-size: 0.8rem; font-weight: 700; color: var(--text-secondary); }
+.sv-tile-value { font-size: 1.5rem; font-weight: 700; }
 .sv-foot { margin-top: 12px; }

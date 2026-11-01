@@ -298,7 +298,7 @@ class StatusCacheTests(unittest.TestCase):
 
 
 ITEMS = [{
-    "amount_cents": 490, "hourly_micros": 8000, "period": "month", "starts_on": datetime.date(2026, 1, 1), "ends_on": None,
+    "kind": "server", "amount_cents": 490, "hourly_micros": 8000, "period": "month", "starts_on": datetime.date(2026, 1, 1), "ends_on": None,
 }]
 
 

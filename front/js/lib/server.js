@@ -48,6 +48,9 @@ export function uptime(seconds) {
 /** A load average with two decimals: 0.5 -> "0,50". */
 export const load = (value) => value.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+/** An amount in euros always with its cents, so the figures of a table line up: 2 -> "2,00 €". */
+export const money = (amount) => amount.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
+
 export const rate = (value) => `${bytes(value)}/s`;
 
 export const percent = (value) => `${(value || 0).toLocaleString('es-ES', { maximumFractionDigits: 1 })} %`;
