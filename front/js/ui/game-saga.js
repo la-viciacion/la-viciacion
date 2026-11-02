@@ -19,7 +19,7 @@ function row(g) {
       ? html`<a class="game-link" href="${g.url}" target="_blank" rel="noopener noreferrer">${g.name}</a>`
       : g.name;
   return html`
-    <li class="sg-game ${g.current ? 'current' : ''}" data-rawg="${g.rawg_id}">
+    <li class="sg-game ${g.current ? 'current' : ''}" data-source-id="${g.igdb_id || g.rawg_id}">
       <span class="sg-year pf-sub">${releaseYear(g.released) || '—'}</span>
       <div class="sg-main">
         <div>${name}

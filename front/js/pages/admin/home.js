@@ -26,12 +26,12 @@ function attentionItems(att) {
       tab: 'users',
     });
   }
-  if (att.games_without_rawg) {
+  if (att.games_without_source) {
     items.push({
-      text: `${plural(att.games_without_rawg, 'juego no tiene', 'juegos no tienen')} ID de IGDB ni de RAWG (enlázalos para completar portada y metadatos)`,
+      text: `${plural(att.games_without_source, 'juego no tiene', 'juegos no tienen')} ID de IGDB ni de RAWG (enlázalos para completar portada y metadatos)`,
       go: 'Ver juegos',
       tab: 'games',
-      filters: { rawg: 'unlinked' },
+      filters: { data: 'unlinked' },
     });
   }
   if (att.pending_challenge_proposals) {

@@ -126,7 +126,7 @@ class NewGame(BaseModel):
     parent_igdb_id: Optional[int | None] = None
 
 
-class RawgGameCandidate(BaseModel):
+class GameCandidate(BaseModel):
     """A game of the picker's search. It is RAWG's, or IGDB's when RAWG could not answer (no `rawg_id`, `source` says it)."""
     rawg_id: Optional[int | None] = None
     igdb_id: Optional[int | None] = None
@@ -144,7 +144,7 @@ class RawgGameCandidate(BaseModel):
     db_game_id: Optional[str | None] = None
 
 
-class RawgParent(BaseModel):
+class GameParent(BaseModel):
     """The base game of a RAWG or IGDB DLC / expansion, and whether it is already in the catalogue."""
     rawg_id: Optional[int | None] = None
     igdb_id: Optional[int | None] = None

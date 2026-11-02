@@ -95,7 +95,7 @@ export function openAddGame(onPick) {
     </div>`);
   const input = modal.el.querySelector('#addGameSearch');
   modal.el.querySelector('#manualGameBtn').addEventListener('click', () => openManualGame(onPick, input.value.trim()));
-  bindSearch(modal, 'addGameSearch', (query, isLatest, signal) => searchRawg(modal, query, onPick, isLatest, signal), 300);
+  bindSearch(modal, 'addGameSearch', (query, isLatest, signal) => searchGames(modal, query, onPick, isLatest, signal), 300);
 }
 
 // ── Step 1c: create a game neither source has ───────────────
@@ -187,12 +187,12 @@ function bindBaseGame(modal, form) {
   return { chosen: () => chosen };
 }
 
-async function searchRawg(modal, query, onPick, isLatest = () => true, signal) {
+async function searchGames(modal, query, onPick, isLatest = () => true, signal) {
   const results = modal.el.querySelector('#addGameResults');
   if (query.length < 2) return mount(results, hint('Escribe al menos 2 caracteres'));
   mount(results, hint('Buscando...'));
   try {
-    const candidates = await api(`/games/search-rawg?query=${encodeURIComponent(query)}`, { signal });
+    const candidates = await api(`/games/search?query=${encodeURIComponent(query)}`, { signal });
     if (!results.isConnected || !isLatest()) return;
     if (!candidates?.length) return mount(results, hint('Sin resultados'));
     const showList = () => {
@@ -206,7 +206,7 @@ async function searchRawg(modal, query, onPick, isLatest = () => true, signal) {
         </button>`)}`);
       results.onclick = (e) => {
         const row = e.target.closest('.modal-result-row');
-        if (row) pickRawgCandidate(results, candidates[Number(row.dataset.index)], onPick, showList);
+        if (row) pickCandidate(results, candidates[Number(row.dataset.index)], onPick, showList);
       };
     };
     showList();
@@ -216,7 +216,7 @@ async function searchRawg(modal, query, onPick, isLatest = () => true, signal) {
 }
 
 // A game that is already in the catalogue is used at once; a fresh one from RAWG is only created after a confirmation.
-async function pickRawgCandidate(results, candidate, onPick, back) {
+async function pickCandidate(results, candidate, onPick, back) {
   if (candidate.exists_in_db && candidate.db_game_id) {
     closeAllModals();
     return onPick(candidate.db_game_id, candidate.name);
@@ -236,7 +236,7 @@ async function pickRawgCandidate(results, candidate, onPick, back) {
     </div>`);
   results.onclick = (e) => {
     if (e.target.closest('[data-back]')) back();
-    else if (e.target.closest('[data-confirm]')) addRawgGame(results, candidate, onPick);
+    else if (e.target.closest('[data-confirm]')) addCandidateGame(results, candidate, onPick);
   };
   showDlcNote(results, candidate);
 }
@@ -258,7 +258,7 @@ async function showDlcNote(results, candidate) {
   }
 }
 
-async function addRawgGame(results, candidate, onPick) {
+async function addCandidateGame(results, candidate, onPick) {
   try {
     mount(results, hint('Añadiendo juego...'));
     const game = await api('/games/', jsonRequest('POST', {

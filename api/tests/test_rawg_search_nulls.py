@@ -28,7 +28,7 @@ class RawgSearchNullsTests(unittest.IsolatedAsyncioTestCase):
         with mock.patch.object(my_utils.config.__class__, "RAWG_API_KEY", "k"), \
                 mock.patch.object(my_utils.igdb, "configured", return_value=False), \
                 mock.patch.object(my_utils, "_http_get", return_value=_Resp()):
-            found = await my_utils.search_rawg_games("call of duty: modern")
+            found = await my_utils.search_games("call of duty: modern")
         self.assertEqual([c.rawg_id for c in found], [1, 2, 3])
         self.assertEqual(found[0].platforms, ["PC"])
         self.assertEqual(found[1].genres, [])
@@ -36,14 +36,17 @@ class RawgSearchNullsTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_a_rawg_error_answer_is_an_outage_not_an_empty_search(self):
         bad = mock.Mock(ok=False, status_code=502, content=b"bad gateway")
-        with mock.patch.object(my_utils.config.__class__, "RAWG_API_KEY", "k"),                 mock.patch.object(my_utils.igdb, "configured", return_value=False),                 mock.patch.object(my_utils, "_http_get", return_value=bad):
-            with self.assertRaises(my_utils.RawgUnavailable):
-                await my_utils.search_rawg_games("doom")
+        with mock.patch.object(my_utils.config.__class__, "RAWG_API_KEY", "k"), \
+                mock.patch.object(my_utils.igdb, "configured", return_value=False), \
+                mock.patch.object(my_utils, "_http_get", return_value=bad):
+            with self.assertRaises(my_utils.SearchUnavailable):
+                await my_utils.search_games("doom")
 
     async def test_no_key_is_reported_too(self):
-        with mock.patch.object(my_utils.config.__class__, "RAWG_API_KEY", ""),                 mock.patch.object(my_utils.igdb, "configured", return_value=False):
-            with self.assertRaises(my_utils.RawgUnavailable):
-                await my_utils.search_rawg_games("doom")
+        with mock.patch.object(my_utils.config.__class__, "RAWG_API_KEY", ""), \
+                mock.patch.object(my_utils.igdb, "configured", return_value=False):
+            with self.assertRaises(my_utils.SearchUnavailable):
+                await my_utils.search_games("doom")
 
 
 if __name__ == "__main__":

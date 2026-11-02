@@ -136,7 +136,7 @@ async def _http_get(url: str, params: dict, timeout: int):
     return await asyncio.to_thread(requests.get, url, params=params, timeout=timeout)
 
 
-class RawgUnavailable(Exception):
+class SearchUnavailable(Exception):
     """RAWG could not answer a search (no key, unreachable or an error): "no results" would be a lie."""
 
 
@@ -159,9 +159,9 @@ def reset_search_state() -> None:
     _search_cache.clear()
 
 
-async def search_rawg_games(query: str, db: Session = None) -> list[schemas.RawgGameCandidate]:
+async def search_games(query: str, db: Session = None) -> list[schemas.GameCandidate]:
     """Search games and return candidates, checking if they exist in the DB. IGDB is asked first when it is configured
-    (its candidates have no `rawg_id`); RAWG takes over when IGDB cannot answer or finds nothing. Raises `RawgUnavailable`
+    (its candidates have no `rawg_id`); RAWG takes over when IGDB cannot answer or finds nothing. Raises `SearchUnavailable`
     when no source can answer, so an outage is not mistaken for an empty search. The sources' answers are kept for a few minutes
     per text; whether a candidate is already in the catalogue is looked up every time."""
     found = await _search_cache.get(" ".join(query.casefold().split()), lambda: _search_sources(query))
@@ -171,39 +171,39 @@ async def search_rawg_games(query: str, db: Session = None) -> list[schemas.Rawg
     return candidates
 
 
-async def _search_sources(query: str) -> list[schemas.RawgGameCandidate]:
+async def _search_sources(query: str) -> list[schemas.GameCandidate]:
     global _igdb_paused_until
     if not igdb.configured():
         return await _search_rawg(query)
     if time.monotonic() >= _igdb_paused_until:
         try:
             found = await _search_igdb(query)
-        except RawgUnavailable:
+        except SearchUnavailable:
             _igdb_paused_until = time.monotonic() + IGDB_PAUSE_SECONDS
         else:
             if found:
                 return found
             try:  # IGDB answered and has nothing: RAWG may know a game IGDB does not
                 return await _search_rawg(query)
-            except RawgUnavailable:
+            except SearchUnavailable:
                 return found
     return await _search_rawg(query)
 
 
-async def _search_igdb(query: str) -> list[schemas.RawgGameCandidate]:
+async def _search_igdb(query: str) -> list[schemas.GameCandidate]:
     try:
         found = await asyncio.to_thread(igdb.search_games, query)
     except Exception as e:
         logger.error(f"Error searching IGDB for '{query}': {e}")
-        raise RawgUnavailable("IGDB did not answer") from None
-    return [schemas.RawgGameCandidate(**item) for item in found]
+        raise SearchUnavailable("IGDB did not answer") from None
+    return [schemas.GameCandidate(**item) for item in found]
 
 
-async def _search_rawg(query: str) -> list[schemas.RawgGameCandidate]:
+async def _search_rawg(query: str) -> list[schemas.GameCandidate]:
     api_key = config.RAWG_API_KEY
     if not api_key:
         logger.warning("No RAWG API key configured")
-        raise RawgUnavailable("No RAWG API key configured")
+        raise SearchUnavailable("No RAWG API key configured")
 
     url = "https://api.rawg.io/api/games"
     params = {"key": api_key, "search": query, "page": 1, "page_size": 10}
@@ -211,14 +211,14 @@ async def _search_rawg(query: str) -> list[schemas.RawgGameCandidate]:
         resp = await _http_get(url, params, timeout=RAWG_SEARCH_TIMEOUT)
         if not resp.ok:
             logger.error(f"RAWG search error {resp.status_code}: {redact_rawg_key(resp.content)}")
-            raise RawgUnavailable(f"RAWG answered {resp.status_code}")
+            raise SearchUnavailable(f"RAWG answered {resp.status_code}")
         data = resp.json()
         results = data.get("results", [])
-    except RawgUnavailable:
+    except SearchUnavailable:
         raise
     except Exception as e:
         logger.error(f"Error searching RAWG for '{query}': {redact_rawg_key(e)}")
-        raise RawgUnavailable("RAWG did not answer") from None
+        raise SearchUnavailable("RAWG did not answer") from None
 
     candidates = []
     for item in results:
@@ -227,7 +227,7 @@ async def _search_rawg(query: str) -> list[schemas.RawgGameCandidate]:
         if not item.get("id"):
             continue
         candidates.append(
-            schemas.RawgGameCandidate(
+            schemas.GameCandidate(
                 rawg_id=item["id"],
                 name=item.get("name") or "",
                 slug=item.get("slug") or "",
@@ -246,7 +246,7 @@ async def _search_rawg(query: str) -> list[schemas.RawgGameCandidate]:
     return candidates
 
 
-def mark_existing_games(db: Session, candidates: list[schemas.RawgGameCandidate]) -> None:
+def mark_existing_games(db: Session, candidates: list[schemas.GameCandidate]) -> None:
     """Flag the candidates that are already in the games table (same RAWG id, IGDB id, slug or name): one query."""
     rawg_ids = {c.rawg_id for c in candidates if c.rawg_id}
     igdb_ids = {c.igdb_id for c in candidates if c.igdb_id}
@@ -306,21 +306,21 @@ async def rawg_parent(rawg_id: int, params: dict | None = None) -> tuple[int, st
     return None
 
 
-async def rawg_parent_candidate(rawg_id: int, db: Session) -> schemas.RawgParent | None:
+async def rawg_parent_candidate(rawg_id: int, db: Session) -> schemas.GameParent | None:
     """The base game of a RAWG game for the "add game" notice, flagged when it is already in the catalogue."""
     if not config.RAWG_API_KEY:
         return None
     found = await rawg_parent(rawg_id)
     if found is None:
         return None
-    parent = schemas.RawgParent(rawg_id=found[0], name=found[1])
+    parent = schemas.GameParent(rawg_id=found[0], name=found[1])
     existing = await run_in_threadpool(lambda: db.query(models.Game.id).filter(models.Game.rawg_id == parent.rawg_id).first())
     if existing:
         parent.exists_in_db, parent.db_game_id = True, existing.id
     return parent
 
 
-async def igdb_parent_candidate(igdb_id: int, db: Session) -> schemas.RawgParent | None:
+async def igdb_parent_candidate(igdb_id: int, db: Session) -> schemas.GameParent | None:
     """The base game of an IGDB game for the "add game" notice, flagged when it is already in the catalogue."""
     if not igdb.configured():
         return None
@@ -331,7 +331,7 @@ async def igdb_parent_candidate(igdb_id: int, db: Session) -> schemas.RawgParent
         return None
     if found is None:
         return None
-    parent = schemas.RawgParent(igdb_id=found[0], name=found[1])
+    parent = schemas.GameParent(igdb_id=found[0], name=found[1])
     existing = await run_in_threadpool(lambda: db.query(models.Game.id).filter(models.Game.igdb_id == parent.igdb_id).first())
     if existing:
         parent.exists_in_db, parent.db_game_id = True, existing.id

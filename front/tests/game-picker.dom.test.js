@@ -108,7 +108,7 @@ test('closing the picker cancels the search that was waiting', async () => {
 test('a RAWG game already in the catalogue is used at once', async () => {
   openGamePicker((id, name) => (picked = [id, name]));
   document.querySelector('#modalAddGameBtn').click();
-  installApi({ 'GET /games/search-rawg?query=hades': [{ name: 'Hades', rawg_id: 1, released: '2020-09-17', exists_in_db: true, db_game_id: 'hades' }] });
+  installApi({ 'GET /games/search?query=hades': [{ name: 'Hades', rawg_id: 1, released: '2020-09-17', exists_in_db: true, db_game_id: 'hades' }] });
   await search('#addGameSearch', 'hades', 300);
   assert.match(text('#addGameResults .modal-result-name')[0], /Hades \(2020\)\s*Ya en tu catálogo/);
   document.querySelector('.modal-result-row').click();
@@ -120,7 +120,7 @@ test('a new RAWG game is only created after a confirmation, and "Volver" cancels
   document.querySelector('#modalAddGameBtn').click();
   const candidate = { name: 'Tunic', rawg_id: 9, released: '2022-03-16', image_url: 'https://img/t.jpg', genres: ['Action', 'Adventure'], slug: 'tunic', exists_in_db: false };
   calls = installApi({
-    'GET /games/search-rawg?query=tunic': [candidate],
+    'GET /games/search?query=tunic': [candidate],
     'POST /games/': { id: 'tunic', name: 'Tunic' },
   });
   await search('#addGameSearch', 'tunic', 300);
@@ -144,7 +144,7 @@ test('a DLC says which game it belongs to, never blocks adding it, and a game of
   document.querySelector('#modalAddGameBtn').click();
   const dlc = { name: 'Vessel of Hatred', rawg_id: 11, exists_in_db: false };
   installApi({
-    'GET /games/search-rawg?query=vessel': [dlc, { name: 'Tunic', rawg_id: 9, exists_in_db: false }],
+    'GET /games/search?query=vessel': [dlc, { name: 'Tunic', rawg_id: 9, exists_in_db: false }],
     'GET /games/rawg-parent/11': { rawg_id: 5, name: 'Diablo <IV>', exists_in_db: false },
     'GET /games/rawg-parent/9': null,
   });
@@ -171,7 +171,7 @@ test('a failure while adding the game stays in the window', async () => {
   openGamePicker(() => {});
   document.querySelector('#modalAddGameBtn').click();
   installApi({
-    'GET /games/search-rawg?query=tunic': [{ name: 'Tunic', rawg_id: 9, exists_in_db: false }],
+    'GET /games/search?query=tunic': [{ name: 'Tunic', rawg_id: 9, exists_in_db: false }],
     'POST /games/': json({ detail: 'Ya existe' }, 409),
   });
   await search('#addGameSearch', 'tunic', 300);
@@ -186,7 +186,7 @@ test('a game found by IGDB is added with its IGDB id and its base game is asked 
   document.querySelector('#modalAddGameBtn').click();
   const candidate = { name: 'Hades II', rawg_id: null, igdb_id: 555, source: 'igdb', released: '2025-09-25', dev: 'Supergiant Games', genres: ['RPG'], slug: 'hades-ii', exists_in_db: false };
   calls = installApi({
-    'GET /games/search-rawg?query=hades': [candidate],
+    'GET /games/search?query=hades': [candidate],
     'GET /games/igdb-parent/555': null,
     'POST /games/': { id: 'h2', name: 'Hades II' },
   });
@@ -207,7 +207,7 @@ test('a game found by IGDB is added with its IGDB id and its base game is asked 
 test('a newer search cancels the request of the older one', async () => {
   openGamePicker(() => {});
   document.querySelector('#modalAddGameBtn').click();
-  installApi({ 'GET /games/search-rawg?query=': () => new Promise(() => {}) });
+  installApi({ 'GET /games/search?query=': () => new Promise(() => {}) });
   const signals = [];
   const fetchOf = globalThis.fetch;
   globalThis.fetch = (url, options) => (signals.push(options.signal), fetchOf(url, options));
@@ -221,7 +221,7 @@ test('a newer search cancels the request of the older one', async () => {
 test('a RAWG outage is told, not shown as an empty search', async () => {
   openGamePicker(() => {});
   document.querySelector('#modalAddGameBtn').click();
-  installApi({ 'GET /games/search-rawg?query=hades': json({ detail: 'RAWG no responde ahora mismo' }, 503) });
+  installApi({ 'GET /games/search?query=hades': json({ detail: 'RAWG no responde ahora mismo' }, 503) });
   await search('#addGameSearch', 'hades', 300);
   assert.match(text('#addGameResults')[0], /RAWG no responde ahora mismo/);
   assert.notEqual(text('#addGameResults')[0], 'Sin resultados');
@@ -230,7 +230,7 @@ test('a RAWG outage is told, not shown as an empty search', async () => {
 test('a game RAWG does not have is created by hand with only the name required', async () => {
   openGamePicker((id, name) => (picked = [id, name]));
   document.querySelector('#modalAddGameBtn').click();
-  installApi({ 'GET /games/search-rawg?query=fortune': [] });
+  installApi({ 'GET /games/search?query=fortune': [] });
   await search('#addGameSearch', 'Fortune', 300);
   document.querySelector('#manualGameBtn').click();
   const form = document.querySelector('.sess-form');

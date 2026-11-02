@@ -111,7 +111,7 @@ export const ENTITIES = {
     endpoint: '/manage/games',
     search: true,
     selects: [
-      { key: 'rawg', label: 'Datos de RAWG', options: [['', 'Datos: todos'], ['pending', 'Incompletos'], ['unlinked', 'Sin ID de IGDB ni de RAWG']] },
+      { key: 'data', label: 'Datos', options: [['', 'Datos: todos'], ['pending', 'Incompletos'], ['unlinked', 'Sin ID de IGDB ni de RAWG']] },
     ],
     defaultSort: { key: 'name', dir: 'asc' },
     orders: [['name:asc', 'Orden: alfabético'], ['release_date:desc', 'Más nuevos'], ['played:desc', 'Más jugados']],

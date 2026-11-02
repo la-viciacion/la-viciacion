@@ -464,9 +464,9 @@ video.gm-trailer, iframe.gm-trailer { cursor: auto; background: #000; }
 @media (hover: hover) and (min-width: 700px) { .gm-nav { display: block; } }
 .gm-more { cursor: pointer; font: inherit; font-size: 0.72rem; font-weight: 700; }
 .gm-more:hover { color: var(--text-primary); }
-.gm-rawg-btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 0.85rem; text-decoration: none; border-color: var(--border-accent); color: var(--accent-teal); }
-.gm-rawg-btn:hover { background: rgba(61,217,179,0.1); }
-.gm-rawg-btn:focus-visible { outline: 2px solid var(--accent-teal); outline-offset: 2px; }
+.gm-source-btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 0.85rem; text-decoration: none; border-color: var(--border-accent); color: var(--accent-teal); }
+.gm-source-btn:hover { background: rgba(61,217,179,0.1); }
+.gm-source-btn:focus-visible { outline: 2px solid var(--accent-teal); outline-offset: 2px; }
 #gmSaga { margin-top: 28px; }
 .pf-price-form { align-items: center; }
 .pf-price-field { display: inline-flex; align-items: center; gap: 6px; font-size: 0.85rem; }
