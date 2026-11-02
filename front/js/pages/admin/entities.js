@@ -41,6 +41,8 @@ const PERIOD_FIELD = { key: 'period', type: 'period' };
 const REPEATING_PERIOD_FIELD = { ...PERIOD_FIELD, repeatable: true };
 // a challenge that repeats does not tell the group every month unless the admin says so
 const ANNOUNCE_REPEAT = { key: 'period', values: { repeat: false } };
+// A rotating game is built (the `games` list, the schedule) but not offered for now: this is the switch (REPEATING_PERIOD_FIELD to offer it)
+const GAME_PERIOD_FIELD = PERIOD_FIELD;
 const REPEAT_NAME_FIELD = { key: 'label', label: 'Nombre (con el que se verá en la lista de los que se lanzan solos)', type: 'text', required: true, when: { key: 'period', is: 'repeat' } };
 const WHEN = { type: 'heading', label: 'Cuándo' };
 const WHAT = { type: 'heading', label: 'Qué' }; // the game comes after the period: a repeating challenge picks it another way
@@ -318,7 +320,7 @@ export const ENTITIES = {
         repeat: '/manage/challenge-schedules',
         fields: [
           WHEN,
-          REPEATING_PERIOD_FIELD,
+          GAME_PERIOD_FIELD,
           REPEAT_NAME_FIELD,
           WHAT,
           { key: 'game_id', label: 'Juego', type: 'game', required: true, when: { key: 'period', not: 'repeat' } },
