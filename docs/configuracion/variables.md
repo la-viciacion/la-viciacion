@@ -3,7 +3,7 @@
 Un único `.env` en la raíz del proyecto lo leen la API, el bot y la base de datos (`env_file` en `docker-compose.yml`). La plantilla comentada es `.env.template`. Si cambias algo, recrea los contenedores: `docker compose up -d`.
 
 !!! info "Las claves de servicios externos solo viven aquí"
-    `TELEGRAM_TOKEN`, `TELEGRAM_GROUP_ID`, `TELEGRAM_ADMIN_CHAT_ID`, `AI_API_KEY`, `OPENAI_ADMIN_KEY`, `RAWG_API_KEY` y las credenciales SMTP **nunca se guardan en la base de datos**, ni cifradas. Así, una copia de seguridad no sirve para manejar el bot del grupo ni gastar la cuota de la IA. El panel solo te dice si cada una está puesta o no, sin enseñarla.
+    `TELEGRAM_TOKEN`, `TELEGRAM_GROUP_ID`, `TELEGRAM_ADMIN_CHAT_ID`, `AI_API_KEY`, `OPENAI_ADMIN_KEY`, `RAWG_API_KEY`, `TWITCH_CLIENT_SECRET` y las credenciales SMTP **nunca se guardan en la base de datos**, ni cifradas. Así, una copia de seguridad no sirve para manejar el bot del grupo ni gastar la cuota de la IA. El panel solo te dice si cada una está puesta o no, sin enseñarla.
 
 ## Obligatorias
 
@@ -38,6 +38,7 @@ Detalle en [Telegram](telegram.md).
 | Variable | Para qué sirve |
 |---|---|
 | `RAWG_API_KEY` | Búsqueda de juegos y portadas. Sin ella, buscar y sincronizar no hace nada. |
+| `TWITCH_CLIENT_ID`, `TWITCH_CLIENT_SECRET` | Opcionales. Una aplicación de Twitch, para que [IGDB](servicios.md#igdb-respaldo-de-la-busqueda-de-juegos) busque juegos cuando RAWG no responde. Sin ellas, IGDB no se usa. |
 | `AI_PROVIDER` | `google` o `openai`. |
 | `AI_API_KEY` | La clave del proveedor de IA. |
 | `AI_MODEL` | Un modelo de ese proveedor. El código no trae ninguno por defecto. |
