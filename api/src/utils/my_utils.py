@@ -409,22 +409,8 @@ async def get_game_details_by_rawg_id(rawg_id: int) -> dict | None:
 
 
 async def get_game_info(game: str):
-    """Retrieve rawg and hltb info for backward compatibility."""
-    api_key = config.RAWG_API_KEY
-    rawg_content = None
-    if api_key:
-        try:
-            url = "https://api.rawg.io/api/games"
-            params = {"key": api_key, "search": game, "page": 1, "page_size": 1}
-            game_request = await _http_get(url, params, timeout=10)
-            if game_request.ok:
-                results = game_request.json().get("results", [])
-                if results:
-                    rawg_content = results[0]
-        except Exception as e:
-            logger.warning(f"Error fetching RAWG for {game}: {redact_rawg_key(e)}")
-
-    # HLTB
+    """The HowLongToBeat entry of a game by its name ({"hltb": its json, or None}). It used to search RAWG too, and nobody
+    read that answer: a game's data comes from its IGDB or RAWG id, never from a search by name."""
     hltb_content = None
     try:
         results_list = await HowLongToBeat().async_search(hltb_sync.clean_name(game))
@@ -435,7 +421,7 @@ async def get_game_info(game: str):
     except Exception:
         hltb_content = None
 
-    return {"rawg": rawg_content, "hltb": hltb_content}
+    return {"hltb": hltb_content}
 
 
 async def get_game_details_by_igdb_id(igdb_id: int) -> dict | None:

@@ -25,7 +25,7 @@ class GameExtrasTests(ApiTestCase):
 
     def test_it_asks_with_the_ids_of_the_game_and_adds_available(self):
         body = self.get().json()
-        self.extras.assert_awaited_once_with(100, "1145360")
+        self.extras.assert_awaited_once_with(100, "1145360", None)
         self.assertEqual((body["available"], body["description"], body["metacritic"]), (True, "Un juego", 93))
 
     def test_when_nobody_can_be_asked_the_page_has_no_card(self):

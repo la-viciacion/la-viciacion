@@ -153,6 +153,35 @@ class IgdbClientTests(unittest.TestCase):
         ]):
             self.assertEqual(igdb.game_details(1022)["parent_igdb_id"], 4)
 
+    def test_the_page_of_a_game_has_its_trailer_screenshots_critics_age_rating_publishers_and_platforms(self):
+        item = {
+            "id": 5, "summary": " A roguelike. ", "aggregated_rating": 93.5, "aggregated_rating_count": 17,
+            "videos": [{"video_id": "bad id!", "name": "Trailer"}, {"video_id": "gameplay001", "name": "Gameplay"}, {"video_id": "trailerabc1", "name": "Launch Trailer"}],
+            "screenshots": [{"image_id": f"s{n}"} for n in range(12)],
+            "age_ratings": [
+                {"rating_category": {"rating": "12", "organization": {"name": "PEGI"}}},
+                {"rating_category": {"rating": "T", "organization": {"name": "ESRB"}}},
+            ],
+            "involved_companies": [{"publisher": True, "company": {"name": "Supergiant"}}, {"publisher": False, "company": {"name": "Dev Only"}}],
+            "platforms": [{"name": "PC"}, {"name": "PC"}, {"name": "Switch"}],
+        }
+        with mock.patch.object(igdb.requests, "post", side_effect=[
+            _response({"access_token": "t", "expires_in": 5000000}), _response([item]), _response([]),
+        ]):
+            media = igdb.media_of(5)
+            self.assertIsNone(igdb.media_of(6))
+        self.assertEqual((media["description"], media["trailer"], media["critic"], media["esrb"]), ("A roguelike.", "trailerabc1", 94, "Teen"))
+        self.assertEqual((media["publishers"], media["platforms"], len(media["screenshots"])), (["Supergiant"], ["PC", "Switch"], 8))
+        self.assertEqual(media["screenshots"][0], {
+            "thumb": "https://images.igdb.com/igdb/image/upload/t_screenshot_med/s0.jpg", "full": "https://images.igdb.com/igdb/image/upload/t_1080p/s0.jpg",
+        })
+
+    def test_without_critics_or_a_known_rating_those_are_none(self):
+        item = {"id": 5, "aggregated_rating": 80.0, "age_ratings": [{"rating_category": {"rating": "EC", "organization": {"name": "ESRB"}}}]}
+        with mock.patch.object(igdb.requests, "post", side_effect=[_response({"access_token": "t", "expires_in": 5000000}), _response([item])]):
+            media = igdb.media_of(5)
+        self.assertEqual((media["critic"], media["esrb"], media["trailer"], media["description"]), (None, None, None, None))  # no critic counted: a score alone is not trusted
+
     def test_a_dlc_is_marked_and_a_game_igdb_does_not_have_is_none(self):
         with mock.patch.object(igdb.requests, "post", side_effect=[
             _response({"access_token": "t", "expires_in": 5000000}), _response([dict(ITEM, game_type=2)]), _response([]),
@@ -224,6 +253,14 @@ class IgdbSourceTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         my_utils.reset_search_state()
         self.addCleanup(my_utils.reset_search_state)
+
+    async def test_the_completion_lookup_asks_howlongtobeat_and_not_rawg(self):
+        class Hltb:
+            async def async_search(self, name):
+                return []
+        with mock.patch.object(my_utils, "_http_get") as http, mock.patch.object(my_utils, "HowLongToBeat", Hltb):
+            self.assertEqual(await my_utils.get_game_info("Hades"), {"hltb": None})
+        http.assert_not_called()
 
     async def test_igdb_answers_first_and_rawg_is_not_asked_while_it_finds_games(self):
         candidate = igdb._candidate(ITEM)

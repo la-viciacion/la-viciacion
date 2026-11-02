@@ -223,3 +223,88 @@ class FetchTests(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+IGDB_PAGE = {
+    "description": "A roguelike.", "trailer": "abcdefghijk",
+    "screenshots": [{"thumb": "https://images.igdb.com/igdb/image/upload/t_screenshot_med/a.jpg", "full": "https://images.igdb.com/igdb/image/upload/t_1080p/a.jpg"}],
+    "critic": 93, "esrb": "Teen", "publishers": ["Supergiant Games"], "platforms": ["PC", "Switch"],
+}
+
+
+class ParseIgdbTests(unittest.TestCase):
+    def test_it_reads_the_youtube_trailer_the_screenshots_and_the_critics(self):
+        out = game_extras.parse_igdb(IGDB_PAGE)
+        self.assertEqual(out["trailer"], {"url": None, "youtube": "abcdefghijk", "poster": "https://images.igdb.com/igdb/image/upload/t_1080p/a.jpg"})
+        self.assertEqual((out["metacritic"], out["esrb"], out["publishers"], out["platforms"]), (93, "Teen", ["Supergiant Games"], ["PC", "Switch"]))
+        self.assertEqual(out["screenshots"][0]["full"], "https://images.igdb.com/igdb/image/upload/t_1080p/a.jpg")
+
+    def test_nothing_is_empty(self):
+        out = game_extras.parse_igdb(None)
+        self.assertEqual((out["description"], out["trailer"], out["screenshots"], out["metacritic"], out["publishers"]), (None, None, [], None, []))
+
+
+class MergeWithIgdbTests(unittest.TestCase):
+    def test_igdb_leads_for_everything_but_the_description_which_steam_has_in_spanish(self):
+        steam = game_extras.parse_steam({"short_description": "Un roguelike.", "metacritic": {"score": 80}, "screenshots": [{"path_full": "https://shared.steamstatic.com/f1.jpg"}]})
+        rawg = game_extras.parse_rawg({"metacritic": 70, "esrb_rating": {"name": "Mature"}, "publishers": [{"name": "RAWG Pub"}]}, None, None)
+        out = game_extras.merge(steam, rawg, game_extras.parse_igdb(IGDB_PAGE))
+        self.assertEqual((out["description"], out["description_lang"]), ("Un roguelike.", "es"))
+        self.assertEqual((out["metacritic"], out["critic_source"], out["esrb"], out["publishers"]), (93, "igdb", "Teen", ["Supergiant Games"]))
+        self.assertEqual(out["trailer"]["youtube"], "abcdefghijk")
+        self.assertIn("igdb.com", out["screenshots"][0]["full"])
+
+    def test_without_steams_description_igdbs_comes_before_rawgs_and_the_score_says_its_source(self):
+        rawg = game_extras.parse_rawg({"description_raw": "RAWG text", "metacritic": 70}, None, None)
+        out = game_extras.merge(game_extras.parse_steam(None), rawg, game_extras.parse_igdb(IGDB_PAGE))
+        self.assertEqual((out["description"], out["description_lang"]), ("A roguelike.", "en"))
+        rawg_only = game_extras.merge(game_extras.parse_steam(None), rawg)
+        self.assertEqual((rawg_only["metacritic"], rawg_only["critic_source"]), (70, "metacritic"))
+
+
+class IgdbFetchTests(unittest.IsolatedAsyncioTestCase):
+    """The same recorder of RAWG and Steam as `FetchTests`, with IGDB in front."""
+
+    serve = FetchTests.serve
+
+    def setUp(self):
+        FetchTests.setUp(self)
+        self.media = mock.Mock(return_value=dict(IGDB_PAGE))
+        for patcher in (
+            mock.patch.object(game_extras.igdb, "configured", return_value=True),
+            mock.patch.object(game_extras.igdb, "media_of", self.media),
+        ):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    async def test_a_game_igdb_describes_fully_does_not_ask_rawg_at_all(self):
+        self.serve(appdetails={"10": {"data": {"short_description": "Hola"}}})
+        out = await game_extras.extras_of(5, "10", 99)
+        self.assertEqual((out["description"], out["metacritic"], out["critic_source"], out["sources"]), ("Hola", 93, "igdb", ["IGDB", "Steam"]))
+        self.media.assert_called_once_with(99)
+        self.assertEqual([u for u in self.calls if "api.rawg.io" in u], [])
+
+    async def test_rawg_fills_only_what_igdb_and_steam_lack(self):
+        self.media.return_value = dict(IGDB_PAGE, trailer=None)
+        self.serve(movies={"results": [{"data": {"480": "https://media.rawg.io/v.mp4"}}]})
+        out = await game_extras.extras_of(5, None, 99)
+        self.assertEqual(out["trailer"]["url"], "https://media.rawg.io/v.mp4")
+        self.assertTrue(any(u.endswith("/movies") for u in self.calls))
+        self.assertFalse(any(u.endswith("/screenshots") for u in self.calls))  # IGDB had them
+        self.assertFalse(any(u.endswith("/stores") for u in self.calls))  # the Steam id is not looked for in RAWG for an IGDB game
+        self.assertEqual(out["sources"], ["IGDB", "RAWG"])
+
+    async def test_igdb_failing_leaves_a_partial_answer_from_the_rest_and_nothing_at_all_is_none(self):
+        self.media.side_effect = game_extras.igdb.IgdbError("down")
+        self.serve(appdetails={"10": {"data": STEAM_PAGE}}, game={"metacritic": 70})
+        out = await game_extras.extras_of(5, "10", 99)
+        self.assertEqual(out["metacritic"], 70)
+        game_extras.clear()
+        self.fail = {"appdetails", "game"}
+        self.serve()
+        self.assertIsNone(await game_extras.extras_of(5, "10", 99))
+
+    async def test_a_game_with_only_an_igdb_id_is_asked_to_igdb_alone(self):
+        self.serve()
+        out = await game_extras.extras_of(None, None, 99)
+        self.assertEqual((out["trailer"]["youtube"], out["sources"], self.calls), ("abcdefghijk", ["IGDB"], []))

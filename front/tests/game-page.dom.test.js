@@ -289,6 +289,30 @@ test('the trailer is only loaded when it is played', async () => {
   assert.equal(document.querySelector('#gmMedia [data-trailer]'), null);
 });
 
+const IGDB_EXTRAS = {
+  ...EXTRAS,
+  trailer: { url: null, youtube: 'abcdefghijk', poster: 'https://images.igdb.com/igdb/image/upload/t_1080p/a.jpg' },
+  screenshots: [{ thumb: 'https://images.igdb.com/igdb/image/upload/t_screenshot_med/a.jpg', full: 'https://images.igdb.com/igdb/image/upload/t_1080p/a.jpg' }],
+  critic_source: 'igdb',
+  sources: ['IGDB', 'Steam'],
+};
+
+test('IGDB gives a YouTube trailer, played in an embedded player only when asked, and the critics score with its source', async () => {
+  await openWithExtras(IGDB_EXTRAS);
+  assert.match(document.querySelector('#gmOutside').textContent, /92Crítica/);
+  assert.match(document.querySelector('#gmMedia .gm-credit').textContent, /Datos de IGDB, Steam/);
+  assert.equal(document.querySelector('#gmMedia iframe'), null);
+  document.querySelector('#gmMedia [data-trailer]').click();
+  const frame = document.querySelector('#gmMedia iframe');
+  assert.equal(frame.getAttribute('src'), 'https://www.youtube-nocookie.com/embed/abcdefghijk?autoplay=1&rel=0');
+  assert.equal(document.querySelector('#gmMedia [data-trailer]'), null);
+});
+
+test('a trailer that is neither a trusted file nor a YouTube id is not shown', async () => {
+  await openWithExtras({ ...IGDB_EXTRAS, trailer: { url: null, youtube: '"><script>', poster: null }, screenshots: [] });
+  assert.equal(document.querySelector('#gmMedia').children.length, 0);
+});
+
 test('with nothing to say, or Steam and RAWG not available, nothing is added and the page works the same', async () => {
   for (const answer of [{ available: false }, { available: true, description: null, trailer: null, screenshots: [], metacritic: null, esrb: null }, () => { throw new Error('boom'); }]) {
     await openWithExtras(answer);

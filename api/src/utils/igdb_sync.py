@@ -279,8 +279,76 @@ def refresh_release_dates(db, games: list[models.Game]) -> tuple[list[models.Gam
     return changed, unanswered
 
 
-def apply_one(db, game_id: str, igdb_id: int) -> dict:
-    """Resolve one doubtful game by hand: link it to the IGDB entry the admin chose (one IGDB request to check it exists)."""
+def _blank(value) -> bool:
+    return value is None or (isinstance(value, str) and value.strip() in ("", "-"))
+
+
+APPLIED = ("dev", "release_date", "image_url", "genres", "steam_id")
+
+
+def _apply_details(db, game: models.Game, details: dict) -> list[str]:
+    """Overwrite the game with what IGDB gives (a blank never overwrites; the name is never touched) and return what
+    changed. The slug is IGDB's only for a game RAWG does not know: RAWG's slug opens RAWG's page, IGDB's would not."""
+    changed = []
+    if game.igdb_id != details["igdb_id"]:
+        game.igdb_id = details["igdb_id"]
+        changed.append("igdb_id")
+    for field in APPLIED:
+        new = details.get(field)
+        if not _blank(new) and getattr(game, field) != new:
+            setattr(game, field, new)
+            changed.append(field)
+    if not game.rawg_id and not _blank(details.get("slug")) and game.slug != details["slug"]:
+        game.slug = details["slug"]
+        changed.append("slug")
+    for column in igdb.EXTRA_COLUMNS:
+        new, current = details.get(column), getattr(game, column)
+        if (new and new != current) or (current is None and new is not None):
+            setattr(game, column, new)
+            changed.append(column)
+    if details.get("is_dlc") and not game.is_dlc:  # only ever adds the mark, like the RAWG sync
+        game.is_dlc = True
+        changed.append("is_dlc")
+    if details.get("parent_igdb_id") and game.parent_game_id is None:  # linked only when the base is in the catalogue
+        base = db.query(models.Game.id).filter(models.Game.igdb_id == details["parent_igdb_id"], models.Game.id != game.id).first()
+        if base:
+            game.parent_game_id = base.id
+            changed.append("parent_game_id")
+    return changed
+
+
+def resync_one(db, game_id: str) -> dict:
+    """Refresh one game from IGDB on the admin's explicit request: every field IGDB gives overwrites ours (a blank one
+    never does). Without an `igdb_id` the game is looked for first, like the batch does: a doubtful match comes back as
+    `ambiguous` with its candidates, to be chosen through `apply_one`. A few IGDB requests."""
+    if not igdb.configured():
+        raise RuntimeError("No hay credenciales de IGDB configuradas")
+    game = db.get(models.Game, game_id)
+    if game is None:
+        raise LookupError("Juego no encontrado")
+    igdb_id = game.igdb_id
+    if igdb_id is None:
+        steam_hits = igdb.find_by_steam(game.steam_id) if (game.steam_id or "").strip() else []
+        verdict, found = choose(game, steam_hits, [] if steam_hits else igdb.search_items(game.name, 10))
+        if verdict == "not_found":
+            return {"status": "not_found"}
+        if verdict == "ambiguous":
+            return {"status": "ambiguous", "candidates": [candidate(i) for i in found]}
+        igdb_id = found["id"]
+        taken = db.query(models.Game).filter(models.Game.igdb_id == igdb_id, models.Game.id != game.id).first()
+        if taken:
+            return {"status": "duplicate", "other_name": taken.name}
+    details = igdb.game_details(igdb_id)
+    if details is None:
+        return {"status": "not_found"}
+    changed = _apply_details(db, game, details)
+    db.commit()
+    return {"status": "updated" if changed else "unchanged", "changed": changed}
+
+
+def apply_one(db, game_id: str, igdb_id: int, overwrite: bool = False) -> dict:
+    """Resolve one doubtful game by hand: link it to the IGDB entry the admin chose (one IGDB request to check it exists).
+    With `overwrite` (the resync of one game) every field IGDB gives replaces ours, as `resync_one` does."""
     game = db.get(models.Game, game_id)
     if game is None:
         raise LookupError("Juego no encontrado")
@@ -290,7 +358,11 @@ def apply_one(db, game_id: str, igdb_id: int) -> dict:
     details = igdb.game_details(igdb_id)
     if details is None:
         raise LookupError("IGDB no tiene ese juego")
+    if overwrite:
+        changed = _apply_details(db, game, details)
+        db.commit()
+        return {"linked": True, "changed": changed}
     game.igdb_id = igdb_id
     _fill(game, {column: details[column] for column in igdb.EXTRA_COLUMNS})
     db.commit()
-    return {"linked": True}
+    return {"linked": True, "changed": ["igdb_id"]}

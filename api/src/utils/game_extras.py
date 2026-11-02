@@ -1,16 +1,18 @@
-"""What the world outside says about a game (a trailer, screenshots, a description, Metacritic, the age rating, the
-publisher and the platforms it came out on), asked to Steam and RAWG when a game's page opens and kept in memory for a day
-(see outside_cache.py: nothing is stored in the database).
+"""What the world outside says about a game (a trailer, screenshots, a description, the critics' score, the age rating,
+the publisher and the platforms it came out on), asked to IGDB, Steam and RAWG when a game's page opens and kept in memory
+for a day (see outside_cache.py: nothing is stored in the database).
 
-It is all optional: Steam knows only the games that have a Steam app id (the game's `steam_id`, or the one RAWG's stores
-link to when it has none) and RAWG the ones with a `rawg_id`, so a game from Nintendo gets only what RAWG has, and when
-neither answers the page simply has no card. The description is Steam's, in Spanish; without it RAWG's, in English.
-Prices are left out on purpose: they depend on the store, and a game is played on several platforms."""
+IGDB comes first for everything a game with an `igdb_id` has there; Steam (the game's `steam_id`) next, and RAWG (a
+`rawg_id`) only for what is still missing, so a game that IGDB describes fully costs no RAWG request. The description is the
+exception to the order: Steam's is in Spanish and curated, so it leads; without it IGDB's, then RAWG's, in English. It is all
+optional: when nobody answers the page simply has no card. Prices are left out on purpose: they depend on the store, and a
+game is played on several platforms."""
 import asyncio
 import html
 import re
 from urllib.parse import urlparse
 
+from ..clients import igdb
 from ..config import Config
 from . import my_utils
 from .logger import LogManager
@@ -24,7 +26,7 @@ CACHE_SECONDS = 24 * 3600
 FAILURE_SECONDS = 5 * 60
 MAX_SCREENSHOTS = 8
 MAX_PLATFORMS = 10
-MEDIA_HOSTS = ("steamstatic.com", "akamaihd.net", "rawg.io")  # where the videos and pictures may come from
+MEDIA_HOSTS = ("steamstatic.com", "akamaihd.net", "rawg.io", "igdb.com")  # where the videos and pictures may come from
 
 STEAM_MOVIE = "https://cdn.akamai.steamstatic.com/steam/apps/{movie_id}/movie480.mp4"  # what a plain <video> can play
 STEAM_DETAILS = "https://store.steampowered.com/api/appdetails"
@@ -117,18 +119,39 @@ def parse_rawg(detail, movies, screenshots) -> dict:
     return out
 
 
-def merge(steam: dict, rawg: dict) -> dict:
-    """Steam first for the pictures and the description (it is in Spanish and curated), RAWG for the rest; whatever one
-    lacks the other fills in (the description, then, is RAWG's English one: `description_lang` says which)."""
+def parse_igdb(media) -> dict:
+    """The parts of IGDB's page of a game the app uses (`igdb.media_of`; it can be None). Its trailer is a YouTube id."""
+    data = media if isinstance(media, dict) else {}
+    shots = [s for s in data.get("screenshots") or [] if media_url(s.get("full"))]
+    trailer = data.get("trailer")
     return {
-        "description": steam["description"] or rawg["description"],
+        "description": clean_text(data.get("description")),
+        "trailer": {"url": None, "youtube": trailer, "poster": media_url(shots[0]["full"]) if shots else None} if trailer else None,
+        "screenshots": [{"thumb": media_url(s["thumb"]) or media_url(s["full"]), "full": media_url(s["full"])} for s in shots],
+        "metacritic": data.get("critic"),
+        "esrb": data.get("esrb"),
+        "publishers": list(data.get("publishers") or []),
+        "platforms": list(data.get("platforms") or []),
+    }
+
+
+def merge(steam: dict, rawg: dict, igdb_data: dict | None = None) -> dict:
+    """IGDB first for everything it has, then Steam, then RAWG; except the description: Steam's, in Spanish and curated, leads
+    (`description_lang` says which one it is). The score is the critics' (`critic_source`: IGDB's own average, or Metacritic's
+    when it comes from Steam or RAWG)."""
+    igdb_data = igdb_data or parse_igdb(None)
+    description = steam["description"] or igdb_data["description"] or rawg["description"]
+    critic = igdb_data["metacritic"] or rawg["metacritic"] or steam["metacritic"]
+    return {
+        "description": description,
         "description_lang": "es" if steam["description"] else "en",
-        "trailer": steam["trailer"] or rawg["trailer"],
-        "screenshots": steam["screenshots"] or rawg["screenshots"],
-        "metacritic": rawg["metacritic"] or steam["metacritic"],
-        "esrb": rawg["esrb"],
-        "publishers": rawg["publishers"],
-        "platforms": rawg["platforms"],
+        "trailer": igdb_data["trailer"] or steam["trailer"] or rawg["trailer"],
+        "screenshots": igdb_data["screenshots"] or steam["screenshots"] or rawg["screenshots"],
+        "metacritic": critic,
+        "critic_source": "igdb" if igdb_data["metacritic"] else "metacritic" if critic else None,
+        "esrb": igdb_data["esrb"] or rawg["esrb"],
+        "publishers": igdb_data["publishers"] or rawg["publishers"],
+        "platforms": igdb_data["platforms"] or rawg["platforms"],
     }
 
 
@@ -146,42 +169,73 @@ async def _get_json(url: str, params: dict) -> dict | None:
         return None
 
 
-async def extras_of(rawg_id: int | None, steam_id: str | None) -> dict | None:
+async def extras_of(rawg_id: int | None, steam_id: str | None, igdb_id: int | None = None) -> dict | None:
     """The extras of a game, or None when nobody could be asked (no ids, no key) or nobody answered: the caller shows no
     card then. An answer with nothing in it is a dict with empty fields."""
     steam_id = steam_id if steam_id and steam_id.isdigit() else None
     rawg_id = rawg_id if rawg_id and config.RAWG_API_KEY else None
-    if not steam_id and not rawg_id:
+    igdb_id = igdb_id if igdb_id and igdb.configured() else None
+    if not steam_id and not rawg_id and not igdb_id:
         return None
-    return await cache.get((rawg_id, steam_id), lambda: _fetch(rawg_id, steam_id))
+    return await cache.get((igdb_id, rawg_id, steam_id), lambda: _fetch(rawg_id, steam_id, igdb_id))
 
 
-async def _fetch(rawg_id: int | None, steam_id: str | None) -> dict | None:
+def _missing(igdb_data: dict, steam: dict) -> set[str]:
+    """What neither IGDB nor Steam gave and RAWG could (the age rating alone is not worth a request)."""
+    found = {
+        "description": igdb_data["description"] or steam["description"],
+        "trailer": igdb_data["trailer"] or steam["trailer"],
+        "screenshots": igdb_data["screenshots"] or steam["screenshots"],
+        "metacritic": igdb_data["metacritic"] or steam["metacritic"],
+        "publishers": igdb_data["publishers"],
+        "platforms": igdb_data["platforms"],
+    }
+    return {field for field, value in found.items() if not value}
+
+
+async def _igdb_media(igdb_id: int) -> dict | None:
+    """IGDB's page of the game, or None when it fails (logged, never raised) or has no such game."""
+    try:
+        return await asyncio.to_thread(igdb.media_of, igdb_id)
+    except Exception as e:
+        logger.warning(f"Error fetching IGDB media for game {igdb_id}: {e}")
+        return None
+
+
+async def _fetch(rawg_id: int | None, steam_id: str | None, igdb_id: int | None = None) -> dict | None:
+    igdb_media = await _igdb_media(igdb_id) if igdb_id else None
+    igdb_data = parse_igdb(igdb_media)
     rawg_params = {"key": config.RAWG_API_KEY}
     game_url = RAWG_GAME.format(rawg_id=rawg_id) if rawg_id else None
-    # no coroutine for what cannot be asked: None stands for "not asked", {} would stand for an answer
-    rawg_detail, linked = await asyncio.gather(
-        _get_json(game_url, rawg_params) if rawg_id else _none(),
-        # a game created without its Steam id (by hand, or before Steam's link was kept) may still have it in RAWG's stores
-        my_utils._steam_id_from_rawg_stores(rawg_id, rawg_params) if rawg_id and not steam_id else _none(),
-    )
+    # a game created without its Steam id (by hand, or before Steam's link was kept) may still have it in RAWG's stores; a game
+    # IGDB answered for has it already, and RAWG is not asked just for that
+    linked = await my_utils._steam_id_from_rawg_stores(rawg_id, rawg_params) if rawg_id and not steam_id and igdb_media is None else None
     steam_id = steam_id or linked or None
     steam_details = await _get_json(STEAM_DETAILS, {"appids": steam_id, "l": "spanish"}) if steam_id else None
     steam = parse_steam(((steam_details or {}).get(steam_id) or {}).get("data") if steam_id else None)
-    # RAWG's videos and pictures only when Steam had none: they are a fallback, and each is a call
-    movies, shots = await asyncio.gather(
-        _get_json(game_url + "/movies", rawg_params) if rawg_id and not steam["trailer"] else _none(),
-        _get_json(game_url + "/screenshots", rawg_params) if rawg_id and not steam["screenshots"] else _none(),
-    )
-    if steam_details is None and rawg_detail is None:
+    # RAWG only for what IGDB and Steam did not give: it is a fallback, and each of its answers is a call
+    missing = _missing(igdb_data, steam)
+    ask_rawg = bool(rawg_id) and bool(missing)
+    rawg_detail, movies, shots = None, None, None
+    if ask_rawg:
+        rawg_detail, movies, shots = await asyncio.gather(
+            _get_json(game_url, rawg_params),
+            _get_json(game_url + "/movies", rawg_params) if "trailer" in missing else _none(),
+            _get_json(game_url + "/screenshots", rawg_params) if "screenshots" in missing else _none(),
+        )
+    asked = [bool(igdb_id), bool(steam_id), ask_rawg]
+    answered = [igdb_media is not None, steam_details is not None, rawg_detail is not None]
+    if any(asked) and not any(a for a, ok in zip(asked, answered) if ok):
         return None  # nobody answered
-    extras = merge(steam, parse_rawg(rawg_detail, movies, shots))
+    extras = merge(steam, parse_rawg(rawg_detail, movies, shots), igdb_data)
+    extras["sources"] = [name for name, ok in zip(("IGDB", "Steam", "RAWG"), answered) if ok]
     # a service that was asked and did not answer leaves its part out: ask again soon, not tomorrow
     failed = [
+        bool(igdb_id) and igdb_media is None,
         bool(steam_id) and steam_details is None,
-        bool(rawg_id) and rawg_detail is None,
-        bool(rawg_id) and not steam["trailer"] and movies is None,
-        bool(rawg_id) and not steam["screenshots"] and shots is None,
+        ask_rawg and rawg_detail is None,
+        ask_rawg and "trailer" in missing and movies is None,
+        ask_rawg and "screenshots" in missing and shots is None,
     ]
     return Partial(extras) if any(failed) else extras
 
