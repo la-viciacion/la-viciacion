@@ -123,6 +123,16 @@ class Game(Base):
 
     __table_args__ = (UniqueConstraint("name"),)
 
+    @property
+    def page_url(self) -> str | None:
+        """The page of the game in the source its `slug` belongs to: IGDB's for a game that only IGDB knows, RAWG's for
+        the rest (a slug is each site's own, one site's does not open the other's page). None without a slug."""
+        if not self.slug:
+            return None
+        if self.igdb_id and not self.rawg_id:
+            return f"https://www.igdb.com/games/{self.slug}"
+        return f"https://rawg.io/games/{self.slug}"
+
 
 class UserGame(Base):
     __tablename__ = "users_games"

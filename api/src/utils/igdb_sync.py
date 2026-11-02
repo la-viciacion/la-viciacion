@@ -251,6 +251,34 @@ def _run(max_games: int | None):
         logger.info(f"IGDB link ended ({reason})")
 
 
+RELEASE_BATCH = 50  # games per request when the dates are refreshed
+
+
+def refresh_release_dates(db, games: list[models.Game]) -> tuple[list[models.Game], list[models.Game]]:
+    """Pull the release day of games that are not out yet from IGDB (one request per fifty): announced dates slip. Only
+    an exact day IGDB gives is written (never blanked, never a placeholder). Returns (the games whose date changed, the
+    games IGDB could not be asked about, to be tried elsewhere)."""
+    asked = [g for g in games if g.igdb_id]
+    if not asked or not igdb.configured():
+        return [], list(games)
+    changed, unanswered = [], [g for g in games if not g.igdb_id]
+    for first in range(0, len(asked), RELEASE_BATCH):
+        batch = asked[first:first + RELEASE_BATCH]
+        try:
+            dates = igdb.release_dates([g.igdb_id for g in batch])
+        except igdb.IgdbError as e:
+            logger.warning(f"IGDB release dates not refreshed: {e}")
+            unanswered.extend(batch)
+            continue
+        for game in batch:
+            day = dates.get(game.igdb_id)
+            if day and day != game.release_date:
+                game.release_date = day
+                changed.append(game)
+    db.commit()
+    return changed, unanswered
+
+
 def apply_one(db, game_id: str, igdb_id: int) -> dict:
     """Resolve one doubtful game by hand: link it to the IGDB entry the admin chose (one IGDB request to check it exists)."""
     game = db.get(models.Game, game_id)

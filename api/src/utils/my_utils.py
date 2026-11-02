@@ -37,9 +37,12 @@ def escape_markdown(text) -> str:
 
 
 def rawg_game_link(name, slug: str | None) -> str:
-    """A game's name as a Markdown link to its RAWG page (just the escaped name when it has no slug)."""
+    """A game's name as a Markdown link to its page (`Game.page_url`; a bare RAWG slug also works), just the escaped
+    name when it has none."""
     text = escape_markdown(name)
-    return f"[{text}](https://rawg.io/games/{slug})" if slug else text
+    if not slug:
+        return text
+    return f"[{text}]({slug if slug.startswith('http') else f'https://rawg.io/games/{slug}'})"
 
 
 def app_game_link(name, game_id) -> str:
@@ -312,6 +315,24 @@ async def rawg_parent_candidate(rawg_id: int, db: Session) -> schemas.RawgParent
     return parent
 
 
+async def igdb_parent_candidate(igdb_id: int, db: Session) -> schemas.RawgParent | None:
+    """The base game of an IGDB game for the "add game" notice, flagged when it is already in the catalogue."""
+    if not igdb.configured():
+        return None
+    try:
+        found = await asyncio.to_thread(igdb.parent_of, igdb_id)
+    except Exception as e:  # the notice is a bonus
+        logger.warning(f"Error fetching the base game of IGDB game {igdb_id}: {e}")
+        return None
+    if found is None:
+        return None
+    parent = schemas.RawgParent(igdb_id=found[0], name=found[1])
+    existing = await run_in_threadpool(lambda: db.query(models.Game.id).filter(models.Game.igdb_id == parent.igdb_id).first())
+    if existing:
+        parent.exists_in_db, parent.db_game_id = True, existing.id
+    return parent
+
+
 async def _hltb_details(name: str, released: str | None) -> tuple[int, str | None, str | None]:
     """(average seconds, developer, Steam id) from HowLongToBeat. The time only from a clear match (seconds, like the
     rest of `games.avg_time`); the developer and the Steam id, used only as fallbacks, from the closest result."""
@@ -457,7 +478,7 @@ async def get_new_game_info(game) -> schemas.NewGame:
                 name=igdb_details["name"], dev=igdb_details["dev"], release_date=igdb_details["release_date"],
                 steam_id=igdb_details["steam_id"], image_url=igdb_details["image_url"], genres=igdb_details["genres"],
                 tags=igdb_details["tags"], avg_time=igdb_details["avg_time"], slug=igdb_details["slug"],
-                igdb_id=igdb_id, is_dlc=igdb_details["is_dlc"],
+                igdb_id=igdb_id, is_dlc=igdb_details["is_dlc"], parent_igdb_id=igdb_details.get("parent_igdb_id"),
                 **{column: igdb_details[column] for column in igdb.EXTRA_COLUMNS},
             )
 

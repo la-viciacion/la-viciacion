@@ -28,7 +28,7 @@ function attentionItems(att) {
   }
   if (att.games_without_rawg) {
     items.push({
-      text: `${plural(att.games_without_rawg, 'juego no tiene', 'juegos no tienen')} ID de RAWG (sincronízalos para completar portada y metadatos)`,
+      text: `${plural(att.games_without_rawg, 'juego no tiene', 'juegos no tienen')} ID de IGDB ni de RAWG (enlázalos para completar portada y metadatos)`,
       go: 'Ver juegos',
       tab: 'games',
       filters: { rawg: 'unlinked' },
@@ -56,8 +56,14 @@ function integrations(cfg) {
     : ['green', 'Activa', `${cfg.ai_model.provider} (${cfg.ai_model.model})`];
   const push = v['push.enabled']
     ? ['green', 'Activos', `${plural(cfg.push_devices.devices, 'dispositivo suscrito', 'dispositivos suscritos')}`] : ['gray', 'Apagados', 'Nadie recibe avisos en la app'];
+  const sources = cfg.games_sources;
+  const games = sources.igdb && sources.rawg ? ['green', 'IGDB y RAWG', 'Busca en IGDB y, si no responde o no encuentra el juego, en RAWG']
+    : sources.igdb ? ['green', 'Solo IGDB', 'Falta RAWG_API_KEY en el .env del servidor: no hay respaldo si IGDB no responde']
+    : sources.rawg ? ['orange', 'Solo RAWG', 'Faltan TWITCH_CLIENT_ID y TWITCH_CLIENT_SECRET en el .env del servidor: IGDB no se usa']
+    : ['red', 'Sin configurar', 'Faltan las claves de IGDB (TWITCH_CLIENT_ID y TWITCH_CLIENT_SECRET) y la de RAWG (RAWG_API_KEY): no se pueden buscar juegos'];
   const mail = cfg.mail.configured ? ['green', 'Configurado', `Envía como ${cfg.mail.from}`] : ['gray', 'Sin configurar', 'Nadie puede recuperar su contraseña por correo'];
   return [
+    { name: 'Catálogo de juegos', tab: 'games', state: games },
     { name: 'Telegram', tab: 'services', state: telegram },
     { name: 'Inteligencia artificial', tab: 'services', state: ai },
     { name: 'Avisos en la app', tab: 'channels', state: push },

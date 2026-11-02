@@ -248,6 +248,8 @@ async def new_game(db: Session, game: schemas.NewGame) -> models.Game:
     # 2. a DLC from RAWG brings its base game along (best effort: the DLC is stored even when this fails)
     if game_info.parent_rawg_id and not game_info.parent_game_id:
         game_info.parent_game_id = await _ensure_parent(db, game_info.parent_rawg_id)
+    if game_info.parent_igdb_id and not game_info.parent_game_id:
+        game_info.parent_game_id = await _ensure_parent_igdb(db, game_info.parent_igdb_id)
     # 3. everything else is database work: keep it off the event loop
     return await run_in_threadpool(_store_game, db, game, game_info)
 
@@ -269,6 +271,24 @@ async def _ensure_parent(db: Session, parent_rawg_id: int) -> str | None:
     except Exception as e:
         db.rollback()
         logger.warning(f"Base game {parent_rawg_id} not added: {e}")
+        return None
+
+
+async def _ensure_parent_igdb(db: Session, parent_igdb_id: int) -> str | None:
+    """`_ensure_parent` for a base game IGDB names: its id in the catalogue, adding it from IGDB when it is not there."""
+    try:
+        existing = await run_in_threadpool(lambda: db.query(models.Game.id).filter(models.Game.igdb_id == parent_igdb_id).first())
+        if existing:
+            return existing.id
+        info = await utils.get_new_game_info({"name": "", "igdb_id": parent_igdb_id})
+        if not info.name:  # IGDB did not answer: never create a game "as typed" with no name
+            logger.warning(f"Base game {parent_igdb_id} not added: IGDB gave no details")
+            return None
+        info.parent_igdb_id = None
+        return (await run_in_threadpool(_store_game, db, info, info)).id
+    except Exception as e:
+        db.rollback()
+        logger.warning(f"Base game {parent_igdb_id} not added: {e}")
         return None
 
 

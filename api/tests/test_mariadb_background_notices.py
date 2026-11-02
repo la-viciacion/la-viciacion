@@ -352,6 +352,7 @@ class WishlistReleaseNoticeTests(MessagingTestCase):
         for patcher in (
             mock.patch.object(my_utils, "send_message_to_user", new=to_user),
             mock.patch.object(actions.rawg_sync, "refresh_release_dates", return_value=[]),
+            mock.patch.object(actions.igdb_sync, "refresh_release_dates", return_value=([], [])),
         ):
             patcher.start()
             self.addCleanup(patcher.stop)

@@ -223,6 +223,31 @@ class CreateGameTests(CatalogTestCase):
         )
         self.assertEqual(self.scalar("SELECT COUNT(*) FROM games"), 1)
 
+    def test_an_igdb_dlc_brings_its_base_game_along_and_a_base_igdb_cannot_give_leaves_it_unlinked(self):
+        def details(igdb_id):
+            return {
+                700: {"igdb_id": 700, "name": "Base Game", "slug": "base-game", "dev": "Studio", "steam_id": "", "release_date": None,
+                      "image_url": None, "genres": "RPG", "is_dlc": False, "parent_igdb_id": None, "themes": "", "keywords": "", "franchises": "", "collections": ""},
+                701: {"igdb_id": 701, "name": "Base Game: Expansion", "slug": "expansion", "dev": "Studio", "steam_id": "", "release_date": None,
+                      "image_url": None, "genres": "RPG", "is_dlc": True, "parent_igdb_id": 700, "themes": "", "keywords": "", "franchises": "", "collections": ""},
+            }.get(igdb_id)
+        self.with_rawg(Rawg(), hltb())
+        with mock.patch.object(my_utils.igdb, "configured", return_value=True), mock.patch.object(my_utils.igdb, "game_details", side_effect=details):
+            dlc = self.create(name="Base Game: Expansion", igdb_id=701).json()
+        base = self.scalar("SELECT id FROM games WHERE igdb_id = 700")
+        self.assertEqual((dlc["is_dlc"], dlc["parent_game_id"]), (True, base))
+        with mock.patch.object(my_utils.igdb, "configured", return_value=True), mock.patch.object(my_utils.igdb, "game_details", return_value=None):
+            orphan = self.create(name="Typed DLC", igdb_id=702, is_dlc=True).json()
+        self.assertEqual((orphan["is_dlc"], orphan["parent_game_id"]), (True, None))
+
+    def test_the_picker_asks_igdb_for_the_base_game_of_a_candidate(self):
+        self.game("base", "Base Game", igdb_id=700)
+        with mock.patch.object(my_utils.igdb, "configured", return_value=True), mock.patch.object(my_utils.igdb, "parent_of", side_effect=[(700, "Base Game"), None]):
+            known = self.api("GET", "/games/igdb-parent/701", as_user="ana").json()
+            alone = self.api("GET", "/games/igdb-parent/700", as_user="ana")
+        self.assertEqual((known["igdb_id"], known["name"], known["exists_in_db"], known["db_game_id"]), (700, "Base Game", True, "base"))
+        self.assertIsNone(alone.json())
+
     def test_an_igdb_game_is_still_added_when_igdb_cannot_give_its_details(self):
         self.with_rawg(Rawg())
         with mock.patch.object(my_utils.igdb, "configured", return_value=True),                 mock.patch.object(my_utils.igdb, "game_details", side_effect=my_utils.igdb.IgdbError("down")):

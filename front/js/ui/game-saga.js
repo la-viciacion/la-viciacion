@@ -15,8 +15,8 @@ function row(g) {
   const state = standing(g);
   const name = g.game_id
     ? html`<a class="game-link" href="${gameHref(g.game_id)}">${g.name}</a>`
-    : g.slug
-      ? html`<a class="game-link" href="https://rawg.io/games/${encodeURIComponent(g.slug)}" target="_blank" rel="noopener noreferrer">${g.name}</a>`
+    : g.url
+      ? html`<a class="game-link" href="${g.url}" target="_blank" rel="noopener noreferrer">${g.name}</a>`
       : g.name;
   return html`
     <li class="sg-game ${g.current ? 'current' : ''}" data-rawg="${g.rawg_id}">

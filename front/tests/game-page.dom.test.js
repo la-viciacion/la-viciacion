@@ -8,7 +8,7 @@ globalThis.location = window.location; // the page reads the address
 const page = await import('../js/pages/game/index.js');
 
 const OVERVIEW = {
-  game: { id: 'celeste', name: 'Celeste <b>', image_url: null, genres: ['Platformer'], tags: ['Singleplayer', 'platformer', 'Pixel <i>'], dev: 'Maddy', slug: 'celeste', release_date: '2018-01-25', avg_time: 30000 },
+  game: { id: 'celeste', name: 'Celeste <b>', image_url: null, genres: ['Platformer'], tags: ['Singleplayer', 'platformer', 'Pixel <i>'], dev: 'Maddy', slug: 'celeste', page_url: 'https://rawg.io/games/celeste', release_date: '2018-01-25', avg_time: 30000 },
   summary: { players: 2, played_seconds: 10800, completed_by: 1, score_count: 2, score_mean: 80 },
   players: [
     { user_id: 2, username: 'bea', name: 'Bea', played_seconds: 7200, sessions: 2, last_played: '2026-03-01T20:00:00', seasons: [2026], completed: true, completions: 1, score: 70, playing: true, is_active: true, is_me: false },
@@ -46,8 +46,17 @@ test('the game links to its RAWG page with a button, in a new tab, when it has a
   assert.ok(link().classList.contains('pf-btn')); // it looks like a button, not like a link in the text
 });
 
+test('a game only IGDB knows links to its page in IGDB', async () => {
+  installApi({ 'GET /games/celeste/overview': { ...OVERVIEW, game: { ...OVERVIEW.game, page_url: 'https://www.igdb.com/games/celeste' } }, 'GET /users/photo/': json({ detail: 'no' }, 404) });
+  await page.render({ main: main(), user: { id: 1, username: 'ana' } });
+  await settle();
+  const link = main().querySelector('.gm-head a.gm-rawg-btn');
+  assert.equal(link.getAttribute('href'), 'https://www.igdb.com/games/celeste');
+  assert.match(link.textContent, /Ver en IGDB/);
+});
+
 test('without a slug there is no RAWG button', async () => {
-  installApi({ 'GET /games/celeste/overview': { ...OVERVIEW, game: { ...OVERVIEW.game, slug: null } }, 'GET /users/photo/': json({ detail: 'no' }, 404) });
+  installApi({ 'GET /games/celeste/overview': { ...OVERVIEW, game: { ...OVERVIEW.game, slug: null, page_url: null } }, 'GET /users/photo/': json({ detail: 'no' }, 404) });
   await page.render({ main: main(), user: { id: 1, username: 'ana' } });
   await settle();
   assert.equal(main().querySelector('.gm-rawg-btn'), null);
@@ -146,7 +155,7 @@ const SAGA = {
   available: true,
   games: [
     { rawg_id: 100, name: 'Celeste <b>', slug: 'celeste', image_url: null, released: '2018-01-25', game_id: 'celeste', current: true, next: false, mine: { has: true, completed: true, seconds: 7200 }, players: 2 },
-    { rawg_id: 300, name: 'Celeste Remix', slug: 'celeste-remix', image_url: null, released: '2020-01-01', game_id: null, current: false, next: true, mine: null, players: 0 },
+    { rawg_id: 300, name: 'Celeste Remix', slug: 'celeste-remix', url: 'https://rawg.io/games/celeste-remix', image_url: null, released: '2020-01-01', game_id: null, current: false, next: true, mine: null, players: 0 },
     { rawg_id: 400, name: 'Celeste 2', slug: null, image_url: null, released: null, game_id: 'celeste-2', current: false, next: false, mine: null, players: 1 },
   ],
 };

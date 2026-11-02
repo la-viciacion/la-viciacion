@@ -181,12 +181,13 @@ test('a failure while adding the game stays in the window', async () => {
   assert.equal(text('#addGameResults')[0], 'Error: Ya existe');
 });
 
-test('a game found by IGDB is added without a RAWG id and without asking RAWG about its base game', async () => {
+test('a game found by IGDB is added with its IGDB id and its base game is asked to IGDB, not to RAWG', async () => {
   openGamePicker((id, name) => (picked = [id, name]));
   document.querySelector('#modalAddGameBtn').click();
   const candidate = { name: 'Hades II', rawg_id: null, igdb_id: 555, source: 'igdb', released: '2025-09-25', dev: 'Supergiant Games', genres: ['RPG'], slug: 'hades-ii', exists_in_db: false };
   calls = installApi({
     'GET /games/search-rawg?query=hades': [candidate],
+    'GET /games/igdb-parent/555': null,
     'POST /games/': { id: 'h2', name: 'Hades II' },
   });
   await search('#addGameSearch', 'hades', 300);
@@ -198,6 +199,7 @@ test('a game found by IGDB is added without a RAWG id and without asking RAWG ab
   assert.ok(post.body.rawg_id == null);
   assert.equal(post.body.dev, 'Supergiant Games');
   assert.equal(post.body.igdb_id, 555);
+  assert.ok(calls.some((c) => c.path === '/games/igdb-parent/555'));
   assert.ok(!calls.some((c) => c.path.startsWith('/games/rawg-parent')));
   assert.deepEqual(picked, ['h2', 'Hades II']);
 });

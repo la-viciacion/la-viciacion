@@ -6,7 +6,7 @@ from .. import auth
 from ..auth import get_db
 from ..crud import game_catalog, game_overview, game_series, games
 from ..database import models, schemas
-from ..utils import game_extras, messages, rawg_series
+from ..utils import game_extras, igdb_series, messages, rawg_series
 from ..utils import my_utils as utils
 from ..utils.logger import LogManager
 
@@ -43,6 +43,12 @@ async def search_rawg(query: str, db: Session = Depends(get_db)):
         return await utils.search_rawg_games(query.strip(), db=db)
     except utils.RawgUnavailable:  # already logged where it failed
         raise HTTPException(status_code=503, detail=messages.RAWG_UNAVAILABLE)
+
+
+@router.get("/igdb-parent/{igdb_id}", response_model=schemas.RawgParent | None)
+async def get_igdb_parent(igdb_id: int, db: Session = Depends(get_db)):
+    """The base game of an IGDB DLC / expansion (null for a game of its own): the notice before adding it."""
+    return await utils.igdb_parent_candidate(igdb_id, db)
 
 
 @router.get("/rawg-parent/{rawg_id}", response_model=schemas.RawgParent | None)
@@ -92,14 +98,17 @@ async def get_game_series(
     current_user: models.User = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    """The saga of a game: the other games of its RAWG series and the game itself in order of release, each with what
-    you have of it and how many players have it. RAWG is asked (and the answer kept in memory for a day, see
-    utils/rawg_series.py), so it is a request of its own: `available` is false when the game has no RAWG id or RAWG
-    cannot be asked, and the page shows no saga then."""
+    """The saga of a game: the other games of its series and the game itself in order of release, each with what you have
+    of it and how many players have it. The series is IGDB's when the game has an IGDB id, else (or when IGDB cannot say)
+    RAWG's; it is asked (and the answer kept in memory for a day, see utils/igdb_series.py and utils/rawg_series.py), so
+    it is a request of its own: `available` is false when the game has neither id or nobody can be asked, and the page
+    shows no saga then."""
     game = await run_in_threadpool(db.get, models.Game, game_id)
     if game is None:
         raise HTTPException(status_code=404, detail="Game not exists")
-    series = await rawg_series.series_of(game.rawg_id) if game.rawg_id else None
+    series = await igdb_series.series_of(game.igdb_id) if game.igdb_id else None
+    if series is None and game.rawg_id:  # IGDB did not know it, failed or is not configured
+        series = await rawg_series.series_of(game.rawg_id)
     if series is None:
         return {"available": False, "games": []}
     return {"available": True, "games": await run_in_threadpool(game_series.saga, db, game, current_user.id, series)}

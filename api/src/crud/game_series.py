@@ -27,14 +27,19 @@ def mark_next(rows: list[dict]) -> list[dict]:
 
 
 def saga(db: Session, game: models.Game, viewer_id: int, series: list[dict]) -> list[dict]:
-    """The series of `game` (RAWG's other games) plus the game itself, with, for each one the catalogue has, the viewer's
-    status (`mine`: has it, completed it, seconds played) and how many players have it."""
-    others = [s for s in series if s["rawg_id"] != game.rawg_id]
+    """The series of `game` (the other games of its RAWG or IGDB series) plus the game itself, with, for each one the
+    catalogue has, the viewer's status (`mine`: has it, completed it, seconds played) and how many players have it. A
+    game of the series is in the catalogue when a game has its RAWG id or its IGDB id."""
+    own = lambda s: bool((s.get("rawg_id") and s["rawg_id"] == game.rawg_id) or (s.get("igdb_id") and s["igdb_id"] == game.igdb_id))  # noqa: E731
+    others = [s for s in series if not own(s)]
     if not others:
         return []
-    ids = [s["rawg_id"] for s in others]
-    in_catalogue = {g.rawg_id: g for g in db.query(models.Game).filter(models.Game.rawg_id.in_(ids))}
-    game_ids = [g.id for g in in_catalogue.values()] + [game.id]
+    rawg_ids = [s["rawg_id"] for s in others if s.get("rawg_id")]
+    igdb_ids = [s["igdb_id"] for s in others if s.get("igdb_id")]
+    by_rawg = {g.rawg_id: g for g in db.query(models.Game).filter(models.Game.rawg_id.in_(rawg_ids))} if rawg_ids else {}
+    by_igdb = {g.igdb_id: g for g in db.query(models.Game).filter(models.Game.igdb_id.in_(igdb_ids))} if igdb_ids else {}
+    in_catalogue = [*by_rawg.values(), *by_igdb.values()]
+    game_ids = [g.id for g in in_catalogue] + [game.id]
     owners = {
         game_id: count
         for game_id, count in db.query(models.UserGame.game_id, func.count(func.distinct(models.UserGame.user_id)))
@@ -55,16 +60,23 @@ def saga(db: Session, game: models.Game, viewer_id: int, series: list[dict]) -> 
         .group_by(models.GameTimer.game_id)
     }
 
-    def row(name, released, image_url, slug, rawg_id, found: models.Game | None, current: bool) -> dict:
+    def row(name, released, image_url, slug, rawg_id, found: models.Game | None, current: bool, igdb_id=None, url=None) -> dict:
         status = dict(mine[found.id], seconds=seconds.get(found.id, 0)) if found is not None and found.id in mine else None
         return {
-            "rawg_id": rawg_id, "name": name, "slug": slug, "image_url": image_url, "released": released,
+            "rawg_id": rawg_id, "igdb_id": igdb_id, "name": name, "slug": slug, "url": url, "image_url": image_url, "released": released,
             "game_id": found.id if found is not None else None, "current": current, "next": False,
             "mine": status, "players": owners.get(found.id, 0) if found is not None else 0,
         }
 
-    rows = [row(game.name, game.release_date.isoformat() if game.release_date else None, game.image_url, game.slug or None, game.rawg_id, game, True)]
+    rows = [row(game.name, game.release_date.isoformat() if game.release_date else None, game.image_url, game.slug or None, game.rawg_id, game, True, game.igdb_id, game.page_url)]
     for s in others:
-        found = in_catalogue.get(s["rawg_id"])
-        rows.append(row(found.name if found else s["name"], s["released"], (found.image_url if found else None) or s["image_url"], s["slug"], s["rawg_id"], found, False))
+        found = by_rawg.get(s.get("rawg_id")) or by_igdb.get(s.get("igdb_id"))
+        # the page of a game the catalogue does not have: on the site the series came from
+        url = None
+        if s.get("slug"):
+            url = f"https://www.igdb.com/games/{s['slug']}" if s.get("igdb_id") else f"https://rawg.io/games/{s['slug']}"
+        rows.append(row(
+            found.name if found else s["name"], s["released"], (found.image_url if found else None) or s["image_url"], s["slug"],
+            s.get("rawg_id"), found, False, s.get("igdb_id"), (found.page_url if found else None) or url,
+        ))
     return mark_next(order(rows))

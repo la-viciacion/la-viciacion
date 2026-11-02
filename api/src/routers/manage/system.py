@@ -12,11 +12,15 @@ from ... import auth
 from ...chat import agent as chat_agent
 from ...chat import model as chat_model
 from ...auth import get_db
+from ...clients import igdb
+from ...config import Config
 from ...database import models
 from ...utils import ai, audit, my_utils, push, settings, sql_dump
 from ...utils import email as mail
 from ...utils.logger import LogManager
 from .common import router
+
+config = Config()
 
 logger = LogManager().get_logger()
 
@@ -39,6 +43,7 @@ def get_settings(admin: models.User = Depends(auth.require_admin), db: Session =
         "jobs": jobs,
         "push_devices": push_devices,
         "mail": mail_info,
+        "games_sources": {"rawg": bool(config.RAWG_API_KEY), "igdb": igdb.configured()},
         "ai_uses": settings.ai_uses(db),
         "ai_model": ai.in_use(),
         "chat": {**chat_model.in_use(), **settings.chat_prompt(db)},
