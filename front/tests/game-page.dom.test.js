@@ -8,7 +8,7 @@ globalThis.location = window.location; // the page reads the address
 const page = await import('../js/pages/game/index.js');
 
 const OVERVIEW = {
-  game: { id: 'celeste', name: 'Celeste <b>', image_url: null, genres: ['Platformer'], tags: ['Singleplayer', 'platformer', 'Pixel <i>'], dev: 'Maddy', slug: 'celeste', page_url: 'https://rawg.io/games/celeste', release_date: '2018-01-25', avg_time: 30000 },
+  game: { id: 'celeste', name: 'Celeste <b>', image_url: null, genres: ['Platformer'], tags: ['Singleplayer', 'platformer', 'Pixel <i>'], dev: 'Maddy', slug: 'celeste', links: [{ name: 'RAWG', url: 'https://rawg.io/games/celeste' }], release_date: '2018-01-25', avg_time: 30000 },
   summary: { players: 2, played_seconds: 10800, completed_by: 1, score_count: 2, score_mean: 80 },
   players: [
     { user_id: 2, username: 'bea', name: 'Bea', played_seconds: 7200, sessions: 2, last_played: '2026-03-01T20:00:00', seasons: [2026], completed: true, completions: 1, score: 70, playing: true, is_active: true, is_me: false },
@@ -47,7 +47,7 @@ test('the game links to its RAWG page with a button, in a new tab, when it has a
 });
 
 test('a game only IGDB knows links to its page in IGDB', async () => {
-  installApi({ 'GET /games/celeste/overview': { ...OVERVIEW, game: { ...OVERVIEW.game, page_url: 'https://www.igdb.com/games/celeste' } }, 'GET /users/photo/': json({ detail: 'no' }, 404) });
+  installApi({ 'GET /games/celeste/overview': { ...OVERVIEW, game: { ...OVERVIEW.game, links: [{ name: 'IGDB', url: 'https://www.igdb.com/games/celeste' }] } }, 'GET /users/photo/': json({ detail: 'no' }, 404) });
   await page.render({ main: main(), user: { id: 1, username: 'ana' } });
   await settle();
   const link = main().querySelector('.gm-head a.gm-rawg-btn');
@@ -55,8 +55,38 @@ test('a game only IGDB knows links to its page in IGDB', async () => {
   assert.match(link.textContent, /Ver en IGDB/);
 });
 
+test('a game with both ids shows a button for RAWG and, once IGDB answers, another for IGDB', async () => {
+  installApi({
+    'GET /games/celeste/extras': { available: true, igdb_url: 'https://www.igdb.com/games/celeste', description: null, trailer: null, screenshots: [], metacritic: null, esrb: null },
+    'GET /games/celeste/overview': OVERVIEW,
+    'GET /users/photo/': json({ detail: 'no' }, 404),
+  });
+  await page.render({ main: main(), user: { id: 1, username: 'ana' } });
+  await settle();
+  const buttons = [...main().querySelectorAll('.gm-head a.gm-rawg-btn')];
+  assert.deepEqual(buttons.map((a) => [a.textContent.trim(), a.getAttribute('href')]), [
+    ['Ver en RAWG ↗', 'https://rawg.io/games/celeste'],
+    ['Ver en IGDB ↗', 'https://www.igdb.com/games/celeste'],
+  ]);
+});
+
+test('IGDB\'s button is not added twice, nor for an address that is not IGDB\'s', async () => {
+  const open = async (links, igdbUrl) => {
+    installApi({
+      'GET /games/celeste/extras': { available: true, igdb_url: igdbUrl, description: null, trailer: null, screenshots: [], metacritic: null, esrb: null },
+      'GET /games/celeste/overview': { ...OVERVIEW, game: { ...OVERVIEW.game, links } },
+      'GET /users/photo/': json({ detail: 'no' }, 404),
+    });
+    await page.render({ main: main(), user: { id: 1, username: 'ana' } });
+    await settle();
+    return main().querySelectorAll('.gm-head a.gm-rawg-btn').length;
+  };
+  assert.equal(await open([{ name: 'IGDB', url: 'https://www.igdb.com/games/celeste' }], 'https://www.igdb.com/games/celeste'), 1);
+  assert.equal(await open([{ name: 'RAWG', url: 'https://rawg.io/games/celeste' }], 'https://evil.example/games/celeste'), 1);
+});
+
 test('without a slug there is no RAWG button', async () => {
-  installApi({ 'GET /games/celeste/overview': { ...OVERVIEW, game: { ...OVERVIEW.game, slug: null, page_url: null } }, 'GET /users/photo/': json({ detail: 'no' }, 404) });
+  installApi({ 'GET /games/celeste/overview': { ...OVERVIEW, game: { ...OVERVIEW.game, slug: null, links: [] } }, 'GET /users/photo/': json({ detail: 'no' }, 404) });
   await page.render({ main: main(), user: { id: 1, username: 'ana' } });
   await settle();
   assert.equal(main().querySelector('.gm-rawg-btn'), null);
@@ -249,7 +279,6 @@ const EXTRAS = {
   screenshots: [{ thumb: 'https://shared.steamstatic.com/t.jpg', full: 'https://shared.steamstatic.com/f.jpg' }, { thumb: 'https://shared.steamstatic.com/t2.jpg', full: 'javascript:alert(1)' }],
   metacritic: 92,
   esrb: 'Everyone 10+',
-  description_lang: 'es',
   publishers: ['Extremely OK Games', 'maddy'],
   platforms: ['PC', 'Nintendo Switch'],
 };
@@ -294,13 +323,12 @@ const IGDB_EXTRAS = {
   trailer: { url: null, youtube: 'abcdefghijk', poster: 'https://images.igdb.com/igdb/image/upload/t_1080p/a.jpg' },
   screenshots: [{ thumb: 'https://images.igdb.com/igdb/image/upload/t_screenshot_med/a.jpg', full: 'https://images.igdb.com/igdb/image/upload/t_1080p/a.jpg' }],
   critic_source: 'igdb',
-  sources: ['IGDB', 'Steam'],
 };
 
 test('IGDB gives a YouTube trailer, played in an embedded player only when asked, and the critics score with its source', async () => {
   await openWithExtras(IGDB_EXTRAS);
   assert.match(document.querySelector('#gmOutside').textContent, /92Crítica/);
-  assert.match(document.querySelector('#gmMedia .gm-credit').textContent, /Datos de IGDB, Steam/);
+  assert.equal(document.querySelector('#gmMedia .gm-credit'), null);
   assert.equal(document.querySelector('#gmMedia iframe'), null);
   document.querySelector('#gmMedia [data-trailer]').click();
   const frame = document.querySelector('#gmMedia iframe');
@@ -379,9 +407,8 @@ test('the publisher (unless it is the developer) is a line and the platforms are
   assert.equal(document.querySelector('#gmPlatforms').children.length, 0);
 });
 
-test('a description in English is marked as such and one in Spanish is not', async () => {
-  await openWithExtras({ ...EXTRAS, description_lang: 'en' });
-  assert.match(document.querySelector('#gmDesc').textContent, /En inglés/);
+test('a description carries no mark of its language or its source', async () => {
   await openWithExtras(EXTRAS);
   assert.doesNotMatch(document.querySelector('#gmDesc').textContent, /En inglés/);
+  assert.equal(document.querySelector('#gmDesc .pf-tag'), null);
 });

@@ -106,6 +106,7 @@ def overview(db: Session, game_id: str, viewer_id: int) -> dict | None:
             "image_url": game.image_url,
             "slug": game.slug or None,
             "page_url": game.page_url,
+            "links": game.links,
             "genres": games.genre_list(game.genres),
             "tags": games.genre_list(game.tags),
             # what IGDB says of it (empty until the game is linked to IGDB)

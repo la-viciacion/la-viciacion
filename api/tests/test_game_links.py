@@ -19,6 +19,14 @@ class PageUrlTests(unittest.TestCase):
         self.assertIsNone(models.Game(slug="", rawg_id=1).page_url)
 
 
+class LinksTests(unittest.TestCase):
+    def test_a_game_has_the_page_of_the_source_its_slug_belongs_to(self):
+        self.assertEqual(models.Game(slug="hades", rawg_id=1).links, [{"name": "RAWG", "url": "https://rawg.io/games/hades"}])
+        self.assertEqual(models.Game(slug="hades", rawg_id=1, igdb_id=2).links, [{"name": "RAWG", "url": "https://rawg.io/games/hades"}])
+        self.assertEqual(models.Game(slug="hades-ii", igdb_id=2).links, [{"name": "IGDB", "url": "https://www.igdb.com/games/hades-ii"}])
+        self.assertEqual(models.Game(igdb_id=2).links, [])
+
+
 class LinkTests(unittest.TestCase):
     def test_a_notice_links_a_url_as_it_is_and_a_bare_slug_to_rawg(self):
         self.assertEqual(my_utils.rawg_game_link("Hades II", "https://www.igdb.com/games/hades-ii"), "[Hades II](https://www.igdb.com/games/hades-ii)")

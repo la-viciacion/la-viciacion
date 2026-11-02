@@ -423,7 +423,6 @@
   #gmMediaBlock .ach-fold { display: none; }
   #gmMediaBlock .gm-trailer { grid-column: 2; grid-row: 1; max-width: none; }
   #gmMediaBlock .gm-carousel { grid-column: 1 / -1; grid-row: 2; }
-  #gmMediaBlock .gm-credit { grid-column: 1 / -1; grid-row: 3; }
 }
 .gm-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-top: 6px; }
 .gm-outside { display: contents; }
@@ -465,7 +464,6 @@ video.gm-trailer, iframe.gm-trailer { cursor: auto; background: #000; }
 @media (hover: hover) and (min-width: 700px) { .gm-nav { display: block; } }
 .gm-more { cursor: pointer; font: inherit; font-size: 0.72rem; font-weight: 700; }
 .gm-more:hover { color: var(--text-primary); }
-.gm-credit { font-size: 0.75rem; }
 .gm-rawg-btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 0.85rem; text-decoration: none; border-color: var(--border-accent); color: var(--accent-teal); }
 .gm-rawg-btn:hover { background: rgba(61,217,179,0.1); }
 .gm-rawg-btn:focus-visible { outline: 2px solid var(--accent-teal); outline-offset: 2px; }

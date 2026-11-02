@@ -94,8 +94,7 @@ class MergeTests(unittest.TestCase):
         spanish = game_extras.merge(game_extras.parse_steam({"short_description": "Texto"}), rawg)
         english = game_extras.merge(game_extras.parse_steam(None), rawg)
         none = game_extras.merge(game_extras.parse_steam(None), game_extras.parse_rawg(None, None, None))
-        self.assertEqual((spanish["description"], spanish["description_lang"]), ("Texto", "es"))
-        self.assertEqual((english["description"], english["description_lang"]), ("English text", "en"))
+        self.assertEqual((spanish["description"], english["description"]), ("Texto", "English text"))
         self.assertIsNone(none["description"])
 
     def test_steam_leads_and_rawg_fills_in(self):
@@ -161,7 +160,7 @@ class FetchTests(unittest.IsolatedAsyncioTestCase):
     async def test_a_game_with_no_steam_page_in_the_stores_has_only_rawgs_data(self):
         self.serve(stores={"results": [{"url": "https://www.nintendo.com/x"}]}, game={"description_raw": "English", "metacritic": 80})
         out = await game_extras.extras_of(5, None)
-        self.assertEqual((out["description"], out["description_lang"], out["metacritic"]), ("English", "en", 80))
+        self.assertEqual((out["description"], out["metacritic"]), ("English", 80))
         self.assertFalse(any("steampowered" in u for u in self.calls))
 
     async def test_a_game_with_neither_id_is_not_asked(self):
@@ -249,7 +248,7 @@ class MergeWithIgdbTests(unittest.TestCase):
         steam = game_extras.parse_steam({"short_description": "Un roguelike.", "metacritic": {"score": 80}, "screenshots": [{"path_full": "https://shared.steamstatic.com/f1.jpg"}]})
         rawg = game_extras.parse_rawg({"metacritic": 70, "esrb_rating": {"name": "Mature"}, "publishers": [{"name": "RAWG Pub"}]}, None, None)
         out = game_extras.merge(steam, rawg, game_extras.parse_igdb(IGDB_PAGE))
-        self.assertEqual((out["description"], out["description_lang"]), ("Un roguelike.", "es"))
+        self.assertEqual(out["description"], "Un roguelike.")
         self.assertEqual((out["metacritic"], out["critic_source"], out["esrb"], out["publishers"]), (93, "igdb", "Teen", ["Supergiant Games"]))
         self.assertEqual(out["trailer"]["youtube"], "abcdefghijk")
         self.assertIn("igdb.com", out["screenshots"][0]["full"])
@@ -257,7 +256,7 @@ class MergeWithIgdbTests(unittest.TestCase):
     def test_without_steams_description_igdbs_comes_before_rawgs_and_the_score_says_its_source(self):
         rawg = game_extras.parse_rawg({"description_raw": "RAWG text", "metacritic": 70}, None, None)
         out = game_extras.merge(game_extras.parse_steam(None), rawg, game_extras.parse_igdb(IGDB_PAGE))
-        self.assertEqual((out["description"], out["description_lang"]), ("A roguelike.", "en"))
+        self.assertEqual(out["description"], "A roguelike.")
         rawg_only = game_extras.merge(game_extras.parse_steam(None), rawg)
         self.assertEqual((rawg_only["metacritic"], rawg_only["critic_source"]), (70, "metacritic"))
 
@@ -280,7 +279,7 @@ class IgdbFetchTests(unittest.IsolatedAsyncioTestCase):
     async def test_a_game_igdb_describes_fully_does_not_ask_rawg_at_all(self):
         self.serve(appdetails={"10": {"data": {"short_description": "Hola"}}})
         out = await game_extras.extras_of(5, "10", 99)
-        self.assertEqual((out["description"], out["metacritic"], out["critic_source"], out["sources"]), ("Hola", 93, "igdb", ["IGDB", "Steam"]))
+        self.assertEqual((out["description"], out["metacritic"], out["critic_source"]), ("Hola", 93, "igdb"))
         self.media.assert_called_once_with(99)
         self.assertEqual([u for u in self.calls if "api.rawg.io" in u], [])
 
@@ -292,7 +291,6 @@ class IgdbFetchTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(any(u.endswith("/movies") for u in self.calls))
         self.assertFalse(any(u.endswith("/screenshots") for u in self.calls))  # IGDB had them
         self.assertFalse(any(u.endswith("/stores") for u in self.calls))  # the Steam id is not looked for in RAWG for an IGDB game
-        self.assertEqual(out["sources"], ["IGDB", "RAWG"])
 
     async def test_igdb_failing_leaves_a_partial_answer_from_the_rest_and_nothing_at_all_is_none(self):
         self.media.side_effect = game_extras.igdb.IgdbError("down")
@@ -304,7 +302,13 @@ class IgdbFetchTests(unittest.IsolatedAsyncioTestCase):
         self.serve()
         self.assertIsNone(await game_extras.extras_of(5, "10", 99))
 
+    async def test_igdbs_own_page_comes_with_the_extras(self):
+        self.media.return_value = dict(IGDB_PAGE, url="https://www.igdb.com/games/hades-ii")
+        self.serve()
+        out = await game_extras.extras_of(None, None, 99)
+        self.assertEqual(out["igdb_url"], "https://www.igdb.com/games/hades-ii")
+
     async def test_a_game_with_only_an_igdb_id_is_asked_to_igdb_alone(self):
         self.serve()
         out = await game_extras.extras_of(None, None, 99)
-        self.assertEqual((out["trailer"]["youtube"], out["sources"], self.calls), ("abcdefghijk", ["IGDB"], []))
+        self.assertEqual((out["trailer"]["youtube"], self.calls), ("abcdefghijk", []))
