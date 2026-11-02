@@ -79,7 +79,7 @@ function draw(data) {
           <div id="gmPlatforms"></div>
           <div class="gm-actions" id="gmActions">
             <span id="gmOutside" class="gm-outside"></span>
-            ${(game.links || []).map((link) => html`<a class="pf-btn gm-rawg-btn" href="${link.url}" target="_blank" rel="noopener noreferrer">Ver en ${link.name} <span aria-hidden="true">↗</span></a>`)}
+            ${(game.links || []).map((link) => html`<a class="pf-btn gm-source-btn" href="${link.url}" target="_blank" rel="noopener noreferrer">Ver en ${link.name} <span aria-hidden="true">↗</span></a>`)}
           </div>
         </div>
       </div>

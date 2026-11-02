@@ -38,7 +38,7 @@ test('it asks for the game of the address and shows its name as text', () => {
 });
 
 test('the game links to its RAWG page with a button, in a new tab, when it has a slug', async () => {
-  const link = () => main().querySelector('.gm-head a.gm-rawg-btn');
+  const link = () => main().querySelector('.gm-head a.gm-source-btn');
   assert.equal(link().getAttribute('href'), 'https://rawg.io/games/celeste');
   assert.equal(link().getAttribute('target'), '_blank');
   assert.equal(link().getAttribute('rel'), 'noopener noreferrer');
@@ -50,7 +50,7 @@ test('a game only IGDB knows links to its page in IGDB', async () => {
   installApi({ 'GET /games/celeste/overview': { ...OVERVIEW, game: { ...OVERVIEW.game, links: [{ name: 'IGDB', url: 'https://www.igdb.com/games/celeste' }] } }, 'GET /users/photo/': json({ detail: 'no' }, 404) });
   await page.render({ main: main(), user: { id: 1, username: 'ana' } });
   await settle();
-  const link = main().querySelector('.gm-head a.gm-rawg-btn');
+  const link = main().querySelector('.gm-head a.gm-source-btn');
   assert.equal(link.getAttribute('href'), 'https://www.igdb.com/games/celeste');
   assert.match(link.textContent, /Ver en IGDB/);
 });
@@ -63,7 +63,7 @@ test('a game with both ids shows a button for RAWG and, once IGDB answers, anoth
   });
   await page.render({ main: main(), user: { id: 1, username: 'ana' } });
   await settle();
-  const buttons = [...main().querySelectorAll('.gm-head a.gm-rawg-btn')];
+  const buttons = [...main().querySelectorAll('.gm-head a.gm-source-btn')];
   assert.deepEqual(buttons.map((a) => [a.textContent.trim(), a.getAttribute('href')]), [
     ['Ver en RAWG ↗', 'https://rawg.io/games/celeste'],
     ['Ver en IGDB ↗', 'https://www.igdb.com/games/celeste'],
@@ -79,7 +79,7 @@ test('IGDB\'s button is not added twice, nor for an address that is not IGDB\'s'
     });
     await page.render({ main: main(), user: { id: 1, username: 'ana' } });
     await settle();
-    return main().querySelectorAll('.gm-head a.gm-rawg-btn').length;
+    return main().querySelectorAll('.gm-head a.gm-source-btn').length;
   };
   assert.equal(await open([{ name: 'IGDB', url: 'https://www.igdb.com/games/celeste' }], 'https://www.igdb.com/games/celeste'), 1);
   assert.equal(await open([{ name: 'RAWG', url: 'https://rawg.io/games/celeste' }], 'https://evil.example/games/celeste'), 1);
@@ -89,7 +89,7 @@ test('without a slug there is no RAWG button', async () => {
   installApi({ 'GET /games/celeste/overview': { ...OVERVIEW, game: { ...OVERVIEW.game, slug: null, links: [] } }, 'GET /users/photo/': json({ detail: 'no' }, 404) });
   await page.render({ main: main(), user: { id: 1, username: 'ana' } });
   await settle();
-  assert.equal(main().querySelector('.gm-rawg-btn'), null);
+  assert.equal(main().querySelector('.gm-source-btn'), null);
 });
 
 test('the figures of the group and the players, the most played first, with who plays now', () => {
@@ -198,7 +198,7 @@ test('the saga card lists the games from the newest, with what you have, links t
   assert.equal(rows.length, 3);
   assert.match(document.querySelector('#gmSaga').textContent, /Has completado 1 de 3\. Siguiente: Celeste Remix\./);
   // the newest first (2020, then 2018), the one without a date last
-  assert.deepEqual(rows.map((r) => r.dataset.rawg), ['300', '100', '400']);
+  assert.deepEqual(rows.map((r) => r.dataset.sourceId), ['300', '100', '400']);
   assert.equal(rows[1].classList.contains('current'), true);
   assert.equal(rows[1].querySelectorAll('b').length, 0); // text, never markup
   assert.match(rows[1].textContent, /2018.*Esta página.*Completado.*2 jugadores lo tienen/s);
@@ -297,7 +297,7 @@ test('the outside facts go under the title and the Multimedia card starts open a
   assert.equal(document.querySelector('#gmOutside .gm-badge.good').textContent, '92'); // 75 and up is green
   assert.equal(document.querySelector('#gmOutside .gm-badge.age').textContent, 'E10+');
   // the facts and the RAWG button share one row
-  assert.equal(document.querySelector('#gmOutside').parentElement.querySelector('.gm-rawg-btn') !== null, true);
+  assert.equal(document.querySelector('#gmOutside').parentElement.querySelector('.gm-source-btn') !== null, true);
   const block = document.querySelector('#gmMediaBlock');
   assert.equal(block.classList.contains('folded'), false);
   assert.equal(document.querySelector('#gmMedia [data-fold]').getAttribute('aria-expanded'), 'true');

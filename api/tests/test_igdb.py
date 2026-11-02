@@ -310,66 +310,66 @@ class IgdbSourceTests(unittest.IsolatedAsyncioTestCase):
         with mock.patch.object(my_utils, "_search_rawg", rawg), \
                 mock.patch.object(igdb, "configured", return_value=True), \
                 mock.patch.object(igdb, "search_games", return_value=[candidate]):
-            found = await my_utils.search_rawg_games("zelda")
+            found = await my_utils.search_games("zelda")
         self.assertEqual([(c.name, c.rawg_id, c.source) for c in found], [("The Legend of Zelda", None, "igdb")])
         rawg.assert_not_awaited()
 
     async def test_rawg_is_asked_when_igdb_finds_nothing_and_its_failure_then_is_not_an_outage(self):
-        rawg_candidate = my_utils.schemas.RawgGameCandidate(rawg_id=1, name="Obscure", slug="obscure")
+        rawg_candidate = my_utils.schemas.GameCandidate(rawg_id=1, name="Obscure", slug="obscure")
         with mock.patch.object(igdb, "configured", return_value=True), mock.patch.object(igdb, "search_games", return_value=[]):
             with mock.patch.object(my_utils, "_search_rawg", return_value=[rawg_candidate]):
-                self.assertEqual([c.name for c in await my_utils.search_rawg_games("obscure")], ["Obscure"])
+                self.assertEqual([c.name for c in await my_utils.search_games("obscure")], ["Obscure"])
             my_utils.reset_search_state()
-            with mock.patch.object(my_utils, "_search_rawg", side_effect=my_utils.RawgUnavailable("down")):
-                self.assertEqual(await my_utils.search_rawg_games("obscure"), [])
+            with mock.patch.object(my_utils, "_search_rawg", side_effect=my_utils.SearchUnavailable("down")):
+                self.assertEqual(await my_utils.search_games("obscure"), [])
 
     async def test_rawg_answers_when_igdb_cannot(self):
-        rawg_candidate = my_utils.schemas.RawgGameCandidate(rawg_id=1, name="Zelda", slug="zelda")
+        rawg_candidate = my_utils.schemas.GameCandidate(rawg_id=1, name="Zelda", slug="zelda")
         with mock.patch.object(my_utils, "_search_rawg", return_value=[rawg_candidate]), \
                 mock.patch.object(igdb, "configured", return_value=True), \
                 mock.patch.object(igdb, "search_games", side_effect=igdb.IgdbError("down")):
-            self.assertEqual([c.rawg_id for c in await my_utils.search_rawg_games("zelda")], [1])
+            self.assertEqual([c.rawg_id for c in await my_utils.search_games("zelda")], [1])
 
     async def test_without_igdb_only_rawg_is_asked_and_its_outage_is_reported(self):
-        with mock.patch.object(my_utils, "_search_rawg", side_effect=my_utils.RawgUnavailable("down")), \
+        with mock.patch.object(my_utils, "_search_rawg", side_effect=my_utils.SearchUnavailable("down")), \
                 mock.patch.object(igdb, "configured", return_value=False), mock.patch.object(igdb, "search_games") as search:
-            with self.assertRaises(my_utils.RawgUnavailable):
-                await my_utils.search_rawg_games("zelda")
+            with self.assertRaises(my_utils.SearchUnavailable):
+                await my_utils.search_games("zelda")
         search.assert_not_called()
 
     async def test_after_a_failure_igdb_is_not_waited_for_again_for_a_while(self):
         igdb_search = mock.Mock(side_effect=igdb.IgdbError("down"))
         with mock.patch.object(my_utils, "_search_rawg", return_value=[]), \
                 mock.patch.object(igdb, "configured", return_value=True), mock.patch.object(igdb, "search_games", igdb_search):
-            await my_utils.search_rawg_games("zelda")
-            await my_utils.search_rawg_games("zelda 2")
+            await my_utils.search_games("zelda")
+            await my_utils.search_games("zelda 2")
             self.assertEqual(igdb_search.call_count, 1)
             with mock.patch.object(my_utils.time, "monotonic", return_value=time_after_pause()):
-                await my_utils.search_rawg_games("zelda 3")
+                await my_utils.search_games("zelda 3")
             self.assertEqual(igdb_search.call_count, 2)
 
     async def test_the_same_text_is_asked_once_and_the_marks_do_not_stay_in_the_answer(self):
-        rawg = mock.AsyncMock(return_value=[my_utils.schemas.RawgGameCandidate(rawg_id=1, name="Hades", slug="hades")])
+        rawg = mock.AsyncMock(return_value=[my_utils.schemas.GameCandidate(rawg_id=1, name="Hades", slug="hades")])
         with mock.patch.object(my_utils, "_search_rawg", rawg), mock.patch.object(igdb, "configured", return_value=False):
-            first = await my_utils.search_rawg_games("Hades")
+            first = await my_utils.search_games("Hades")
             first[0].exists_in_db = True  # what mark_existing_games does
-            second = await my_utils.search_rawg_games("  hades ")
+            second = await my_utils.search_games("  hades ")
         self.assertEqual(rawg.await_count, 1)
         self.assertFalse(second[0].exists_in_db)
 
     async def test_a_failure_is_not_remembered(self):
-        rawg = mock.AsyncMock(side_effect=[my_utils.RawgUnavailable("down"), []])
+        rawg = mock.AsyncMock(side_effect=[my_utils.SearchUnavailable("down"), []])
         with mock.patch.object(my_utils, "_search_rawg", rawg), mock.patch.object(igdb, "configured", return_value=False):
-            with self.assertRaises(my_utils.RawgUnavailable):
-                await my_utils.search_rawg_games("zelda")
-            self.assertEqual(await my_utils.search_rawg_games("zelda"), [])
+            with self.assertRaises(my_utils.SearchUnavailable):
+                await my_utils.search_games("zelda")
+            self.assertEqual(await my_utils.search_games("zelda"), [])
 
     async def test_both_down_is_an_outage(self):
-        with mock.patch.object(my_utils, "_search_rawg", side_effect=my_utils.RawgUnavailable("down")), \
+        with mock.patch.object(my_utils, "_search_rawg", side_effect=my_utils.SearchUnavailable("down")), \
                 mock.patch.object(igdb, "configured", return_value=True), \
                 mock.patch.object(igdb, "search_games", side_effect=igdb.IgdbError("down")):
-            with self.assertRaises(my_utils.RawgUnavailable):
-                await my_utils.search_rawg_games("zelda")
+            with self.assertRaises(my_utils.SearchUnavailable):
+                await my_utils.search_games("zelda")
 
 
 if __name__ == "__main__":

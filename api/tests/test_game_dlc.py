@@ -205,7 +205,7 @@ class AdminEditsTheMarkTests(unittest.TestCase):
     def test_naming_a_base_game_marks_the_game_and_the_list_shows_its_name(self):
         out = self.patch("voh", parent_game_id="d4")
         self.assertEqual((out["is_dlc"], out["parent_game_id"], out["parent_name"]), (True, "d4", "Diablo IV"))
-        listed = {g["id"]: g for g in manage_games.list_games(search=None, rawg=None, sort="name", order="asc", limit=50, offset=0, db=self.db)["items"]}
+        listed = {g["id"]: g for g in manage_games.list_games(search=None, data=None, sort="name", order="asc", limit=50, offset=0, db=self.db)["items"]}
         self.assertEqual((listed["voh"]["is_dlc"], listed["voh"]["parent_name"]), (True, "Diablo IV"))
         self.assertEqual((listed["d4"]["is_dlc"], listed["d4"]["parent_name"]), (False, None))
 

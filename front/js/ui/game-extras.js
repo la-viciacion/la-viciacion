@@ -56,9 +56,9 @@ export async function showExtras({ head, desc, meta, platforms, media }, game) {
   // IGDB's own page, for a game that also has a RAWG one (the page shows a button for each source it knows)
   const buttons = head.parentElement;
   if (buttons && safe(x.igdb_url) && x.igdb_url.startsWith('https://www.igdb.com/games/')
-    && ![...buttons.querySelectorAll('a.gm-rawg-btn')].some((a) => a.href === x.igdb_url)) {
+    && ![...buttons.querySelectorAll('a.gm-source-btn')].some((a) => a.href === x.igdb_url)) {
     const link = document.createElement('a');
-    link.className = 'pf-btn gm-rawg-btn';
+    link.className = 'pf-btn gm-source-btn';
     link.href = x.igdb_url;
     link.target = '_blank';
     link.rel = 'noopener noreferrer';

@@ -14,7 +14,7 @@ En **Catálogo → Juegos** del panel:
 
 - **Enlazar con IGDB…** da su id de IGDB, la dirección de su página y sus datos (temas, palabras clave, franquicias, colecciones) a los juegos que ya tienes, por tandas del tamaño que elijas. Solo enlaza cuando la coincidencia es segura (el mismo juego de Steam, o el mismo nombre con un año que cuadre); los dudosos se listan al terminar para elegir a mano. Con la casilla **Sustituir también los datos del juego**, los que se enlacen o completen en esa tanda toman de IGDB la portada, la fecha, los géneros y la desarrolladora en lugar de los que tenían.
 - **⋯ → Resincronizar (IGDB, RAWG y HLTB)…** actualiza **un** juego desde las tres fuentes, con una ventana que muestra que está trabajando y luego el resultado de cada una; si IGDB y RAWG dan el mismo dato, manda IGDB.
-- El filtro **Datos de RAWG** (*Incompletos*, *Sin ID de IGDB ni de RAWG*) te dice qué juegos queda por arreglar a mano.
+- El filtro **Datos** (*Incompletos*, *Sin ID de IGDB ni de RAWG*) te dice qué juegos queda por arreglar a mano.
 
 ![El catálogo de juegos en el panel](../assets/screens/admin-games.webp){ .screenshot }
 

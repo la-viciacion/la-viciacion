@@ -32,26 +32,26 @@ def get_games(name: str = None, limit: int = None, db: Session = Depends(get_db)
     return games_db
 
 
-@router.get("/search-rawg", response_model=list[schemas.RawgGameCandidate])
-async def search_rawg(query: str, db: Session = Depends(get_db)):
+@router.get("/search", response_model=list[schemas.GameCandidate])
+async def search_games(query: str, db: Session = Depends(get_db)):
     """Search games (IGDB first, RAWG as the backup) and return candidates with DB existence status."""
     if not query or len(query.strip()) < 2:
         raise HTTPException(
             status_code=400, detail="Query must be at least 2 characters long"
         )
     try:
-        return await utils.search_rawg_games(query.strip(), db=db)
-    except utils.RawgUnavailable:  # already logged where it failed
+        return await utils.search_games(query.strip(), db=db)
+    except utils.SearchUnavailable:  # already logged where it failed
         raise HTTPException(status_code=503, detail=messages.GAME_SEARCH_UNAVAILABLE)
 
 
-@router.get("/igdb-parent/{igdb_id}", response_model=schemas.RawgParent | None)
+@router.get("/igdb-parent/{igdb_id}", response_model=schemas.GameParent | None)
 async def get_igdb_parent(igdb_id: int, db: Session = Depends(get_db)):
     """The base game of an IGDB DLC / expansion (null for a game of its own): the notice before adding it."""
     return await utils.igdb_parent_candidate(igdb_id, db)
 
 
-@router.get("/rawg-parent/{rawg_id}", response_model=schemas.RawgParent | None)
+@router.get("/rawg-parent/{rawg_id}", response_model=schemas.GameParent | None)
 async def get_rawg_parent(rawg_id: int, db: Session = Depends(get_db)):
     """The base game of a RAWG DLC / expansion (null for a game of its own): the notice before adding it."""
     return await utils.rawg_parent_candidate(rawg_id, db)

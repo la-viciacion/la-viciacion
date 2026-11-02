@@ -87,7 +87,7 @@ class MarkExistingGamesTests(unittest.TestCase):
         self.db.commit()
 
     def candidate(self, name, slug="", rawg_id=None):
-        return schemas.RawgGameCandidate(rawg_id=rawg_id or 0, name=name, slug=slug)
+        return schemas.GameCandidate(rawg_id=rawg_id or 0, name=name, slug=slug)
 
     def test_a_candidate_matches_by_rawg_id_slug_or_name(self):
         candidates = [

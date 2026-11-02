@@ -93,7 +93,7 @@ class OverviewTests(OpsTestCase):
         # starting the timer opened the library entry of that game
         self.assertEqual(self.admin("GET", "/overview").json(), {"users": 2, "games": 1, "timers": 2, "active_timers": 1, "library": 1})
 
-    def test_attention_flags_forgotten_timers_players_without_telegram_and_games_without_rawg(self):
+    def test_attention_flags_forgotten_timers_players_without_telegram_and_games_without_source(self):
         self.session(self.ana, "celeste", ago(hours=30), 10)
         with database.SessionLocal() as db:
             db.add(models.GameTimer(user_id=self.ana, game_id="celeste", start_time=ago(hours=20), is_active=True, platform="pc"))
@@ -102,7 +102,7 @@ class OverviewTests(OpsTestCase):
         self.assertEqual((body["stale_timer_hours"], body["stale_timers"]), (overview.STALE_TIMER_HOURS, 1))
         self.assertEqual((body["stale_timers_oldest"][0]["user"], body["stale_timers_oldest"][0]["game"]), ("ana", "Celeste"))
         self.assertEqual(body["users_without_telegram"], 1)  # ana; root has one
-        self.assertEqual(body["games_without_rawg"], 1)
+        self.assertEqual(body["games_without_source"], 1)
 
     def test_a_recent_timer_is_not_forgotten_and_the_emergency_account_is_ignored(self):
         self.api("POST", "/timers/start", as_user="ana", json={"user_id": self.ana, "game_id": "celeste", "platform": "pc"})

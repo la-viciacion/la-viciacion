@@ -341,7 +341,7 @@ def theme_rule(tags) -> Callable[[set[str]], bool]:
     first person shooter is a shooter *and* seen in first person) only when the game has all of the group. The same rule,
     from the tags a challenge was launched with (a group comes back from the JSON as a list), is what its progress counts."""
     singles = {tag.casefold() for tag in tags if isinstance(tag, str)}
-    groups = [{tag.casefold() for tag in group} for group in tags if not isinstance(tag, str)]
+    groups = [{tag.casefold() for tag in group} for group in tags if not isinstance(group, str)]
     return lambda words: bool(words & singles) or any(group <= words for group in groups)
 
 

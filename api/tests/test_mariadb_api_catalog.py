@@ -113,7 +113,7 @@ class GamesTests(CatalogTestCase):
 
 class SearchRawgTests(CatalogTestCase):
     def search(self, query="cel"):
-        return self.api("GET", "/games/search-rawg", as_user="ana", params={"query": query})
+        return self.api("GET", "/games/search", as_user="ana", params={"query": query})
 
     def test_a_query_needs_two_characters(self):
         self.assertEqual(self.search("a").status_code, 400)

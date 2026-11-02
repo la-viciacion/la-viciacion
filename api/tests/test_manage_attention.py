@@ -43,10 +43,10 @@ class AttentionTests(unittest.TestCase):
         self.db.commit()
         self.assertEqual(overview.attention(self.db)["pending_challenge_proposals"], 1)
 
-    def test_games_without_rawg(self):
-        self.assertEqual(overview.attention(self.db)["games_without_rawg"], 1)
+    def test_games_without_source(self):
+        self.assertEqual(overview.attention(self.db)["games_without_source"], 1)
 
     def test_a_game_igdb_knows_is_not_a_game_without_a_source(self):
         self.db.add(models.Game(id="c", name="Hades II", igdb_id=5))
         self.db.commit()
-        self.assertEqual(overview.attention(self.db)["games_without_rawg"], 1)
+        self.assertEqual(overview.attention(self.db)["games_without_source"], 1)
