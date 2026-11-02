@@ -241,6 +241,7 @@ async function pickRawgCandidate(results, candidate, onPick, back) {
 // RAWG's search does not say which results are DLCs; the base game is asked for the one about to be added. It only
 // informs: failing or not answering leaves the confirmation as it is.
 async function showDlcNote(results, candidate) {
+  if (!candidate.rawg_id) return; // IGDB's candidates have no RAWG entry to ask about
   try {
     const parent = await api(`/games/rawg-parent/${candidate.rawg_id}`);
     const note = results.querySelector('.modal-dlc-note');
@@ -263,6 +264,7 @@ async function addRawgGame(results, candidate, onPick) {
       image_url: candidate.image_url || null,
       genres: (candidate.genres || []).join(','),
       slug: candidate.slug || null,
+      ...(candidate.dev ? { dev: candidate.dev } : {}),
     }));
     closeAllModals();
     onPick(game.id, game.name);

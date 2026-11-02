@@ -83,6 +83,14 @@ class Config:
         return os.getenv("RAWG_API_KEY", "").strip()
 
     @property
+    def TWITCH_CLIENT_ID(self) -> str:
+        return os.getenv("TWITCH_CLIENT_ID", "").strip()
+
+    @property
+    def TWITCH_CLIENT_SECRET(self) -> str:
+        return os.getenv("TWITCH_CLIENT_SECRET", "").strip()
+
+    @property
     def HETZNER_API_TOKEN(self) -> str:
         return os.getenv("HETZNER_API_TOKEN", "").strip()
 
