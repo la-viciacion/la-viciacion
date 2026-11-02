@@ -263,6 +263,7 @@ async function addRawgGame(results, candidate, onPick) {
     const game = await api('/games/', jsonRequest('POST', {
       name: candidate.name,
       rawg_id: candidate.rawg_id,
+      ...(candidate.igdb_id ? { igdb_id: candidate.igdb_id } : {}),
       release_date: candidate.released || null,
       image_url: candidate.image_url || null,
       genres: (candidate.genres || []).join(','),

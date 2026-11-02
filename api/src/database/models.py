@@ -109,6 +109,8 @@ class Game(Base):
     avg_time = Column(Integer)
     slug = Column(String(255))
     rawg_id = Column(Integer, nullable=True, index=True)
+    # IGDB's id, the backup source of the catalogue: a game can have it, RAWG's, both or neither (typed by hand)
+    igdb_id = Column(Integer, nullable=True, index=True)
     # A DLC / expansion / edition, with or without its base game: the link is optional (a game made by hand may not
     # say which, RAWG's base may not be in the catalogue). Deleting the base game leaves the DLC marked, unlinked
     is_dlc = Column(Boolean, nullable=False, server_default=text("0"), default=False)

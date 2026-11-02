@@ -241,7 +241,7 @@ def completion_suggestion(db: Session, user_id: int, genres: str | list[str] | N
 
 
 async def new_game(db: Session, game: schemas.NewGame) -> models.Game:
-    logger.info(f"Adding new game to DB: {game.name} (rawg_id: {game.rawg_id})")
+    logger.info(f"Adding new game to DB: {game.name} (rawg_id: {game.rawg_id}, igdb_id: {game.igdb_id})")
 
     # 1. Resolve official game data from RAWG first (network: awaited, off the DB)
     game_info = await utils.get_new_game_info(game)
@@ -280,10 +280,12 @@ def parent_of(db: Session, game: models.Game) -> models.Game | None:
 def _store_game(db: Session, game: schemas.NewGame, game_info: schemas.NewGame) -> models.Game:
     official_name = game_info.name if game_info.name else game.name
 
-    # Check if the game already exists in DB by rawg_id or official name
+    # Check if the game already exists in DB by rawg_id, igdb_id or official name
     existing_game = None
     if game_info.rawg_id:
         existing_game = db.query(models.Game).filter(models.Game.rawg_id == game_info.rawg_id).first()
+    if not existing_game and game_info.igdb_id:
+        existing_game = db.query(models.Game).filter(models.Game.igdb_id == game_info.igdb_id).first()
     if not existing_game and official_name:
         existing_game = db.query(models.Game).filter(models.Game.name == official_name).first()
     if existing_game:
@@ -306,6 +308,7 @@ def _store_game(db: Session, game: schemas.NewGame, game_info: schemas.NewGame) 
         avg_time=game_info.avg_time,
         slug=game_info.slug,
         rawg_id=game_info.rawg_id,
+        igdb_id=game_info.igdb_id,
         is_dlc=bool(game_info.is_dlc or game_info.parent_game_id),
         parent_game_id=game_info.parent_game_id,
     )

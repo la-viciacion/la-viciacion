@@ -42,7 +42,7 @@ class IgdbClientTests(unittest.TestCase):
             [found] = igdb.search_games('zelda "breath"')
         self.assertEqual(
             found,
-            {"rawg_id": None, "source": "igdb", "name": "The Legend of Zelda", "slug": "the-legend-of-zelda",
+            {"rawg_id": None, "igdb_id": 1022, "source": "igdb", "name": "The Legend of Zelda", "slug": "the-legend-of-zelda",
              "released": "1986-02-21", "image_url": "https://images.igdb.com/igdb/image/upload/t_cover_big/co1uii.jpg",
              "genres": ["Adventure"], "platforms": ["Wii"], "dev": "Nintendo"},
         )
@@ -60,6 +60,29 @@ class IgdbClientTests(unittest.TestCase):
         self.assertEqual(names, ["Among Us!", "Among Us", "The Wolf Among Us", "Among Us VR"])
         self.assertIn(b'where name ~ *"among us"* & game_type = (0,8,9,10,11) & version_parent = null;', post.call_args.kwargs["data"])
         self.assertIn(b"sort total_rating_count desc", post.call_args.kwargs["data"])
+
+    def test_the_details_of_a_game_are_in_the_shape_of_a_new_game(self):
+        item = dict(ITEM, game_type=0, external_games=[
+            {"external_game_source": 10, "uid": "yt"}, {"external_game_source": igdb.STEAM_SOURCE, "uid": "11949"},
+        ])
+        with mock.patch.object(igdb.requests, "post", side_effect=[
+            _response({"access_token": "t", "expires_in": 5000000}), _response([item]),
+        ]) as post:
+            details = igdb.game_details(1022)
+        self.assertIn(b"where id = 1022;", post.call_args.kwargs["data"])
+        self.assertEqual(details["steam_id"], "11949")
+        self.assertEqual(
+            (details["igdb_id"], details["name"], details["dev"], details["genres"], details["is_dlc"]),
+            (1022, "The Legend of Zelda", "Nintendo", "Adventure", False),
+        )
+        self.assertEqual(str(details["release_date"]), "1986-02-21")
+
+    def test_a_dlc_is_marked_and_a_game_igdb_does_not_have_is_none(self):
+        with mock.patch.object(igdb.requests, "post", side_effect=[
+            _response({"access_token": "t", "expires_in": 5000000}), _response([dict(ITEM, game_type=2)]), _response([]),
+        ]):
+            self.assertTrue(igdb.game_details(1)["is_dlc"])
+            self.assertIsNone(igdb.game_details(2))
 
     def test_the_search_is_asked_only_when_no_name_contains_the_text(self):
         with mock.patch.object(igdb.requests, "post", side_effect=[

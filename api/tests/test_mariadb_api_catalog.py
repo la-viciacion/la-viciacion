@@ -132,6 +132,14 @@ class SearchRawgTests(CatalogTestCase):
         self.assertEqual((first["exists_in_db"], first["db_game_id"]), (True, "celeste"))
         self.assertFalse(second["exists_in_db"])
 
+    def test_an_igdb_candidate_is_recognised_by_its_igdb_id(self):
+        self.game("hades-two", "Hades 2 (my name)", igdb_id=555)
+        candidate = my_utils.igdb._candidate({"id": 555, "name": "Hades II", "slug": "hades-ii"})
+        with mock.patch.object(my_utils.igdb, "configured", return_value=True),                 mock.patch.object(my_utils.igdb, "search_games", return_value=[candidate]):
+            self.with_rawg(Rawg(fail=True))
+            [found] = self.search().json()
+        self.assertEqual((found["igdb_id"], found["exists_in_db"], found["db_game_id"]), (555, True, "hades-two"))
+
     def test_a_game_is_recognised_by_name_or_slug_too(self):
         self.with_rawg(Rawg(search=[CELESTE]))
         self.game("by-name", "Celeste")
@@ -194,6 +202,28 @@ class CreateGameTests(CatalogTestCase):
         self.with_rawg(Rawg())
         game = self.create(name="My Indie Thing").json()
         self.assertEqual((game["name"], game["dev"], game["rawg_id"], game["avg_time"]), ("My Indie Thing", "-", None, 0))
+
+    def test_a_game_picked_from_igdb_is_stored_with_its_id_and_what_igdb_knows(self):
+        igdb_game = {
+            "igdb_id": 555, "name": "Hades II", "slug": "hades-ii", "dev": "Supergiant Games", "steam_id": "1145350",
+            "release_date": datetime.date(2025, 9, 25), "image_url": "https://img/h2.jpg", "genres": "RPG", "is_dlc": False,
+        }
+        self.with_rawg(Rawg(), hltb(hltb_hit(main=40, name="Hades II")))
+        with mock.patch.object(my_utils.igdb, "configured", return_value=True),                 mock.patch.object(my_utils.igdb, "game_details", return_value=igdb_game):
+            response = self.create(name="Hades II", igdb_id=555)
+            again = self.create(name="Another name", igdb_id=555)
+        game = response.json()
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual((game["igdb_id"], game["rawg_id"], game["dev"], game["steam_id"], game["slug"]), (555, None, "Supergiant Games", "1145350", "hades-ii"))
+        self.assertEqual((game["release_date"], game["genres"], game["avg_time"]), ("2025-09-25", "RPG", 144000))
+        self.assertEqual(again.status_code, 400)
+        self.assertEqual(self.scalar("SELECT COUNT(*) FROM games"), 1)
+
+    def test_an_igdb_game_is_still_added_when_igdb_cannot_give_its_details(self):
+        self.with_rawg(Rawg())
+        with mock.patch.object(my_utils.igdb, "configured", return_value=True),                 mock.patch.object(my_utils.igdb, "game_details", side_effect=my_utils.igdb.IgdbError("down")):
+            game = self.create(name="Hades II", igdb_id=555, slug="hades-ii", dev="Supergiant Games").json()
+        self.assertEqual((game["name"], game["igdb_id"], game["slug"], game["dev"]), ("Hades II", 555, "hades-ii", "Supergiant Games"))
 
     def test_without_a_rawg_key_it_still_works(self):
         game = self.create(name="Offline Game").json()
