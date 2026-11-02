@@ -75,7 +75,7 @@ class IgdbSyncRunTests(ApiTestCase):
         igdb_sync._status.clear()
         igdb_sync._status["state"] = "idle"
         igdb_sync._cancel.clear()
-        self.by_steam, self.by_name, self.asked, self.extras = {}, {}, [], {}
+        self.by_steam, self.by_name, self.asked, self.extras, self.details = {}, {}, [], {}, {}
         for patcher in (
             mock.patch.object(igdb_sync.time, "sleep"),
             mock.patch.object(igdb_sync.threading, "Thread", new=SameThread),
@@ -83,6 +83,7 @@ class IgdbSyncRunTests(ApiTestCase):
             mock.patch.object(igdb, "find_by_steam", side_effect=lambda steam: self.by_steam.get(steam, [])),
             mock.patch.object(igdb, "search_items", side_effect=self.search),
             mock.patch.object(igdb, "game_extras", side_effect=lambda igdb_id: self.extras.get(igdb_id)),
+            mock.patch.object(igdb, "game_details", side_effect=lambda igdb_id: self.details.get(igdb_id)),
         ):
             patcher.start()
             self.addCleanup(patcher.stop)
@@ -107,8 +108,8 @@ class IgdbSyncRunTests(ApiTestCase):
             g = db.get(models.Game, game_id)
             return g.themes, g.keywords, g.franchises, g.collections
 
-    def run_sync(self, max_games=None):
-        self.assertTrue(igdb_sync.start(max_games))
+    def run_sync(self, max_games=None, overwrite=False):
+        self.assertTrue(igdb_sync.start(max_games, overwrite))
         return igdb_sync.status()
 
     def test_certain_matches_are_linked_and_the_rest_is_listed_without_touching_anything_else(self):
@@ -126,6 +127,56 @@ class IgdbSyncRunTests(ApiTestCase):
         self.assertEqual([n["name"] for n in status["not_found"]], ["Ghost"])
         with database.SessionLocal() as db:
             self.assertEqual(db.get(models.Game, "hades").dev, "Me")
+
+    def igdb_details(self, igdb_id, name, **fields):
+        return {
+            "igdb_id": igdb_id, "name": name, "slug": "x", "igdb_slug": f"{name.lower()}-igdb", "dev": "IGDB Studio", "steam_id": "", "release_date": datetime.date(2018, 1, 25),
+            "image_url": "https://images.igdb.com/cover.jpg", "genres": "Platform", "is_dlc": False, "parent_igdb_id": None,
+            "themes": "Fantasy", "keywords": "Roguelike", "franchises": "", "collections": "", **fields,
+        }
+
+    def test_with_overwrite_a_game_that_is_linked_takes_igdbs_data_and_without_it_keeps_its_own(self):
+        for name, game_id in (("Celeste", "celeste"), ("Hades", "hades")):
+            self.game(game_id, name, release_date=datetime.date(2018, 1, 25), dev="RAWG Studio", image_url="https://media.rawg.io/old.jpg", genres="Platformer", rawg_id=1)
+        self.by_name.update({"Celeste": [item(20, "Celeste", 2018)], "Hades": [item(21, "Hades", 2018)]})
+        self.details[20] = self.igdb_details(20, "Celeste")
+        self.details[21] = self.igdb_details(21, "Hades")
+        with database.SessionLocal() as db:
+            db.get(models.Game, "hades").image_url = "https://media.rawg.io/hades.jpg"
+            db.commit()
+        self.run_sync(max_games=1, overwrite=True)  # alphabetical: Celeste only
+        with database.SessionLocal() as db:
+            celeste, hades = db.get(models.Game, "celeste"), db.get(models.Game, "hades")
+            self.assertEqual((celeste.dev, celeste.image_url, celeste.genres, celeste.igdb_id), ("IGDB Studio", "https://images.igdb.com/cover.jpg", "Platform", 20))
+            self.assertEqual((hades.dev, hades.genres, hades.igdb_id), ("RAWG Studio", "Platformer", None))  # not in the batch
+        igdb_sync._status["state"] = "idle"
+        self.run_sync(overwrite=False)  # Hades, linked without replacing
+        with database.SessionLocal() as db:
+            hades = db.get(models.Game, "hades")
+            self.assertEqual((hades.igdb_id, hades.dev, hades.image_url, hades.genres), (21, "RAWG Studio", "https://media.rawg.io/hades.jpg", "Platformer"))
+
+    def test_with_overwrite_a_game_linked_but_incomplete_is_replaced_too_and_a_complete_one_is_not_touched(self):
+        self.game("old", "Old", igdb_id=50, dev="RAWG Studio", genres="Platformer")
+        self.game("done", "Done", igdb_id=51, igdb_slug="done", themes="", keywords="", franchises="", collections="", dev="Keep")
+        self.details[50] = self.igdb_details(50, "Old")
+        status = self.run_sync(overwrite=True)
+        self.assertEqual((status["filled"], status["total"]), (1, 1))
+        with database.SessionLocal() as db:
+            self.assertEqual((db.get(models.Game, "old").dev, db.get(models.Game, "old").genres, db.get(models.Game, "done").dev), ("IGDB Studio", "Platform", "Keep"))
+
+    def test_a_game_is_linked_on_the_spot_when_there_is_a_certain_match_and_otherwise_left_alone(self):
+        self.game("celeste", "Celeste", release_date=datetime.date(2018, 1, 25), dev="Keep")
+        self.game("fear", "Fear", release_date=datetime.date(2017, 1, 1))
+        self.game("dup", "Celeste Classic", release_date=datetime.date(2018, 1, 1))
+        self.game("owner", "Owner", igdb_id=22, igdb_slug="owner", themes="")
+        self.by_name.update({"Celeste": [item(20, "Celeste", 2018)], "Fear": [item(30, "Layers of Fear", 2016)], "Celeste Classic": [item(22, "Celeste Classic", 2018)]})
+        with database.SessionLocal() as db:
+            games = {g.id: g for g in db.query(models.Game)}
+            self.assertEqual([igdb_sync.link_one(db, games[g]) for g in ("celeste", "fear", "dup", "owner")], [True, False, False, False])
+            self.assertEqual((games["celeste"].igdb_id, games["celeste"].igdb_slug, games["celeste"].themes, games["celeste"].dev), (20, "celeste", "Fantasy", "Keep"))
+            self.assertEqual((games["fear"].igdb_id, games["dup"].igdb_id), (None, None))
+        with mock.patch.object(igdb, "configured", return_value=False), database.SessionLocal() as db:
+            self.assertFalse(igdb_sync.link_one(db, db.get(models.Game, "fear")))
 
     def test_a_linked_game_gets_what_igdb_says_of_it(self):
         self.game("celeste", "Celeste", release_date=datetime.date(2018, 1, 25))

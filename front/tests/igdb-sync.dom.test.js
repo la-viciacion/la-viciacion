@@ -20,6 +20,8 @@ const estimate = { total_games: 528, pending_games: 400, games: 50, estimated_se
 test('the batch size is empty for all the games, or a whole number from one', () => {
   assert.deepEqual(batchOf(''), {});
   assert.deepEqual(batchOf('50'), { max_games: 50 });
+  assert.deepEqual(batchOf('50', true), { max_games: 50, overwrite: true });
+  assert.deepEqual(batchOf('', true), { overwrite: true });
   assert.equal(batchOf('0'), null);
   assert.equal(batchOf('2.5'), null);
   assert.equal(batchOf('abc'), null);
@@ -49,6 +51,23 @@ test('the admin sizes the batch, sees the figures for it and starts it', async (
   await settle();
   assert.deepEqual(calls.find((c) => c.method === 'POST').body, { max_games: 20 });
   assert.equal(text('.adm-progress-txt')[0], '3 / 50 juegos · Game');
+});
+
+test('the admin can ask for IGDB\'s data to replace the games\' own, and the estimate does not change for it', async () => {
+  mock.timers.enable({ apis: ['setTimeout'] });
+  const calls = installApi({
+    'GET /manage/igdb-sync/status': () => (calls.some((c) => c.method === 'POST') ? status() : { state: 'idle' }),
+    'GET /manage/igdb-sync/estimate': estimate,
+    'POST /manage/igdb-sync/start': json(status(), 202),
+  });
+  await igdbSyncFlow({ onDone: () => {} });
+  await settle();
+  const form = document.querySelector('form.adm-form');
+  assert.equal(form.elements.overwrite.checked, false);
+  form.elements.overwrite.checked = true;
+  form.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+  await settle();
+  assert.deepEqual(calls.find((c) => c.method === 'POST').body, { max_games: 50, overwrite: true });
 });
 
 test('a doubtful game is linked from its candidates in the list', async () => {

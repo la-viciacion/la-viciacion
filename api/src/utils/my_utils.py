@@ -147,6 +147,11 @@ _igdb_paused_until = 0.0
 _search_cache = OutsideCache(SEARCH_CACHE_SECONDS, failure_seconds=SEARCH_CACHE_SECONDS)  # text -> its candidates; a failure is raised, never kept
 
 
+def igdb_paused() -> bool:
+    """IGDB failed a moment ago (see `IGDB_PAUSE_SECONDS`): what is best effort leaves it alone."""
+    return time.monotonic() < _igdb_paused_until
+
+
 def reset_search_state() -> None:
     """Forget the remembered searches and the pause of IGDB (the tests)."""
     global _igdb_paused_until

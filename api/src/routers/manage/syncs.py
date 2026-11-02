@@ -95,6 +95,7 @@ def igdb_sync_status():
 
 class IgdbSyncBody(BaseModel):
     max_games: Optional[int] = None    # only the first N games without an IGDB id, alphabetically; None = all of them
+    overwrite: bool = False            # the games it links or completes also take IGDB's data in place of the one they have
 
 
 @router.post("/igdb-sync/start", status_code=202)
@@ -102,7 +103,7 @@ def igdb_sync_start(body: IgdbSyncBody):
     if body.max_games is not None and body.max_games < 1:
         raise HTTPException(status_code=400, detail="max_games debe ser al menos 1")
     try:
-        started = igdb_sync.start(body.max_games)
+        started = igdb_sync.start(body.max_games, body.overwrite)
     except RuntimeError as e:
         raise HTTPException(status_code=400, detail=str(e))
     if not started:

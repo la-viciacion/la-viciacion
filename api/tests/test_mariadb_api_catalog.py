@@ -249,6 +249,29 @@ class CreateGameTests(CatalogTestCase):
         self.assertEqual((known["igdb_id"], known["name"], known["exists_in_db"], known["db_game_id"]), (700, "Base Game", True, "base"))
         self.assertIsNone(alone.json())
 
+    def test_a_game_created_from_rawg_is_linked_to_igdb_when_it_can_be_and_never_fails_for_it(self):
+        self.with_rawg(Rawg(details={101: CELESTE}), hltb())
+        match = [{"id": 20, "name": "Celeste", "slug": "celeste-igdb", "first_release_date": 1516838400, "game_type": 0, "version_parent": None, "themes": [{"name": "Fantasy"}]}]
+        with mock.patch.object(my_utils.igdb, "configured", return_value=True), mock.patch.object(my_utils.igdb, "find_by_steam", return_value=[]), \
+                mock.patch.object(my_utils.igdb, "search_items", return_value=match):
+            game = self.create(rawg_id=101).json()
+        self.assertEqual((game["rawg_id"], game["igdb_id"]), (101, 20))
+        self.assertEqual(self.scalar("SELECT CONCAT_WS('|', igdb_slug, themes) FROM games"), "celeste-igdb|Fantasy")
+
+        self.with_rawg(Rawg(details={202: dict(CELESTE, id=202, name="Other", slug="other")}), hltb())
+        with mock.patch.object(my_utils.igdb, "configured", return_value=True), mock.patch.object(my_utils.igdb, "find_by_steam", return_value=[]), \
+                mock.patch.object(my_utils.igdb, "search_items", side_effect=my_utils.igdb.IgdbError("down")):
+            other = self.create(name="Other", rawg_id=202)
+        self.assertEqual((other.status_code, other.json()["igdb_id"]), (201, None))  # IGDB failing does not stop the creation
+
+    def test_nothing_is_asked_to_igdb_while_it_is_known_to_be_down(self):
+        self.with_rawg(Rawg(details={101: CELESTE}), hltb())
+        search = mock.Mock(return_value=[])
+        with mock.patch.object(my_utils.igdb, "configured", return_value=True), mock.patch.object(my_utils.igdb, "search_items", search), \
+                mock.patch.object(my_utils, "igdb_paused", return_value=True):
+            self.assertEqual(self.create(rawg_id=101).status_code, 201)
+        search.assert_not_called()
+
     def test_an_igdb_game_is_still_added_when_igdb_cannot_give_its_details(self):
         self.with_rawg(Rawg())
         with mock.patch.object(my_utils.igdb, "configured", return_value=True),                 mock.patch.object(my_utils.igdb, "game_details", side_effect=my_utils.igdb.IgdbError("down")):
