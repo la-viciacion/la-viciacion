@@ -275,6 +275,36 @@ def _run(max_games: int | None, overwrite: bool = False):
         logger.info(f"IGDB link ended ({reason})")
 
 
+RECENT_DAYS = 7  # the hourly link only looks at the games added this recently: the older ones are the admin's, in batches
+HOURLY_LIMIT = 20
+
+
+def link_recent(db, limit: int = HOURLY_LIMIT, days: int = RECENT_DAYS) -> str:
+    """The hourly job: links to IGDB (certain matches only, as `link_one`) the games added in the last days that have no IGDB id,
+    the ones created from RAWG while IGDB could not answer. The older games are left alone, for the batches of the admin."""
+    if not igdb.configured():
+        return "IGDB is not set up"
+    if status().get("state") == "running":
+        return "a batch is running"
+    since = datetime.datetime.now() - datetime.timedelta(days=days)
+    games = (
+        db.query(models.Game)
+        .filter(models.Game.igdb_id.is_(None), models.Game.created_at >= since)
+        .order_by(models.Game.created_at)
+        .limit(limit)
+        .all()
+    )
+    linked = 0
+    for game in games:
+        try:
+            linked += link_one(db, game)
+        except igdb.IgdbError as e:  # IGDB is down: the next hour tries again
+            db.rollback()
+            return f"{linked} linked, IGDB failed: {e}"
+        time.sleep(THROTTLE_SECONDS)
+    return f"{linked} linked of {len(games)}"
+
+
 RELEASE_BATCH = 50  # games per request when the dates are refreshed
 
 

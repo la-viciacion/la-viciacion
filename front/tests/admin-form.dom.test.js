@@ -68,7 +68,7 @@ test('what a way to create always sends goes with the form', async () => {
 test('the games form edits every field of a game, the DLC mark and its base game included', async () => {
   const { ENTITIES } = await import('../js/pages/admin/entities.js');
   const keys = ENTITIES.games.fields.map((f) => f.key);
-  assert.deepEqual(keys, ['name', 'dev', 'release_date', 'genres', 'tags', 'avg_time', 'image_url', 'steam_id', 'rawg_id', 'igdb_id', 'slug', 'is_dlc', 'parent_game_id']);
+  assert.deepEqual(keys, ['name', 'dev', 'release_date', 'genres', 'tags', 'avg_time', 'image_url', 'steam_id', 'rawg_id', 'igdb_id', 'igdb_slug', 'themes', 'franchises', 'collections', 'slug', 'is_dlc', 'parent_game_id']);
 
   const row = { id: 'voh', name: 'Vessel <b>', is_dlc: true, parent_game_id: 'd4', parent_name: 'Diablo <IV>' };
   openForm(ENTITIES.games, row, null);

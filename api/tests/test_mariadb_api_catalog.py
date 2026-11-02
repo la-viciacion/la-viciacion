@@ -249,6 +249,13 @@ class CreateGameTests(CatalogTestCase):
         self.assertEqual((known["igdb_id"], known["name"], known["exists_in_db"], known["db_game_id"]), (700, "Base Game", True, "base"))
         self.assertIsNone(alone.json())
 
+    def test_a_game_remembers_when_it_was_added(self):
+        self.with_rawg(Rawg(), hltb())
+        self.create(name="Typed Game")
+        self.assertIsNotNone(self.scalar("SELECT created_at FROM games"))
+        self.game("old", "Old")  # a fixture row, as the games from before the column are
+        self.assertIsNone(self.scalar("SELECT created_at FROM games WHERE id = 'old'"))
+
     def test_a_game_created_from_rawg_is_linked_to_igdb_when_it_can_be_and_never_fails_for_it(self):
         self.with_rawg(Rawg(details={101: CELESTE}), hltb())
         match = [{"id": 20, "name": "Celeste", "slug": "celeste-igdb", "first_release_date": 1516838400, "game_type": 0, "version_parent": None, "themes": [{"name": "Fantasy"}]}]

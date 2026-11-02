@@ -1,3 +1,4 @@
+import datetime
 import math
 import uuid
 import random
@@ -346,6 +347,7 @@ def _store_game(db: Session, game: schemas.NewGame, game_info: schemas.NewGame) 
         igdb_slug=game_info.igdb_slug,
         rawg_id=game_info.rawg_id,
         igdb_id=game_info.igdb_id,
+        created_at=datetime.datetime.now(),
         themes=game_info.themes,
         keywords=game_info.keywords,
         franchises=game_info.franchises,

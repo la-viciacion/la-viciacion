@@ -13,6 +13,8 @@ what nothing else can trigger remains here:
                     timers that are due (each user chooses the interval, 10 minutes or more).
                     Switched off by TIMER_NOTICE_REFRESH: only the first notification is sent
   forgotten_timers  every hour, reminds who has a timer running for too long
+  igdb_link         every hour, links to IGDB (certain matches only) up to 20 games added in the last 7 days that have no IGDB id,
+                    the ones created from RAWG while IGDB could not answer. Not tied to the notifications switch
   daily_streaks     every day at 05:00, announces the streaks lost the day before
   daily_wishlist    every day at 09:00, refreshes the release date of the games somebody waits for
                     and tells who wished a game that comes out today (each user chooses the channels, or switches it off)
@@ -50,7 +52,7 @@ from ..config import Config
 from ..crud import challenge_schedules, costs, group_polls, users
 from ..database import models
 from ..database.database import SessionLocal
-from . import actions, challenge_notices, inbox, polls, push, recap_notices, server_status, settings
+from . import actions, challenge_notices, igdb_sync, inbox, polls, push, recap_notices, server_status, settings
 from .logger import LogManager
 
 log_manager = LogManager()
@@ -236,6 +238,10 @@ async def _forgotten_timers(db: Session, window: tuple[datetime.datetime, dateti
     return f"{len(failed)} failed" if failed else ""
 
 
+async def _igdb_link(db: Session) -> str:
+    return await asyncio.to_thread(igdb_sync.link_recent, db)
+
+
 async def _daily_streaks(db: Session) -> str:
     await actions.announce_lost_streaks(db)
     return ""
@@ -324,6 +330,10 @@ def tick(now: datetime.datetime | None = None) -> None:
             previous = _last_run(db, "forgotten_timers")
             if is_due(now, slot, previous, HOURLY_GRACE) and _claim(db, "forgotten_timers", slot, now):
                 _run(db, "forgotten_timers", lambda: _forgotten_timers(db, forgotten_window(slot, previous)))
+
+        slot = hourly_slot(now)
+        if is_due(now, slot, _last_run(db, "igdb_link"), HOURLY_GRACE) and _claim(db, "igdb_link", slot, now):
+            _run(db, "igdb_link", lambda: _igdb_link(db))
 
         # not tied to the notifications switch: closing a poll is a change of state (only the winner's notice is)
         if group_polls.due(db, now):

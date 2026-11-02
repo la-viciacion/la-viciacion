@@ -122,6 +122,7 @@ class Game(Base):
     rawg_id = Column(Integer, nullable=True, index=True)
     # IGDB's id, the backup source of the catalogue: a game can have it, RAWG's, both or neither (typed by hand)
     igdb_id = Column(Integer, nullable=True, index=True)
+    created_at = Column(DateTime, nullable=True)  # when the app added it (NULL: before this column existed)
     igdb_slug = Column(String(255), nullable=True)  # IGDB's page of the game: `slug` is RAWG's
     # What IGDB says of the game, comma separated like genres and tags (NULL = never asked, "" = IGDB has nothing)
     themes = Column(Text, nullable=True)
