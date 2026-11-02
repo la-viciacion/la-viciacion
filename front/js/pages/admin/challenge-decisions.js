@@ -4,6 +4,7 @@ import { api, jsonRequest } from '../../lib/api.js';
 import { html } from '../../lib/html.js';
 import { modalHeader, openModal } from '../../ui/modal.js';
 import { toast } from '../../ui/toast.js';
+import { confirmDialog } from './dialogs.js';
 
 export function ask({ title, body, submit, run, admin }) {
   const m = openModal(html`
@@ -20,7 +21,7 @@ export function ask({ title, body, submit, run, admin }) {
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     try {
-      await run(form.elements);
+      if ((await run(form.elements)) === false) return; // the admin changed their mind: the form stays
       m.close();
       await admin.reload();
     } catch (err) {
@@ -41,8 +42,12 @@ export function approveProposal(row, admin) {
         <option value="auto">Participan todos (pueden salirse)</option>
         <option value="opt_in">Voluntario (hay que apuntarse)</option>
       </select></label>
-      <label class="adm-check"><input type="checkbox" name="announce" checked /> Avisar al grupo (Telegram y notificaciones)</label>`,
+      <label class="adm-check"><input type="checkbox" name="announce" /> Avisar al grupo (Telegram y notificaciones)</label>`,
     run: async (el) => {
+      const who = el.participation.selectedOptions[0].textContent;
+      const sure = await confirmDialog('Lanzar el reto', html`<p>Revisa el resumen antes de lanzarlo.</p>
+        <ul class="adm-list"><li><strong>Reto</strong>: ${row.title}</li><li><strong>Participación</strong>: ${who}</li><li><strong>Avisar al grupo</strong>: ${el.announce.checked ? 'Sí' : 'No'}</li></ul>`, { ok: 'Lanzar' });
+      if (!sure) return false;
       await api(`/manage/challenge-proposals/${row.id}/approve`, jsonRequest('POST', { participation: el.participation.value, announce: el.announce.checked }));
       toast('Reto lanzado');
     },

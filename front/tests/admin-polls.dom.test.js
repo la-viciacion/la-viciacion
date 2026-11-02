@@ -50,6 +50,12 @@ test('the options are rows of the launch form itself, added one by one, and are 
   rows()[1].value = 'Hollow Knight';
   document.querySelector('form').requestSubmit();
   await settle();
+  const summary = [...document.querySelectorAll('.modal-overlay:last-child .adm-list li')].map((li) => li.textContent);
+  assert.ok(summary.includes('Opciones de respuesta: Celeste · Hollow Knight'));
+  assert.match(document.querySelector('.modal-overlay:last-child').textContent, /Se publicará en el grupo de Telegram/);
+  assert.deepEqual(calls, []); // a poll goes to the group: nothing is sent before the second yes
+  document.querySelector('[data-confirm]').click();
+  await settle();
   assert.deepEqual(calls[0].body.options, ['Celeste', 'Hollow Knight']);
 });
 
@@ -60,19 +66,30 @@ test('only an open poll can be closed, and a closed one Telegram did not stop ca
   assert.deepEqual([close.show(poll({ status: 'closed', telegram_stopped: true })), retry.show(poll({ status: 'closed', telegram_stopped: true }))], [false, false]);
 });
 
-test('closing asks whether to tell the group and sends the choice', async () => {
+test('closing asks whether to tell the group (no by default) and, if so, asks once more', async () => {
   const calls = installApi({ 'POST /manage/polls/4/close': poll({ status: 'closed', telegram_stopped: true }) });
   let reloaded = 0;
   closePoll(poll(), { reload: async () => { reloaded += 1; } });
   assert.match(document.querySelector('.modal-header').textContent, /Cerrar · ¿A qué <b>jugamos<\/b>\?/);
   assert.equal(document.querySelectorAll('.modal-content b').length, 0); // the question is text
   const form = document.querySelector('.modal-content form');
-  assert.equal(form.elements.announce.checked, true);
-  form.elements.announce.checked = false;
+  assert.equal(form.elements.announce.checked, false);
+  form.elements.announce.checked = true;
   form.requestSubmit();
   await settle();
-  assert.deepEqual(calls[0].body, { announce: false });
+  assert.deepEqual(calls, []);
+  document.querySelector('[data-confirm]').click();
+  await settle();
+  assert.deepEqual(calls[0].body, { announce: true });
   assert.equal(reloaded, 1);
+});
+
+test('closing without telling the group needs no second yes', async () => {
+  const calls = installApi({ 'POST /manage/polls/4/close': poll({ status: 'closed', telegram_stopped: true }) });
+  closePoll(poll(), { reload: async () => {} });
+  document.querySelector('.modal-content form').requestSubmit();
+  await settle();
+  assert.deepEqual(calls[0].body, { announce: false });
 });
 
 test('trying again on a poll already closed announces nothing and does not ask', async () => {

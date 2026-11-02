@@ -424,6 +424,8 @@ export const ENTITIES = {
       },
       { label: 'Límite', render: (r) => (r.closed_at ? html`Cerrada ${formatTimestamp(r.closed_at)}` : r.closes_at ? formatTimestamp(r.closes_at) : 'A mano') },
     ],
+    confirmCreate: 'Encuesta', // it is published in the Telegram group
+    confirmNote: 'Se publicará en el grupo de Telegram.',
     creates: [
       {
         label: 'Lanzar encuesta',

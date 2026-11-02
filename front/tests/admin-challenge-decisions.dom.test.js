@@ -13,7 +13,7 @@ afterEach(() => closeAllModals());
 
 const proposal = { id: 7, title: 'Temático: <b>Horror</b>', label: 'Temático', status: 'pending', proposer: { id: 2, name: 'Bea' } };
 
-test('approving asks who takes part and whether to tell the group, and sends both', async () => {
+test('approving asks who takes part and whether to tell the group, shows a summary, and sends only after the second yes', async () => {
   const calls = installApi({ 'POST /manage/challenge-proposals/7/approve': { id: 7, status: 'approved' } });
   let reloaded = 0;
   approveProposal(proposal, { reload: async () => { reloaded += 1; } });
@@ -21,13 +21,30 @@ test('approving asks who takes part and whether to tell the group, and sends bot
   assert.equal(document.querySelectorAll('.modal-content b').length, 0); // the title is text
   assert.match(document.querySelector('.modal-content').textContent, /Propuesto por Bea/);
   const form = document.querySelector('.modal-content form');
-  assert.equal(form.elements.announce.checked, true);
+  assert.equal(form.elements.announce.checked, false); // the group is told only if the admin says so
   form.elements.participation.value = 'opt_in';
-  form.elements.announce.checked = false;
+  form.elements.announce.checked = true;
   form.requestSubmit();
   await settle();
-  assert.deepEqual(calls[0].body, { participation: 'opt_in', announce: false });
+  assert.match(document.querySelector('.modal-overlay:last-child .adm-list').textContent, /Voluntario.*Avisar al grupo: Sí/);
+  assert.deepEqual(calls, []); // nothing sent yet
+  document.querySelector('[data-confirm]').click();
+  await settle();
+  assert.deepEqual(calls[0].body, { participation: 'opt_in', announce: true });
   assert.equal(reloaded, 1);
+});
+
+test('saying no to the summary leaves the approval as it was', async () => {
+  const calls = installApi({ 'POST /manage/challenge-proposals/7/approve': { id: 7, status: 'approved' } });
+  let reloaded = 0;
+  approveProposal(proposal, { reload: async () => { reloaded += 1; } });
+  document.querySelector('.modal-content form').requestSubmit();
+  await settle();
+  document.querySelector('.modal-overlay:last-child [data-close]').click();
+  await settle();
+  assert.deepEqual(calls, []);
+  assert.equal(reloaded, 0);
+  assert.ok(document.querySelector('.modal-content form')); // the form is still there
 });
 
 test('an error of the API stays in the window and nothing reloads', async () => {
@@ -35,6 +52,8 @@ test('an error of the API stays in the window and nothing reloads', async () => 
   let reloaded = 0;
   approveProposal(proposal, { reload: async () => { reloaded += 1; } });
   document.querySelector('.modal-content form').requestSubmit();
+  await settle();
+  document.querySelector('[data-confirm]').click();
   await settle();
   assert.match(document.querySelector('.adm-error').textContent, /Ese mes ya ha pasado/);
   assert.equal(reloaded, 0);

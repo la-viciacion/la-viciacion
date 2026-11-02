@@ -16,7 +16,8 @@
 // An entity may have several ways to create a row (`creates`: [{ label, choose?, fields, body }]): `fields` is the form and
 // `body` what is always sent with it (the kind of challenge, for instance). With one way, openForm takes it as `variant`; with
 // several, openCreateForm opens one form that starts with a Tipo select (`choose` is each type's name) and swaps the fields;
-// an entity with `confirmCreate` shows what is about to be created, and asks, before sending it.
+// an entity with `confirmCreate` (true, or the name of what is created) shows what is about to be created, and asks, before
+// sending it; `confirmNote` adds a line to that (what it will do).
 // a type with `repeat: endpoint` posts there instead when its period is a month that repeats.
 // image (editing only): { current: (row) => url of the picture or null, upload: (row) => route that takes the new file }
 import { api, jsonRequest } from '../../lib/api.js';
@@ -258,6 +259,7 @@ function describeField(f, root) {
   switch (f.type) {
     case 'checkbox': return el.checked ? 'Sí' : 'No';
     case 'game': return document.getElementById(`${inputId(f)}_name`).textContent;
+    case 'options': return [...el.querySelectorAll('input')].map((input) => input.value.trim()).filter(Boolean).join(' · ');
     case 'games': return [...el.querySelectorAll('li > span')].map((name) => name.textContent).join(', ');
     case 'period': return describePeriod(root.querySelector('[data-period-field]'));
     case 'select':
@@ -275,6 +277,8 @@ function summaryRows(fields, root) {
     .map((f) => [f.type === 'period' ? 'Periodo' : f.label.replace(/\s*\(.*\)\s*$/, ''), describeField(f, root)])
     .filter(([, value]) => value && value !== 'Ninguno');
 }
+
+const confirmName = (entity, variant) => (typeof entity.confirmCreate === 'string' ? entity.confirmCreate : variant.choose);
 
 const seen = new WeakMap(); // the value each field with `defaultBy` last took its default for
 
@@ -314,7 +318,7 @@ export function openForm(entity, row, admin, variant = null) {
   modal.el.addEventListener('click', (e) => onFormClick(e, modal, fields));
   modal.el.querySelector('form').addEventListener('submit', (e) => {
     e.preventDefault();
-    submit(entity, row, fields, modal, admin, { extra: variant?.body });
+    submit(entity, row, fields, modal, admin, { extra: variant?.body, confirm: creating && entity.confirmCreate ? confirmName(entity, variant) : null });
   });
 }
 
@@ -359,7 +363,7 @@ export function openCreateForm(entity, admin) {
   modal.el.addEventListener('click', (e) => onFormClick(e, modal, current.fields));
   form.addEventListener('submit', (e) => {
     e.preventDefault();
-    submit(entity, null, current.fields, modal, admin, { extra: current.variant.body, repeat: current.variant.repeat, confirm: entity.confirmCreate ? current.variant.choose : null });
+    submit(entity, null, current.fields, modal, admin, { extra: current.variant.body, repeat: current.variant.repeat, confirm: entity.confirmCreate ? confirmName(entity, current.variant) : null });
   });
   choose(variants[0]);
 }
@@ -410,7 +414,7 @@ async function submit(entity, row, fields, modal, admin, { extra = {}, repeat: r
 
   if (!row && confirm) {
     const rows = summaryRows(fields, modal.el);
-    const ok = await confirmDialog(`Lanzar · ${confirm}`, html`<p>Revisa el resumen antes de crearlo:</p><ul class="adm-list">${rows.map(([label, value]) => html`<li><strong>${label}</strong>: ${value}</li>`)}</ul>`, { ok: 'Lanzar' });
+    const ok = await confirmDialog(`Lanzar · ${confirm}`, html`<p>Revisa el resumen antes de crearlo.${entity.confirmNote ? ` ${entity.confirmNote}` : ''}</p><ul class="adm-list">${rows.map(([label, value]) => html`<li><strong>${label}</strong>: ${value}</li>`)}</ul>`, { ok: 'Lanzar' });
     if (!ok) return;
   }
 
