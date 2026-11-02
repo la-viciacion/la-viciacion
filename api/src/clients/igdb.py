@@ -37,6 +37,10 @@ class IgdbError(Exception):
     """IGDB did not answer or answered something unusable; the text is safe to log."""
 
 
+class IgdbRefused(IgdbError):
+    """Twitch refused the credentials: asking again will not help."""
+
+
 def configured() -> bool:
     return bool(config.TWITCH_CLIENT_ID and config.TWITCH_CLIENT_SECRET)
 
@@ -59,7 +63,8 @@ def _access_token(renew: bool = False) -> str:
         except requests.RequestException as e:
             raise IgdbError(f"Twitch did not answer ({type(e).__name__})") from None
         if not response.ok:
-            raise IgdbError(f"Twitch refused the credentials ({response.status_code})")
+            error = IgdbRefused if response.status_code in (400, 401, 403) else IgdbError
+            raise error(f"Twitch refused the credentials ({response.status_code})")
         body = response.json()
         _token = (body["access_token"], time.time() + body["expires_in"] - TOKEN_MARGIN_SECONDS)
         return _token[0]
@@ -97,7 +102,12 @@ def _same_name(a: str, b: str) -> bool:
 
 
 def search_games(query: str, limit: int = 10) -> list[dict]:
-    """The games IGDB finds for `query`, as the candidates of the game picker (`rawg_id` is None: they are not RAWG's).
+    """The games IGDB finds for `query`, as the candidates of the game picker (`rawg_id` is None: they are not RAWG's)."""
+    return [_candidate(item) for item in search_items(query, limit)]
+
+
+def search_items(query: str, limit: int = 10) -> list[dict]:
+    """The games IGDB finds for `query`, as IGDB gives them, best first.
     The ones named like the query come first, then the games proper, then the best known (most rated).
 
     It is asked while the player types, so a name that is half written has to match: IGDB's own search only knows whole
@@ -111,7 +121,15 @@ def search_games(query: str, limit: int = 10) -> list[dict]:
     found.sort(key=lambda item: (
         not _same_name(item["name"], query), item.get("game_type") not in MAIN_TYPES, -(item.get("total_rating_count") or 0),
     ))
-    return [_candidate(item) for item in found[:limit]]
+    return found[:limit]
+
+
+def find_by_steam(steam_id: str) -> list[dict]:
+    """The IGDB entries that have this Steam app (a game and, often, its editions or bundles), as IGDB gives them."""
+    return _post(
+        "fields name,first_release_date,game_type,version_parent,platforms.name; "
+        f"where external_games.external_game_source = {STEAM_SOURCE} & external_games.uid = {_quote(str(steam_id))}; limit 10;"
+    )
 
 
 STEAM_SOURCE = 1  # `external_game_source` of Steam in IGDB
