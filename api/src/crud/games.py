@@ -327,6 +327,7 @@ def _store_game(db: Session, game: schemas.NewGame, game_info: schemas.NewGame) 
         tags=game_info.tags,
         avg_time=game_info.avg_time,
         slug=game_info.slug,
+        igdb_slug=game_info.igdb_slug,
         rawg_id=game_info.rawg_id,
         igdb_id=game_info.igdb_id,
         themes=game_info.themes,

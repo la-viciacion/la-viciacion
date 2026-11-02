@@ -12,7 +12,8 @@ class PageUrlTests(unittest.TestCase):
         self.assertEqual(models.Game(slug="hades").page_url, "https://rawg.io/games/hades")  # from before IGDB
 
     def test_a_game_only_igdb_knows_links_to_igdb(self):
-        self.assertEqual(models.Game(slug="hades-ii", igdb_id=2).page_url, "https://www.igdb.com/games/hades-ii")
+        self.assertEqual(models.Game(igdb_slug="hades-ii", igdb_id=2).page_url, "https://www.igdb.com/games/hades-ii")
+        self.assertEqual(models.Game(slug="hades-ii", igdb_id=2).page_url, "https://www.igdb.com/games/hades-ii")  # before igdb_slug
 
     def test_without_a_slug_there_is_no_page(self):
         self.assertIsNone(models.Game(igdb_id=2).page_url)
@@ -22,9 +23,21 @@ class PageUrlTests(unittest.TestCase):
 class LinksTests(unittest.TestCase):
     def test_a_game_has_the_page_of_the_source_its_slug_belongs_to(self):
         self.assertEqual(models.Game(slug="hades", rawg_id=1).links, [{"name": "RAWG", "url": "https://rawg.io/games/hades"}])
-        self.assertEqual(models.Game(slug="hades", rawg_id=1, igdb_id=2).links, [{"name": "RAWG", "url": "https://rawg.io/games/hades"}])
-        self.assertEqual(models.Game(slug="hades-ii", igdb_id=2).links, [{"name": "IGDB", "url": "https://www.igdb.com/games/hades-ii"}])
+        self.assertEqual(models.Game(slug="hades-ii", igdb_id=2).links, [{"name": "IGDB", "url": "https://www.igdb.com/games/hades-ii"}])  # created by IGDB before igdb_slug
         self.assertEqual(models.Game(igdb_id=2).links, [])
+
+    def test_a_game_with_both_ids_links_to_igdb_first_and_rawg_after(self):
+        game = models.Game(slug="hades", igdb_slug="hades--1", rawg_id=1, igdb_id=2)
+        self.assertEqual(game.links, [{"name": "IGDB", "url": "https://www.igdb.com/games/hades--1"}, {"name": "RAWG", "url": "https://rawg.io/games/hades"}])
+        self.assertEqual(game.page_url, "https://www.igdb.com/games/hades--1")  # what the notices link to
+
+    def test_until_igdbs_address_is_known_the_notices_keep_rawgs(self):
+        game = models.Game(slug="hades", rawg_id=1, igdb_id=2)
+        self.assertEqual(game.page_url, "https://rawg.io/games/hades")
+        self.assertEqual([link["name"] for link in game.links], ["RAWG"])
+
+    def test_a_game_without_a_rawg_id_has_no_rawg_page_even_with_a_slug(self):
+        self.assertEqual([link["name"] for link in models.Game(slug="x", igdb_slug="y", igdb_id=2).links], ["IGDB"])
 
 
 class LinkTests(unittest.TestCase):

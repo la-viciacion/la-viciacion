@@ -16,7 +16,7 @@ def stamp(year):
 
 
 def item(igdb_id, name, year=None, game_type=0, version_parent=None):
-    return {"id": igdb_id, "name": name, "first_release_date": stamp(year) if year else None, "game_type": game_type,
+    return {"id": igdb_id, "name": name, "slug": name.lower().replace(" ", "-"), "first_release_date": stamp(year) if year else None, "game_type": game_type,
             "version_parent": version_parent, "platforms": [{"name": "PC"}],
             "themes": [{"name": "Fantasy"}], "keywords": [{"name": "Roguelike"}], "franchises": [{"name": f"Saga of {name}"}]}
 
@@ -98,6 +98,10 @@ class IgdbSyncRunTests(ApiTestCase):
         with database.SessionLocal() as db:
             return db.get(models.Game, game_id).igdb_id
 
+    def igdb_slug(self, game_id):
+        with database.SessionLocal() as db:
+            return db.get(models.Game, game_id).igdb_slug
+
     def igdb_data(self, game_id):
         with database.SessionLocal() as db:
             g = db.get(models.Game, game_id)
@@ -128,14 +132,21 @@ class IgdbSyncRunTests(ApiTestCase):
         self.by_name["Celeste"] = [item(20, "Celeste", 2018)]
         self.run_sync()
         self.assertEqual(self.igdb_data("celeste"), ("Fantasy", "Roguelike", "Saga of Celeste", ""))
+        self.assertEqual(self.igdb_slug("celeste"), "celeste")
+
+    def test_a_linked_game_without_the_address_of_its_igdb_page_is_asked_for_it(self):
+        self.game("old", "Old", igdb_id=50, themes="", keywords="", franchises="", collections="")  # linked before igdb_slug
+        self.extras[50] = {"themes": "", "keywords": "", "franchises": "", "collections": "", "igdb_slug": "old-game"}
+        self.assertEqual((self.run_sync()["filled"], self.igdb_slug("old")), (1, "old-game"))
 
     def test_a_game_already_linked_but_without_igdb_data_is_filled_and_one_with_it_is_left_alone(self):
-        self.game("hades", "Hades", igdb_id=10)
-        self.game("done", "Done", igdb_id=11, themes="Horror", keywords="", franchises="", collections="")
-        self.extras[10] = {"themes": "Fantasy", "keywords": "Roguelike", "franchises": "", "collections": "Hades"}
+        self.game("hades", "Hades", igdb_id=10, igdb_slug="hades")
+        self.game("done", "Done", igdb_id=11, igdb_slug="done", themes="Horror", keywords="", franchises="", collections="")
+        self.extras[10] = {"themes": "Fantasy", "keywords": "Roguelike", "franchises": "", "collections": "Hades", "igdb_slug": "hades-slug"}
         status = self.run_sync()
         self.assertEqual((status["filled"], status["linked"], status["processed"], self.asked), (1, 0, 1, []))
         self.assertEqual(self.igdb_data("hades"), ("Fantasy", "Roguelike", "", "Hades"))
+        self.assertEqual(self.igdb_slug("hades"), "hades-slug")
         self.assertEqual(self.igdb_data("done"), ("Horror", "", "", ""))
         self.game("gone", "Gone", igdb_id=12)  # IGDB no longer has it
         igdb_sync._status["state"] = "idle"
@@ -144,14 +155,14 @@ class IgdbSyncRunTests(ApiTestCase):
     def test_a_batch_takes_the_first_games_alphabetically_and_a_game_already_linked_is_not_asked(self):
         for game_id, name in (("a", "Alpha"), ("b", "Beta"), ("c", "Gamma"), ("d", "Delta")):
             self.game(game_id, name)
-        self.game("done", "Aaa Done", igdb_id=1, themes="")
+        self.game("done", "Aaa Done", igdb_id=1, igdb_slug="done", themes="")
         self.by_name.update({"Alpha": [item(11, "Alpha")], "Beta": [item(12, "Beta")]})
         status = self.run_sync(max_games=2)
         self.assertEqual((status["total"], status["linked"], self.asked), (2, 2, ["Alpha", "Beta"]))
         self.assertEqual(self.igdb_id("done"), 1)
 
     def test_an_igdb_id_another_game_has_is_a_duplicate_and_is_not_assigned(self):
-        self.game("one", "Celeste", igdb_id=20)
+        self.game("one", "Celeste", igdb_id=20, igdb_slug="celeste")
         self.game("two", "Celeste Classic", release_date=datetime.date(2018, 1, 1))
         self.by_name["Celeste Classic"] = [item(20, "Celeste Classic", 2018)]
         status = self.run_sync()
@@ -177,7 +188,7 @@ class IgdbSyncRunTests(ApiTestCase):
     def test_the_estimate_counts_the_games_without_an_id_or_without_igdb_data(self):
         self.game("a", "A")
         self.game("b", "B", igdb_id=2)  # linked, its data never asked
-        self.game("c", "C", igdb_id=3, themes="")
+        self.game("c", "C", igdb_id=3, igdb_slug="c", themes="")
         with database.SessionLocal() as db:
             self.assertEqual(
                 (igdb_sync.estimate(db)["pending_games"], igdb_sync.estimate(db, 1)["games"], igdb_sync.estimate(db)["total_games"]),
@@ -203,7 +214,7 @@ class IgdbSyncRunTests(ApiTestCase):
 
     def test_a_doubtful_game_is_linked_by_hand_once_igdb_has_it(self):
         self.game("fear", "Fear")
-        self.game("other", "Other", igdb_id=30)
+        self.game("other", "Other", igdb_id=30, igdb_slug="other")
         with database.SessionLocal() as db, mock.patch.object(igdb, "game_details", return_value={"name": "Fear", "themes": "Horror", "keywords": "", "franchises": "", "collections": ""}):
             self.assertEqual(igdb_sync.apply_one(db, "fear", 31), {"linked": True, "changed": ["igdb_id"]})
             self.assertEqual(db.get(models.Game, "fear").themes, "Horror")

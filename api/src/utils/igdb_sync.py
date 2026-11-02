@@ -79,8 +79,10 @@ def choose(game: models.Game, steam_hits: list[dict], name_hits: list[dict]) -> 
 
 
 def pending_query(db):
-    """Games with no IGDB id, and games with one whose IGDB data was never asked (linked by hand or created before it)."""
-    return db.query(models.Game).filter(models.Game.igdb_id.is_(None) | models.Game.themes.is_(None))
+    """Games with no IGDB id, and games with one whose IGDB data or page address was never asked (linked by hand or before)."""
+    return db.query(models.Game).filter(
+        models.Game.igdb_id.is_(None) | models.Game.themes.is_(None) | models.Game.igdb_slug.is_(None)
+    )
 
 
 def _fill(game: models.Game, extras: dict[str, str]) -> None:
@@ -219,6 +221,7 @@ def _run(max_games: int | None):
                         })
                     else:
                         game.igdb_id = found["id"]
+                        game.igdb_slug = found.get("slug") or ""
                         _fill(game, igdb.extras_of(found))
                         db.commit()
                         _bump("linked")
@@ -288,7 +291,7 @@ APPLIED = ("dev", "release_date", "image_url", "genres", "steam_id")
 
 def _apply_details(db, game: models.Game, details: dict) -> list[str]:
     """Overwrite the game with what IGDB gives (a blank never overwrites; the name is never touched) and return what
-    changed. The slug is IGDB's only for a game RAWG does not know: RAWG's slug opens RAWG's page, IGDB's would not."""
+    changed. Its address in IGDB goes to `igdb_slug`: `slug` is RAWG's and is left as it is."""
     changed = []
     if game.igdb_id != details["igdb_id"]:
         game.igdb_id = details["igdb_id"]
@@ -298,9 +301,9 @@ def _apply_details(db, game: models.Game, details: dict) -> list[str]:
         if not _blank(new) and getattr(game, field) != new:
             setattr(game, field, new)
             changed.append(field)
-    if not game.rawg_id and not _blank(details.get("slug")) and game.slug != details["slug"]:
-        game.slug = details["slug"]
-        changed.append("slug")
+    if not _blank(details.get("igdb_slug")) and game.igdb_slug != details["igdb_slug"]:
+        game.igdb_slug = details["igdb_slug"]
+        changed.append("igdb_slug")
     for column in igdb.EXTRA_COLUMNS:
         new, current = details.get(column), getattr(game, column)
         if (new and new != current) or (current is None and new is not None):
@@ -363,6 +366,7 @@ def apply_one(db, game_id: str, igdb_id: int, overwrite: bool = False) -> dict:
         db.commit()
         return {"linked": True, "changed": changed}
     game.igdb_id = igdb_id
+    game.igdb_slug = details.get("igdb_slug") or ""
     _fill(game, {column: details[column] for column in igdb.EXTRA_COLUMNS})
     db.commit()
     return {"linked": True, "changed": ["igdb_id"]}
