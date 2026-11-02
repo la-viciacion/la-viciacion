@@ -16,6 +16,10 @@ TOKEN_URL = "https://id.twitch.tv/oauth2/token"
 GAMES_URL = "https://api.igdb.com/v4/games"
 IMAGE_URL = "https://images.igdb.com/igdb/image/upload/t_cover_big/{image_id}.jpg"
 TOKEN_MARGIN_SECONDS = 3600  # renewed an hour before it expires
+# main games, remakes, remasters, expanded games and ports: what a player has played. A search also finds the DLCs, packs
+# and skins of a game, and ahead of the game itself for the best known ones.
+GAME_TYPES = "(0,8,9,10,11)"
+FETCH_LIMIT = 25  # IGDB cannot sort a search: a wider net is cast and the best known of it is kept
 
 _token_lock = threading.Lock()
 _token: tuple[str, float] | None = None  # (token, when it expires)
@@ -71,15 +75,22 @@ def _post(body: str, retried: bool = False) -> list[dict]:
     return response.json()
 
 
+def _same_name(a: str, b: str) -> bool:
+    return "".join(c for c in a.casefold() if c.isalnum()) == "".join(c for c in b.casefold() if c.isalnum())
+
+
 def search_games(query: str, limit: int = 10) -> list[dict]:
-    """The games IGDB finds for `query`, as the candidates of the game picker (`rawg_id` is None: they are not RAWG's)."""
+    """The games IGDB finds for `query`, as the candidates of the game picker (`rawg_id` is None: they are not RAWG's).
+    The ones named exactly like the query come first, then the best known (most rated)."""
     found = _post(
         f"search {_quote(query)}; "
-        "fields name,slug,first_release_date,cover.image_id,genres.name,platforms.name,"
+        "fields name,slug,first_release_date,cover.image_id,genres.name,platforms.name,total_rating_count,"
         "involved_companies.developer,involved_companies.company.name; "
-        f"limit {int(limit)};"
+        f"where game_type = {GAME_TYPES} & version_parent = null; limit {FETCH_LIMIT};"
     )
-    return [_candidate(item) for item in found if item.get("id") and item.get("name")]
+    found = [item for item in found if item.get("id") and item.get("name")]
+    found.sort(key=lambda item: (not _same_name(item["name"], query), -(item.get("total_rating_count") or 0)))
+    return [_candidate(item) for item in found[:limit]]
 
 
 def _candidate(item: dict) -> dict:

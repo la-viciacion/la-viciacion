@@ -45,6 +45,24 @@ class IgdbClientTests(unittest.TestCase):
         self.assertIn(b'search "zelda \\"breath\\"";', post.call_args.kwargs["data"])
         self.assertEqual(post.call_args.kwargs["headers"], {"Client-ID": "id", "Authorization": "Bearer t"})
 
+    def test_only_games_are_asked_for_and_the_exact_name_then_the_best_known_come_first(self):
+        def item(name, count):
+            return {"id": hash(name), "name": name, "total_rating_count": count}
+        found = [item("The Wolf Among Us", 1225), item("Among Us", None), item("Among Us!", 600), item("Among Us VR", 50)]
+        with mock.patch.object(igdb.requests, "post", side_effect=[
+            _response({"access_token": "t", "expires_in": 5000000}), _response(found),
+        ]) as post:
+            names = [c["name"] for c in igdb.search_games("among us")]
+        self.assertEqual(names, ["Among Us!", "Among Us", "The Wolf Among Us", "Among Us VR"])
+        self.assertIn(b"where game_type = (0,8,9,10,11) & version_parent = null;", post.call_args.kwargs["data"])
+
+    def test_the_result_is_cut_to_the_limit(self):
+        found = [{"id": n, "name": f"Game {n}", "total_rating_count": n} for n in range(1, 21)]
+        with mock.patch.object(igdb.requests, "post", side_effect=[
+            _response({"access_token": "t", "expires_in": 5000000}), _response(found),
+        ]):
+            self.assertEqual(len(igdb.search_games("game", limit=10)), 10)
+
     def test_the_token_is_asked_once_and_the_secret_never_goes_in_a_url(self):
         with mock.patch.object(igdb.requests, "post", side_effect=[
             _response({"access_token": "t", "expires_in": 5000000}), _response([]), _response([]),
