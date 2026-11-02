@@ -111,6 +111,7 @@ class Game(Base):
     rawg_id = Column(Integer, nullable=True, index=True)
     # IGDB's id, the backup source of the catalogue: a game can have it, RAWG's, both or neither (typed by hand)
     igdb_id = Column(Integer, nullable=True, index=True)
+    igdb_slug = Column(String(255), nullable=True)  # IGDB's page of the game: `slug` is RAWG's
     # What IGDB says of the game, comma separated like genres and tags (NULL = never asked, "" = IGDB has nothing)
     themes = Column(Text, nullable=True)
     keywords = Column(Text, nullable=True)
@@ -125,24 +126,23 @@ class Game(Base):
 
     @property
     def links(self) -> list[dict]:
-        """The pages of the game in the sources its `slug` is known for: RAWG's when it has a RAWG id (or no id at all, from
-        before IGDB), IGDB's when it has an IGDB id and no RAWG id. A game with both has RAWG's slug here; IGDB's own address
-        for it comes with the outside data (`igdb_url`), which is where IGDB is asked."""
-        if not self.slug:
-            return []
-        if self.igdb_id and not self.rawg_id:
-            return [{"name": "IGDB", "url": f"https://www.igdb.com/games/{self.slug}"}]
-        return [{"name": "RAWG", "url": f"https://rawg.io/games/{self.slug}"}]
+        """The pages of the game, IGDB's first (it is the main source) and RAWG's after it. A slug is each site's own: IGDB's
+        is `igdb_slug` (a game IGDB created before that column has it in `slug`, and no RAWG id), RAWG's is `slug` (for a game
+        with a RAWG id, or with no id at all, from before IGDB). A game with an IGDB id and no `igdb_slug` yet has no IGDB
+        link here: the outside data of its page brings IGDB's own address (`igdb_url`)."""
+        links = []
+        igdb_slug = self.igdb_slug or (self.slug if self.igdb_id and not self.rawg_id else None)
+        if self.igdb_id and igdb_slug:
+            links.append({"name": "IGDB", "url": f"https://www.igdb.com/games/{igdb_slug}"})
+        if self.slug and (self.rawg_id or not self.igdb_id):
+            links.append({"name": "RAWG", "url": f"https://rawg.io/games/{self.slug}"})
+        return links
 
     @property
     def page_url(self) -> str | None:
-        """The page of the game in the source its `slug` belongs to: IGDB's for a game that only IGDB knows, RAWG's for
-        the rest (a slug is each site's own, one site's does not open the other's page). None without a slug."""
-        if not self.slug:
-            return None
-        if self.igdb_id and not self.rawg_id:
-            return f"https://www.igdb.com/games/{self.slug}"
-        return f"https://rawg.io/games/{self.slug}"
+        """The page the notices link to: IGDB's, else RAWG's (see `links`); None when the game has neither."""
+        links = self.links
+        return links[0]["url"] if links else None
 
 
 class UserGame(Base):

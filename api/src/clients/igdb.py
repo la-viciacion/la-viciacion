@@ -137,7 +137,7 @@ def find_by_steam(steam_id: str) -> list[dict]:
     """The IGDB entries that have this Steam app (a game and, often, its editions or bundles), as IGDB gives them, with
     what `extras_of` reads."""
     return _post(
-        f"fields name,first_release_date,game_type,version_parent,platforms.name,{EXTRA_FIELDS}; "
+        f"fields name,slug,first_release_date,game_type,version_parent,platforms.name,{EXTRA_FIELDS}; "
         f"where external_games.external_game_source = {STEAM_SOURCE} & external_games.uid = {_quote(str(steam_id))}; limit 10;"
     )
 
@@ -220,9 +220,9 @@ def _names_of(items) -> list[str]:
 
 
 def game_extras(igdb_id: int) -> dict[str, str] | None:
-    """`extras_of` for the game with this IGDB id, or None when IGDB has no such game."""
-    found = _post(f"fields {EXTRA_FIELDS}; where id = {int(igdb_id)};")
-    return extras_of(found[0]) if found else None
+    """`extras_of` for the game with this IGDB id plus its `igdb_slug`, or None when IGDB has no such game."""
+    found = _post(f"fields slug,{EXTRA_FIELDS}; where id = {int(igdb_id)};")
+    return {**extras_of(found[0]), "igdb_slug": found[0].get("slug") or ""} if found else None
 
 
 STEAM_SOURCE = 1  # `external_game_source` of Steam in IGDB
@@ -250,6 +250,7 @@ def game_details(igdb_id: int) -> dict | None:
         "igdb_id": igdb_id,
         "name": candidate["name"],
         "slug": candidate["slug"],
+        "igdb_slug": candidate["slug"],
         "dev": candidate["dev"],
         "release_date": datetime.datetime.fromtimestamp(released, datetime.timezone.utc).date() if released else None,
         "steam_id": steam,

@@ -9,7 +9,7 @@ const FIELDS = {
   rawg_id: 'ID de RAWG', slug: 'slug', dev: 'desarrolladora', release_date: 'lanzamiento',
   image_url: 'imagen', genres: 'géneros', tags: 'etiquetas', steam_id: 'Steam ID',
   parent_rawg_id: 'juego base (DLC)',
-  igdb_id: 'ID de IGDB', themes: 'temas', keywords: 'palabras clave', franchises: 'franquicias', collections: 'colecciones',
+  igdb_id: 'ID de IGDB', igdb_slug: 'enlace de IGDB', themes: 'temas', keywords: 'palabras clave', franchises: 'franquicias', collections: 'colecciones',
   is_dlc: 'marca de DLC', parent_game_id: 'juego base (DLC)',
 };
 

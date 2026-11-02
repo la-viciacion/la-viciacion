@@ -205,7 +205,7 @@ class CreateGameTests(CatalogTestCase):
 
     def test_a_game_picked_from_igdb_is_stored_with_its_id_and_what_igdb_knows(self):
         igdb_game = {
-            "igdb_id": 555, "name": "Hades II", "slug": "hades-ii", "dev": "Supergiant Games", "steam_id": "1145350",
+            "igdb_id": 555, "name": "Hades II", "slug": "hades-ii", "igdb_slug": "hades-ii", "dev": "Supergiant Games", "steam_id": "1145350",
             "release_date": datetime.date(2025, 9, 25), "image_url": "https://img/h2.jpg", "genres": "RPG", "is_dlc": False,
             "themes": "Fantasy", "keywords": "Roguelike,Action roguelike", "franchises": "Hades", "collections": "",
         }
@@ -215,7 +215,8 @@ class CreateGameTests(CatalogTestCase):
             again = self.create(name="Another name", igdb_id=555)
         game = response.json()
         self.assertEqual(response.status_code, 201)
-        self.assertEqual((game["igdb_id"], game["rawg_id"], game["dev"], game["steam_id"], game["slug"]), (555, None, "Supergiant Games", "1145350", "hades-ii"))
+        self.assertEqual((game["igdb_id"], game["rawg_id"], game["dev"], game["steam_id"], game["slug"]), (555, None, "Supergiant Games", "1145350", None))
+        self.assertEqual(self.scalar("SELECT igdb_slug FROM games"), "hades-ii")  # `slug` is RAWG's
         self.assertEqual((game["release_date"], game["genres"], game["avg_time"]), ("2025-09-25", "RPG", 144000))
         self.assertEqual(again.status_code, 400)
         self.assertEqual(
@@ -252,7 +253,8 @@ class CreateGameTests(CatalogTestCase):
         self.with_rawg(Rawg())
         with mock.patch.object(my_utils.igdb, "configured", return_value=True),                 mock.patch.object(my_utils.igdb, "game_details", side_effect=my_utils.igdb.IgdbError("down")):
             game = self.create(name="Hades II", igdb_id=555, slug="hades-ii", dev="Supergiant Games").json()
-        self.assertEqual((game["name"], game["igdb_id"], game["slug"], game["dev"]), ("Hades II", 555, "hades-ii", "Supergiant Games"))
+        self.assertEqual((game["name"], game["igdb_id"], game["dev"]), ("Hades II", 555, "Supergiant Games"))
+        self.assertEqual(self.scalar("SELECT igdb_slug FROM games"), "hades-ii")
 
     def test_without_a_rawg_key_it_still_works(self):
         game = self.create(name="Offline Game").json()

@@ -108,7 +108,7 @@ class HltbResyncTests(unittest.TestCase):
 
 
 IGDB_DETAILS = {
-    "igdb_id": 228525, "name": "Hades II", "slug": "hades-ii", "dev": "Supergiant Games", "steam_id": "1145350",
+    "igdb_id": 228525, "name": "Hades II", "slug": "hades-ii", "igdb_slug": "hades-ii", "dev": "Supergiant Games", "steam_id": "1145350",
     "release_date": datetime.date(2025, 9, 25), "image_url": "https://img/h2.jpg", "genres": "Role-playing (RPG)", "is_dlc": False,
     "parent_igdb_id": None, "themes": "Fantasy", "keywords": "Roguelike", "franchises": "Hades", "collections": "Hades",
 }
@@ -138,7 +138,7 @@ class IgdbResyncTests(unittest.TestCase):
         game = self.game()
         self.assertEqual(got["status"], "updated")
         self.assertEqual((game.dev, game.release_date, game.image_url, game.genres, game.steam_id), ("Supergiant Games", datetime.date(2025, 9, 25), "https://img/h2.jpg", "Role-playing (RPG)", "1145350"))
-        self.assertEqual((game.themes, game.keywords, game.franchises, game.collections, game.slug), ("Fantasy", "Roguelike", "Hades", "Hades", "hades-ii"))
+        self.assertEqual((game.themes, game.keywords, game.franchises, game.collections, game.igdb_slug, game.slug), ("Fantasy", "Roguelike", "Hades", "Hades", "hades-ii", None))
         self.assertEqual(game.name, "Hades II")
         self.assertEqual(igdb_sync.resync_one(self.db, "g")["status"], "unchanged")
         igdb.search_items.assert_not_called()
