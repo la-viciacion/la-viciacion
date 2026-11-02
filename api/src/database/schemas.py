@@ -283,6 +283,7 @@ class ExportGame(BaseModel):
     slug: str | None = Field(default=None, max_length=255)
     steam_id: str | None = Field(default=None, max_length=255)
     rawg_id: int | None = None
+    igdb_id: int | None = None  # a file from before IGDB has none
 
 
 class ExportPlatform(BaseModel):
