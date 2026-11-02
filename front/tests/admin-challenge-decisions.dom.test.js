@@ -63,13 +63,13 @@ test('the panel lists the proposals in their own tab, the schedules under the ch
   assert.deepEqual(actions.map((a) => a.show({ status: 'approved' })), [false, false]);
 });
 
-test('a themed challenge can repeat every month; a game could too (not offered for now), and a rotation needs its games', () => {
+test('a game or a themed challenge can repeat every month (not offered for now), and a rotation needs its games', () => {
   const [game, , themed] = ENTITIES.challenges.creates;
   assert.deepEqual([game.repeat, themed.repeat], ['/manage/challenge-schedules', '/manage/challenge-schedules']);
   const games = game.fields.find((f) => f.key === 'games');
   assert.deepEqual([games.type, games.required, games.when], ['games', true, { key: 'period', is: 'repeat' }]);
   assert.deepEqual(game.fields.find((f) => f.key === 'game_id').when, { key: 'period', not: 'repeat' });
-  assert.ok(!game.fields.find((f) => f.type === 'period').repeatable); // not offered for now
+  for (const type of [game]) assert.ok(!type.fields.find((f) => f.type === 'period').repeatable); // not offered for now
   assert.deepEqual(ENTITIES.schedules.fields.map((f) => f.key), ['label', 'active', 'announce', 'participation', 'games']);
 });
 

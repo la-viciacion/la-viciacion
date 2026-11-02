@@ -228,15 +228,15 @@ async function loadCompanion(entity) {
   }
 }
 
+// Nothing at all while there are none (they are not offered for now), so the page does not talk about what it cannot do.
 function companionView(entity, st) {
   const other = ENTITIES[entity.companion];
   const items = state[entity.companion].data?.items;
+  if (!st.companionFailed && !items?.length) return '';
   return html`
     <h2 class="adm-subtitle">${other.label}</h2>
     <p class="adm-sub">${other.description}</p>
-    ${st.companionFailed ? html`<div class="adm-error">No se han podido cargar.</div>`
-      : !items?.length ? html`<div class="adm-sub">Ninguno todavía: se crean con «Lanzar reto», en los tipos «Cada mes».</div>`
-      : tableView(other, items, true)}`;
+    ${st.companionFailed ? html`<div class="adm-error">No se han podido cargar.</div>` : tableView(other, items, true)}`;
 }
 
 function toolbarView(entity, st) {
