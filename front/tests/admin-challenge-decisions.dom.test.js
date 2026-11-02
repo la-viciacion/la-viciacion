@@ -73,6 +73,15 @@ test('a game or a themed challenge can repeat every month (not offered for now),
   assert.deepEqual(ENTITIES.schedules.fields.map((f) => f.key), ['label', 'active', 'announce', 'participation', 'games']);
 });
 
+test('no group challenge tells the group unless the admin ticks it, and every launch is confirmed first', async () => {
+  const { creates, confirmCreate } = ENTITIES.challenges;
+  assert.equal(confirmCreate, true);
+  for (const type of creates) {
+    const fields = typeof type.fields === 'function' ? await type.fields.call(null).catch(() => []) : type.fields;
+    assert.ok(fields.filter((f) => f.key === 'announce').every((f) => f.default === false), type.choose);
+  }
+});
+
 test('the challenges have one button and the type is chosen in the form', () => {
   const { createLabel, creates } = ENTITIES.challenges;
   assert.equal(createLabel, 'Lanzar reto');
