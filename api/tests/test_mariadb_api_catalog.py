@@ -113,8 +113,8 @@ class SearchRawgTests(CatalogTestCase):
         self.assertEqual(self.search("a").status_code, 400)
         self.assertEqual(self.search("  ").status_code, 400)
 
-    def test_without_a_key_it_finds_nothing(self):
-        self.assertEqual(self.search().json(), [])
+    def test_without_a_key_it_says_rawg_is_unavailable(self):
+        self.assertEqual(self.search().status_code, 503)
 
     def test_the_results_are_mapped_and_marked_when_the_game_is_already_here(self):
         other = dict(CELESTE, id=102, name="Celeste Classic", slug="celeste-classic")
@@ -131,12 +131,12 @@ class SearchRawgTests(CatalogTestCase):
         self.game("by-name", "Celeste")
         self.assertTrue(self.search().json()[0]["exists_in_db"])
 
-    def test_a_failing_rawg_is_an_empty_list_not_an_error(self):
+    def test_a_failing_rawg_is_a_503_not_an_empty_list(self):
         self.with_rawg(Rawg(fail=True))
-        self.assertEqual(self.search().json(), [])
+        self.assertEqual(self.search().status_code, 503)
         self.with_rawg(Rawg())
         with mock.patch.object(my_utils, "_http_get", new=mock.AsyncMock(return_value=Response(ok=False, status=500))):
-            self.assertEqual(self.search().json(), [])
+            self.assertEqual(self.search().status_code, 503)
 
 
 class CreateGameTests(CatalogTestCase):
