@@ -21,7 +21,7 @@ Todo se configura con **un único fichero**, el `.env`, que leen la API, el bot 
 - Para que el grupo entre desde fuera: un dominio y un proxy inverso con **HTTPS** (las notificaciones del móvil lo exigen). Ver [Operación](operacion.md).
 - Opcional, según lo que quieras activar:
     - Un **bot de Telegram** y un grupo → [Telegram](telegram.md).
-    - Una clave de **RAWG** para buscar juegos y portadas, y una de **IA** para avisos más graciosos → [Servicios externos](servicios.md).
+    - Las credenciales de **IGDB** (Twitch) para buscar juegos y describirlos, una clave de **RAWG** de respaldo, y una de **IA** para avisos más graciosos → [Servicios externos](servicios.md).
     - Un servidor **SMTP** para recuperar contraseñas por correo → [Cuentas y acceso](cuentas.md).
 
 ## Por dónde empezar
@@ -46,7 +46,7 @@ Todo se configura con **un único fichero**, el `.env`, que leen la API, el bot 
 
 - :material-puzzle: **[Servicios externos](servicios.md)**
 
-    RAWG, IA, notificaciones push y el tiempo.
+    IGDB, RAWG, IA, notificaciones push y el tiempo.
 
 - :material-view-dashboard: **[Panel de administración](panel-admin.md)**
 

@@ -1,4 +1,4 @@
-// Game picker (own catalogue, or add one from RAWG) shared by two flows:
+// Game picker (own catalogue, or add one found in IGDB or RAWG) shared by two flows:
 //   "Nuevo timer": pick a game -> pick a platform -> start the timer
 //   "Sesión manual": pick a game -> fill the session form (see sessions.js)
 // Each step is a modal; the picker hands the chosen game to `onPick(id, name)`.
@@ -84,11 +84,11 @@ async function searchCatalogue(modal, query, onPick, isLatest = () => true) {
   }
 }
 
-// ── Step 1b: add a game from RAWG ───────────────────────────
+// ── Step 1b: add a game from IGDB or RAWG ───────────────────────────
 export function openAddGame(onPick) {
   const modal = openStep(html`
     ${modalHeader('Añadir juego nuevo')}
-    <input type="text" id="addGameSearch" class="modal-search-input" placeholder="Buscar en RAWG..." autocomplete="off" />
+    <input type="text" id="addGameSearch" class="modal-search-input" placeholder="Buscar un juego..." autocomplete="off" />
     <div class="modal-results-list" id="addGameResults">${hint('Escribe el nombre del juego')}</div>
     <div class="modal-footer">
       <button class="btn-modal-secondary" id="manualGameBtn">${iconPlus()} ¿No aparece? Crearlo a mano</button>
@@ -98,7 +98,7 @@ export function openAddGame(onPick) {
   bindSearch(modal, 'addGameSearch', (query, isLatest, signal) => searchRawg(modal, query, onPick, isLatest, signal), 300);
 }
 
-// ── Step 1c: create a game RAWG does not have ───────────────
+// ── Step 1c: create a game neither source has ───────────────
 // Only the name is required (it is all a session needs); the rest can be edited later from the admin panel.
 // It can be marked as a DLC, optionally saying which catalogue game it belongs to.
 function openManualGame(onPick, name = '') {
@@ -190,7 +190,7 @@ function bindBaseGame(modal, form) {
 async function searchRawg(modal, query, onPick, isLatest = () => true, signal) {
   const results = modal.el.querySelector('#addGameResults');
   if (query.length < 2) return mount(results, hint('Escribe al menos 2 caracteres'));
-  mount(results, hint('Buscando en RAWG...'));
+  mount(results, hint('Buscando...'));
   try {
     const candidates = await api(`/games/search-rawg?query=${encodeURIComponent(query)}`, { signal });
     if (!results.isConnected || !isLatest()) return;

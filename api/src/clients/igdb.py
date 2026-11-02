@@ -88,6 +88,9 @@ def _post(body: str, retried: bool = False, timeout: int = TIMEOUT_SECONDS) -> l
         raise IgdbError(f"IGDB did not answer ({type(e).__name__})") from None
     if response.status_code == 401 and not retried:  # the token was revoked before it expired
         return _post(body, retried=True, timeout=timeout)
+    if response.status_code == 429 and not retried:  # four requests a second, shared with the batch: one more try a second later
+        time.sleep(1.1)
+        return _post(body, retried=True, timeout=timeout)
     if not response.ok:
         raise IgdbError(f"IGDB answered {response.status_code}")
     return response.json()

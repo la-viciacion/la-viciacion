@@ -37,8 +37,8 @@ Detalle en [Telegram](telegram.md).
 
 | Variable | Para qué sirve |
 |---|---|
-| `RAWG_API_KEY` | Búsqueda de juegos y portadas. Sin ella, buscar y sincronizar no hace nada. |
-| `TWITCH_CLIENT_ID`, `TWITCH_CLIENT_SECRET` | Opcionales. Una aplicación de Twitch, para que [IGDB](servicios.md#igdb-respaldo-de-la-busqueda-de-juegos) busque juegos cuando RAWG no responde. Sin ellas, IGDB no se usa. |
+| `RAWG_API_KEY` | Opcional. El respaldo de IGDB para buscar juegos y completar la ficha. Sin ella (y sin IGDB), buscar juegos no encuentra nada. |
+| `TWITCH_CLIENT_ID`, `TWITCH_CLIENT_SECRET` | Opcionales. Una aplicación de Twitch, para que [IGDB](servicios.md#igdb-la-fuente-principal-de-los-juegos), la fuente principal, busque y describa los juegos. Sin ellas se usa solo RAWG. |
 | `AI_PROVIDER` | `google` o `openai`. |
 | `AI_API_KEY` | La clave del proveedor de IA. |
 | `AI_MODEL` | Un modelo de ese proveedor. El código no trae ninguno por defecto. |

@@ -40,11 +40,23 @@ class LinksTests(unittest.TestCase):
         self.assertEqual([link["name"] for link in models.Game(slug="x", igdb_slug="y", igdb_id=2).links], ["IGDB"])
 
 
+class UnsafeSlugTests(unittest.TestCase):
+    def test_a_slug_that_is_not_what_the_sites_use_never_becomes_a_link(self):
+        for slug in ("x) [evil](http://evil.example", "has space", "../../etc", "", "-leading", "a/b"):
+            self.assertEqual(models.Game(slug=slug, rawg_id=1).links, [], slug)
+            self.assertEqual(models.Game(igdb_slug=slug, igdb_id=2).links, [], slug)
+            self.assertIsNone(models.Game(slug=slug, rawg_id=1).page_url)
+
+    def test_the_slugs_the_sites_really_use_are_links(self):
+        for slug in ("hades--1", "the-legend-of-zelda-tears-of-the-kingdom", "diablo-iv", "game_2.0", "a"):
+            self.assertEqual(len(models.Game(slug=slug, rawg_id=1).links), 1, slug)
+
+
 class LinkTests(unittest.TestCase):
     def test_a_notice_links_a_url_as_it_is_and_a_bare_slug_to_rawg(self):
-        self.assertEqual(my_utils.rawg_game_link("Hades II", "https://www.igdb.com/games/hades-ii"), "[Hades II](https://www.igdb.com/games/hades-ii)")
-        self.assertEqual(my_utils.rawg_game_link("Hades", "hades"), "[Hades](https://rawg.io/games/hades)")
-        self.assertEqual(my_utils.rawg_game_link("Hades", None), "Hades")
+        self.assertEqual(my_utils.game_link("Hades II", "https://www.igdb.com/games/hades-ii"), "[Hades II](https://www.igdb.com/games/hades-ii)")
+        self.assertEqual(my_utils.game_link("Hades", "hades"), "[Hades](https://rawg.io/games/hades)")
+        self.assertEqual(my_utils.game_link("Hades", None), "Hades")
 
     def test_the_inbox_keeps_the_links_of_both_sites(self):
         message = "Hoy sale [Hades II](https://www.igdb.com/games/hades-ii) y [Celeste](https://rawg.io/games/celeste)"
