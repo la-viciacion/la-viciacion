@@ -73,6 +73,8 @@ class CatalogTestCase(ApiTestCase):
         super().setUp()
         self.ana = self.user("ana")
         self.root = self.user("root", admin=True)
+        my_utils.reset_search_state()
+        self.addCleanup(my_utils.reset_search_state)
         # the developer's .env may have IGDB credentials: a failing RAWG must not reach the real one
         patcher = mock.patch.object(my_utils.igdb, "configured", return_value=False)
         patcher.start()

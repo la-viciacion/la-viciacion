@@ -30,12 +30,15 @@ function openStep(content) {
 // another search starts.
 function bindSearch(modal, inputId, search, delay = 250) {
   const input = modal.el.querySelector(`#${inputId}`);
+  let pending; // the request of the search in flight: a newer one makes its answer useless
   input.addEventListener('input', () => {
     clearTimeout(searchTimer);
     const query = input.value.trim();
     searchTimer = setTimeout(() => {
       const mine = ++searchCount;
-      search(query, () => mine === searchCount);
+      pending?.abort();
+      pending = new AbortController();
+      search(query, () => mine === searchCount, pending.signal);
     }, delay);
   });
   input.focus();
@@ -92,7 +95,7 @@ export function openAddGame(onPick) {
     </div>`);
   const input = modal.el.querySelector('#addGameSearch');
   modal.el.querySelector('#manualGameBtn').addEventListener('click', () => openManualGame(onPick, input.value.trim()));
-  bindSearch(modal, 'addGameSearch', (query, isLatest) => searchRawg(modal, query, onPick, isLatest), 300);
+  bindSearch(modal, 'addGameSearch', (query, isLatest, signal) => searchRawg(modal, query, onPick, isLatest, signal), 300);
 }
 
 // ── Step 1c: create a game RAWG does not have ───────────────
@@ -184,12 +187,12 @@ function bindBaseGame(modal, form) {
   return { chosen: () => chosen };
 }
 
-async function searchRawg(modal, query, onPick, isLatest = () => true) {
+async function searchRawg(modal, query, onPick, isLatest = () => true, signal) {
   const results = modal.el.querySelector('#addGameResults');
   if (query.length < 2) return mount(results, hint('Escribe al menos 2 caracteres'));
   mount(results, hint('Buscando en RAWG...'));
   try {
-    const candidates = await api(`/games/search-rawg?query=${encodeURIComponent(query)}`);
+    const candidates = await api(`/games/search-rawg?query=${encodeURIComponent(query)}`, { signal });
     if (!results.isConnected || !isLatest()) return;
     if (!candidates?.length) return mount(results, hint('Sin resultados'));
     const showList = () => {

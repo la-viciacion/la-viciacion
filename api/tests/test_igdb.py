@@ -4,6 +4,10 @@ from unittest import mock
 from src.clients import igdb
 from src.utils import my_utils
 
+def time_after_pause():
+    return my_utils.time.monotonic() + my_utils.RAWG_PAUSE_SECONDS + 1
+
+
 ITEM = {
     "id": 1022, "name": "The Legend of Zelda", "slug": "the-legend-of-zelda", "first_release_date": 509328000,
     "cover": {"id": 1, "image_id": "co1uii"}, "genres": [{"name": "Adventure"}], "platforms": [{"name": "Wii"}],
@@ -42,7 +46,7 @@ class IgdbClientTests(unittest.TestCase):
              "released": "1986-02-21", "image_url": "https://images.igdb.com/igdb/image/upload/t_cover_big/co1uii.jpg",
              "genres": ["Adventure"], "platforms": ["Wii"], "dev": "Nintendo"},
         )
-        self.assertIn(b'search "zelda \\"breath\\"";', post.call_args.kwargs["data"])
+        self.assertIn(b'name ~ *"zelda \\"breath\\""*', post.call_args.kwargs["data"])
         self.assertEqual(post.call_args.kwargs["headers"], {"Client-ID": "id", "Authorization": "Bearer t"})
 
     def test_only_games_are_asked_for_and_the_exact_name_then_the_best_known_come_first(self):
@@ -54,7 +58,18 @@ class IgdbClientTests(unittest.TestCase):
         ]) as post:
             names = [c["name"] for c in igdb.search_games("among us")]
         self.assertEqual(names, ["Among Us!", "Among Us", "The Wolf Among Us", "Among Us VR"])
-        self.assertIn(b"where game_type = (0,8,9,10,11) & version_parent = null;", post.call_args.kwargs["data"])
+        self.assertIn(b'where name ~ *"among us"* & game_type = (0,8,9,10,11) & version_parent = null;', post.call_args.kwargs["data"])
+        self.assertIn(b"sort total_rating_count desc", post.call_args.kwargs["data"])
+
+    def test_the_search_is_asked_only_when_no_name_contains_the_text(self):
+        with mock.patch.object(igdb.requests, "post", side_effect=[
+            _response({"access_token": "t", "expires_in": 5000000}), _response([]), _response([ITEM]),
+        ]) as post:
+            [found] = igdb.search_games("zelda tears")
+        self.assertEqual(found["name"], "The Legend of Zelda")
+        contains, fuzzy = (c.kwargs["data"] for c in post.call_args_list[1:])
+        self.assertIn(b'name ~ *"zelda tears"*', contains)
+        self.assertIn(b'search "zelda tears";', fuzzy)
 
     def test_the_result_is_cut_to_the_limit(self):
         found = [{"id": n, "name": f"Game {n}", "total_rating_count": n} for n in range(1, 21)]
@@ -65,7 +80,7 @@ class IgdbClientTests(unittest.TestCase):
 
     def test_the_token_is_asked_once_and_the_secret_never_goes_in_a_url(self):
         with mock.patch.object(igdb.requests, "post", side_effect=[
-            _response({"access_token": "t", "expires_in": 5000000}), _response([]), _response([]),
+            _response({"access_token": "t", "expires_in": 5000000}), _response([ITEM]), _response([ITEM]),
         ]) as post:
             igdb.search_games("a")
             igdb.search_games("b")
@@ -93,6 +108,10 @@ class IgdbClientTests(unittest.TestCase):
 
 
 class IgdbFallbackTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        my_utils.reset_search_state()
+        self.addCleanup(my_utils.reset_search_state)
+
     async def test_igdb_answers_when_rawg_cannot(self):
         candidate = igdb._candidate(ITEM)
         with mock.patch.object(my_utils, "_search_rawg", side_effect=my_utils.RawgUnavailable("down")), \
@@ -112,6 +131,40 @@ class IgdbFallbackTests(unittest.IsolatedAsyncioTestCase):
                 mock.patch.object(igdb, "configured", return_value=False):
             with self.assertRaises(my_utils.RawgUnavailable):
                 await my_utils.search_rawg_games("zelda")
+
+    async def test_after_a_failure_rawg_is_not_waited_for_again_for_a_while(self):
+        rawg = mock.AsyncMock(side_effect=my_utils.RawgUnavailable("down"))
+        with mock.patch.object(my_utils, "_search_rawg", rawg),                 mock.patch.object(igdb, "configured", return_value=True),                 mock.patch.object(igdb, "search_games", return_value=[igdb._candidate(ITEM)]):
+            await my_utils.search_rawg_games("zelda")
+            await my_utils.search_rawg_games("zelda 2")
+            self.assertEqual(rawg.await_count, 1)
+            with mock.patch.object(my_utils.time, "monotonic", return_value=time_after_pause()):
+                await my_utils.search_rawg_games("zelda 3")
+            self.assertEqual(rawg.await_count, 2)
+
+    async def test_without_igdb_rawg_is_asked_every_time(self):
+        rawg = mock.AsyncMock(side_effect=my_utils.RawgUnavailable("down"))
+        with mock.patch.object(my_utils, "_search_rawg", rawg), mock.patch.object(igdb, "configured", return_value=False):
+            for query in ("zelda", "zelda 2"):
+                with self.assertRaises(my_utils.RawgUnavailable):
+                    await my_utils.search_rawg_games(query)
+        self.assertEqual(rawg.await_count, 2)
+
+    async def test_the_same_text_is_asked_once_and_the_marks_do_not_stay_in_the_answer(self):
+        rawg = mock.AsyncMock(return_value=[my_utils.schemas.RawgGameCandidate(rawg_id=1, name="Hades", slug="hades")])
+        with mock.patch.object(my_utils, "_search_rawg", rawg):
+            first = await my_utils.search_rawg_games("Hades")
+            first[0].exists_in_db = True  # what mark_existing_games does
+            second = await my_utils.search_rawg_games("  hades ")
+        self.assertEqual(rawg.await_count, 1)
+        self.assertFalse(second[0].exists_in_db)
+
+    async def test_a_failure_is_not_remembered(self):
+        rawg = mock.AsyncMock(side_effect=[my_utils.RawgUnavailable("down"), []])
+        with mock.patch.object(my_utils, "_search_rawg", rawg), mock.patch.object(igdb, "configured", return_value=False):
+            with self.assertRaises(my_utils.RawgUnavailable):
+                await my_utils.search_rawg_games("zelda")
+            self.assertEqual(await my_utils.search_rawg_games("zelda"), [])
 
     async def test_both_down_is_an_outage(self):
         with mock.patch.object(my_utils, "_search_rawg", side_effect=my_utils.RawgUnavailable("down")), \

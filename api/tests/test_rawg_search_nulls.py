@@ -20,6 +20,10 @@ class _Resp:
 
 
 class RawgSearchNullsTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        my_utils.reset_search_state()
+        self.addCleanup(my_utils.reset_search_state)
+
     async def test_null_fields_do_not_break_the_search(self):
         with mock.patch.object(my_utils.config.__class__, "RAWG_API_KEY", "k"), \
                 mock.patch.object(my_utils, "_http_get", return_value=_Resp()):
