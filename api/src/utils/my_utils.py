@@ -138,23 +138,23 @@ class RawgUnavailable(Exception):
 
 
 RAWG_SEARCH_TIMEOUT = 4  # seconds: the picker searches while the player types, it cannot wait ten for a service that is down
-RAWG_PAUSE_SECONDS = 60  # after RAWG fails, IGDB (when configured) is asked straight away for this long
+IGDB_PAUSE_SECONDS = 60  # after IGDB fails, RAWG is asked straight away for this long
 SEARCH_CACHE_SECONDS = 300  # typing, deleting and typing again asks the same text several times
-_rawg_paused_until = 0.0
+_igdb_paused_until = 0.0
 _search_cache = OutsideCache(SEARCH_CACHE_SECONDS, failure_seconds=SEARCH_CACHE_SECONDS)  # text -> its candidates; a failure is raised, never kept
 
 
 def reset_search_state() -> None:
-    """Forget the remembered searches and the pause of RAWG (the tests)."""
-    global _rawg_paused_until
-    _rawg_paused_until = 0.0
+    """Forget the remembered searches and the pause of IGDB (the tests)."""
+    global _igdb_paused_until
+    _igdb_paused_until = 0.0
     _search_cache.clear()
 
 
 async def search_rawg_games(query: str, db: Session = None) -> list[schemas.RawgGameCandidate]:
-    """Search games and return candidates, checking if they exist in the DB. RAWG is asked first; when it cannot
-    answer, IGDB takes over if it is configured (its candidates have no `rawg_id`). Raises `RawgUnavailable` when no
-    source can answer, so an outage is not mistaken for an empty search. The sources' answers are kept for a few minutes
+    """Search games and return candidates, checking if they exist in the DB. IGDB is asked first when it is configured
+    (its candidates have no `rawg_id`); RAWG takes over when IGDB cannot answer or finds nothing. Raises `RawgUnavailable`
+    when no source can answer, so an outage is not mistaken for an empty search. The sources' answers are kept for a few minutes
     per text; whether a candidate is already in the catalogue is looked up every time."""
     found = await _search_cache.get(" ".join(query.casefold().split()), lambda: _search_sources(query))
     candidates = [c.model_copy() for c in found]  # the marks below must not reach the cached answer
@@ -164,16 +164,22 @@ async def search_rawg_games(query: str, db: Session = None) -> list[schemas.Rawg
 
 
 async def _search_sources(query: str) -> list[schemas.RawgGameCandidate]:
-    global _rawg_paused_until
-    backup = igdb.configured()
-    if not (backup and time.monotonic() < _rawg_paused_until):
+    global _igdb_paused_until
+    if not igdb.configured():
+        return await _search_rawg(query)
+    if time.monotonic() >= _igdb_paused_until:
         try:
-            return await _search_rawg(query)
+            found = await _search_igdb(query)
         except RawgUnavailable:
-            if not backup:
-                raise
-            _rawg_paused_until = time.monotonic() + RAWG_PAUSE_SECONDS
-    return await _search_igdb(query)
+            _igdb_paused_until = time.monotonic() + IGDB_PAUSE_SECONDS
+        else:
+            if found:
+                return found
+            try:  # IGDB answered and has nothing: RAWG may know a game IGDB does not
+                return await _search_rawg(query)
+            except RawgUnavailable:
+                return found
+    return await _search_rawg(query)
 
 
 async def _search_igdb(query: str) -> list[schemas.RawgGameCandidate]:
@@ -182,7 +188,6 @@ async def _search_igdb(query: str) -> list[schemas.RawgGameCandidate]:
     except Exception as e:
         logger.error(f"Error searching IGDB for '{query}': {e}")
         raise RawgUnavailable("IGDB did not answer") from None
-    logger.warning(f"RAWG could not search '{query}': {len(found)} candidates from IGDB")
     return [schemas.RawgGameCandidate(**item) for item in found]
 
 

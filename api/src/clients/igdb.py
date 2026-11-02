@@ -13,6 +13,7 @@ from ..config import Config
 config = Config()
 
 TIMEOUT_SECONDS = 10
+SEARCH_TIMEOUT_SECONDS = 5  # the picker searches while the player types: it cannot wait ten for a service that is down
 TOKEN_URL = "https://id.twitch.tv/oauth2/token"
 GAMES_URL = "https://api.igdb.com/v4/games"
 IMAGE_URL = "https://images.igdb.com/igdb/image/upload/t_cover_big/{image_id}.jpg"
@@ -79,14 +80,14 @@ def _quote(text: str) -> str:
     return '"' + text.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
-def _post(body: str, retried: bool = False) -> list[dict]:
+def _post(body: str, retried: bool = False, timeout: int = TIMEOUT_SECONDS) -> list[dict]:
     headers = {"Client-ID": config.TWITCH_CLIENT_ID, "Authorization": f"Bearer {_access_token(renew=retried)}"}
     try:
-        response = requests.post(GAMES_URL, data=body.encode("utf-8"), headers=headers, timeout=TIMEOUT_SECONDS)
+        response = requests.post(GAMES_URL, data=body.encode("utf-8"), headers=headers, timeout=timeout)
     except requests.RequestException as e:
         raise IgdbError(f"IGDB did not answer ({type(e).__name__})") from None
     if response.status_code == 401 and not retried:  # the token was revoked before it expired
-        return _post(body, retried=True)
+        return _post(body, retried=True, timeout=timeout)
     if not response.ok:
         raise IgdbError(f"IGDB answered {response.status_code}")
     return response.json()
@@ -107,10 +108,10 @@ def _same_name(a: str, b: str) -> bool:
 
 def search_games(query: str, limit: int = 10) -> list[dict]:
     """The games IGDB finds for `query`, as the candidates of the game picker (`rawg_id` is None: they are not RAWG's)."""
-    return [_candidate(item) for item in search_items(query, limit)]
+    return [_candidate(item) for item in search_items(query, limit, timeout=SEARCH_TIMEOUT_SECONDS)]
 
 
-def search_items(query: str, limit: int = 10, extras: bool = False) -> list[dict]:
+def search_items(query: str, limit: int = 10, extras: bool = False, timeout: int = TIMEOUT_SECONDS) -> list[dict]:
     """The games IGDB finds for `query`, as IGDB gives them, best first.
     The ones named like the query come first, then the games proper, then the best known (most rated).
 
@@ -122,9 +123,9 @@ def search_items(query: str, limit: int = 10, extras: bool = False) -> list[dict
     needs them, the picker's list would carry kilobytes of keywords for nothing."""
     where = f"game_type = {GAME_TYPES} & version_parent = null"
     fields = f"{FIELDS},{EXTRA_FIELDS}" if extras else FIELDS
-    found = _post(f"fields {fields}; where name ~ *{_quote(query)}* & {where}; sort total_rating_count desc; limit {FETCH_LIMIT};")
+    found = _post(f"fields {fields}; where name ~ *{_quote(query)}* & {where}; sort total_rating_count desc; limit {FETCH_LIMIT};", timeout=timeout)
     if not found:
-        found = _post(f"search {_quote(query)}; fields {fields}; where {where}; limit {FETCH_LIMIT};")
+        found = _post(f"search {_quote(query)}; fields {fields}; where {where}; limit {FETCH_LIMIT};", timeout=timeout)
     found = [item for item in found if item.get("id") and item.get("name")]
     found.sort(key=lambda item: (
         not _same_name(item["name"], query), item.get("game_type") not in MAIN_TYPES, -(item.get("total_rating_count") or 0),
