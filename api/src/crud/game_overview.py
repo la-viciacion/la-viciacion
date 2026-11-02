@@ -107,6 +107,10 @@ def overview(db: Session, game_id: str, viewer_id: int) -> dict | None:
             "slug": game.slug or None,
             "genres": games.genre_list(game.genres),
             "tags": games.genre_list(game.tags),
+            # what IGDB says of it (empty until the game is linked to IGDB)
+            "themes": games.genre_list(game.themes),
+            "franchises": games.genre_list(game.franchises),
+            "collections": games.genre_list(game.collections),
             "dev": game.dev,
             "release_date": game.release_date,
             "avg_time": game.avg_time or None,

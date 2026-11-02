@@ -309,6 +309,10 @@ def _store_game(db: Session, game: schemas.NewGame, game_info: schemas.NewGame) 
         slug=game_info.slug,
         rawg_id=game_info.rawg_id,
         igdb_id=game_info.igdb_id,
+        themes=game_info.themes,
+        keywords=game_info.keywords,
+        franchises=game_info.franchises,
+        collections=game_info.collections,
         is_dlc=bool(game_info.is_dlc or game_info.parent_game_id),
         parent_game_id=game_info.parent_game_id,
     )

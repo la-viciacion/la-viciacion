@@ -29,6 +29,10 @@ FIELDS = (
     "involved_companies.developer,involved_companies.company.name"
 )
 
+# What IGDB says of a game besides its genres, kept in games.themes / keywords / franchises / collections
+EXTRA_FIELDS = "themes.name,keywords.name,franchises.name,collections.name"
+EXTRA_COLUMNS = ("themes", "keywords", "franchises", "collections")
+
 _token_lock = threading.Lock()
 _token: tuple[str, float] | None = None  # (token, when it expires)
 
@@ -106,17 +110,21 @@ def search_games(query: str, limit: int = 10) -> list[dict]:
     return [_candidate(item) for item in search_items(query, limit)]
 
 
-def search_items(query: str, limit: int = 10) -> list[dict]:
+def search_items(query: str, limit: int = 10, extras: bool = False) -> list[dict]:
     """The games IGDB finds for `query`, as IGDB gives them, best first.
     The ones named like the query come first, then the games proper, then the best known (most rated).
 
     It is asked while the player types, so a name that is half written has to match: IGDB's own search only knows whole
     words ("hollow kni" finds nothing), so the names that contain the text are asked for first, most rated first. Only when
-    none does (the words are not together, "zelda tears") is the search, which tolerates that, asked."""
+    none does (the words are not together, "zelda tears") is the search, which tolerates that, asked.
+
+    `extras` also asks for the themes, keywords, franchises and collections (`extras_of`): only the link of the catalogue
+    needs them, the picker's list would carry kilobytes of keywords for nothing."""
     where = f"game_type = {GAME_TYPES} & version_parent = null"
-    found = _post(f"fields {FIELDS}; where name ~ *{_quote(query)}* & {where}; sort total_rating_count desc; limit {FETCH_LIMIT};")
+    fields = f"{FIELDS},{EXTRA_FIELDS}" if extras else FIELDS
+    found = _post(f"fields {fields}; where name ~ *{_quote(query)}* & {where}; sort total_rating_count desc; limit {FETCH_LIMIT};")
     if not found:
-        found = _post(f"search {_quote(query)}; fields {FIELDS}; where {where}; limit {FETCH_LIMIT};")
+        found = _post(f"search {_quote(query)}; fields {fields}; where {where}; limit {FETCH_LIMIT};")
     found = [item for item in found if item.get("id") and item.get("name")]
     found.sort(key=lambda item: (
         not _same_name(item["name"], query), item.get("game_type") not in MAIN_TYPES, -(item.get("total_rating_count") or 0),
@@ -125,11 +133,40 @@ def search_items(query: str, limit: int = 10) -> list[dict]:
 
 
 def find_by_steam(steam_id: str) -> list[dict]:
-    """The IGDB entries that have this Steam app (a game and, often, its editions or bundles), as IGDB gives them."""
+    """The IGDB entries that have this Steam app (a game and, often, its editions or bundles), as IGDB gives them, with
+    what `extras_of` reads."""
     return _post(
-        "fields name,first_release_date,game_type,version_parent,platforms.name; "
+        f"fields name,first_release_date,game_type,version_parent,platforms.name,{EXTRA_FIELDS}; "
         f"where external_games.external_game_source = {STEAM_SOURCE} & external_games.uid = {_quote(str(steam_id))}; limit 10;"
     )
+
+
+def clean_name(name: str) -> str:
+    """A name of IGDB as it is kept in a comma separated column: an explanation in parentheses that has commas goes away
+    ("4X (explore, expand, exploit, and exterminate)" is "4X") and any other comma becomes a space."""
+    name = re.sub(r"\s*\([^)]*,[^)]*\)", "", name)
+    return " ".join(name.replace(",", " ").split())
+
+
+def _names(items) -> str:
+    seen: dict[str, str] = {}
+    for item in items or []:
+        name = clean_name(item.get("name") or "")
+        if name:
+            seen.setdefault(name.casefold(), name)
+    return ",".join(seen.values())
+
+
+def extras_of(item: dict) -> dict[str, str]:
+    """The themes, keywords, franchises and collections of an IGDB entry, each as the text for its column (empty when
+    IGDB has none: the game is not asked about them again)."""
+    return {column: _names(item.get(column)) for column in EXTRA_COLUMNS}
+
+
+def game_extras(igdb_id: int) -> dict[str, str] | None:
+    """`extras_of` for the game with this IGDB id, or None when IGDB has no such game."""
+    found = _post(f"fields {EXTRA_FIELDS}; where id = {int(igdb_id)};")
+    return extras_of(found[0]) if found else None
 
 
 STEAM_SOURCE = 1  # `external_game_source` of Steam in IGDB
@@ -138,10 +175,11 @@ DLC_TYPES = (1, 2, 4)  # dlc_addon, expansion, standalone_expansion
 
 def game_details(igdb_id: int) -> dict | None:
     """What IGDB knows of a game, to create it: the same keys as RAWG's details minus the tags (None when IGDB has no
-    such game). The tags are RAWG's vocabulary and IGDB's keywords are not the same: a game made from IGDB has none."""
+    such game) and its themes, keywords, franchises and collections. The tags are RAWG's vocabulary and IGDB's keywords are
+    not the same: a game made from IGDB has no `tags`, it has those four columns instead."""
     found = _post(
         "fields name,slug,first_release_date,game_type,cover.image_id,genres.name,involved_companies.developer,"
-        "involved_companies.company.name,external_games.external_game_source,external_games.uid; "
+        f"involved_companies.company.name,external_games.external_game_source,external_games.uid,{EXTRA_FIELDS}; "
         f"where id = {int(igdb_id)};"
     )
     if not found:
@@ -162,6 +200,7 @@ def game_details(igdb_id: int) -> dict | None:
         "image_url": candidate["image_url"],
         "genres": ",".join(candidate["genres"]),
         "is_dlc": item.get("game_type") in DLC_TYPES,
+        **extras_of(item),
     }
 
 

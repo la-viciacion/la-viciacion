@@ -1,7 +1,7 @@
 import datetime
 import unittest
 
-from src.utils import external_events as events
+from src.utils import external_events as events, game_tags
 
 
 class GamesTests(unittest.TestCase):
@@ -24,6 +24,7 @@ class GamesTests(unittest.TestCase):
         self.assertTrue(events.is_horror("Resident Evil 4", "Survival Horror"))
         self.assertFalse(events.is_horror("Doom", "Singleplayer,Action"))
         self.assertFalse(events.is_horror("Doom", None))
+        self.assertTrue(events.is_horror("Alien: Isolation", game_tags.words(None, "Horror,Survival", "", "Alien")))  # IGDB's themes count too
 
 
 class DaysTests(unittest.TestCase):

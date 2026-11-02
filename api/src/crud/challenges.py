@@ -8,7 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..database import models
-from ..utils import challenges
+from ..utils import challenges, game_tags
 from ..utils.challenges import AUTO, DECLINE_HOURS, DUEL, GROUP, OPT_IN, PARTICIPATIONS, TEMPLATES, USER, ChallengeConflict, ChallengeError, rank_players
 
 
@@ -158,8 +158,8 @@ def theme_games(db: Session, challenge: models.Challenge, viewer_id: int) -> lis
     mine = {game_id for (game_id,) in db.query(models.UserGame.game_id).filter(models.UserGame.user_id == viewer_id)}
     games = [
         {"id": game_id, "name": name, "image_url": image_url, "owners": owners[game_id], "mine": game_id in mine}
-        for game_id, name, image_url, tags in db.query(models.Game.id, models.Game.name, models.Game.image_url, models.Game.tags).filter(models.Game.id.in_(list(owners)))
-        if wanted & {tag.casefold() for tag in challenges.split_genres(tags)}
+        for game_id, name, image_url, *words in db.query(models.Game.id, models.Game.name, models.Game.image_url, *challenges.GAME_WORDS).filter(models.Game.id.in_(list(owners)))
+        if wanted & {tag.casefold() for tag in challenges.split_genres(game_tags.words(*words))}
     ]
     return sorted(games, key=lambda game: (not game["mine"], -game["owners"], game["name"].casefold()))
 

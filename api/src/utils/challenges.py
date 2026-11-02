@@ -18,7 +18,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..database import models
-from . import streaks, themes
+from . import game_tags, streaks, themes
 
 GROUP = "group"
 USER = "user"
@@ -325,13 +325,16 @@ def available_tags(db: Session) -> dict[str, tuple[str, int]]:
     return _available(db, models.Game.tags)
 
 
+GAME_WORDS = (models.Game.tags, models.Game.themes, models.Game.keywords, models.Game.franchises, models.Game.collections)
+
+
 def available_themes(db: Session) -> dict[str, tuple[str, int]]:
     """The themes (utils/themes.py) that have at least one game in the database: {lower-cased name: (name, how many games
-    have any of its tags)}."""
+    have any of its tags, RAWG's or IGDB's)}."""
     wanted = {name: {tag.casefold() for tag in tags} for name, tags in themes.THEMES.items()}
     counts = dict.fromkeys(themes.THEMES, 0)
-    for (tags,) in db.query(models.Game.tags).filter(models.Game.tags.isnot(None), models.Game.tags != ""):
-        owned = {tag.casefold() for tag in split_genres(tags)}
+    for row in db.query(*GAME_WORDS):
+        owned = {tag.casefold() for tag in split_genres(game_tags.words(*row))}
         for name, theme_tags in wanted.items():
             if owned & theme_tags:
                 counts[name] += 1
