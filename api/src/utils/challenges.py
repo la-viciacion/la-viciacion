@@ -325,7 +325,7 @@ def available_tags(db: Session) -> dict[str, tuple[str, int]]:
     return _available(db, models.Game.tags)
 
 
-GAME_WORDS = (models.Game.tags, models.Game.themes, models.Game.keywords, models.Game.franchises, models.Game.collections)
+GAME_WORDS = (models.Game.genres, models.Game.tags, models.Game.themes, models.Game.keywords, models.Game.franchises, models.Game.collections)
 
 
 def available_themes(db: Session) -> dict[str, tuple[str, int]]:

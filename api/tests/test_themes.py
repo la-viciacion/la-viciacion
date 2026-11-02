@@ -7,8 +7,25 @@ from src.utils import game_tags, themes
 
 class ThemesTests(unittest.TestCase):
     def test_every_tag_of_a_theme_is_one_the_games_keep(self):
-        dropped = {(name, tag): game_tags.drop_reason(tag) for name, tags in themes.THEMES.items() for tag in tags if not game_tags.keeps(tag)}
+        dropped = {
+            (name, tag): game_tags.drop_reason(tag)
+            for name, tags in themes.THEMES.items() for tag in tags if tag not in themes.IGDB_ONLY and not game_tags.keeps(tag)
+        }
         self.assertEqual(dropped, {})
+
+    def test_the_names_only_igdb_uses_are_in_a_theme_and_would_really_be_dropped_for_rawg(self):
+        in_themes = {tag for tags in themes.THEMES.values() for tag in tags}
+        self.assertEqual(themes.IGDB_ONLY - in_themes, set())
+        self.assertTrue(all(not game_tags.keeps(tag) for tag in themes.IGDB_ONLY))
+
+    def test_igdbs_names_count_for_the_themes_like_rawgs(self):
+        owned = lambda name, *words: {w.casefold() for w in words} & {t.casefold() for t in themes.THEMES[name]}  # noqa: E731
+        self.assertTrue(owned("Rol", "Role-playing (RPG)"))
+        self.assertTrue(owned("Ciencia ficción", "Science fiction"))
+        self.assertTrue(owned("Terror", "Psychological horror"))
+        self.assertTrue(owned("Estrategia en tiempo real", "Real Time Strategy (RTS)"))
+        self.assertTrue(owned("Souls-like", "Soulslike"))
+        self.assertTrue(owned("Guerra", "Warfare"))
 
     def test_a_theme_has_tags_and_names_are_not_repeated_whatever_their_case(self):
         names = [name.casefold() for name in themes.THEMES]
