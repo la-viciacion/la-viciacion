@@ -146,7 +146,7 @@ class NewGameAnnouncementTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_the_game_links_to_rawg_and_a_tap_on_the_push_opens_its_page_in_the_app(self):
         send = mock.AsyncMock()
-        await self.announce(types.SimpleNamespace(id=5, name="Doom", slug="doom"), send)
+        await self.announce(types.SimpleNamespace(id=5, name="Doom", slug="doom", page_url="https://rawg.io/games/doom"), send)
         text = send.await_args.args[0]
         self.assertIn("[Doom](https://rawg.io/games/doom)", text)
         self.assertIn("Ana\_B", text)
@@ -154,12 +154,12 @@ class NewGameAnnouncementTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_a_game_without_slug_is_announced_without_link(self):
         send = mock.AsyncMock()
-        await self.announce(types.SimpleNamespace(id=5, name="Doom", slug=None), send)
+        await self.announce(types.SimpleNamespace(id=5, name="Doom", slug=None, page_url=None), send)
         self.assertNotIn("](", send.await_args.args[0])
 
     async def test_a_failing_announcement_does_not_propagate(self):
         send = mock.AsyncMock(side_effect=RuntimeError("down"))
-        await self.announce(types.SimpleNamespace(id=5, name="Doom", slug="doom"), send)
+        await self.announce(types.SimpleNamespace(id=5, name="Doom", slug="doom", page_url="https://rawg.io/games/doom"), send)
 
 
 if __name__ == "__main__":

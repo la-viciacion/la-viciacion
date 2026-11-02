@@ -26,7 +26,7 @@ export function noticeBody(body) {
 function noticeHref(url) {
   try {
     const { origin, hash, host, pathname } = new URL(url);
-    if (host === 'rawg.io' && pathname.startsWith('/games/')) return { href: url, external: true };
+    if ((host === 'rawg.io' || host === 'www.igdb.com') && pathname.startsWith('/games/')) return { href: url, external: true };
     if (origin === window.location.origin && hash.startsWith('#/game/')) return { href: hash, external: false };
   } catch {
     // not an address

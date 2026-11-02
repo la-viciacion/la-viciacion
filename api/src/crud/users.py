@@ -406,7 +406,7 @@ async def announce_new_game(
     try:
         # the season of the new entry, not the running one: a backdated start belongs to its own season
         played_games = count_played_games(db, user.id, seasons.of(started_date))
-        msg = new_game_message(user.name, game_db.name, game_db.slug, played_games)
+        msg = new_game_message(user.name, game_db.name, game_db.page_url, played_games)
         await utils.send_message(
             msg,
             silent,

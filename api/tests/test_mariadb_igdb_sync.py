@@ -184,6 +184,23 @@ class IgdbSyncRunTests(ApiTestCase):
                 (2, 1, 3),
             )
 
+    def test_the_dates_of_the_wished_games_are_refreshed_from_igdb_and_what_it_cannot_say_goes_elsewhere(self):
+        old = datetime.date(2026, 1, 1)
+        self.game("a", "A", igdb_id=1, release_date=old)
+        self.game("b", "B", igdb_id=2, release_date=old)
+        self.game("c", "C", rawg_id=3, release_date=old)  # IGDB does not know it
+        with database.SessionLocal() as db:
+            games = [db.get(models.Game, g) for g in ("a", "b", "c")]
+            with mock.patch.object(igdb, "release_dates", return_value={1: datetime.date(2026, 9, 15)}):
+                changed, unanswered = igdb_sync.refresh_release_dates(db, games)
+            self.assertEqual(([g.id for g in changed], [g.id for g in unanswered]), (["a"], ["c"]))  # B: IGDB has no exact day, so it stays
+            self.assertEqual((games[0].release_date, games[1].release_date), (datetime.date(2026, 9, 15), old))
+            with mock.patch.object(igdb, "release_dates", side_effect=igdb.IgdbError("down")):
+                changed, unanswered = igdb_sync.refresh_release_dates(db, games)
+            self.assertEqual(([g.id for g in changed], sorted(g.id for g in unanswered)), ([], ["a", "b", "c"]))
+        with mock.patch.object(igdb, "configured", return_value=False):
+            self.assertEqual(igdb_sync.refresh_release_dates(None, games), ([], games))
+
     def test_a_doubtful_game_is_linked_by_hand_once_igdb_has_it(self):
         self.game("fear", "Fear")
         self.game("other", "Other", igdb_id=30)

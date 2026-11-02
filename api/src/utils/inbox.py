@@ -22,9 +22,9 @@ logger = LogManager().get_logger()
 
 BODY_MAX = 255
 
-# A link to a game ([name](https://rawg.io/games/slug) or of its page in the app) in the Telegram text: the inbox keeps
+# A link to a game ([name](https://rawg.io/games/slug), IGDB's or of its page in the app) in the Telegram text: the inbox keeps
 # the ones in the body so the page can show them. Any other link (a recap's story) is not shown inside the notice.
-LINK = re.compile(r"\[((?:\\.|[^\]\\])*)\]\((https?://(?:rawg\.io/games/|[^)\s]*/#/game/)[^)\s]*)\)")
+LINK = re.compile(r"\[((?:\\.|[^\]\\])*)\]\((https?://(?:rawg\.io/games/|(?:www\.)?igdb\.com/games/|[^)\s]*/#/game/)[^)\s]*)\)")
 
 
 def linked_body(message: str, body: str) -> str:

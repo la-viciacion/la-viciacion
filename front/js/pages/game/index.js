@@ -79,7 +79,7 @@ function draw(data) {
           <div id="gmPlatforms"></div>
           <div class="gm-actions" id="gmActions">
             <span id="gmOutside" class="gm-outside"></span>
-            ${game.slug ? html`<a class="pf-btn gm-rawg-btn" href="https://rawg.io/games/${encodeURIComponent(game.slug)}" target="_blank" rel="noopener noreferrer">Ver en RAWG <span aria-hidden="true">↗</span></a>` : ''}
+            ${game.page_url ? html`<a class="pf-btn gm-rawg-btn" href="${game.page_url}" target="_blank" rel="noopener noreferrer">Ver en ${game.page_url.includes('igdb.com') ? 'IGDB' : 'RAWG'} <span aria-hidden="true">↗</span></a>` : ''}
           </div>
         </div>
       </div>

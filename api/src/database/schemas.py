@@ -119,6 +119,8 @@ class NewGame(BaseModel):
     parent_game_id: Optional[str | None] = None
     # RAWG's id for the base game, set only by get_new_game_info so that creating the game can add the base: never stored
     parent_rawg_id: Optional[int | None] = None
+    # IGDB's id for the base game, the same way: set only by get_new_game_info, never stored
+    parent_igdb_id: Optional[int | None] = None
 
 
 class RawgGameCandidate(BaseModel):
@@ -140,8 +142,9 @@ class RawgGameCandidate(BaseModel):
 
 
 class RawgParent(BaseModel):
-    """The base game of a RAWG DLC / expansion, and whether it is already in the catalogue."""
-    rawg_id: int
+    """The base game of a RAWG or IGDB DLC / expansion, and whether it is already in the catalogue."""
+    rawg_id: Optional[int | None] = None
+    igdb_id: Optional[int | None] = None
     name: str
     exists_in_db: bool = False
     db_game_id: Optional[str | None] = None

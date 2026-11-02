@@ -2,7 +2,7 @@
 from unittest import mock
 
 from src.database import database, models
-from src.utils import rawg_series
+from src.utils import igdb_series, rawg_series
 from tests import clock
 from tests.api_support import ApiTestCase
 from tests.clock import ago
@@ -23,9 +23,10 @@ class GameSeriesTests(ApiTestCase):
             {"rawg_id": 200, "name": "Hades II", "slug": "hades-ii", "image_url": "http://img/2", "released": "2025-05-06"},
             {"rawg_id": 300, "name": "Hades Remix", "slug": "hades-remix", "image_url": None, "released": "2022-01-01"},
         ])
-        patcher = mock.patch.object(rawg_series, "series_of", self.series)
-        patcher.start()
-        self.addCleanup(patcher.stop)
+        self.igdb_series = mock.AsyncMock(return_value=None)
+        for patcher in (mock.patch.object(rawg_series, "series_of", self.series), mock.patch.object(igdb_series, "series_of", self.igdb_series)):
+            patcher.start()
+            self.addCleanup(patcher.stop)
 
     def saga(self, game="hades", as_user="ana"):
         return self.api("GET", f"/games/{game}/series", as_user=as_user)
@@ -36,6 +37,32 @@ class GameSeriesTests(ApiTestCase):
 
     def test_a_game_without_a_rawg_id_has_no_saga_and_rawg_is_not_asked(self):
         self.assertEqual(self.saga("alone").json(), {"available": False, "games": []})
+        self.series.assert_not_awaited()
+
+    def test_a_game_with_an_igdb_id_gets_igdbs_series_matched_by_igdb_id_and_rawg_is_not_asked(self):
+        self.game("witcher", "The Witcher", igdb_id=900, rawg_id=901, slug="the-witcher", release_date=clock.today().replace(year=2007, month=10, day=30))
+        self.game("witcher-2", "The Witcher 2", igdb_id=902)
+        self.igdb_series.return_value = [
+            {"igdb_id": 902, "rawg_id": None, "name": "The Witcher 2: Assassins of Kings", "slug": "the-witcher-2", "image_url": None, "released": "2011-05-17"},
+            {"igdb_id": 903, "rawg_id": None, "name": "The Witcher 3", "slug": "the-witcher-3-wild-hunt", "image_url": "http://img/3", "released": "2015-05-19"},
+        ]
+        games = self.saga("witcher").json()["games"]
+        self.assertEqual([(g["name"], g["game_id"], g["current"]) for g in games], [("The Witcher", "witcher", True), ("The Witcher 2", "witcher-2", False), ("The Witcher 3", None, False)])
+        self.assertEqual(games[1]["players"], 0)
+        self.assertEqual(games[2]["url"], "https://www.igdb.com/games/the-witcher-3-wild-hunt")  # not ours: IGDB's page
+        self.assertEqual(games[0]["url"], "https://rawg.io/games/the-witcher")  # ours has a RAWG id: its slug is RAWG's
+        self.igdb_series.assert_awaited_once_with(900)
+        self.series.assert_not_awaited()
+
+    def test_when_igdb_cannot_say_the_series_of_a_game_with_a_rawg_id_comes_from_rawg(self):
+        self.game("both", "Both", igdb_id=1, rawg_id=300)
+        self.assertTrue(self.saga("both").json()["available"])
+        self.igdb_series.assert_awaited_once_with(1)
+        self.series.assert_awaited_once_with(300)
+
+    def test_a_game_with_only_an_igdb_id_has_no_saga_when_igdb_cannot_say(self):
+        self.game("igdb-only", "Igdb Only", igdb_id=2)
+        self.assertEqual(self.saga("igdb-only").json(), {"available": False, "games": []})
         self.series.assert_not_awaited()
 
     def test_when_rawg_cannot_be_asked_the_page_has_no_saga(self):

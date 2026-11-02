@@ -107,11 +107,11 @@ export const ENTITIES = {
 
   games: {
     label: 'Juegos',
-    description: 'Catálogo de juegos compartido por todos. Los metadatos y portadas vienen de RAWG.',
+    description: 'Catálogo de juegos compartido por todos. Los metadatos y portadas vienen de IGDB y de RAWG.',
     endpoint: '/manage/games',
     search: true,
     selects: [
-      { key: 'rawg', label: 'Datos de RAWG', options: [['', 'Datos: todos'], ['pending', 'Incompletos'], ['unlinked', 'Sin ID de RAWG']] },
+      { key: 'rawg', label: 'Datos de RAWG', options: [['', 'Datos: todos'], ['pending', 'Incompletos'], ['unlinked', 'Sin ID de IGDB ni de RAWG']] },
     ],
     defaultSort: { key: 'name', dir: 'asc' },
     orders: [['name:asc', 'Orden: alfabético'], ['release_date:desc', 'Más nuevos'], ['played:desc', 'Más jugados']],
@@ -139,6 +139,7 @@ export const ENTITIES = {
       { key: 'image_url', label: 'Imagen (URL)', type: 'text' },
       { key: 'steam_id', label: 'Steam ID', type: 'text' },
       { key: 'rawg_id', label: 'RAWG ID', type: 'number' },
+      { key: 'igdb_id', label: 'IGDB ID', type: 'number' },
       { key: 'slug', label: 'Slug', type: 'text' },
       { key: 'is_dlc', label: 'Es un DLC o una expansión', type: 'checkbox' },
       { key: 'parent_game_id', label: 'Juego base (opcional)', type: 'game', nameKey: 'parent_name', clearable: true, checks: 'is_dlc' },

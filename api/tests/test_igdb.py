@@ -108,6 +108,51 @@ class IgdbClientTests(unittest.TestCase):
             self.assertIsNone(igdb.game_extras(6))
         self.assertIn(b"where id = 5;", post.call_args_list[1].kwargs["data"])
 
+    def test_the_series_of_a_game_are_the_other_games_of_its_collections_without_dlcs(self):
+        collections = [{"games": [
+            {"id": 1, "name": "Hades", "slug": "hades", "game_type": 0, "first_release_date": 1600300800, "cover": {"image_id": "cob9kr"}},
+            {"id": 2, "name": "Hades II", "slug": "hades-ii", "game_type": 0, "first_release_date": 1758758400},
+            {"id": 3, "name": "Hades Pack", "slug": "pack", "game_type": 13},
+            {"id": 4, "name": "Hades Soundtrack DLC", "slug": "dlc", "game_type": 1},
+        ]}, {"games": [{"id": 1, "name": "Hades", "slug": "hades", "game_type": 0}]}]
+        with mock.patch.object(igdb.requests, "post", side_effect=[
+            _response({"access_token": "t", "expires_in": 5000000}), _response([{"id": 2, "collections": collections}]), _response([]),
+        ]):
+            self.assertEqual(
+                igdb.series_of(2),
+                [{"igdb_id": 1, "rawg_id": None, "name": "Hades", "slug": "hades", "released": "2020-09-17",
+                  "image_url": "https://images.igdb.com/igdb/image/upload/t_cover_big/cob9kr.jpg"}],
+            )
+            self.assertIsNone(igdb.series_of(9))
+
+    def test_only_an_exact_release_day_is_a_release_date(self):
+        found = [
+            {"id": 1, "release_dates": [{"date": 1789430400, "date_format": 0}, {"date": 1800000000, "date_format": 0}]},
+            {"id": 2, "release_dates": [{"date": 1798675200, "date_format": 2}]},  # "2026": a placeholder day
+            {"id": 3, "release_dates": []},
+        ]
+        with mock.patch.object(igdb.requests, "post", side_effect=[_response({"access_token": "t", "expires_in": 5000000}), _response(found)]) as post:
+            dates = igdb.release_dates([1, 2, 3])
+        self.assertEqual({k: str(v) for k, v in dates.items()}, {1: "2026-09-15"})  # the earliest exact one
+        self.assertIn(b"where id = (1,2,3);", post.call_args.kwargs["data"])
+        self.assertEqual(igdb.release_dates([]), {})
+
+    def test_the_base_game_of_a_dlc_is_found_and_a_game_of_its_own_has_none(self):
+        with mock.patch.object(igdb.requests, "post", side_effect=[
+            _response({"access_token": "t", "expires_in": 5000000}),
+            _response([{"id": 5, "game_type": 1, "parent_game": {"id": 4, "name": "Base"}}]),
+            _response([{"id": 4, "game_type": 0}]), _response([]),
+        ]):
+            self.assertEqual(igdb.parent_of(5), (4, "Base"))
+            self.assertIsNone(igdb.parent_of(4))
+            self.assertIsNone(igdb.parent_of(99))
+
+    def test_a_dlc_brings_the_id_of_its_base_game_with_the_details(self):
+        with mock.patch.object(igdb.requests, "post", side_effect=[
+            _response({"access_token": "t", "expires_in": 5000000}), _response([dict(ITEM, game_type=1, parent_game=4)]),
+        ]):
+            self.assertEqual(igdb.game_details(1022)["parent_igdb_id"], 4)
+
     def test_a_dlc_is_marked_and_a_game_igdb_does_not_have_is_none(self):
         with mock.patch.object(igdb.requests, "post", side_effect=[
             _response({"access_token": "t", "expires_in": 5000000}), _response([dict(ITEM, game_type=2)]), _response([]),

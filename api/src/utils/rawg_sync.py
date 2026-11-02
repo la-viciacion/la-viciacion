@@ -18,7 +18,7 @@ import threading
 import time
 
 import requests
-from sqlalchemy import func, or_
+from sqlalchemy import and_, func, or_
 
 from ..config import Config
 from ..database import models
@@ -202,7 +202,8 @@ def _needs_steam(game: models.Game, overwrite: bool) -> bool:
 
 
 def pending_condition():
-    """SQL condition of a game worth a call: no rawg_id, or a rawg_id with basic info missing.
+    """SQL condition of a game worth a call: no rawg_id (and no igdb_id either: a game IGDB describes is not pending),
+    or a rawg_id with basic info missing.
 
     Basic info is what RAWG gives nearly every game: slug, image and genres, and the tags once (NULL = never asked;
     an empty string = RAWG has none, which `_apply` records so the game is not asked again). Not basic: the Steam id
@@ -210,13 +211,14 @@ def pending_condition():
     cannot fill would keep coming back at one or two calls each time). They are still filled in when the game is
     processed for another reason."""
     blank = lambda column: column.is_(None) | (column == "")  # noqa: E731
-    return or_(
+    only_igdb = models.Game.rawg_id.is_(None) & models.Game.igdb_id.isnot(None)  # IGDB describes it: RAWG is not needed
+    return and_(~only_igdb, or_(
         models.Game.rawg_id.is_(None),
         blank(models.Game.slug),
         blank(models.Game.image_url),
         blank(models.Game.genres),
         models.Game.tags.is_(None),
-    )
+    ))
 
 
 def _pending_query(db, overwrite: bool):

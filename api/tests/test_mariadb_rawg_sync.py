@@ -209,6 +209,13 @@ class SyncRunTests(SyncTestCase):
         self.assertEqual((status["calls"], status["updated"]), (1, 1))
         self.assertEqual(self.rawg.calls, ["/games/101"])
 
+    def test_a_game_that_only_igdb_describes_is_not_pending_for_rawg(self):
+        self.game("igdb-only", "Igdb Only", igdb_id=7)  # no RAWG id, no tags: RAWG is not needed
+        self.game("none", "None")  # nobody describes it
+        status = self.sync()
+        self.assertEqual(self.rawg.calls[:1], ["/games"])
+        self.assertEqual(status["total"], 1)
+
     def test_a_game_with_everything_filled_is_not_even_looked_at(self):
         self.game("full", "Full", rawg_id=5, slug="full", dev="Dev", genres="RPG", tags="Singleplayer", image_url="https://i", steam_id="1",
                   release_date=datetime.date(2020, 1, 1))

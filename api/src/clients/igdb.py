@@ -179,7 +179,7 @@ def game_details(igdb_id: int) -> dict | None:
     such game) and its themes, keywords, franchises and collections. The tags are RAWG's vocabulary and IGDB's keywords are
     not the same: a game made from IGDB has no `tags`, it has those four columns instead."""
     found = _post(
-        "fields name,slug,first_release_date,game_type,cover.image_id,genres.name,involved_companies.developer,"
+        "fields name,slug,first_release_date,game_type,parent_game,cover.image_id,genres.name,involved_companies.developer,"
         f"involved_companies.company.name,external_games.external_game_source,external_games.uid,{EXTRA_FIELDS}; "
         f"where id = {int(igdb_id)};"
     )
@@ -201,6 +201,7 @@ def game_details(igdb_id: int) -> dict | None:
         "image_url": candidate["image_url"],
         "genres": ",".join(candidate["genres"]),
         "is_dlc": item.get("game_type") in DLC_TYPES,
+        "parent_igdb_id": item.get("parent_game") if item.get("game_type") in DLC_TYPES else None,
         **extras_of(item),
     }
 
@@ -225,3 +226,52 @@ def _candidate(item: dict) -> dict:
         "platforms": [p["name"] for p in item.get("platforms") or [] if p.get("name")],
         "dev": ", ".join(developers) or None,
     }
+
+
+def _day(stamp: int | None) -> datetime.date | None:
+    return datetime.datetime.fromtimestamp(stamp, datetime.timezone.utc).date() if stamp else None
+
+
+def series_of(igdb_id: int) -> list[dict] | None:
+    """The other games of the series (IGDB's collections) a game belongs to, as the saga of the game page takes them
+    (empty when it has none), or None when IGDB has no such game. DLCs, packs and bundles of the series are left out."""
+    found = _post(
+        "fields collections.games.name,collections.games.slug,collections.games.first_release_date,"
+        f"collections.games.game_type,collections.games.cover.image_id; where id = {int(igdb_id)};"
+    )
+    if not found:
+        return None
+    series: dict[int, dict] = {}
+    for collection in found[0].get("collections") or []:
+        for game in collection.get("games") or []:
+            if game.get("id") == igdb_id or not game.get("name") or game.get("game_type") not in MAIN_TYPES:
+                continue
+            image_id = (game.get("cover") or {}).get("image_id")
+            series.setdefault(game["id"], {
+                "igdb_id": game["id"], "rawg_id": None, "name": game["name"], "slug": game.get("slug") or None,
+                "image_url": IMAGE_URL.format(image_id=image_id) if image_id else None,
+                "released": _day(game.get("first_release_date")).isoformat() if game.get("first_release_date") else None,
+            })
+    return list(series.values())
+
+
+def release_dates(igdb_ids: list[int]) -> dict[int, datetime.date]:
+    """The release day of each game IGDB has an **exact** date for (the earliest of its releases). A game announced for
+    "2026" or "Q4" has a placeholder day in IGDB that is not a day it comes out: it is not in the answer."""
+    ids = ",".join(str(int(i)) for i in igdb_ids)
+    if not ids:
+        return {}
+    found = _post(f"fields release_dates.date,release_dates.date_format; where id = ({ids}); limit {len(igdb_ids)};")
+    dates = {}
+    for item in found:
+        exact = [r["date"] for r in item.get("release_dates") or [] if r.get("date") and r.get("date_format") == 0]
+        if exact:
+            dates[item["id"]] = _day(min(exact))
+    return dates
+
+
+def parent_of(igdb_id: int) -> tuple[int, str] | None:
+    """(IGDB id, name) of the base game when `igdb_id` is a DLC or an expansion of another one, else None."""
+    found = _post(f"fields parent_game.name,game_type; where id = {int(igdb_id)};")
+    parent = found[0].get("parent_game") if found and found[0].get("game_type") in DLC_TYPES else None
+    return (parent["id"], parent.get("name") or "") if isinstance(parent, dict) and parent.get("id") else None

@@ -140,13 +140,13 @@ def releases(db: Session, viewer_id: int, year: int, month: int, today: datetime
 
 def to_refresh(db: Session, today: datetime.date) -> list[models.Game]:
     """Games somebody is waiting for whose release date may still change: not released (or releasing today) and
-    known to RAWG, which is where a date is refreshed from."""
+    known to IGDB or RAWG, which is where a date is refreshed from."""
     return (
         db.query(models.Game)
         .join(models.UserWishlist, models.UserWishlist.game_id == models.Game.id)
         .join(models.User, models.UserWishlist.user_id == models.User.id)
         .filter(
-            models.Game.rawg_id.isnot(None),
+            models.Game.rawg_id.isnot(None) | models.Game.igdb_id.isnot(None),
             (models.Game.release_date.is_(None)) | (models.Game.release_date >= today),
             models.User.is_active == 1,
             models.not_god(),

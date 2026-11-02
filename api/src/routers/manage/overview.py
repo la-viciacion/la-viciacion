@@ -29,8 +29,8 @@ STALE_TIMER_HOURS = 12
 
 @router.get("/attention")
 def attention(db: Session = Depends(get_db)):
-    """What the admin may want to look at: forgotten timers, players the bot cannot reach, games without RAWG
-    metadata and the challenges players have proposed that nobody has answered. Computed on request, like every
+    """What the admin may want to look at: forgotten timers, players the bot cannot reach, games neither RAWG nor IGDB
+    describe and the challenges players have proposed that nobody has answered. Computed on request, like every
     other figure."""
     cutoff = datetime.datetime.now() - datetime.timedelta(hours=STALE_TIMER_HOURS)
     stale = (
@@ -52,6 +52,8 @@ def attention(db: Session = Depends(get_db)):
         "users_without_telegram": db.query(func.count(models.User.id))
         .filter(models.User.is_active == 1, models.User.telegram_id.is_(None), models.not_god())
         .scalar(),
-        "games_without_rawg": db.query(func.count(models.Game.id)).filter(models.Game.rawg_id.is_(None)).scalar(),
+        "games_without_rawg": db.query(func.count(models.Game.id))
+        .filter(models.Game.rawg_id.is_(None), models.Game.igdb_id.is_(None))
+        .scalar(),  # neither source knows them (the key is old: it counted the RAWG ids only)
         "pending_challenge_proposals": db.query(func.count(models.ChallengeProposal.id)).filter(models.ChallengeProposal.status == "pending").scalar(),
     }
