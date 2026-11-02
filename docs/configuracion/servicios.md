@@ -23,6 +23,18 @@ En **Catálogo → Juegos** del panel:
 
 Los tiempos para completar (la historia principal) vienen de [HowLongToBeat](https://howlongtobeat.com), **sin clave**. **Sincronizar tiempos (HLTB)…** reemplaza el tiempo de los juegos que elijas (todos, solo los que no tienen, los que tienen un tiempo increíble o los N jugados más recientemente). Cada juego tarda unos 5 segundos y la ventana lo calcula antes de aceptar. Con esos tiempos se calculan la **deuda** y algunos logros.
 
+## IGDB: respaldo de la búsqueda de juegos
+
+[IGDB](https://www.igdb.com/) es el catálogo de juegos de Twitch. Si RAWG no responde (le ha pasado durante horas), la búsqueda de juegos nuevos usa IGDB en su lugar. Es opcional.
+
+1. Crea una aplicación en la [consola de desarrolladores de Twitch](https://dev.twitch.tv/console) (hace falta la verificación en dos pasos): URL de redirección `http://localhost`, categoría *Application Integration*, cliente *Confidential*.
+2. Copia el **Client ID** y genera un **Client Secret** (solo se ve una vez).
+3. Ponlos en el `.env`: `TWITCH_CLIENT_ID=...` y `TWITCH_CLIENT_SECRET=...`, y `docker compose up -d`.
+
+Un juego creado desde IGDB guarda su id de IGDB, con su desarrollador, fecha, portada, géneros y Steam id, pero sin etiquetas (son de RAWG).
+
+En **Catálogo → Juegos** del panel, **Enlazar con IGDB…** da su id de IGDB a los juegos que ya tienes, por tandas del tamaño que elijas. Solo guarda el id (no cambia ningún otro dato) y solo cuando la coincidencia es segura: el mismo juego de Steam, o el mismo nombre con un año que cuadre. Los dudosos se listan al terminar para elegir a mano.
+
 ## IA: avisos más graciosos
 
 La IA reescribe algunos avisos del grupo (un juego nuevo, un juego completado, cambios en los rankings…) con humor. Sin ella los avisos salen como texto normal.
