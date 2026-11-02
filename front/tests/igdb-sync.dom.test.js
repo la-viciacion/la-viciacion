@@ -13,7 +13,7 @@ afterEach(() => {
 });
 
 const status = (extra) => ({
-  state: 'running', total: 50, processed: 3, current: 'Game', linked: 2, ambiguous: [], duplicates: [], not_found: [], errors: [], stop_reason: null, ...extra,
+  state: 'running', total: 50, processed: 3, current: 'Game', linked: 2, filled: 0, ambiguous: [], duplicates: [], not_found: [], errors: [], stop_reason: null, ...extra,
 });
 const estimate = { total_games: 528, pending_games: 400, games: 50, estimated_seconds: 75 };
 

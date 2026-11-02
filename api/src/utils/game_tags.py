@@ -102,6 +102,13 @@ def keeps(name: str) -> bool:
     return drop_reason(name) is None
 
 
+def words(*columns: str | None) -> str:
+    """Everything a game says about what it is as one comma separated text: its RAWG tags (`games.tags`) and what IGDB
+    says (`games.themes`, `keywords`, `franchises`, `collections`). What reads a game's tags (the themes of the
+    challenges, the horror and Star Wars achievements) reads this, so a game counts whichever source described it."""
+    return ",".join(column for column in columns if column)
+
+
 def clean(names) -> str:
     """The text for `games.tags` from RAWG's tag names: the ones worth keeping, each once (whatever its case), in the
     order RAWG gave them, comma separated. Nothing worth keeping gives the empty text."""

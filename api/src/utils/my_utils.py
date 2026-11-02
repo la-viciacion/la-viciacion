@@ -432,7 +432,7 @@ async def get_game_details_by_igdb_id(igdb_id: int) -> dict | None:
         "steam_id": details["steam_id"] or hltb_steam or "",
         "tags": "",
         "avg_time": int(avg_time) if avg_time else 0,
-    }
+    }  # `themes`, `keywords`, `franchises` and `collections` come in `details`
 
 
 async def get_new_game_info(game) -> schemas.NewGame:
@@ -453,6 +453,7 @@ async def get_new_game_info(game) -> schemas.NewGame:
                 steam_id=igdb_details["steam_id"], image_url=igdb_details["image_url"], genres=igdb_details["genres"],
                 tags=igdb_details["tags"], avg_time=igdb_details["avg_time"], slug=igdb_details["slug"],
                 igdb_id=igdb_id, is_dlc=igdb_details["is_dlc"],
+                **{column: igdb_details[column] for column in igdb.EXTRA_COLUMNS},
             )
 
     if details:

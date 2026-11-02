@@ -207,6 +207,7 @@ class CreateGameTests(CatalogTestCase):
         igdb_game = {
             "igdb_id": 555, "name": "Hades II", "slug": "hades-ii", "dev": "Supergiant Games", "steam_id": "1145350",
             "release_date": datetime.date(2025, 9, 25), "image_url": "https://img/h2.jpg", "genres": "RPG", "is_dlc": False,
+            "themes": "Fantasy", "keywords": "Roguelike,Action roguelike", "franchises": "Hades", "collections": "",
         }
         self.with_rawg(Rawg(), hltb(hltb_hit(main=40, name="Hades II")))
         with mock.patch.object(my_utils.igdb, "configured", return_value=True),                 mock.patch.object(my_utils.igdb, "game_details", return_value=igdb_game):
@@ -217,6 +218,9 @@ class CreateGameTests(CatalogTestCase):
         self.assertEqual((game["igdb_id"], game["rawg_id"], game["dev"], game["steam_id"], game["slug"]), (555, None, "Supergiant Games", "1145350", "hades-ii"))
         self.assertEqual((game["release_date"], game["genres"], game["avg_time"]), ("2025-09-25", "RPG", 144000))
         self.assertEqual(again.status_code, 400)
+        self.assertEqual(
+            self.scalar("SELECT CONCAT_WS('|', themes, keywords, franchises, collections) FROM games"), "Fantasy|Roguelike,Action roguelike|Hades|"
+        )
         self.assertEqual(self.scalar("SELECT COUNT(*) FROM games"), 1)
 
     def test_an_igdb_game_is_still_added_when_igdb_cannot_give_its_details(self):

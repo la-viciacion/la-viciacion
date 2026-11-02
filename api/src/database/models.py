@@ -111,6 +111,11 @@ class Game(Base):
     rawg_id = Column(Integer, nullable=True, index=True)
     # IGDB's id, the backup source of the catalogue: a game can have it, RAWG's, both or neither (typed by hand)
     igdb_id = Column(Integer, nullable=True, index=True)
+    # What IGDB says of the game, comma separated like genres and tags (NULL = never asked, "" = IGDB has nothing)
+    themes = Column(Text, nullable=True)
+    keywords = Column(Text, nullable=True)
+    franchises = Column(Text, nullable=True)
+    collections = Column(Text, nullable=True)
     # A DLC / expansion / edition, with or without its base game: the link is optional (a game made by hand may not
     # say which, RAWG's base may not be in the catalogue). Deleting the base game leaves the DLC marked, unlinked
     is_dlc = Column(Boolean, nullable=False, server_default=text("0"), default=False)

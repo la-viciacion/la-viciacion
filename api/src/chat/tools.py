@@ -95,7 +95,9 @@ async def search_games(ctx: RunContext[ChatDeps], query: str) -> dict:
     genres and tags are in English in the catalog, and common Spanish words are translated). Returns up to 10 with their
     genres, release date and average time to finish (hours)."""
     conditions = [
-        column.like(f"%{term}%") for term in search_terms(query) for column in (models.Game.name, models.Game.genres, models.Game.tags)
+        column.like(f"%{term}%")
+        for term in search_terms(query)
+        for column in (models.Game.name, models.Game.genres, models.Game.tags, models.Game.themes, models.Game.franchises, models.Game.collections)
     ]
     found = ctx.deps.db.query(models.Game).filter(or_(*conditions)).order_by(models.Game.name).limit(MAX_ITEMS).all()
     result: dict = {
@@ -124,6 +126,9 @@ async def game_info(ctx: RunContext[ChatDeps], game: str) -> dict:
         "name": info["name"],
         "genres": info["genres"],
         "tags": info["tags"][:8],
+        "themes": info["themes"],
+        "franchises": info["franchises"],
+        "collections": info["collections"],
         "developer": info["dev"],
         "release_date": _day(info["release_date"]),
         "average_hours_to_finish": hours(info["avg_time"]) if info["avg_time"] else None,

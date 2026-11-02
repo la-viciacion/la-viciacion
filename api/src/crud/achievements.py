@@ -12,7 +12,7 @@ from ..utils import my_utils as utils
 from ..utils import challenges as challenge_templates
 from ..utils.achievements import AchievementsElems, first_season
 from ..utils.logger import LogManager
-from ..utils import external_events, seasons, streaks, user_settings, weather
+from ..utils import external_events, game_tags, seasons, streaks, user_settings, weather
 
 log_manager = LogManager()
 logger = log_manager.get_logger()
@@ -854,8 +854,8 @@ class Achievements:
         names = {}
         if any(ach.name in external_events.GAME_RULES for ach in pending):
             names = {
-                game_id: (name, tags)
-                for game_id, name, tags in db.query(models.Game.id, models.Game.name, models.Game.tags).filter(
+                game_id: (name, game_tags.words(*words))
+                for game_id, name, *words in db.query(models.Game.id, models.Game.name, *challenge_templates.GAME_WORDS).filter(
                     models.Game.id.in_({session.game_id for session in sessions})
                 )
             }
@@ -888,10 +888,10 @@ class Achievements:
             return
         horror = {
             game_id
-            for game_id, name, tags in db.query(models.Game.id, models.Game.name, models.Game.tags).filter(
+            for game_id, name, *words in db.query(models.Game.id, models.Game.name, *challenge_templates.GAME_WORDS).filter(
                 models.Game.id.in_({session.game_id for session in sessions})
             )
-            if external_events.is_horror(name, tags)
+            if external_events.is_horror(name, game_tags.words(*words))
         }
         for ach in pending:
             for session in sessions:

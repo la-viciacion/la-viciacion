@@ -1,7 +1,9 @@
-"""Links the games of the catalogue to IGDB (admin-triggered, in batches): it fills `games.igdb_id` and nothing else.
+"""Links the games of the catalogue to IGDB (admin-triggered, in batches): it fills `games.igdb_id` and what IGDB says of
+the game (themes, keywords, franchises, collections), which no other source fills.
 
 Rules that keep it safe to run on real data:
-  * only `igdb_id` is written, and only on a game that has none; the name and every other field are never touched
+  * only those five columns are written, and only while they are empty (a game with an IGDB id and no IGDB data gets the
+    data); the name and every other field are never touched
   * a game is linked automatically only on a certain match: the Steam app the game has, or the same name (roman numerals
     and punctuation aside) with a release year that agrees (a year of margin). Anything else is reported as ambiguous with
     candidates for the admin to pick: the best result for a name is never assumed (a remake is not the original)
@@ -77,7 +79,13 @@ def choose(game: models.Game, steam_hits: list[dict], name_hits: list[dict]) -> 
 
 
 def pending_query(db):
-    return db.query(models.Game).filter(models.Game.igdb_id.is_(None))
+    """Games with no IGDB id, and games with one whose IGDB data was never asked (linked by hand or created before it)."""
+    return db.query(models.Game).filter(models.Game.igdb_id.is_(None) | models.Game.themes.is_(None))
+
+
+def _fill(game: models.Game, extras: dict[str, str]) -> None:
+    for column, text in extras.items():
+        setattr(game, column, text)
 
 
 def _alphabetical_first(games: list[models.Game], limit: int) -> list[models.Game]:
@@ -130,6 +138,7 @@ def start(max_games: int | None = None) -> bool:
             processed=0,
             current=None,
             linked=0,
+            filled=0,
             stop_reason=None,
             ambiguous=[],
             not_found=[],
@@ -182,8 +191,19 @@ def _run(max_games: int | None):
                 break
             _set(current=game.name)
             try:
+                if game.igdb_id:  # linked already: only its data is missing
+                    extras = _ask(igdb.game_extras, game.igdb_id)
+                    consecutive_errors = 0
+                    if extras is None:
+                        _push("not_found", {"game_id": game.id, "name": game.name})
+                    else:
+                        _fill(game, extras)
+                        db.commit()
+                        _bump("filled")
+                    _bump("processed")
+                    continue
                 steam_hits = _ask(igdb.find_by_steam, game.steam_id) if (game.steam_id or "").strip() else []
-                name_hits = [] if steam_hits else _ask(igdb.search_items, game.name, 10)
+                name_hits = [] if steam_hits else _ask(igdb.search_items, game.name, 10, True)
                 verdict, found = choose(game, steam_hits, name_hits)
                 consecutive_errors = 0
                 if verdict == "not_found":
@@ -199,6 +219,7 @@ def _run(max_games: int | None):
                         })
                     else:
                         game.igdb_id = found["id"]
+                        _fill(game, igdb.extras_of(found))
                         db.commit()
                         _bump("linked")
             except igdb.IgdbRefused as e:
@@ -238,8 +259,10 @@ def apply_one(db, game_id: str, igdb_id: int) -> dict:
     taken = db.query(models.Game).filter(models.Game.igdb_id == igdb_id, models.Game.id != game_id).first()
     if taken:
         raise ValueError(f"Ese id de IGDB ya lo tiene «{taken.name}»")
-    if igdb.game_details(igdb_id) is None:
+    details = igdb.game_details(igdb_id)
+    if details is None:
         raise LookupError("IGDB no tiene ese juego")
     game.igdb_id = igdb_id
+    _fill(game, {column: details[column] for column in igdb.EXTRA_COLUMNS})
     db.commit()
     return {"linked": True}

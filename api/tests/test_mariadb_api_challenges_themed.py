@@ -120,6 +120,12 @@ class GamesOfTheThemeTests(ThemedTestCase):
         root = [(g["name"], g["mine"]) for g in self.games("root")]
         self.assertEqual(root, [("Amnesia", False), ("Alien", False)])  # the most owned first when none is theirs
 
+    def test_a_game_counts_for_the_theme_by_what_igdb_says_of_it_too(self):
+        self.game("lords", "Lords", themes="Horror")  # no RAWG tags at all
+        self.library_entry(self.ana, "lords", TODAY())
+        self.assertIn("Lords", [g["name"] for g in self.games("ana")])
+        self.assertEqual(self.api("GET", f"/challenges/{self.challenge}", as_user="ana").json()["theme_games"]["available"], 3)
+
     def test_the_challenge_says_how_many_games_the_group_has_and_how_many_the_viewer_has(self):
         summary = lambda user: self.api("GET", f"/challenges/{self.challenge}", as_user=user).json()["theme_games"]  # noqa: E731
         self.assertEqual((summary("ana"), summary("bea"), summary("root")), ({"available": 2, "mine": 1}, {"available": 2, "mine": 2}, {"available": 2, "mine": 0}))

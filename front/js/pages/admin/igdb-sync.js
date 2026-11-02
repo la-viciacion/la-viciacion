@@ -1,5 +1,5 @@
-// IGDB link UI: gives each game of the catalogue the id it has in IGDB (the backup source of the game search).
-// It writes nothing else and only on games that have no id yet, so it asks for no phrase. It goes in batches the admin
+// IGDB link UI: gives each game of the catalogue the id it has in IGDB (the backup source of the game search) and what IGDB
+// says of it (themes, keywords, franchises, collections). It writes only those, and only while they are empty, so it asks for no phrase. It goes in batches the admin
 // sizes (the games a batch could not decide stay pending and come back in the next one); each game takes a second or so.
 import { api, jsonRequest } from '../../lib/api.js';
 import { html, mount } from '../../lib/html.js';
@@ -29,7 +29,7 @@ export async function igdbSyncFlow({ onDone }) {
 }
 
 const estimateStats = (est) => html`
-  ${statTile('juegos sin enlazar', est.pending_games)}
+  ${statTile('juegos pendientes', est.pending_games)}
   ${statTile('juegos de esta tanda', est.games)}
   ${statTile('duración aproximada (min)', Math.max(1, Math.ceil(est.estimated_seconds / 60)))}`;
 
@@ -37,7 +37,7 @@ async function confirmStep(onDone) {
   const m = openModal(html`
     ${modalHeader('Enlazar juegos con IGDB')}
     <form class="adm-form" novalidate>
-      <p class="adm-sub">Busca cada juego que aún no tiene id de IGDB y se lo guarda, solo cuando la coincidencia es segura: el mismo juego de Steam, o el mismo nombre con un año que cuadre. Los dudosos se listan al terminar para elegir a mano. No se cambia ningún otro dato del juego.</p>
+      <p class="adm-sub">Busca cada juego que aún no tiene id de IGDB y se lo guarda junto con lo que IGDB dice de él (temas, palabras clave, franquicias y colecciones), solo cuando la coincidencia es segura: el mismo juego de Steam, o el mismo nombre con un año que cuadre. Los juegos ya enlazados a los que les falten esos datos también se completan. Los dudosos se listan al terminar para elegir a mano. No se cambia ningún otro dato del juego.</p>
       <label>¿Cuántos juegos en esta tanda? (vacío = todos)<input class="adm-input" type="number" name="max" min="1" step="1" placeholder="todos" value="50" /></label>
       <div class="adm-stats adm-stats-sm" id="igEstimate"></div>
       <div class="adm-error" role="alert"></div>
@@ -109,6 +109,7 @@ function headView(s, left = null) {
     <div class="adm-progress-txt">${s.processed} / ${s.total} juegos${running && s.current ? ` · ${s.current}` : ''}${running && left ? ` · quedan unos ${left} min` : ''}</div>
     <div class="adm-stats adm-stats-sm">
       ${statTile('enlazados', s.linked)}
+      ${statTile('completados', s.filled)}
       ${statTile('dudosos', s.ambiguous.length)}
       ${statTile('sin resultado', s.not_found.length)}
       ${statTile('duplicados', s.duplicates.length)}

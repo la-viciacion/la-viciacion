@@ -109,6 +109,11 @@ class NewGame(BaseModel):
     slug: Optional[str | None] = None
     rawg_id: Optional[int | None] = None
     igdb_id: Optional[int | None] = None
+    # IGDB's, comma separated; not in the read model of a game (the keywords alone are kilobytes a game)
+    themes: Optional[str | None] = None
+    keywords: Optional[str | None] = None
+    franchises: Optional[str | None] = None
+    collections: Optional[str | None] = None
     is_dlc: bool = False
     # the base game in the catalogue; a game with one is a DLC whatever `is_dlc` says
     parent_game_id: Optional[str | None] = None

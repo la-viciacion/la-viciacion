@@ -77,6 +77,37 @@ class IgdbClientTests(unittest.TestCase):
         )
         self.assertEqual(str(details["release_date"]), "1986-02-21")
 
+    def test_the_themes_keywords_franchises_and_collections_come_with_the_details(self):
+        item = dict(
+            ITEM, game_type=0,
+            themes=[{"name": "Fantasy"}, {"name": "4X (explore, expand, exploit, and exterminate)"}],
+            keywords=[{"name": "Roguelike"}, {"name": "roguelike"}, {"name": "Hack, and slash"}],
+            franchises=[{"name": "The Legend of Zelda"}], collections=[],
+        )
+        with mock.patch.object(igdb.requests, "post", side_effect=[
+            _response({"access_token": "t", "expires_in": 5000000}), _response([item]),
+        ]) as post:
+            details = igdb.game_details(1022)
+        self.assertIn(b"themes.name,keywords.name,franchises.name,collections.name", post.call_args.kwargs["data"])
+        self.assertEqual(
+            (details["themes"], details["keywords"], details["franchises"], details["collections"]),
+            ("Fantasy,4X", "Roguelike,Hack and slash", "The Legend of Zelda", ""),
+        )
+
+    def test_a_name_with_a_comma_never_splits_in_two(self):
+        self.assertEqual(igdb.clean_name("4X (explore, expand, exploit, and exterminate)"), "4X")
+        self.assertEqual(igdb.clean_name("Role-playing (RPG)"), "Role-playing (RPG)")
+        self.assertEqual(igdb.clean_name("Rock, Paper,  Scissors"), "Rock Paper Scissors")
+
+    def test_the_extras_of_a_linked_game_are_asked_by_id_and_a_game_igdb_lacks_is_none(self):
+        with mock.patch.object(igdb.requests, "post", side_effect=[
+            _response({"access_token": "t", "expires_in": 5000000}),
+            _response([{"id": 5, "themes": [{"name": "Horror"}]}]), _response([]),
+        ]) as post:
+            self.assertEqual(igdb.game_extras(5), {"themes": "Horror", "keywords": "", "franchises": "", "collections": ""})
+            self.assertIsNone(igdb.game_extras(6))
+        self.assertIn(b"where id = 5;", post.call_args_list[1].kwargs["data"])
+
     def test_a_dlc_is_marked_and_a_game_igdb_does_not_have_is_none(self):
         with mock.patch.object(igdb.requests, "post", side_effect=[
             _response({"access_token": "t", "expires_in": 5000000}), _response([dict(ITEM, game_type=2)]), _response([]),
