@@ -20,6 +20,10 @@ TOKEN_MARGIN_SECONDS = 3600  # renewed an hour before it expires
 # and skins of a game, and ahead of the game itself for the best known ones.
 GAME_TYPES = "(0,8,9,10,11)"
 FETCH_LIMIT = 25  # IGDB cannot sort a search: a wider net is cast and the best known of it is kept
+FIELDS = (
+    "name,slug,first_release_date,cover.image_id,genres.name,platforms.name,total_rating_count,"
+    "involved_companies.developer,involved_companies.company.name"
+)
 
 _token_lock = threading.Lock()
 _token: tuple[str, float] | None = None  # (token, when it expires)
@@ -81,13 +85,15 @@ def _same_name(a: str, b: str) -> bool:
 
 def search_games(query: str, limit: int = 10) -> list[dict]:
     """The games IGDB finds for `query`, as the candidates of the game picker (`rawg_id` is None: they are not RAWG's).
-    The ones named exactly like the query come first, then the best known (most rated)."""
-    found = _post(
-        f"search {_quote(query)}; "
-        "fields name,slug,first_release_date,cover.image_id,genres.name,platforms.name,total_rating_count,"
-        "involved_companies.developer,involved_companies.company.name; "
-        f"where game_type = {GAME_TYPES} & version_parent = null; limit {FETCH_LIMIT};"
-    )
+    The ones named exactly like the query come first, then the best known (most rated).
+
+    It is asked while the player types, so a name that is half written has to match: IGDB's own search only knows whole
+    words ("hollow kni" finds nothing), so the names that contain the text are asked for first, most rated first. Only when
+    none does (the words are not together, "zelda tears") is the search, which tolerates that, asked."""
+    where = f"game_type = {GAME_TYPES} & version_parent = null"
+    found = _post(f"fields {FIELDS}; where name ~ *{_quote(query)}* & {where}; sort total_rating_count desc; limit {FETCH_LIMIT};")
+    if not found:
+        found = _post(f"search {_quote(query)}; fields {FIELDS}; where {where}; limit {FETCH_LIMIT};")
     found = [item for item in found if item.get("id") and item.get("name")]
     found.sort(key=lambda item: (not _same_name(item["name"], query), -(item.get("total_rating_count") or 0)))
     return [_candidate(item) for item in found[:limit]]

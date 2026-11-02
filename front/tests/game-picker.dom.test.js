@@ -201,6 +201,20 @@ test('a game found by IGDB is added without a RAWG id and without asking RAWG ab
   assert.deepEqual(picked, ['h2', 'Hades II']);
 });
 
+test('a newer search cancels the request of the older one', async () => {
+  openGamePicker(() => {});
+  document.querySelector('#modalAddGameBtn').click();
+  installApi({ 'GET /games/search-rawg?query=': () => new Promise(() => {}) });
+  const signals = [];
+  const fetchOf = globalThis.fetch;
+  globalThis.fetch = (url, options) => (signals.push(options.signal), fetchOf(url, options));
+  await search('#addGameSearch', 'hades', 300);
+  await search('#addGameSearch', 'hades ii', 300);
+  assert.equal(signals.length, 2);
+  assert.equal(signals[0].aborted, true);
+  assert.equal(signals[1].aborted, false);
+});
+
 test('a RAWG outage is told, not shown as an empty search', async () => {
   openGamePicker(() => {});
   document.querySelector('#modalAddGameBtn').click();

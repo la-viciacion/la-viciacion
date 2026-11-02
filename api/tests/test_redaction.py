@@ -28,6 +28,10 @@ class RedactionTests(unittest.TestCase):
 
 
 class LoggedErrorsTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        my_utils.reset_search_state()
+        self.addCleanup(my_utils.reset_search_state)
+
     async def test_a_failed_search_does_not_log_the_key(self):
         with mock.patch.object(redaction.config.__class__, "RAWG_API_KEY", KEY), \
                 mock.patch.object(my_utils.igdb, "configured", return_value=False), \
