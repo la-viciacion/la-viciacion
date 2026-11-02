@@ -10,6 +10,7 @@
 // heading: a title between groups of fields, it holds no value
 // when: { key, is } or { key, not } on any field: it shows only while that other field has (or has not) that value (a period's
 //   value is its mode: month, week, range or repeat); a field that is not shown is neither read nor required
+// defaultBy: { key, values: { <value>: default } } on a checkbox: it takes that default whenever the field it depends on changes to that value
 // month: the months after the running one, as a "YYYY-MM" text (the challenges are launched for a month)
 // choice: { options: [[text, label], ...], default? } a select whose value stays text (select reads it as a number)
 // An entity may have several ways to create a row (`creates`: [{ label, choose?, fields, body }]): `fields` is the form and
@@ -250,8 +251,17 @@ function isShown(f, fields, root) {
 
 const fieldView = (f, value, row) => (f.when ? html`<div data-when="${f.key}">${fieldHtml(f, value, row)}</div>` : fieldHtml(f, value, row));
 
+const seen = new WeakMap(); // the value each field with `defaultBy` last took its default for
+
 function applyWhen(root, fields) {
   root.querySelectorAll('[data-when]').forEach((box) => { box.hidden = !isShown(fields.find((f) => f.key === box.dataset.when), fields, root); });
+  for (const f of fields.filter((x) => x.defaultBy)) {
+    const value = valueOf(f.defaultBy.key, fields, root);
+    const last = seen.get(root) ?? {};
+    if (last[f.key] === value) continue;
+    seen.set(root, { ...last, [f.key]: value });
+    document.getElementById(inputId(f)).checked = f.defaultBy.values[value] ?? Boolean(f.default);
+  }
 }
 
 const bindPeriods = (el) => el.querySelectorAll('[data-period-field]').forEach(bindPeriod);
