@@ -33,6 +33,7 @@ const ACTIONS = [
   ['POST', /^recalculate-achievements$/, 'Pidió recalcular todos los logros'],
   ['POST', /^rawg-sync\//, 'Usó la sincronización con RAWG'],
   ['POST', /^hltb-sync\//, 'Usó la sincronización de tiempos con HowLongToBeat'],
+  ['POST', /^igdb-sync\//, 'Usó el enlazado de juegos con IGDB'],
 ];
 
 // Who asked the AI when its quota ran out (api/src/utils/ai_quota.py `source`)

@@ -1,0 +1,174 @@
+"""The link of the catalogue to IGDB (MariaDB required, see api_support.py). IGDB is a fake, the throttling sleeps are
+skipped and the background thread runs in the test, so a whole run is one call to `start()` and a look at `status()`."""
+import datetime
+import unittest
+from types import SimpleNamespace
+from unittest import mock
+
+from src.clients import igdb
+from src.database import database, models
+from src.utils import igdb_sync
+from tests.api_support import ApiTestCase
+
+
+def stamp(year):
+    return int(datetime.datetime(year, 6, 1, tzinfo=datetime.timezone.utc).timestamp())
+
+
+def item(igdb_id, name, year=None, game_type=0, version_parent=None):
+    return {"id": igdb_id, "name": name, "first_release_date": stamp(year) if year else None, "game_type": game_type,
+            "version_parent": version_parent, "platforms": [{"name": "PC"}]}
+
+
+def game(name, year=None, steam=None):
+    return SimpleNamespace(name=name, release_date=datetime.date(year, 1, 1) if year else None, steam_id=steam)
+
+
+class ChooseTests(unittest.TestCase):
+    """The decision of what to do with a game is pure: no database is read."""
+
+    def test_the_steam_app_decides_when_it_points_at_one_game(self):
+        verdict, found = igdb_sync.choose(game("Hades II", 2024, steam="1145350"), [item(5, "Hades II", 2025)], [])
+        self.assertEqual((verdict, found["id"]), ("linked", 5))
+
+    def test_a_steam_app_shared_by_a_game_and_its_edition_picks_the_game(self):
+        hits = [item(1, "Horizon Zero Dawn: Complete Edition", 2020, game_type=3, version_parent=2), item(2, "Horizon Zero Dawn", 2017)]
+        self.assertEqual(igdb_sync.choose(game("Horizon Zero Dawn", steam="1"), hits, [])[1]["id"], 2)
+
+    def test_a_steam_app_with_two_games_proper_is_left_to_a_human(self):
+        verdict, found = igdb_sync.choose(game("X", steam="1"), [item(1, "X", 2000), item(2, "X HD", 2010)], [])
+        self.assertEqual((verdict, [c["id"] for c in found]), ("ambiguous", [1, 2]))
+
+    def test_the_same_name_and_a_year_that_agrees_links_it_roman_numerals_included(self):
+        verdict, found = igdb_sync.choose(game("Alan Wake 2", 2023), [], [item(7, "Alan Wake II", 2023)])
+        self.assertEqual((verdict, found["id"]), ("linked", 7))
+        self.assertEqual(igdb_sync.choose(game("Outlast", 2013), [], [item(8, "Outlast", 2014)])[0], "linked")  # a year of margin
+
+    def test_a_remake_is_not_the_original(self):
+        names = [item(1, "Resident Evil 4", 2005), item(2, "Resident Evil 4", 2023, game_type=8)]
+        self.assertEqual(igdb_sync.choose(game("Resident Evil 4", 2023), [], names)[1]["id"], 2)
+        verdict, found = igdb_sync.choose(game("Silent Hill 2", 2024), [], [item(3, "Silent Hill 2", 2001)])
+        self.assertEqual((verdict, [c["id"] for c in found]), ("ambiguous", [3]))  # the name is right and the year is not
+
+    def test_a_game_without_a_year_links_only_when_one_entry_has_its_name(self):
+        self.assertEqual(igdb_sync.choose(game("Celeste"), [], [item(1, "Celeste", 2018)])[0], "linked")
+        self.assertEqual(igdb_sync.choose(game("Celeste"), [], [item(1, "Celeste", 2018), item(2, "Celeste", 2019)])[0], "ambiguous")
+
+    def test_a_name_that_is_not_exact_is_never_linked_and_nothing_is_not_found(self):
+        verdict, found = igdb_sync.choose(game("Fear", 2017), [], [item(1, "Layers of Fear", 2016)])
+        self.assertEqual((verdict, found[0]["id"]), ("ambiguous", 1))
+        self.assertEqual(igdb_sync.choose(game("Nothing"), [], []), ("not_found", None))
+
+
+class SameThread:
+    def __init__(self, target, args=(), daemon=None):
+        self.target, self.args = target, args
+
+    def start(self):
+        self.target(*self.args)
+
+
+class IgdbSyncRunTests(ApiTestCase):
+    def setUp(self):
+        super().setUp()
+        igdb_sync._status.clear()
+        igdb_sync._status["state"] = "idle"
+        igdb_sync._cancel.clear()
+        self.by_steam, self.by_name, self.asked = {}, {}, []
+        for patcher in (
+            mock.patch.object(igdb_sync.time, "sleep"),
+            mock.patch.object(igdb_sync.threading, "Thread", new=SameThread),
+            mock.patch.object(igdb, "configured", return_value=True),
+            mock.patch.object(igdb, "find_by_steam", side_effect=lambda steam: self.by_steam.get(steam, [])),
+            mock.patch.object(igdb, "search_items", side_effect=self.search),
+        ):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    def search(self, name, limit=10):
+        self.asked.append(name)
+        answer = self.by_name.get(name)
+        if isinstance(answer, Exception):
+            raise answer
+        return answer or []
+
+    def igdb_id(self, game_id):
+        with database.SessionLocal() as db:
+            return db.get(models.Game, game_id).igdb_id
+
+    def run_sync(self, max_games=None):
+        self.assertTrue(igdb_sync.start(max_games))
+        return igdb_sync.status()
+
+    def test_certain_matches_are_linked_and_the_rest_is_listed_without_touching_anything_else(self):
+        self.game("hades", "Hades", steam_id="1145350", dev="Me")
+        self.game("celeste", "Celeste", release_date=datetime.date(2018, 1, 25))
+        self.game("fear", "Fear", release_date=datetime.date(2017, 1, 1))
+        self.game("ghost", "Ghost")
+        self.by_steam["1145350"] = [item(10, "Hades II", 2025)]
+        self.by_name.update({"Celeste": [item(20, "Celeste", 2018)], "Fear": [item(30, "Layers of Fear", 2016)]})
+        status = self.run_sync()
+        self.assertEqual((status["state"], status["stop_reason"], status["linked"], status["processed"]), ("finished", "completed", 2, 4))
+        self.assertEqual([self.igdb_id(g) for g in ("hades", "celeste", "fear", "ghost")], [10, 20, None, None])
+        self.assertEqual([a["name"] for a in status["ambiguous"]], ["Fear"])
+        self.assertEqual(status["ambiguous"][0]["candidates"][0]["igdb_id"], 30)
+        self.assertEqual([n["name"] for n in status["not_found"]], ["Ghost"])
+        with database.SessionLocal() as db:
+            self.assertEqual(db.get(models.Game, "hades").dev, "Me")
+
+    def test_a_batch_takes_the_first_games_alphabetically_and_a_game_already_linked_is_not_asked(self):
+        for game_id, name in (("a", "Alpha"), ("b", "Beta"), ("c", "Gamma"), ("d", "Delta")):
+            self.game(game_id, name)
+        self.game("done", "Aaa Done", igdb_id=1)
+        self.by_name.update({"Alpha": [item(11, "Alpha")], "Beta": [item(12, "Beta")]})
+        status = self.run_sync(max_games=2)
+        self.assertEqual((status["total"], status["linked"], self.asked), (2, 2, ["Alpha", "Beta"]))
+        self.assertEqual(self.igdb_id("done"), 1)
+
+    def test_an_igdb_id_another_game_has_is_a_duplicate_and_is_not_assigned(self):
+        self.game("one", "Celeste", igdb_id=20)
+        self.game("two", "Celeste Classic", release_date=datetime.date(2018, 1, 1))
+        self.by_name["Celeste Classic"] = [item(20, "Celeste Classic", 2018)]
+        status = self.run_sync()
+        self.assertEqual((status["linked"], status["duplicates"][0]["other_name"]), (0, "Celeste"))
+        self.assertIsNone(self.igdb_id("two"))
+
+    def test_five_failures_in_a_row_stop_the_run_and_a_refusal_stops_it_at_once(self):
+        for n in range(7):
+            self.game(f"g{n}", f"Game {n}")
+            self.by_name[f"Game {n}"] = igdb.IgdbError("IGDB did not answer")
+        status = self.run_sync()
+        self.assertEqual((status["stop_reason"], len(status["errors"])), ("errors", 5))
+        igdb_sync._status["state"] = "idle"
+        self.by_name = {f"Game {n}": igdb.IgdbRefused("Twitch refused the credentials (403)") for n in range(7)}
+        self.assertTrue(igdb_sync.start(None))
+        self.assertIn("refused the credentials", igdb_sync.status()["stop_reason"])
+
+    def test_without_credentials_it_does_not_start(self):
+        with mock.patch.object(igdb, "configured", return_value=False):
+            with self.assertRaises(RuntimeError):
+                igdb_sync.start()
+
+    def test_the_estimate_counts_only_the_games_without_an_id(self):
+        self.game("a", "A")
+        self.game("b", "B")
+        self.game("c", "C", igdb_id=3)
+        with database.SessionLocal() as db:
+            self.assertEqual(
+                (igdb_sync.estimate(db)["pending_games"], igdb_sync.estimate(db, 1)["games"], igdb_sync.estimate(db)["total_games"]),
+                (2, 1, 3),
+            )
+
+    def test_a_doubtful_game_is_linked_by_hand_once_igdb_has_it(self):
+        self.game("fear", "Fear")
+        self.game("other", "Other", igdb_id=30)
+        with database.SessionLocal() as db, mock.patch.object(igdb, "game_details", return_value={"name": "Fear"}):
+            self.assertEqual(igdb_sync.apply_one(db, "fear", 31), {"linked": True})
+            with self.assertRaises(ValueError):
+                igdb_sync.apply_one(db, "fear", 30)
+            with self.assertRaises(LookupError):
+                igdb_sync.apply_one(db, "nope", 32)
+        with database.SessionLocal() as db, mock.patch.object(igdb, "game_details", return_value=None):
+            with self.assertRaises(LookupError):
+                igdb_sync.apply_one(db, "other", 99)
+        self.assertEqual(self.igdb_id("fear"), 31)

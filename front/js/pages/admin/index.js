@@ -436,6 +436,10 @@ async function onClick(e) {
         const { rawgSyncFlow } = await import('./rawg-sync.js');
         return rawgSyncFlow({ onDone: admin.reload });
       }
+      case 'igdb-sync': {
+        const { igdbSyncFlow } = await import('./igdb-sync.js');
+        return igdbSyncFlow({ onDone: admin.reload });
+      }
       case 'hltb-sync': {
         const { hltbSyncFlow } = await import('./hltb-sync.js');
         return hltbSyncFlow({ onDone: admin.reload });

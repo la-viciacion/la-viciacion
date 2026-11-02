@@ -148,7 +148,7 @@ export const ENTITIES = {
       { label: 'Sesiones', run: (r, admin) => admin.jumpTo('timers', { game_id: r.id, game_name: r.name }) },
       { label: 'Resincronizar (RAWG y HLTB)…', run: async (r, admin) => (await import('./resync.js')).resyncGame(r, admin) },
     ],
-    toolbarActions: [{ act: 'rawg-sync', label: 'Sincronizar con RAWG…' }, { act: 'hltb-sync', label: 'Sincronizar tiempos (HLTB)…' }],
+    toolbarActions: [{ act: 'rawg-sync', label: 'Sincronizar con RAWG…' }, { act: 'hltb-sync', label: 'Sincronizar tiempos (HLTB)…' }, { act: 'igdb-sync', label: 'Enlazar con IGDB…' }],
     canDelete: true,
     deleteNote: 'Se borrarán también sus sesiones, entradas de biblioteca y logros.',
   },
