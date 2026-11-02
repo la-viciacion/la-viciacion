@@ -356,10 +356,11 @@ export const ENTITIES = {
         fields: async () => {
           const themes = await api('/manage/challenges/themes');
           return [
-            { key: 'theme', label: 'Temática', type: 'choice', required: true, options: themes.length ? themes.map((t) => [t.theme, themeLabel(t)]) : [['', 'No hay temáticas']] },
             WHEN,
             REPEATING_PERIOD_FIELD,
             REPEAT_NAME_FIELD,
+            WHAT,
+            { key: 'theme', label: 'Temática', type: 'choice', required: true, options: themes.length ? themes.map((t) => [t.theme, themeLabel(t)]) : [['', 'No hay temáticas']] },
             GOAL,
             { key: 'mode', label: 'Objetivo de cada jugador', type: 'choice', required: true, default: 'play', options: [['play', 'Jugar unas horas'], ['complete', 'Completar al menos un juego']] },
             { key: 'min_hours_each', label: 'Horas mínimas por jugador (si hay que jugar)', type: 'number', step: '0.5', default: 2 },
