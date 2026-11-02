@@ -39,6 +39,16 @@ def _year(item: dict) -> int | None:
     return datetime.datetime.fromtimestamp(stamp, datetime.timezone.utc).year if stamp else None
 
 
+def _years(item: dict) -> set[int]:
+    """The years a game came out in IGDB's lists: its first release and every exact one (an early access or a beta too: RAWG,
+    where our date may come from, keeps those, and a name and a year that agree is how a game is recognised)."""
+    years = {_year(item)} - {None}
+    for release in item.get("release_dates") or []:
+        if release.get("date") and release.get("date_format") == 0:
+            years.add(datetime.datetime.fromtimestamp(release["date"], datetime.timezone.utc).year)
+    return years
+
+
 def candidate(item: dict) -> dict:
     return {
         "igdb_id": item["id"], "name": item["name"], "year": _year(item),
@@ -62,7 +72,7 @@ def choose(game: models.Game, steam_hits: list[dict], name_hits: list[dict]) -> 
     exact = [i for i in name_hits if igdb._same_name(i["name"], game.name)]
     year = game.release_date.year if game.release_date else None
     if year is not None:
-        agreeing = [i for i in exact if _year(i) is not None and abs(_year(i) - year) <= YEAR_MARGIN]
+        agreeing = [i for i in exact if any(abs(y - year) <= YEAR_MARGIN for y in _years(i))]
         if len(agreeing) > 1:
             agreeing = _games_proper(agreeing) or agreeing
         if len(agreeing) == 1:

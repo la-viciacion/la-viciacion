@@ -45,6 +45,13 @@ class ChooseTests(unittest.TestCase):
         self.assertEqual((verdict, found["id"]), ("linked", 7))
         self.assertEqual(igdb_sync.choose(game("Outlast", 2013), [], [item(8, "Outlast", 2014)])[0], "linked")  # a year of margin
 
+    def test_a_game_that_came_out_in_early_access_is_recognised_by_the_year_of_its_early_access(self):
+        launch = item(1, "Valheim", 2026)
+        launch["release_dates"] = [{"date": stamp(2021), "date_format": 0, "status": {"name": "Early Access"}}, {"date": stamp(2026), "date_format": 0}]
+        verdict, found = igdb_sync.choose(game("Valheim", 2021), [], [launch])
+        self.assertEqual((verdict, found["id"]), ("linked", 1))
+        self.assertEqual(igdb_sync.choose(game("Valheim", 2021), [], [item(1, "Valheim", 2026)])[0], "ambiguous")  # no early access listed: a human decides
+
     def test_a_remake_is_not_the_original(self):
         names = [item(1, "Resident Evil 4", 2005), item(2, "Resident Evil 4", 2023, game_type=8)]
         self.assertEqual(igdb_sync.choose(game("Resident Evil 4", 2023), [], names)[1]["id"], 2)

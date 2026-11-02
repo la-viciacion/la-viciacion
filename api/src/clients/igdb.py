@@ -122,7 +122,7 @@ def search_items(query: str, limit: int = 10, extras: bool = False, timeout: int
     `extras` also asks for the themes, keywords, franchises and collections (`extras_of`): only the link of the catalogue
     needs them, the picker's list would carry kilobytes of keywords for nothing."""
     where = f"game_type = {GAME_TYPES} & version_parent = null"
-    fields = f"{FIELDS},{EXTRA_FIELDS}" if extras else FIELDS
+    fields = f"{FIELDS},{EXTRA_FIELDS},{RELEASE_FIELDS}" if extras else FIELDS
     found = _post(f"fields {fields}; where name ~ *{_quote(query)}* & {where}; sort total_rating_count desc; limit {FETCH_LIMIT};", timeout=timeout)
     if not found:
         found = _post(f"search {_quote(query)}; fields {fields}; where {where}; limit {FETCH_LIMIT};", timeout=timeout)
@@ -229,13 +229,28 @@ STEAM_SOURCE = 1  # `external_game_source` of Steam in IGDB
 DLC_TYPES = (1, 2, 4)  # dlc_addon, expansion, standalone_expansion
 
 
+NOT_OFFICIAL = frozenset({"alpha", "beta", "early access", "offline", "cancelled"})  # statuses of a release that is not the launch
+RELEASE_FIELDS = "release_dates.date,release_dates.date_format,release_dates.status.name"
+
+
+def official_day(item: dict) -> datetime.date | None:
+    """The day the game was officially released: the earliest of its releases that has an **exact** day (a game announced for
+    "2026" or "Q4" has a placeholder day in IGDB that is not a day it comes out) and is not an alpha, a beta or an early
+    access, which IGDB keeps in the same list. None when there is none."""
+    days = [
+        r["date"] for r in item.get("release_dates") or []
+        if r.get("date") and r.get("date_format") == 0 and ((r.get("status") or {}).get("name") or "").casefold() not in NOT_OFFICIAL
+    ]
+    return _day(min(days)) if days else None
+
+
 def game_details(igdb_id: int) -> dict | None:
     """What IGDB knows of a game, to create it: the same keys as RAWG's details minus the tags (None when IGDB has no
     such game) and its themes, keywords, franchises and collections. The tags are RAWG's vocabulary and IGDB's keywords are
     not the same: a game made from IGDB has no `tags`, it has those four columns instead."""
     found = _post(
-        "fields name,slug,first_release_date,game_type,parent_game,cover.image_id,genres.name,involved_companies.developer,"
-        f"involved_companies.company.name,external_games.external_game_source,external_games.uid,{EXTRA_FIELDS}; "
+        "fields name,slug,game_type,parent_game,cover.image_id,genres.name,involved_companies.developer,"
+        f"involved_companies.company.name,external_games.external_game_source,external_games.uid,{RELEASE_FIELDS},{EXTRA_FIELDS}; "
         f"where id = {int(igdb_id)};"
     )
     if not found:
@@ -245,14 +260,13 @@ def game_details(igdb_id: int) -> dict | None:
         (e["uid"] for e in item.get("external_games") or [] if e.get("external_game_source") == STEAM_SOURCE and e.get("uid")),
         "",
     )
-    released = item.get("first_release_date")
     return {
         "igdb_id": igdb_id,
         "name": candidate["name"],
         "slug": candidate["slug"],
         "igdb_slug": candidate["slug"],
         "dev": candidate["dev"],
-        "release_date": datetime.datetime.fromtimestamp(released, datetime.timezone.utc).date() if released else None,
+        "release_date": official_day(item),
         "steam_id": steam,
         "image_url": candidate["image_url"],
         "genres": ",".join(candidate["genres"]),
@@ -312,18 +326,13 @@ def series_of(igdb_id: int) -> list[dict] | None:
 
 
 def release_dates(igdb_ids: list[int]) -> dict[int, datetime.date]:
-    """The release day of each game IGDB has an **exact** date for (the earliest of its releases). A game announced for
-    "2026" or "Q4" has a placeholder day in IGDB that is not a day it comes out: it is not in the answer."""
+    """The official release day of each game IGDB has one for (`official_day`: exact, and not an early access or a beta);
+    the others are not in the answer."""
     ids = ",".join(str(int(i)) for i in igdb_ids)
     if not ids:
         return {}
-    found = _post(f"fields release_dates.date,release_dates.date_format; where id = ({ids}); limit {len(igdb_ids)};")
-    dates = {}
-    for item in found:
-        exact = [r["date"] for r in item.get("release_dates") or [] if r.get("date") and r.get("date_format") == 0]
-        if exact:
-            dates[item["id"]] = _day(min(exact))
-    return dates
+    found = _post(f"fields {RELEASE_FIELDS}; where id = ({ids}); limit {len(igdb_ids)};")
+    return {item["id"]: day for item in found if (day := official_day(item))}
 
 
 def parent_of(igdb_id: int) -> tuple[int, str] | None:
