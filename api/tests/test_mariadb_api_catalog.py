@@ -73,6 +73,10 @@ class CatalogTestCase(ApiTestCase):
         super().setUp()
         self.ana = self.user("ana")
         self.root = self.user("root", admin=True)
+        # the developer's .env may have IGDB credentials: a failing RAWG must not reach the real one
+        patcher = mock.patch.object(my_utils.igdb, "configured", return_value=False)
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
     def with_rawg(self, rawg, hltb_class=None):
         """Turns on a RAWG key and puts the fakes in place for the rest of the test."""

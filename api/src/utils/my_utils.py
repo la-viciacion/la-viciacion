@@ -9,6 +9,7 @@ from howlongtobeatpy import HowLongToBeat
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
+from ..clients import igdb
 from ..config import Config
 from ..crud import games, users
 from ..database import models, schemas
@@ -135,8 +136,31 @@ class RawgUnavailable(Exception):
 
 
 async def search_rawg_games(query: str, db: Session = None) -> list[schemas.RawgGameCandidate]:
-    """Search games in RAWG.io and return candidates, checking if they exist in the DB.
-    Raises `RawgUnavailable` when RAWG cannot be asked or fails, so an outage is not mistaken for an empty search."""
+    """Search games and return candidates, checking if they exist in the DB. RAWG is asked first; when it cannot
+    answer, IGDB takes over if it is configured (its candidates have no `rawg_id`). Raises `RawgUnavailable` when no
+    source can answer, so an outage is not mistaken for an empty search."""
+    try:
+        candidates = await _search_rawg(query)
+    except RawgUnavailable:
+        if not igdb.configured():
+            raise
+        candidates = await _search_igdb(query)
+    if db is not None and candidates:
+        await run_in_threadpool(mark_existing_games, db, candidates)
+    return candidates
+
+
+async def _search_igdb(query: str) -> list[schemas.RawgGameCandidate]:
+    try:
+        found = await asyncio.to_thread(igdb.search_games, query)
+    except Exception as e:
+        logger.error(f"Error searching IGDB for '{query}': {e}")
+        raise RawgUnavailable("IGDB did not answer") from None
+    logger.warning(f"RAWG could not search '{query}': {len(found)} candidates from IGDB")
+    return [schemas.RawgGameCandidate(**item) for item in found]
+
+
+async def _search_rawg(query: str) -> list[schemas.RawgGameCandidate]:
     api_key = config.RAWG_API_KEY
     if not api_key:
         logger.warning("No RAWG API key configured")
@@ -180,8 +204,6 @@ async def search_rawg_games(query: str, db: Session = None) -> list[schemas.Rawg
                 metacritic=item.get("metacritic"),
             )
         )
-    if db is not None and candidates:
-        await run_in_threadpool(mark_existing_games, db, candidates)
     return candidates
 
 

@@ -30,6 +30,7 @@ class RedactionTests(unittest.TestCase):
 class LoggedErrorsTests(unittest.IsolatedAsyncioTestCase):
     async def test_a_failed_search_does_not_log_the_key(self):
         with mock.patch.object(redaction.config.__class__, "RAWG_API_KEY", KEY), \
+                mock.patch.object(my_utils.igdb, "configured", return_value=False), \
                 mock.patch.object(my_utils, "_http_get", side_effect=RuntimeError(URL_ERROR)), \
                 mock.patch.object(my_utils.logger, "error") as error:
             with self.assertRaises(my_utils.RawgUnavailable):

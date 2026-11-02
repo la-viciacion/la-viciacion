@@ -115,7 +115,10 @@ class NewGame(BaseModel):
 
 
 class RawgGameCandidate(BaseModel):
-    rawg_id: int
+    """A game of the picker's search. It is RAWG's, or IGDB's when RAWG could not answer (no `rawg_id`, `source` says it)."""
+    rawg_id: Optional[int | None] = None
+    source: str = "rawg"
+    dev: Optional[str | None] = None
     name: str
     slug: str
     released: Optional[str | None] = None
