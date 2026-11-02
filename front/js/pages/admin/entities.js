@@ -39,6 +39,8 @@ const platformSelect = { key: 'platform', label: 'Plataforma', options: () => [[
 const PERIOD_FIELD = { key: 'period', type: 'period' };
 // ...and for a game or a themed challenge, a month may also repeat every month (a schedule: it needs a name to be listed)
 const REPEATING_PERIOD_FIELD = { ...PERIOD_FIELD, repeatable: true };
+// a challenge that repeats does not tell the group every month unless the admin says so
+const ANNOUNCE_REPEAT = { key: 'period', values: { repeat: false } };
 const REPEAT_NAME_FIELD = { key: 'label', label: 'Nombre (con el que se verá en la lista de los que se lanzan solos)', type: 'text', required: true, when: { key: 'period', is: 'repeat' } };
 const WHEN = { type: 'heading', label: 'Cuándo' };
 const GOAL = { type: 'heading', label: 'Objetivo' };
@@ -325,7 +327,7 @@ export const ENTITIES = {
           { key: 'versus', label: 'Además es una competición (gana quien más avance)', type: 'checkbox', default: false },
           WHO,
           PARTICIPATION_FIELD,
-          { key: 'announce', label: 'Avisar al grupo (Telegram y notificaciones)', type: 'checkbox', default: true },
+          { key: 'announce', label: 'Avisar al grupo (Telegram y notificaciones)', type: 'checkbox', default: true, defaultBy: ANNOUNCE_REPEAT },
         ],
       },
       {
@@ -364,7 +366,7 @@ export const ENTITIES = {
             { key: 'versus', label: 'Además es una competición (gana quien más avance)', type: 'checkbox', default: false },
             WHO,
             PARTICIPATION_FIELD,
-            { key: 'announce', label: 'Avisar al grupo (Telegram y notificaciones)', type: 'checkbox', default: true },
+            { key: 'announce', label: 'Avisar al grupo (Telegram y notificaciones)', type: 'checkbox', default: true, defaultBy: ANNOUNCE_REPEAT },
           ];
         },
       },

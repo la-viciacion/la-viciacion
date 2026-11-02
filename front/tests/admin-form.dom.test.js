@@ -208,17 +208,20 @@ test('a field that depends on another shows only while it has that value, and is
       { key: 'game_id', label: 'Juego', type: 'text', required: true, when: { key: 'period', not: 'repeat' } },
       { key: 'label', label: 'Nombre', type: 'text', required: true, when: { key: 'period', is: 'repeat' } },
       { key: 'period', type: 'period', repeatable: true },
+      { key: 'announce', label: 'Avisar', type: 'checkbox', default: true, defaultBy: { key: 'period', values: { repeat: false } } },
     ],
   };
   openCreateForm({ createLabel: 'Lanzar reto', endpoint: '/manage/challenges', creates: [type, { ...type, choose: 'Otro' }] }, { reload: async () => {} });
   await new Promise((resolve) => setImmediate(resolve));
   const shown = (key) => !document.querySelector(`[data-when="${key}"]`).hidden;
   assert.deepEqual([shown('game_id'), shown('label')], [true, false]);
+  assert.equal(document.getElementById('f_announce').checked, true);
   const form = document.querySelector('.modal-content form');
   const repeat = form.querySelector('[data-period-repeat]');
   repeat.checked = true;
   repeat.dispatchEvent(new window.Event('change', { bubbles: true }));
   assert.deepEqual([shown('game_id'), shown('label')], [false, true]);
+  assert.equal(document.getElementById('f_announce').checked, false); // a repeating one does not tell the group by default
   assert.equal(form.querySelector('[data-period-month]').closest('label').hidden, true); // each launch picks its own month
   assert.equal(form.querySelector('[data-period-now]').closest('label').hidden, false);
   form.requestSubmit();
@@ -228,5 +231,5 @@ test('a field that depends on another shows only while it has that value, and is
   form.querySelector('[data-period-now]').checked = true;
   form.requestSubmit();
   await new Promise((resolve) => setImmediate(resolve));
-  assert.deepEqual(sent.at(-1), { path: '/manage/challenge-schedules', body: { label: 'Cada mes', start_now: true, kind: 'game' } });
+  assert.deepEqual(sent.at(-1), { path: '/manage/challenge-schedules', body: { label: 'Cada mes', start_now: true, announce: false, kind: 'game' } });
 });
