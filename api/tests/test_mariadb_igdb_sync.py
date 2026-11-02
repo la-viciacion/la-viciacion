@@ -253,6 +253,32 @@ class IgdbSyncRunTests(ApiTestCase):
                 (2, 1, 3),
             )
 
+    def test_only_the_games_added_lately_are_linked_by_the_hourly_job_and_a_failing_igdb_stops_it(self):
+        now = datetime.datetime.now()
+        self.game("new", "Celeste", created_at=now - datetime.timedelta(hours=2), release_date=datetime.date(2018, 1, 25))
+        self.game("old-new", "Hades", created_at=now - datetime.timedelta(days=30), release_date=datetime.date(2018, 1, 25))
+        self.game("ancient", "Doom")  # added before created_at existed: the admin's business
+        self.game("linked", "Linked", created_at=now, igdb_id=5)
+        self.by_name.update({"Celeste": [item(20, "Celeste", 2018)], "Hades": [item(21, "Hades", 2018)], "Doom": [item(22, "Doom")]})
+        with database.SessionLocal() as db:
+            self.assertEqual(igdb_sync.link_recent(db), "1 linked of 1")
+        self.assertEqual((self.igdb_id("new"), self.igdb_id("old-new"), self.igdb_id("ancient")), (20, None, None))
+        self.assertEqual(self.asked, ["Celeste"])
+        self.game("next", "Next", created_at=now, release_date=datetime.date(2018, 1, 25))
+        self.by_name["Next"] = igdb.IgdbError("down")
+        with database.SessionLocal() as db:
+            self.assertIn("IGDB failed", igdb_sync.link_recent(db))
+
+    def test_the_hourly_job_does_nothing_without_igdb_or_while_a_batch_runs(self):
+        self.game("new", "Celeste", created_at=datetime.datetime.now(), release_date=datetime.date(2018, 1, 25))
+        self.by_name["Celeste"] = [item(20, "Celeste", 2018)]
+        with database.SessionLocal() as db:
+            with mock.patch.object(igdb, "configured", return_value=False):
+                self.assertEqual(igdb_sync.link_recent(db), "IGDB is not set up")
+            with mock.patch.object(igdb_sync, "status", return_value={"state": "running"}):
+                self.assertEqual(igdb_sync.link_recent(db), "a batch is running")
+        self.assertEqual(self.asked, [])
+
     def test_the_dates_of_the_wished_games_are_refreshed_from_igdb_and_what_it_cannot_say_goes_elsewhere(self):
         old = datetime.date(2026, 1, 1)
         self.game("a", "A", igdb_id=1, release_date=old)

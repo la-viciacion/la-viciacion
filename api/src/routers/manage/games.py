@@ -27,6 +27,10 @@ class GamePatch(BaseModel):
     slug: Optional[str] = None
     rawg_id: Optional[int] = None
     igdb_id: Optional[int] = None
+    igdb_slug: Optional[str] = None
+    themes: Optional[str] = None
+    franchises: Optional[str] = None
+    collections: Optional[str] = None
     is_dlc: Optional[bool] = None
     parent_game_id: Optional[str] = None
 
@@ -45,6 +49,10 @@ def _game_out(g: models.Game, sessions: int = 0, players: int = 0, played_second
         "slug": g.slug,
         "rawg_id": g.rawg_id,
         "igdb_id": g.igdb_id,
+        "igdb_slug": g.igdb_slug,
+        "themes": g.themes,
+        "franchises": g.franchises,
+        "collections": g.collections,
         "is_dlc": bool(g.is_dlc),
         "parent_game_id": g.parent_game_id,
         "parent_name": parent_name,

@@ -40,6 +40,7 @@ class SchedulerTestCase(ApiTestCase):
             mock.patch.object(actions, "check_forgotten_timer", new=check_forgotten_timer),
             mock.patch.object(actions, "announce_lost_streaks", new=announce_lost_streaks),
             mock.patch.object(actions, "push_has_devices", return_value=False),
+            mock.patch.object(scheduler.igdb_sync, "link_recent", side_effect=lambda db: self.calls.append(("igdb_link",)) or "0 linked of 0"),
         ):
             patcher.start()
             self.addCleanup(patcher.stop)
@@ -141,6 +142,15 @@ class WeeklySummaryJobTests(SchedulerTestCase):
 
 
 class HourlyAndDailyJobTests(SchedulerTestCase):
+    def test_the_games_added_lately_are_linked_to_igdb_once_an_hour_whatever_the_notifications_switch(self):
+        with mock.patch.object(scheduler.settings, "get", side_effect=lambda key: False if key == "notifications.enabled" else scheduler.settings.REGISTRY[key].default):
+            scheduler.tick(at(3, 5))
+            scheduler.tick(at(3, 20))  # the same hour: it already ran
+        self.assertEqual(self.names().count("igdb_link"), 1)
+        self.assertEqual(self.jobs()["igdb_link"][1], "ok: 0 linked of 0")
+        scheduler.tick(at(4, 5))
+        self.assertEqual(self.names().count("igdb_link"), 2)
+
     def test_forgotten_timers_are_checked_once_an_hour_for_every_user(self):
         self.user("bea")
         scheduler.tick(at(10, 5))
