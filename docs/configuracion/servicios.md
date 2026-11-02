@@ -2,38 +2,34 @@
 
 Todos son opcionales: la app arranca sin ninguno. El panel (**Inicio → Integraciones**) te dice cuáles faltan.
 
-## RAWG: buscar juegos y portadas
+## IGDB: la fuente principal de los juegos
 
-[RAWG](https://rawg.io/apidocs) es el catálogo del que salen los datos de los juegos (portada, géneros, desarrollador, fecha, etiquetas).
-
-1. Pide una clave gratuita en <https://rawg.io/apidocs>.
-2. Ponla en el `.env`: `RAWG_API_KEY=tu_clave`, y `docker compose up -d`.
-
-Sin clave, la búsqueda de juegos nuevos y las sincronizaciones no hacen nada (los juegos se pueden crear a mano, solo con el nombre).
-
-En **Catálogo → Juegos** del panel:
-
-- **Sincronizar con RAWG…** recorre los juegos incompletos para rellenar lo que falte. Pide confirmación, trabaja en segundo plano con una ventana de progreso y se puede cancelar.
-- El filtro **Datos de RAWG** (*Incompletos*, *Sin ID de RAWG*) te dice qué juegos queda por arreglar a mano.
-- **⋯ → Resincronizar (RAWG y HLTB)…** actualiza **un** juego desde las dos fuentes.
-
-![El catálogo de juegos en el panel](../assets/screens/admin-games.webp){ .screenshot }
-
-### Tiempos de HowLongToBeat
-
-Los tiempos para completar (la historia principal) vienen de [HowLongToBeat](https://howlongtobeat.com), **sin clave**. **Sincronizar tiempos (HLTB)…** reemplaza el tiempo de los juegos que elijas (todos, solo los que no tienen, los que tienen un tiempo increíble o los N jugados más recientemente). Cada juego tarda unos 5 segundos y la ventana lo calcula antes de aceptar. Con esos tiempos se calculan la **deuda** y algunos logros.
-
-## IGDB: respaldo de la búsqueda de juegos
-
-[IGDB](https://www.igdb.com/) es el catálogo de juegos de Twitch. Si RAWG no responde (le ha pasado durante horas), la búsqueda de juegos nuevos usa IGDB en su lugar. Es opcional.
+[IGDB](https://www.igdb.com/) (el catálogo de juegos de Twitch) es de donde salen los datos de los juegos: la búsqueda, la portada, los géneros, la desarrolladora, la fecha de lanzamiento **oficial** (no la de acceso anticipado ni la de una beta), los temas, las palabras clave, las franquicias y colecciones, la saga, y en la ficha el tráiler, las capturas y la nota de la crítica. **RAWG solo se usa si IGDB no responde o no tiene el juego.**
 
 1. Crea una aplicación en la [consola de desarrolladores de Twitch](https://dev.twitch.tv/console) (hace falta la verificación en dos pasos): URL de redirección `http://localhost`, categoría *Application Integration*, cliente *Confidential*.
 2. Copia el **Client ID** y genera un **Client Secret** (solo se ve una vez).
 3. Ponlos en el `.env`: `TWITCH_CLIENT_ID=...` y `TWITCH_CLIENT_SECRET=...`, y `docker compose up -d`.
 
-Un juego creado desde IGDB guarda su id de IGDB, con su desarrollador, fecha, portada, géneros y Steam id, pero sin etiquetas (son de RAWG).
+En **Catálogo → Juegos** del panel:
 
-En **Catálogo → Juegos** del panel, **Enlazar con IGDB…** da su id de IGDB a los juegos que ya tienes, por tandas del tamaño que elijas. Solo guarda el id (no cambia ningún otro dato) y solo cuando la coincidencia es segura: el mismo juego de Steam, o el mismo nombre con un año que cuadre. Los dudosos se listan al terminar para elegir a mano.
+- **Enlazar con IGDB…** da su id de IGDB, la dirección de su página y sus datos (temas, palabras clave, franquicias, colecciones) a los juegos que ya tienes, por tandas del tamaño que elijas. Solo enlaza cuando la coincidencia es segura (el mismo juego de Steam, o el mismo nombre con un año que cuadre); los dudosos se listan al terminar para elegir a mano. Con la casilla **Sustituir también los datos del juego**, los que se enlacen o completen en esa tanda toman de IGDB la portada, la fecha, los géneros y la desarrolladora en lugar de los que tenían.
+- **⋯ → Resincronizar (IGDB, RAWG y HLTB)…** actualiza **un** juego desde las tres fuentes, con una ventana que muestra que está trabajando y luego el resultado de cada una; si IGDB y RAWG dan el mismo dato, manda IGDB.
+- El filtro **Datos de RAWG** (*Incompletos*, *Sin ID de IGDB ni de RAWG*) te dice qué juegos queda por arreglar a mano.
+
+![El catálogo de juegos en el panel](../assets/screens/admin-games.webp){ .screenshot }
+
+## RAWG: el respaldo
+
+[RAWG](https://rawg.io/apidocs) busca y crea juegos cuando IGDB no responde o no los tiene, y completa lo que falte en la ficha (saga, tráiler, capturas) de los juegos que tienen su id. Es opcional.
+
+1. Pide una clave gratuita en <https://rawg.io/apidocs>.
+2. Ponla en el `.env`: `RAWG_API_KEY=tu_clave`, y `docker compose up -d`.
+
+Sin IGDB ni RAWG, la búsqueda de juegos nuevos no encuentra nada (los juegos se pueden crear a mano, solo con el nombre). **Sincronizar con RAWG…** recorre los juegos incompletos para rellenar lo que falte (por ejemplo sus etiquetas, que son de RAWG); pide confirmación, trabaja en segundo plano con una ventana de progreso y se puede cancelar. Nunca sustituye los datos de un juego que IGDB ya describe.
+
+### Tiempos de HowLongToBeat
+
+Los tiempos para completar (la historia principal) vienen de [HowLongToBeat](https://howlongtobeat.com), **sin clave**. **Sincronizar tiempos (HLTB)…** reemplaza el tiempo de los juegos que elijas (todos, solo los que no tienen, los que tienen un tiempo increíble o los N jugados más recientemente). Cada juego tarda unos 5 segundos y la ventana lo calcula antes de aceptar. Con esos tiempos se calculan la **deuda** y algunos logros.
 
 ## IA: avisos más graciosos
 

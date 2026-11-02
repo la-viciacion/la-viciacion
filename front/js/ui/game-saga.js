@@ -1,5 +1,5 @@
 // "Saga" card of the game page: the games of the series of a game in order of release, with what you have of each one.
-// GET /games/{id}/series asks RAWG (and the API keeps the answer for a day), so it is loaded apart, after the page is
+// GET /games/{id}/series asks IGDB, or RAWG (and the API keeps the answer for a day), so it is loaded apart, after the page is
 // drawn; when there is no saga, or it cannot be loaded, the card is simply not there. It folds (a long saga is long),
 // and the choice is remembered in this browser.
 import { api } from '../lib/api.js';

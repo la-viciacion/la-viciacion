@@ -10,7 +10,7 @@
     Borra la sesión y añádela otra vez con el juego correcto. Un administrador puede cambiarle el juego sin perder nada.
 
 ??? question "He jugado a un juego y no aparece en el buscador"
-    Pulsa **¿No está? Añadir nuevo juego**. Si el buscador de RAWG tampoco lo encuentra, **¿No aparece? Crearlo a mano**: solo hace falta el nombre.
+    Pulsa **¿No está? Añadir nuevo juego**. Si el buscador tampoco lo encuentra, **¿No aparece? Crearlo a mano**: solo hace falta el nombre.
 
 ??? question "¿Por qué no me sale un logro que creo merecer?"
     Los logros se evalúan cada vez que paras un timer o cambias tus sesiones. Algunos requieren una duración mínima (las sesiones de menos de 10 minutos no cuentan para días ni rachas) y los nuevos solo cuentan desde 2027. Si sigues pensando que falta, pide a un administrador que **recalcule los logros**.

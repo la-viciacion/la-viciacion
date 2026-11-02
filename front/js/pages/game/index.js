@@ -124,7 +124,7 @@ function draw(data) {
   hydratePhotos(main);
   main.querySelector('#gmMoreTags')?.addEventListener('click', () => mount(main.querySelector('.gm-tags'), html`${tagPills(tags)}`));
   showExtras({ head: main.querySelector('#gmOutside'), desc: main.querySelector('#gmDesc'), meta: main.querySelector('#gmMeta'), platforms: main.querySelector('#gmPlatforms'), media: main.querySelector('#gmMedia') }, game); // Steam and RAWG too
-  showSaga(main.querySelector('#gmSaga'), game.id); // RAWG may take a while: the page does not wait for it
+  showSaga(main.querySelector('#gmSaga'), game.id); // the sources may take a while: the page does not wait for them
   main.querySelector('#gmBack').addEventListener('click', back);
   main.querySelector('#gmWish')?.addEventListener('click', () => toggleWish(game.id, data.wished));
   main.querySelector('#gmRate')?.addEventListener('click', () => openRating({

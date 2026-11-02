@@ -376,9 +376,9 @@ def game_path(game_id: int) -> str:
 
 
 def new_game_message(user_name: str, game_name: str, slug: str | None, number: int) -> str:
-    """The notice of a game just started: who, which game (a link to RAWG when it has a slug) and the number of
+    """The notice of a game just started: who, which game (a link to its page, IGDB's or RAWG's, when it has one) and the number of
     games they have started this season. The AI rewrites it keeping all three (see ai_prompts.NEW_GAME_PROMPT)."""
-    started_game = utils.rawg_game_link(game_name, slug)
+    started_game = utils.game_link(game_name, slug)
     return "*" + utils.escape_markdown(user_name) + "* acaba de empezar " + started_game + ", su juego número " + str(number) + " de este año."
 
 

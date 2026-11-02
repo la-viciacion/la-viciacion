@@ -1,3 +1,5 @@
+import re
+
 from sqlalchemy import (
     BigInteger,
     Boolean,
@@ -94,6 +96,15 @@ class UserSettings(Base):
     updated_at = Column(DateTime, server_default=text("CURRENT_TIMESTAMP"), onupdate=text("CURRENT_TIMESTAMP"))
 
 
+_SLUG = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._~-]*$")
+
+
+def _safe_slug(slug: str | None) -> bool:
+    """A slug that is only what the sites use in an address. A game can be created with a slug the player typed, and it ends up
+    inside a link of a notice: a character that is not in this list (a parenthesis, a space) would break out of it."""
+    return bool(slug) and bool(_SLUG.match(slug))
+
+
 class Game(Base):
     __tablename__ = "games"
 
@@ -132,9 +143,9 @@ class Game(Base):
         link here: the outside data of its page brings IGDB's own address (`igdb_url`)."""
         links = []
         igdb_slug = self.igdb_slug or (self.slug if self.igdb_id and not self.rawg_id else None)
-        if self.igdb_id and igdb_slug:
+        if self.igdb_id and _safe_slug(igdb_slug):
             links.append({"name": "IGDB", "url": f"https://www.igdb.com/games/{igdb_slug}"})
-        if self.slug and (self.rawg_id or not self.igdb_id):
+        if _safe_slug(self.slug) and (self.rawg_id or not self.igdb_id):
             links.append({"name": "RAWG", "url": f"https://rawg.io/games/{self.slug}"})
         return links
 

@@ -259,6 +259,18 @@ class IgdbClientTests(unittest.TestCase):
         ]):
             self.assertEqual(len(igdb.search_games("zelda")), 1)
 
+    def test_a_rate_limit_is_tried_once_more_a_second_later_and_not_again(self):
+        sleep = mock.patch.object(igdb.time, "sleep")
+        with sleep as slept, mock.patch.object(igdb.requests, "post", side_effect=[
+            _response({"access_token": "t", "expires_in": 5000000}), _response({}, 429), _response([ITEM]),
+        ]):
+            self.assertEqual(len(igdb.search_games("zelda")), 1)
+        slept.assert_called_once_with(1.1)
+        igdb._token = ("t", 2**40)
+        with mock.patch.object(igdb.time, "sleep"), mock.patch.object(igdb.requests, "post", side_effect=[_response({}, 429), _response({}, 429)]):
+            with self.assertRaises(igdb.IgdbError):
+                igdb.search_games("zelda")
+
     def test_refused_credentials_and_errors_are_igdb_errors(self):
         with mock.patch.object(igdb.requests, "post", return_value=_response({}, 403)):
             with self.assertRaises(igdb.IgdbError):

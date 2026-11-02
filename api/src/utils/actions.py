@@ -439,7 +439,7 @@ async def check_forgotten_timer(db: Session, user: models.User, crossed_between:
 
 def _game_text(name: str, slug: str | None) -> str:
     """A game in a notice: a link to its page (`Game.page_url`), or in bold when it has none."""
-    return utils.rawg_game_link(name, slug) if slug else "*" + utils.escape_markdown(name) + "*"
+    return utils.game_link(name, slug) if slug else "*" + utils.escape_markdown(name) + "*"
 
 
 def wishlist_release_message(releases: list[tuple[str, list[str], str | None]]) -> str:

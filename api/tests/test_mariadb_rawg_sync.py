@@ -131,6 +131,14 @@ class PureHelpersTests(ApiTestCase):
         self.assertEqual(game.steam_id, "-")  # an empty answer never blanks a value
 
 
+    def test_rawg_never_replaces_what_igdb_describes_even_when_asked_to(self):
+        game = models.Game(id="g", name="G", dev="IGDB Dev", slug=None, genres="Role-playing (RPG)", image_url="https://igdb", rawg_id=None, igdb_id=9)
+        det = {"rawg_id": 7, "slug": "g", "dev": "RAWG Dev", "release_date": datetime.date(2020, 1, 1), "image_url": "https://rawg", "genres": "RPG", "steam_id": ""}
+        changed = rawg_sync._apply(None, game, det, overwrite=True)
+        self.assertEqual(sorted(changed), ["rawg_id", "release_date", "slug"])  # only blanks and its own id
+        self.assertEqual((game.dev, game.genres, game.image_url), ("IGDB Dev", "Role-playing (RPG)", "https://igdb"))
+
+
 class ClientTests(SyncTestCase):
     def rawg_client(self, max_calls=10):
         return rawg_sync._Client(max_calls)

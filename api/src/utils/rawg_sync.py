@@ -169,6 +169,7 @@ FIELDS = ("slug", "dev", "release_date", "image_url", "genres", "tags", "steam_i
 
 
 def _apply(db, game: models.Game, det: dict, overwrite: bool) -> list[str]:
+    overwrite = overwrite and not game.igdb_id  # IGDB is the main source: RAWG fills blanks of a game it describes, never replaces
     changed = []
     if game.rawg_id != det["rawg_id"]:
         game.rawg_id = det["rawg_id"]

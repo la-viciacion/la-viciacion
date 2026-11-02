@@ -36,7 +36,7 @@ def escape_markdown(text) -> str:
     return re.sub(r"([_*`\[])", r"\\\1", str(text))
 
 
-def rawg_game_link(name, slug: str | None) -> str:
+def game_link(name, slug: str | None) -> str:
     """A game's name as a Markdown link to its page (`Game.page_url`; a bare RAWG slug also works), just the escaped
     name when it has none."""
     text = escape_markdown(name)
