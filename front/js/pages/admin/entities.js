@@ -313,6 +313,7 @@ export const ENTITIES = {
     // one type per template of the group (the personal ones are the players'): a single button, the type is chosen in the form;
     // a month that repeats is scheduled instead of launched (`repeat`: where that goes)
     createLabel: 'Lanzar reto',
+    confirmCreate: true, // a summary and a second "yes" before launching: a group challenge is announced and cannot be edited
     creates: [
       {
         label: 'Lanzar reto de juego',
@@ -332,7 +333,7 @@ export const ENTITIES = {
           { key: 'versus', label: 'Además es una competición (gana quien más avance)', type: 'checkbox', default: false },
           WHO,
           PARTICIPATION_FIELD,
-          { key: 'announce', label: 'Avisar al grupo (Telegram y notificaciones)', type: 'checkbox', default: true, defaultBy: ANNOUNCE_REPEAT },
+          { key: 'announce', label: 'Avisar al grupo (Telegram y notificaciones)', type: 'checkbox', default: false, defaultBy: ANNOUNCE_REPEAT },
         ],
       },
       {
@@ -347,7 +348,7 @@ export const ENTITIES = {
           { key: 'versus', label: 'Además es una competición (gana quien más aporte)', type: 'checkbox', default: false },
           WHO,
           PARTICIPATION_FIELD,
-          { key: 'announce', label: 'Avisar al grupo (Telegram y notificaciones)', type: 'checkbox', default: true },
+          { key: 'announce', label: 'Avisar al grupo (Telegram y notificaciones)', type: 'checkbox', default: false },
         ],
       },
       {
@@ -372,7 +373,7 @@ export const ENTITIES = {
             { key: 'versus', label: 'Además es una competición (gana quien más avance)', type: 'checkbox', default: false },
             WHO,
             PARTICIPATION_FIELD,
-            { key: 'announce', label: 'Avisar al grupo (Telegram y notificaciones)', type: 'checkbox', default: true, defaultBy: ANNOUNCE_REPEAT },
+            { key: 'announce', label: 'Avisar al grupo (Telegram y notificaciones)', type: 'checkbox', default: false, defaultBy: ANNOUNCE_REPEAT },
           ];
         },
       },

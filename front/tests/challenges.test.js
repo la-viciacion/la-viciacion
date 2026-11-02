@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { amountLabel, blocks, daysUntil, debtPreview, digest, digestLine, hoursLabel, joinedLine, launchMonths, medal, nextMonday, periodOptions, partTarget, partValue, percent, remainingLabel, resultLine, standing, summaryLine, themeGamesLine, themeLabel, timeLeft, totalPart } from '../js/lib/challenges.js';
+import { amountLabel, blocks, daysUntil, debtPreview, digest, digestLine, hoursLabel, joinedLine, chosenPeriodLine, launchMonths, medal, nextMonday, periodOptions, partTarget, partValue, percent, remainingLabel, resultLine, standing, summaryLine, themeGamesLine, themeLabel, timeLeft, totalPart } from '../js/lib/challenges.js';
 
 const TODAY = new Date(2026, 9, 15, 12, 0); // 15 October 2026
 
@@ -365,4 +365,11 @@ test('a month that repeats is a schedule: no month, and whether the running one 
   assert.deepEqual(periodOptions({ period: 'month', month: '2026-12', repeat: true }), { options: { repeat: true, start_now: false } });
   assert.deepEqual(periodOptions({ period: 'month', repeat: true, now: true }), { options: { repeat: true, start_now: true } });
   assert.deepEqual(periodOptions({ period: 'week', week: '2026-12-07', repeat: true }), { options: { period: 'week', starts_on: '2026-12-07' } }); // only a month repeats
+});
+
+test('the chosen period reads as a sentence for the summary before launching', () => {
+  assert.equal(chosenPeriodLine({ period: 'month', monthLabel: 'Diciembre 2026' }), 'Un mes completo: Diciembre 2026');
+  assert.equal(chosenPeriodLine({ period: 'week', week: '2026-12-28' }), 'Una semana: del 28 de diciembre de 2026 al 3 de enero de 2027');
+  assert.equal(chosenPeriodLine({ period: 'range', from: '2026-11-20', to: '2026-11-27' }), 'Del 20 de noviembre de 2026 al 27 de noviembre de 2026');
+  assert.equal(chosenPeriodLine({ period: 'month', repeat: true }), 'Cada mes (se lanza solo el día 1)');
 });

@@ -85,6 +85,20 @@ export function nextMonday(now = new Date()) {
   return isoDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() + ((8 - now.getDay()) % 7 || 7)));
 }
 
+/** The period as a sentence, for the summary before launching: "Una semana: del 2 al 8 de noviembre de 2026". `monthLabel` is
+ * the month as the selector shows it. */
+export function chosenPeriodLine({ period, monthLabel, week, from, to, repeat }) {
+  const day = (iso) => parseDay(iso).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+  if (period === 'month' && repeat) return 'Cada mes (se lanza solo el día 1)';
+  if (period === 'month') return `Un mes completo: ${monthLabel}`;
+  if (period === 'week') {
+    const last = parseDay(week);
+    last.setDate(last.getDate() + 6);
+    return `Una semana: del ${day(week)} al ${day(isoDay(last))}`;
+  }
+  return `Del ${day(from)} al ${day(to)}`;
+}
+
 /** What a period form sends from what was chosen: { options } or { error } (the API checks it again). A week sends only
  * its first day (it lasts seven), a month only the month, free dates both days. A month that `repeat`s is a schedule: no
  * month (each launch picks its own) and `start_now` says whether the running one counts. */

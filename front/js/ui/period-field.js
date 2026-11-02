@@ -1,7 +1,7 @@
 // The period of a group challenge, as the form of the admin and the players' proposals both ask for it: a month, a week or
 // free dates, each showing only what it needs; with `repeatable`, a month may also repeat every month. `periodField()` is the markup, `bindPeriod(box)` makes it show and hide and
 // `readPeriod(box)` gives what the API takes (`periodOptions`).
-import { PERIOD_MODES, launchMonths, nextMonday, periodOptions, todayIso } from '../lib/challenges.js';
+import { PERIOD_MODES, chosenPeriodLine, launchMonths, nextMonday, periodOptions, todayIso } from '../lib/challenges.js';
 import { html } from '../lib/html.js';
 
 export function periodField({ repeatable = false } = {}) {
@@ -41,11 +41,20 @@ export function bindPeriod(box) {
   show();
 }
 
-export function readPeriod(box) {
+function chosen(box) {
   const value = (selector) => box.querySelector(selector).value;
-  return periodOptions({
+  return {
     period: value('[data-period]'), month: value('[data-period-month]'), week: value('[data-period-week]'),
     from: value('[data-period-from]'), to: value('[data-period-to]'),
     repeat: box.querySelector('[data-period-repeat]')?.checked, now: box.querySelector('[data-period-now]')?.checked,
-  });
+  };
+}
+
+/** The period as a sentence, for a summary. */
+export function describePeriod(box) {
+  return chosenPeriodLine({ ...chosen(box), monthLabel: box.querySelector('[data-period-month]').selectedOptions[0]?.textContent.trim() });
+}
+
+export function readPeriod(box) {
+  return periodOptions(chosen(box));
 }

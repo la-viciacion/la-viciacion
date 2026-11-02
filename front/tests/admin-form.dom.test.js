@@ -233,3 +233,33 @@ test('a field that depends on another shows only while it has that value, and is
   await new Promise((resolve) => setImmediate(resolve));
   assert.deepEqual(sent.at(-1), { path: '/manage/challenge-schedules', body: { label: 'Cada mes', start_now: true, announce: false, kind: 'game' } });
 });
+
+test('an entity that confirms its creation shows a summary first and sends only after the second yes', async () => {
+  const sent = [];
+  globalThis.fetch = async (url, options = {}) => {
+    sent.push(options.body ? JSON.parse(options.body) : undefined);
+    return new Response(JSON.stringify({}), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  };
+  const { openCreateForm } = await import('../js/pages/admin/form.js');
+  const type = {
+    label: 'Lanzar', choose: 'Horas entre todos', body: { kind: 'group_hours' },
+    fields: [
+      { type: 'heading', label: 'Cuándo' }, { key: 'period', type: 'period' },
+      { key: 'min_hours_total', label: 'Horas entre todos (de cualquier juego)', type: 'number', default: 40 },
+      { key: 'announce', label: 'Avisar al grupo (Telegram)', type: 'checkbox', default: false },
+    ],
+  };
+  openCreateForm({ createLabel: 'Lanzar reto', endpoint: '/manage/challenges', confirmCreate: true, creates: [type, { ...type, choose: 'Otro' }] }, { reload: async () => {} });
+  await new Promise((resolve) => setImmediate(resolve));
+  const form = document.querySelector('.modal-content form');
+  form.requestSubmit();
+  await new Promise((resolve) => setImmediate(resolve));
+  const summary = [...document.querySelectorAll('.modal-content .adm-list li')].map((li) => li.textContent);
+  assert.ok(summary[0].startsWith('Periodo: Un mes completo'));
+  assert.deepEqual(summary.slice(1), ['Horas entre todos: 40', 'Avisar al grupo: No']); // the label without its explanation
+  assert.deepEqual(sent, []); // nothing sent yet
+  document.querySelector('[data-confirm]').click();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].announce, false);
+});

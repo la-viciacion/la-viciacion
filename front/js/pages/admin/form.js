@@ -16,6 +16,7 @@
 // An entity may have several ways to create a row (`creates`: [{ label, choose?, fields, body }]): `fields` is the form and
 // `body` what is always sent with it (the kind of challenge, for instance). With one way, openForm takes it as `variant`; with
 // several, openCreateForm opens one form that starts with a Tipo select (`choose` is each type's name) and swaps the fields;
+// an entity with `confirmCreate` shows what is about to be created, and asks, before sending it.
 // a type with `repeat: endpoint` posts there instead when its period is a month that repeats.
 // image (editing only): { current: (row) => url of the picture or null, upload: (row) => route that takes the new file }
 import { api, jsonRequest } from '../../lib/api.js';
@@ -24,10 +25,10 @@ import { html, mount } from '../../lib/html.js';
 import { PASSWORD_HINT, generatePassword, isValidPassword } from '../../lib/password.js';
 import { platformList } from '../../lib/platforms.js';
 import { modalHeader, openModal } from '../../ui/modal.js';
-import { bindPeriod, periodField, periodMode, readPeriod } from '../../ui/period-field.js';
+import { bindPeriod, describePeriod, periodField, periodMode, readPeriod } from '../../ui/period-field.js';
 import { toast } from '../../ui/toast.js';
 import { store } from './components.js';
-import { pickGame } from './dialogs.js';
+import { confirmDialog, pickGame } from './dialogs.js';
 
 const inputId = (f) => `f_${f.key}`;
 
@@ -251,6 +252,30 @@ function isShown(f, fields, root) {
 
 const fieldView = (f, value, row) => (f.when ? html`<div data-when="${f.key}">${fieldHtml(f, value, row)}</div>` : fieldHtml(f, value, row));
 
+// What a field says in the summary before creating: the value as the person sees it, not as it is sent.
+function describeField(f, root) {
+  const el = document.getElementById(inputId(f));
+  switch (f.type) {
+    case 'checkbox': return el.checked ? 'Sí' : 'No';
+    case 'game': return document.getElementById(`${inputId(f)}_name`).textContent;
+    case 'games': return [...el.querySelectorAll('li > span')].map((name) => name.textContent).join(', ');
+    case 'period': return describePeriod(root.querySelector('[data-period-field]'));
+    case 'select':
+    case 'month':
+    case 'choice':
+    case 'platform': return el.selectedOptions[0]?.textContent.trim() ?? '';
+    default: return el.value;
+  }
+}
+
+/** [[label, value]] of the fields that show and have something, for the summary (the label without its explanation). */
+function summaryRows(fields, root) {
+  return fields
+    .filter((f) => f.type !== 'heading' && isShown(f, fields, root))
+    .map((f) => [f.type === 'period' ? 'Periodo' : f.label.replace(/\s*\(.*\)\s*$/, ''), describeField(f, root)])
+    .filter(([, value]) => value && value !== 'Ninguno');
+}
+
 const seen = new WeakMap(); // the value each field with `defaultBy` last took its default for
 
 function applyWhen(root, fields) {
@@ -289,7 +314,7 @@ export function openForm(entity, row, admin, variant = null) {
   modal.el.addEventListener('click', (e) => onFormClick(e, modal, fields));
   modal.el.querySelector('form').addEventListener('submit', (e) => {
     e.preventDefault();
-    submit(entity, row, fields, modal, admin, variant?.body);
+    submit(entity, row, fields, modal, admin, { extra: variant?.body });
   });
 }
 
@@ -334,12 +359,12 @@ export function openCreateForm(entity, admin) {
   modal.el.addEventListener('click', (e) => onFormClick(e, modal, current.fields));
   form.addEventListener('submit', (e) => {
     e.preventDefault();
-    submit(entity, null, current.fields, modal, admin, current.variant.body, current.variant.repeat);
+    submit(entity, null, current.fields, modal, admin, { extra: current.variant.body, repeat: current.variant.repeat, confirm: entity.confirmCreate ? current.variant.choose : null });
   });
   choose(variants[0]);
 }
 
-async function submit(entity, row, fields, modal, admin, extra = {}, repeatEndpoint = null) {
+async function submit(entity, row, fields, modal, admin, { extra = {}, repeat: repeatEndpoint = null, confirm = null } = {}) {
   const errorEl = modal.el.querySelector('.adm-error');
   errorEl.textContent = '';
   const body = {};
@@ -381,6 +406,12 @@ async function submit(entity, row, fields, modal, admin, extra = {}, repeatEndpo
   if (newPassword !== null && !isValidPassword(newPassword)) {
     errorEl.textContent = `La contraseña debe tener ${PASSWORD_HINT.toLowerCase()}`;
     return;
+  }
+
+  if (!row && confirm) {
+    const rows = summaryRows(fields, modal.el);
+    const ok = await confirmDialog(`Lanzar · ${confirm}`, html`<p>Revisa el resumen antes de crearlo:</p><ul class="adm-list">${rows.map(([label, value]) => html`<li><strong>${label}</strong>: ${value}</li>`)}</ul>`, { ok: 'Lanzar' });
+    if (!ok) return;
   }
 
   try {
