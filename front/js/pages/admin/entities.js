@@ -43,6 +43,7 @@ const REPEATING_PERIOD_FIELD = { ...PERIOD_FIELD, repeatable: true };
 const ANNOUNCE_REPEAT = { key: 'period', values: { repeat: false } };
 const REPEAT_NAME_FIELD = { key: 'label', label: 'Nombre (con el que se verá en la lista de los que se lanzan solos)', type: 'text', required: true, when: { key: 'period', is: 'repeat' } };
 const WHEN = { type: 'heading', label: 'Cuándo' };
+const WHAT = { type: 'heading', label: 'Qué' }; // the game comes after the period: a repeating challenge picks it another way
 const GOAL = { type: 'heading', label: 'Objetivo' };
 const WHO = { type: 'heading', label: 'Quién y aviso' };
 const PARTICIPATION_FIELD = { key: 'participation', label: 'Quién participa', type: 'choice', default: 'auto', options: [['auto', 'Todos (pueden salirse)'], ['opt_in', 'Voluntario (hay que apuntarse)']] };
@@ -316,11 +317,12 @@ export const ENTITIES = {
         body: { kind: 'game' },
         repeat: '/manage/challenge-schedules',
         fields: [
-          { key: 'game_id', label: 'Juego', type: 'game', required: true, when: { key: 'period', not: 'repeat' } },
-          { key: 'games', label: 'Juegos de la rotación (en este orden; al acabar la lista vuelve a empezar; con uno solo se repite siempre)', type: 'games', required: true, when: { key: 'period', is: 'repeat' } },
           WHEN,
           REPEATING_PERIOD_FIELD,
           REPEAT_NAME_FIELD,
+          WHAT,
+          { key: 'game_id', label: 'Juego', type: 'game', required: true, when: { key: 'period', not: 'repeat' } },
+          { key: 'games', label: 'Juegos de la rotación (en este orden; al acabar la lista vuelve a empezar; con uno solo se repite siempre)', type: 'games', required: true, when: { key: 'period', is: 'repeat' } },
           GOAL,
           { key: 'min_hours_each', label: 'Horas mínimas por jugador', type: 'number', step: '0.5', default: 5, required: true },
           { key: 'min_hours_total', label: 'Horas mínimas entre todos', type: 'number', step: '0.5', default: 20, required: true },
