@@ -79,6 +79,7 @@ def export_user(db: Session, user: models.User, now: datetime.datetime) -> dict:
             {
                 "id": g.id, "name": g.name, "dev": g.dev, "release_date": _day(g.release_date), "genres": g.genres,
                 "avg_time": g.avg_time, "image_url": g.image_url, "slug": g.slug, "steam_id": g.steam_id, "rawg_id": g.rawg_id,
+                "igdb_id": g.igdb_id,
             }
             for g in games
         ],
@@ -185,6 +186,9 @@ def _resolve_games(db: Session, data, creator_is_admin: bool, report: Report) ->
     names = [g.name.lower() for g in mentioned.values() if g is not None and g.id not in present]
     by_name = {n.lower(): i for i, n in db.query(models.Game.id, models.Game.name).filter(func.lower(models.Game.name).in_(names))} if names else {}
     taken_names = set(by_name)
+    # an IGDB id is one game's: a game of the file whose id another game of this database already has comes without it
+    igdb_ids = {g.igdb_id for g in mentioned.values() if g is not None and g.igdb_id}
+    igdb_taken = {i for (i,) in db.query(models.Game.igdb_id).filter(models.Game.igdb_id.in_(igdb_ids))} if igdb_ids else set()
     resolved = {}
     for game_id, game in mentioned.items():
         if game_id in present:
@@ -195,7 +199,10 @@ def _resolve_games(db: Session, data, creator_is_admin: bool, report: Report) ->
             db.add(models.Game(
                 id=game_id, name=game.name, dev=game.dev, release_date=game.release_date, genres=game.genres, avg_time=game.avg_time,
                 image_url=game.image_url, slug=game.slug, steam_id=game.steam_id, rawg_id=game.rawg_id,
+                igdb_id=None if game.igdb_id in igdb_taken else game.igdb_id,
             ))
+            if game.igdb_id:
+                igdb_taken.add(game.igdb_id)
             taken_names.add(game.name.lower())
             resolved[game_id] = game_id
             report.created["games"] += 1

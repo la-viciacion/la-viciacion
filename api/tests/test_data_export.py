@@ -91,6 +91,11 @@ class ExportTests(DataTestCase):
         self.assertEqual(out["platforms"], [{"id": "pc", "name": "PC"}])
         self.assertNotIn("a@x.es", json.dumps(out))
 
+    def test_the_igdb_id_of_a_game_goes_out_with_it(self):
+        self.db.get(models.Game, "doom").igdb_id = 77
+        self.db.commit()
+        self.assertEqual({g["id"]: g["igdb_id"] for g in self.export()["games"]}, {"doom": 77, "hades": None})
+
     def test_nothing_derived_is_in_it(self):
         out = self.export()
         self.assertNotIn("season", out["sessions"][0])
@@ -239,6 +244,19 @@ class ImportCatalogueTests(DataTestCase):
         self.assertEqual((report["sessions"]["imported"], report["created"]), (1, {"games": 1, "platforms": 1}))
         self.assertEqual(self.db.get(models.Game, "zelda").genres, "Adventure")
         self.assertEqual(self.db.get(models.PlatformTag, "switch").name, "Switch")
+
+    def test_the_igdb_id_of_a_game_comes_in_with_the_file_and_is_never_given_to_two_games(self):
+        self.db.get(models.Game, "doom").igdb_id = 77
+        self.db.commit()
+        report = self.run_import(
+            parse(
+                games=[{"id": "h2", "name": "Hades II", "igdb_id": 228525}, {"id": "dup", "name": "Doom Remix", "igdb_id": 77}],
+                sessions=[session(game="h2"), session(game="dup", start=at(3, 10))],
+            ),
+            actor=self.root,
+        )
+        self.assertEqual(report["created"]["games"], 2)
+        self.assertEqual({g.name: g.igdb_id for g in self.db.query(models.Game)}, {"Doom": 77, "Hades": None, "Hades II": 228525, "Doom Remix": None})
 
     def test_an_admin_does_not_create_a_game_whose_name_is_taken_but_uses_that_one(self):
         report = self.run_import(parse(games=[{"id": "other", "name": "Hades"}], sessions=[session(game="other")]), actor=self.root)
