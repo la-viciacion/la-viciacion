@@ -4,14 +4,15 @@ import { PASSWORD_HINT, isValidPassword } from '../../lib/password.js';
 import { flash } from './flash.js';
 
 // `user` is the session user: it is updated in place after saving so the rest of the app sees the change.
-// `about` gives the city and birth date block (about.js, null until it has loaded), which is saved with the rest.
-export function initAccount(main, { user, userPath, about = () => null }) {
+// `about` gives the city and birth date block (about.js, null until it has loaded), which is saved with the rest;
+// `onSaved` runs after a save, so the card of what the profile lacks can follow.
+export function initAccount(main, { user, userPath, about = () => null, onSaved = async () => {} }) {
   main.querySelector('#pfData').addEventListener('submit', async (e) => {
     e.preventDefault();
     const form = e.currentTarget;
     const msg = main.querySelector('#pfDataMsg');
-    // The email identifies the account, so it is only sent when filled in. The Telegram ID is not edited here: it is linked
-    // with /activate in the group, and this form only unlinks it (below).
+    // The email identifies the account, so it is only sent when filled in. The Telegram ID is read-only: it is linked with
+    // /activate in the group and only an admin changes or removes it.
     const changes = { name: form.name.value };
     if (form.email.value.trim()) changes.email = form.email.value;
     try {
@@ -23,25 +24,9 @@ export function initAccount(main, { user, userPath, about = () => null }) {
       const navName = document.querySelector('.navbar-username');
       if (navName) navName.textContent = shown;
       flash(msg, 'Datos guardados', true);
+      onSaved().catch(() => {}); // the completeness card: optional
     } catch (err) {
       flash(msg, err.message);
-    }
-  });
-
-  main.querySelector('#pfTelegramUnlink').addEventListener('click', async (e) => {
-    const button = e.currentTarget;
-    const msg = main.querySelector('#pfDataMsg');
-    if (user.telegram_id == null) return flash(msg, 'No tienes ningún Telegram vinculado');
-    button.disabled = true;
-    try {
-      const updated = await api(userPath('profile'), jsonRequest('PATCH', { telegram_id: null }));
-      user.telegram_id = updated.telegram_id;
-      main.querySelector('#pfData').telegram_id.value = '';
-      flash(msg, 'Telegram desvinculado. Para volver a vincularlo escribe /activate al bot en el grupo', true);
-    } catch (err) {
-      flash(msg, err.message);
-    } finally {
-      button.disabled = false;
     }
   });
 

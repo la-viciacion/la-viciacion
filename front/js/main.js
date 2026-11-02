@@ -17,6 +17,7 @@ import { renderShell, showLoadError, showLoading } from './ui/layout.js';
 import { closeMenu } from './ui/menu.js';
 import { openPlayingSheet } from './ui/playing.js';
 import { inviteToPush } from './ui/push-invite.js';
+import { inviteToProfile } from './ui/profile-invite.js';
 import { inviteToRecap } from './ui/recap-invite.js';
 import { celebrateBirthday } from './ui/birthday.js';
 import { mountEasterEggs } from './ui/easter-eggs.js';
@@ -138,8 +139,10 @@ async function route() {
     history.replaceState(null, '', location.pathname);
     openPlayingSheet(user.id);
   }
-  inviteToPush().catch(() => {}); // optional: never blocks or breaks a page
-  inviteToRecap(user).catch(() => {}); // the same
+  const pushInvite = inviteToPush().catch(() => {}); // optional: never blocks or breaks a page
+  const recapInvite = inviteToRecap(user).catch(() => {}); // the same
+  // the profile bar waits for the other two, so it never lands on top of them
+  Promise.all([pushInvite, recapInvite]).then(() => inviteToProfile(user)).catch(() => {});
   celebrateBirthday(user).catch(() => {}); // the same
   import('./ui/chat.js').then((chat) => chat.mountChat()).catch(() => {}); // the same: the button only appears if the API says the chat works
 }

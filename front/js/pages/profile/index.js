@@ -10,8 +10,10 @@
 import { api, loadAvatarUrl } from '../../lib/api.js';
 import { html, mount } from '../../lib/html.js';
 import { PASSWORD_HINT } from '../../lib/password.js';
+import { missingSteps } from '../../lib/profile-completeness.js';
 import * as seasons from '../../lib/seasons.js';
 import { showChallengesHistory } from '../../ui/challenges-history.js';
+import { profileCard } from '../../ui/profile-invite.js';
 import { recapCard } from '../../ui/recap-invite.js';
 import { achievementsView, sectionTitle, seasonName, seasonPills, seasonSuffix, statsView, titleView, topView } from '../../ui/profile-summary.js';
 import { initAbout } from './about.js';
@@ -49,6 +51,7 @@ let main;
 let user;
 let group = SETTINGS[0][0]; // the group of Ajustes on screen
 let avatarUrl;
+let missing = []; // what the profile still lacks (lib/profile-completeness.js)
 let recapsOpen = false; // the panel keeps the recaps open: the card of the profile is there every day
 let opened; // tabs already initialised
 let summaryGames; // the list of Resumen (the season on screen)
@@ -71,8 +74,10 @@ const recapsAreOpen = () => api('/statistics/recap-access').then((access) => Boo
 
 async function load() {
   let data;
-  [data, avatarUrl, recapsOpen] = await Promise.all([api(userPath('profile')), loadAvatarUrl(user.username), recapsAreOpen()]);
+  let settings;
+  [data, avatarUrl, recapsOpen, settings] = await Promise.all([api(userPath('profile')), loadAvatarUrl(user.username), recapsAreOpen(), api(userPath('settings'))]);
   if (!data) return;
+  missing = missingSteps({ hasAvatar: Boolean(avatarUrl), settings });
   shown = null;
   onScreen = data.season;
   draw(data);
@@ -167,6 +172,13 @@ async function refreshSummary(season = shown) {
   if (changed && summaryGames) await summaryGames.showSeason(data.season);
 }
 
+// The photo or the city or birth date were saved: the card follows (the photo is known to be there, the rest is asked).
+async function refreshCompleteness({ photo = false } = {}) {
+  const settings = await api(userPath('settings'));
+  missing = missingSteps({ hasAvatar: photo || !missing.includes('photo'), settings });
+  mount(main.querySelector('#pfCompleteness'), profileCard(missing));
+}
+
 // A game changed in one of the two lists: the numbers of the summary and the other list follow.
 async function gamesChanged(source) {
   await refreshSummary();
@@ -221,6 +233,7 @@ function draw(d) {
         </div>
       </div>
       ${recapCard(new Date(), recapsOpen)}
+      <div id="pfCompleteness">${profileCard(missing)}</div>
       <div class="pf-season" id="pfSeasons" role="group" aria-label="Temporada">${seasonPills(d)}</div>
       <section class="pf-stats" id="pfStats" aria-label="Estadísticas: ${seasonName(d)}">${statsView(d)}</section>
       <div class="pf-cols">
@@ -256,10 +269,9 @@ function draw(d) {
       <label>Nombre<input class="adm-input" type="text" name="name" value="${d.user.name || ''}" autocomplete="name" /></label>
       <label>Email (con el que inicias sesión)<input class="adm-input" type="email" name="email" value="${d.user.email || ''}" autocomplete="email" /></label>
       <label>Telegram ID<input class="adm-input" type="number" name="telegram_id" value="${d.user.telegram_id ?? ''}" placeholder="Sin vincular" readonly /></label>
-      <div class="pf-sub">El bot te reconoce por este número. No se escribe aquí: se vincula escribiendo <b>/activate</b> al bot en el grupo de Telegram (solo si tu usuario de Telegram es el mismo que tu apodo de la app). Desde aquí puedes probarlo o desvincularlo.</div>
+      <div class="pf-sub">El bot te reconoce por este número. No se escribe aquí: se vincula escribiendo <b>/activate</b> al bot en el grupo de Telegram (solo si tu usuario de Telegram es el mismo que tu apodo de la app). Desde aquí puedes probarlo; solo un administrador puede cambiarlo o quitarlo.</div>
       <div>
         <button class="pf-btn" type="button" id="pfTelegramTest">Enviar mensaje de prueba</button>
-        <button class="pf-btn" type="button" id="pfTelegramUnlink">Desvincular Telegram</button>
       </div>
       <div id="pfAbout" class="pf-form"></div>
       <div class="pf-msg" id="pfDataMsg" role="status"></div>
@@ -309,11 +321,16 @@ function draw(d) {
   });
   main.querySelector('.pf-tabs').addEventListener('keydown', onTabKey);
   main.querySelector('#pfSeasons').addEventListener('click', onSeason);
+  main.querySelector('#pfCompleteness').addEventListener('click', (e) => {
+    if (!e.target.closest('[data-go]')) return;
+    showTab('ajustes');
+    showGroup('perfil');
+  });
   main.querySelector('#pfGroups').addEventListener('click', (e) => {
     const pill = e.target.closest('.pf-group');
     if (pill) showGroup(pill.dataset.group);
   });
   main.querySelector('#pfLogout').addEventListener('click', () => onLogout());
-  initAvatar(main, { path: userPath('avatar') });
-  initAccount(main, { user, userPath, about: () => aboutYou });
+  initAvatar(main, { path: userPath('avatar'), onChange: () => refreshCompleteness({ photo: true }) });
+  initAccount(main, { user, userPath, about: () => aboutYou, onSaved: () => refreshCompleteness() });
 }

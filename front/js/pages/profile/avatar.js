@@ -24,7 +24,7 @@ function resizeImage(file) {
   });
 }
 
-export function initAvatar(main, { path }) {
+export function initAvatar(main, { path, onChange = () => {} }) {
   main.querySelector('#pfAvatarInput').addEventListener('change', async (e) => {
     const file = e.target.files[0];
     e.target.value = '';
@@ -42,6 +42,7 @@ export function initAvatar(main, { path }) {
       showAvatar(main.querySelector('#pfAvatar'), url);
       showAvatar(document.querySelector('.navbar-avatar'), url);
       flash(msg, 'Foto actualizada', true);
+      onChange().catch(() => {}); // the completeness card: optional
     } catch (err) {
       flash(msg, err.message);
     }
