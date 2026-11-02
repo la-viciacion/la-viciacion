@@ -8,12 +8,17 @@
 // select: { options: [[number, label], ...] }
 // period: a month, a week or free dates (what a group challenge lasts); it sets several keys of the body at once (ui/period-field.js)
 // heading: a title between groups of fields, it holds no value
+// when: { key, is } or { key, not } on any field: it shows only while that other field has (or has not) that value (a period's
+//   value is its mode: month, week, range or repeat); a field that is not shown is neither read nor required
+// defaultBy: { key, values: { <value>: default } } on a checkbox: it takes that default whenever the field it depends on changes to that value
 // month: the months after the running one, as a "YYYY-MM" text (the challenges are launched for a month)
 // choice: { options: [[text, label], ...], default? } a select whose value stays text (select reads it as a number)
 // An entity may have several ways to create a row (`creates`: [{ label, choose?, fields, body }]): `fields` is the form and
 // `body` what is always sent with it (the kind of challenge, for instance). With one way, openForm takes it as `variant`; with
 // several, openCreateForm opens one form that starts with a Tipo select (`choose` is each type's name) and swaps the fields;
-// a type may post to its own `endpoint`.
+// an entity with `confirmCreate` (true, or the name of what is created) shows what is about to be created, and asks, before
+// sending it; `confirmNote` adds a line to that (what it will do).
+// a type with `repeat: endpoint` posts there instead when its period is a month that repeats.
 // image (editing only): { current: (row) => url of the picture or null, upload: (row) => route that takes the new file }
 import { api, jsonRequest } from '../../lib/api.js';
 import { launchMonths } from '../../lib/challenges.js';
@@ -21,10 +26,10 @@ import { html, mount } from '../../lib/html.js';
 import { PASSWORD_HINT, generatePassword, isValidPassword } from '../../lib/password.js';
 import { platformList } from '../../lib/platforms.js';
 import { modalHeader, openModal } from '../../ui/modal.js';
-import { bindPeriod, periodField, readPeriod } from '../../ui/period-field.js';
+import { bindPeriod, describePeriod, periodField, periodMode, readPeriod } from '../../ui/period-field.js';
 import { toast } from '../../ui/toast.js';
 import { store } from './components.js';
-import { pickGame } from './dialogs.js';
+import { confirmDialog, pickGame } from './dialogs.js';
 
 const inputId = (f) => `f_${f.key}`;
 
@@ -39,7 +44,7 @@ function fieldHtml(f, value, row) {
         ${f.options.map(([value, name]) => html`<option value="${value}" ${String(value) === String(v) ? html`selected` : ''}>${name}</option>`)}
       </select></label>`;
     case 'period':
-      return periodField();
+      return periodField({ repeatable: f.repeatable });
     case 'heading':
       return html`<h3 class="adm-form-section">${f.label}</h3>`;
     case 'month':
@@ -233,6 +238,61 @@ async function onFormClick(e, modal, fields) {
   }
 }
 
+// Whether a field shows now: it has no condition, or the field it depends on is shown and has the value it asks for.
+function valueOf(key, fields, root) {
+  const f = fields.find((x) => x.key === key);
+  if (!f || !isShown(f, fields, root)) return null;
+  return f.type === 'period' ? periodMode(root.querySelector('[data-period-field]')) : readField(f);
+}
+
+function isShown(f, fields, root) {
+  if (!f.when) return true;
+  const value = valueOf(f.when.key, fields, root);
+  return 'is' in f.when ? value === f.when.is : value !== f.when.not;
+}
+
+const fieldView = (f, value, row) => (f.when ? html`<div data-when="${f.key}">${fieldHtml(f, value, row)}</div>` : fieldHtml(f, value, row));
+
+// What a field says in the summary before creating: the value as the person sees it, not as it is sent.
+function describeField(f, root) {
+  const el = document.getElementById(inputId(f));
+  switch (f.type) {
+    case 'checkbox': return el.checked ? 'Sí' : 'No';
+    case 'game': return document.getElementById(`${inputId(f)}_name`).textContent;
+    case 'options': return [...el.querySelectorAll('input')].map((input) => input.value.trim()).filter(Boolean).join(' · ');
+    case 'games': return [...el.querySelectorAll('li > span')].map((name) => name.textContent).join(', ');
+    case 'period': return describePeriod(root.querySelector('[data-period-field]'));
+    case 'select':
+    case 'month':
+    case 'choice':
+    case 'platform': return el.selectedOptions[0]?.textContent.trim() ?? '';
+    default: return el.value;
+  }
+}
+
+/** [[label, value]] of the fields that show and have something, for the summary (the label without its explanation). */
+function summaryRows(fields, root) {
+  return fields
+    .filter((f) => f.type !== 'heading' && isShown(f, fields, root))
+    .map((f) => [f.type === 'period' ? 'Periodo' : f.label.replace(/\s*\(.*\)\s*$/, ''), describeField(f, root)])
+    .filter(([, value]) => value && value !== 'Ninguno');
+}
+
+const confirmName = (entity, variant) => (typeof entity.confirmCreate === 'string' ? entity.confirmCreate : variant.choose);
+
+const seen = new WeakMap(); // the value each field with `defaultBy` last took its default for
+
+function applyWhen(root, fields) {
+  root.querySelectorAll('[data-when]').forEach((box) => { box.hidden = !isShown(fields.find((f) => f.key === box.dataset.when), fields, root); });
+  for (const f of fields.filter((x) => x.defaultBy)) {
+    const value = valueOf(f.defaultBy.key, fields, root);
+    const last = seen.get(root) ?? {};
+    if (last[f.key] === value) continue;
+    seen.set(root, { ...last, [f.key]: value });
+    document.getElementById(inputId(f)).checked = f.defaultBy.values[value] ?? Boolean(f.default);
+  }
+}
+
 const bindPeriods = (el) => el.querySelectorAll('[data-period-field]').forEach(bindPeriod);
 
 /** Open the create (row = null) or edit form of an entity. */
@@ -242,7 +302,7 @@ export function openForm(entity, row, admin, variant = null) {
   const modal = openModal(html`
     ${modalHeader(creating ? (variant?.label ?? entity.createLabel) : `Editar · ${entity.name(row)}`)}
     <form class="adm-form" novalidate>
-      ${fields.map((f) => fieldHtml(f, row ? row[f.key] : undefined, row))}
+      ${fields.map((f) => fieldView(f, row ? row[f.key] : undefined, row))}
       <div class="adm-error" role="alert"></div>
       <div class="adm-actions">
         <button type="button" class="adm-btn" data-close>Cancelar</button>
@@ -253,10 +313,12 @@ export function openForm(entity, row, admin, variant = null) {
   fields.filter((f) => f.type === 'options').forEach((f) => numberOptions(modal.el.querySelector(`#f_${f.key}`)));
   modal.el.querySelectorAll('textarea.adm-grow').forEach(autoGrow);
   bindPeriods(modal.el);
+  modal.el.addEventListener('change', () => applyWhen(modal.el, fields));
+  applyWhen(modal.el, fields);
   modal.el.addEventListener('click', (e) => onFormClick(e, modal, fields));
   modal.el.querySelector('form').addEventListener('submit', (e) => {
     e.preventDefault();
-    submit(entity, row, fields, modal, admin, variant?.body);
+    submit(entity, row, fields, modal, admin, { extra: variant?.body, confirm: creating && entity.confirmCreate ? confirmName(entity, variant) : null });
   });
 }
 
@@ -287,24 +349,26 @@ export function openCreateForm(entity, admin) {
     try {
       const fields = typeof variant.fields === 'function' ? await variant.fields() : variant.fields;
       current = { variant, fields };
-      mount(area, html`${fields.map((f) => fieldHtml(f, undefined, undefined))}`);
+      mount(area, html`${fields.map((f) => fieldView(f, undefined, undefined))}`);
       fields.filter((f) => f.type === 'options').forEach((f) => numberOptions(modal.el.querySelector(`#f_${f.key}`)));
       area.querySelectorAll('textarea.adm-grow').forEach(autoGrow);
       bindPeriods(area);
+      applyWhen(modal.el, fields);
     } catch (err) {
       error.textContent = err.message;
     }
   };
   form.elements.variant.addEventListener('change', () => choose(variants[Number(form.elements.variant.value)]));
+  modal.el.addEventListener('change', () => applyWhen(modal.el, current.fields));
   modal.el.addEventListener('click', (e) => onFormClick(e, modal, current.fields));
   form.addEventListener('submit', (e) => {
     e.preventDefault();
-    submit({ ...entity, endpoint: current.variant.endpoint ?? entity.endpoint }, null, current.fields, modal, admin, current.variant.body);
+    submit(entity, null, current.fields, modal, admin, { extra: current.variant.body, repeat: current.variant.repeat, confirm: entity.confirmCreate ? confirmName(entity, current.variant) : null });
   });
   choose(variants[0]);
 }
 
-async function submit(entity, row, fields, modal, admin, extra = {}) {
+async function submit(entity, row, fields, modal, admin, { extra = {}, repeat: repeatEndpoint = null, confirm = null } = {}) {
   const errorEl = modal.el.querySelector('.adm-error');
   errorEl.textContent = '';
   const body = {};
@@ -312,7 +376,7 @@ async function submit(entity, row, fields, modal, admin, extra = {}) {
   const uploads = [];
 
   for (const f of fields) {
-    if (f.type === 'heading') continue;
+    if (f.type === 'heading' || !isShown(f, fields, modal.el)) continue;
     if (f.type === 'period') {
       const period = readPeriod(modal.el.querySelector('[data-period-field]'));
       if (period.error) { errorEl.textContent = period.error; return; }
@@ -348,9 +412,18 @@ async function submit(entity, row, fields, modal, admin, extra = {}) {
     return;
   }
 
+  if (!row && confirm) {
+    const rows = summaryRows(fields, modal.el);
+    const ok = await confirmDialog(`Lanzar · ${confirm}`, html`<p>Revisa el resumen antes de crearlo.${entity.confirmNote ? ` ${entity.confirmNote}` : ''}</p><ul class="adm-list">${rows.map(([label, value]) => html`<li><strong>${label}</strong>: ${value}</li>`)}</ul>`, { ok: 'Lanzar' });
+    if (!ok) return;
+  }
+
   try {
     if (!row) {
-      await api(entity.endpoint, jsonRequest('POST', { ...body, ...extra }));
+      // a month that repeats is not launched but scheduled: the type says where that goes
+      const repeating = Boolean(body.repeat && repeatEndpoint);
+      delete body.repeat;
+      await api(repeating ? repeatEndpoint : entity.endpoint, jsonRequest('POST', { ...body, ...extra }));
     } else {
       await api(`${entity.endpoint}/${row.id}`, jsonRequest('PATCH', body));
       if (newPassword !== null) await api(`${entity.endpoint}/${row.id}/password`, jsonRequest('POST', { password: newPassword }));

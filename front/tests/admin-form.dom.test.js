@@ -194,3 +194,72 @@ test('a period field sends the period and only the keys it needs, between headin
   await new Promise((resolve) => setImmediate(resolve));
   assert.deepEqual(sent[0], { period: 'week', starts_on: '2099-03-02', min_hours_total: 40, kind: 'group_hours' });
 });
+
+test('a field that depends on another shows only while it has that value, and is neither read nor required otherwise', async () => {
+  const sent = [];
+  globalThis.fetch = async (url, options = {}) => {
+    sent.push({ path: String(url).replace(/^\/api\/v1/, ''), body: options.body ? JSON.parse(options.body) : undefined });
+    return new Response(JSON.stringify({}), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  };
+  const { openCreateForm } = await import('../js/pages/admin/form.js');
+  const type = {
+    label: 'Lanzar', choose: 'Reto', body: { kind: 'game' }, repeat: '/manage/challenge-schedules',
+    fields: [
+      { key: 'game_id', label: 'Juego', type: 'text', required: true, when: { key: 'period', not: 'repeat' } },
+      { key: 'label', label: 'Nombre', type: 'text', required: true, when: { key: 'period', is: 'repeat' } },
+      { key: 'period', type: 'period', repeatable: true },
+      { key: 'announce', label: 'Avisar', type: 'checkbox', default: true, defaultBy: { key: 'period', values: { repeat: false } } },
+    ],
+  };
+  openCreateForm({ createLabel: 'Lanzar reto', endpoint: '/manage/challenges', creates: [type, { ...type, choose: 'Otro' }] }, { reload: async () => {} });
+  await new Promise((resolve) => setImmediate(resolve));
+  const shown = (key) => !document.querySelector(`[data-when="${key}"]`).hidden;
+  assert.deepEqual([shown('game_id'), shown('label')], [true, false]);
+  assert.equal(document.getElementById('f_announce').checked, true);
+  const form = document.querySelector('.modal-content form');
+  const repeat = form.querySelector('[data-period-repeat]');
+  repeat.checked = true;
+  repeat.dispatchEvent(new window.Event('change', { bubbles: true }));
+  assert.deepEqual([shown('game_id'), shown('label')], [false, true]);
+  assert.equal(document.getElementById('f_announce').checked, false); // a repeating one does not tell the group by default
+  assert.equal(form.querySelector('[data-period-month]').closest('label').hidden, true); // each launch picks its own month
+  assert.equal(form.querySelector('[data-period-now]').closest('label').hidden, false);
+  form.requestSubmit();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.match(document.querySelector('.adm-error').textContent, /Falta: Nombre/); // the hidden game is not asked for
+  document.getElementById('f_label').value = 'Cada mes';
+  form.querySelector('[data-period-now]').checked = true;
+  form.requestSubmit();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(sent.at(-1), { path: '/manage/challenge-schedules', body: { label: 'Cada mes', start_now: true, announce: false, kind: 'game' } });
+});
+
+test('an entity that confirms its creation shows a summary first and sends only after the second yes', async () => {
+  const sent = [];
+  globalThis.fetch = async (url, options = {}) => {
+    sent.push(options.body ? JSON.parse(options.body) : undefined);
+    return new Response(JSON.stringify({}), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  };
+  const { openCreateForm } = await import('../js/pages/admin/form.js');
+  const type = {
+    label: 'Lanzar', choose: 'Horas entre todos', body: { kind: 'group_hours' },
+    fields: [
+      { type: 'heading', label: 'Cuándo' }, { key: 'period', type: 'period' },
+      { key: 'min_hours_total', label: 'Horas entre todos (de cualquier juego)', type: 'number', default: 40 },
+      { key: 'announce', label: 'Avisar al grupo (Telegram)', type: 'checkbox', default: false },
+    ],
+  };
+  openCreateForm({ createLabel: 'Lanzar reto', endpoint: '/manage/challenges', confirmCreate: true, creates: [type, { ...type, choose: 'Otro' }] }, { reload: async () => {} });
+  await new Promise((resolve) => setImmediate(resolve));
+  const form = document.querySelector('.modal-content form');
+  form.requestSubmit();
+  await new Promise((resolve) => setImmediate(resolve));
+  const summary = [...document.querySelectorAll('.modal-content .adm-list li')].map((li) => li.textContent);
+  assert.ok(summary[0].startsWith('Periodo: Un mes completo'));
+  assert.deepEqual(summary.slice(1), ['Horas entre todos: 40', 'Avisar al grupo: No']); // the label without its explanation
+  assert.deepEqual(sent, []); // nothing sent yet
+  document.querySelector('[data-confirm]').click();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].announce, false);
+});

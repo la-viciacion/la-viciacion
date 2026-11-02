@@ -13,7 +13,7 @@ afterEach(() => closeAllModals());
 
 const proposal = { id: 7, title: 'Temático: <b>Horror</b>', label: 'Temático', status: 'pending', proposer: { id: 2, name: 'Bea' } };
 
-test('approving asks who takes part and whether to tell the group, and sends both', async () => {
+test('approving asks who takes part and whether to tell the group, shows a summary, and sends only after the second yes', async () => {
   const calls = installApi({ 'POST /manage/challenge-proposals/7/approve': { id: 7, status: 'approved' } });
   let reloaded = 0;
   approveProposal(proposal, { reload: async () => { reloaded += 1; } });
@@ -21,13 +21,30 @@ test('approving asks who takes part and whether to tell the group, and sends bot
   assert.equal(document.querySelectorAll('.modal-content b').length, 0); // the title is text
   assert.match(document.querySelector('.modal-content').textContent, /Propuesto por Bea/);
   const form = document.querySelector('.modal-content form');
-  assert.equal(form.elements.announce.checked, true);
+  assert.equal(form.elements.announce.checked, false); // the group is told only if the admin says so
   form.elements.participation.value = 'opt_in';
-  form.elements.announce.checked = false;
+  form.elements.announce.checked = true;
   form.requestSubmit();
   await settle();
-  assert.deepEqual(calls[0].body, { participation: 'opt_in', announce: false });
+  assert.match(document.querySelector('.modal-overlay:last-child .adm-list').textContent, /Voluntario.*Avisar al grupo: Sí/);
+  assert.deepEqual(calls, []); // nothing sent yet
+  document.querySelector('[data-confirm]').click();
+  await settle();
+  assert.deepEqual(calls[0].body, { participation: 'opt_in', announce: true });
   assert.equal(reloaded, 1);
+});
+
+test('saying no to the summary leaves the approval as it was', async () => {
+  const calls = installApi({ 'POST /manage/challenge-proposals/7/approve': { id: 7, status: 'approved' } });
+  let reloaded = 0;
+  approveProposal(proposal, { reload: async () => { reloaded += 1; } });
+  document.querySelector('.modal-content form').requestSubmit();
+  await settle();
+  document.querySelector('.modal-overlay:last-child [data-close]').click();
+  await settle();
+  assert.deepEqual(calls, []);
+  assert.equal(reloaded, 0);
+  assert.ok(document.querySelector('.modal-content form')); // the form is still there
 });
 
 test('an error of the API stays in the window and nothing reloads', async () => {
@@ -35,6 +52,8 @@ test('an error of the API stays in the window and nothing reloads', async () => 
   let reloaded = 0;
   approveProposal(proposal, { reload: async () => { reloaded += 1; } });
   document.querySelector('.modal-content form').requestSubmit();
+  await settle();
+  document.querySelector('[data-confirm]').click();
   await settle();
   assert.match(document.querySelector('.adm-error').textContent, /Ese mes ya ha pasado/);
   assert.equal(reloaded, 0);
@@ -63,20 +82,29 @@ test('the panel lists the proposals in their own tab, the schedules under the ch
   assert.deepEqual(actions.map((a) => a.show({ status: 'approved' })), [false, false]);
 });
 
-test('a schedule is created as a themed one or as a game of the month that rotates, and a rotation needs its games', () => {
-  const [themed, rotation] = ENTITIES.challenges.creates.filter((c) => c.endpoint === '/manage/challenge-schedules');
-  assert.deepEqual([themed.body, rotation.body], [{ kind: 'themed' }, { kind: 'game' }]);
-  const games = rotation.fields.find((f) => f.key === 'games');
-  assert.deepEqual([games.type, games.required], ['games', true]);
-  assert.ok(rotation.fields.some((f) => f.key === 'start_now'));
+test('a game or a themed challenge can repeat every month (not offered for now), and a rotation needs its games', () => {
+  const [game, , themed] = ENTITIES.challenges.creates;
+  assert.deepEqual([game.repeat, themed.repeat], ['/manage/challenge-schedules', '/manage/challenge-schedules']);
+  const games = game.fields.find((f) => f.key === 'games');
+  assert.deepEqual([games.type, games.required, games.when], ['games', true, { key: 'period', is: 'repeat' }]);
+  assert.deepEqual(game.fields.find((f) => f.key === 'game_id').when, { key: 'period', not: 'repeat' });
+  for (const type of [game]) assert.ok(!type.fields.find((f) => f.type === 'period').repeatable); // not offered for now
   assert.deepEqual(ENTITIES.schedules.fields.map((f) => f.key), ['label', 'active', 'announce', 'participation', 'games']);
 });
 
-test('the challenges have one button and the type is chosen in the form, with the schedules as two more types', () => {
+test('no group challenge tells the group unless the admin ticks it, and every launch is confirmed first', async () => {
+  const { creates, confirmCreate } = ENTITIES.challenges;
+  assert.equal(confirmCreate, true);
+  for (const type of creates) {
+    const fields = typeof type.fields === 'function' ? await type.fields.call(null).catch(() => []) : type.fields;
+    assert.ok(fields.filter((f) => f.key === 'announce').every((f) => f.default === false), type.choose);
+  }
+});
+
+test('the challenges have one button and the type is chosen in the form', () => {
   const { createLabel, creates } = ENTITIES.challenges;
   assert.equal(createLabel, 'Lanzar reto');
   assert.ok(creates.every((c) => c.choose && c.body.kind));
-  assert.deepEqual(creates.map((c) => c.choose), ['Reto de juego', 'Horas entre todos', 'Reto temático', 'Cada mes: temático', 'Cada mes: juego rotativo']);
-  assert.deepEqual(creates.map((c) => c.endpoint), [undefined, undefined, undefined, '/manage/challenge-schedules', '/manage/challenge-schedules']);
+  assert.deepEqual(creates.map((c) => c.choose), ['Reto de juego', 'Horas entre todos', 'Reto temático']);
   assert.equal(ENTITIES.schedules.creates, undefined);
 });

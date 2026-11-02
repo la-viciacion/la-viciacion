@@ -35,12 +35,12 @@ test('the schedules are the second table of the challenges, and their buttons ac
   admin.dispose();
 });
 
-test('without schedules the challenges still show, and say how to make one', async () => {
+test('without schedules there is no second table', async () => {
   api([]);
   const main = document.getElementById('main');
   await admin.render({ main, user: { id: 1 } });
   await settle();
   assert.equal(main.querySelectorAll('table').length, 1);
-  assert.match(main.textContent, /«Cada mes»/);
+  assert.doesNotMatch(main.textContent, /Se lanzan solos/);
   admin.dispose();
 });
