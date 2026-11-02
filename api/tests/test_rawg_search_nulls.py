@@ -26,6 +26,7 @@ class RawgSearchNullsTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_null_fields_do_not_break_the_search(self):
         with mock.patch.object(my_utils.config.__class__, "RAWG_API_KEY", "k"), \
+                mock.patch.object(my_utils.igdb, "configured", return_value=False), \
                 mock.patch.object(my_utils, "_http_get", return_value=_Resp()):
             found = await my_utils.search_rawg_games("call of duty: modern")
         self.assertEqual([c.rawg_id for c in found], [1, 2, 3])
