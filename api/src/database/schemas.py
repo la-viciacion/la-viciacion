@@ -90,6 +90,7 @@ class Game(BaseModel):
     avg_time: int | None = 0
     slug: str | None = None
     rawg_id: int | None = None
+    igdb_id: int | None = None
     is_dlc: bool = False
     parent_game_id: str | None = None
 
@@ -107,6 +108,7 @@ class NewGame(BaseModel):
     avg_time: Optional[int | None] = None
     slug: Optional[str | None] = None
     rawg_id: Optional[int | None] = None
+    igdb_id: Optional[int | None] = None
     is_dlc: bool = False
     # the base game in the catalogue; a game with one is a DLC whatever `is_dlc` says
     parent_game_id: Optional[str | None] = None
@@ -117,6 +119,7 @@ class NewGame(BaseModel):
 class RawgGameCandidate(BaseModel):
     """A game of the picker's search. It is RAWG's, or IGDB's when RAWG could not answer (no `rawg_id`, `source` says it)."""
     rawg_id: Optional[int | None] = None
+    igdb_id: Optional[int | None] = None
     source: str = "rawg"
     dev: Optional[str | None] = None
     name: str

@@ -126,7 +126,7 @@ async def get_game_extras(
 
 @router.post("/", response_model=schemas.Game, status_code=201)
 async def create_game(game: schemas.NewGame, db: Session = Depends(get_db)):
-    """Add a new game to DB: from its RAWG entry when `rawg_id` is given, as typed otherwise (only the name is required).
+    """Add a new game to DB: from its RAWG entry when `rawg_id` is given, from its IGDB one when `igdb_id` is, as typed otherwise (only the name is required).
     A game typed by hand can be marked as a DLC (`is_dlc`) and say which game it belongs to (`parent_game_id`, optional)."""
     # the duplicate check and the stored name must see the same text: " Celeste" is "Celeste"
     game.name = game.name.strip()
@@ -147,6 +147,9 @@ def _refuse_duplicates(db: Session, game: schemas.NewGame) -> None:
         )
         if existing:
             raise HTTPException(status_code=400, detail=messages.GAME_ALREADY_IN_CATALOGUE)
+
+    if game.igdb_id and db.query(models.Game.id).filter(models.Game.igdb_id == game.igdb_id).first():
+        raise HTTPException(status_code=400, detail=messages.GAME_ALREADY_IN_CATALOGUE)
 
     games_db = games.get_game_by_name(db, game.name)
     for game_db in games_db:

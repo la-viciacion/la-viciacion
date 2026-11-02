@@ -99,6 +99,39 @@ def search_games(query: str, limit: int = 10) -> list[dict]:
     return [_candidate(item) for item in found[:limit]]
 
 
+STEAM_SOURCE = 1  # `external_game_source` of Steam in IGDB
+DLC_TYPES = (1, 2, 4)  # dlc_addon, expansion, standalone_expansion
+
+
+def game_details(igdb_id: int) -> dict | None:
+    """What IGDB knows of a game, to create it: the same keys as RAWG's details minus the tags (None when IGDB has no
+    such game). The tags are RAWG's vocabulary and IGDB's keywords are not the same: a game made from IGDB has none."""
+    found = _post(
+        "fields name,slug,first_release_date,game_type,cover.image_id,genres.name,involved_companies.developer,"
+        "involved_companies.company.name,external_games.external_game_source,external_games.uid; "
+        f"where id = {int(igdb_id)};"
+    )
+    if not found:
+        return None
+    item, candidate = found[0], _candidate(found[0])
+    steam = next(
+        (e["uid"] for e in item.get("external_games") or [] if e.get("external_game_source") == STEAM_SOURCE and e.get("uid")),
+        "",
+    )
+    released = item.get("first_release_date")
+    return {
+        "igdb_id": igdb_id,
+        "name": candidate["name"],
+        "slug": candidate["slug"],
+        "dev": candidate["dev"],
+        "release_date": datetime.datetime.fromtimestamp(released, datetime.timezone.utc).date() if released else None,
+        "steam_id": steam,
+        "image_url": candidate["image_url"],
+        "genres": ",".join(candidate["genres"]),
+        "is_dlc": item.get("game_type") in DLC_TYPES,
+    }
+
+
 def _candidate(item: dict) -> dict:
     released = item.get("first_release_date")
     image_id = (item.get("cover") or {}).get("image_id")
@@ -109,6 +142,7 @@ def _candidate(item: dict) -> dict:
     ]
     return {
         "rawg_id": None,
+        "igdb_id": item["id"],
         "source": "igdb",
         "name": item["name"],
         "slug": item.get("slug") or "",

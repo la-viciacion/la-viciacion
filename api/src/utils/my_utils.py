@@ -234,24 +234,28 @@ async def _search_rawg(query: str) -> list[schemas.RawgGameCandidate]:
 
 
 def mark_existing_games(db: Session, candidates: list[schemas.RawgGameCandidate]) -> None:
-    """Flag the candidates that are already in the games table (same RAWG id, slug or name): one query."""
+    """Flag the candidates that are already in the games table (same RAWG id, IGDB id, slug or name): one query."""
     rawg_ids = {c.rawg_id for c in candidates if c.rawg_id}
+    igdb_ids = {c.igdb_id for c in candidates if c.igdb_id}
     slugs = {c.slug for c in candidates if c.slug}
     names = {c.name for c in candidates if c.name}
     filters = []
     if rawg_ids:
         filters.append(models.Game.rawg_id.in_(rawg_ids))
+    if igdb_ids:
+        filters.append(models.Game.igdb_id.in_(igdb_ids))
     if slugs:
         filters.append(models.Game.slug.in_(slugs))
     if names:
         filters.append(models.Game.name.in_(names))
     if not filters:
         return
-    games_db = db.query(models.Game.id, models.Game.rawg_id, models.Game.slug, models.Game.name).filter(or_(*filters)).all()
+    games_db = db.query(models.Game.id, models.Game.rawg_id, models.Game.igdb_id, models.Game.slug, models.Game.name).filter(or_(*filters)).all()
     for candidate in candidates:
         for game in games_db:
             if (
                 (candidate.rawg_id and game.rawg_id == candidate.rawg_id)
+                or (candidate.igdb_id and game.igdb_id == candidate.igdb_id)
                 or (candidate.slug and game.slug == candidate.slug)
                 or (candidate.name and game.name == candidate.name)
             ):
@@ -408,15 +412,48 @@ async def get_game_info(game: str):
     return {"rawg": rawg_content, "hltb": hltb_content}
 
 
+async def get_game_details_by_igdb_id(igdb_id: int) -> dict | None:
+    """The details of a game from IGDB plus its HowLongToBeat time, in the shape of `get_game_details_by_rawg_id`
+    (None when IGDB cannot say). IGDB gives no tags, so `tags` is empty; the Steam id falls back to HowLongToBeat's."""
+    if not igdb.configured():
+        return None
+    try:
+        details = await asyncio.to_thread(igdb.game_details, igdb_id)
+    except Exception as e:
+        logger.error(f"Error fetching IGDB details for id {igdb_id}: {e}")
+        return None
+    if details is None:
+        return None
+    released = details["release_date"]
+    avg_time, hltb_dev, hltb_steam = await _hltb_details(details["name"], released.isoformat() if released else None)
+    return {
+        **details,
+        "dev": details["dev"] or hltb_dev or "-",
+        "steam_id": details["steam_id"] or hltb_steam or "",
+        "tags": "",
+        "avg_time": int(avg_time) if avg_time else 0,
+    }
+
+
 async def get_new_game_info(game) -> schemas.NewGame:
-    """Build schemas.NewGame from the RAWG entry named by `rawg_id`. Without one (or when RAWG has nothing
-    for it) the game is the one typed by hand: RAWG is never searched by name here, because its best
-    match for a game it does not know is a different game."""
+    """Build schemas.NewGame from the RAWG entry named by `rawg_id`, or else from the IGDB one named by `igdb_id`.
+    Without either (or when the source has nothing for it) the game is the one typed by hand: a source is never
+    searched by name here, because its best match for a game it does not know is a different game."""
     game_data = game if isinstance(game, dict) else (game.dict() if hasattr(game, "dict") else vars(game))
     game_name = game_data.get("name", "")
     rawg_id = game_data.get("rawg_id")
+    igdb_id = game_data.get("igdb_id")
 
     details = await get_game_details_by_rawg_id(rawg_id) if rawg_id else None
+    if not details and igdb_id:
+        igdb_details = await get_game_details_by_igdb_id(igdb_id)
+        if igdb_details:
+            return schemas.NewGame(
+                name=igdb_details["name"], dev=igdb_details["dev"], release_date=igdb_details["release_date"],
+                steam_id=igdb_details["steam_id"], image_url=igdb_details["image_url"], genres=igdb_details["genres"],
+                tags=igdb_details["tags"], avg_time=igdb_details["avg_time"], slug=igdb_details["slug"],
+                igdb_id=igdb_id, is_dlc=igdb_details["is_dlc"],
+            )
 
     if details:
         return schemas.NewGame(
@@ -434,7 +471,7 @@ async def get_new_game_info(game) -> schemas.NewGame:
             parent_rawg_id=details["parent_rawg_id"],
         )
 
-    logger.info(f"Adding '{game_name}' as typed (no RAWG entry)")
+    logger.info(f"Adding '{game_name}' as typed (no source entry)")
     return schemas.NewGame(
         name=game_name,
         dev=(game_data.get("dev") or "").strip() or "-",
@@ -444,8 +481,9 @@ async def get_new_game_info(game) -> schemas.NewGame:
         genres=(game_data.get("genres") or "").strip(),
         tags="",
         avg_time=0,
-        slug="",
+        slug=(game_data.get("slug") or "") if igdb_id else "",  # a picked IGDB candidate came with its slug
         rawg_id=None,
+        igdb_id=igdb_id,
         is_dlc=bool(game_data.get("is_dlc")),
         parent_game_id=game_data.get("parent_game_id") or None,
     )
