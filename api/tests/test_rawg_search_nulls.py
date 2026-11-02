@@ -29,6 +29,17 @@ class RawgSearchNullsTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(found[1].genres, [])
         self.assertEqual(found[2].platforms, [])
 
+    async def test_a_rawg_error_answer_is_an_outage_not_an_empty_search(self):
+        bad = mock.Mock(ok=False, status_code=502, content=b"bad gateway")
+        with mock.patch.object(my_utils.config.__class__, "RAWG_API_KEY", "k"),                 mock.patch.object(my_utils, "_http_get", return_value=bad):
+            with self.assertRaises(my_utils.RawgUnavailable):
+                await my_utils.search_rawg_games("doom")
+
+    async def test_no_key_is_reported_too(self):
+        with mock.patch.object(my_utils.config.__class__, "RAWG_API_KEY", ""):
+            with self.assertRaises(my_utils.RawgUnavailable):
+                await my_utils.search_rawg_games("doom")
+
 
 if __name__ == "__main__":
     unittest.main()

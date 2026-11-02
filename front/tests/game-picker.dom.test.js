@@ -181,6 +181,15 @@ test('a failure while adding the game stays in the window', async () => {
   assert.equal(text('#addGameResults')[0], 'Error: Ya existe');
 });
 
+test('a RAWG outage is told, not shown as an empty search', async () => {
+  openGamePicker(() => {});
+  document.querySelector('#modalAddGameBtn').click();
+  installApi({ 'GET /games/search-rawg?query=hades': json({ detail: 'RAWG no responde ahora mismo' }, 503) });
+  await search('#addGameSearch', 'hades', 300);
+  assert.match(text('#addGameResults')[0], /RAWG no responde ahora mismo/);
+  assert.notEqual(text('#addGameResults')[0], 'Sin resultados');
+});
+
 test('a game RAWG does not have is created by hand with only the name required', async () => {
   openGamePicker((id, name) => (picked = [id, name]));
   document.querySelector('#modalAddGameBtn').click();

@@ -39,7 +39,10 @@ async def search_rawg(query: str, db: Session = Depends(get_db)):
         raise HTTPException(
             status_code=400, detail="Query must be at least 2 characters long"
         )
-    return await utils.search_rawg_games(query.strip(), db=db)
+    try:
+        return await utils.search_rawg_games(query.strip(), db=db)
+    except utils.RawgUnavailable:  # already logged where it failed
+        raise HTTPException(status_code=503, detail=messages.RAWG_UNAVAILABLE)
 
 
 @router.get("/rawg-parent/{rawg_id}", response_model=schemas.RawgParent | None)

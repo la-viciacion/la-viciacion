@@ -130,12 +130,17 @@ async def _http_get(url: str, params: dict, timeout: int):
     return await asyncio.to_thread(requests.get, url, params=params, timeout=timeout)
 
 
+class RawgUnavailable(Exception):
+    """RAWG could not answer a search (no key, unreachable or an error): "no results" would be a lie."""
+
+
 async def search_rawg_games(query: str, db: Session = None) -> list[schemas.RawgGameCandidate]:
-    """Search games in RAWG.io and return candidates, checking if they exist in the DB."""
+    """Search games in RAWG.io and return candidates, checking if they exist in the DB.
+    Raises `RawgUnavailable` when RAWG cannot be asked or fails, so an outage is not mistaken for an empty search."""
     api_key = config.RAWG_API_KEY
     if not api_key:
         logger.warning("No RAWG API key configured")
-        return []
+        raise RawgUnavailable("No RAWG API key configured")
 
     url = "https://api.rawg.io/api/games"
     params = {"key": api_key, "search": query, "page": 1, "page_size": 10}
@@ -143,12 +148,14 @@ async def search_rawg_games(query: str, db: Session = None) -> list[schemas.Rawg
         resp = await _http_get(url, params, timeout=10)
         if not resp.ok:
             logger.error(f"RAWG search error {resp.status_code}: {redact_rawg_key(resp.content)}")
-            return []
+            raise RawgUnavailable(f"RAWG answered {resp.status_code}")
         data = resp.json()
         results = data.get("results", [])
+    except RawgUnavailable:
+        raise
     except Exception as e:
         logger.error(f"Error searching RAWG for '{query}': {redact_rawg_key(e)}")
-        return []
+        raise RawgUnavailable("RAWG did not answer") from None
 
     candidates = []
     for item in results:

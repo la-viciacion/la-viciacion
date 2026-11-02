@@ -32,7 +32,8 @@ class LoggedErrorsTests(unittest.IsolatedAsyncioTestCase):
         with mock.patch.object(redaction.config.__class__, "RAWG_API_KEY", KEY), \
                 mock.patch.object(my_utils, "_http_get", side_effect=RuntimeError(URL_ERROR)), \
                 mock.patch.object(my_utils.logger, "error") as error:
-            self.assertEqual(await my_utils.search_rawg_games("doom"), [])
+            with self.assertRaises(my_utils.RawgUnavailable):
+                await my_utils.search_rawg_games("doom")
         logged = " ".join(str(c.args[0]) for c in error.call_args_list)
         self.assertIn("Error searching RAWG", logged)
         self.assertNotIn(KEY, logged)
