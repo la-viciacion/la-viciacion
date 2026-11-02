@@ -7,6 +7,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from ..database import models, schemas
+from ..utils import igdb_sync
 from ..utils import my_utils as utils
 from ..utils.logger import LogManager
 
@@ -251,7 +252,22 @@ async def new_game(db: Session, game: schemas.NewGame) -> models.Game:
     if game_info.parent_igdb_id and not game_info.parent_game_id:
         game_info.parent_game_id = await _ensure_parent_igdb(db, game_info.parent_igdb_id)
     # 3. everything else is database work: keep it off the event loop
-    return await run_in_threadpool(_store_game, db, game, game_info)
+    stored = await run_in_threadpool(_store_game, db, game, game_info)
+    if stored.rawg_id and not stored.igdb_id:
+        await _link_to_igdb(db, stored)
+    return stored
+
+
+async def _link_to_igdb(db: Session, game: models.Game) -> None:
+    """A game created from RAWG (IGDB had nothing or was down) is linked to IGDB when it can be, so IGDB is the main source of
+    it from the start. Best effort: it is skipped while IGDB is known to be failing, and never stops the creation."""
+    if utils.igdb_paused() or not utils.igdb.configured():
+        return
+    try:
+        await run_in_threadpool(igdb_sync.link_one, db, game)
+    except Exception as e:
+        db.rollback()
+        logger.warning(f"Game '{game.name}' not linked to IGDB: {e}")
 
 
 async def _ensure_parent(db: Session, parent_rawg_id: int) -> str | None:

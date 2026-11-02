@@ -118,8 +118,11 @@ def cancel() -> bool:
     return running
 
 
-def start(max_games: int | None = None) -> bool:
+def start(max_games: int | None = None, overwrite: bool = False) -> bool:
     """Launch the background run. False if one is already running.
+
+    With `overwrite` every game the batch links or completes also takes IGDB's data (cover, date, genres, developer, Steam
+    id...) in place of the one it has, as the resync of one game does; a game that is already complete is not touched.
 
     `max_games` keeps only the first N games without an IGDB id in alphabetical order, to link in small batches (the
     ones a batch could not decide are still pending and come back in the next); without it every pending game is
@@ -136,6 +139,7 @@ def start(max_games: int | None = None) -> bool:
             started_at=datetime.datetime.now().isoformat(timespec="seconds"),
             finished_at=None,
             max_games=max_games,
+            overwrite=overwrite,
             total=0,
             processed=0,
             current=None,
@@ -147,7 +151,7 @@ def start(max_games: int | None = None) -> bool:
             duplicates=[],
             errors=[],
         )
-    threading.Thread(target=_run, args=(max_games,), daemon=True).start()
+    threading.Thread(target=_run, args=(max_games, overwrite), daemon=True).start()
     return True
 
 
@@ -172,7 +176,7 @@ def _ask(function, *args):
     return function(*args)
 
 
-def _run(max_games: int | None):
+def _run(max_games: int | None, overwrite: bool = False):
     db = SessionLocal()
     reason = "completed"
     try:
@@ -194,12 +198,15 @@ def _run(max_games: int | None):
             _set(current=game.name)
             try:
                 if game.igdb_id:  # linked already: only its data is missing
-                    extras = _ask(igdb.game_extras, game.igdb_id)
+                    data = _ask(igdb.game_details if overwrite else igdb.game_extras, game.igdb_id)
                     consecutive_errors = 0
-                    if extras is None:
+                    if data is None:
                         _push("not_found", {"game_id": game.id, "name": game.name})
                     else:
-                        _fill(game, extras)
+                        if overwrite:
+                            _apply_details(db, game, data)
+                        else:
+                            _fill(game, data)
                         db.commit()
                         _bump("filled")
                     _bump("processed")
@@ -223,6 +230,10 @@ def _run(max_games: int | None):
                         game.igdb_id = found["id"]
                         game.igdb_slug = found.get("slug") or ""
                         _fill(game, igdb.extras_of(found))
+                        if overwrite:  # IGDB is the main source: what it says replaces what RAWG said
+                            details = _ask(igdb.game_details, found["id"])
+                            if details is not None:
+                                _apply_details(db, game, details)
                         db.commit()
                         _bump("linked")
             except igdb.IgdbRefused as e:
@@ -287,6 +298,22 @@ def _blank(value) -> bool:
 
 
 APPLIED = ("dev", "release_date", "image_url", "genres", "steam_id")
+
+
+def link_one(db, game: models.Game) -> bool:
+    """Link a game to IGDB on a certain match, nothing else touched (the id, its page and IGDB's own data); False when there
+    is none, IGDB cannot say or another game has that id. A game just created from RAWG, whose data is fresh, goes through here."""
+    if game.igdb_id or not igdb.configured():
+        return False
+    steam_hits = igdb.find_by_steam(game.steam_id) if (game.steam_id or "").strip() else []
+    verdict, found = choose(game, steam_hits, [] if steam_hits else igdb.search_items(game.name, 10, True))
+    if verdict != "linked" or db.query(models.Game.id).filter(models.Game.igdb_id == found["id"], models.Game.id != game.id).first():
+        return False
+    game.igdb_id = found["id"]
+    game.igdb_slug = found.get("slug") or ""
+    _fill(game, igdb.extras_of(found))
+    db.commit()
+    return True
 
 
 def _apply_details(db, game: models.Game, details: dict) -> list[str]:

@@ -13,11 +13,12 @@ const STOP_REASONS = {
   errors: 'Detenida por errores consecutivos de IGDB. Prueba de nuevo más tarde.',
 };
 
-/** The number of games of the batch as the API takes it ({ max_games } or {} for all of them), or null when it is not valid. */
-export function batchOf(text) {
-  if (String(text).trim() === '') return {};
+/** The batch as the API takes it ({ max_games?, overwrite? }: no number is all of the games), or null when the number is not valid. */
+export function batchOf(text, overwrite = false) {
+  const body = overwrite ? { overwrite: true } : {};
+  if (String(text).trim() === '') return body;
   const max = Number(text);
-  return Number.isInteger(max) && max >= 1 ? { max_games: max } : null;
+  return Number.isInteger(max) && max >= 1 ? { max_games: max, ...body } : null;
 }
 
 /** Entry point. onDone() runs when a run finishes so the admin can refresh its data. */
@@ -39,6 +40,7 @@ async function confirmStep(onDone) {
     <form class="adm-form" novalidate>
       <p class="adm-sub">Busca cada juego que aún no tiene id de IGDB y se lo guarda junto con lo que IGDB dice de él (temas, palabras clave, franquicias y colecciones), solo cuando la coincidencia es segura: el mismo juego de Steam, o el mismo nombre con un año que cuadre. Los juegos ya enlazados a los que les falten esos datos también se completan. Los dudosos se listan al terminar para elegir a mano. No se cambia ningún otro dato del juego.</p>
       <label>¿Cuántos juegos en esta tanda? (vacío = todos)<input class="adm-input" type="number" name="max" min="1" step="1" placeholder="todos" value="50" /></label>
+      <label class="adm-check"><input type="checkbox" name="overwrite" /> Sustituir también los datos del juego (portada, fecha, géneros, desarrolladora…) por los de IGDB, en los que se enlacen o completen en esta tanda</label>
       <div class="adm-stats adm-stats-sm" id="igEstimate"></div>
       <div class="adm-error" role="alert"></div>
       <div class="adm-actions">
@@ -53,7 +55,7 @@ async function confirmStep(onDone) {
   const error = form.querySelector('.adm-error');
 
   const refresh = async () => {
-    const picked = batchOf(el.max.value);
+    const picked = batchOf(el.max.value, el.overwrite.checked);
     if (!picked) {
       error.textContent = 'El número de juegos debe ser un entero de 1 en adelante';
       go.disabled = true;
@@ -62,7 +64,7 @@ async function confirmStep(onDone) {
     error.textContent = '';
     go.disabled = false;
     try {
-      const params = new URLSearchParams(Object.entries(picked).map(([key, value]) => [key, String(value)]));
+      const params = new URLSearchParams(Object.entries(picked).filter(([key]) => key === 'max_games').map(([key, value]) => [key, String(value)]));
       mount(form.querySelector('#igEstimate'), estimateStats(await api(`/manage/igdb-sync/estimate?${params}`)));
     } catch (err) {
       error.textContent = err.message;
@@ -71,7 +73,7 @@ async function confirmStep(onDone) {
   el.max.addEventListener('change', refresh);
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const picked = batchOf(el.max.value);
+    const picked = batchOf(el.max.value, el.overwrite.checked);
     if (!picked) return;
     go.disabled = true;
     try {
