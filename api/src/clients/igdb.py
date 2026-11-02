@@ -85,17 +85,17 @@ def _quote(text: str) -> str:
     return '"' + text.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
-def _post(body: str, retried: bool = False, timeout: int = TIMEOUT_SECONDS) -> list[dict]:
-    headers = {"Client-ID": config.TWITCH_CLIENT_ID, "Authorization": f"Bearer {_access_token(renew=retried)}"}
+def _post(body: str, retried: bool = False, timeout: int = TIMEOUT_SECONDS, renew: bool = False) -> list[dict]:
+    headers = {"Client-ID": config.TWITCH_CLIENT_ID, "Authorization": f"Bearer {_access_token(renew=renew)}"}
     try:
         response = requests.post(GAMES_URL, data=body.encode("utf-8"), headers=headers, timeout=timeout)
     except requests.RequestException as e:
         raise IgdbError(f"IGDB did not answer ({type(e).__name__})") from None
     if response.status_code == 401 and not retried:  # the token was revoked before it expired
-        return _post(body, retried=True, timeout=timeout)
+        return _post(body, retried=True, timeout=timeout, renew=True)
     if response.status_code == 429 and not retried:  # four requests a second, shared with the batch: one more try a second later
         time.sleep(1.1)
-        return _post(body, retried=True, timeout=timeout)
+        return _post(body, retried=True, timeout=timeout)  # same token: only a refused one is asked again
     if not response.ok:
         raise IgdbError(f"IGDB answered {response.status_code}")
     return response.json()
