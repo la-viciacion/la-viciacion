@@ -41,8 +41,9 @@ const PERIOD_FIELD = { key: 'period', type: 'period' };
 const REPEATING_PERIOD_FIELD = { ...PERIOD_FIELD, repeatable: true };
 // a challenge that repeats does not tell the group every month unless the admin says so
 const ANNOUNCE_REPEAT = { key: 'period', values: { repeat: false } };
-// A rotating game is built (the `games` list, the schedule) but not offered for now: this is the switch (REPEATING_PERIOD_FIELD to offer it)
-const GAME_PERIOD_FIELD = PERIOD_FIELD;
+// Recurrence is built (the `repeat` types, the schedules, the second table) but not offered for now: this is the switch
+const OFFER_RECURRENCE = false;
+const SCHEDULABLE_PERIOD_FIELD = OFFER_RECURRENCE ? REPEATING_PERIOD_FIELD : PERIOD_FIELD; // the period of a game and a themed challenge
 const REPEAT_NAME_FIELD = { key: 'label', label: 'Nombre (con el que se verá en la lista de los que se lanzan solos)', type: 'text', required: true, when: { key: 'period', is: 'repeat' } };
 const WHEN = { type: 'heading', label: 'Cuándo' };
 const WHAT = { type: 'heading', label: 'Qué' }; // the game comes after the period: a repeating challenge picks it another way
@@ -296,7 +297,7 @@ export const ENTITIES = {
 
   challenges: {
     label: 'Retos',
-    description: 'Los retos del grupo se lanzan y se borran aquí, y solo aquí: son de la app, no de un jugador. Los jugadores lanzan los suyos, personales, desde la página Retos; aquí se ven todos. Bajo la tabla están los que se lanzan solos cada mes: se crean aquí mismo, con «Repetir cada mes».',
+    description: 'Los retos del grupo se lanzan y se borran aquí, y solo aquí: son de la app, no de un jugador. Los jugadores lanzan los suyos, personales, desde la página Retos; aquí se ven todos.',
     endpoint: '/manage/challenges',
     companion: 'schedules',
     paged: false,
@@ -320,7 +321,7 @@ export const ENTITIES = {
         repeat: '/manage/challenge-schedules',
         fields: [
           WHEN,
-          GAME_PERIOD_FIELD,
+          SCHEDULABLE_PERIOD_FIELD,
           REPEAT_NAME_FIELD,
           WHAT,
           { key: 'game_id', label: 'Juego', type: 'game', required: true, when: { key: 'period', not: 'repeat' } },
@@ -359,7 +360,7 @@ export const ENTITIES = {
           const themes = await api('/manage/challenges/themes');
           return [
             WHEN,
-            REPEATING_PERIOD_FIELD,
+            SCHEDULABLE_PERIOD_FIELD,
             REPEAT_NAME_FIELD,
             WHAT,
             { key: 'theme', label: 'Temática', type: 'choice', required: true, options: themes.length ? themes.map((t) => [t.theme, themeLabel(t)]) : [['', 'No hay temáticas']] },
