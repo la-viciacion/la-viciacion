@@ -169,6 +169,7 @@ SCREENSHOT_FULL = "https://images.igdb.com/igdb/image/upload/t_1080p/{image_id}.
 MAX_SCREENSHOTS = 8
 MAX_PLATFORMS = 10
 ESRB_NAMES = {"E": "Everyone", "E10+": "Everyone 10+", "T": "Teen", "M": "Mature", "AO": "Adults Only", "RP": "Rating Pending"}
+PAGE_PREFIX = "https://www.igdb.com/games/"  # IGDB sends the address of the game's page: only that one is kept
 VIDEO_ID = re.compile(r"^[A-Za-z0-9_-]{6,20}$")  # a YouTube id: it goes into the address of an embedded player
 
 
@@ -176,7 +177,7 @@ def media_of(igdb_id: int) -> dict | None:
     """What IGDB says that the page of a game shows: the summary (English), the trailer (a YouTube id), the screenshots, the
     critics' score, the ESRB age rating (as RAWG names it), the publishers and the platforms. None when IGDB has no such game."""
     found = _post(
-        "fields summary,aggregated_rating,aggregated_rating_count,videos.video_id,videos.name,screenshots.image_id,"
+        "fields url,summary,aggregated_rating,aggregated_rating_count,videos.video_id,videos.name,screenshots.image_id,"
         "age_ratings.rating_category.rating,age_ratings.rating_category.organization.name,"
         f"involved_companies.publisher,involved_companies.company.name,platforms.name; where id = {int(igdb_id)};"
     )
@@ -196,6 +197,7 @@ def media_of(igdb_id: int) -> dict | None:
         None,
     )
     return {
+        "url": item["url"] if str(item.get("url") or "").startswith(PAGE_PREFIX) else None,
         "description": (item.get("summary") or "").strip() or None,
         "trailer": (trailers or videos)[0]["video_id"] if (trailers or videos) else None,
         "screenshots": [{"thumb": SCREENSHOT_THUMB.format(image_id=i), "full": SCREENSHOT_FULL.format(image_id=i)} for i in shots],

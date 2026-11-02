@@ -1,5 +1,5 @@
 // What the world outside says about a game, on its page: the description under the title (Steam's, in Spanish; else IGDB's or
-// RAWG's, in English), the publisher and the platforms, a few small facts (the critics' score and the age rating, beside
+// RAWG's), the publisher and the platforms, a few small facts (the critics' score and the age rating, beside
 // the button to the game's page) and a "Multimedia" card with the trailer (a file, or a YouTube video from IGDB) and a
 // carousel of screenshots.
 // On a wide screen the trailer sits beside the header and the carousel runs below it (profile.css); on a phone the
@@ -53,9 +53,25 @@ export async function showExtras({ head, desc, meta, platforms, media }, game) {
     return;
   }
   if (!x?.available) return;
+  // IGDB's own page, for a game that also has a RAWG one (the page shows a button for each source it knows)
+  const buttons = head.parentElement;
+  if (buttons && safe(x.igdb_url) && x.igdb_url.startsWith('https://www.igdb.com/games/')
+    && ![...buttons.querySelectorAll('a.gm-rawg-btn')].some((a) => a.href === x.igdb_url)) {
+    const link = document.createElement('a');
+    link.className = 'pf-btn gm-rawg-btn';
+    link.href = x.igdb_url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.textContent = 'Ver en IGDB ';
+    const arrow = document.createElement('span');
+    arrow.setAttribute('aria-hidden', 'true');
+    arrow.textContent = '↗';
+    link.append(arrow);
+    buttons.append(link);
+  }
   if (hasFacts(x)) mount(head, html`${facts(x)}`);
   if (x.description) {
-    mount(desc, html`<p class="gm-desc" title="Pulsa para ver todo el texto">${x.description_lang === 'en' ? html`<span class="pf-tag muted" title="Solo la tenemos en inglés">En inglés</span> ` : ''}${x.description}</p>`);
+    mount(desc, html`<p class="gm-desc" title="Pulsa para ver todo el texto">${x.description}</p>`);
     desc.onclick = () => desc.firstElementChild.classList.add('open');
   }
   const publishers = publishersOf(x, game.dev);
@@ -82,7 +98,6 @@ export async function showExtras({ head, desc, meta, platforms, media }, game) {
                 <a href="${s.full}" target="_blank" rel="noopener noreferrer"><img src="${safe(s.thumb) || s.full}" alt="Captura del juego" loading="lazy" /></a>`)}</div>
               <button type="button" class="gm-nav next" data-shots="1" aria-label="Capturas siguientes">›</button>
             </div>` : ''}
-          <div class="pf-sub gm-credit">Datos de ${(x.sources?.length ? x.sources : ['Steam', 'RAWG']).join(', ')}</div>
         </div>
       </div>
     </section>`);

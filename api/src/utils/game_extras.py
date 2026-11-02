@@ -125,6 +125,7 @@ def parse_igdb(media) -> dict:
     shots = [s for s in data.get("screenshots") or [] if media_url(s.get("full"))]
     trailer = data.get("trailer")
     return {
+        "igdb_url": data.get("url"),
         "description": clean_text(data.get("description")),
         "trailer": {"url": None, "youtube": trailer, "poster": media_url(shots[0]["full"]) if shots else None} if trailer else None,
         "screenshots": [{"thumb": media_url(s["thumb"]) or media_url(s["full"]), "full": media_url(s["full"])} for s in shots],
@@ -137,14 +138,13 @@ def parse_igdb(media) -> dict:
 
 def merge(steam: dict, rawg: dict, igdb_data: dict | None = None) -> dict:
     """IGDB first for everything it has, then Steam, then RAWG; except the description: Steam's, in Spanish and curated, leads
-    (`description_lang` says which one it is). The score is the critics' (`critic_source`: IGDB's own average, or Metacritic's
+    . The score is the critics' (`critic_source`: IGDB's own average, or Metacritic's
     when it comes from Steam or RAWG)."""
     igdb_data = igdb_data or parse_igdb(None)
     description = steam["description"] or igdb_data["description"] or rawg["description"]
     critic = igdb_data["metacritic"] or rawg["metacritic"] or steam["metacritic"]
     return {
         "description": description,
-        "description_lang": "es" if steam["description"] else "en",
         "trailer": igdb_data["trailer"] or steam["trailer"] or rawg["trailer"],
         "screenshots": igdb_data["screenshots"] or steam["screenshots"] or rawg["screenshots"],
         "metacritic": critic,
@@ -152,6 +152,7 @@ def merge(steam: dict, rawg: dict, igdb_data: dict | None = None) -> dict:
         "esrb": igdb_data["esrb"] or rawg["esrb"],
         "publishers": igdb_data["publishers"] or rawg["publishers"],
         "platforms": igdb_data["platforms"] or rawg["platforms"],
+        "igdb_url": igdb_data["igdb_url"],
     }
 
 
@@ -228,7 +229,6 @@ async def _fetch(rawg_id: int | None, steam_id: str | None, igdb_id: int | None 
     if any(asked) and not any(a for a, ok in zip(asked, answered) if ok):
         return None  # nobody answered
     extras = merge(steam, parse_rawg(rawg_detail, movies, shots), igdb_data)
-    extras["sources"] = [name for name, ok in zip(("IGDB", "Steam", "RAWG"), answered) if ok]
     # a service that was asked and did not answer leaves its part out: ask again soon, not tomorrow
     failed = [
         bool(igdb_id) and igdb_media is None,

@@ -124,6 +124,17 @@ class Game(Base):
     __table_args__ = (UniqueConstraint("name"),)
 
     @property
+    def links(self) -> list[dict]:
+        """The pages of the game in the sources its `slug` is known for: RAWG's when it has a RAWG id (or no id at all, from
+        before IGDB), IGDB's when it has an IGDB id and no RAWG id. A game with both has RAWG's slug here; IGDB's own address
+        for it comes with the outside data (`igdb_url`), which is where IGDB is asked."""
+        if not self.slug:
+            return []
+        if self.igdb_id and not self.rawg_id:
+            return [{"name": "IGDB", "url": f"https://www.igdb.com/games/{self.slug}"}]
+        return [{"name": "RAWG", "url": f"https://rawg.io/games/{self.slug}"}]
+
+    @property
     def page_url(self) -> str | None:
         """The page of the game in the source its `slug` belongs to: IGDB's for a game that only IGDB knows, RAWG's for
         the rest (a slug is each site's own, one site's does not open the other's page). None without a slug."""

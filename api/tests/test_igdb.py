@@ -171,10 +171,17 @@ class IgdbClientTests(unittest.TestCase):
             media = igdb.media_of(5)
             self.assertIsNone(igdb.media_of(6))
         self.assertEqual((media["description"], media["trailer"], media["critic"], media["esrb"]), ("A roguelike.", "trailerabc1", 94, "Teen"))
+        self.assertIsNone(media["url"])  # the fixture has none
         self.assertEqual((media["publishers"], media["platforms"], len(media["screenshots"])), (["Supergiant"], ["PC", "Switch"], 8))
         self.assertEqual(media["screenshots"][0], {
             "thumb": "https://images.igdb.com/igdb/image/upload/t_screenshot_med/s0.jpg", "full": "https://images.igdb.com/igdb/image/upload/t_1080p/s0.jpg",
         })
+
+    def test_only_an_address_of_igdbs_own_pages_is_kept(self):
+        for url, kept in (("https://www.igdb.com/games/hades-ii", True), ("https://evil.example/games/x", False), (None, False)):
+            with mock.patch.object(igdb.requests, "post", side_effect=[_response({"access_token": "t", "expires_in": 5000000}), _response([{"id": 5, "url": url}])]):
+                igdb._token = None
+                self.assertEqual(igdb.media_of(5)["url"], url if kept else None)
 
     def test_without_critics_or_a_known_rating_those_are_none(self):
         item = {"id": 5, "aggregated_rating": 80.0, "age_ratings": [{"rating_category": {"rating": "EC", "organization": {"name": "ESRB"}}}]}
