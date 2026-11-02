@@ -182,15 +182,19 @@
   font-size: 0.9rem; max-width: 90vw; animation: slideUp 0.25s ease;
 }
 
-.push-invite {
-  position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 1900;
+.push-invite, .profile-invite {
+  position: fixed; top: 64px; left: 50%; transform: translateX(-50%); z-index: 1900; /* just under the top bar, like the recap's: the bottom of the page goes unseen */
   width: min(560px, calc(100vw - 24px)); display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;
   background: var(--bg-surface); border: 1px solid var(--border-accent); border-radius: var(--radius-md);
-  padding: 14px 16px; box-shadow: var(--shadow-card); animation: slideUp 0.25s ease;
+  padding: 14px 16px; box-shadow: var(--shadow-card); animation: recapDrop 0.3s ease;
 }
-.push-invite-text { display: flex; flex-direction: column; gap: 3px; font-size: 0.85rem; color: var(--text-secondary); flex: 1 1 260px; }
-.push-invite-text strong { color: var(--text-primary); font-size: 0.95rem; }
-.push-invite-actions { display: flex; gap: 8px; }
+/* when the recap's bar is up the push one goes under it, so they never overlap */
+body:has(.recap-invite) .push-invite { top: 140px; }
+@media (prefers-reduced-motion: reduce) { .push-invite, .profile-invite { animation: none; } }
+.push-invite-text, .profile-invite-text { display: flex; flex-direction: column; gap: 3px; font-size: 0.85rem; color: var(--text-secondary); flex: 1 1 260px; }
+.push-invite-text strong, .profile-invite-text strong { color: var(--text-primary); font-size: 0.95rem; }
+.push-invite-actions, .profile-invite-actions { display: flex; gap: 8px; }
+.profile-invite-actions .pf-btn { text-decoration: none; }
 
 .toast.err { border-color: rgba(239, 68, 68, 0.6); color: #fca5a5; }
 
