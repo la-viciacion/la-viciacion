@@ -164,6 +164,59 @@ def extras_of(item: dict) -> dict[str, str]:
     return {column: _names(item.get(column)) for column in EXTRA_COLUMNS}
 
 
+SCREENSHOT_THUMB = "https://images.igdb.com/igdb/image/upload/t_screenshot_med/{image_id}.jpg"
+SCREENSHOT_FULL = "https://images.igdb.com/igdb/image/upload/t_1080p/{image_id}.jpg"
+MAX_SCREENSHOTS = 8
+MAX_PLATFORMS = 10
+ESRB_NAMES = {"E": "Everyone", "E10+": "Everyone 10+", "T": "Teen", "M": "Mature", "AO": "Adults Only", "RP": "Rating Pending"}
+VIDEO_ID = re.compile(r"^[A-Za-z0-9_-]{6,20}$")  # a YouTube id: it goes into the address of an embedded player
+
+
+def media_of(igdb_id: int) -> dict | None:
+    """What IGDB says that the page of a game shows: the summary (English), the trailer (a YouTube id), the screenshots, the
+    critics' score, the ESRB age rating (as RAWG names it), the publishers and the platforms. None when IGDB has no such game."""
+    found = _post(
+        "fields summary,aggregated_rating,aggregated_rating_count,videos.video_id,videos.name,screenshots.image_id,"
+        "age_ratings.rating_category.rating,age_ratings.rating_category.organization.name,"
+        f"involved_companies.publisher,involved_companies.company.name,platforms.name; where id = {int(igdb_id)};"
+    )
+    if not found:
+        return None
+    item = found[0]
+    videos = [v for v in item.get("videos") or [] if VIDEO_ID.match(str(v.get("video_id") or ""))]
+    trailers = [v for v in videos if "trailer" in (v.get("name") or "").casefold()]  # the first trailer, else the first video
+    shots = [s["image_id"] for s in item.get("screenshots") or [] if s.get("image_id")][:MAX_SCREENSHOTS]
+    score = item.get("aggregated_rating")
+    esrb = next(
+        (
+            ESRB_NAMES.get(str((a.get("rating_category") or {}).get("rating")))
+            for a in item.get("age_ratings") or []
+            if ((a.get("rating_category") or {}).get("organization") or {}).get("name") == "ESRB"
+        ),
+        None,
+    )
+    return {
+        "description": (item.get("summary") or "").strip() or None,
+        "trailer": (trailers or videos)[0]["video_id"] if (trailers or videos) else None,
+        "screenshots": [{"thumb": SCREENSHOT_THUMB.format(image_id=i), "full": SCREENSHOT_FULL.format(image_id=i)} for i in shots],
+        "critic": round(score) if isinstance(score, (int, float)) and score > 0 and item.get("aggregated_rating_count") else None,
+        "esrb": esrb,
+        "publishers": _names_of(
+            c.get("company") for c in item.get("involved_companies") or [] if c.get("publisher")
+        ),
+        "platforms": _names_of(item.get("platforms"))[:MAX_PLATFORMS],
+    }
+
+
+def _names_of(items) -> list[str]:
+    found: list[str] = []
+    for item in items or []:
+        name = (item or {}).get("name")
+        if isinstance(name, str) and name.strip() and name.strip() not in found:
+            found.append(name.strip())
+    return found
+
+
 def game_extras(igdb_id: int) -> dict[str, str] | None:
     """`extras_of` for the game with this IGDB id, or None when IGDB has no such game."""
     found = _post(f"fields {EXTRA_FIELDS}; where id = {int(igdb_id)};")

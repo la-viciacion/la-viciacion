@@ -120,14 +120,14 @@ async def get_game_extras(
     current_user: models.User = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    """What Steam and RAWG say about a game: trailer, screenshots, a short description in Spanish, Metacritic, the
-    age rating. They are asked (and the answer kept in memory
-    for a day, see utils/game_extras.py), so it is a request of its own: `available` is false when the game has neither
-    a Steam nor a RAWG id or nobody can be asked, and the page shows no card then."""
+    """What IGDB, Steam and RAWG say about a game (IGDB first, RAWG only for what is missing): trailer, screenshots, a
+    short description (Spanish when Steam has it), the critics' score, the age rating. They are asked (and the answer kept
+    in memory for a day, see utils/game_extras.py), so it is a request of its own: `available` is false when the game has no
+    IGDB, Steam or RAWG id or nobody can be asked, and the page shows no card then."""
     game = await run_in_threadpool(db.get, models.Game, game_id)
     if game is None:
         raise HTTPException(status_code=404, detail="Game not exists")
-    extras = await game_extras.extras_of(game.rawg_id, game.steam_id)
+    extras = await game_extras.extras_of(game.rawg_id, game.steam_id, game.igdb_id)
     if extras is None:
         return {"available": False}
     return {"available": True, **extras}

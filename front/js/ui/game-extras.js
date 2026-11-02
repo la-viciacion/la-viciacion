@@ -1,8 +1,9 @@
-// What the world outside says about a game, on its page: the description under the title (Steam's, in Spanish; RAWG's, in
-// English, when Steam has none), the publisher and the platforms, a few small facts (Metacritic and the age rating, beside
-// the RAWG button) and a "Multimedia" card with the trailer and a carousel of screenshots.
+// What the world outside says about a game, on its page: the description under the title (Steam's, in Spanish; else IGDB's or
+// RAWG's, in English), the publisher and the platforms, a few small facts (the critics' score and the age rating, beside
+// the button to the game's page) and a "Multimedia" card with the trailer (a file, or a YouTube video from IGDB) and a
+// carousel of screenshots.
 // On a wide screen the trailer sits beside the header and the carousel runs below it (profile.css); on a phone the
-// card is one block that folds. GET /games/{id}/extras asks Steam and RAWG (the API keeps the answer for a day), so it is loaded apart,
+// card is one block that folds. GET /games/{id}/extras asks IGDB, Steam and RAWG (the API keeps the answer for a day), so it is loaded apart,
 // after the page is drawn; a game neither knows, or a failure, shows nothing. The card starts open (on a phone it
 // can be folded, and the choice is not remembered) and the trailer only loads when it is played, so opening a game costs no video.
 import { api } from '../lib/api.js';
@@ -19,8 +20,12 @@ const safe = (url) => (typeof url === 'string' && url.startsWith('https://') ? u
 const metaTone = (score) => (score >= 75 ? 'good' : score >= 50 ? 'mid' : 'bad');
 const ESRB_CODES = { Everyone: 'E', 'Everyone 10+': 'E10+', Teen: 'T', Mature: 'M', 'Adults Only': 'AO', 'Rating Pending': 'RP' };
 
+const YOUTUBE_ID = /^[A-Za-z0-9_-]{6,20}$/;
+// What can be played: a file the API trusts, or a YouTube video (IGDB's)
+const playable = (trailer) => Boolean(trailer && (safe(trailer.url) || YOUTUBE_ID.test(trailer.youtube || '')));
+
 const facts = (x) => [
-  x.metacritic ? html`<span class="gm-fact" title="Nota de la crítica en Metacritic"><b class="gm-badge ${metaTone(x.metacritic)}">${x.metacritic}</b><span>Metacritic</span></span>` : '',
+  x.metacritic ? html`<span class="gm-fact" title="${x.critic_source === 'igdb' ? 'Nota media de la crítica (IGDB)' : 'Nota de la crítica en Metacritic'}"><b class="gm-badge ${metaTone(x.metacritic)}">${x.metacritic}</b><span>${x.critic_source === 'igdb' ? 'Crítica' : 'Metacritic'}</span></span>` : '',
   x.esrb ? html`<span class="gm-fact" title="Clasificación por edades (ESRB)"><b class="gm-badge age">${ESRB_CODES[x.esrb] || '?'}</b><span>${x.esrb}</span></span>` : '',
 ];
 
@@ -28,7 +33,7 @@ const facts = (x) => [
 const publishersOf = (x, dev) => (x.publishers || []).filter((p) => !dev || !dev.toLowerCase().includes(p.toLowerCase()));
 
 const hasFacts = (x) => x.metacritic || x.esrb;
-const hasMedia = (x) => (x.trailer && safe(x.trailer.url)) || x.screenshots?.some((s) => safe(s.full));
+const hasMedia = (x) => playable(x.trailer) || x.screenshots?.some((s) => safe(s.full));
 
 function trailerButton(trailer) {
   const poster = safe(trailer.poster);
@@ -50,7 +55,7 @@ export async function showExtras({ head, desc, meta, platforms, media }, game) {
   if (!x?.available) return;
   if (hasFacts(x)) mount(head, html`${facts(x)}`);
   if (x.description) {
-    mount(desc, html`<p class="gm-desc" title="Pulsa para ver todo el texto">${x.description_lang === 'en' ? html`<span class="pf-tag muted" title="RAWG la tiene solo en inglés">En inglés</span> ` : ''}${x.description}</p>`);
+    mount(desc, html`<p class="gm-desc" title="Pulsa para ver todo el texto">${x.description_lang === 'en' ? html`<span class="pf-tag muted" title="Solo la tenemos en inglés">En inglés</span> ` : ''}${x.description}</p>`);
     desc.onclick = () => desc.firstElementChild.classList.add('open');
   }
   const publishers = publishersOf(x, game.dev);
@@ -58,7 +63,7 @@ export async function showExtras({ head, desc, meta, platforms, media }, game) {
   if (x.platforms?.length) mount(platforms, html`<div class="gm-genres gm-platforms" aria-label="Plataformas">${x.platforms.map((name) => html`<span class="pf-tag gm-platform">${name}</span>`)}</div>`);
   if (!hasMedia(x)) return;
 
-  const trailer = x.trailer && safe(x.trailer.url) ? x.trailer : null;
+  const trailer = playable(x.trailer) ? x.trailer : null;
   if (trailer) media.closest('.gm-top')?.classList.add('has-trailer'); // only then the wide header makes room for it
   const shots = (x.screenshots || []).filter((s) => safe(s.full));
   const folds = createFolds();
@@ -77,7 +82,7 @@ export async function showExtras({ head, desc, meta, platforms, media }, game) {
                 <a href="${s.full}" target="_blank" rel="noopener noreferrer"><img src="${safe(s.thumb) || s.full}" alt="Captura del juego" loading="lazy" /></a>`)}</div>
               <button type="button" class="gm-nav next" data-shots="1" aria-label="Capturas siguientes">›</button>
             </div>` : ''}
-          <div class="pf-sub gm-credit">Datos de Steam y RAWG</div>
+          <div class="pf-sub gm-credit">Datos de ${(x.sources?.length ? x.sources : ['Steam', 'RAWG']).join(', ')}</div>
         </div>
       </div>
     </section>`);
@@ -95,6 +100,16 @@ export async function showExtras({ head, desc, meta, platforms, media }, game) {
     }
     const play = e.target.closest('[data-trailer]');
     if (!play || !trailer) return;
+    if (!safe(trailer.url)) {
+      const frame = document.createElement('iframe');
+      frame.className = 'gm-trailer';
+      frame.src = `https://www.youtube-nocookie.com/embed/${trailer.youtube}?autoplay=1&rel=0`;
+      frame.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen';
+      frame.allowFullscreen = true;
+      frame.title = 'Tráiler';
+      play.replaceWith(frame);
+      return;
+    }
     const video = document.createElement('video');
     video.className = 'gm-trailer';
     video.controls = true;

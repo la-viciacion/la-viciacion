@@ -17,7 +17,7 @@ server {
     # The app has no inline script, no iframe and talks only to its own origin; the pictures of the games come from other
     # https hosts, the avatars are blob: URLs and the elements carry a few style="" attributes. When a release has gone
     # by with no violation in the console, rename the header to Content-Security-Policy to enforce it.
-    add_header Content-Security-Policy-Report-Only "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data: blob:; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'" always;
+    add_header Content-Security-Policy-Report-Only "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data: blob:; media-src https:; frame-src https://www.youtube-nocookie.com; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'" always;
 
     # Dotfiles (.env, .git, ...) are never served or proxied; scanners probe them constantly.
     location ~ /\.(?!well-known/) {

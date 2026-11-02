@@ -118,6 +118,7 @@ def igdb_sync_cancel():
 class IgdbApplyBody(BaseModel):
     game_id: str
     igdb_id: int
+    overwrite: bool = False            # the resync of one game: what IGDB gives replaces ours
 
 
 @router.post("/igdb-sync/apply")
@@ -126,7 +127,7 @@ def igdb_sync_apply(body: IgdbApplyBody, db: Session = Depends(get_db)):
     if not igdb.configured():
         raise HTTPException(status_code=400, detail="No hay credenciales de IGDB configuradas")
     try:
-        return igdb_sync.apply_one(db, body.game_id, body.igdb_id)
+        return igdb_sync.apply_one(db, body.game_id, body.igdb_id, body.overwrite)
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:

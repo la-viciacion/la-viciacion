@@ -205,7 +205,7 @@ class IgdbSyncRunTests(ApiTestCase):
         self.game("fear", "Fear")
         self.game("other", "Other", igdb_id=30)
         with database.SessionLocal() as db, mock.patch.object(igdb, "game_details", return_value={"name": "Fear", "themes": "Horror", "keywords": "", "franchises": "", "collections": ""}):
-            self.assertEqual(igdb_sync.apply_one(db, "fear", 31), {"linked": True})
+            self.assertEqual(igdb_sync.apply_one(db, "fear", 31), {"linked": True, "changed": ["igdb_id"]})
             self.assertEqual(db.get(models.Game, "fear").themes, "Horror")
             with self.assertRaises(ValueError):
                 igdb_sync.apply_one(db, "fear", 30)

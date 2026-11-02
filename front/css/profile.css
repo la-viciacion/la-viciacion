@@ -453,7 +453,7 @@
 .gm-trailer img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .gm-play { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 2.2rem; color: #fff; background: rgba(0, 0, 0, 0.35); }
 .gm-trailer:focus-visible { outline: 2px solid var(--accent-teal); outline-offset: 2px; }
-video.gm-trailer { cursor: auto; background: #000; }
+video.gm-trailer, iframe.gm-trailer { cursor: auto; background: #000; }
 .gm-carousel { position: relative; }
 .gm-shots { display: flex; gap: 8px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: thin; padding-bottom: 4px; }
 .gm-shots a { flex: 0 0 min(280px, 78%); scroll-snap-align: start; }

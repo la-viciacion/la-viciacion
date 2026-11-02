@@ -1,4 +1,4 @@
-// Short-lived message at the bottom of the screen.
+// Short-lived message under the top bar (the bottom of the page goes unseen).
 
 export function toast(message, type = 'ok') {
   const el = document.createElement('div');

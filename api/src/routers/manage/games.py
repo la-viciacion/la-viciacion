@@ -9,7 +9,8 @@ from sqlalchemy.orm import Session, aliased
 
 from ...auth import get_db
 from ...database import models
-from ...utils import hltb_sync, messages, rawg_sync
+from ...clients import igdb
+from ...utils import hltb_sync, igdb_sync, messages, rawg_sync
 from ...utils.redaction import redact_rawg_key
 from .common import commit, confirm_or_409, get_or_404, like, router
 
@@ -138,14 +139,15 @@ def _check_parent(db: Session, game: models.Game, data: dict) -> None:
 
 @router.post("/games/{game_id}/resync")
 def resync_game(game_id: str, db: Session = Depends(get_db)):
-    """Refresh one game from RAWG (metadata) and HLTB (average time). Each source reports on its own, so one
-    failing does not stop the other; RAWG goes first because HLTB tells same-named games apart by release year."""
+    """Refresh one game from RAWG and IGDB (metadata) and HLTB (average time). Each source reports on its own, so one
+    failing does not stop the others. RAWG goes before IGDB (what IGDB gives wins, it is the main source) and both before
+    HLTB, which tells same-named games apart by release year."""
     get_or_404(db, models.Game, game_id, "Juego")
     out = {}
-    for source, sync in (("rawg", rawg_sync), ("hltb", hltb_sync)):
+    for source, sync in (("rawg", rawg_sync), ("igdb", igdb_sync), ("hltb", hltb_sync)):
         try:
             out[source] = sync.resync_one(db, game_id)
-        except (ConnectionError, RuntimeError, rawg_sync.RawgFatal) as e:
+        except (ConnectionError, RuntimeError, rawg_sync.RawgFatal, igdb.IgdbError) as e:
             db.rollback()
             out[source] = {"status": "error", "error": redact_rawg_key(str(e))}
     return out
