@@ -134,13 +134,15 @@ class UpdateProfileTests(UsersTestCase):
         self.assertEqual(self.patch(email="BEA@example.com").json()["detail"], messages.EMAIL_IN_USE)
         self.assertEqual(self.patch(email="ana@example.com").status_code, 200)
 
-    def test_a_player_cannot_type_a_telegram_id_but_can_keep_or_remove_theirs(self):
+    def test_a_player_cannot_type_change_or_remove_a_telegram_id_but_can_keep_theirs(self):
         response = self.patch(as_user="bea", username="bea", telegram_id=222)
         self.assertEqual((response.status_code, response.json()["detail"]), (403, messages.TELEGRAM_ID_ONLY_ACTIVATE))
         self.assertEqual(self.patch(telegram_id=111).status_code, 200)  # their own, unchanged (the form sends it back)
         self.assertEqual(self.patch(telegram_id=999).status_code, 403)
         self.assertEqual(self.scalar("SELECT telegram_id FROM users WHERE id = :i", i=self.ana), 111)
-        self.assertEqual(self.patch(telegram_id=None).status_code, 200)  # unlinking
+        self.assertEqual(self.patch(telegram_id=None).status_code, 403)  # nor remove it
+        self.assertEqual(self.scalar("SELECT telegram_id FROM users WHERE id = :i", i=self.ana), 111)
+        self.assertEqual(self.patch(as_user="root", telegram_id=None).status_code, 200)  # an admin can
         self.assertIsNone(self.scalar("SELECT telegram_id FROM users WHERE id = :i", i=self.ana))
 
     def test_an_admin_sets_the_telegram_id_and_it_is_unique(self):

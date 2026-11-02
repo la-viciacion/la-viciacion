@@ -93,7 +93,7 @@ def update_profile(
     active_user: models.User = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    """Edit own name and email, and unlink the Telegram id (only an admin can set one; a player links it with /activate)"""
+    """Edit own name and email (the Telegram id is read-only for a player: an admin sets or removes it, the bot's /activate links it)"""
     auth.ensure_self_or_admin(active_user, username=username)
     user = _target_user(db, active_user, username)
     data = body.model_dump(exclude_unset=True)
@@ -109,8 +109,8 @@ def update_profile(
             raise HTTPException(status_code=400, detail=msg.EMAIL_INVALID)
         if users.email_in_use(db, data["email"], exclude_user_id=user.id):
             raise HTTPException(status_code=400, detail=msg.EMAIL_IN_USE)
-    if data.get("telegram_id") not in (None, user.telegram_id) and not active_user.is_admin:
-        # whoever types an id owns nothing proving it is theirs: it is linked from the group (the bot's /activate) or by an admin
+    if "telegram_id" in data and data["telegram_id"] != user.telegram_id and not active_user.is_admin:
+        # whoever types an id owns nothing proving it is theirs: it is linked from the group (the bot's /activate) or by an admin, who is also the one to remove it
         raise HTTPException(status_code=403, detail=msg.TELEGRAM_ID_ONLY_ACTIVATE)
     if data.get("telegram_id") is not None and users.telegram_id_in_use(db, data["telegram_id"], exclude_user_id=user.id):
         raise HTTPException(status_code=400, detail=msg.TELEGRAM_ID_IN_USE)
