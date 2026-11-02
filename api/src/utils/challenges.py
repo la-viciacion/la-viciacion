@@ -325,18 +325,35 @@ def available_tags(db: Session) -> dict[str, tuple[str, int]]:
     return _available(db, models.Game.tags)
 
 
-GAME_WORDS = (models.Game.genres, models.Game.tags, models.Game.themes, models.Game.keywords, models.Game.franchises, models.Game.collections)
+GAME_WORDS = (
+    models.Game.genres, models.Game.tags, models.Game.themes, models.Game.keywords, models.Game.franchises, models.Game.collections,
+    models.Game.perspectives, models.Game.game_modes,
+)
+
+
+def words_of(*columns) -> set[str]:
+    """The lower-cased words a game says about what it is, from `GAME_WORDS` (its RAWG tags and what IGDB says)."""
+    return {word.casefold() for word in split_genres(game_tags.words(*columns))}
+
+
+def theme_rule(tags) -> Callable[[set[str]], bool]:
+    """A theme's tags as a test of the words of one game: a plain tag counts the game by itself, a group (a list of tags: a
+    first person shooter is a shooter *and* seen in first person) only when the game has all of the group. The same rule,
+    from the tags a challenge was launched with (a group comes back from the JSON as a list), is what its progress counts."""
+    singles = {tag.casefold() for tag in tags if isinstance(tag, str)}
+    groups = [{tag.casefold() for tag in group} for group in tags if not isinstance(tag, str)]
+    return lambda words: bool(words & singles) or any(group <= words for group in groups)
 
 
 def available_themes(db: Session) -> dict[str, tuple[str, int]]:
     """The themes (utils/themes.py) that have at least one game in the database: {lower-cased name: (name, how many games
     have any of its tags, RAWG's or IGDB's)}."""
-    wanted = {name: {tag.casefold() for tag in tags} for name, tags in themes.THEMES.items()}
+    rules = {name: theme_rule(tags) for name, tags in themes.THEMES.items()}
     counts = dict.fromkeys(themes.THEMES, 0)
     for row in db.query(*GAME_WORDS):
-        owned = {tag.casefold() for tag in split_genres(game_tags.words(*row))}
-        for name, theme_tags in wanted.items():
-            if owned & theme_tags:
+        owned = words_of(*row)
+        for name, rule in rules.items():
+            if rule(owned):
                 counts[name] += 1
     return {name.casefold(): (name, count) for name, count in counts.items() if count}
 
@@ -344,17 +361,21 @@ def available_themes(db: Session) -> dict[str, tuple[str, int]]:
 def theme_players(db: Session) -> tuple[dict[str, int], int]:
     """How many active players could take part in each theme (they have a game of it in their library) and how many
     active players there are."""
-    owned: dict[int, set[str]] = {}
+    rules = {name: theme_rule(tags) for name, tags in themes.THEMES.items()}
+    players: dict[str, set[int]] = {name: set() for name in rules}
     rows = (
-        db.query(models.UserGame.user_id, models.Game.tags)
+        db.query(models.UserGame.user_id, *GAME_WORDS)
         .join(models.Game, models.Game.id == models.UserGame.game_id)
         .join(models.User, models.User.id == models.UserGame.user_id)
-        .filter(models.User.is_active == 1, models.not_god(), models.Game.tags.isnot(None), models.Game.tags != "")
+        .filter(models.User.is_active == 1, models.not_god())
         .distinct()
     )
-    for user_id, tags in rows:
-        owned.setdefault(user_id, set()).update(tag.casefold() for tag in split_genres(tags))
-    counts = {name: sum(1 for tags in owned.values() if tags & {tag.casefold() for tag in theme_tags}) for name, theme_tags in themes.THEMES.items()}
+    for user_id, *columns in rows:  # a theme counts a player for one game of theirs that has it, not for the sum of their games
+        owned = words_of(*columns)
+        for name, rule in rules.items():
+            if rule(owned):
+                players[name].add(user_id)
+    counts = {name: len(user_ids) for name, user_ids in players.items()}
     members = db.query(models.User.id).filter(models.User.is_active == 1, models.not_god()).count()
     return counts, members
 
@@ -365,7 +386,7 @@ def themes_used(db: Session, today: datetime.date) -> dict[str, datetime.date]:
     used: dict[str, datetime.date] = {}
     for params, starts_on in db.query(models.Challenge.params, models.Challenge.starts_on).filter(models.Challenge.kind == "themed", models.Challenge.starts_on <= today):
         params = json.loads(params)
-        names = [params["theme"]] if params.get("theme") else [name for name, tags in themes.THEMES.items() if params["tag"].casefold() in {tag.casefold() for tag in tags}]
+        names = [params["theme"]] if params.get("theme") else [name for name, tags in themes.THEMES.items() if params["tag"].casefold() in {tag.casefold() for tag in tags if isinstance(tag, str)}]
         for name in names:
             used[name] = max(used.get(name, starts_on), starts_on)
     return used
@@ -555,12 +576,11 @@ def themed_result(names: dict[int, str], mode: str, amounts: dict[int, int], par
 def progress_themed(db: Session, challenge: models.Challenge, participant_ids: list[int]) -> dict:
     params = json.loads(challenge.params)
     names = names_of(db, participant_ids)
-    wanted = {tag.casefold() for tag in themed_tags(params)}
-    has_tag = lambda tags: bool(wanted & {t.casefold() for t in split_genres(tags)})  # noqa: E731
+    rule = theme_rule(themed_tags(params))
     amounts: dict[int, int] = {}
     if participant_ids and params["mode"] == "play":
         rows = (
-            db.query(models.GameTimer.user_id, models.Game.tags, func.sum(models.GameTimer.duration_seconds))
+            db.query(models.GameTimer.user_id, *GAME_WORDS, func.sum(models.GameTimer.duration_seconds))
             .join(models.Game, models.Game.id == models.GameTimer.game_id)
             .filter(
                 models.GameTimer.user_id.in_(participant_ids),
@@ -568,14 +588,14 @@ def progress_themed(db: Session, challenge: models.Challenge, participant_ids: l
                 models.GameTimer.start_time >= datetime.datetime.combine(challenge.starts_on, datetime.time.min),
                 models.GameTimer.start_time < datetime.datetime.combine(challenge.ends_on + datetime.timedelta(days=1), datetime.time.min),
             )
-            .group_by(models.GameTimer.user_id, models.Game.tags)
+            .group_by(models.GameTimer.user_id, *GAME_WORDS)
         )
-        for user_id, tags, seconds in rows:
-            if has_tag(tags):
+        for user_id, *columns, seconds in rows:
+            if rule(words_of(*columns)):
                 amounts[user_id] = amounts.get(user_id, 0) + int(seconds or 0)  # MariaDB returns SUM() as Decimal
     elif participant_ids:
         rows = (
-            db.query(models.UserGame.user_id, models.UserGame.game_id, models.Game.tags)
+            db.query(models.UserGame.user_id, models.UserGame.game_id, *GAME_WORDS)
             .join(models.Game, models.Game.id == models.UserGame.game_id)
             .filter(
                 models.UserGame.user_id.in_(participant_ids),
@@ -585,8 +605,8 @@ def progress_themed(db: Session, challenge: models.Challenge, participant_ids: l
             )
         )
         done: dict[int, set] = {}
-        for user_id, game_id, tags in rows:
-            if has_tag(tags):
+        for user_id, game_id, *columns in rows:
+            if rule(words_of(*columns)):
                 done.setdefault(user_id, set()).add(game_id)
         amounts = {user_id: len(games) for user_id, games in done.items()}
     return themed_result(names, params["mode"], amounts, params)

@@ -1,7 +1,8 @@
 """The themes a group challenge can be about: the genres, settings and themes of the games, each one the tags of the
 games that belong to it (the tags are RAWG's, `utils/game_tags.py` keeps the ones that say what a game is). A tag
 that is only a feature (Crafting, Loot, Classes), a mode (Co-op), a look (Pixel Graphics) or a mood (Atmospheric)
-is not a theme and is not here. A theme counts a game when it has **any** of its tags, so Terror is Horror, Survival
+is not a theme and is not here. A theme counts a game when it has **any** of its tags (a tuple among them is a group: all of it is needed, a shooter that is
+seen in first person), so Terror is Horror, Survival
 Horror... and the duplicates of a tag (Football, Soccer) are one theme.
 
 A few themes overlap on purpose: Estrategia and Deportes are umbrellas of narrower ones. The names are what the
@@ -14,7 +15,7 @@ a theme lists the names of both. The names of IGDB were chosen by looking at wha
 theme of this list."""
 
 # Names of IGDB that the filter of RAWG's tags would drop (`game_tags`): IGDB's go to `games` without passing through it
-IGDB_ONLY = frozenset({"Music and rhythm", "Massively Multiplayer Online (MMO)"})
+IGDB_ONLY = frozenset({"Music and rhythm", "Massively Multiplayer Online (MMO)", "First person"})
 
 # Genres and subgenres
 GENRES = {
@@ -30,7 +31,7 @@ GENRES = {
     "Souls-like": ("Souls-like", "Soulslike"),
     "Hack and slash": ("Hack and Slash", "Character Action Game", "Spectacle fighter", "Hack and slash/Beat 'em up"),
     "Beat 'em up": ("Beat 'em up", "Hack and slash/Beat 'em up"),
-    "Shooter en primera persona (FPS)": ("FPS",),
+    "Shooter en primera persona (FPS)": ("FPS", ("Shooter", "First person")),
     "Otros shooters": ("Arena Shooter", "Hero Shooter", "Extraction Shooter", "Twin Stick Shooter"),
     "Battle royale": ("Battle Royale",),
     "Shoot 'em up y bullet hell": ("Shoot 'Em Up", "Bullet Hell"),

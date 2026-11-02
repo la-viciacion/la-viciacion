@@ -470,7 +470,7 @@ async def get_new_game_info(game) -> schemas.NewGame:
                 steam_id=igdb_details["steam_id"], image_url=igdb_details["image_url"], genres=igdb_details["genres"],
                 tags=igdb_details["tags"], avg_time=igdb_details["avg_time"], igdb_slug=igdb_details["igdb_slug"],  # `slug` is RAWG's
                 igdb_id=igdb_id, is_dlc=igdb_details["is_dlc"], parent_igdb_id=igdb_details.get("parent_igdb_id"),
-                **{column: igdb_details[column] for column in igdb.EXTRA_COLUMNS},
+                **{column: igdb_details.get(column) for column in igdb.EXTRA_COLUMNS},
             )
 
     if details:

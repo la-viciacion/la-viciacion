@@ -167,6 +167,40 @@ class GamesOfTheThemeTests(ThemedTestCase):
         self.assertIsNone(self.api("GET", f"/challenges/{self.challenge}", as_user="ana").json()["theme_games"])
 
 
+class FirstPersonShooterTests(ThemedTestCase):
+    """A theme can need two things of a game at once, and what IGDB says counts as much as RAWG's tags."""
+
+    def setUp(self):
+        super().setUp()
+        self.game("doom", "Doom", genres="Shooter", perspectives="First person")  # IGDB only
+        self.game("tank", "Tank", genres="Shooter", perspectives="Third person")  # a shooter, not seen in first person
+        self.game("walk", "Walk", genres="Adventure", perspectives="First person")  # seen in first person, not a shooter
+        self.game("old", "Old FPS", tags="FPS")  # RAWG's own tag
+
+    def test_only_the_games_that_have_both_count_for_the_theme(self):
+        found = {t["theme"]: t["games"] for t in self.api("GET", "/manage/challenges/themes", as_user="root").json()}
+        self.assertEqual(found["Shooter en primera persona (FPS)"], 2)  # Doom and Old FPS
+
+    def test_the_progress_of_a_challenge_counts_the_hours_and_completions_of_what_igdb_says_too(self):
+        challenge = self.launch_themed(theme="Shooter en primera persona (FPS)").json()["id"]
+        self.played(self.ana, 2, game="doom")
+        self.played(self.ana, 1, game="old")
+        self.played(self.ana, 9, game="tank")
+        self.played(self.ana, 9, game="walk")
+        self.assertEqual(self.players(challenge)["Ana"]["seconds"], 3 * 3600)
+        again = self.launch_themed(theme="Shooter en primera persona (FPS)", mode="complete", min_hours_each=None).json()["id"]
+        self.library_entry(self.bea, "doom", TODAY(), "pc", completed=1, completed_date=TODAY())
+        self.library_entry(self.bea, "tank", TODAY(), "pc", completed=1, completed_date=TODAY())
+        self.assertEqual(self.players(again)["Bea"]["count"], 1)
+
+    def test_the_players_who_could_take_part_are_counted_by_one_game_that_has_both(self):
+        self.library_entry(self.ana, "tank", TODAY(), "pc")
+        self.library_entry(self.ana, "walk", TODAY(), "pc")  # between the two they have both, but no one game does
+        self.library_entry(self.bea, "doom", TODAY(), "pc")
+        body = {t["theme"]: t["players"] for t in self.api("GET", "/manage/challenges/themes", as_user="root").json()}
+        self.assertEqual(body["Shooter en primera persona (FPS)"], 1)
+
+
 class PlayProgressTests(ThemedTestCase):
     def test_hours_in_every_game_with_the_tag_count_and_the_others_do_not(self):
         challenge = self.launch_themed().json()["id"]

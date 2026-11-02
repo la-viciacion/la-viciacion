@@ -1,8 +1,8 @@
 """Links the games of the catalogue to IGDB (admin-triggered, in batches): it fills `games.igdb_id` and what IGDB says of
-the game (themes, keywords, franchises, collections), which no other source fills.
+the game (themes, keywords, franchises, collections, perspectives, game modes), which no other source fills.
 
 Rules that keep it safe to run on real data:
-  * only those five columns are written, and only while they are empty (a game with an IGDB id and no IGDB data gets the
+  * only those columns are written, and only while they are empty (a game with an IGDB id and no IGDB data gets the
     data); the name and every other field are never touched
   * a game is linked automatically only on a certain match: the Steam app the game has, or the same name (roman numerals
     and punctuation aside) with a release year that agrees (a year of margin). Anything else is reported as ambiguous with
@@ -91,7 +91,7 @@ def choose(game: models.Game, steam_hits: list[dict], name_hits: list[dict]) -> 
 def pending_query(db):
     """Games with no IGDB id, and games with one whose IGDB data or page address was never asked (linked by hand or before)."""
     return db.query(models.Game).filter(
-        models.Game.igdb_id.is_(None) | models.Game.themes.is_(None) | models.Game.igdb_slug.is_(None)
+        models.Game.igdb_id.is_(None) | models.Game.themes.is_(None) | models.Game.perspectives.is_(None) | models.Game.igdb_slug.is_(None)
     )
 
 
@@ -404,6 +404,6 @@ def apply_one(db, game_id: str, igdb_id: int, overwrite: bool = False) -> dict:
         return {"linked": True, "changed": changed}
     game.igdb_id = igdb_id
     game.igdb_slug = details.get("igdb_slug") or ""
-    _fill(game, {column: details[column] for column in igdb.EXTRA_COLUMNS})
+    _fill(game, {column: details.get(column) for column in igdb.EXTRA_COLUMNS})
     db.commit()
     return {"linked": True, "changed": ["igdb_id"]}
