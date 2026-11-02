@@ -2,6 +2,7 @@
 of TWITCH_CLIENT_ID / TWITCH_CLIENT_SECRET (client credentials): the token lasts about two months and is kept in memory
 only. The secret travels in the body of the token request, never in a URL, so a failed request cannot quote it in the log."""
 import datetime
+import re
 import threading
 import time
 
@@ -16,12 +17,15 @@ TOKEN_URL = "https://id.twitch.tv/oauth2/token"
 GAMES_URL = "https://api.igdb.com/v4/games"
 IMAGE_URL = "https://images.igdb.com/igdb/image/upload/t_cover_big/{image_id}.jpg"
 TOKEN_MARGIN_SECONDS = 3600  # renewed an hour before it expires
-# main games, remakes, remasters, expanded games and ports: what a player has played. A search also finds the DLCs, packs
-# and skins of a game, and ahead of the game itself for the best known ones.
-GAME_TYPES = "(0,8,9,10,11)"
+# What a player has played: main games, remakes, remasters, expanded games and ports. DLCs, expansions, standalone expansions
+# and bundles (a trilogy, a legendary edition) are played too and the catalogue has them as games, so they are offered, but
+# after the games proper. Packs, skins and updates (13, 14...) are not.
+MAIN_TYPES = (0, 8, 9, 10, 11)
+EXTRA_TYPES = (1, 2, 3, 4)
+GAME_TYPES = "(" + ",".join(str(t) for t in MAIN_TYPES + EXTRA_TYPES) + ")"
 FETCH_LIMIT = 25  # IGDB cannot sort a search: a wider net is cast and the best known of it is kept
 FIELDS = (
-    "name,slug,first_release_date,cover.image_id,genres.name,platforms.name,total_rating_count,"
+    "name,slug,first_release_date,game_type,cover.image_id,genres.name,platforms.name,total_rating_count,"
     "involved_companies.developer,involved_companies.company.name"
 )
 
@@ -79,13 +83,22 @@ def _post(body: str, retried: bool = False) -> list[dict]:
     return response.json()
 
 
+_ROMAN = {"ii": "2", "iii": "3", "iv": "4", "v": "5", "vi": "6", "vii": "7", "viii": "8", "ix": "9", "x": "10"}
+
+
+def _plain(name: str) -> str:
+    """A name to compare: lower case, without punctuation and with roman numerals as digits ("Alan Wake II" is "Alan Wake 2")."""
+    words = re.sub(r"[^\w ]", "", name.casefold()).split()
+    return "".join(_ROMAN.get(word, word) for word in words)
+
+
 def _same_name(a: str, b: str) -> bool:
-    return "".join(c for c in a.casefold() if c.isalnum()) == "".join(c for c in b.casefold() if c.isalnum())
+    return _plain(a) == _plain(b)
 
 
 def search_games(query: str, limit: int = 10) -> list[dict]:
     """The games IGDB finds for `query`, as the candidates of the game picker (`rawg_id` is None: they are not RAWG's).
-    The ones named exactly like the query come first, then the best known (most rated).
+    The ones named like the query come first, then the games proper, then the best known (most rated).
 
     It is asked while the player types, so a name that is half written has to match: IGDB's own search only knows whole
     words ("hollow kni" finds nothing), so the names that contain the text are asked for first, most rated first. Only when
@@ -95,7 +108,9 @@ def search_games(query: str, limit: int = 10) -> list[dict]:
     if not found:
         found = _post(f"search {_quote(query)}; fields {FIELDS}; where {where}; limit {FETCH_LIMIT};")
     found = [item for item in found if item.get("id") and item.get("name")]
-    found.sort(key=lambda item: (not _same_name(item["name"], query), -(item.get("total_rating_count") or 0)))
+    found.sort(key=lambda item: (
+        not _same_name(item["name"], query), item.get("game_type") not in MAIN_TYPES, -(item.get("total_rating_count") or 0),
+    ))
     return [_candidate(item) for item in found[:limit]]
 
 

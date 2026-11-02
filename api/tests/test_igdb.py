@@ -58,7 +58,7 @@ class IgdbClientTests(unittest.TestCase):
         ]) as post:
             names = [c["name"] for c in igdb.search_games("among us")]
         self.assertEqual(names, ["Among Us!", "Among Us", "The Wolf Among Us", "Among Us VR"])
-        self.assertIn(b'where name ~ *"among us"* & game_type = (0,8,9,10,11) & version_parent = null;', post.call_args.kwargs["data"])
+        self.assertIn(b'where name ~ *"among us"* & game_type = (0,8,9,10,11,1,2,3,4) & version_parent = null;', post.call_args.kwargs["data"])
         self.assertIn(b"sort total_rating_count desc", post.call_args.kwargs["data"])
 
     def test_the_details_of_a_game_are_in_the_shape_of_a_new_game(self):
@@ -93,6 +93,20 @@ class IgdbClientTests(unittest.TestCase):
         contains, fuzzy = (c.kwargs["data"] for c in post.call_args_list[1:])
         self.assertIn(b'name ~ *"zelda tears"*', contains)
         self.assertIn(b'search "zelda tears";', fuzzy)
+
+    def test_roman_numerals_count_as_digits_and_extras_come_after_the_games_proper(self):
+        def item(name, game_type, count):
+            return {"id": hash(name), "name": name, "game_type": game_type, "total_rating_count": count}
+        found = [
+            item("Alan Wake II: The Lake House", 1, 900), item("Alan Wake Remastered", 9, 400),
+            item("Alan Wake II", 0, 300), item("Alan Wake II - Deluxe Bundle", 3, 800),
+        ]
+        with mock.patch.object(igdb.requests, "post", side_effect=[
+            _response({"access_token": "t", "expires_in": 5000000}), _response(found),
+        ]) as post:
+            names = [c["name"] for c in igdb.search_games("Alan Wake 2")]
+        self.assertEqual(names, ["Alan Wake II", "Alan Wake Remastered", "Alan Wake II: The Lake House", "Alan Wake II - Deluxe Bundle"])
+        self.assertIn(b"game_type = (0,8,9,10,11,1,2,3,4)", post.call_args.kwargs["data"])
 
     def test_the_result_is_cut_to_the_limit(self):
         found = [{"id": n, "name": f"Game {n}", "total_rating_count": n} for n in range(1, 21)]
