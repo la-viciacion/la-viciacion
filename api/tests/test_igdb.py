@@ -10,6 +10,7 @@ def time_after_pause():
 
 ITEM = {
     "id": 1022, "name": "The Legend of Zelda", "slug": "the-legend-of-zelda", "first_release_date": 509328000,
+    "release_dates": [{"date": 509328000, "date_format": 0}],
     "cover": {"id": 1, "image_id": "co1uii"}, "genres": [{"name": "Adventure"}], "platforms": [{"name": "Wii"}],
     "involved_companies": [
         {"developer": True, "company": {"name": "Nintendo"}},
@@ -125,17 +126,30 @@ class IgdbClientTests(unittest.TestCase):
             )
             self.assertIsNone(igdb.series_of(9))
 
-    def test_only_an_exact_release_day_is_a_release_date(self):
+    def test_only_an_exact_official_release_day_is_a_release_date(self):
         found = [
             {"id": 1, "release_dates": [{"date": 1789430400, "date_format": 0}, {"date": 1800000000, "date_format": 0}]},
             {"id": 2, "release_dates": [{"date": 1798675200, "date_format": 2}]},  # "2026": a placeholder day
             {"id": 3, "release_dates": []},
+            {"id": 4, "release_dates": [{"date": 1600000000, "date_format": 0, "status": {"name": "Early Access"}}, {"date": 1700000000, "date_format": 0, "status": {"name": "Full Release"}}]},
+            {"id": 5, "release_dates": [{"date": 1600000000, "date_format": 0, "status": {"name": "Beta"}}]},  # no launch yet
         ]
         with mock.patch.object(igdb.requests, "post", side_effect=[_response({"access_token": "t", "expires_in": 5000000}), _response(found)]) as post:
-            dates = igdb.release_dates([1, 2, 3])
-        self.assertEqual({k: str(v) for k, v in dates.items()}, {1: "2026-09-15"})  # the earliest exact one
-        self.assertIn(b"where id = (1,2,3);", post.call_args.kwargs["data"])
+            dates = igdb.release_dates([1, 2, 3, 4, 5])
+        self.assertEqual({k: str(v) for k, v in dates.items()}, {1: "2026-09-15", 4: "2023-11-14"})  # the earliest exact one that is a launch
+        self.assertIn(b"where id = (1,2,3,4,5);", post.call_args.kwargs["data"])
         self.assertEqual(igdb.release_dates([]), {})
+
+    def test_a_game_takes_its_official_launch_not_its_early_access_for_the_release_date(self):
+        item = dict(ITEM, game_type=0, release_dates=[
+            {"date": 1612224000, "date_format": 0, "status": {"name": "Early Access"}},  # 2021-02-02
+            {"date": 1788998400, "date_format": 0, "status": {"name": "Full Release"}},  # 2026-09-10
+        ])
+        with mock.patch.object(igdb.requests, "post", side_effect=[_response({"access_token": "t", "expires_in": 5000000}), _response([item])]):
+            self.assertEqual(str(igdb.game_details(1022)["release_date"]), "2026-09-10")
+        self.assertIsNone(igdb.official_day({"release_dates": [{"date": 1612224000, "date_format": 0, "status": {"name": "Early Access"}}]}))
+        self.assertIsNone(igdb.official_day({"release_dates": [{"date": 1798675200, "date_format": 2}]}))
+        self.assertIsNone(igdb.official_day({}))
 
     def test_the_base_game_of_a_dlc_is_found_and_a_game_of_its_own_has_none(self):
         with mock.patch.object(igdb.requests, "post", side_effect=[
