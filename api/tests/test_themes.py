@@ -27,6 +27,11 @@ class ThemesTests(unittest.TestCase):
         self.assertTrue(owned("Souls-like", "Soulslike"))
         self.assertTrue(owned("Guerra", "Warfare"))
 
+    def test_the_broad_genres_are_themes_in_both_vocabularies(self):
+        owned = lambda name, word: word.casefold() in {t.casefold() for t in themes.THEMES[name]}  # noqa: E731
+        for name, words in (("Puzles", ("Puzzle",)), ("Estrategia (paraguas)", ("Strategy",)), ("Conducción", ("Racing",)), ("Deportes (paraguas)", ("Sport", "Sports"))):
+            self.assertTrue(all(owned(name, word) for word in words), name)
+
     def test_a_theme_has_tags_and_names_are_not_repeated_whatever_their_case(self):
         names = [name.casefold() for name in themes.THEMES]
         self.assertEqual(len(names), len(set(names)))
