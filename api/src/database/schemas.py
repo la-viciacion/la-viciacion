@@ -115,6 +115,8 @@ class NewGame(BaseModel):
     keywords: Optional[str | None] = None
     franchises: Optional[str | None] = None
     collections: Optional[str | None] = None
+    perspectives: Optional[str | None] = None
+    game_modes: Optional[str | None] = None
     is_dlc: bool = False
     # the base game in the catalogue; a game with one is a DLC whatever `is_dlc` says
     parent_game_id: Optional[str | None] = None

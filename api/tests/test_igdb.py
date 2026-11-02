@@ -95,6 +95,13 @@ class IgdbClientTests(unittest.TestCase):
             ("Fantasy,4X", "Roguelike,Hack and slash", "The Legend of Zelda", ""),
         )
 
+    def test_the_perspectives_and_the_modes_of_a_game_come_with_its_data(self):
+        item = dict(ITEM, game_type=0, player_perspectives=[{"name": "First person"}], game_modes=[{"name": "Single player"}, {"name": "Co-operative"}])
+        with mock.patch.object(igdb.requests, "post", side_effect=[_response({"access_token": "t", "expires_in": 5000000}), _response([item])]) as post:
+            details = igdb.game_details(1022)
+        self.assertIn(b"player_perspectives.name,game_modes.name", post.call_args.kwargs["data"])
+        self.assertEqual((details["perspectives"], details["game_modes"]), ("First person", "Single player,Co-operative"))
+
     def test_a_name_with_a_comma_never_splits_in_two(self):
         self.assertEqual(igdb.clean_name("4X (explore, expand, exploit, and exterminate)"), "4X")
         self.assertEqual(igdb.clean_name("Role-playing (RPG)"), "Role-playing (RPG)")
@@ -105,7 +112,9 @@ class IgdbClientTests(unittest.TestCase):
             _response({"access_token": "t", "expires_in": 5000000}),
             _response([{"id": 5, "themes": [{"name": "Horror"}]}]), _response([]),
         ]) as post:
-            self.assertEqual(igdb.game_extras(5), {"themes": "Horror", "keywords": "", "franchises": "", "collections": ""})
+            self.assertEqual(igdb.game_extras(5), {
+                "themes": "Horror", "keywords": "", "franchises": "", "collections": "", "perspectives": "", "game_modes": "", "igdb_slug": "",
+            })
             self.assertIsNone(igdb.game_extras(6))
         self.assertIn(b"where id = 5;", post.call_args_list[1].kwargs["data"])
 

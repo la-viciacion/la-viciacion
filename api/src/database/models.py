@@ -128,6 +128,8 @@ class Game(Base):
     keywords = Column(Text, nullable=True)
     franchises = Column(Text, nullable=True)
     collections = Column(Text, nullable=True)
+    perspectives = Column(Text, nullable=True)  # how it is seen: First person, Side view...
+    game_modes = Column(Text, nullable=True)  # how it is played: Single player, Co-operative...
     # A DLC / expansion / edition, with or without its base game: the link is optional (a game made by hand may not
     # say which, RAWG's base may not be in the catalogue). Deleting the base game leaves the DLC marked, unlinked
     is_dlc = Column(Boolean, nullable=False, server_default=text("0"), default=False)

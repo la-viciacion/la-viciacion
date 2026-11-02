@@ -31,8 +31,13 @@ FIELDS = (
 )
 
 # What IGDB says of a game besides its genres, kept in games.themes / keywords / franchises / collections
-EXTRA_FIELDS = "themes.name,keywords.name,franchises.name,collections.name"
-EXTRA_COLUMNS = ("themes", "keywords", "franchises", "collections")
+EXTRA_FIELDS = "themes.name,keywords.name,franchises.name,collections.name,player_perspectives.name,game_modes.name"
+# column of the game -> the field of IGDB it is made from
+EXTRA_SOURCES = {
+    "themes": "themes", "keywords": "keywords", "franchises": "franchises", "collections": "collections",
+    "perspectives": "player_perspectives", "game_modes": "game_modes",
+}
+EXTRA_COLUMNS = tuple(EXTRA_SOURCES)
 
 _token_lock = threading.Lock()
 _token: tuple[str, float] | None = None  # (token, when it expires)
@@ -162,9 +167,9 @@ def _names(items) -> str:
 
 
 def extras_of(item: dict) -> dict[str, str]:
-    """The themes, keywords, franchises and collections of an IGDB entry, each as the text for its column (empty when
-    IGDB has none: the game is not asked about them again)."""
-    return {column: _names(item.get(column)) for column in EXTRA_COLUMNS}
+    """The themes, keywords, franchises, collections, perspectives and game modes of an IGDB entry, each as the text for its
+    column (empty when IGDB has none: the game is not asked about them again)."""
+    return {column: _names(item.get(field)) for column, field in EXTRA_SOURCES.items()}
 
 
 SCREENSHOT_THUMB = "https://images.igdb.com/igdb/image/upload/t_screenshot_med/{image_id}.jpg"

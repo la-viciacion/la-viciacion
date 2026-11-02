@@ -164,7 +164,7 @@ class IgdbSyncRunTests(ApiTestCase):
 
     def test_with_overwrite_a_game_linked_but_incomplete_is_replaced_too_and_a_complete_one_is_not_touched(self):
         self.game("old", "Old", igdb_id=50, dev="RAWG Studio", genres="Platformer")
-        self.game("done", "Done", igdb_id=51, igdb_slug="done", themes="", keywords="", franchises="", collections="", dev="Keep")
+        self.game("done", "Done", igdb_id=51, igdb_slug="done", themes="", keywords="", franchises="", collections="", perspectives="", game_modes="", dev="Keep")
         self.details[50] = self.igdb_details(50, "Old")
         status = self.run_sync(overwrite=True)
         self.assertEqual((status["filled"], status["total"]), (1, 1))
@@ -175,7 +175,7 @@ class IgdbSyncRunTests(ApiTestCase):
         self.game("celeste", "Celeste", release_date=datetime.date(2018, 1, 25), dev="Keep")
         self.game("fear", "Fear", release_date=datetime.date(2017, 1, 1))
         self.game("dup", "Celeste Classic", release_date=datetime.date(2018, 1, 1))
-        self.game("owner", "Owner", igdb_id=22, igdb_slug="owner", themes="")
+        self.game("owner", "Owner", igdb_id=22, igdb_slug="owner", themes="", perspectives="")
         self.by_name.update({"Celeste": [item(20, "Celeste", 2018)], "Fear": [item(30, "Layers of Fear", 2016)], "Celeste Classic": [item(22, "Celeste Classic", 2018)]})
         with database.SessionLocal() as db:
             games = {g.id: g for g in db.query(models.Game)}
@@ -199,7 +199,7 @@ class IgdbSyncRunTests(ApiTestCase):
 
     def test_a_game_already_linked_but_without_igdb_data_is_filled_and_one_with_it_is_left_alone(self):
         self.game("hades", "Hades", igdb_id=10, igdb_slug="hades")
-        self.game("done", "Done", igdb_id=11, igdb_slug="done", themes="Horror", keywords="", franchises="", collections="")
+        self.game("done", "Done", igdb_id=11, igdb_slug="done", themes="Horror", keywords="", franchises="", collections="", perspectives="", game_modes="")
         self.extras[10] = {"themes": "Fantasy", "keywords": "Roguelike", "franchises": "", "collections": "Hades", "igdb_slug": "hades-slug"}
         status = self.run_sync()
         self.assertEqual((status["filled"], status["linked"], status["processed"], self.asked), (1, 0, 1, []))
@@ -213,7 +213,7 @@ class IgdbSyncRunTests(ApiTestCase):
     def test_a_batch_takes_the_first_games_alphabetically_and_a_game_already_linked_is_not_asked(self):
         for game_id, name in (("a", "Alpha"), ("b", "Beta"), ("c", "Gamma"), ("d", "Delta")):
             self.game(game_id, name)
-        self.game("done", "Aaa Done", igdb_id=1, igdb_slug="done", themes="")
+        self.game("done", "Aaa Done", igdb_id=1, igdb_slug="done", themes="", perspectives="")
         self.by_name.update({"Alpha": [item(11, "Alpha")], "Beta": [item(12, "Beta")]})
         status = self.run_sync(max_games=2)
         self.assertEqual((status["total"], status["linked"], self.asked), (2, 2, ["Alpha", "Beta"]))
@@ -246,7 +246,7 @@ class IgdbSyncRunTests(ApiTestCase):
     def test_the_estimate_counts_the_games_without_an_id_or_without_igdb_data(self):
         self.game("a", "A")
         self.game("b", "B", igdb_id=2)  # linked, its data never asked
-        self.game("c", "C", igdb_id=3, igdb_slug="c", themes="")
+        self.game("c", "C", igdb_id=3, igdb_slug="c", themes="", perspectives="")
         with database.SessionLocal() as db:
             self.assertEqual(
                 (igdb_sync.estimate(db)["pending_games"], igdb_sync.estimate(db, 1)["games"], igdb_sync.estimate(db)["total_games"]),

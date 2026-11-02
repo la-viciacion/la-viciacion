@@ -8,7 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..database import models
-from ..utils import challenges, game_tags
+from ..utils import challenges
 from ..utils.challenges import AUTO, DECLINE_HOURS, DUEL, GROUP, OPT_IN, PARTICIPATIONS, TEMPLATES, USER, ChallengeConflict, ChallengeError, rank_players
 
 
@@ -147,7 +147,7 @@ def theme_games(db: Session, challenge: models.Challenge, viewer_id: int) -> lis
     """The games of a themed challenge that are in the group's libraries (any game that has a tag of its theme counts for
     the challenge, but only a game somebody has can be played): each with how many active players have it and whether the
     viewer does, theirs first and then the most owned. Derived; nothing is stored."""
-    wanted = {tag.casefold() for tag in challenges.themed_tags(json.loads(challenge.params))}
+    rule = challenges.theme_rule(challenges.themed_tags(json.loads(challenge.params)))
     owners = dict(
         db.query(models.UserGame.game_id, func.count(func.distinct(models.UserGame.user_id)))
         .join(models.User, models.User.id == models.UserGame.user_id)
@@ -159,7 +159,7 @@ def theme_games(db: Session, challenge: models.Challenge, viewer_id: int) -> lis
     games = [
         {"id": game_id, "name": name, "image_url": image_url, "owners": owners[game_id], "mine": game_id in mine}
         for game_id, name, image_url, *words in db.query(models.Game.id, models.Game.name, models.Game.image_url, *challenges.GAME_WORDS).filter(models.Game.id.in_(list(owners)))
-        if wanted & {tag.casefold() for tag in challenges.split_genres(game_tags.words(*words))}
+        if rule(challenges.words_of(*words))
     ]
     return sorted(games, key=lambda game: (not game["mine"], -game["owners"], game["name"].casefold()))
 

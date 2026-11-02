@@ -2,24 +2,29 @@
 decides which tags the games keep, or a theme would count nothing."""
 import unittest
 
-from src.utils import game_tags, themes
+from src.utils import challenges, game_tags, themes
+
+
+def flat(tags):
+    """The names of a theme's tags, the ones inside a group (a tuple: all of it is needed) included."""
+    return [name for tag in tags for name in ([tag] if isinstance(tag, str) else tag)]
 
 
 class ThemesTests(unittest.TestCase):
     def test_every_tag_of_a_theme_is_one_the_games_keep(self):
         dropped = {
             (name, tag): game_tags.drop_reason(tag)
-            for name, tags in themes.THEMES.items() for tag in tags if tag not in themes.IGDB_ONLY and not game_tags.keeps(tag)
+            for name, tags in themes.THEMES.items() for tag in flat(tags) if tag not in themes.IGDB_ONLY and not game_tags.keeps(tag)
         }
         self.assertEqual(dropped, {})
 
     def test_the_names_only_igdb_uses_are_in_a_theme_and_would_really_be_dropped_for_rawg(self):
-        in_themes = {tag for tags in themes.THEMES.values() for tag in tags}
+        in_themes = {tag for tags in themes.THEMES.values() for tag in flat(tags)}
         self.assertEqual(themes.IGDB_ONLY - in_themes, set())
         self.assertTrue(all(not game_tags.keeps(tag) for tag in themes.IGDB_ONLY))
 
     def test_igdbs_names_count_for_the_themes_like_rawgs(self):
-        owned = lambda name, *words: {w.casefold() for w in words} & {t.casefold() for t in themes.THEMES[name]}  # noqa: E731
+        owned = lambda name, *words: {w.casefold() for w in words} & {t.casefold() for t in flat(themes.THEMES[name])}  # noqa: E731
         self.assertTrue(owned("Rol", "Role-playing (RPG)"))
         self.assertTrue(owned("Ciencia ficción", "Science fiction"))
         self.assertTrue(owned("Terror", "Psychological horror"))
@@ -27,8 +32,23 @@ class ThemesTests(unittest.TestCase):
         self.assertTrue(owned("Souls-like", "Soulslike"))
         self.assertTrue(owned("Guerra", "Warfare"))
 
+    def test_a_theme_can_ask_for_a_group_of_tags_all_of_which_a_game_needs(self):
+        rule = challenges.theme_rule(themes.THEMES["Shooter en primera persona (FPS)"])
+        self.assertTrue(rule({"fps"}))  # RAWG's tag says it all
+        self.assertTrue(rule({"shooter", "first person", "indie"}))  # IGDB: a shooter, seen in first person
+        self.assertFalse(rule({"shooter"}))
+        self.assertFalse(rule({"first person", "rpg"}))
+        self.assertFalse(rule(set()))
+
+    def test_a_group_survives_being_stored_in_the_definition_of_a_challenge(self):
+        import json
+        stored = json.loads(json.dumps({"tags": list(themes.THEMES["Shooter en primera persona (FPS)"])}))["tags"]  # a tuple comes back as a list
+        rule = challenges.theme_rule(stored)
+        self.assertTrue(rule({"shooter", "first person"}))
+        self.assertFalse(rule({"shooter"}))
+
     def test_the_broad_genres_are_themes_in_both_vocabularies(self):
-        owned = lambda name, word: word.casefold() in {t.casefold() for t in themes.THEMES[name]}  # noqa: E731
+        owned = lambda name, word: word.casefold() in {t.casefold() for t in flat(themes.THEMES[name])}  # noqa: E731
         for name, words in (("Puzles", ("Puzzle",)), ("Estrategia (paraguas)", ("Strategy",)), ("Conducción", ("Racing",)), ("Deportes (paraguas)", ("Sport", "Sports"))):
             self.assertTrue(all(owned(name, word) for word in words), name)
 
