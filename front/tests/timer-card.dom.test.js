@@ -45,6 +45,25 @@ test('a running timer stays on screen when a later check fails', async () => {
   assert.ok(document.getElementById('stopTimerBtn'));
 });
 
+test('the start of a running timer is shown and can be moved back without stopping it', async () => {
+  let sent = null;
+  installApi({
+    'GET /timers/active/7': RUNNING,
+    'PATCH /timers/5/start': (req) => { sent = req; return json({ id: 5 }); },
+  });
+  await loadTimerCard();
+  assert.match(document.getElementById('editStartBtn').textContent, /10:00/);
+  document.getElementById('editStartBtn').click();
+  const form = document.querySelector('.sess-form');
+  const earlier = new Date(Date.now() - 3600 * 1000);
+  const pad = (n) => String(n).padStart(2, '0');
+  form.querySelector('[name="start"]').value = `${earlier.getFullYear()}-${pad(earlier.getMonth() + 1)}-${pad(earlier.getDate())}T${pad(earlier.getHours())}:${pad(earlier.getMinutes())}`;
+  form.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+  await settle();
+  assert.ok(sent);
+  assert.equal(changes, 1);
+});
+
 test('stopping a timer that another device already stopped refreshes the card', async () => {
   installApi({ 'GET /timers/active/7': RUNNING, 'POST /timers/stop/5': () => json({ detail: 'Active timer not found' }, 404) });
   await loadTimerCard();

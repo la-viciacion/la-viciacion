@@ -137,6 +137,24 @@ def stop_timer(db: Session, timer_id: int, user_id: int) -> GameTimer:
     return timer
 
 
+def change_running_start(db: Session, current_user: User, timer_id: int, user_id: int, start: datetime.datetime) -> GameTimer:
+    """Move the start of a running timer back (it was started late) without stopping it. The same rules as a
+    finished session apply to the span from the new start to now; the season cannot change, so the library
+    entry the start opened stays the right one."""
+    lock_sessions(db, user_id)
+    timer = _running(db, timer_id, user_id)
+    if seasons.of(start) != seasons.of(timer.start_time):
+        raise Refused(400, "El inicio debe ser de la misma temporada que el timer")
+    now = datetime.datetime.now()
+    if start >= now:
+        raise Refused(400, "El inicio debe ser anterior a ahora")
+    validate_session(db, current_user, user_id, start, now, exclude_id=timer.id)
+    timer.start_time = start
+    _commit_session(db)
+    db.refresh(timer)
+    return timer
+
+
 def cancel_timer(db: Session, timer_id: int, user_id: int) -> GameTimer:
     """Discard a running timer as if it had never started (nothing is recorded)."""
     lock_sessions(db, user_id)

@@ -13,6 +13,7 @@ from ..database.schemas import (
     GameTimerResponse,
     GamePlatformsResponse,
     ManualSessionCreate,
+    RunningStartUpdate,
     SessionUpdate,
 )
 from ..utils import actions
@@ -92,6 +93,21 @@ def update_session_endpoint(
         recalculate=changed, since=min(old_start, timer.start_time).date(),
     )
     return timer
+
+
+@router.patch("/{timer_id}/start", response_model=GameTimerResponse)
+def change_running_start_endpoint(
+    timer_id: int,
+    body: RunningStartUpdate,
+    current_user: User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Move the start of a running timer back, for a game that was started late. What the start unlocked
+    (the notice, the achievements of the time of day) is not redone; what the session earns is worked out
+    when it stops."""
+    timer = timers.get_session(db, timer_id)
+    auth.ensure_self_or_admin(current_user, user_id=timer.user_id)
+    return timers.change_running_start(db, current_user, timer_id, timer.user_id, body.start_time)
 
 
 @router.delete("/{timer_id}")

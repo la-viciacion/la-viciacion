@@ -337,3 +337,17 @@
 .comp-entry { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 10px 12px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm); }
 
 .sessions-head { margin-top: 32px; }
+
+.timer-start-edit {
+  background: none;
+  border: none;
+  padding: 4px 0 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.timer-start-edit:hover { color: var(--accent-teal); }
