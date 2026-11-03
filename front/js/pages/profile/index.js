@@ -166,7 +166,7 @@ async function refreshSummary(season = shown) {
   mount(main.querySelector('#pfStats'), statsView(data));
   mount(main.querySelector('#pfTopTitle'), titleView(`Más jugados ${seasonSuffix(data)}`));
   mount(main.querySelector('#pfTop'), topView(data));
-  mount(main.querySelector('#pfAchTitle'), titleView(`Logros ${seasonSuffix(data)}`));
+  mount(main.querySelector('#pfAchTitle'), titleView(`Últimos logros ${seasonSuffix(data)}`));
   mount(main.querySelector('#pfAchievements'), achievementsView(data));
   mount(main.querySelector('#pfGamesTitle'), titleView(`Juegos ${seasonSuffix(data)}`));
   if (changed && summaryGames) await summaryGames.showSeason(data.season);
@@ -242,7 +242,7 @@ function draw(d) {
           <div class="pf-card" id="pfTop">${topView(d)}</div>
         </div>
         <div>
-          ${sectionTitle(`Logros ${seasonSuffix(d)}`, 'pfAchTitle')}
+          ${sectionTitle(`Últimos logros ${seasonSuffix(d)}`, 'pfAchTitle')}
           <div class="pf-card" id="pfAchievements">${achievementsView(d)}</div>
         </div>
       </div>
