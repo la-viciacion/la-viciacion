@@ -8,7 +8,7 @@ globalThis.location = window.location; // the page reads the address
 const page = await import('../js/pages/game/index.js');
 
 const OVERVIEW = {
-  game: { id: 'celeste', name: 'Celeste <b>', image_url: null, genres: ['Platformer'], tags: ['Singleplayer', 'platformer', 'Pixel <i>'], dev: 'Maddy', slug: 'celeste', links: [{ name: 'RAWG', url: 'https://rawg.io/games/celeste' }], release_date: '2018-01-25', avg_time: 30000 },
+  game: { id: 'celeste', name: 'Celeste <b>', image_url: null, genres: ['Platformer'], tags: ['Singleplayer', 'platformer', 'Pixel <i>'], dev: 'Maddy', slug: 'celeste', links: [{ name: 'IGDB', url: 'https://www.igdb.com/games/celeste' }], release_date: '2018-01-25', avg_time: 30000 },
   summary: { players: 2, played_seconds: 10800, completed_by: 1, score_count: 2, score_mean: 80 },
   players: [
     { user_id: 2, username: 'bea', name: 'Bea', played_seconds: 7200, sessions: 2, last_played: '2026-03-01T20:00:00', seasons: [2026], completed: true, completions: 1, score: 70, playing: true, is_active: true, is_me: false },
@@ -37,13 +37,18 @@ test('it asks for the game of the address and shows its name as text', () => {
   assert.equal(document.querySelectorAll('h1 b').length, 0);
 });
 
-test('the game links to its RAWG page with a button, in a new tab, when it has a slug', async () => {
-  const link = () => main().querySelector('.gm-head a.gm-source-btn');
-  assert.equal(link().getAttribute('href'), 'https://rawg.io/games/celeste');
-  assert.equal(link().getAttribute('target'), '_blank');
-  assert.equal(link().getAttribute('rel'), 'noopener noreferrer');
-  assert.match(link().textContent, /Ver en RAWG/);
-  assert.ok(link().classList.contains('pf-btn')); // it looks like a button, not like a link in the text
+test('the game links to its IGDB page with a button, in a new tab, and never to RAWG', async () => {
+  installApi({ 'GET /games/celeste/overview': { ...OVERVIEW, game: { ...OVERVIEW.game, links: [{ name: 'IGDB', url: 'https://www.igdb.com/games/celeste' }, { name: 'RAWG', url: 'https://rawg.io/games/celeste' }] } }, 'GET /users/photo/': json({ detail: 'no' }, 404) });
+  await page.render({ main: main(), user: { id: 1, username: 'ana' } });
+  await settle();
+  const links = [...main().querySelectorAll('.gm-head a.gm-source-btn')];
+  assert.equal(links.length, 1);
+  const link = links[0];
+  assert.equal(link.getAttribute('href'), 'https://www.igdb.com/games/celeste');
+  assert.equal(link.getAttribute('target'), '_blank');
+  assert.equal(link.getAttribute('rel'), 'noopener noreferrer');
+  assert.match(link.textContent, /Ver en IGDB/);
+  assert.ok(link.classList.contains('pf-btn')); // it looks like a button, not like a link in the text
 });
 
 test('a game only IGDB knows links to its page in IGDB', async () => {
@@ -55,7 +60,7 @@ test('a game only IGDB knows links to its page in IGDB', async () => {
   assert.match(link.textContent, /Ver en IGDB/);
 });
 
-test('a game with both ids shows a button for RAWG and, once IGDB answers, another for IGDB', async () => {
+test('a game whose IGDB link is not stored gets its button once IGDB answers, and none for RAWG', async () => {
   installApi({
     'GET /games/celeste/extras': { available: true, igdb_url: 'https://www.igdb.com/games/celeste', description: null, trailer: null, screenshots: [], metacritic: null, esrb: null },
     'GET /games/celeste/overview': OVERVIEW,
@@ -65,7 +70,6 @@ test('a game with both ids shows a button for RAWG and, once IGDB answers, anoth
   await settle();
   const buttons = [...main().querySelectorAll('.gm-head a.gm-source-btn')];
   assert.deepEqual(buttons.map((a) => [a.textContent.trim(), a.getAttribute('href')]), [
-    ['Ver en RAWG ↗', 'https://rawg.io/games/celeste'],
     ['Ver en IGDB ↗', 'https://www.igdb.com/games/celeste'],
   ]);
 });
@@ -82,7 +86,7 @@ test('IGDB\'s button is not added twice, nor for an address that is not IGDB\'s'
     return main().querySelectorAll('.gm-head a.gm-source-btn').length;
   };
   assert.equal(await open([{ name: 'IGDB', url: 'https://www.igdb.com/games/celeste' }], 'https://www.igdb.com/games/celeste'), 1);
-  assert.equal(await open([{ name: 'RAWG', url: 'https://rawg.io/games/celeste' }], 'https://evil.example/games/celeste'), 1);
+  assert.equal(await open([{ name: 'RAWG', url: 'https://rawg.io/games/celeste' }], 'https://evil.example/games/celeste'), 0); // RAWG's link is never a button
 });
 
 test('without a slug there is no RAWG button', async () => {
@@ -93,7 +97,8 @@ test('without a slug there is no RAWG button', async () => {
 });
 
 test('the figures of the group and the players, the most played first, with who plays now', () => {
-  assert.deepEqual(text('.pf-stat-label'), ['Jugadores', 'Horas del grupo', 'Completados', 'Nota media (2)']);
+  assert.equal(document.querySelector('.gm-group-title .section-title').textContent, 'En el grupo');
+  assert.deepEqual(text('.pf-stat-label'), ['Jugadores', 'Horas del grupo', 'Completados', 'Nota del grupo (2)']);
   assert.deepEqual(text('.gm-player-name').map((t) => t.split('\n')[0].trim().replace(/\s+/g, ' ')).map((t) => t.split(' ')[0]), ['Bea', 'Ana']);
   assert.ok(document.querySelector('.gm-player .pl-avatar.live'));
   assert.equal(document.querySelectorAll('.gm-player .pl-avatar.live').length, 1);
@@ -269,7 +274,7 @@ test('the cost per hour of the group is a figure of the game when the API gives 
   installApi({ 'GET /games/celeste/overview': { ...OVERVIEW, cost_per_hour: null }, 'GET /users/photo/': json({ detail: 'no' }, 404) });
   await page.render({ main: main(), user: { id: 1, username: 'ana' } });
   await settle();
-  assert.deepEqual(text('.pf-stat-label'), ['Jugadores', 'Horas del grupo', 'Completados', 'Nota media (2)']);
+  assert.deepEqual(text('.pf-stat-label'), ['Jugadores', 'Horas del grupo', 'Completados', 'Nota del grupo (2)']);
 });
 
 const EXTRAS = {
@@ -296,7 +301,7 @@ test('the outside facts go under the title and the Multimedia card starts open a
   assert.match(facts, /Everyone 10\+/);
   assert.equal(document.querySelector('#gmOutside .gm-badge.good').textContent, '92'); // 75 and up is green
   assert.equal(document.querySelector('#gmOutside .gm-badge.age').textContent, 'E10+');
-  // the facts and the RAWG button share one row
+  // the facts and the IGDB button share one row
   assert.equal(document.querySelector('#gmOutside').parentElement.querySelector('.gm-source-btn') !== null, true);
   const block = document.querySelector('#gmMediaBlock');
   assert.equal(block.classList.contains('folded'), false);
@@ -323,11 +328,13 @@ const IGDB_EXTRAS = {
   trailer: { url: null, youtube: 'abcdefghijk', poster: 'https://images.igdb.com/igdb/image/upload/t_1080p/a.jpg' },
   screenshots: [{ thumb: 'https://images.igdb.com/igdb/image/upload/t_screenshot_med/a.jpg', full: 'https://images.igdb.com/igdb/image/upload/t_1080p/a.jpg' }],
   critic_source: 'igdb',
+  user_rating: 81,
 };
 
 test('IGDB gives a YouTube trailer, played in an embedded player only when asked, and the critics score with its source', async () => {
   await openWithExtras(IGDB_EXTRAS);
   assert.match(document.querySelector('#gmOutside').textContent, /92Crítica/);
+  assert.match(document.querySelector('#gmOutside').textContent, /81Usuarios/);
   assert.equal(document.querySelector('#gmMedia .gm-credit'), null);
   assert.equal(document.querySelector('#gmMedia iframe'), null);
   document.querySelector('#gmMedia [data-trailer]').click();
