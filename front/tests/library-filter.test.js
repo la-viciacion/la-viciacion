@@ -110,15 +110,17 @@ test('"¿Qué juego sigo?" sorts the open games into almost finished, forgotten 
     game(4, { played_time: 2 * H, last_played: daysAgo(90) }), // forgotten
     game(5, { played_time: 4 * H, last_played: daysAgo(70) }), // forgotten, more time put in
     game(6, { avg_time: 3 * H }), // never played, short
-    game(7, { avg_time: 4 * H, played_time: 2 * H, last_played: daysAgo(5) }), // 2 h left: short, before the one never played
+    game(7, { avg_time: 4 * H, played_time: 2 * H, last_played: daysAgo(5) }), // average under 5 h: short, after the shorter one
     game(8, { played_time: 20 * H, last_played: daysAgo(3) }), // 200 %: the average says nothing about it
     game(9, { avg_time: 0, played_time: 1 * H, last_played: daysAgo(2) }), // no average time: nowhere
+    game(11, { avg_time: 5 * H, played_time: 1 * H, last_played: daysAgo(3) }), // exactly 5 h is not short
+    game(12, { avg_time: 3 * H, played_time: 2.5 * H, last_played: daysAgo(90) }), // short wins over almost and forgotten
     game(10, { played_time: 3 * H, last_played: daysAgo(10) }), // 7 h left, played recently: nowhere
   ];
   const { almost, forgotten, short } = nextUp(list, NOW);
   assert.deepEqual(almost.map((g) => g.game_id), ['g2', 'g1', 'g3']);
   assert.deepEqual(forgotten.map((g) => g.game_id), ['g5', 'g4']);
-  assert.deepEqual(short.map((g) => [g.game_id, g.left]), [['g7', 2 * H], ['g6', 3 * H]]);
+  assert.deepEqual(short.map((g) => g.game_id), ['g6', 'g12', 'g7']);
 });
 
 test('with nothing to suggest every list is empty', () => {

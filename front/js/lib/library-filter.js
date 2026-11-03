@@ -8,7 +8,7 @@ export const PAUSED_DAYS = 30; // a pending game not played for this long is pau
 export const FORGOTTEN_DAYS = 60; // ... and forgotten for this long
 export const ALMOST_SHARE = 0.7; // from this share of the average time a game is almost finished...
 export const ALMOST_CAP = 1.5; // ... until this one (well past the average, the average says nothing about it)
-export const SHORT_SECONDS = 4 * 3600; // a game with this much left or less is short
+export const SHORT_SECONDS = 5 * 3600; // a game that lasts less than this on average is short
 
 /** Where an entry stands: "completed", "abandoned", "unfinished" (pending in a closed season), "backlog" (never
  * played), "paused" (not played for PAUSED_DAYS) or "playing". */
@@ -50,24 +50,24 @@ export function openGames(entries, now = new Date(), season = now.getFullYear())
 }
 
 /** "¿Qué juego sigo?": { almost, forgotten, short }, each game in the first list that fits it.
+ * short: with an average time under 5 hours, whatever else it is, the shortest first (a game never played counts);
  * almost: from 70 % of the average time (until 150 %), the nearest to the end first;
- * forgotten: played and not touched for 60 days, the one with most time put in first;
- * short: with 4 hours left or less by the average, the shortest first (a game never played counts). */
+ * forgotten: played and not touched for 60 days, the one with most time put in first. */
 export function nextUp(entries, now = new Date(), season = now.getFullYear()) {
   const result = { almost: [], forgotten: [], short: [] };
   for (const game of openGames(entries, now, season)) {
     const left = game.avg_time ? game.avg_time - game.played_time : null;
-    if (game.avg_time && game.played_time >= ALMOST_SHARE * game.avg_time && game.played_time <= ALMOST_CAP * game.avg_time) {
+    if (game.avg_time && game.avg_time < SHORT_SECONDS) {
+      result.short.push({ ...game, left });
+    } else if (game.avg_time && game.played_time >= ALMOST_SHARE * game.avg_time && game.played_time <= ALMOST_CAP * game.avg_time) {
       result.almost.push({ ...game, left });
     } else if (game.played_time > 0 && game.last_played && now - new Date(game.last_played) > FORGOTTEN_DAYS * DAY) {
       result.forgotten.push({ ...game, left });
-    } else if (left !== null && left > 0 && left <= SHORT_SECONDS) {
-      result.short.push({ ...game, left });
     }
   }
   result.almost.sort((a, b) => Math.abs(a.left) - Math.abs(b.left));
   result.forgotten.sort((a, b) => b.played_time - a.played_time);
-  result.short.sort((a, b) => a.left - b.left);
+  result.short.sort((a, b) => a.avg_time - b.avg_time);
   return result;
 }
 
