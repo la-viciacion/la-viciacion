@@ -71,26 +71,29 @@ function draw(data) {
               <span class="pf-tag dlc">DLC</span>
               ${game.parent ? html`<span class="pf-sub">Contenido adicional de <a href="#/game/${encodeURIComponent(game.parent.id)}">${game.parent.name}</a></span>` : ''}
             </div>` : ''}
-          <div class="gm-genres">${game.genres.map((genre) => html`<span class="pf-tag muted">${genre}</span>`)}</div>
-          ${tags.length ? html`<div class="gm-genres gm-tags" aria-label="Etiquetas">${tagPills(tags.slice(0, TAGS_SHOWN))}${tags.length > TAGS_SHOWN
-            ? html`<button type="button" class="pf-tag muted gm-more" id="gmMoreTags" title="Ver todas las etiquetas">+${tags.length - TAGS_SHOWN}</button>` : ''}</div>` : ''}
+          <div class="gm-pills">
+            <div class="gm-genres">${game.genres.map((genre) => html`<span class="pf-tag muted">${genre}</span>`)}</div>
+            ${tags.length ? html`<div class="gm-genres gm-tags" aria-label="Etiquetas">${tagPills(tags.slice(0, TAGS_SHOWN))}${tags.length > TAGS_SHOWN
+              ? html`<button type="button" class="pf-tag muted gm-more" id="gmMoreTags" title="Ver todas las etiquetas">+${tags.length - TAGS_SHOWN}</button>` : ''}</div>` : ''}
+          </div>
           ${details ? html`<div class="pf-sub gm-details">${details}</div>` : ''}
           <div id="gmMeta"></div>
           <div id="gmPlatforms"></div>
           <div class="gm-actions" id="gmActions">
             <span id="gmOutside" class="gm-outside"></span>
-            ${(game.links || []).map((link) => html`<a class="pf-btn gm-source-btn" href="${link.url}" target="_blank" rel="noopener noreferrer">Ver en ${link.name} <span aria-hidden="true">↗</span></a>`)}
+            ${(game.links || []).filter((link) => link.name === 'IGDB').map((link) => html`<a class="pf-btn gm-source-btn" href="${link.url}" target="_blank" rel="noopener noreferrer">Ver en ${link.name} <span aria-hidden="true">↗</span></a>`)}
           </div>
         </div>
       </div>
       <div id="gmMedia"></div>
     </div>
 
+    <div class="section-header gm-group-title"><h2 class="section-title">En el grupo</h2><div class="section-line"></div></div>
     <section class="pf-stats" aria-label="El grupo y este juego">
       ${tile('Jugadores', summary.players)}
       ${tile('Horas del grupo', formatDuration(summary.played_seconds))}
       ${tile('Completados', summary.completed_by)}
-      ${tile(summary.score_count ? `Nota media (${summary.score_count})` : 'Nota media', summary.score_count ? scoreBadge(Math.round(summary.score_mean)) : '—')}
+      ${tile(summary.score_count ? `Nota del grupo (${summary.score_count})` : 'Nota del grupo', summary.score_count ? scoreBadge(Math.round(summary.score_mean)) : '—')}
       ${data.cost_per_hour ? tile(`Coste por hora (${data.cost_per_hour.contributors})`, perHour(data.cost_per_hour.per_hour_cents)) : ''}
     </section>
 
