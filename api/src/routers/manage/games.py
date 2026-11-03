@@ -72,7 +72,7 @@ def list_games(
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
-    """Games with their usage (sessions, time played and players). `data=unlinked`: neither a RAWG nor an IGDB id;
+    """Games with their usage (sessions, time played and players). `data=unlinked`: no IGDB id;
     `data=pending`: what the RAWG sync would try (no id, or basic info missing)."""
     session_counts = (
         db.query(
@@ -101,7 +101,7 @@ def list_games(
     if search:
         q = q.filter(models.Game.name.like(like(search)))
     if data == "unlinked":
-        q = q.filter(models.Game.rawg_id.is_(None), models.Game.igdb_id.is_(None))
+        q = q.filter(models.Game.igdb_id.is_(None))
     elif data == "pending":
         q = q.filter(rawg_sync.pending_condition())
     total = q.count()

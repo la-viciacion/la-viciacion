@@ -107,11 +107,11 @@ export const ENTITIES = {
 
   games: {
     label: 'Juegos',
-    description: 'Catálogo de juegos compartido por todos. Los metadatos y portadas vienen de IGDB y de RAWG.',
+    description: 'Catálogo de juegos compartido por todos. Los metadatos y portadas vienen de IGDB.',
     endpoint: '/manage/games',
     search: true,
     selects: [
-      { key: 'data', label: 'Datos', options: [['', 'Datos: todos'], ['pending', 'Incompletos'], ['unlinked', 'Sin ID de IGDB ni de RAWG']] },
+      { key: 'data', label: 'Datos', options: [['', 'Datos: todos'], ['pending', 'Incompletos'], ['unlinked', 'Sin ID de IGDB']] },
     ],
     defaultSort: { key: 'name', dir: 'asc' },
     orders: [['name:asc', 'Orden: alfabético'], ['release_date:desc', 'Más nuevos'], ['played:desc', 'Más jugados']],
@@ -138,7 +138,6 @@ export const ENTITIES = {
       { key: 'avg_time', label: 'Tiempo medio (s)', type: 'number' },
       { key: 'image_url', label: 'Imagen (URL)', type: 'text' },
       { key: 'steam_id', label: 'Steam ID', type: 'text' },
-      { key: 'rawg_id', label: 'RAWG ID', type: 'number' },
       { key: 'igdb_id', label: 'IGDB ID', type: 'number' },
       { key: 'igdb_slug', label: 'Dirección en IGDB (slug)', type: 'text' },
       { key: 'themes', label: 'Temas de IGDB (coma)', type: 'text' },
@@ -151,9 +150,9 @@ export const ENTITIES = {
     name: (r) => r.name,
     actions: [
       { label: 'Sesiones', run: (r, admin) => admin.jumpTo('timers', { game_id: r.id, game_name: r.name }) },
-      { label: 'Resincronizar (IGDB, RAWG y HLTB)…', run: async (r, admin) => (await import('./resync.js')).resyncGame(r, admin) },
+      { label: 'Resincronizar (IGDB y HLTB)…', run: async (r, admin) => (await import('./resync.js')).resyncGame(r, admin) },
     ],
-    toolbarActions: [{ act: 'rawg-sync', label: 'Sincronizar con RAWG…' }, { act: 'hltb-sync', label: 'Sincronizar tiempos (HLTB)…' }, { act: 'igdb-sync', label: 'Enlazar con IGDB…' }],
+    toolbarActions: [{ act: 'hltb-sync', label: 'Sincronizar tiempos (HLTB)…' }, { act: 'igdb-sync', label: 'Enlazar con IGDB…' }],
     canDelete: true,
     deleteNote: 'Se borrarán también sus sesiones, entradas de biblioteca y logros.',
   },

@@ -25,7 +25,7 @@ Los textos pueden estar escritos por una IA para que sean más graciosos, si el 
 - Los logros secretos que consigues, completos.
 - **Sale un juego deseado**: el día que sale un juego de tu lista de deseados, con quién más lo espera (un solo mensaje con todos los de ese día).
 
-Cuando un aviso nombra un juego, el nombre es un **enlace**: en Telegram te lleva a su página de IGDB (o de RAWG, si el juego aún no la tiene) o a su página en la app, según el aviso. En las notificaciones del móvil el nombre sale como texto normal; los enlaces los encuentras en Avisos.
+Cuando un aviso nombra un juego, el nombre es un **enlace**: en Telegram te lleva a su página de IGDB o a su página en la app, según el aviso. En las notificaciones del móvil el nombre sale como texto normal; los enlaces los encuentras en Avisos.
 
 ## Avisos dentro de la app
 

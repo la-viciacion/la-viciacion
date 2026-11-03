@@ -5,7 +5,7 @@ import { installApi, installDom, installStorage, json, settle } from './dom.js';
 
 installStorage();
 installDom('<main id="main"></main>');
-const { resyncGame, rawgLine, igdbLine, hltbLine } = await import('../js/pages/admin/resync.js');
+const { resyncGame, igdbLine, hltbLine } = await import('../js/pages/admin/resync.js');
 
 afterEach(() => closeAllModals());
 
@@ -34,7 +34,6 @@ test('it shows what each source did and reloads the list on close', async () => 
   await settle();
   assert.ok(calls.some((c) => c.method === 'POST' && c.path === '/manage/games/g1/resync'));
   const text = document.body.textContent;
-  assert.match(text, /lanzamiento, imagen/);
   assert.match(text, /temas, ID de IGDB/);
   assert.match(text, /20 h/);
   click('[data-close]');
@@ -72,24 +71,21 @@ test('a failure is told in the same window', async () => {
   assert.ok(document.querySelector('[data-close]'));
 });
 
-test('an ambiguous RAWG match can be resolved from the same dialog', async () => {
-  const calls = installApi({
-    'POST /manage/games/g1/resync': { rawg: { status: 'ambiguous', candidates: [{ rawg_id: 391403, name: 'Path of Exile 2', released: '2026-12-11', platforms: [] }] }, igdb: { status: 'not_found' }, hltb: { status: 'not_found' } },
-    'POST /manage/rawg-sync/apply': { changed: ['rawg_id'], calls: 2 },
+test('RAWG is not shown in the dialog, whatever the API says about it', async () => {
+  installApi({
+    'POST /manage/games/g1/resync': { rawg: { status: 'ambiguous', candidates: [{ rawg_id: 391403, name: 'Path of Exile 2', released: '2026-12-11', platforms: [] }] }, igdb: { status: 'unchanged' }, hltb: { status: 'not_found' } },
   });
   const done = resyncGame(GAME, { reload: () => {} });
   await settle();
+  assert.doesNotMatch(document.body.textContent, /RAWG/);
   click('[data-confirm]');
   await done;
   await settle();
-  click('[data-use="391403"]');
-  await settle();
-  const apply = calls.find((c) => c.path === '/manage/rawg-sync/apply');
-  assert.deepEqual(apply.body, { game_id: 'g1', rawg_id: 391403, overwrite: true });
-  assert.match(document.body.textContent, /ID de RAWG/);
+  assert.doesNotMatch(document.body.textContent, /RAWG/);
+  assert.equal(document.querySelector('[data-use]'), null);
 });
 
-test('an ambiguous IGDB match can be resolved from the same dialog and the RAWG block stays as it was', async () => {
+test('an ambiguous IGDB match can be resolved from the same dialog', async () => {
   const calls = installApi({
     'POST /manage/games/g1/resync': {
       rawg: { status: 'not_found' }, hltb: { status: 'not_found' },
@@ -107,11 +103,9 @@ test('an ambiguous IGDB match can be resolved from the same dialog and the RAWG 
   const apply = calls.find((c) => c.path === '/manage/igdb-sync/apply');
   assert.deepEqual(apply.body, { game_id: 'g1', igdb_id: 7, overwrite: true });
   assert.match(document.body.textContent, /ID de IGDB, temas/);
-  assert.match(document.body.textContent, /No lo encuentra en RAWG/);
 });
 
 test('every status has a line', () => {
   for (const status of ['unchanged', 'not_found', 'duplicate', 'error']) assert.ok(igdbLine({ status, other_name: 'X', error: 'e', changed: [] }));
-  for (const status of ['unchanged', 'not_found', 'duplicate', 'error']) assert.ok(rawgLine({ status, other_name: 'X', error: 'e', changed: [] }));
   for (const status of ['unchanged', 'no_time', 'not_found', 'error']) assert.ok(hltbLine({ status, seconds: 3600, error: 'e' }));
 });
