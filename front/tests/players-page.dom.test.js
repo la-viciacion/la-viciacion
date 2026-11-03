@@ -125,13 +125,11 @@ test('the page of another player compares the libraries, and your own page does 
   window.location.hash = '#/player/2';
   await player.render({ main: main() });
   await settle();
-  assert.match(document.querySelector('.lc-counts').textContent, /1 en común · 1 solo tuyos · 1 solo de Bea/);
   assert.deepEqual(text('[data-list="shared"] .game-link'), ['Celeste']);
-  assert.match(document.querySelector('[data-list="shared"]').textContent, /Tú: 2 h .* completado/);
-  assert.match(document.querySelector('[data-list="shared"]').textContent, /Bea: 1 h/);
-  assert.deepEqual(text('[data-list="only_mine"] .game-link'), ['Hades <b>']); // text, never markup
-  assert.equal(document.querySelectorAll('[data-list="only_mine"] b').length, 0);
-  assert.match(document.querySelector('[data-list="only_theirs"] summary').textContent, /Solo lo tiene Bea/);
+  assert.match(document.querySelector('[data-list="shared"]').textContent, /Tú2 h · completado/);
+  assert.match(document.querySelector('[data-list="shared"]').textContent, /Bea1 h/);
+  assert.equal(document.querySelector('[data-list="only_mine"]'), null); // the ones only one has are not drawn
+  assert.doesNotMatch(document.querySelector('#plCompare').textContent, /Hades|Doom/);
   installApi({ 'GET /group/players/2': { ...PROFILE, is_me: true }, 'GET /users/photo/': json({ detail: 'no' }, 404) });
   window.location.hash = '#/player/2';
   await player.render({ main: main() });
@@ -140,15 +138,23 @@ test('the page of another player compares the libraries, and your own page does 
 });
 
 test('a long list shows a few games and "Mostrar más" the rest', async () => {
-  const many = Array.from({ length: 20 }, (_, i) => ({ game_id: `g${i}`, game_name: `Juego ${i}`, image_url: null, mine: { seconds: 60, completed: false, score: null }, theirs: null }));
-  installApi({ 'GET /group/players/2/compare': { ...COMPARE, counts: { shared: 0, only_mine: 20, only_theirs: 0 }, shared: [], only_mine: many, only_theirs: [] }, 'GET /group/players/2': PROFILE, 'GET /users/photo/': json({ detail: 'no' }, 404) });
+  const many = Array.from({ length: 20 }, (_, i) => ({ game_id: `g${i}`, game_name: `Juego ${i}`, image_url: null, mine: { seconds: 60, completed: false, score: null }, theirs: { seconds: 60, completed: false, score: null } }));
+  installApi({ 'GET /group/players/2/compare': { ...COMPARE, counts: { shared: 20, only_mine: 0, only_theirs: 0 }, shared: many, only_mine: [], only_theirs: [] }, 'GET /group/players/2': PROFILE, 'GET /users/photo/': json({ detail: 'no' }, 404) });
   window.location.hash = '#/player/2';
   await player.render({ main: main() });
   await settle();
-  assert.equal(document.querySelectorAll('[data-list="only_mine"] .game-link').length, 8);
-  document.querySelector('[data-more="only_mine"]').click();
-  assert.equal(document.querySelectorAll('[data-list="only_mine"] .game-link').length, 20);
-  assert.equal(document.querySelector('[data-more="only_mine"]'), null);
+  assert.equal(document.querySelectorAll('[data-list="shared"] .game-link').length, 12);
+  document.querySelector('[data-more]').click();
+  assert.equal(document.querySelectorAll('[data-list="shared"] .game-link').length, 20);
+  assert.equal(document.querySelector('[data-more]'), null);
+});
+
+test('with no game in common it says so', async () => {
+  installApi({ 'GET /group/players/2/compare': { ...COMPARE, counts: { shared: 0, only_mine: 1, only_theirs: 1 }, shared: [] }, 'GET /group/players/2': PROFILE, 'GET /users/photo/': json({ detail: 'no' }, 404) });
+  window.location.hash = '#/player/2';
+  await player.render({ main: main() });
+  await settle();
+  assert.match(document.querySelector('#plCompare').textContent, /ningún juego en común/);
 });
 
 test('the comparison says nothing when it cannot be loaded', async () => {
@@ -157,4 +163,20 @@ test('the comparison says nothing when it cannot be loaded', async () => {
   await player.render({ main: main() });
   await settle();
   assert.match(document.querySelector('#plCompare').textContent, /Cargando/);
+});
+
+test('the section in common folds and unfolds, and stays as left when the season changes', async () => {
+  window.location.hash = '#/player/2';
+  installApi({ 'GET /group/players/2?season=2025': { ...PROFILE, season: 2025 }, 'GET /group/players/2/compare': COMPARE, 'GET /group/players/2': PROFILE, 'GET /users/photo/': json({ detail: 'no' }, 404) });
+  await player.render({ main: main() });
+  await settle();
+  const fold = () => document.querySelector('[data-fold="common"]');
+  fold().click();
+  assert.equal(fold().getAttribute('aria-expanded'), 'false');
+  assert.ok(document.querySelector('.pl-block.folded'));
+  document.querySelector('[data-season="2025"]').click();
+  await settle();
+  assert.equal(fold().getAttribute('aria-expanded'), 'false');
+  fold().click();
+  assert.equal(document.querySelector('.pl-block.folded'), null);
 });
