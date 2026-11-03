@@ -39,4 +39,5 @@ export const iconCalendar = () => svg(16, '<rect x="3" y="4" width="18" height="
 // .btn-complete), a filled circle with a dark tick once it is completed.
 export const iconCircleCheck = (size = 24) => svg(size, '<circle cx="12" cy="12" r="9.5"/><polyline class="ck-tick" points="7.5 12.5 10.7 15.7 16.5 9"/>', 'ck');
 export const iconCircleCheckDone = (size = 24) => svg(size, '<circle cx="12" cy="12" r="10.5" fill="currentColor" stroke="none"/><polyline points="7.5 12.5 10.7 15.7 16.5 9" stroke="#0a0a14" stroke-width="2.4"/>', 'ck');
+export const iconInfo = () => svg(16, '<circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>');
 export const iconPlus = () => svg(16, '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>');

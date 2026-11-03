@@ -19,12 +19,13 @@ import { api, jsonRequest } from '../../lib/api.js';
 import { blockedReason } from '../../lib/completion.js';
 import { formatDate, formatDateTime, formatDuration, formatRelative } from '../../lib/format.js';
 import { html, mount, raw } from '../../lib/html.js';
-import { NO_FILTERS, NO_PLATFORM, STATES, entryPlatforms, entryState, filterEntries, nextUp, unratedGames } from '../../lib/library-filter.js';
+import { ALMOST_CAP, ALMOST_SHARE, FORGOTTEN_DAYS, NO_FILTERS, NO_PLATFORM, SHORT_SECONDS, STATES, entryPlatforms, entryState, filterEntries, nextUp, unratedGames } from '../../lib/library-filter.js';
 import { gameHref } from '../../lib/links.js';
 import { inputValue, paidText, parseEuros } from '../../lib/money.js';
 import { platformName } from '../../lib/platforms.js';
 import { SCORE_HINT, SCORE_MAX, SCORE_MIN, parseScore, saveScore } from '../../lib/score.js';
 import * as seasons from '../../lib/seasons.js';
+import { infoTip } from '../../ui/info-tip.js';
 import { iconCalendar, iconCircleCheck, iconClock, iconFlag, iconStar, iconUndo } from '../../ui/icons.js';
 import { showValue } from '../../ui/library-value.js';
 import { scoreBadge } from '../../ui/score-badge.js';
@@ -120,10 +121,11 @@ function priceForm(g) {
 }
 
 // "¿Qué juego sigo?": three short lists of the games worth going back to (see nextUp in lib/library-filter.js)
+const ONLY_OPEN = ' Solo cuentan los juegos pendientes de esta temporada, y cada uno sale en la primera lista que le encaja.';
 const NEXT_UP = [
-  ['almost', 'Casi terminados', (g) => `Llevas ${formatDuration(g.played_time)} de unas ${formatDuration(g.avg_time)}${g.left > 0 ? ` · te quedan ${formatDuration(g.left)}` : ''}`],
-  ['forgotten', 'Olvidados', (g) => `Sin tocar ${formatRelative(g.last_played)} · llevas ${formatDuration(g.played_time)}`],
-  ['short', 'Cortos', (g) => `${g.played_time ? `Te quedan ${formatDuration(g.left)}` : `Duran unas ${formatDuration(g.avg_time)}`} según HowLongToBeat`],
+  ['almost', 'Casi terminados', `Llevas entre el ${ALMOST_SHARE * 100} % y el ${ALMOST_CAP * 100} % del tiempo medio de HowLongToBeat. Los más cerca del final, primero.${ONLY_OPEN}`, (g) => `Llevas ${formatDuration(g.played_time)} de unas ${formatDuration(g.avg_time)}${g.left > 0 ? ` · te quedan ${formatDuration(g.left)}` : ''}`],
+  ['forgotten', 'Olvidados', `Los has jugado, pero hace más de ${FORGOTTEN_DAYS} días que no los tocas. Primero los que más horas llevan.${ONLY_OPEN}`, (g) => `Sin tocar ${formatRelative(g.last_played)} · llevas ${formatDuration(g.played_time)}`],
+  ['short', 'Cortos', `Duran menos de ${SHORT_SECONDS / 3600} horas de media según HowLongToBeat. Primero los más breves.${ONLY_OPEN}`, (g) => `Duran unas ${formatDuration(g.avg_time)} según HowLongToBeat${g.played_time ? ` · llevas ${formatDuration(g.played_time)}` : ''}`],
 ];
 const NEXT_UP_SHOWN = 4;
 
@@ -135,9 +137,12 @@ function nextUpCard(entries) {
     <details class="pf-card pf-next" open>
       <summary><strong>¿Qué juego sigo?</strong> <span class="pf-sub">Juegos que merece la pena retomar</span></summary>
       <div class="pf-next-lists">
-        ${lists.map(([key, title, detail]) => html`
+        ${lists.map(([key, title, hint, detail]) => html`
           <div class="pf-next-list" data-next="${key}">
-            <h3>${title}</h3>
+            <div class="pf-info-head">
+              <h3>${title}</h3>
+              ${infoTip(hint, `Cómo se elige: ${title}`)}
+            </div>
             ${found[key].slice(0, NEXT_UP_SHOWN).map((g) => html`
               <div class="pf-next-item"><a class="game-link" href="${gameHref(g.game_id)}">${g.game_name}</a><div class="pf-sub">${detail(g)}</div></div>`)}
             ${found[key].length > NEXT_UP_SHOWN ? html`<div class="pf-sub">y ${found[key].length - NEXT_UP_SHOWN} más</div>` : ''}
@@ -248,8 +253,7 @@ export function createLibrary(el, options) {
       ${select('state', 'Estado', STATES, filters.state)}
       ${select('rated', 'Nota', [['yes', 'Puntuados'], ['no', 'Sin puntuar']], filters.rated)}
       ${select('platform', 'Plataforma', [...platforms], filters.platform)}
-      <span class="adm-spacer"></span>
-      <button class="pf-btn primary" type="button" data-action="random-rate" ${pending ? '' : 'disabled'}>${iconStar()}<span>Puntuar al azar (${pending})</span></button>`);
+      ${pending ? html`<button class="pf-btn primary pf-rate-random" type="button" data-action="random-rate">${iconStar()}<span>Puntuar al azar (${pending})</span></button>` : ''}`);
   }
 
   function onFilter(e) {
