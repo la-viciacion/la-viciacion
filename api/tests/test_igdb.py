@@ -328,12 +328,18 @@ class IgdbSourceTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_rawg_is_asked_when_igdb_finds_nothing_and_its_failure_then_is_not_an_outage(self):
         rawg_candidate = my_utils.schemas.GameCandidate(rawg_id=1, name="Obscure", slug="obscure")
-        with mock.patch.object(igdb, "configured", return_value=True), mock.patch.object(igdb, "search_games", return_value=[]):
+        with mock.patch.object(igdb, "configured", return_value=True), mock.patch.object(igdb, "search_games", return_value=[]),                 mock.patch.object(my_utils.config.__class__, "RAWG_API_KEY", "k"):
             with mock.patch.object(my_utils, "_search_rawg", return_value=[rawg_candidate]):
                 self.assertEqual([c.name for c in await my_utils.search_games("obscure")], ["Obscure"])
             my_utils.reset_search_state()
             with mock.patch.object(my_utils, "_search_rawg", side_effect=my_utils.SearchUnavailable("down")):
                 self.assertEqual(await my_utils.search_games("obscure"), [])
+
+    async def test_without_a_rawg_key_an_empty_igdb_answer_is_the_answer_and_rawg_is_not_asked(self):
+        rawg = mock.AsyncMock()
+        with mock.patch.object(igdb, "configured", return_value=True), mock.patch.object(igdb, "search_games", return_value=[]),                 mock.patch.object(my_utils.config.__class__, "RAWG_API_KEY", ""), mock.patch.object(my_utils, "_search_rawg", rawg):
+            self.assertEqual(await my_utils.search_games("obscure"), [])
+        rawg.assert_not_awaited()
 
     async def test_rawg_answers_when_igdb_cannot(self):
         rawg_candidate = my_utils.schemas.GameCandidate(rawg_id=1, name="Zelda", slug="zelda")
