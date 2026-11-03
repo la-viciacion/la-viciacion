@@ -226,6 +226,12 @@ class SessionUpdate(BaseModel):
     notes: str | None = Field(default=None, max_length=NOTES_MAX)
 
 
+class RunningStartUpdate(BaseModel):
+    """The new start of a timer that is still running (it was started late)."""
+
+    start_time: NaiveDatetime
+
+
 class GameTimerResponse(GameTimerBase):
     id: int
     season: int | None = None  # derived from start_time

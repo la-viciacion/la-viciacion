@@ -1,12 +1,14 @@
 // Timer card: shows the running timer (live clock) or the "start one" prompt,
 // and starts/stops timers through the API.
 import { api, jsonRequest } from '../../lib/api.js';
-import { formatClock, formatDuration, formatRelative } from '../../lib/format.js';
+import { formatClock, formatDuration, formatRelative, fromInputValue, toInputValue } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
 import { auraColor } from '../../lib/timer-aura.js';
-import { iconPlay, iconStop } from '../../ui/icons.js';
+import { iconPencil, iconPlay, iconStop } from '../../ui/icons.js';
+import { modalHeader, openModal } from '../../ui/modal.js';
 import { scoreBadge } from '../../ui/score-badge.js';
 import { toast } from '../../ui/toast.js';
+import { sessionProblem } from './sessions.js';
 
 let userId = null;
 let onChange = () => {};
@@ -56,6 +58,7 @@ const activeCard = (timer, gameName, score) => html`
       <div class="timer-label"><span class="live-dot"></span> Jugando ahora</div>
       <div class="timer-game">${gameName || timer.game_id} ${scoreBadge(score)}</div>
       <div class="timer-duration" id="timerDuration">00:00:00</div>
+      <button class="timer-start-edit" id="editStartBtn" title="Cambiar la hora de inicio" aria-label="Cambiar la hora de inicio">Empezó a las ${toInputValue(timer.start_time).slice(11)} ${iconPencil()}</button>
     </div>
     <div class="timer-actions">
       <button class="btn-cancel-timer" id="cancelTimerBtn" data-timer-id="${timer.id}">Cancelar</button>
@@ -134,6 +137,7 @@ export async function loadTimerCard() {
     mount(section, activeCard(active.timer, active.game_name, active.score));
     document.getElementById('stopTimerBtn').addEventListener('click', (e) => stopTimer(e.currentTarget.dataset.timerId));
     document.getElementById('cancelTimerBtn').addEventListener('click', (e) => cancelTimer(e.currentTarget.dataset.timerId));
+    document.getElementById('editStartBtn').addEventListener('click', () => editStart(active.timer));
     startClock(active.timer.start_time);
     return;
   }
@@ -192,4 +196,40 @@ async function stopTimer(timerId) {
     toast(`Error al detener el timer: ${err.message}`, 'err');
     if (err.status === 404) await onChange(); // already stopped (another device): show what is true now
   }
+}
+
+/** The start of a running timer, moved back for a game that was started late. */
+function editStart(timer) {
+  const now = toInputValue(new Date());
+  const modal = openModal(html`
+    ${modalHeader('¿A qué hora empezaste?')}
+    <form class="sess-form" novalidate>
+      <label>Inicio <input class="sess-input" type="datetime-local" name="start" step="60" max="${now}" value="${toInputValue(timer.start_time)}" required /></label>
+      <div class="sess-hint">El timer sigue en marcha: solo cambia desde cuándo cuenta. No puede solaparse con otra sesión tuya ni pasar de 24 horas.</div>
+      <div class="sess-error" role="alert"></div>
+      <div class="sess-actions">
+        <span class="sess-spacer"></span>
+        <button type="button" class="sess-btn" data-close>Cancelar</button>
+        <button type="submit" class="sess-btn primary">Guardar</button>
+      </div>
+    </form>`);
+  const form = modal.el.querySelector('form');
+  const fail = (message) => { form.querySelector('.sess-error').textContent = message; };
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    fail('');
+    const start = form.elements.start.value;
+    if (!start || new Date(start) >= new Date()) return fail('El inicio debe ser anterior a ahora');
+    const problem = sessionProblem(start, toInputValue(new Date()));
+    if (problem) return fail(problem);
+    try {
+      await api(`/timers/${timer.id}/start`, jsonRequest('PATCH', { start_time: fromInputValue(start) }));
+      modal.close();
+      toast('Inicio del timer actualizado');
+      await onChange();
+    } catch (err) {
+      fail(err.message);
+      if (err.status === 404) await onChange(); // already stopped (another device): show what is true now
+    }
+  });
 }

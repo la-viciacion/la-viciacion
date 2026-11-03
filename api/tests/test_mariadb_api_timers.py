@@ -195,6 +195,45 @@ class ActiveStopCancelTests(TimerTestCase):
         self.assertEqual(self.scalar("SELECT COUNT(*) FROM game_timers"), 1)
 
 
+class ChangeRunningStartTests(TimerTestCase):
+    def change(self, timer_id, start, as_user="ana"):
+        return self.api("PATCH", f"/timers/{timer_id}/start", as_user=as_user, json={"start_time": iso(start)})
+
+    def test_the_start_moves_back_and_the_timer_keeps_running(self):
+        timer_id = self.start().json()["id"]
+        moved = self.change(timer_id, ago(minutes=40))
+        self.assertEqual(moved.status_code, 200)
+        self.assertTrue(moved.json()["is_active"])
+        stopped = self.api("POST", f"/timers/stop/{timer_id}", as_user="ana", params={"user_id": self.ana}).json()
+        self.assertGreaterEqual(stopped["duration_seconds"], 40 * 60)
+
+    def test_it_cannot_start_in_the_future_or_over_24_hours_ago(self):
+        timer_id = self.start().json()["id"]
+        self.assertEqual(self.change(timer_id, datetime.datetime.now() + timedelta(minutes=5)).status_code, 400)
+        self.assertEqual(self.change(timer_id, ago(hours=25)).status_code, 400)
+
+    def test_it_cannot_overlap_a_finished_session(self):
+        self.assertEqual(self.manual(start=ago(hours=3), end=ago(hours=2), game="hades").status_code, 201)
+        timer_id = self.start().json()["id"]
+        clash = self.change(timer_id, ago(hours=2, minutes=30))
+        self.assertEqual(clash.status_code, 409)
+        self.assertEqual(self.change(timer_id, ago(hours=1, minutes=50)).status_code, 200)
+
+    def test_it_cannot_move_to_another_season(self):
+        timer_id = self.start().json()["id"]
+        self.assertEqual(self.change(timer_id, ago(days=400)).status_code, 400)
+
+    def test_a_finished_session_is_not_a_running_timer(self):
+        timer_id = self.start().json()["id"]
+        self.api("POST", f"/timers/stop/{timer_id}", as_user="ana", params={"user_id": self.ana})
+        self.assertEqual(self.change(timer_id, ago(hours=1)).status_code, 404)
+
+    def test_only_the_owner_or_an_admin_changes_it(self):
+        timer_id = self.start().json()["id"]
+        self.assertEqual(self.change(timer_id, ago(minutes=10), as_user="bea").status_code, 403)
+        self.assertEqual(self.change(timer_id, ago(minutes=10), as_user="root").status_code, 200)
+
+
 class HistoryTests(TimerTestCase):
     def setUp(self):
         super().setUp()
