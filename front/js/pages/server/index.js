@@ -1,5 +1,5 @@
 // Server page (#/server): how the machine the app runs on is doing, the month's traffic and what keeping the app running
-// costs, by kind (server, domain...), for the admins. GET /server/status (Hetzner and Prometheus, the cost derived from the
+// costs, by kind (server, domain...), for everybody. GET /server/status (Hetzner and Prometheus, the cost derived from the
 // recorded rates: nothing is stored by this page).
 import { api } from '../../lib/api.js';
 import { formatRelative } from '../../lib/format.js';
@@ -7,7 +7,6 @@ import { html, mount } from '../../lib/html.js';
 import { KIND_ORDER, LIMITS, WINDOWS, axisTicks, axisTime, barLayout, bytes, load, money, monthName, monthShort, monthTotal, monthYear, yearTotals, last, linePoints, peak, percent, rate, sharedMax, trafficShare, uptime } from '../../lib/server.js';
 
 export const active = null; // it belongs to no item of the top bar
-export const adminOnly = true; // for now: the API refuses everybody else, and the page sends them home
 
 const WIDTH = 300;
 const HEIGHT = 80;
