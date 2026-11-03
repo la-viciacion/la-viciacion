@@ -227,7 +227,7 @@ if __name__ == "__main__":
 IGDB_PAGE = {
     "description": "A roguelike.", "trailer": "abcdefghijk",
     "screenshots": [{"thumb": "https://images.igdb.com/igdb/image/upload/t_screenshot_med/a.jpg", "full": "https://images.igdb.com/igdb/image/upload/t_1080p/a.jpg"}],
-    "critic": 93, "esrb": "Teen", "publishers": ["Supergiant Games"], "platforms": ["PC", "Switch"],
+    "critic": 93, "user_rating": 81, "esrb": "Teen", "publishers": ["Supergiant Games"], "platforms": ["PC", "Switch"],
 }
 
 
@@ -235,7 +235,7 @@ class ParseIgdbTests(unittest.TestCase):
     def test_it_reads_the_youtube_trailer_the_screenshots_and_the_critics(self):
         out = game_extras.parse_igdb(IGDB_PAGE)
         self.assertEqual(out["trailer"], {"url": None, "youtube": "abcdefghijk", "poster": "https://images.igdb.com/igdb/image/upload/t_1080p/a.jpg"})
-        self.assertEqual((out["metacritic"], out["esrb"], out["publishers"], out["platforms"]), (93, "Teen", ["Supergiant Games"], ["PC", "Switch"]))
+        self.assertEqual((out["metacritic"], out["user_rating"], out["esrb"], out["publishers"], out["platforms"]), (93, 81, "Teen", ["Supergiant Games"], ["PC", "Switch"]))
         self.assertEqual(out["screenshots"][0]["full"], "https://images.igdb.com/igdb/image/upload/t_1080p/a.jpg")
 
     def test_nothing_is_empty(self):
@@ -250,6 +250,7 @@ class MergeWithIgdbTests(unittest.TestCase):
         out = game_extras.merge(steam, rawg, game_extras.parse_igdb(IGDB_PAGE))
         self.assertEqual(out["description"], "Un roguelike.")
         self.assertEqual((out["metacritic"], out["critic_source"], out["esrb"], out["publishers"]), (93, "igdb", "Teen", ["Supergiant Games"]))
+        self.assertEqual(out["user_rating"], 81)
         self.assertEqual(out["trailer"]["youtube"], "abcdefghijk")
         self.assertIn("igdb.com", out["screenshots"][0]["full"])
 
@@ -258,7 +259,7 @@ class MergeWithIgdbTests(unittest.TestCase):
         out = game_extras.merge(game_extras.parse_steam(None), rawg, game_extras.parse_igdb(IGDB_PAGE))
         self.assertEqual(out["description"], "A roguelike.")
         rawg_only = game_extras.merge(game_extras.parse_steam(None), rawg)
-        self.assertEqual((rawg_only["metacritic"], rawg_only["critic_source"]), (70, "metacritic"))
+        self.assertEqual((rawg_only["metacritic"], rawg_only["critic_source"], rawg_only["user_rating"]), (70, "metacritic", None))
 
 
 class IgdbFetchTests(unittest.IsolatedAsyncioTestCase):

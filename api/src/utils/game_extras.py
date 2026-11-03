@@ -130,6 +130,7 @@ def parse_igdb(media) -> dict:
         "trailer": {"url": None, "youtube": trailer, "poster": media_url(shots[0]["full"]) if shots else None} if trailer else None,
         "screenshots": [{"thumb": media_url(s["thumb"]) or media_url(s["full"]), "full": media_url(s["full"])} for s in shots],
         "metacritic": data.get("critic"),
+        "user_rating": data.get("user_rating"),
         "esrb": data.get("esrb"),
         "publishers": list(data.get("publishers") or []),
         "platforms": list(data.get("platforms") or []),
@@ -139,7 +140,7 @@ def parse_igdb(media) -> dict:
 def merge(steam: dict, rawg: dict, igdb_data: dict | None = None) -> dict:
     """IGDB first for everything it has, then Steam, then RAWG; except the description: Steam's, in Spanish and curated, leads
     . The score is the critics' (`critic_source`: IGDB's own average, or Metacritic's
-    when it comes from Steam or RAWG)."""
+    when it comes from Steam or RAWG); the users' score (`user_rating`) is only IGDB's."""
     igdb_data = igdb_data or parse_igdb(None)
     description = steam["description"] or igdb_data["description"] or rawg["description"]
     critic = igdb_data["metacritic"] or rawg["metacritic"] or steam["metacritic"]
@@ -149,6 +150,7 @@ def merge(steam: dict, rawg: dict, igdb_data: dict | None = None) -> dict:
         "screenshots": igdb_data["screenshots"] or steam["screenshots"] or rawg["screenshots"],
         "metacritic": critic,
         "critic_source": "igdb" if igdb_data["metacritic"] else "metacritic" if critic else None,
+        "user_rating": igdb_data["user_rating"],
         "esrb": igdb_data["esrb"] or rawg["esrb"],
         "publishers": igdb_data["publishers"] or rawg["publishers"],
         "platforms": igdb_data["platforms"] or rawg["platforms"],
