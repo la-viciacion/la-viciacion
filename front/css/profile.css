@@ -215,8 +215,10 @@
 @media (max-width: 640px) { .gc-grid { grid-template-columns: 1fr; } }
 
 /* Achievements page */
-.ach-count { margin: 0 0 12px; }
+.ach-filter { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 12px; }
+.ach-count { margin: 0; }
 .ach-block { margin-bottom: 28px; }
+.pl-block, .ach-block.pl-block { margin: 32px 0 0; }
 .ach-note { margin: 0 0 12px; }
 .ach-fold { width: 100%; padding: 0; background: none; border: 0; font: inherit; color: inherit; cursor: pointer; text-align: left; }
 /* The toggle of every foldable section (achievements, group library, saga, media): a labelled pill, so it reads as a control

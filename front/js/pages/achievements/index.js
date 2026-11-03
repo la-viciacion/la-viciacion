@@ -81,6 +81,8 @@ const BLOCKS = [
 ];
 
 let shown = seasons.current(); // the season on screen in the season block
+let onlyMine = false; // "Solo conseguidos": list only the ones the viewer has unlocked
+let loaded = []; // the last answer, so that the filter does not ask again
 const folded = createFolds(); // the titles of the blocks the viewer has folded: they start open, and stay as left when a season changes
 
 const pills = () => html`
@@ -89,7 +91,10 @@ const pills = () => html`
     <button type="button" class="pf-season-badge" data-season="${year}" aria-pressed="${String(year === shown)}">Temporada ${year}</button>`)}
   </div>`;
 
-const block = ({ title, note, seasonal }, list) => html`
+// `list` is the whole block: with "Solo conseguidos" only the cards are narrowed, the "Tienes X de Y" keeps counting all.
+const block = ({ title, note, seasonal }, list) => {
+  const cards = onlyMine ? list.filter((a) => a.unlocked_by_me) : list;
+  return html`
   <section class="ach-block ${folded.has(title) ? 'folded' : ''}">
     <button type="button" class="section-header ach-fold" data-fold="${title}" aria-expanded="${String(!folded.has(title))}">
       ${titleView(title)}<span class="ach-chevron" aria-hidden="true">${iconChevron()}</span>
@@ -97,9 +102,10 @@ const block = ({ title, note, seasonal }, list) => html`
     <div class="ach-content">
       <div class="pf-sub ach-note">${note} Tienes ${list.filter((a) => a.unlocked_by_me).length} de ${list.length}.</div>
       ${seasonal ? pills() : ''}
-      <div class="ach-grid">${list.map(card)}</div>
+      <div class="ach-grid">${cards.length ? cards.map(card) : html`<div class="pf-empty">Todavía no has conseguido ninguno.</div>`}</div>
     </div>
   </section>`;
+};
 
 // The season block always shows (with its pills), even when the season has nothing: another one may have.
 async function load(main) {
@@ -108,18 +114,27 @@ async function load(main) {
     const list = await api(shown === SUMMARY ? '/group/achievements?summary=true'
       : shown === seasons.current() ? '/group/achievements' : `/group/achievements?season=${shown}`);
     if (!list) return;
-    const mine = list.filter((a) => a.unlocked_by_me).length;
-    mount(target, html`
-      <div class="pf-sub ach-count" role="status">Tienes ${mine} de ${list.length}</div>
-      ${BLOCKS.map((b) => ({ b, items: list.filter(b.pick) })).filter(({ b, items }) => items.length || b.seasonal).map(({ b, items }) => block(b, items))}`);
+    loaded = list;
+    draw(target);
   } catch (err) {
     mount(target, html`<div class="pf-empty">Error cargando los logros: ${err.message}</div>`);
   }
 }
 
+function draw(target) {
+  const mine = loaded.filter((a) => a.unlocked_by_me).length;
+  mount(target, html`
+    <div class="ach-filter">
+      <div class="pf-sub ach-count" role="status">Tienes ${mine} de ${loaded.length}</div>
+      <button type="button" class="pf-season-badge" data-only-mine aria-pressed="${String(onlyMine)}">Solo conseguidos</button>
+    </div>
+    ${BLOCKS.map((b) => ({ b, items: loaded.filter(b.pick) })).filter(({ b, items }) => items.length || b.seasonal).map(({ b, items }) => block(b, items))}`);
+}
+
 export async function render({ main }) {
   shown = seasons.current();
   folded.clear();
+  onlyMine = false;
   mount(main, html`
     <h1 class="pf-title pg-title">Logros</h1>
     <div id="achList"><div class="loading-spinner">Cargando logros...</div></div>`);
@@ -127,6 +142,11 @@ export async function render({ main }) {
     const fold = e.target.closest('[data-fold]');
     if (fold) {
       toggleFold(folded, fold.dataset.fold, fold.closest('.ach-block'), fold);
+      return;
+    }
+    if (e.target.closest('[data-only-mine]')) {
+      onlyMine = !onlyMine;
+      draw(e.currentTarget);
       return;
     }
     const pill = e.target.closest('[data-season]');
