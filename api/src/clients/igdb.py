@@ -1,6 +1,7 @@
-"""IGDB, the game database behind Twitch, as the backup of RAWG's search. It authenticates with the Twitch application
-of TWITCH_CLIENT_ID / TWITCH_CLIENT_SECRET (client credentials): the token lasts about two months and is kept in memory
-only. The secret travels in the body of the token request, never in a URL, so a failed request cannot quote it in the log."""
+"""IGDB, the game database behind Twitch: the main source of the game data (search, creation, covers, genres, dates, themes,
+series, trailer...). It authenticates with the Twitch application of TWITCH_CLIENT_ID / TWITCH_CLIENT_SECRET (client
+credentials): the token lasts about two months and is kept in memory only. The secret travels in the body of the token request,
+never in a URL, so a failed request cannot quote it in the log. Whatever goes wrong is an `IgdbError` with a text safe to log."""
 import datetime
 import re
 import threading
@@ -75,8 +76,11 @@ def _access_token(renew: bool = False) -> str:
         if not response.ok:
             error = IgdbRefused if response.status_code in (400, 401, 403) else IgdbError
             raise error(f"Twitch refused the credentials ({response.status_code})")
-        body = response.json()
-        _token = (body["access_token"], time.time() + body["expires_in"] - TOKEN_MARGIN_SECONDS)
+        try:
+            body = response.json()
+            _token = (body["access_token"], time.time() + body["expires_in"] - TOKEN_MARGIN_SECONDS)
+        except (ValueError, KeyError, TypeError):
+            raise IgdbError("Twitch answered something that is not a token") from None
         return _token[0]
 
 
@@ -98,7 +102,10 @@ def _post(body: str, retried: bool = False, timeout: int = TIMEOUT_SECONDS, rene
         return _post(body, retried=True, timeout=timeout)  # same token: only a refused one is asked again
     if not response.ok:
         raise IgdbError(f"IGDB answered {response.status_code}")
-    return response.json()
+    try:
+        return response.json()
+    except ValueError:
+        raise IgdbError("IGDB answered something that is not JSON") from None
 
 
 _ROMAN = {"ii": "2", "iii": "3", "iv": "4", "v": "5", "vi": "6", "vii": "7", "viii": "8", "ix": "9", "x": "10"}
@@ -254,8 +261,8 @@ def official_day(item: dict) -> datetime.date | None:
 
 def game_details(igdb_id: int) -> dict | None:
     """What IGDB knows of a game, to create it: the same keys as RAWG's details minus the tags (None when IGDB has no
-    such game) and its themes, keywords, franchises and collections. The tags are RAWG's vocabulary and IGDB's keywords are
-    not the same: a game made from IGDB has no `tags`, it has those four columns instead."""
+    such game) and its themes, keywords, franchises, collections, perspectives and game modes. The tags are RAWG's vocabulary
+    and IGDB's keywords are not the same: a game made from IGDB has no `tags`, it has those columns instead."""
     found = _post(
         "fields name,slug,game_type,parent_game,cover.image_id,genres.name,involved_companies.developer,"
         f"involved_companies.company.name,external_games.external_game_source,external_games.uid,{RELEASE_FIELDS},{EXTRA_FIELDS}; "

@@ -2,8 +2,9 @@
 the game (themes, keywords, franchises, collections, perspectives, game modes), which no other source fills.
 
 Rules that keep it safe to run on real data:
-  * only those columns are written, and only while they are empty (a game with an IGDB id and no IGDB data gets the
-    data); the name and every other field are never touched
+  * only those columns and the IGDB id and page address are written, and only while they are empty (a game with an IGDB id
+    and no IGDB data gets the data); the name and every other field are never touched, unless the admin asks to replace the
+    data of the games the batch links or completes (`overwrite`: cover, date, genres, developer, Steam id; never the name)
   * a game is linked automatically only on a certain match: the Steam app the game has, or the same name (roman numerals
     and punctuation aside) with a release year that agrees (a year of margin). Anything else is reported as ambiguous with
     candidates for the admin to pick: the best result for a name is never assumed (a remake is not the original)

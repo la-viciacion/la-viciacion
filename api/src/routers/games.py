@@ -13,6 +13,8 @@ from ..utils.logger import LogManager
 log_manager = LogManager()
 logger = log_manager.get_logger()
 
+MAX_QUERY_LENGTH = 100  # no game has a longer name, and the text goes into a request to IGDB
+
 router = APIRouter(
     prefix="/games",
     tags=["Games"],
@@ -39,6 +41,8 @@ async def search_games(query: str, db: Session = Depends(get_db)):
         raise HTTPException(
             status_code=400, detail="Query must be at least 2 characters long"
         )
+    if len(query) > MAX_QUERY_LENGTH:
+        raise HTTPException(status_code=400, detail=f"Query must be at most {MAX_QUERY_LENGTH} characters long")
     try:
         return await utils.search_games(query.strip(), db=db)
     except utils.SearchUnavailable:  # already logged where it failed
@@ -107,8 +111,9 @@ async def get_game_series(
     if game is None:
         raise HTTPException(status_code=404, detail="Game not exists")
     series = await igdb_series.series_of(game.igdb_id) if game.igdb_id else None
-    if series is None and game.rawg_id:  # IGDB did not know it, failed or is not configured
-        series = await rawg_series.series_of(game.rawg_id)
+    if not series and game.rawg_id:  # IGDB has no series for it (or failed, or is not configured): RAWG may
+        fallback = await rawg_series.series_of(game.rawg_id)
+        series = fallback if fallback is not None else series
     if series is None:
         return {"available": False, "games": []}
     return {"available": True, "games": await run_in_threadpool(game_series.saga, db, game, current_user.id, series)}

@@ -60,6 +60,14 @@ class GameSeriesTests(ApiTestCase):
         self.igdb_series.assert_awaited_once_with(1)
         self.series.assert_awaited_once_with(300)
 
+    def test_when_igdb_knows_no_series_for_a_game_that_has_a_rawg_id_rawgs_fills_it_in(self):
+        self.game("both", "Both", igdb_id=1, rawg_id=300)
+        self.igdb_series.return_value = []
+        self.assertTrue(self.saga("both").json()["games"])  # RAWG's series (the fixture's) is shown
+        self.series.assert_awaited_once_with(300)
+        self.series.return_value = None  # and when RAWG cannot say either, IGDB's empty answer stands
+        self.assertEqual(self.saga("both").json(), {"available": True, "games": []})
+
     def test_a_game_with_only_an_igdb_id_has_no_saga_when_igdb_cannot_say(self):
         self.game("igdb-only", "Igdb Only", igdb_id=2)
         self.assertEqual(self.saga("igdb-only").json(), {"available": False, "games": []})

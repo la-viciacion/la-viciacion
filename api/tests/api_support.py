@@ -27,7 +27,7 @@ from src import auth
 from src.crud.achievements import Achievements
 from src.database import database, models
 from src.routers import basic
-from src.utils import actions, my_utils, settings, ttl_cache
+from src.utils import actions, my_utils, rawg_health, settings, ttl_cache
 from tests.app_routes import BASE, ROUTERS
 from tests.mariadb_db import MariaDBTestCase
 
@@ -98,6 +98,8 @@ class ApiTestCase(MariaDBTestCase):
             db.close()
 
     def setUp(self):
+        rawg_health.reset()  # a test that makes RAWG fail pauses it for the process: no test inherits that
+        self.addCleanup(rawg_health.reset)
         test = getattr(self, self._testMethodName)
         if inspect.iscoroutinefunction(test) and not isinstance(self, unittest.IsolatedAsyncioTestCase):
             # a plain TestCase "passes" an async test without ever running it

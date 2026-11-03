@@ -17,6 +17,8 @@ from ..database import models, schemas
 from .achievements import AchievementsElems
 from .outside_cache import OutsideCache
 from . import ai, ai_prompts, game_tags, hltb_sync, inbox, push, settings
+from . import rawg_health
+from .rawg_health import RawgPaused
 from .redaction import redact_rawg_key
 from ..utils.logger import LogManager
 
@@ -136,6 +138,18 @@ async def _http_get(url: str, params: dict, timeout: int):
     return await asyncio.to_thread(requests.get, url, params=params, timeout=timeout)
 
 
+async def rawg_get(url: str, params: dict, timeout: int):
+    """`_http_get` for RAWG: a network failure pauses RAWG for a while (`rawg_health`) and, paused, it raises `RawgPaused` at once
+    instead of waiting for another timeout. Every request to RAWG goes through here."""
+    if rawg_health.paused():
+        raise RawgPaused("RAWG is paused after a failure")
+    try:
+        return await _http_get(url, params, timeout=timeout)
+    except requests.RequestException:
+        rawg_health.failed()
+        raise
+
+
 class SearchUnavailable(Exception):
     """RAWG could not answer a search (no key, unreachable or an error): "no results" would be a lie."""
 
@@ -153,9 +167,10 @@ def igdb_paused() -> bool:
 
 
 def reset_search_state() -> None:
-    """Forget the remembered searches and the pause of IGDB (the tests)."""
+    """Forget the remembered searches and the pauses of IGDB and RAWG (the tests)."""
     global _igdb_paused_until
     _igdb_paused_until = 0.0
+    rawg_health.reset()
     _search_cache.clear()
 
 
@@ -183,6 +198,8 @@ async def _search_sources(query: str) -> list[schemas.GameCandidate]:
         else:
             if found:
                 return found
+            if not config.RAWG_API_KEY or rawg_health.paused():  # nothing to ask, or it is down: IGDB's empty answer is the answer
+                return found
             try:  # IGDB answered and has nothing: RAWG may know a game IGDB does not
                 return await _search_rawg(query)
             except SearchUnavailable:
@@ -208,7 +225,7 @@ async def _search_rawg(query: str) -> list[schemas.GameCandidate]:
     url = "https://api.rawg.io/api/games"
     params = {"key": api_key, "search": query, "page": 1, "page_size": 10}
     try:
-        resp = await _http_get(url, params, timeout=RAWG_SEARCH_TIMEOUT)
+        resp = await rawg_get(url, params, timeout=RAWG_SEARCH_TIMEOUT)
         if not resp.ok:
             logger.error(f"RAWG search error {resp.status_code}: {redact_rawg_key(resp.content)}")
             raise SearchUnavailable(f"RAWG answered {resp.status_code}")
@@ -216,6 +233,8 @@ async def _search_rawg(query: str) -> list[schemas.GameCandidate]:
         results = data.get("results", [])
     except SearchUnavailable:
         raise
+    except RawgPaused:
+        raise SearchUnavailable("RAWG is paused") from None
     except Exception as e:
         logger.error(f"Error searching RAWG for '{query}': {redact_rawg_key(e)}")
         raise SearchUnavailable("RAWG did not answer") from None
@@ -280,7 +299,7 @@ def mark_existing_games(db: Session, candidates: list[schemas.GameCandidate]) ->
 async def _steam_id_from_rawg_stores(rawg_id: int, params: dict) -> str:
     """The Steam app id of a RAWG game, from the links of its stores ('' when it has none or RAWG fails)."""
     try:
-        resp = await _http_get(f"https://api.rawg.io/api/games/{rawg_id}/stores", params, timeout=6)
+        resp = await rawg_get(f"https://api.rawg.io/api/games/{rawg_id}/stores", params, timeout=6)
         if resp.ok:
             for store in resp.json().get("results", []):
                 match = re.search(r"steampowered\.com/app/(\d+)", store.get("url", ""))
@@ -296,7 +315,7 @@ async def rawg_parent(rawg_id: int, params: dict | None = None) -> tuple[int, st
     game of its own or RAWG fails (the mark is a bonus: the game is created without it)."""
     params = params or {"key": config.RAWG_API_KEY}
     try:
-        resp = await _http_get(f"https://api.rawg.io/api/games/{rawg_id}/parent-games", params, timeout=6)
+        resp = await rawg_get(f"https://api.rawg.io/api/games/{rawg_id}/parent-games", params, timeout=6)
         if resp.ok:
             for parent in resp.json().get("results") or []:
                 if parent.get("id"):
@@ -368,7 +387,7 @@ async def get_game_details_by_rawg_id(rawg_id: int) -> dict | None:
     params = {"key": api_key}
     stores = asyncio.create_task(_steam_id_from_rawg_stores(rawg_id, params))
     try:
-        resp = await _http_get(f"https://api.rawg.io/api/games/{rawg_id}", params, timeout=10)
+        resp = await rawg_get(f"https://api.rawg.io/api/games/{rawg_id}", params, timeout=10)
         if not resp.ok:
             logger.error(f"RAWG details error {resp.status_code}: {redact_rawg_key(resp.content)}")
             stores.cancel()

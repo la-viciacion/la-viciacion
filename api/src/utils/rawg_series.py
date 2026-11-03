@@ -42,13 +42,15 @@ async def series_of(rawg_id: int) -> list[dict] | None:
 
 async def _fetch(rawg_id: int) -> list[dict] | None:
     try:
-        resp = await my_utils._http_get(
+        resp = await my_utils.rawg_get(
             f"https://api.rawg.io/api/games/{rawg_id}/game-series", {"key": config.RAWG_API_KEY, "page_size": PAGE_SIZE}, timeout=8
         )
         if not resp.ok:
             logger.warning(f"RAWG series error {resp.status_code} for game {rawg_id}: {redact_rawg_key(resp.content)}")
             return None
         return parse(resp.json().get("results"))
+    except my_utils.RawgPaused:
+        return None  # RAWG failed a moment ago
     except Exception as e:
         logger.warning(f"Error fetching the series of RAWG game {rawg_id}: {redact_rawg_key(e)}")
         return None
