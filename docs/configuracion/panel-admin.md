@@ -4,7 +4,7 @@ Los administradores ven en el menú lateral **Administración → Panel de admin
 
 ## Inicio
 
-Un resumen de la instalación: cuántos usuarios, juegos, sesiones, timers activos y entradas de biblioteca hay; **Requiere atención** (por ejemplo, jugadores sin Telegram o juegos sin ID de RAWG, con un enlace directo para arreglarlos) y **Integraciones**, que te dice qué servicios faltan por configurar.
+Un resumen de la instalación: cuántos usuarios, juegos, sesiones, timers activos y entradas de biblioteca hay; **Requiere atención** (por ejemplo, jugadores sin Telegram o juegos sin ID de IGDB, con un enlace directo para arreglarlos) y **Integraciones**, que te dice qué servicios faltan por configurar.
 
 ![Inicio del panel](../assets/screens/admin-home.webp){ .screenshot }
 
@@ -12,7 +12,7 @@ Un resumen de la instalación: cuántos usuarios, juegos, sesiones, timers activ
 
 ### Juegos
 
-La lista de todos los juegos con búsqueda, orden y filtros. **Editar** cambia cualquier dato (nombre, desarrollador, fecha, géneros, etiquetas, portada, tiempo medio, IDs, si es un DLC y cuál es su juego base…). Un DLC puede quedar sin juego base; quitar la marca de DLC le quita también el juego base. Aquí están también las sincronizaciones con IGDB, RAWG y HowLongToBeat: ver [Servicios externos](servicios.md).
+La lista de todos los juegos con búsqueda, orden y filtros. **Editar** cambia cualquier dato (nombre, desarrollador, fecha, géneros, etiquetas, portada, tiempo medio, IDs, la página y los datos de IGDB, si es un DLC y cuál es su juego base…). Un DLC puede quedar sin juego base; quitar la marca de DLC le quita también el juego base. Aquí están también las sincronizaciones con IGDB y HowLongToBeat: ver [Servicios externos](servicios.md).
 
 ### Plataformas
 

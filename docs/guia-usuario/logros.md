@@ -11,7 +11,7 @@ Los logros se desbloquean **solos** al jugar (nunca los pides tú) y se anuncian
 - **De temporada**: se consiguen una vez al año y cuentan solo lo jugado en esa temporada. Hay una pastilla **Resumen**, que junta todas las temporadas (cada logro una vez, entero si lo has conseguido, con las temporadas en que lo hiciste), y una pastilla por temporada (la en curso por defecto) y cada una muestra quién del grupo lo consiguió *en ese año* y, en la temporada actual, cuánto te falta.
 - **Lifetime** («de por vida»): cuentan todo tu historial y se consiguen **una sola vez**.
 
-Cada tarjeta muestra el logro, su descripción y quién lo tiene. Los que aún no tienes aparecen **atenuados y solo con el nombre**: hay que averiguar de qué van. Si todavía no los has desbloqueado, no ves ni la descripción ni la imagen.
+El botón **Solo conseguidos** deja solo los que ya has desbloqueado (el «Tienes X de Y» sigue contando todos). Cada tarjeta muestra el logro, su descripción y quién lo tiene. Los que aún no tienes aparecen **atenuados y solo con el nombre**: hay que averiguar de qué van. Si todavía no los has desbloqueado, no ves ni la descripción ni la imagen.
 
 ### Barras de progreso
 

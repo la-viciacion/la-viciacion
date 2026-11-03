@@ -11,6 +11,8 @@ Es la forma habitual: pulsas al empezar y paras al terminar.
 3. Elige la **plataforma**. Si ya lo habías jugado, la que usaste la última vez aparece la primera.
 4. El timer empieza a correr. Cuando termines, pulsa **Detener**; si te has equivocado y no quieres que cuente, **Cancelar**.
 
+Si empezaste a jugar antes de pulsar, no hace falta pararlo: bajo el reloj, **Empezó a las HH:MM** abre una ventana para **mover el inicio hacia atrás** y el timer sigue en marcha. Las reglas son las de una sesión manual (antes de ahora, como mucho 24 horas, sin solaparse con otra sesión tuya) y el nuevo inicio debe ser de la misma temporada. El aura de la tarjeta del timer pasa del verde azulado al rojo a medida que la sesión se alarga.
+
 <div class="grid" markdown>
 
 ![Elegir un juego del catálogo](../assets/screens/picker.webp){ .screenshot }

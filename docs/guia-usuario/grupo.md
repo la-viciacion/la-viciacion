@@ -22,7 +22,7 @@ Un timer de más de 6 horas se muestra atenuado con «¿Un timer olvidado?» y n
 
 ![Los jugadores del grupo](../assets/screens/players.webp){ .screenshot }
 
-Al pulsar uno ves **su página**: sus cifras por temporada, sus juegos más jugados con sus notas y sus últimos logros. En la de otro jugador aparece también la **afinidad contigo**, un porcentaje que dice cuánto se parecen vuestros gustos: juegos en común (50 %), notas parecidas en los juegos que ambos habéis puntuado (30 %) y el tiempo que dedicáis a los mismos géneros (20 %). Con menos de 3 juegos en común dice que hay pocos datos. Debajo, **Tu biblioteca y la de ese jugador** separa los juegos que **tenéis los dos** (con las horas, si lo completó y la nota de cada uno), los que **solo tienes tú** y los que **solo tiene él o ella**, cada lista del más jugado al menos.
+Al pulsar uno ves **su página**: sus cifras por temporada, sus juegos más jugados con sus notas y sus últimos logros. En la de otro jugador, al final, la sección plegable **En común con…** (el navegador recuerda si la plegaste) trae la **afinidad contigo**, un porcentaje que dice cuánto se parecen vuestros gustos: juegos en común (50 %), notas parecidas en los juegos que ambos habéis puntuado (30 %) y el tiempo que dedicáis a los mismos géneros (20 %). Con menos de 3 juegos en común dice que hay pocos datos. Debajo separa los juegos que **tenéis los dos** (con las horas, si lo completó y la nota de cada uno), los que **solo tienes tú** y los que **solo tiene él o ella**, cada lista del más jugado al menos. Los logros que se listan en una página de jugador son los cinco últimos.
 
 ![La página de otro jugador](../assets/screens/player.webp){ .screenshot }
 
@@ -32,11 +32,13 @@ Al pulsar uno ves **su página**: sus cifras por temporada, sus juegos más juga
 
 ![El catálogo de juegos](../assets/screens/games.webp){ .screenshot }
 
-Puedes buscar por nombre, ordenar (actividad reciente, más jugados, mejor nota, más jugadores, fecha de lanzamiento, nombre) y filtrar por género o por lo que tienes tú. **Añadir juego** busca en RAWG y lleva a la página del juego recién creado.
+Puedes buscar por nombre, ordenar (actividad reciente, más jugados, mejor nota, más jugadores, fecha de lanzamiento, nombre) y filtrar por género o por lo que tienes tú. **Añadir juego** busca en IGDB (admite el nombre a medias, y los números romanos) y lleva a la página del juego recién creado.
 
 Al pulsar un juego abres **su página**: portada, géneros, desarrollador, fecha de lanzamiento, tiempo medio para completarlo, las cifras del grupo, tu nota (que puedes poner o cambiar ahí mismo) y la lista de quién lo tiene con sus horas, completados y notas. Si el juego es de una saga, la tarjeta **Saga** (a la derecha de «Quién lo juega» en una pantalla ancha, debajo en el móvil) lista las entregas de la más reciente a la más antigua con lo que tienes de cada una (completada, en tu biblioteca o sin tener), cuántos jugadores la tienen y cuál es la **siguiente** que te falta; los datos vienen de IGDB, así que si no responde la tarjeta no sale. En el móvil se puede plegar pulsando su título, y el navegador lo recuerda; en una pantalla ancha va siempre abierta. Si ya lo has jugado, una tarjeta compara **tu ritmo**: lo que tardaste (o llevas) frente a lo que ha tardado el resto del grupo en completarlo y frente al tiempo medio de HowLongToBeat. Si es un DLC o una expansión lo indica con la marca **DLC** y enlaza al juego base.
 
-Si IGDB o Steam conocen el juego, bajo el título aparecen unos datos de fuera del grupo: la **nota de la crítica** (en verde, amarillo o rojo según lo buena que sea) y la **clasificación por edades**, en una fila junto al botón **Ver en IGDB**. La **descripción** va justo bajo el nombre (en español si Steam la tiene; si no, la de IGDB, en inglés; se recorta y se amplía al tocarla), seguida del **editor** y de las **plataformas** en las que salió el juego (en pastillas pequeñas), y una tarjeta **Multimedia** trae el **tráiler** (no se descarga hasta que le das al play) y las **capturas** en un carrusel. En una pantalla ancha el tráiler está a la derecha de la cabecera y las capturas debajo, a todo el ancho; en el móvil es un bloque bajo la cabecera, abierto, que puedes ocultar con su botón. Las etiquetas del juego se limitan a las 6 primeras, con un botón **+N** para ver el resto. Solo sale lo que haya: un juego que ni Steam ni IGDB conocen, como muchos de Nintendo, no tiene estos datos, y si esas páginas fallan simplemente no aparecen. Nada de esto se guarda en La Viciación.
+Si IGDB o Steam conocen el juego, bajo el título aparecen unos datos de fuera del grupo: la **nota de la crítica** y la de los **usuarios** de IGDB (en verde, amarillo o rojo según lo buenas que sean) y la **clasificación por edades**, en una fila junto al botón **Ver en IGDB**. La **descripción** va justo bajo el nombre (en español si Steam la tiene; si no, la de IGDB, en inglés; se recorta y se amplía al tocarla), seguida del **editor** y de las **plataformas** en las que salió el juego (en pastillas pequeñas), y una tarjeta **Multimedia** trae el **tráiler** (no se descarga hasta que le das al play) y las **capturas** en un carrusel. En una pantalla ancha el tráiler está a la derecha de la cabecera y las capturas debajo, a todo el ancho; en el móvil es un bloque bajo la cabecera, abierto, que puedes ocultar con su botón. Las etiquetas del juego se limitan a las 6 primeras, con un botón **+N** para ver el resto. Solo sale lo que haya: un juego que ni Steam ni IGDB conocen, como muchos de Nintendo, no tiene estos datos, y si esas páginas fallan simplemente no aparecen. Nada de esto se guarda en La Viciación.
+
+La página tiene dos mitades, separadas por un título: arriba, **lo que dice el mundo** del juego (descripción, notas, tráiler) y, bajo **En el grupo**, **lo nuestro**: las cifras del grupo, tu nota, tu ritmo, quién lo juega y la saga. La media que han puesto los jugadores se llama **Nota del grupo**, para no confundirla con las de IGDB.
 
 ![La página de un juego](../assets/screens/game.webp){ .screenshot }
 
@@ -45,7 +47,7 @@ Si IGDB o Steam conocen el juego, bajo el título aparecen unos datos de fuera d
 
 ## Biblioteca del grupo
 
-**Menú → Biblioteca del grupo** junta las bibliotecas de todos: cuántos juegos distintos hay, cuántos jugadores y cuántas horas, y cinco listas para curiosear:
+**Menú → Biblioteca** junta las bibliotecas de todos: cuántos juegos distintos hay, cuántos jugadores y cuántas horas, y cinco listas para curiosear:
 
 - **Joyas ocultas**: juegos que tienen como mucho dos jugadores y a los que han dado una nota media de 80 o más.
 - **El cementerio**: juegos que alguien ha abandonado y no ha vuelto a tocar, con quién los dejó.
@@ -58,6 +60,10 @@ Cada juego enlaza a su página. Arriba hay una fila de **botones**, uno por secc
 
 ## Calendario
 
-**Menú → Calendario** pone en un mes (empezando en lunes) **todos los juegos del catálogo con fecha de lanzamiento**, los hayan jugado o no. Pulsa un día para ver sus juegos y entrar en cualquiera; el panel **Juegos del mes** los lista con quién quiere cada uno. Los juegos sin fecha confirmada que alguien desea aparecen aparte, y el botón **Hoy** te devuelve al mes en curso.
+**Menú → Calendario** pone en un mes (empezando en lunes) **todos los juegos del catálogo con fecha de lanzamiento**, los hayan jugado o no. Pulsa un día para ver sus juegos en una ventana y entrar en cualquiera; el panel **Juegos del mes** los lista con quién quiere cada uno. Los juegos sin fecha confirmada que alguien desea aparecen aparte, y el botón **Hoy** te devuelve al mes en curso.
 
 ![Calendario de lanzamientos](../assets/screens/calendar.webp){ .screenshot }
+
+## Servidor
+
+**Menú → Servidor** enseña cómo va la máquina en la que corre la app, para que cualquiera del grupo lo vea: el estado, la carga y el tiempo encendido, la CPU, la red, el disco y la memoria en gráficas de 1 hora a 30 días (con una línea de puntos en el máximo recomendado), el tráfico del mes frente al que incluye el plan y lo que cuesta mantener la app, mes a mes, con la previsión hasta diciembre. Solo sale lo que el administrador haya conectado ([Servicios externos](../configuracion/servicios.md#estado-del-servidor-hetzner-cloud)); sin eso la página lo dice. Nunca enseña la dirección del servidor.
