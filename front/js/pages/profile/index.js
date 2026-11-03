@@ -8,12 +8,15 @@
 // The layout classes (adm-shell, adm-side, adm-nav...) are the admin's, so both look the same.
 // All routes are /api/v1/users/{username}/...
 import { api, loadAvatarUrl } from '../../lib/api.js';
+import { createFolds, toggleFold } from '../../lib/fold.js';
 import { html, mount } from '../../lib/html.js';
 import { PASSWORD_HINT } from '../../lib/password.js';
 import { missingSteps } from '../../lib/profile-completeness.js';
 import * as seasons from '../../lib/seasons.js';
 import { showChallengesHistory } from '../../ui/challenges-history.js';
 import { profileCard } from '../../ui/profile-invite.js';
+import { iconChevron } from '../../ui/icons.js';
+import { infoTip } from '../../ui/info-tip.js';
 import { recapCard } from '../../ui/recap-invite.js';
 import { achievementsView, sectionTitle, seasonName, seasonPills, seasonSuffix, statsView, titleView, topView } from '../../ui/profile-summary.js';
 import { initAbout } from './about.js';
@@ -46,6 +49,9 @@ const SETTINGS = [
   ['avisos', 'Notificaciones'],
   ['datos', 'Tus datos'],
 ];
+
+const GAMES_FOLD = 'games';
+const folds = createFolds('profile-folds'); // the games list the player has folded (remembered in this browser)
 
 let main;
 let user;
@@ -168,7 +174,7 @@ async function refreshSummary(season = shown) {
   mount(main.querySelector('#pfTop'), topView(data));
   mount(main.querySelector('#pfAchTitle'), titleView(`Últimos logros ${seasonSuffix(data)}`));
   mount(main.querySelector('#pfAchievements'), achievementsView(data));
-  mount(main.querySelector('#pfGamesTitle'), titleView(`Juegos ${seasonSuffix(data)}`));
+  mount(main.querySelector('#pfGamesTitle'), gamesTitle(data));
   if (changed && summaryGames) await summaryGames.showSeason(data.season);
 }
 
@@ -198,6 +204,8 @@ async function onSeason(e) {
 }
 
 // ── Templates ───────────────────────────────────────────────
+const gamesTitle = (d) => html`${titleView(`Juegos ${seasonSuffix(d)}`)}<span class="ach-chevron" aria-hidden="true">${iconChevron()}</span>`;
+
 function avatar(d) {
   const initial = (d.user.name || d.user.username)[0].toUpperCase();
   return avatarUrl
@@ -246,8 +254,10 @@ function draw(d) {
           <div class="pf-card" id="pfAchievements">${achievementsView(d)}</div>
         </div>
       </div>
-      ${sectionTitle(`Juegos ${seasonSuffix(d)}`, 'pfGamesTitle')}
-      <div id="pfLibrary"></div>
+      <section class="ach-block pf-games ${folds.has(GAMES_FOLD) ? 'folded' : ''}">
+        <button type="button" class="section-header ach-fold" id="pfGamesTitle" data-fold="${GAMES_FOLD}" aria-expanded="${String(!folds.has(GAMES_FOLD))}">${gamesTitle(d)}</button>
+        <div class="ach-content" id="pfLibrary"></div>
+      </section>
       ${sectionTitle('Retos')}
       <div class="pf-card" id="pfChallenges"></div>
     </section>
@@ -268,8 +278,10 @@ function draw(d) {
       <label>Usuario (apodo)<input class="adm-input" type="text" value="${d.user.username}" disabled /></label>
       <label>Nombre<input class="adm-input" type="text" name="name" value="${d.user.name || ''}" autocomplete="name" /></label>
       <label>Email (con el que inicias sesión)<input class="adm-input" type="email" name="email" value="${d.user.email || ''}" autocomplete="email" /></label>
-      <label>Telegram ID<input class="adm-input" type="number" name="telegram_id" value="${d.user.telegram_id ?? ''}" placeholder="Sin vincular" readonly /></label>
-      <div class="pf-sub">El bot te reconoce por este número. No se escribe aquí: se vincula escribiendo <b>/activate</b> al bot en el grupo de Telegram (solo si tu usuario de Telegram es el mismo que tu apodo de la app). Desde aquí puedes probarlo; solo un administrador puede cambiarlo o quitarlo.</div>
+      <div class="pf-form-field">
+        <div class="pf-info-head pf-field-head">Telegram ID ${infoTip(html`El bot te reconoce por este número. No se escribe aquí: se vincula escribiendo <b>/activate</b> al bot en el grupo de Telegram (solo si tu usuario de Telegram es el mismo que tu apodo de la app). Desde aquí puedes probarlo; solo un administrador puede cambiarlo o quitarlo.`, 'Cómo se vincula Telegram')}</div>
+        <input class="adm-input" type="number" name="telegram_id" value="${d.user.telegram_id ?? ''}" placeholder="Sin vincular" aria-label="Telegram ID" readonly />
+      </div>
       <div>
         <button class="pf-btn" type="button" id="pfTelegramTest">Enviar mensaje de prueba</button>
       </div>
@@ -321,6 +333,7 @@ function draw(d) {
   });
   main.querySelector('.pf-tabs').addEventListener('keydown', onTabKey);
   main.querySelector('#pfSeasons').addEventListener('click', onSeason);
+  main.querySelector('#pfGamesTitle').addEventListener('click', (e) => toggleFold(folds, GAMES_FOLD, e.currentTarget.closest('.ach-block'), e.currentTarget));
   main.querySelector('#pfCompleteness').addEventListener('click', (e) => {
     if (!e.target.closest('[data-go]')) return;
     showTab('ajustes');
