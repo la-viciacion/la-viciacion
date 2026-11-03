@@ -38,7 +38,7 @@ TOPICS = (
         "rankings, rachas y logros. Con timer: en Inicio, «Nuevo timer», elegir el juego del catálogo y la plataforma; al terminar, «Detener» "
         "(o «Cancelar» si no debe contar). Mientras corre, el grupo ve al jugador como «jugando ahora». Si se olvida, pasadas 4 horas (se puede "
         "cambiar en Perfil → Ajustes → Notificaciones) la app avisa una sola vez; un timer olvidado se cierra editando su hora de fin o "
-        "pidiéndoselo a un administrador. Si el juego no está, «¿No está? Añadir nuevo juego» lo busca en IGDB (y en RAWG si IGDB no responde o no lo tiene) y, si tampoco está, se puede "
+        "pidiéndoselo a un administrador. Si el juego no está, «¿No está? Añadir nuevo juego» lo busca en IGDB y, si tampoco está, se puede "
         "crear a mano con el nombre. Sesión manual («+ Sesión manual» en Inicio): fin posterior al inicio y no en el futuro, como máximo 24 horas, "
         "solo de la temporada en curso, sin solaparse con otra sesión propia y sin timer en marcha. Las sesiones propias de esta temporada "
         "se corrigen o borran en Perfil → Resumen → Juegos → Sesiones; si el juego es otro, se borra y se añade de nuevo (un administrador sí puede cambiarlo).",
@@ -95,9 +95,9 @@ TOPICS = (
         "juega ahora (un timer de más de 6 horas se atenúa como «¿Un timer olvidado?»). Actividad es el muro del grupo (sesiones, juegos empezados y "
         "completados, notas y logros). Jugadores lista a los miembros con sus cifras, y en la página de otro jugador aparece la afinidad con uno mismo: "
         "juegos en común (50 %), notas parecidas (30 %) y tiempo en los mismos géneros (20 %); con menos de 3 juegos en común dice que hay pocos datos. "
-        "Juegos es el catálogo compartido (buscar, ordenar, filtrar, añadir desde IGDB o RAWG) y la página de cada juego tiene portada, géneros, el tiempo medio para "
-        "completarlo (de HowLongToBeat), las cifras del grupo, la nota propia y quién lo tiene. Si IGDB, Steam o RAWG lo conocen, bajo el título salen la nota de la crítica, "
-        "la clasificación por edades, el editor y las plataformas en las que salió, una descripción bajo el nombre (en español si Steam la tiene, si no la de IGDB o RAWG en inglés) "
+        "Juegos es el catálogo compartido (buscar, ordenar, filtrar, añadir desde IGDB) y la página de cada juego tiene portada, géneros, el tiempo medio para "
+        "completarlo (de HowLongToBeat), las cifras del grupo, la nota propia y quién lo tiene. Si IGDB o Steam lo conocen, bajo el título salen la nota de la crítica y la de los usuarios, "
+        "la clasificación por edades, el editor y las plataformas en las que salió, una descripción bajo el nombre (en español si Steam la tiene, si no la de IGDB en inglés) "
         "y una tarjeta «Multimedia» con el tráiler (se carga al pulsarlo) y las capturas; los juegos que ninguna fuente conoce, como muchos de Nintendo, no la tienen. Calendario pone en un mes todos los juegos con fecha de "
         "lanzamiento.",
     ),

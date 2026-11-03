@@ -174,7 +174,7 @@ class GamesAdminTests(ManageTestCase):
     def test_the_data_filter_lists_games_without_id_or_with_incomplete_data(self):
         self.game("done", "Done", rawg_id=505, slug="done", image_url="https://img/d.jpg", genres="Action", tags="")  # "" = RAWG has no tags
         ids = lambda **params: sorted(g["id"] for g in self.games(**params)["items"])  # noqa: E731
-        self.assertEqual(ids(data="unlinked"), ["hades"])
+        self.assertEqual(ids(data="unlinked"), ["celeste", "done", "hades", "tetris"])  # none has an IGDB id: a RAWG id alone does not link a game
         self.assertEqual(ids(data="pending"), ["celeste", "hades", "tetris"])  # what the RAWG sync would try
         self.assertEqual(self.games(data="pending")["total"], 3)
         self.assertEqual(ids(data="pending", search="tet"), ["tetris"])  # combines with the search

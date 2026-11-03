@@ -1,4 +1,4 @@
-// Refresh one game from RAWG and IGDB (metadata) and HLTB (average time) from the games list.
+// Refresh one game from IGDB (metadata) and HLTB (average time) from the games list.
 import { api, jsonRequest } from '../../lib/api.js';
 import { html, mount } from '../../lib/html.js';
 import { modalHeader, openModal } from '../../ui/modal.js';
@@ -14,18 +14,6 @@ const FIELDS = {
 };
 
 const hours = (seconds) => `${Math.round(seconds / 360) / 10} h`;
-
-export function rawgLine(r) {
-  switch (r.status) {
-    case 'updated': return html`✓ Actualizado: ${r.changed.map((f) => FIELDS[f] || f).join(', ')}.`;
-    case 'unchanged': return html`✓ Ya estaba al día.`;
-    case 'not_found': return html`No lo encuentra en RAWG.`;
-    case 'duplicate': return html`Ese juego de RAWG ya lo tiene «${r.other_name}».`;
-    case 'ambiguous': return html`Coincidencia dudosa, elige la correcta:
-      <div class="adm-amb-candidates">${r.candidates.map((c) => html`<button class="adm-btn sm" data-use="${c.rawg_id}" title="${(c.platforms || []).join(', ')}">${c.name}${c.released ? ` (${c.released.slice(0, 4)})` : ''}</button>`)}</div>`;
-    default: return html`Error: ${r.error}`;
-  }
-}
 
 export function igdbLine(r) {
   switch (r.status) {
@@ -54,7 +42,7 @@ export function hltbLine(r) {
 export async function resyncGame(game, admin) {
   const ok = await confirmDialog(
     `Resincronizar · ${game.name}`,
-    html`<p>Se consultarán IGDB, RAWG y HowLongToBeat. Los datos que den <strong>sustituyen</strong> a los guardados (el nombre no se toca y nada se deja en blanco). Si los dos dan el mismo dato, manda IGDB.</p>`,
+    html`<p>Se consultarán IGDB y HowLongToBeat. Los datos que den <strong>sustituyen</strong> a los guardados (el nombre no se toca y nada se deja en blanco). Si los dos dan el mismo dato, manda IGDB.</p>`,
     { ok: 'Resincronizar' },
   );
   if (!ok) return;
@@ -62,7 +50,7 @@ export async function resyncGame(game, admin) {
   const m = openModal(html`
     <div id="rsHead">${modalHeader(`Resincronizando · ${game.name}`)}</div>
     <div class="adm-body" id="rsBody">
-      <p class="adm-sub">Consultando IGDB, RAWG y HowLongToBeat. Puede tardar unos segundos.</p>
+      <p class="adm-sub">Consultando IGDB y HowLongToBeat. Puede tardar unos segundos.</p>
       <div class="adm-indeterminate" role="progressbar" aria-label="Resincronizando"></div>
     </div>
     <div class="adm-actions" id="rsActions"></div>`, { onClose: () => admin.reload() });
@@ -83,19 +71,15 @@ export async function resyncGame(game, admin) {
   const shown = { ...result };
   const draw = () => mount(body, html`
     <p><strong>IGDB</strong><br />${igdbLine(shown.igdb)}</p>
-    <p><strong>RAWG</strong><br />${rawgLine(shown.rawg)}</p>
     <p><strong>HowLongToBeat</strong><br />${hltbLine(shown.hltb)}</p>`);
   draw();
   body.addEventListener('click', async (e) => {
-    const button = e.target.closest('[data-use], [data-use-igdb]');
+    const button = e.target.closest('[data-use-igdb]');
     if (!button) return;
-    const igdb = button.dataset.useIgdb != null;
     button.disabled = true;
     try {
-      const r = igdb
-        ? await api('/manage/igdb-sync/apply', jsonRequest('POST', { game_id: game.id, igdb_id: Number(button.dataset.useIgdb), overwrite: true }))
-        : await api('/manage/rawg-sync/apply', jsonRequest('POST', { game_id: game.id, rawg_id: Number(button.dataset.use), overwrite: true }));
-      shown[igdb ? 'igdb' : 'rawg'] = { status: r.changed.length ? 'updated' : 'unchanged', changed: r.changed };
+      const r = await api('/manage/igdb-sync/apply', jsonRequest('POST', { game_id: game.id, igdb_id: Number(button.dataset.useIgdb), overwrite: true }));
+      shown.igdb = { status: r.changed.length ? 'updated' : 'unchanged', changed: r.changed };
       draw();
     } catch (err) {
       toast(err.message, 'err');
