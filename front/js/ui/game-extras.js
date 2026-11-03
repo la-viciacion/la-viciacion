@@ -1,5 +1,5 @@
 // What the world outside says about a game, on its page: the description under the title (Steam's, in Spanish; else IGDB's or
-// RAWG's), the publisher and the platforms, a few small facts (the critics' score and the age rating, beside
+// RAWG's), the publisher and the platforms, a few small facts (the critics' and users' scores and the age rating, beside
 // the button to the game's page) and a "Multimedia" card with the trailer (a file, or a YouTube video from IGDB) and a
 // carousel of screenshots.
 // On a wide screen the trailer sits beside the header and the carousel runs below it (profile.css); on a phone the
@@ -26,13 +26,14 @@ const playable = (trailer) => Boolean(trailer && (safe(trailer.url) || YOUTUBE_I
 
 const facts = (x) => [
   x.metacritic ? html`<span class="gm-fact" title="${x.critic_source === 'igdb' ? 'Nota media de la crítica (IGDB)' : 'Nota de la crítica en Metacritic'}"><b class="gm-badge ${metaTone(x.metacritic)}">${x.metacritic}</b><span>${x.critic_source === 'igdb' ? 'Crítica' : 'Metacritic'}</span></span>` : '',
+  x.user_rating ? html`<span class="gm-fact" title="Nota media de los usuarios (IGDB)"><b class="gm-badge ${metaTone(x.user_rating)}">${x.user_rating}</b><span>Usuarios</span></span>` : '',
   x.esrb ? html`<span class="gm-fact" title="Clasificación por edades (ESRB)"><b class="gm-badge age">${ESRB_CODES[x.esrb] || '?'}</b><span>${x.esrb}</span></span>` : '',
 ];
 
 // The publisher only when it is not the developer too ("Rockstar Games" under "Rockstar Studios" says something; "Hades" by itself does not)
 const publishersOf = (x, dev) => (x.publishers || []).filter((p) => !dev || !dev.toLowerCase().includes(p.toLowerCase()));
 
-const hasFacts = (x) => x.metacritic || x.esrb;
+const hasFacts = (x) => x.metacritic || x.user_rating || x.esrb;
 const hasMedia = (x) => playable(x.trailer) || x.screenshots?.some((s) => safe(s.full));
 
 function trailerButton(trailer) {

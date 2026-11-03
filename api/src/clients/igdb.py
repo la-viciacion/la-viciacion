@@ -190,9 +190,11 @@ VIDEO_ID = re.compile(r"^[A-Za-z0-9_-]{6,20}$")  # a YouTube id: it goes into th
 
 def media_of(igdb_id: int) -> dict | None:
     """What IGDB says that the page of a game shows: the summary (English), the trailer (a YouTube id), the screenshots, the
-    critics' score, the ESRB age rating (as RAWG names it), the publishers and the platforms. None when IGDB has no such game."""
+    critics' score and the users' one, the ESRB age rating (as RAWG names it), the publishers and the platforms. None when
+    IGDB has no such game."""
     found = _post(
-        "fields url,summary,aggregated_rating,aggregated_rating_count,videos.video_id,videos.name,screenshots.image_id,"
+        "fields url,summary,aggregated_rating,aggregated_rating_count,rating,rating_count,"
+        "videos.video_id,videos.name,screenshots.image_id,"
         "age_ratings.rating_category.rating,age_ratings.rating_category.organization.name,"
         f"involved_companies.publisher,involved_companies.company.name,platforms.name; where id = {int(igdb_id)};"
     )
@@ -203,6 +205,7 @@ def media_of(igdb_id: int) -> dict | None:
     trailers = [v for v in videos if "trailer" in (v.get("name") or "").casefold()]  # the first trailer, else the first video
     shots = [s["image_id"] for s in item.get("screenshots") or [] if s.get("image_id")][:MAX_SCREENSHOTS]
     score = item.get("aggregated_rating")
+    users = item.get("rating")
     esrb = next(
         (
             ESRB_NAMES.get(str((a.get("rating_category") or {}).get("rating")))
@@ -217,6 +220,7 @@ def media_of(igdb_id: int) -> dict | None:
         "trailer": (trailers or videos)[0]["video_id"] if (trailers or videos) else None,
         "screenshots": [{"thumb": SCREENSHOT_THUMB.format(image_id=i), "full": SCREENSHOT_FULL.format(image_id=i)} for i in shots],
         "critic": round(score) if isinstance(score, (int, float)) and score > 0 and item.get("aggregated_rating_count") else None,
+        "user_rating": round(users) if isinstance(users, (int, float)) and users > 0 and item.get("rating_count") else None,
         "esrb": esrb,
         "publishers": _names_of(
             c.get("company") for c in item.get("involved_companies") or [] if c.get("publisher")

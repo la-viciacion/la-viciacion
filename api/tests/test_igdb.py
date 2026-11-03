@@ -179,6 +179,7 @@ class IgdbClientTests(unittest.TestCase):
     def test_the_page_of_a_game_has_its_trailer_screenshots_critics_age_rating_publishers_and_platforms(self):
         item = {
             "id": 5, "summary": " A roguelike. ", "aggregated_rating": 93.5, "aggregated_rating_count": 17,
+            "rating": 81.4, "rating_count": 230,
             "videos": [{"video_id": "bad id!", "name": "Trailer"}, {"video_id": "gameplay001", "name": "Gameplay"}, {"video_id": "trailerabc1", "name": "Launch Trailer"}],
             "screenshots": [{"image_id": f"s{n}"} for n in range(12)],
             "age_ratings": [
@@ -194,6 +195,7 @@ class IgdbClientTests(unittest.TestCase):
             media = igdb.media_of(5)
             self.assertIsNone(igdb.media_of(6))
         self.assertEqual((media["description"], media["trailer"], media["critic"], media["esrb"]), ("A roguelike.", "trailerabc1", 94, "Teen"))
+        self.assertEqual(media["user_rating"], 81)
         self.assertIsNone(media["url"])  # the fixture has none
         self.assertEqual((media["publishers"], media["platforms"], len(media["screenshots"])), (["Supergiant"], ["PC", "Switch"], 8))
         self.assertEqual(media["screenshots"][0], {
@@ -207,10 +209,10 @@ class IgdbClientTests(unittest.TestCase):
                 self.assertEqual(igdb.media_of(5)["url"], url if kept else None)
 
     def test_without_critics_or_a_known_rating_those_are_none(self):
-        item = {"id": 5, "aggregated_rating": 80.0, "age_ratings": [{"rating_category": {"rating": "EC", "organization": {"name": "ESRB"}}}]}
+        item = {"id": 5, "aggregated_rating": 80.0, "rating": 70.0, "age_ratings": [{"rating_category": {"rating": "EC", "organization": {"name": "ESRB"}}}]}
         with mock.patch.object(igdb.requests, "post", side_effect=[_response({"access_token": "t", "expires_in": 5000000}), _response([item])]):
             media = igdb.media_of(5)
-        self.assertEqual((media["critic"], media["esrb"], media["trailer"], media["description"]), (None, None, None, None))  # no critic counted: a score alone is not trusted
+        self.assertEqual((media["critic"], media["user_rating"], media["esrb"], media["trailer"], media["description"]), (None, None, None, None, None))  # no vote counted: a score alone is not trusted
 
     def test_a_dlc_is_marked_and_a_game_igdb_does_not_have_is_none(self):
         with mock.patch.object(igdb.requests, "post", side_effect=[
