@@ -336,4 +336,4 @@
 .comp-list { display: flex; flex-direction: column; gap: 10px; }
 .comp-entry { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 10px 12px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm); }
 
-.sessions-head { margin-top: 16px; }
+.sessions-head { margin-top: 32px; }

@@ -123,6 +123,9 @@ body {
   margin-bottom: 20px;
 }
 
+/* A section that follows other content (a list, a card) is set apart from it; the first one of a block keeps no gap. */
+* + .section-header { margin-top: 32px; }
+
 .section-title {
   font-size: 1.1rem;
   font-weight: 700;
