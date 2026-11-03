@@ -280,6 +280,18 @@ class IgdbClientTests(unittest.TestCase):
             with self.assertRaises(igdb.IgdbError):
                 igdb.search_games("zelda")
 
+    def test_an_answer_that_is_not_what_it_should_be_is_an_igdb_error_and_never_a_stack_trace(self):
+        igdb._token = None
+        bad_token = mock.Mock(ok=True, status_code=200, json=mock.Mock(return_value={"unexpected": 1}))
+        with mock.patch.object(igdb.requests, "post", return_value=bad_token):
+            with self.assertRaises(igdb.IgdbError):
+                igdb.search_games("zelda")
+        igdb._token = ("t", 2**40)
+        html = mock.Mock(ok=True, status_code=200, json=mock.Mock(side_effect=ValueError("not json")))
+        with mock.patch.object(igdb.requests, "post", return_value=html):
+            with self.assertRaises(igdb.IgdbError):
+                igdb.search_games("zelda")
+
     def test_refused_credentials_and_errors_are_igdb_errors(self):
         with mock.patch.object(igdb.requests, "post", return_value=_response({}, 403)):
             with self.assertRaises(igdb.IgdbError):

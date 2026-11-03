@@ -158,13 +158,16 @@ def merge(steam: dict, rawg: dict, igdb_data: dict | None = None) -> dict:
 
 async def _get_json(url: str, params: dict) -> dict | None:
     """The JSON answer, or None when the service fails (logged, never raised)."""
+    rawg = urlparse(url).hostname == "api.rawg.io"
     try:
-        resp = await my_utils._http_get(url, params, timeout=8)
+        resp = await (my_utils.rawg_get if rawg else my_utils._http_get)(url, params, timeout=8)
         if not resp.ok:
             logger.warning(f"Outside game data error {resp.status_code} from {urlparse(url).netloc}: {redact_rawg_key(resp.content)}")
             return None
         body = resp.json()
         return body if isinstance(body, dict) else None
+    except my_utils.RawgPaused:
+        return None  # RAWG failed a moment ago: it is not asked again yet, and said so then
     except Exception as e:
         logger.warning(f"Error fetching outside game data from {urlparse(url).netloc}: {redact_rawg_key(e)}")
         return None

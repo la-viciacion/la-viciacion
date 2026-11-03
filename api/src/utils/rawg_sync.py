@@ -23,7 +23,7 @@ from sqlalchemy import and_, func, or_
 from ..config import Config
 from ..database import models
 from ..database.database import SessionLocal
-from . import game_tags
+from . import game_tags, rawg_health
 from .logger import LogManager
 from .redaction import redact_rawg_key
 
@@ -71,12 +71,15 @@ class _Client:
         return self.calls + needed <= self.max_calls
 
     def get(self, path: str, **params):
+        if rawg_health.paused():  # it failed a moment ago: no wait, no request counted
+            raise ConnectionError("RAWG no responde (en pausa tras un fallo)")
         for attempt in (1, 2):
             time.sleep(THROTTLE_SECONDS if attempt == 1 else 3)
             self.calls += 1
             try:
                 resp = requests.get(f"{RAWG}{path}", params={"key": self.key, **params}, timeout=15)
             except requests.RequestException as e:
+                rawg_health.failed()
                 raise ConnectionError(redact_rawg_key(str(e)))
             # One retry for transient upstream errors (each try counts as a call).
             if resp.status_code in (502, 503, 504) and attempt == 1 and self.budget_left():
