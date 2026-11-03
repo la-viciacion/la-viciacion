@@ -62,7 +62,7 @@ El panel enseña el gasto del **último año** (OpenAI no guarda más): el total
 
 ## Estado del servidor (Hetzner Cloud)
 
-La página **Servidor** (Menú → Explorar, solo para administradores: los jugadores no la ven y la API se la niega) pregunta a Hetzner cómo va la máquina. Solo vale para servidores **Cloud**, no para dedicados.
+La página **Servidor** (Menú → Explorar, la ven todos los jugadores) pregunta a Hetzner cómo va la máquina. Solo vale para servidores **Cloud**, no para dedicados.
 
 1. En la consola de Hetzner Cloud → tu proyecto → **Security → API tokens**, crea un token con permiso de **solo lectura**.
 2. Ponlo en el `.env` como `HETZNER_API_TOKEN=` y reinicia la API. Si el proyecto tiene más de un servidor, indica cuál con `HETZNER_SERVER_ID=` (el número que sale en la URL del servidor en la consola).

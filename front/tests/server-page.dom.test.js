@@ -38,8 +38,8 @@ const HOST = {
   load: [0.5, 0.4, 0.3], cores: 2, uptime: 90061,
 };
 
-test('the page is for the admins: it says so and main.js sends the others home', () => {
-  assert.equal(server.adminOnly, true);
+test('the page is for everybody: it is not admin-only', () => {
+  assert.equal(server.adminOnly, undefined);
 });
 
 const main = () => document.getElementById('main');

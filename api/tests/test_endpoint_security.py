@@ -74,10 +74,10 @@ class EndpointSecurityTests(unittest.TestCase):
                 open_routes.add((method, route.path))
         self.assertEqual(open_routes, PUBLIC)
 
-    def test_the_server_panel_is_admin_only_for_now(self):
+    def test_the_server_panel_needs_a_logged_in_user(self):
         for module, route, method in routes():
             if module is server:
-                self.assertIn("require_admin", dependency_names(route.dependant), f"{method} {route.path}")
+                self.assertIn("get_current_active_user", dependency_names(route.dependant), f"{method} {route.path}")
 
     def test_the_admin_panel_api_is_admin_only(self):
         for module, route, method in routes():

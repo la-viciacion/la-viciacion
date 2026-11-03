@@ -16,7 +16,7 @@ config = Config()
 router = APIRouter(
     prefix="/server",
     tags=["Server"],
-    dependencies=[Depends(auth.require_admin)],  # for now: nobody else sees the server
+    dependencies=[Depends(auth.get_current_active_user)],
 )
 
 
@@ -37,7 +37,7 @@ def get_status(
     db: Session = Depends(get_db),
 ):
     """How the server is doing (CPU, memory, network, disk, traffic and the cost of the month, the year and the whole life,
-    derived from the recorded rates), for the admins. It asks Hetzner (a blocking call: a plain def, so it runs in a worker
+    derived from the recorded rates), for every player. It asks Hetzner (a blocking call: a plain def, so it runs in a worker
     thread) and keeps the answer a minute; `refresh` asks again."""
     token = config.HETZNER_API_TOKEN
     if not token:

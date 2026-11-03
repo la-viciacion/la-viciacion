@@ -1,5 +1,5 @@
 // Structure of the side menu. Pure: no DOM, so it can be tested. Each item is { id, label, href, icon, wip? }
-// (icon is the name of a function of ui/icons.js; `admin`: only the administrators see it); `logout` is not a link, the menu draws it apart at the foot.
+// (icon is the name of a function of ui/icons.js; `admin`: only the administrators see it, none does now); `logout` is not a link, the menu draws it apart at the foot.
 
 /** The sections of the menu for `user`; an empty section (the admin one for a player) is left out. */
 export function menuSections(user) {
@@ -10,12 +10,12 @@ export function menuSections(user) {
     ] },
     { label: 'Explorar', items: [
       { id: 'games', label: 'Juegos', href: '#/games', icon: 'iconGamepad' },
-      { id: 'library', label: 'Biblioteca del grupo', href: '#/library', icon: 'iconStar' },
+      { id: 'library', label: 'Biblioteca', href: '#/library', icon: 'iconStar' },
+      { id: 'players', label: 'Jugadores', href: '#/players', icon: 'iconPerson' },
       { id: 'calendar', label: 'Calendario', href: '#/calendar', icon: 'iconCalendar' },
       { id: 'achievements', label: 'Logros', href: '#/achievements', icon: 'iconTrophy' },
-      { id: 'players', label: 'Jugadores', href: '#/players', icon: 'iconPerson' },
-      { id: 'server', label: 'Servidor', href: '#/server', icon: 'iconServer', admin: true },
       { id: 'stats', label: 'Estadísticas', href: '#/stats', icon: 'iconChart', wip: true },
+      { id: 'server', label: 'Servidor', href: '#/server', icon: 'iconServer' },
     ] },
     { label: 'Tú', items: [
       { id: 'profile', label: 'Mi perfil', href: '#/profile/resumen', icon: 'iconProfile' },
