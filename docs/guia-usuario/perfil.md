@@ -17,7 +17,9 @@ Arriba, con una pastilla por **temporada** (y **Total** para todo el historial),
 | **Racha actual / Mejor racha** | Días seguidos jugando. La racha actual solo aparece en la temporada en curso y en el total. |
 | **Logros** | Logros que has conseguido. |
 
-Debajo, tus **más jugados**, tus **logros** de la temporada, tus **retos** y la lista completa de **juegos** con sus botones: *Sesiones*, *Cambiar nota*, *Marcar completado* y *Abandonar*.
+Debajo, tus **más jugados**, tus **últimos logros** de la temporada (los cinco más recientes), tus **retos** y la lista de **juegos**, que se puede plegar y con sus botones: *Sesiones*, *Cambiar nota*, *Marcar completado* y *Abandonar*.
+
+Mientras te falte la foto, la ciudad o la fecha de nacimiento, arriba sale una tarjeta con el porcentaje del perfil completado y un botón **Completar**. Al abrir la app también puede salir un aviso en la parte baja: con **Ahora no** vuelve a la semana, y deja de salir un mes después de la primera vez o en cuanto el perfil esté completo.
 
 Para cambiar tu foto, pulsa **Cambiar foto** (PNG o JPG).
 
@@ -33,9 +35,9 @@ Si has jugado un mismo juego en varias plataformas dentro de una temporada, sale
 
 Cada juego sin terminar tiene un **estado**: *En curso*, *Pausado* (llevas más de 30 días sin jugarlo), *Pendiente* (lo tienes pero nunca lo has jugado), *Completado*, *Abandonado* o *Sin completar* (se quedó a medias en una temporada ya cerrada). Se puede filtrar por cualquiera.
 
-Encima de la lista, **¿Qué juego sigo?** propone a qué volver: los **casi terminados** (llevas al menos el 70 % de lo que suele durar), los **olvidados** (más de 60 días sin tocarlos) y los **cortos** (duran menos de 5 horas según HowLongToBeat, los hayas empezado o no). Usa el tiempo medio de HowLongToBeat, así que un juego sin tiempo medio solo puede salir como olvidado.
+Encima de la lista, **¿Qué juego sigo?** propone a qué volver (el icono **i** de cada lista explica cómo se elige): los **casi terminados** (llevas al menos el 70 % de lo que suele durar), los **olvidados** (más de 60 días sin tocarlos) y los **cortos** (duran menos de 5 horas según HowLongToBeat, los hayas empezado o no). Usa el tiempo medio de HowLongToBeat, así que un juego sin tiempo medio solo puede salir como olvidado.
 
-**Puntuar al azar** abre un juego de los que todavía no has puntuado: pones la nota, y con cada una te sale el siguiente hasta que no queden. **Omitir, ver otro** pasa al siguiente y **Dejar de puntuar** cierra la ventana.
+**Puntuar al azar** (el botón solo sale si te quedan juegos sin nota) abre un juego de los que todavía no has puntuado: pones la nota, y con cada una te sale el siguiente hasta que no queden. **Omitir, ver otro** pasa al siguiente y **Dejar de puntuar** cierra la ventana.
 
 ## Ajustes
 
@@ -43,7 +45,7 @@ Encima de la lista, **¿Qué juego sigo?** propone a qué volver: los **casi ter
 
 Los ajustes están en cuatro grupos, que eliges con los botones de arriba: **Perfil**, **Seguridad**, **Notificaciones** y **Tus datos**.
 
-- **Perfil** (Mis datos): tu nombre, tu usuario, tu email, tu **Telegram ID** (con un botón para enviarte un mensaje de prueba), tu **ciudad** y tu **fecha de nacimiento**. La ciudad y la fecha de nacimiento solo sirven para algunos [logros secretos](logros.md) (el tiempo, los eclipses, tu cumpleaños…) y, el día de tu cumpleaños, para que el logo te lo celebre con una tarta y la primera vez que abras la app ese día te salga una felicitación (nunca dice tu edad); nadie más las ve.
+- **Perfil** (Mis datos): tu nombre, tu usuario, tu email, tu **Telegram ID** (solo se ve: se vincula con `/activate` en el grupo y solo un administrador puede cambiarlo o quitarlo; hay un botón para enviarte un mensaje de prueba), tu **ciudad** y tu **fecha de nacimiento**. La ciudad y la fecha de nacimiento solo sirven para algunos [logros secretos](logros.md) (el tiempo, los eclipses, tu cumpleaños…) y, el día de tu cumpleaños, para que el logo te lo celebre con una tarta y la primera vez que abras la app ese día te salga una felicitación (nunca dice tu edad); nadie más las ve.
 - **Seguridad**: cambia tu contraseña cuando quieras y cierra la sesión en ese dispositivo.
 - **Notificaciones**: qué avisos privados quieres recibir y por qué canal (Telegram y/o móvil), y los dispositivos en los que tienes las notificaciones activadas. Más en [Notificaciones y Telegram](notificaciones.md).
 - **Tus datos**: **Descargar mis datos** te da un archivo `.json` con tus sesiones, tu biblioteca, tus notas, los precios que has apuntado, tu lista de deseados y tus logros.

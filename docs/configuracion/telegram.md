@@ -52,7 +52,7 @@ En **Sistema → Servicios** ves si el token y los identificadores están puesto
 
 ## Que cada jugador se vincule
 
-Cada jugador escribe `/activate` en el grupo. El bot guarda su identificador de Telegram si su **usuario de la app coincide con su `@usuario` de Telegram** (no distingue mayúsculas) y no hay otra cuenta con ese identificador. También se puede poner o corregir el **Telegram ID** a mano desde el perfil o el panel. Ver la [guía de usuario](../guia-usuario/notificaciones.md).
+Cada jugador escribe `/activate` en el grupo. El bot guarda su identificador de Telegram si su **usuario de la app coincide con su `@usuario` de Telegram** (no distingue mayúsculas) y no hay otra cuenta con ese identificador. Un jugador no puede escribir ni quitar su **Telegram ID**: solo un administrador puede ponerlo, corregirlo o quitarlo, desde el panel. Ver la [guía de usuario](../guia-usuario/notificaciones.md).
 
 Esa es la **única escritura** del bot; todo lo demás que hace es consultar.
 

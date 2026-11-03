@@ -12,6 +12,7 @@ La Viciación avisa por dos canales: **Telegram** (un grupo y un bot) y las **no
 - Cambios en los rankings de horas y de juegos.
 - Rachas perdidas (cada día a las 05:00 se anuncian las del día anterior).
 - Los lanzamientos de la lista de deseados: **el día antes** de que salga un juego (lo normal) o, si el administrador lo prefiere, **un resumen cada domingo** con los que salen en los 7 días siguientes. Nunca los dos.
+- Las **encuestas** que lanza un administrador: aparecen como una encuesta de Telegram normal en el grupo (se ve quién vota qué), puede haber una abierta a la vez, a veces dejan añadir opciones, y al cerrarse se avisa de la opción ganadora.
 - El resumen mensual o anual y los retos del grupo: cuando se lanza uno, cuando el grupo llega al total y, al día siguiente de que acabe, cómo ha terminado.
 
 Los textos pueden estar escritos por una IA para que sean más graciosos, si el administrador la ha configurado.
@@ -48,7 +49,7 @@ El bot solo atiende a los miembros del grupo con cuenta en la app. Para que te r
 
 Cuando entras al grupo, el bot te da la bienvenida y te recuerda este paso.
 
-También puedes poner tu **Telegram ID** a mano en **Perfil → Ajustes → Perfil** y probarlo con **Enviar mensaje de prueba**.
+No puedes escribir ni quitar tu **Telegram ID** a mano (nada prueba que sea tuyo): lo pone `/activate` o un administrador. En **Perfil → Ajustes → Perfil** lo ves y lo pruebas con **Enviar mensaje de prueba**.
 
 ### El menú del bot
 
