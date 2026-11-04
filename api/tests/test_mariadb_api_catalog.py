@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from unittest import mock
 
 from PIL import Image
+from sqlalchemy import text
 
 from src.database import database
 from src.utils import images, messages, my_utils, push, seasons, settings
@@ -341,6 +342,13 @@ class PlatformsAndAchievementImagesTests(CatalogTestCase):
     def test_the_version_needs_a_login_and_is_dev_without_a_release_build(self):
         self.assertEqual(self.api("GET", "/utils/version").status_code, 401)
         self.assertEqual(self.api("GET", "/utils/version", as_user="ana").json(), {"version": "dev"})
+
+    def test_the_easter_eggs_wait_for_the_season_of_their_achievement(self):
+        self.assertEqual(self.api("GET", "/utils/easter-eggs").status_code, 401)
+        self.assertEqual(self.api("GET", "/utils/easter-eggs", as_user="ana").json(), {"logo": False, "konami": False})  # they count from 2027
+        with self.engine.begin() as conn:
+            conn.execute(text("UPDATE achievements SET valid_from_season = :s WHERE `key` = 'KONAMI_LIFETIME'"), {"s": seasons.current()})
+        self.assertEqual(self.api("GET", "/utils/easter-eggs", as_user="ana").json(), {"logo": False, "konami": True})
 
     def test_an_achievement_image_is_public_once_uploaded(self):
         key = self.key()
