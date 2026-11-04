@@ -254,6 +254,26 @@ def after_timer_stop(user_id: int, game_id: str, duration_seconds: int | None):
         logger.error("Error unpinning the timer notification: " + str(e), exc_info=True)
 
 
+def after_easter_egg(user_id: int, ach):
+    """Background-task entrypoint for an easter egg the front reported: unlocks its achievement and announces it."""
+    from ..database.database import SessionLocal
+
+    async def _run():
+        db = SessionLocal()
+        try:
+            user = users.get_user_by_id(db, user_id)
+            if user is not None:
+                await achievements.easter_egg(db, user, ach)
+        finally:
+            db.close()
+
+    with _check_lock:
+        try:
+            asyncio.run(_run())
+        except Exception as e:
+            logger.error("Error unlocking an easter egg achievement: " + str(e), exc_info=True)
+
+
 def after_completion(entry_id: int, silent: bool = False):
     """Background-task entrypoint for a completed library entry: average time, achievements and the
     group announcement. Best effort: the completion itself is already saved."""

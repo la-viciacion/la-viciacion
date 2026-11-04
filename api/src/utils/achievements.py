@@ -1,8 +1,5 @@
 from enum import Enum
 
-
-
-
 # An achievement whose key ends like this has no season limit: it counts the whole history of a player and is
 # earned once, not once a season (see crud/achievements.py). Nothing else says so: the name is the rule.
 LIFETIME_SUFFIX = "_LIFETIME"
@@ -645,6 +642,24 @@ class AchievementsElems(Enum):
         "message": "*{}* ha desenterrado _{}_, un juego con 25 años (o más) a sus espaldas. Con brocha, paciencia y un emulador.",
     }
 
+    # The easter eggs of the app itself (see EASTER_EGGS): they cannot be worked out from the sessions, so the front
+    # reports them when they happen and no recalculation touches them
+    LOGO_BLAST_LIFETIME = {
+        "since": 2027,
+        "special": 1,
+        "secret": True,
+        "title": "Big Bang",
+        "message": "*{}* ha descubierto un secreto de la casa, aunque no sabemos si ha sido por error.",
+    }
+
+    KONAMI_LIFETIME = {
+        "since": 2027,
+        "special": 2,
+        "secret": True,
+        "title": "Treinta vidas",
+        "message": "*{}* se ha sacado un truco de los de antes, de los de boli y papel.",
+    }
+
     JUST_IN_TIME = {
         "since": 2023,
         "special": 1,
@@ -690,3 +705,10 @@ class AchievementsElems(Enum):
         + " es un animal nocturno, y por eso empieza a jugar de madrugada (a partir de las 2)."
         + " Bueno, lo más seguro es que juegue a todas horas.",
     }
+
+
+# The easter eggs the front reports (POST /users/{username}/easter-egg/{name}) and the achievement each one unlocks
+EASTER_EGGS = {
+    "logo": AchievementsElems.LOGO_BLAST_LIFETIME,
+    "konami": AchievementsElems.KONAMI_LIFETIME,
+}
