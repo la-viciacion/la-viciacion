@@ -1299,12 +1299,12 @@ class EasterEggTests(unittest.IsolatedAsyncioTestCase):
 
     def test_an_egg_can_be_earned_only_from_its_season_and_while_switched_on(self):
         logo = ach_module.AchievementsElems.LOGO_BLAST_LIFETIME
-        self.assertIsNone(Achievements.easter_egg_since(self.db, logo))  # 2027: the front keeps the egg from going off
+        self.assertEqual(Achievements.easter_egg_since(self.db, logo), (None, "the achievement counts from 2027"))  # the front keeps the egg from going off
         self.start_in(YEAR)
-        self.assertEqual(Achievements.easter_egg_since(self.db, logo), YEAR)
+        self.assertEqual(Achievements.easter_egg_since(self.db, logo), (YEAR, ""))
         self.db.query(models.Achievement).filter_by(key=logo.name).update({"active": False})
         self.db.commit()
-        self.assertIsNone(Achievements.easter_egg_since(self.db, logo))
+        self.assertEqual(Achievements.easter_egg_since(self.db, logo), (None, "the achievement is switched off"))
 
     async def test_each_egg_unlocks_its_own_achievement(self):
         self.start_in(YEAR, "KONAMI_LIFETIME")

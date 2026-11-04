@@ -254,8 +254,9 @@ def after_timer_stop(user_id: int, game_id: str, duration_seconds: int | None):
         logger.error("Error unpinning the timer notification: " + str(e), exc_info=True)
 
 
-def after_easter_egg(user_id: int, ach):
-    """Background-task entrypoint for an easter egg the front reported: unlocks its achievement and announces it."""
+def after_easter_egg(user_id: int, egg: str, ach):
+    """Background-task entrypoint for an easter egg the front reported: unlocks its achievement and announces it. The
+    outcome is logged, so it can be told who found which egg and whether it gave them the achievement."""
     from ..database.database import SessionLocal
 
     async def _run():
@@ -263,7 +264,8 @@ def after_easter_egg(user_id: int, ach):
         try:
             user = users.get_user_by_id(db, user_id)
             if user is not None:
-                await achievements.easter_egg(db, user, ach)
+                unlocked = await achievements.easter_egg(db, user, ach)
+                logger.info(f"Easter egg '{egg}' by {user.username}: " + ("achievement unlocked" if unlocked else "no achievement, they already have it"))
         finally:
             db.close()
 

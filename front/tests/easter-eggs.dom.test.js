@@ -6,12 +6,12 @@ const window = installDom('<a href="#" class="navbar-brand"><img alt=""></a><inp
 const { LOGO_MESSAGES, mountEasterEggs } = await import('../js/ui/easter-eggs.js');
 const reported = [];
 const armed = { logo: true, konami: true };
-mountEasterEggs({ onEasterEgg: (egg) => reported.push(egg), isArmed: async (egg) => armed[egg] });
+mountEasterEggs({ attempt: async (egg) => { reported.push(egg); return armed[egg]; } });
 mountEasterEggs(); // mounting twice must not double the listeners
 
 afterEach(() => document.querySelectorAll('.toast, .konami-rain, .logo-blast').forEach((el) => el.remove()));
 
-// an egg asks whether it is armed before it goes off: let that answer arrive
+// an egg reports the attempt and asks whether it is armed before it goes off: let that answer arrive
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 const press = (key, target = document) => target.dispatchEvent(new window.KeyboardEvent('keydown', { key, bubbles: true }));
 const toasts = () => [...document.querySelectorAll('.toast')].map((el) => el.textContent);
@@ -65,7 +65,7 @@ test('the seventh click also blows the logo up, once, and the blast clears itsel
   assert.equal(document.querySelectorAll('.logo-blast').length, 1);
   assert.equal(document.querySelectorAll('.logo-blast-spark').length, 28);
   assert.ok(document.querySelector('.navbar-brand').classList.contains('logo-shake'));
-  assert.deepEqual(reported.filter((egg) => egg === 'logo'), ['logo', 'logo']); // reported each time, also by the click test above
+  assert.deepEqual(reported.filter((egg) => egg === 'logo'), ['logo', 'logo']); // attempted each time, also by the click test above
 });
 
 test('an egg whose achievement cannot be earned yet does not go off, so nobody finds it too early', async () => {
@@ -78,7 +78,7 @@ test('an egg whose achievement cannot be earned yet does not go off, so nobody f
   assert.equal(document.querySelector('.logo-blast'), null);
   assert.equal(document.querySelector('.konami-rain'), null);
   assert.deepEqual(toasts(), []);
-  assert.equal(reported.length, before);
+  assert.deepEqual(reported.slice(before), ['logo', 'konami']); // the attempt is still reported, so the API can log it
 });
 
 test('an egg goes off for the one that is armed and not for the other', async () => {

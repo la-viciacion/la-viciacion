@@ -170,8 +170,14 @@ class UpdateProfileTests(UsersTestCase):
             self.assertEqual(self.api("POST", "/users/ana/easter-egg/logo", as_user="root").status_code, 403)  # not even an admin
             self.assertEqual(self.api("POST", "/users/ana/easter-egg/nope", as_user="ana").status_code, 404)
             unlock.assert_not_called()
-            self.assertEqual(self.api("POST", "/users/ana/easter-egg/konami", as_user="ana").status_code, 202)
-            unlock.assert_called_once_with(self.ana, AchievementsElems.KONAMI_LIFETIME)
+            with self.assertLogs(users_router.logger, "INFO") as logged:  # they count from 2027: not armed, and it is logged
+                self.assertEqual(self.api("POST", "/users/ana/easter-egg/konami", as_user="ana").json(), {"armed": False})
+            self.assertIn("Easter egg 'konami' by ana: not armed, the achievement counts from 2027", logged.output[0])
+            unlock.assert_not_called()
+            with self.engine.begin() as conn:
+                conn.execute(text("UPDATE achievements SET valid_from_season = :s WHERE `key` = 'KONAMI_LIFETIME'"), {"s": seasons.current()})
+            self.assertEqual(self.api("POST", "/users/ana/easter-egg/konami", as_user="ana").json(), {"armed": True})
+            unlock.assert_called_once_with(self.ana, "konami", AchievementsElems.KONAMI_LIFETIME)
 
     def test_it_only_changes_what_was_sent(self):
         self.patch(name="Only name")
