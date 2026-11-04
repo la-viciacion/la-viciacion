@@ -21,6 +21,7 @@ from ..auth import get_db
 from ..crud import data_export, game_prices, games, scores, users, wishlist
 from ..database import models, schemas
 from ..utils import actions, audit, images, places
+from ..utils.achievements import EASTER_EGGS
 from ..utils import messages as msg
 from ..utils import my_utils as utils
 from ..utils.logger import LogManager
@@ -217,6 +218,22 @@ def change_password(
     users.change_password(db, user, body.new_password)
     audit.record_event(request, "password_changed", 200, user=user)
     return {"message": "Contraseña actualizada"}
+
+
+@router.post("/{username}/easter-egg/{egg}", status_code=202)
+def easter_egg(
+    username: str,
+    egg: str,
+    background_tasks: BackgroundTasks,
+    active_user: models.User = Depends(auth.get_current_active_user),
+):
+    """The front reports that an easter egg went off (the logo blew up, the Konami code): its achievement is checked
+    in background and nobody else is told."""
+    auth.ensure_self(active_user, username)
+    if egg not in EASTER_EGGS:
+        raise HTTPException(status_code=404, detail="Not found")
+    background_tasks.add_task(actions.after_easter_egg, active_user.id, EASTER_EGGS[egg])
+    return {"message": "Recibido"}
 
 
 @router.get("/{username}/library")

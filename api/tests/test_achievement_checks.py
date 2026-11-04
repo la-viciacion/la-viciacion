@@ -9,7 +9,7 @@ from src.crud import time_entries
 from src.crud.achievements import Achievements
 from src.database import models
 from src.utils import astronomy, seasons, weather
-from src.utils.achievements import first_season, is_lifetime
+from src.utils.achievements import EASTER_EGGS, first_season, is_lifetime
 from tests.sqlite_db import make_session
 from tests import clock
 
@@ -776,10 +776,11 @@ class LifetimeTests(unittest.IsolatedAsyncioTestCase):
         outside_world = {ach.name for ach in ach_module.EXTERNAL_LIFETIME}  # about when and what, not how much: no tables
         rescues = {ach.name for ach in ach_module.RESCUES_LIFETIME}  # about what happened to a game, not how much: no tables
         challenges = {ach.name for ach, _ in ach_module.LIFETIME_CHALLENGES} | {ach.name for ach in ach_module.CHALLENGE_FEATS}  # about the challenges met: their own check
+        eggs = {ach.name for ach in EASTER_EGGS.values()}  # reported by the front, not worked out: no check at all
         by_name = {ach.name for ach in ach_module.AchievementsElems if is_lifetime(ach.name)}
-        self.assertEqual(in_tables | outside_world | rescues | challenges, by_name)  # a typo in the suffix would turn one into a seasonal one without a word
-        self.assertTrue(in_tables.isdisjoint(outside_world | rescues | challenges) and outside_world.isdisjoint(rescues | challenges) and rescues.isdisjoint(challenges))
-        self.assertEqual((len(in_tables), len(outside_world), len(rescues), len(challenges)), (20, 15, 2, 5))
+        self.assertEqual(in_tables | outside_world | rescues | challenges | eggs, by_name)  # a typo in the suffix would turn one into a seasonal one without a word
+        self.assertTrue(in_tables.isdisjoint(outside_world | rescues | challenges | eggs) and outside_world.isdisjoint(rescues | challenges | eggs) and rescues.isdisjoint(challenges | eggs) and challenges.isdisjoint(eggs))
+        self.assertEqual((len(in_tables), len(outside_world), len(rescues), len(challenges), len(eggs)), (20, 15, 2, 5, 2))
         for table in tables:
             self.assertTrue(all(is_lifetime(ach.name) for ach, _ in table))
         for table in (ach_module.TOTAL_HOURS, ach_module.TOTAL_DAYS, ach_module.PLAYED_GAMES, ach_module.COMPLETED_GAMES, ach_module.HOURS_IN_A_GAME):
@@ -1253,6 +1254,60 @@ class OutsideWorldTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("STAR_WARS_DAY_LIFETIME", expected)  # what needs no weather is worked out as ever
         self.assertNotIn("STORM_LIFETIME", expected)
         self.assertIn("STORM_LIFETIME", undecided)  # so the recalculation leaves it alone instead of revoking it
+
+
+class EasterEggTests(unittest.IsolatedAsyncioTestCase):
+    """The easter eggs (the logo, the Konami code): reported by the front, earned once in a lifetime, from 2027."""
+
+    def setUp(self):
+        self.db = make_session()
+        Achievements().populate_achievements(self.db)
+        self.sent = mock.AsyncMock()
+        patcher = mock.patch.object(ach_module.utils, "send_message", self.sent)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.private = mock.AsyncMock()
+        patcher = mock.patch.object(ach_module.utils, "send_message_to_user", self.private)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def rows(self):
+        return self.db.query(models.UserAchievement).count()
+
+    def start_in(self, season, key="LOGO_BLAST_LIFETIME"):
+        self.db.query(models.Achievement).filter_by(key=key).update({"valid_from_season": season})
+        self.db.commit()
+
+    async def test_it_is_earned_once_and_only_the_player_hears_what_it_is(self):
+        self.start_in(YEAR)
+        logo = ach_module.AchievementsElems.LOGO_BLAST_LIFETIME
+        self.assertTrue(await Achievements().easter_egg(self.db, USER, logo))
+        self.assertFalse(await Achievements().easter_egg(self.db, USER, logo))
+        self.assertEqual(self.rows(), 1)
+        self.assertEqual(self.sent.await_count, 1)  # the group: somebody unlocked a hidden achievement
+        self.assertNotIn("Big Bang", self.sent.await_args.args[0])
+        self.assertIn("Big Bang", self.private.await_args.args[1])
+
+    async def test_it_earns_nothing_before_its_season_or_when_switched_off(self):
+        logo = ach_module.AchievementsElems.LOGO_BLAST_LIFETIME
+        self.assertFalse(await Achievements().easter_egg(self.db, USER, logo))  # it begins to count in 2027
+        self.start_in(YEAR)
+        self.db.query(models.Achievement).filter_by(key=logo.name).update({"active": False})
+        self.db.commit()
+        self.assertFalse(await Achievements().easter_egg(self.db, USER, logo))
+        self.assertEqual(self.rows(), 0)
+
+    async def test_each_egg_unlocks_its_own_achievement(self):
+        self.start_in(YEAR, "KONAMI_LIFETIME")
+        self.assertTrue(await Achievements().easter_egg(self.db, USER, ach_module.AchievementsElems.KONAMI_LIFETIME))
+        self.assertEqual(self.rows(), 1)  # the logo's stays locked: it was not asked for
+
+    def test_they_are_hidden_special_and_without_a_season_limit(self):
+        self.assertEqual(set(EASTER_EGGS), {"logo", "konami"})
+        for ach in EASTER_EGGS.values():
+            self.assertTrue(is_lifetime(ach.name))
+            self.assertEqual((ach.value["secret"], ach.value["since"]), (True, 2027))
+            self.assertIn(ach.value["special"], (1, 2, 3))
 
 
 LEGACY_2023 = {  # the achievements that existed before the rule 'every new one starts in 2027'

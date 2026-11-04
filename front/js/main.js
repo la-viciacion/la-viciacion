@@ -156,7 +156,12 @@ window.addEventListener('hashchange', () => {
   if (session.getToken() || isResetRoute(location.hash)) route();
 });
 
-mountEasterEggs();
+// the easter eggs are achievements: the API decides whether one counts, so a failure is nobody's business
+mountEasterEggs({
+  onEasterEgg: (egg) => {
+    if (knownUser) api(`/users/${encodeURIComponent(knownUser.username)}/easter-egg/${egg}`, { method: 'POST' }).catch(() => {});
+  },
+});
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(console.warn));

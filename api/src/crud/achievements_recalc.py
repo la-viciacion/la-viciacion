@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 from ..database import models
 from ..utils import actions  # noqa: F401  (imported first: the crud and utils modules import each other)
 from ..utils import seasons
-from ..utils.achievements import is_lifetime
+from ..utils.achievements import EASTER_EGGS, is_lifetime
 from ..utils.logger import LogManager
 from . import time_entries
 from .achievements import ALL_TOGETHER_PLAYERS, Achievements, Award, just_in_time_holds, just_in_time_tolerance
@@ -33,6 +33,9 @@ MULTIPLAYER_KEYS = {"TEAMWORK", "ALL_TOGETHER"}
 # judged against data that changes afterwards (the average time of HLTB, stored in `games`, never fetched here): the
 # recalculation that follows a session never touches them, only the admin's, which shows each change before it is made
 MOMENT_KEYS = {"JUST_IN_TIME"}
+# reported by the front when they happen, so nothing in the database says who deserves them: no recalculation, not even
+# the admin's, may revoke them
+EVENT_KEYS = {ach.name for ach in EASTER_EGGS.values()}
 
 
 class Change(NamedTuple):
@@ -251,6 +254,7 @@ async def _plan(
     titles = {key: title for key, title in db.query(models.Achievement.key, models.Achievement.title).all()}
     switched_on = {key for (key,) in db.query(models.Achievement.key).filter(models.Achievement.active == True)}  # noqa: E712
     allowed = switched_on if achievement_keys is None else switched_on & set(achievement_keys)
+    allowed -= EVENT_KEYS
     if not moments:
         allowed -= MOMENT_KEYS
     valid_from = dict(db.query(models.Achievement.key, models.Achievement.valid_from_season).all())
