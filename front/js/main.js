@@ -156,8 +156,18 @@ window.addEventListener('hashchange', () => {
   if (session.getToken() || isResetRoute(location.hash)) route();
 });
 
+// Which easter eggs can be earned now, asked when the first one is about to go off (once it answers). Nobody signed in
+// or no answer: none goes off.
+let armedEggs = null;
+const isEggArmed = async (egg) => {
+  if (!knownUser) return false;
+  armedEggs ??= api('/utils/easter-eggs').catch(() => { armedEggs = null; return {}; });
+  return (await armedEggs)?.[egg] === true;
+};
+
 // the easter eggs are achievements: the API decides whether one counts, so a failure is nobody's business
 mountEasterEggs({
+  isArmed: isEggArmed,
   onEasterEgg: (egg) => {
     if (knownUser) api(`/users/${encodeURIComponent(knownUser.username)}/easter-egg/${egg}`, { method: 'POST' }).catch(() => {});
   },

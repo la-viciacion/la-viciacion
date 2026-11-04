@@ -65,25 +65,32 @@ function rainOfGames() {
   setTimeout(() => rain.remove(), RAIN_MS);
 }
 
-function konami(report) {
+function konami() {
   rainOfGames();
   toast('↑↑↓↓←→←→BA · +30 vidas');
-  report('konami');
 }
 
 let mounted = false;
 
-// `onEasterEgg(name)` is told when one goes off ('logo', 'konami'), so the app can report it (each is an achievement)
-export function mountEasterEggs({ onEasterEgg = () => {} } = {}) {
+// Each egg is an achievement, and only goes off while its achievement can be earned (`isArmed(name)`, asked when the
+// egg is about to go off; before that day a player who found it would not try again). `onEasterEgg(name)` is told
+// when one went off ('logo', 'konami'), so the app can report it.
+export function mountEasterEggs({ onEasterEgg = () => {}, isArmed = async () => true } = {}) {
   if (mounted) return;
   mounted = true;
+
+  const goOff = (name, effect) => isArmed(name).then((armed) => {
+    if (!armed) return;
+    effect();
+    onEasterEgg(name);
+  }).catch(() => {});
 
   const typing = (el) => el?.closest?.('input, textarea, select, [contenteditable]');
   const keys = sequenceMatcher(KONAMI_KEYS);
   document.addEventListener('keydown', (e) => {
     if (e.repeat || typing(e.target)) return;
     const step = keyStep(e.key);
-    if (step && keys(step)) konami(onEasterEgg);
+    if (step && keys(step)) goOff('konami', konami);
   });
 
   const swipes = sequenceMatcher(KONAMI_SWIPES);
@@ -96,7 +103,7 @@ export function mountEasterEggs({ onEasterEgg = () => {} } = {}) {
     if (!start || !end) return;
     const step = swipeStep(end.clientX - start.x, end.clientY - start.y);
     start = null;
-    if (swipes(step)) konami(onEasterEgg);
+    if (swipes(step)) goOff('konami', konami);
   }, { passive: true });
 
   // the logo keeps taking you home; this only counts the clicks
@@ -104,9 +111,10 @@ export function mountEasterEggs({ onEasterEgg = () => {} } = {}) {
   document.addEventListener('click', (e) => {
     const brand = e.target.closest?.('.navbar-brand');
     if (brand && logoClicks()) {
-      logoBlast(brand);
-      onEasterEgg('logo');
-      toast(LOGO_MESSAGES[Math.floor(Math.random() * LOGO_MESSAGES.length)]);
+      goOff('logo', () => {
+        logoBlast(brand);
+        toast(LOGO_MESSAGES[Math.floor(Math.random() * LOGO_MESSAGES.length)]);
+      });
     }
   });
 }

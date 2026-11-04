@@ -7,6 +7,7 @@ from ..config import Config
 from ..crud.achievements import Achievements
 from ..database import models
 from ..utils import images
+from ..utils.achievements import EASTER_EGGS
 from ..utils import messages as msg
 from ..utils import my_utils as utils
 from ..utils.logger import LogManager
@@ -38,6 +39,16 @@ def platforms(
     for tag in tags:
         response.append({"id": tag[0], "name": tag[1]})
     return response
+
+
+@router.get("/easter-eggs")
+def easter_eggs(
+    db: Session = Depends(get_db),
+    user: models.User = Security(auth.get_current_active_user),
+):
+    """Which easter eggs can be earned now ({name: bool}): one goes off only while its achievement counts, so nobody
+    finds it before it can give them anything (the achievement's season is what says so, 2027 for the first two)."""
+    return {name: achievements.easter_egg_since(db, ach) is not None for name, ach in EASTER_EGGS.items()}
 
 
 @router.get("/version")
