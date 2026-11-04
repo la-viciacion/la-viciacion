@@ -906,6 +906,19 @@ class Achievements:
                     )
                     break
 
+    async def easter_egg(self, db: Session, user: models.User, ach: AchievementsElems, silent: bool = False) -> bool:
+        """An easter egg (see EASTER_EGGS), reported by the front: it is earned once in a lifetime, from the season it
+        begins to count in. True if it was unlocked now."""
+        row = (
+            db.query(models.Achievement.active, models.Achievement.valid_from_season)
+            .filter(models.Achievement.key == ach.name)
+            .first()
+        )
+        if row is None or not row.active or row.valid_from_season > seasons.current():
+            return False
+        view = Achievements(silent=silent, season=seasons.ALL, since=row.valid_from_season)
+        return await view._unlock_if_new(db, user, ach, silent)
+
     async def archaeologist(self, db: Session, user: models.User, silent: bool = False, played: list | None = None):
         """A session or timer of a game that was 25 years old or more the day it started (a game with no release
         date never counts). Dated that moment, naming the game."""

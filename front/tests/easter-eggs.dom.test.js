@@ -4,7 +4,8 @@ import { installDom } from './dom.js';
 
 const window = installDom('<a href="#" class="navbar-brand"><img alt=""></a><input id="field">');
 const { LOGO_MESSAGES, mountEasterEggs } = await import('../js/ui/easter-eggs.js');
-mountEasterEggs();
+const reported = [];
+mountEasterEggs({ onEasterEgg: (egg) => reported.push(egg) });
 mountEasterEggs(); // mounting twice must not double the listeners
 
 afterEach(() => document.querySelectorAll('.toast, .konami-rain').forEach((el) => el.remove()));
@@ -25,6 +26,7 @@ test('the Konami code on a keyboard rains games and says so once', () => {
   for (const key of ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a']) press(key);
   assert.equal(document.querySelectorAll('.konami-rain span').length, 36);
   assert.deepEqual(toasts(), ['↑↑↓↓←→←→BA · +30 vidas']);
+  assert.deepEqual(reported, ['konami']);
 });
 
 test('on a phone the same code is swiped and tapped', () => {
@@ -46,4 +48,14 @@ test('seven clicks on the logo show one of the messages', () => {
   logo.click();
   assert.equal(toasts().length, 1);
   assert.ok(LOGO_MESSAGES.includes(toasts()[0]));
+});
+
+test('the seventh click also blows the logo up, once, and the blast clears itself', () => {
+  const logo = document.querySelector('.navbar-brand');
+  document.querySelector('.logo-blast')?.remove();
+  for (let i = 0; i < 7; i++) logo.click();
+  assert.equal(document.querySelectorAll('.logo-blast').length, 1);
+  assert.equal(document.querySelectorAll('.logo-blast-spark').length, 28);
+  assert.ok(logo.classList.contains('logo-shake'));
+  assert.deepEqual(reported.filter((egg) => egg === 'logo'), ['logo', 'logo']); // reported each time, also by the click test above
 });

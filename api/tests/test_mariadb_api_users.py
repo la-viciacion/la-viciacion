@@ -162,6 +162,17 @@ class UpdateProfileTests(UsersTestCase):
         self.assertEqual(codes[-1], 429)
         self.assertNotIn(429, codes[:3])
 
+    def test_an_easter_egg_is_reported_only_by_the_player_themself_and_only_a_known_one(self):
+        from src.routers import users as users_router
+        from src.utils.achievements import AchievementsElems
+        with mock.patch.object(users_router.actions, "after_easter_egg") as unlock:
+            self.assertEqual(self.api("POST", "/users/ana/easter-egg/logo", as_user="bea").status_code, 403)
+            self.assertEqual(self.api("POST", "/users/ana/easter-egg/logo", as_user="root").status_code, 403)  # not even an admin
+            self.assertEqual(self.api("POST", "/users/ana/easter-egg/nope", as_user="ana").status_code, 404)
+            unlock.assert_not_called()
+            self.assertEqual(self.api("POST", "/users/ana/easter-egg/konami", as_user="ana").status_code, 202)
+            unlock.assert_called_once_with(self.ana, AchievementsElems.KONAMI_LIFETIME)
+
     def test_it_only_changes_what_was_sent(self):
         self.patch(name="Only name")
         row = self.rows("SELECT email, telegram_id FROM users WHERE id = :i", i=self.ana)[0]

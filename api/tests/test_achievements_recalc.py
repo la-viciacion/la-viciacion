@@ -345,6 +345,12 @@ class RecalculationTests(unittest.TestCase):
         self.assertEqual(set(got), {("add", 1, PAST, self.LIFETIME_DAYS)})  # the season of the day that reached them
         self.assertEqual(got[("add", 1, PAST, self.LIFETIME_DAYS)].date_after, D(PAST, 1, 1) + datetime.timedelta(days=39))
 
+    def test_the_easter_eggs_are_never_revoked_because_nothing_in_the_sessions_says_who_earned_them(self):
+        for key in ("LOGO_BLAST_LIFETIME", "KONAMI_LIFETIME"):
+            self.award(1, key, D(YEAR, 6, 1))
+        self.assertEqual(self.changes(), {})
+        self.assertEqual(self.changes(achievement_keys=["LOGO_BLAST_LIFETIME", "KONAMI_LIFETIME"]), {})  # not even when asked for by name
+
     def test_one_earned_twice_keeps_the_first_and_revokes_the_other(self):
         self.play_a_day_each(1, D(PAST - 1, 1, 1), 60)
         self.play_a_day_each(1, D(PAST, 1, 1), 50)

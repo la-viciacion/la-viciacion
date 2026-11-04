@@ -4,11 +4,45 @@ import { KONAMI_KEYS, KONAMI_SWIPES, keyStep, sequenceMatcher, swipeStep, tapCou
 import { toast } from './toast.js';
 
 export const LOGO_MESSAGES = [
-  'Tranquilo, el home no se va a ir a ningún sitio',
-  '¿Buscas algo? Aquí solo hay vicio',
-  'Un clic más y te pongo un timer',
-  'El logo ya no aguanta más, déjalo respirar',
+  '🏆 Logro oculto desbloqueado. Recompensa: nada',
+  '🏆 Logro oculto desbloqueado. Recompensa: ninguna, pero con estilo',
+  '🏆 Logro oculto desbloqueado. Recompensa: ¿esperabas algo?'
 ];
+
+const BLAST_PARTICLES = 28;
+const BLAST_MS = 1400;
+
+// The explosion bursts from the middle of the logo and is cleared when it ends
+function logoBlast(brand) {
+  if (document.querySelector('.logo-blast')) return;
+  const box = brand.getBoundingClientRect();
+  const blast = document.createElement('div');
+  blast.className = 'logo-blast';
+  blast.setAttribute('aria-hidden', 'true');
+  blast.style.left = `${box.left + box.width / 2}px`;
+  blast.style.top = `${box.top + box.height / 2}px`;
+  for (const part of ['logo-blast-flash', 'logo-blast-ring', 'logo-blast-ring logo-blast-ring-late']) {
+    const el = document.createElement('span');
+    el.className = part;
+    blast.appendChild(el);
+  }
+  for (let i = 0; i < BLAST_PARTICLES; i++) {
+    const angle = (i / BLAST_PARTICLES) * 2 * Math.PI + Math.random() * 0.4;
+    const distance = 70 + Math.random() * 130;
+    const spark = document.createElement('span');
+    spark.className = 'logo-blast-spark';
+    spark.style.setProperty('--dx', `${Math.cos(angle) * distance}px`);
+    spark.style.setProperty('--dy', `${Math.sin(angle) * distance}px`);
+    spark.style.animationDelay = `${Math.random() * 0.12}s`;
+    blast.appendChild(spark);
+  }
+  document.body.appendChild(blast);
+  brand.classList.add('logo-shake');
+  setTimeout(() => {
+    blast.remove();
+    brand.classList.remove('logo-shake');
+  }, BLAST_MS);
+}
 
 const RAIN = ['🎮', '🕹️', '👾', '🎲', '🏆'];
 const RAIN_COUNT = 36;
@@ -31,14 +65,16 @@ function rainOfGames() {
   setTimeout(() => rain.remove(), RAIN_MS);
 }
 
-function konami() {
+function konami(report) {
   rainOfGames();
   toast('↑↑↓↓←→←→BA · +30 vidas');
+  report('konami');
 }
 
 let mounted = false;
 
-export function mountEasterEggs() {
+// `onEasterEgg(name)` is told when one goes off ('logo', 'konami'), so the app can report it (each is an achievement)
+export function mountEasterEggs({ onEasterEgg = () => {} } = {}) {
   if (mounted) return;
   mounted = true;
 
@@ -47,7 +83,7 @@ export function mountEasterEggs() {
   document.addEventListener('keydown', (e) => {
     if (e.repeat || typing(e.target)) return;
     const step = keyStep(e.key);
-    if (step && keys(step)) konami();
+    if (step && keys(step)) konami(onEasterEgg);
   });
 
   const swipes = sequenceMatcher(KONAMI_SWIPES);
@@ -60,13 +96,16 @@ export function mountEasterEggs() {
     if (!start || !end) return;
     const step = swipeStep(end.clientX - start.x, end.clientY - start.y);
     start = null;
-    if (swipes(step)) konami();
+    if (swipes(step)) konami(onEasterEgg);
   }, { passive: true });
 
   // the logo keeps taking you home; this only counts the clicks
   const logoClicks = tapCounter();
   document.addEventListener('click', (e) => {
-    if (e.target.closest?.('.navbar-brand') && logoClicks()) {
+    const brand = e.target.closest?.('.navbar-brand');
+    if (brand && logoClicks()) {
+      logoBlast(brand);
+      onEasterEgg('logo');
       toast(LOGO_MESSAGES[Math.floor(Math.random() * LOGO_MESSAGES.length)]);
     }
   });
