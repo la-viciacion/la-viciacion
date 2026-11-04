@@ -220,20 +220,27 @@ def change_password(
     return {"message": "Contraseña actualizada"}
 
 
-@router.post("/{username}/easter-egg/{egg}", status_code=202)
+@router.post("/{username}/easter-egg/{egg}")
 def easter_egg(
     username: str,
     egg: str,
     background_tasks: BackgroundTasks,
     active_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db),
 ):
-    """The front reports that an easter egg went off (the logo blew up, the Konami code): its achievement is checked
-    in background and nobody else is told."""
+    """The front reports that an easter egg is about to go off (the logo blew up, the Konami code). {"armed": bool} says
+    whether it can: while its achievement cannot be earned (switched off, or not valid yet) the front lets nothing
+    happen, so nobody finds it by chance when it would give them nothing. When it can, the achievement is checked in
+    background and nobody else is told. Every attempt is logged, with what came of it."""
     auth.ensure_self(active_user, username)
     if egg not in EASTER_EGGS:
         raise HTTPException(status_code=404, detail="Not found")
-    background_tasks.add_task(actions.after_easter_egg, active_user.id, EASTER_EGGS[egg])
-    return {"message": "Recibido"}
+    since, why = actions.achievements.easter_egg_since(db, EASTER_EGGS[egg])
+    if since is None:
+        logger.info(f"Easter egg '{egg}' by {active_user.username}: not armed, {why}")
+        return {"armed": False}
+    background_tasks.add_task(actions.after_easter_egg, active_user.id, egg, EASTER_EGGS[egg])
+    return {"armed": True}
 
 
 @router.get("/{username}/library")

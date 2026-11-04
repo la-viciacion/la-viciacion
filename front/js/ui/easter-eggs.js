@@ -72,17 +72,15 @@ function konami() {
 
 let mounted = false;
 
-// Each egg is an achievement, and only goes off while its achievement can be earned (`isArmed(name)`, asked when the
-// egg is about to go off; before that day a player who found it would not try again). `onEasterEgg(name)` is told
-// when one went off ('logo', 'konami'), so the app can report it.
-export function mountEasterEggs({ onEasterEgg = () => {}, isArmed = async () => true } = {}) {
+// Each egg is an achievement, and only goes off while its achievement can be earned: when one is about to, `attempt(name)`
+// ('logo', 'konami') reports it to the app and answers whether it can (before that day a player who found it would not
+// try again, so nothing happens).
+export function mountEasterEggs({ attempt = async () => true } = {}) {
   if (mounted) return;
   mounted = true;
 
-  const goOff = (name, effect) => isArmed(name).then((armed) => {
-    if (!armed) return;
-    effect();
-    onEasterEgg(name);
+  const goOff = (name, effect) => attempt(name).then((armed) => {
+    if (armed) effect();
   }).catch(() => {});
 
   const typing = (el) => el?.closest?.('input, textarea, select, [contenteditable]');
