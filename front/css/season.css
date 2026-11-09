@@ -1,0 +1,17 @@
+/* Season page (#/season): the rankings of the running season as bars */
+.ss-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 12px; align-items: start; }
+.ss-card { min-width: 0; }
+.ss-title { margin: 0; font-size: 1rem; font-weight: 700; }
+.ss-list { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.ss-row { display: flex; align-items: center; gap: 10px; }
+.ss-row .pl-avatar { width: 32px; height: 32px; border: 0; flex: none; }
+.ss-place { width: 1.6rem; flex: none; text-align: center; font-weight: 700; font-size: 0.9rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.ss-main { flex: 1; min-width: 0; }
+.ss-line { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 4px; }
+.ss-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.ss-value { flex: none; font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+.ss-bar { height: 8px; border-radius: var(--radius-pill); background: var(--bg-card-hover); overflow: hidden; }
+.ss-fill { height: 100%; border-radius: var(--radius-pill); background: var(--accent-teal); }
+.ss-fill.place-1 { background: var(--accent-gold); }
+.ss-fill.place-2 { background: var(--accent-purple); }
+.ss-fill.place-3 { background: var(--accent-pink); }
