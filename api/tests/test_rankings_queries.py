@@ -50,6 +50,16 @@ class RankingsFromTheDatabaseTests(unittest.TestCase):
         got = rankings.user_ratio(self.db)
         self.assertEqual([(r["user_id"], r["ratio"]) for r in got], [(4, 1.0), (1, 0.67), (2, 0), (3, 0)])
 
+    def test_played_games_and_achievements_list_every_player_with_a_zero(self):
+        self.db.add(models.Achievement(id=1, key="a", title="A", message="m"))
+        self.db.add(models.UserAchievement(user_id=2, achievement_id=1, date=datetime.date(YEAR, 2, 1)))
+        self.db.commit()
+        games = rankings.user_played_games(self.db)
+        self.assertEqual([(r.user_id, r.played_games) for r in games], [(1, 3), (2, 2), (4, 1), (3, 0)])
+        got = rankings.user_ranking_achievements(self.db)
+        self.assertEqual([(r.user_id, r.achievements) for r in got], [(2, 1), (1, 0), (3, 0), (4, 0)])
+        self.assertEqual([r.user_id for r in rankings.user_ranking_achievements(self.db, is_active=True)], [2, 1, 3])
+
     def test_only_active_leaves_out_inactive_players_everywhere(self):
         for ranking in (
             rankings.user_completed_games(self.db, is_active=True),
