@@ -21,7 +21,7 @@ El botón de la esquina superior izquierda abre el **menú lateral**, con todas 
 
 <div markdown>
 
-- **Principal**: Inicio, Actividad y Novedades.
+- **Principal**: Inicio y Actividad.
 - **Explorar** (lo que es de todo el grupo): Temporada (los rankings de la temporada en curso), Juegos, Biblioteca, Jugadores, Calendario, Logros, Estadísticas (todavía en construcción) y Servidor.
 - **Tú** (lo que es tuyo): Mi perfil, Deseados, Recomendados, Retos y Ajustes.
 - **Administración**: solo si eres administrador.
@@ -38,7 +38,7 @@ En el móvil el menú ocupa toda la pantalla:
 
 ### Novedades
 
-**Menú → Novedades** (o pulsar la versión al pie del menú) cuenta lo que ha ido cambiando en la app, de lo más reciente a lo más antiguo: lo nuevo, las mejoras y los arreglos que se notan al usarla. Las versiones pequeñas se juntan en una sola entrada, para no saturar.
+**Pulsar la versión al pie del menú** cuenta lo que ha ido cambiando en la app, de lo más reciente a lo más antiguo: lo nuevo, las mejoras y los arreglos que se notan al usarla. Las versiones pequeñas se juntan en una sola entrada, para no saturar.
 
 ![La página de novedades](../assets/screens/changelog.webp){ .screenshot }
 
