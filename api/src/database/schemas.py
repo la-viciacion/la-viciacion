@@ -51,6 +51,12 @@ class UserSettingsUpdate(BaseModel):
     place_longitude: float | None = Field(default=None, ge=-180, le=180)
     # for the birthday achievement; null removes it (the range is checked in the route)
     birth_date: datetime.date | None = None
+    # the ids on each service, free text; empty or null removes one (trimmed in the route)
+    nintendo_id: str | None = Field(default=None, max_length=64)
+    xbox_id: str | None = Field(default=None, max_length=64)
+    playstation_id: str | None = Field(default=None, max_length=64)
+    steam_id: str | None = Field(default=None, max_length=64)
+    discord_id: str | None = Field(default=None, max_length=64)
 
 
 class CompletionUpdate(BaseModel):

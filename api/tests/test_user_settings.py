@@ -9,6 +9,7 @@ from src.utils import user_settings as us
 
 # the place and the birth date, not set
 UNSET = {"place_name": None, "place_latitude": None, "place_longitude": None, "birth_date": None,
+         "nintendo_id": None, "xbox_id": None, "playstation_id": None, "steam_id": None, "discord_id": None,
          "wishlist_release_telegram": None, "wishlist_release_push": None, "challenge_notices_telegram": None, "challenge_notices_push": None,
          "challenge_reminders_telegram": None, "challenge_reminders_push": None}
 
@@ -50,6 +51,11 @@ class ForgottenTimerHoursTests(unittest.TestCase):
                 "place_latitude": None,
                 "place_longitude": None,
                 "birth_date": None,
+                "nintendo_id": None,
+                "xbox_id": None,
+                "playstation_id": None,
+                "steam_id": None,
+                "discord_id": None,
                 "defaults": {
                     "forgotten_timer_telegram": us.DEFAULT_FORGOTTEN_TIMER_CHANNEL,
                     "forgotten_timer_push": us.DEFAULT_FORGOTTEN_TIMER_CHANNEL,
@@ -107,6 +113,20 @@ class PlaceAndBirthTests(unittest.TestCase):
         self.assertEqual((got["place_name"], got["place_latitude"], got["place_longitude"], got["birth_date"]), ("Madrid", 40.4165, -3.70256, "1990-06-15"))
         got = us.update(db, 7, {"place_name": None, "place_latitude": None, "place_longitude": None})
         self.assertEqual((got["place_name"], got["place_latitude"], got["birth_date"]), (None, None, "1990-06-15"))  # the birth date stays
+
+    def test_a_game_id_is_trimmed_and_empty_removes_it(self):
+        row = SimpleNamespace(user_id=7, forgotten_timer_hours=None, timer_notice_minutes=None, show_playing=None,
+                              forgotten_timer_telegram=None, forgotten_timer_push=None, **UNSET)
+        db = db_with(row)
+        got = us.update(db, 7, {"xbox_id": "  Ana#1234 ", "steam_id": "   ", "discord_id": "ana"})
+        self.assertEqual((got["xbox_id"], got["steam_id"], got["discord_id"], got["nintendo_id"]), ("Ana#1234", None, "ana", None))
+        got = us.update(db, 7, {"xbox_id": None})
+        self.assertEqual((got["xbox_id"], got["discord_id"]), (None, "ana"))  # the others stay
+
+    def test_the_public_ids_are_only_the_ones_filled_in(self):
+        self.assertEqual(us.game_ids(db_with(None), 1), {})
+        row = SimpleNamespace(**{**UNSET, "steam_id": "ana", "xbox_id": ""})
+        self.assertEqual(us.game_ids(db_with(row), 1), {"steam_id": "ana"})
 
 
 class TimerNoticeMinutesTests(unittest.TestCase):

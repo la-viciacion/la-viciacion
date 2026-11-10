@@ -46,8 +46,9 @@ def get_player(
     current_user: models.User = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    """What is public of a player, readable by every logged-in user on purpose: figures, most played games and
-    ratings, achievements and what they play now; never the email, the Telegram id, the settings or the library"""
+    """What is public of a player, readable by every logged-in user on purpose: the ids they chose to fill in for each
+    service, figures, most played games and ratings, achievements and what they play now; never the email, the Telegram
+    id, the other settings or the library"""
     found = group.player_profile(
         db, current_user.id, player_id, seasons.ALL if season == "all" else int(season) if season else None,
     )

@@ -1,11 +1,13 @@
-// The city and the birth date of the player: two more personal data inside the "Mis datos" form of the Ajustes tab,
-// next to the name, the email and the Telegram ID, saved with the same button (PATCH /users/{username}/settings).
-// Both are optional and private, and nothing here says what they are for.
+// The city and the birth date of the player, and the ids they have on each service: more personal data inside the
+// "Mis datos" form of the Ajustes tab, next to the name, the email and the Telegram ID, saved with the same button
+// (PATCH /users/{username}/settings). All are optional. The city and the birth date are private, and nothing here says
+// what they are for; the ids are the opposite: the whole group sees them on the player page, and the form says so.
 //  - The city is searched by name (GET /users/places/search, Open-Meteo's geocoding) and picked from the answers:
 //    what is saved is the name and the coordinates of the city's centre, never a GPS fix.
 // `initAbout` fills `el` (a block inside that form, so no <form> of its own) and returns `save()`, which the form's
 // submit calls before it saves the rest: it sends only what changed.
 import { api, jsonRequest } from '../../lib/api.js';
+import { GAME_IDS } from '../../lib/game-ids.js';
 import { html, mount } from '../../lib/html.js';
 
 const today = () => new Date().toLocaleDateString('sv-SE');
@@ -32,7 +34,12 @@ export async function initAbout(el, { path }) {
     <label>Fecha de nacimiento
       <input class="adm-input" type="date" name="birth_date" min="1900-01-01" max="${today()}" value="${saved.birth_date ?? ''}" />
     </label>
-    <div class="pf-sub">Solo la ven tú y los administradores.</div>`);
+    <div class="pf-sub">Solo la ven tú y los administradores.</div>
+    ${GAME_IDS.map(([column, label, hint]) => html`
+      <label>${label}
+        <input class="adm-input" type="text" name="${column}" value="${saved[column] ?? ''}" placeholder="${hint}" maxlength="64" autocomplete="off" />
+      </label>`)}
+    <div class="pf-sub">Tus IDs los ven todos los jugadores en tu página, para que puedan añadirte.</div>`);
 
   const current = el.querySelector('[data-current]');
   const results = el.querySelector('[data-results]');
@@ -91,6 +98,10 @@ export async function initAbout(el, { path }) {
         Object.assign(changes, { place_name: place?.name ?? null, place_latitude: place?.latitude ?? null, place_longitude: place?.longitude ?? null });
       }
       if ((birth.value || null) !== saved.birth_date) changes.birth_date = birth.value || null;
+      for (const [column] of GAME_IDS) {
+        const value = el.querySelector(`[name="${column}"]`).value.trim() || null;
+        if (value !== (saved[column] ?? null)) changes[column] = value;
+      }
       if (!Object.keys(changes).length) return;
       Object.assign(saved, await api(path, jsonRequest('PATCH', changes)));
       help.textContent = HELP;

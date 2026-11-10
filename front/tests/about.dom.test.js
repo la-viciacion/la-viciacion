@@ -7,7 +7,7 @@ installDom('<div id="el"></div>');
 const { initAbout } = await import('../js/pages/profile/about.js');
 
 const MADRID = { name: 'Madrid, Comunidad de Madrid, España', latitude: 40.4165, longitude: -3.70256 };
-const settings = (own = {}) => ({ place_name: null, place_latitude: null, place_longitude: null, birth_date: null, ...own });
+const settings = (own = {}) => ({ place_name: null, place_latitude: null, place_longitude: null, birth_date: null, nintendo_id: null, xbox_id: null, playstation_id: null, steam_id: null, discord_id: null, ...own });
 
 const show = async (own, extra = {}) => {
   const calls = installApi({
@@ -98,4 +98,19 @@ test('an error of the search is shown, not swallowed', async () => {
   const { el, help } = await show({}, { 'GET /users/places/search': () => new Response(JSON.stringify({ detail: 'No se pueden buscar ciudades ahora mismo, inténtalo más tarde' }), { status: 503, headers: { 'Content-Type': 'application/json' } }) });
   await search(el, 'Madrid');
   assert.match(help.textContent, /No se pueden buscar ciudades/);
+});
+
+test('the game ids are filled from what is saved and only the changed ones are sent, trimmed; empty removes one', async () => {
+  const { calls, el, about } = await show({ steam_id: 'ana_steam', xbox_id: 'AnaX' });
+  assert.equal(el.querySelector('[name="steam_id"]').value, 'ana_steam');
+  assert.equal(el.querySelector('[name="nintendo_id"]').value, '');
+  el.querySelector('[name="discord_id"]').value = '  ana#1  ';
+  el.querySelector('[name="xbox_id"]').value = '   ';
+  await about.save();
+  assert.deepEqual(calls.at(-1).body, { xbox_id: null, discord_id: 'ana#1' });
+});
+
+test('the form says the ids are seen by the whole group', async () => {
+  const { el } = await show();
+  assert.match(el.textContent, /todos los jugadores/);
 });
