@@ -7,7 +7,6 @@ export function menuSections(user) {
     { label: 'Principal', items: [
       { id: 'home', label: 'Inicio', href: '#', icon: 'iconHome' },
       { id: 'activity', label: 'Actividad', href: '#/activity', icon: 'iconActivity' },
-      { id: 'changelog', label: 'Novedades', href: '#/changelog', icon: 'iconInfo' },
     ] },
     { label: 'Explorar', items: [
       { id: 'season', label: 'Temporada', href: '#/season', icon: 'iconClock' },
@@ -40,7 +39,6 @@ const PAGES = [
   ['#/profile', 'profile'],
   ['#/admin', 'admin'],
   ['#/activity', 'activity'],
-  ['#/changelog', 'changelog'],
   ['#/season', 'season'],
   ['#/stats', 'stats'],
   ['#/server', 'server'],
