@@ -59,7 +59,7 @@ En cada logro de un jugador, **Editar** cambia la fecha en que lo consiguió y *
 - **Canales**: Telegram (si está configurado y el mensaje de prueba) y avisos en la app (push: el interruptor y cuántos dispositivos hay suscritos). Lo que se configura en el `.env` se ve en **Sistema → Servicios**.
 - **IA**: el interruptor de la IA, **Probar la IA** y los avisos que la usan, cada uno con su interruptor e instrucciones. El proveedor, la clave y el modelo se ven en **Sistema → Servicios**.
 - **Probar resumen**: previsualiza el resumen de cualquier mes o temporada para cualquier jugador, enseña el aviso tal como saldría (sin enviarlo) y permite enviarlo ahora solo a ti o al grupo.
-- **Redactar aviso**: escribe un mensaje propio, con título (80 caracteres) y mensaje (240), y envíalo por **un** canal: la **app** (push) o **Telegram**; a tus dispositivos, a un jugador, al grupo o a todos. Enviar al grupo o a todos pide confirmación.
+- **Redactar aviso**: escribe un mensaje propio, con título (80 caracteres) y mensaje, y envíalo por **un** canal: **Telegram** (el que sale por defecto) o la **app** (push, solo texto plano y 240 caracteres); a tus dispositivos, a un jugador, al grupo o a todos. Enviar al grupo o a todos pide confirmación. El mensaje de Telegram admite hasta 3.000 caracteres y **Markdown** (`# título`, `**negrita**`, `*cursiva*`, `~~tachado~~`, `` `código` ``, `[texto](https://…)`, `- viñetas`, `1.` listas, `> citas` y `---`), pensado para contar las novedades de una release; la vista previa lo dibuja, y la bandeja de avisos de la app guarda una copia en texto plano.
 
 ![Los envíos programados](../assets/screens/admin-sends.webp){ .screenshot }
 
