@@ -7,6 +7,7 @@ import { createFolds, toggleFold } from '../../lib/fold.js';
 import { html, mount } from '../../lib/html.js';
 import { gameHref } from '../../lib/links.js';
 import * as seasons from '../../lib/seasons.js';
+import { toast } from '../../ui/toast.js';
 import { hydratePhotos, playerAvatar } from '../../ui/avatar.js';
 import { showChallengesHistory } from '../../ui/challenges-history.js';
 import { showLibraryCompare } from '../../ui/library-compare.js';
@@ -32,14 +33,30 @@ export function affinityView(a) {
     </div>`;
 }
 
-/** The ids the player filled in, one per service (nothing at all when they filled none). */
+/** The ids the player filled in, one card per service (nothing at all when they filled none); a click copies it. */
 export function gameIdsView(ids) {
   const filled = GAME_IDS.filter(([column]) => ids?.[column]);
   if (!filled.length) return '';
   return html`
-    <dl class="pl-ids" id="plIds">
-      ${filled.map(([column, label]) => html`<div><dt>${label}</dt><dd>${ids[column]}</dd></div>`)}
-    </dl>`;
+    <ul class="pl-ids" id="plIds" aria-label="IDs en otras plataformas">
+      ${filled.map(([column, label]) => html`
+        <li><button type="button" class="pl-id" data-copy="${ids[column]}" title="Copiar ${label}" aria-label="${label}: ${ids[column]}. Copiar">
+          <span class="pl-id-service">${label}</span>
+          <span class="pl-id-value">${ids[column]}</span>
+        </button></li>`)}
+    </ul>`;
+}
+
+/** Copy the id of the card clicked and say so. */
+async function copyId(e) {
+  const card = e.target.closest('[data-copy]');
+  if (!card) return;
+  try {
+    await navigator.clipboard.writeText(card.dataset.copy);
+    toast('Copiado');
+  } catch {
+    toast('No se ha podido copiar', 'err');
+  }
 }
 
 const back = () => (history.length > 1 ? history.back() : (location.hash = '#/players'));
@@ -92,6 +109,7 @@ function draw(d) {
   showChallengesHistory(main.querySelector('#plChallenges'), d.user.id, d.is_me);
   if (!d.is_me) showLibraryCompare(main.querySelector('#plCompare'), d.user.id);
   main.querySelector('#plBack').addEventListener('click', back);
+  main.querySelector('#plIds')?.addEventListener('click', copyId);
   main.querySelector('[data-fold]')?.addEventListener('click', (e) => toggleFold(folds, 'common', e.currentTarget.closest('.ach-block'), e.currentTarget));
   main.querySelector('#plSeasons').addEventListener('click', (e) => {
     const pill = e.target.closest('[data-season]');

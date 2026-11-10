@@ -15,8 +15,9 @@ const show = (ids) => {
 
 test('the player page lists only the ids the player filled in, labelled by service', () => {
   const el = show({ steam_id: 'ana_steam', discord_id: 'ana#1' });
-  assert.deepEqual([...el.querySelectorAll('dt')].map((n) => n.textContent), ['Steam', 'Discord']);
-  assert.deepEqual([...el.querySelectorAll('dd')].map((n) => n.textContent), ['ana_steam', 'ana#1']);
+  assert.deepEqual([...el.querySelectorAll('.pl-id-service')].map((n) => n.textContent), ['Steam', 'Discord']);
+  assert.deepEqual([...el.querySelectorAll('.pl-id-value')].map((n) => n.textContent), ['ana_steam', 'ana#1']);
+  assert.deepEqual([...el.querySelectorAll('[data-copy]')].map((n) => n.dataset.copy), ['ana_steam', 'ana#1']);
 });
 
 test('without any id there is nothing to show', () => {
@@ -27,5 +28,5 @@ test('without any id there is nothing to show', () => {
 test('an id is text, never markup', () => {
   const el = show({ xbox_id: '<img src=x onerror=alert(1)>' });
   assert.equal(el.querySelector('img'), null);
-  assert.match(el.querySelector('dd').textContent, /<img/);
+  assert.match(el.querySelector('.pl-id-value').textContent, /<img/);
 });
