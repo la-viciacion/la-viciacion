@@ -22,7 +22,7 @@ El catálogo de plataformas que se pueden elegir en sesiones y biblioteca. Puede
 
 ### Logros
 
-Todos los logros con su estado. Pulsa uno para ver quién lo ha conseguido y cuándo. Por cada logro puedes cambiar:
+Todos los logros con su estado. Desde el menú **⋯** de uno, **Quién lo tiene** abre sus concesiones. Por cada logro puedes cambiar:
 
 - **Activo**: apagado, nadie lo gana ni se anuncia, pero lo ya ganado se conserva.
 - **Secreto**: oculto para quien no lo tiene.
@@ -30,7 +30,9 @@ Todos los logros con su estado. Pulsa uno para ver quién lo ha conseguido y cu�
 - **Desde**: la temporada en la que empieza a contar. Los nuevos logros empiezan en 2027.
 - El texto y la imagen.
 
-En cada logro de un jugador, **Editar** cambia la fecha en que lo consiguió y **Revocar** lo retira sin avisar. Ojo: si el jugador sigue cumpliendo la condición, se volverá a conceder en la siguiente comprobación; corrige antes el dato que lo provocó.
+### Logros concedidos (Jugadores → Logros)
+
+Lo que ha desbloqueado cada jugador, **secretos incluidos**, en una tabla paginada que se filtra por jugador, logro, juego y temporada (también desde las acciones **Logros** de Usuarios y Juegos). **Editar** cambia la fecha en que lo consiguió y el juego, y **Revocar** lo retira sin avisar. Un jugador no puede tener el mismo logro dos veces en una temporada, así que mover uno a una temporada donde ya lo tiene se rechaza. Ojo: si el jugador sigue cumpliendo la condición, se volverá a conceder en la siguiente comprobación; corrige antes el dato que lo provocó.
 
 ![Logros en el panel](../assets/screens/admin-achievements.webp){ .screenshot }
 
@@ -38,10 +40,11 @@ En cada logro de un jugador, **Editar** cambia la fecha en que lo consiguió y *
 
 ## Jugadores
 
-- **Usuarios**: crear, editar y desactivar cuentas (ver [Cuentas y acceso](cuentas.md)).
+- **Usuarios**: crear, editar y desactivar cuentas (ver [Cuentas y acceso](cuentas.md)) Cada fila muestra cuántas sesiones, entradas de biblioteca, notas y logros tiene, y su menú **⋯** salta a cada una de esas tablas ya filtrada por ese jugador (los juegos tienen lo mismo).
 - **Sesiones**: todas las sesiones de todos, con filtros. Puedes **crear una sesión a mano** (para un timer olvidado, por ejemplo), editar el juego, la plataforma, el inicio o el fin de cualquiera, incluso de temporadas cerradas, y cerrar un timer atascado poniéndole un fin. Los cambios de un administrador no avisan al grupo.
 - **Biblioteca**: las entradas de biblioteca de cada jugador, con su fecha de completado y la marca de abandonado.
 - **Puntuaciones**: crear, cambiar y borrar notas de cualquier jugador.
+- **Logros**: lo que ha desbloqueado cada jugador, secretos incluidos (ver más abajo).
 
 ![Sesiones de todos los jugadores](../assets/screens/admin-timers.webp){ .screenshot }
 
