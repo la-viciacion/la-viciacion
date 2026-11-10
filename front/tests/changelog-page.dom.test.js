@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { installDom, installStorage, text } from './dom.js';
-import { CHANGELOG } from '../js/lib/changelog.js';
+import { CHANGELOG, DOCS_URL } from '../js/lib/changelog.js';
 
 installStorage();
 installDom('<main id="main"></main>');
@@ -16,4 +16,13 @@ test('it lists every entry, the newest first, with its items grouped by kind', (
   const total = CHANGELOG.reduce((n, e) => n + e.items.length, 0);
   assert.equal(document.querySelectorAll('.cl-items li').length, total);
   assert.deepEqual(text('.cl-kind').slice(0, 2), ['Nuevo', 'Mejora']);
+});
+
+test('it links to the full user guide, in a new tab', () => {
+  page.render({ main: document.getElementById('main') });
+  const link = document.querySelector('.cl-docs');
+  assert.equal(link.getAttribute('href'), DOCS_URL);
+  assert.equal(link.getAttribute('target'), '_blank');
+  assert.match(link.getAttribute('rel'), /noopener/);
+  assert.match(link.textContent, /Documentación completa/);
 });
