@@ -1,7 +1,8 @@
 /* Changelog page (#/changelog): one card per entry, its items grouped by kind */
 .cl-list { display: flex; flex-direction: column; gap: 12px; max-width: 720px; }
 .cl-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; }
-.cl-version { margin: 0; font-size: 1.05rem; font-weight: 700; }
+.cl-version { margin: 0; font-size: 1.5rem; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.cl-title { margin-top: 2px; font-size: 0.95rem; font-weight: 600; color: var(--text-secondary); }
 .cl-meta { font-size: 0.8rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .cl-group { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
 .cl-kind { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; padding: 2px 8px; border-radius: var(--radius-pill); border: 1px solid var(--tone); color: var(--tone); }
