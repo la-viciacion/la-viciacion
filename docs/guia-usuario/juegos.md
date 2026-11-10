@@ -23,6 +23,8 @@ La página tiene dos mitades, separadas por un título: arriba, **lo que dice el
 
 ## Biblioteca del grupo
 
+![La biblioteca del grupo](../assets/screens/library.webp){ .screenshot }
+
 **Menú → Biblioteca** junta las bibliotecas de todos: cuántos juegos distintos hay, cuántos jugadores y cuántas horas, y siete secciones para curiosear (cada lista enseña los 10 primeros):
 
 - **Joyas ocultas**: juegos que tienen pocos jugadores y a los que han dado muy buena nota.

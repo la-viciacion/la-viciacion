@@ -29,6 +29,8 @@ Toda tu biblioteca, de todas las temporadas, con filtros por nombre (**Buscar ju
 
 ![Tu biblioteca completa](../assets/screens/profile-games.webp){ .screenshot }
 
+![Apuntar el precio de un juego](../assets/screens/profile-price.webp){ .screenshot }
+
 **Precio y coste por hora.** Cada juego tiene un botón **Precio**: apunta lo que pagaste por él, una casilla por cada plataforma en la que lo tienes (si lo compraste en PC y en Switch son dos precios; una casilla vacía quita el precio). El juego pasa a decir «Pagado: 24,99 €» y encima de la lista aparece **Lo que has gastado**: cuánto llevas gastado, el coste medio por hora y tus juegos más y menos rentables (los que han costado menos y más por hora jugada; solo cuentan los que has jugado al menos media hora). **Los precios son solo tuyos**: nadie del grupo los ve. Del grupo solo se enseña el coste medio por hora de un juego cuando al menos 3 jugadores han apuntado su precio (ver [Biblioteca](juegos.md#biblioteca-del-grupo)), y nunca el de nadie en concreto.
 
 Si has jugado un mismo juego en varias plataformas dentro de una temporada, sale **en una sola fila** con todas sus plataformas, no una por plataforma; las horas son las del juego entero y el filtro de plataforma encuentra la fila con cualquiera de ellas.
