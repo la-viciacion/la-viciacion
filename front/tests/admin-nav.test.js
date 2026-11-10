@@ -11,6 +11,7 @@ test('every tab belongs to exactly one section', () => {
 test('the section of a tab is the one that lists it', () => {
   assert.equal(sectionOf('games').label, 'Catálogo');
   assert.equal(sectionOf('users').label, 'Jugadores');
+  assert.equal(sectionOf('awards').label, 'Jugadores');
   for (const tab of ['sends', 'channels', 'ai', 'recap', 'announce']) assert.equal(sectionOf(tab).label, 'Notificaciones', tab);
   for (const tab of ['chat', 'aiusage', 'costs', 'services', 'backup', 'audit']) assert.equal(sectionOf(tab).label, 'Sistema', tab);
   assert.equal(sectionOf('nothing'), undefined);

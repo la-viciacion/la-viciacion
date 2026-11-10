@@ -17,7 +17,7 @@ import { gameHref } from '../../lib/links.js';
 import { euros } from '../../lib/money.js';
 import { platformList, platformName } from '../../lib/platforms.js';
 import { SPECIAL_NAMES, specialClass } from '../../lib/special.js';
-import { badge, seasonYears } from './components.js';
+import { badge, seasonYears, store } from './components.js';
 import { ENTITY_OPTIONS, describe, detailParts } from './audit-labels.js';
 import { approveProposal, rejectProposal } from './challenge-decisions.js';
 import { closePoll } from './poll-actions.js';
@@ -63,6 +63,12 @@ const COST_FIELDS = [
   { key: 'note', label: 'Nota', type: 'text' },
 ];
 
+// What sort of achievement it is: secret, special (its level) and once in a lifetime
+const kindBadges = (r) => {
+  const kinds = [r.secret ? badge('Secreto', 'ink') : '', SPECIAL_NAMES[r.special] ? badge(`Nivel ${r.special}`, specialClass(r.special).trim()) : '', r.lifetime ? badge('Único', 'gray') : ''];
+  return kinds.some((k) => k !== '') ? html`<div class="adm-badges">${kinds}</div>` : '—';
+};
+
 const userColumn = { label: 'Usuario', sort: 'user', render: (r) => r.user || r.user_id, filter: (r) => ({ user_id: r.user_id }) };
 const gameColumn = { label: 'Juego', sort: 'game', render: (r) => r.game || r.game_id, filter: (r) => ({ game_id: r.game_id, game_name: r.game }) };
 
@@ -76,7 +82,11 @@ export const ENTITIES = {
       { label: 'Usuario', render: (r) => r.username },
       { label: 'Nombre', render: (r) => r.name || '—' },
       { label: 'Email', render: (r) => r.email || '—' },
-      { label: 'Estado', render: (r) => html`${r.is_admin ? badge('Admin', 'purple') : ''}${badge(r.is_active ? 'Activo' : 'Inactivo', r.is_active ? 'green' : 'red')}` },
+      { label: 'Estado', render: (r) => html`<div class="adm-badges nowrap">${r.is_admin ? badge('Admin', 'purple') : ''}${badge(r.is_active ? 'Activo' : 'Inactivo', r.is_active ? 'green' : 'red')}</div>` },
+      { label: 'Sesiones', render: (r) => r.sessions },
+      { label: 'Biblioteca', render: (r) => r.library },
+      { label: 'Notas', render: (r) => r.scores },
+      { label: 'Logros', render: (r) => r.awards },
     ],
     fields: [
       { key: 'email', label: 'Email (inicio de sesión)', type: 'text' },
@@ -100,6 +110,9 @@ export const ENTITIES = {
     name: (r) => r.username,
     actions: [
       { label: 'Sesiones', run: (r, admin) => admin.jumpTo('timers', { user_id: r.id }) },
+      { label: 'Biblioteca', run: (r, admin) => admin.jumpTo('library', { user_id: r.id }) },
+      { label: 'Puntuaciones', run: (r, admin) => admin.jumpTo('scores', { user_id: r.id }) },
+      { label: 'Logros', run: (r, admin) => admin.jumpTo('awards', { user_id: r.id }) },
     ],
     canDelete: true,
     deleteNote: 'Se borrarán también sus sesiones, biblioteca y logros.',
@@ -150,6 +163,9 @@ export const ENTITIES = {
     name: (r) => r.name,
     actions: [
       { label: 'Sesiones', run: (r, admin) => admin.jumpTo('timers', { game_id: r.id, game_name: r.name }) },
+      { label: 'Biblioteca', run: (r, admin) => admin.jumpTo('library', { game_id: r.id, game_name: r.name }) },
+      { label: 'Puntuaciones', run: (r, admin) => admin.jumpTo('scores', { game_id: r.id, game_name: r.name }) },
+      { label: 'Logros', run: (r, admin) => admin.jumpTo('awards', { game_id: r.id, game_name: r.name }) },
       { label: 'Resincronizar (IGDB y HLTB)…', run: async (r, admin) => (await import('./resync.js')).resyncGame(r, admin) },
     ],
     toolbarActions: [{ act: 'hltb-sync', label: 'Sincronizar tiempos (HLTB)…' }, { act: 'igdb-sync', label: 'Enlazar con IGDB…' }],
@@ -490,14 +506,9 @@ export const ENTITIES = {
     paged: false,
     columns: [
       { label: 'Imagen', render: (r) => (r.has_image ? html`<img class="adm-ach" src="/api/v1/utils/achievement-image/${r.key}?v=${Date.now()}" alt="" />` : '—') },
-      {
-        label: 'Logro',
-        // pressing it lists who has it (loaded when opened, see awardees in index.js)
-        render: (r) => (r.awarded
-          ? html`<details class="adm-awardees" data-achievement="${r.id}"><summary><strong>${r.title}</strong><div class="adm-sub">${r.key}</div></summary><div class="adm-awardees-list"></div></details>`
-          : html`<strong>${r.title}</strong><div class="adm-sub">${r.key}</div>`),
-      },
-      { label: 'Estado', render: (r) => html`${r.active ? badge('Activo', 'green') : badge('Inactivo', 'orange')}${r.secret ? badge('Secreto', 'ink') : ''}${SPECIAL_NAMES[r.special] ? badge(`Especial nivel ${r.special}`, specialClass(r.special).trim()) : ''}${r.lifetime ? badge('Único', 'gray') : ''}` },
+      { label: 'Logro', render: (r) => html`<strong>${r.title}</strong><div class="adm-sub">${r.key}</div>` },
+      { label: 'Estado', render: (r) => (r.active ? badge('Activo', 'green') : badge('Inactivo', 'orange')) },
+      { label: 'Tipo', render: kindBadges },
       { label: 'Desde', render: (r) => r.valid_from_season },
       { label: 'Concedido', render: (r) => r.awarded },
     ],
@@ -522,20 +533,43 @@ export const ENTITIES = {
       },
     ],
     name: (r) => r.title,
+    actions: [{ label: 'Quién lo tiene', show: (r) => r.awarded > 0, run: (r, admin) => admin.jumpTo('awards', { achievement_id: String(r.id) }) }],
     canDelete: false,
   },
-};
 
-ENTITIES.awards = {
-  // Not a section of its own: its rows are listed under each achievement and edited from there.
-  label: 'Logros concedidos',
-  endpoint: '/manage/user-achievements',
-  columns: [],
-  fields: [{ key: 'date', label: 'Fecha en la que se obtuvo (su año es la temporada)', type: 'date', required: true }],
-  name: (r) => `${r.user || r.user_id} · ${r.title || r.key}`,
-  canDelete: true,
-  deleteLabel: 'Revocar',
-  deleteNote: 'El logro se revoca sin avisar por Telegram. Si el jugador sigue cumpliendo la condición, el próximo recálculo lo volverá a conceder: corrige antes los datos que lo provocaron.',
+  awards: {
+    label: 'Logros concedidos',
+    nav: 'Logros',
+    description: 'Lo que ha desbloqueado cada jugador, secretos incluidos. Se puede cambiar la fecha (su año es la temporada) y el juego, o revocarlo; nada de esto avisa por Telegram. Un logro revocado vuelve a concederse en la siguiente comprobación si el jugador aún cumple la condición: corrige antes los datos que lo provocaron.',
+    endpoint: '/manage/user-achievements',
+    filters: ['user', 'game'],
+    selects: [
+      { key: 'achievement_id', label: 'Logro', options: () => [['', 'Logro: todos'], ...store.achievements.map((a) => [String(a.id), a.title])] },
+      seasonSelect,
+    ],
+    defaultSort: { key: 'date', dir: 'desc' },
+    columns: [
+      userColumn,
+      {
+        label: 'Logro',
+        sort: 'achievement',
+        render: (r) => html`<strong>${r.title || r.key}</strong><div class="adm-sub">${r.key}</div>`,
+        filter: (r) => ({ achievement_id: String(r.achievement_id) }),
+      },
+      { label: 'Tipo', render: kindBadges },
+      { ...gameColumn, render: (r) => r.game || '—', filter: (r) => (r.game_id ? { game_id: r.game_id, game_name: r.game } : {}) },
+      { label: 'Fecha', sort: 'date', render: (r) => html`<span class="adm-nowrap">${formatDate(r.date)}</span>` },
+      { label: 'Temp.', sort: 'season', render: (r) => r.season ?? '—' },
+    ],
+    fields: [
+      { key: 'date', label: 'Fecha en la que se obtuvo (su año es la temporada)', type: 'date', required: true },
+      { key: 'game_id', label: 'Juego con el que se obtuvo', type: 'game', nameKey: 'game', clearable: true },
+    ],
+    name: (r) => `${r.user || r.user_id} · ${r.title || r.key}`,
+    canDelete: true,
+    deleteLabel: 'Revocar',
+    deleteNote: 'El logro se revoca sin avisar por Telegram. Si el jugador sigue cumpliendo la condición, la próxima comprobación lo volverá a conceder: corrige antes los datos que lo provocaron.',
+  },
 };
 
 ENTITIES.audit = {

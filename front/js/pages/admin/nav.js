@@ -7,7 +7,7 @@ export const HOME = 'home';
 export const SECTIONS = [
   { label: 'Inicio', tabs: [HOME] },
   { label: 'Catálogo', tabs: ['games', 'platforms', 'achievements'] },
-  { label: 'Jugadores', tabs: ['users', 'timers', 'library', 'scores'] },
+  { label: 'Jugadores', tabs: ['users', 'timers', 'library', 'scores', 'awards'] },
   { label: 'Retos', tabs: ['challenges', 'proposals'] },
   { label: 'Notificaciones', tabs: ['sends', 'channels', 'ai', 'recap', 'announce', 'polls'] },
   { label: 'Sistema', tabs: ['chat', 'aiusage', 'costs', 'services', 'backup', 'audit'] },

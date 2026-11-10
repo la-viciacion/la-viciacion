@@ -23,7 +23,6 @@ let root;
 let current = 'home';
 const lastTab = new Map(); // section -> the tab it was left on
 let searchTimer;
-const awardRows = new Map(); // id -> the awarded achievements listed under an achievement, for their edit and revoke buttons
 
 // What entities/dialogs may call back into.
 const admin = {
@@ -72,7 +71,6 @@ export async function render({ main, user }) {
   root.addEventListener('click', onClick);
   root.addEventListener('input', onInput);
   root.addEventListener('change', onChange);
-  root.addEventListener('toggle', onToggle, true); // does not bubble
   window.addEventListener('scroll', closeMenus, true);
   window.addEventListener('resize', closeMenus);
   drawLayout();
@@ -368,30 +366,6 @@ function onChange(e) {
   load();
 }
 
-// Who has an achievement: listed when its row is opened.
-async function onToggle(e) {
-  const box = e.target;
-  if (!box.matches?.('.adm-awardees') || !box.open || box.dataset.loaded) return;
-  box.dataset.loaded = '1';
-  const list = box.querySelector('.adm-awardees-list');
-  mount(list, html`<div class="adm-sub">Cargando…</div>`);
-  try {
-    const { items } = await api(`/manage/user-achievements?achievement_id=${box.dataset.achievement}&sort=date&order=desc&limit=200`);
-    for (const r of items) awardRows.set(r.id, r);
-    mount(list, html`${items.map((r) => html`
-      <div class="adm-awardee">
-        <span><strong>${r.user || r.user_id}</strong><span class="adm-sub">${r.game ? ` · ${r.game}` : ''} · ${r.date}</span></span>
-        <span>
-          <button class="adm-btn sm" data-act="award-edit" data-award="${r.id}">Editar</button>
-          <button class="adm-btn sm danger" data-act="award-revoke" data-award="${r.id}">Revocar</button>
-        </span>
-      </div>`)}`);
-  } catch (err) {
-    box.dataset.loaded = '';
-    mount(list, html`<div class="adm-error">${err.message}</div>`);
-  }
-}
-
 async function onClick(e) {
   const summary = e.target.closest('.adm-menu > summary');
   if (summary) {
@@ -444,8 +418,6 @@ async function onClick(e) {
         const { hltbSyncFlow } = await import('./hltb-sync.js');
         return hltbSyncFlow({ onDone: admin.reload });
       }
-      case 'award-edit': return openForm(ENTITIES.awards, awardRows.get(Number(button.dataset.award)), admin);
-      case 'award-revoke': return deleteRow(ENTITIES.awards, awardRows.get(Number(button.dataset.award)), admin);
       case 'create': {
         if (entity.creates?.length > 1) return openCreateForm(entity, admin); // several types: one button, the type is chosen in the form
         const variant = entity.creates?.[Number(button.dataset.create)];
