@@ -9,3 +9,7 @@
 .cl-better { --tone: var(--accent-purple); }
 .cl-fix { --tone: var(--accent-gold); }
 .cl-items { margin: 0; padding-left: 1.2rem; display: flex; flex-direction: column; gap: 4px; font-size: 0.9rem; }
+.cl-top { display: flex; align-items: baseline; justify-content: space-between; gap: 4px 16px; flex-wrap: wrap; max-width: 720px; margin-bottom: 18px; }
+.cl-top .pg-title { margin: 0; }
+.cl-docs { font-size: 0.85rem; color: var(--accent-teal); text-decoration: none; }
+.cl-docs:hover { text-decoration: underline; }

@@ -10,6 +10,9 @@
 // Item kinds: 'new' (something that was not there), 'better' (something that was already there and now is nicer or
 // easier), 'fix' (something that did not work and now does).
 
+// The published user guide (the MkDocs site of the repository, only its player pages)
+export const DOCS_URL = 'https://la-viciacion.github.io/la-viciacion/guia-usuario/';
+
 export const KINDS = {
   new: 'Nuevo',
   better: 'Mejora',
