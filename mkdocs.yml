@@ -61,8 +61,12 @@ plugins:
   - search:
       lang: es
 
-# The technical docs are written in English and stay a plain section; the pages
-# for people who play and who run the app are in Spanish and get their own tabs.
+# The site is for the players. The configuration and technical pages stay in the repository (docs/configuracion,
+# docs/desarrollo) but are neither built nor published; the README and AGENTS.md link to them on GitHub.
+exclude_docs: |
+  configuracion/
+  desarrollo/
+
 nav:
   - Inicio: index.md
   - Guía de usuario:
@@ -76,26 +80,3 @@ nav:
       - Deseados, recomendados y retos: guia-usuario/descubrir.md
       - Notificaciones y Telegram: guia-usuario/notificaciones.md
       - Preguntas frecuentes: guia-usuario/preguntas-frecuentes.md
-  - Configuración:
-      - configuracion/index.md
-      - Instalación: configuracion/instalacion.md
-      - Variables del .env: configuracion/variables.md
-      - Cuentas y acceso: configuracion/cuentas.md
-      - Telegram: configuracion/telegram.md
-      - Servicios externos: configuracion/servicios.md
-      - Panel de administración: configuracion/panel-admin.md
-      - Operación: configuracion/operacion.md
-  - Documentación técnica:
-      - desarrollo/index.md
-      - Operación:
-          - Despliegue: desarrollo/deployment.md
-          - Configuración: desarrollo/configuration.md
-          - Funcionalidades: desarrollo/features.md
-      - Código:
-          - Arquitectura: desarrollo/architecture.md
-          - Desarrollo local: desarrollo/development.md
-          - Convenciones y recetas: desarrollo/conventions.md
-          - Migraciones: desarrollo/migrations.md
-          - Flujo de Git: desarrollo/workflow.md
-      - Planes:
-          - Roadmap: desarrollo/roadmap.md
