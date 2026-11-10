@@ -1,4 +1,6 @@
-# Timers y sesiones
+# Inicio: timers y sesiones
+
+**Inicio** es la primera pantalla de la app: aquí pones el timer, apuntas una sesión a mano y ves tus juegos de la temporada.
 
 Una **sesión** es un rato jugando a un juego en una plataforma. Es lo único que registras tú: todo lo demás (horas, rankings, rachas, logros…) se calcula a partir de ellas.
 

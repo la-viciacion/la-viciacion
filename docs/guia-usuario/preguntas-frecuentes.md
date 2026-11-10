@@ -18,6 +18,12 @@
 ??? question "No me llegan las notificaciones"
     Comprueba en **Perfil → Ajustes → Notificaciones** que tienes marcado el canal, que has vinculado Telegram (`/activate`) o activado el push en ese dispositivo, y que el navegador tiene permiso. En iPhone hay que instalar la app primero. Las notificaciones push necesitan que el servidor use HTTPS.
 
+??? question "¿Para qué sirven la ciudad y la fecha de nacimiento?"
+    Son datos opcionales de tu perfil (**Perfil → Ajustes → Perfil**) que la app usa para hacer cosas chulas por dentro. Nadie más los ve. Puedes rellenarlos, cambiarlos o quitarlos cuando quieras; la tarjeta «Tu perfil está al X %» de tu [perfil](perfil.md) te avisa de lo que falta.
+
+??? question "¿Dónde está la lista de mis juegos y de mis sesiones?"
+    En **Inicio** ves los de la temporada en curso, y en **Perfil → Mis juegos** toda tu biblioteca, de todas las temporadas, con filtros. Desde cualquiera de las dos puedes editar tus sesiones (solo las de esta temporada). Más en [Inicio](sesiones.md#tu-historial-en-inicio) y [Mis juegos](perfil.md#mis-juegos).
+
 ??? question "¿Hay easter eggs?"
     La app esconde alguno. No te diremos cuántos ni dónde: ¡a descubrirlos!
 

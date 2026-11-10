@@ -72,11 +72,14 @@ nav:
   - Guía de usuario:
       - guia-usuario/index.md
       - Primeros pasos: guia-usuario/primeros-pasos.md
-      - Timers y sesiones: guia-usuario/sesiones.md
+      - Inicio, timers y sesiones: guia-usuario/sesiones.md
       - Tu perfil: guia-usuario/perfil.md
       - El grupo: guia-usuario/grupo.md
+      - Juegos, biblioteca y calendario: guia-usuario/juegos.md
       - Logros: guia-usuario/logros.md
+      - Deseados y recomendados: guia-usuario/descubrir.md
+      - Retos: guia-usuario/retos.md
       - Resumen e historia: guia-usuario/resumen.md
-      - Deseados, recomendados y retos: guia-usuario/descubrir.md
+      - Asistente: guia-usuario/asistente.md
       - Notificaciones y Telegram: guia-usuario/notificaciones.md
       - Preguntas frecuentes: guia-usuario/preguntas-frecuentes.md

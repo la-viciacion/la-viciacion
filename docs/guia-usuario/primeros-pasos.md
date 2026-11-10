@@ -21,9 +21,9 @@ El botón de la esquina superior izquierda abre el **menú lateral**, con todas 
 
 <div markdown>
 
-- **Principal**: Inicio y Actividad.
-- **Explorar** (lo que es de todo el grupo): Temporada (los rankings de la temporada en curso), Juegos, Biblioteca, Jugadores, Calendario, Logros, Estadísticas (todavía en construcción) y Servidor.
-- **Tú** (lo que es tuyo): Mi perfil, Deseados, Recomendados, Retos y Ajustes.
+- **Principal**: [Inicio](sesiones.md) y [Actividad](grupo.md#actividad).
+- **Explorar** (lo que es de todo el grupo): [Temporada](grupo.md#temporada) (los rankings de la temporada en curso), [Juegos](juegos.md#juegos), [Biblioteca](juegos.md#biblioteca-del-grupo), [Jugadores](grupo.md#jugadores), [Calendario](juegos.md#calendario), [Logros](logros.md), [Estadísticas](grupo.md#estadisticas) (todavía en construcción) y [Servidor](grupo.md#servidor).
+- **Tú** (lo que es tuyo): [Mi perfil](perfil.md), [Deseados](descubrir.md#deseados), [Recomendados](descubrir.md#recomendados), [Retos](retos.md) y [Ajustes](perfil.md#ajustes).
 - **Administración**: solo si eres administrador.
 - **Cerrar sesión**, al final. Bajo ese botón sale la **versión** de la app (por ejemplo «v2.39.0»); al pulsarla se abre la página de Novedades.
 
@@ -36,11 +36,19 @@ En el móvil el menú ocupa toda la pantalla:
 
 ![Menú en el móvil](../assets/screens/menu-phone.webp){ .screenshot width="260" }
 
-### Novedades
+## Novedades
 
 **Pulsar la versión al pie del menú** cuenta lo que ha ido cambiando en la app, de lo más reciente a lo más antiguo: lo nuevo, las mejoras y los arreglos que se notan al usarla. Las versiones pequeñas se juntan en una sola entrada, para no saturar.
 
 ![La página de novedades](../assets/screens/changelog.webp){ .screenshot }
+
+## El asistente
+
+En todas las pantallas hay un botón redondo, abajo a la derecha, que abre un chat donde preguntar sobre videojuegos, los datos del grupo y cómo funciona la app (si el administrador tiene la IA activada). Más en [Asistente](asistente.md).
+
+## El resumen
+
+A principios de cada mes la app te ofrece el [Resumen](resumen.md) del mes anterior, y a final de año el de la temporada.
 
 ## Instalarla como app
 
