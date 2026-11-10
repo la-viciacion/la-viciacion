@@ -28,11 +28,11 @@ La Viciación es la app del grupo para llevar la cuenta de **cuánto y a qué ju
 
 - :material-account-group: **[El grupo](grupo.md)**
 
-    Actividad, jugadores, catálogo de juegos y calendario.
+    Actividad, temporada, jugadores, catálogo de juegos, biblioteca y calendario.
 
 - :material-trophy: **[Logros](logros.md)**
 
-    Qué se puede conseguir, los secretos y los especiales.
+    La página de logros y cómo consultarla.
 
 - :material-star-circle: **[Resumen e historia](resumen.md)**
 

@@ -48,18 +48,18 @@ Las sesiones manuales tienen unas reglas, para que los datos sean fiables:
 - **No puede solaparse** con otra sesión tuya.
 - No se puede añadir mientras tienes un **timer en marcha** (el botón aparece desactivado).
 
-Puedes **corregir o borrar** tus sesiones desde **Perfil → Resumen → Juegos → Sesiones**, pero solo las de esta temporada. Si te equivocaste de juego, bórrala y vuelve a añadirla (un administrador sí puede cambiárselo).
+Puedes **corregir o borrar** tus sesiones desde **Inicio** (despliega el juego y pulsa **Editar**) o desde **Perfil → Resumen → Juegos → Sesiones**, pero solo las de esta temporada. El formulario deja cambiar la plataforma, el inicio y el fin (con las mismas reglas de arriba) y tiene el botón **Eliminar sesión**, que pide confirmar. Si te equivocaste de juego, bórrala y vuelve a añadirla (un administrador sí puede cambiárselo).
 
 ## Tu historial en Inicio
 
-Debajo del timer ves **tus juegos** de esta temporada, el último jugado primero. Pulsa un juego para desplegar sus últimas sesiones.
+Debajo del timer ves **tus juegos** de esta temporada, el último jugado primero, con cuánto hace que lo jugaste, el tiempo total, cuántas sesiones tiene (si más de una) y sus plataformas. Pulsa un juego para desplegar sus últimas sesiones (con su fecha, plataforma y duración y un botón **Editar** en cada una). Al final de la lista, **Ver la ficha del juego** abre su página y, si hay más sesiones de las que se enseñan, **Ver todas** las carga. Si tienes muchos juegos, **Mostrar más** carga el resto.
 
 ![Sesiones de un juego desplegadas](../assets/screens/home-history.webp){ .screenshot }
 
 A la derecha de cada fila:
 
 - El **círculo** marca el juego como completado (o te dice que ya lo está).
-- El botón de **play** inicia un timer nuevo con ese juego.
+- El botón de **play** inicia un timer nuevo con ese juego, con la plataforma de su última sesión (aparece desactivado mientras tienes un timer en marcha).
 
 ## Completar un juego
 
@@ -69,8 +69,10 @@ Al pulsar el círculo se abre una ventana con las plataformas y temporadas en la
 
 - Un juego se completa **una vez por temporada**, y solo en la temporada en curso. Cuando la temporada se cierra, la fecha de completado queda congelada.
 - Justo después te ofrece **puntuarlo** (de 1 a 100). Puedes decir **Ahora no**.
+- Si te has equivocado, en **Perfil → Resumen → Juegos** (o **Mis juegos**) un juego completado esta temporada tiene **Cambiar fecha** (elige otro día, desde que empezaste a jugarlo ese año hasta hoy (o el fin de esa temporada)) y **Desmarcar**, que lo deja otra vez sin completar (pide confirmar). Cuando la temporada se cierra, esas dos opciones desaparecen.
+- Si el botón de completar está apagado, la propia fila te dice por qué con un 🔒: la temporada ya está cerrada o ya lo completaste esta temporada en otra plataforma.
 
 ## Puntuar y abandonar
 
-- **Nota**: puedes puntuar cualquier juego de tu biblioteca de **1 a 100**, una sola vez por juego (da igual la plataforma o la temporada). Cambia la nota cuando quieras con **Puntuar** / **Cambiar nota** en la lista de juegos de tu [perfil](perfil.md). Las notas aparecen como un pequeño anillo junto al nombre del juego, del rojo al verde según la puntuación, y las notas de los demás influyen un poco en las [recomendaciones](descubrir.md).
-- **Abandonar**: si no vas a terminar un juego de esta temporada, márcalo con **Abandonar** en **Perfil → Resumen → Juegos** (te pide confirmar con otra pulsación). Es reversible y no se anuncia: si vuelves a jugarlo, se reanuda solo. No cambia ni tus totales ni tus logros; es solo una nota para ti.
+- **Nota**: puedes puntuar cualquier juego de tu biblioteca de **1 a 100**, una sola vez por juego (da igual la plataforma o la temporada). Cambia la nota cuando quieras con **Puntuar** / **Cambiar nota** en la lista de juegos de tu [perfil](perfil.md) (o en la página del juego), y si te arrepientes, **Quitar nota**. Las notas aparecen como un pequeño anillo junto al nombre del juego, del rojo al verde según la puntuación, y las notas de los demás influyen un poco en las [recomendaciones](descubrir.md).
+- **Abandonar**: si no vas a terminar un juego de esta temporada, márcalo con **Abandonar** en **Perfil → Resumen → Juegos** (te pide confirmar con otra pulsación). Es reversible y no se anuncia: con **Retomar** (también con confirmación) vuelve a estar en curso, y si vuelves a jugarlo se reanuda solo. No cambia ni tus totales ni tus logros; es solo una nota para ti.

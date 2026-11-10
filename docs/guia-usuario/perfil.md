@@ -17,7 +17,7 @@ Arriba, con una pastilla por **temporada** (y **Total** para todo el historial),
 | **Racha actual / Mejor racha** | Días seguidos jugando. La racha actual solo aparece en la temporada en curso y en el total. |
 | **Logros** | Logros que has conseguido. |
 
-Debajo, tus **más jugados**, tus **últimos logros** de la temporada (los cinco más recientes), tus **retos** y la lista de **juegos**, que se puede plegar y con sus botones: *Sesiones*, *Cambiar nota*, *Marcar completado* y *Abandonar*.
+Debajo, tus **más jugados**, tus **últimos logros** de la temporada (los cinco más recientes), tus **retos** y la lista de **juegos**, que se puede plegar (el navegador recuerda si la dejaste plegada). Cada juego tiene sus botones: *Sesiones* (despliega y deja editar las de esta temporada), *Puntuar* o *Cambiar nota* (con *Quitar nota* si ya tiene), *Marcar completado* (o, si ya lo está, *Cambiar fecha* y *Desmarcar*), *Abandonar* (o *Retomar*) y *Precio*. El nombre del juego lleva a su página.
 
 Mientras te falte la foto, la ciudad o la fecha de nacimiento, arriba sale una tarjeta con el porcentaje del perfil completado y un botón **Completar**. Al abrir la app también puede salir un aviso en la parte baja: con **Ahora no** vuelve a la semana, y deja de salir un mes después de la primera vez o en cuanto el perfil esté completo.
 
@@ -25,7 +25,7 @@ Para cambiar tu foto, pulsa **Cambiar foto** (PNG o JPG).
 
 ## Mis juegos
 
-Toda tu biblioteca, de todas las temporadas, con filtros por nombre, temporada, estado, nota y plataforma.
+Toda tu biblioteca, de todas las temporadas, con filtros por nombre (**Buscar juego**), temporada, estado, nota y plataforma. Encima de la lista te dice cuántos juegos hay («12 de 80 juegos») y, si son muchos, **Mostrar más** carga el resto.
 
 ![Tu biblioteca completa](../assets/screens/profile-games.webp){ .screenshot }
 
@@ -45,7 +45,7 @@ Encima de la lista, **¿Qué juego sigo?** propone a qué volver (el icono **i**
 
 Los ajustes están en cuatro grupos, que eliges con los botones de arriba: **Perfil**, **Seguridad**, **Notificaciones** y **Tus datos**.
 
-- **Perfil** (Mis datos): tu nombre, tu usuario, tu email, tu **Telegram ID** (solo se ve: se vincula con `/activate` en el grupo y solo un administrador puede cambiarlo o quitarlo; hay un botón para enviarte un mensaje de prueba), tu **ciudad** y tu **fecha de nacimiento**. La ciudad y la fecha de nacimiento solo sirven para algunos [logros secretos](logros.md) (el tiempo, los eclipses, tu cumpleaños…) y, el día de tu cumpleaños, para que el logo te lo celebre con una tarta y la primera vez que abras la app ese día te salga una felicitación (nunca dice tu edad); nadie más las ve.
-- **Seguridad**: cambia tu contraseña cuando quieras y cierra la sesión en ese dispositivo.
-- **Notificaciones**: qué avisos privados quieres recibir y por qué canal (Telegram y/o móvil), y los dispositivos en los que tienes las notificaciones activadas. Más en [Notificaciones y Telegram](notificaciones.md).
+- **Perfil** (Mis datos): tu nombre y tu email (con el que inicias sesión) se pueden cambiar con **Guardar datos**; tu usuario (apodo) no. Además verás tu **Telegram ID** (solo se ve: se vincula con `/activate` en el grupo y solo un administrador puede cambiarlo o quitarlo; hay un botón para enviarte un mensaje de prueba), tu **ciudad** y tu **fecha de nacimiento**. Para poner la ciudad, escribe su nombre (al menos dos letras), pulsa **Buscar**, elige una de las que salen y guarda; **Quitar** la borra. Nada se guarda hasta que pulsas **Guardar datos**. Son datos opcionales que puedes rellenar para que la app haga cosas chulas con ellos; nadie más los ve.
+- **Seguridad**: cambia tu contraseña cuando quieras (la actual y la nueva dos veces; la nueva debe tener de 12 a 24 caracteres, con mayúscula, minúscula, número y un carácter especial) y cierra la sesión en ese dispositivo.
+- **Notificaciones**: qué avisos privados quieres recibir y por qué canal (Telegram y/o móvil), y los dispositivos en los que tienes las notificaciones activadas (con **Activar avisos en este dispositivo**, una casilla **Avisos del grupo** por dispositivo y **Quitar**). Más en [Notificaciones y Telegram](notificaciones.md).
 - **Tus datos**: **Descargar mis datos** te da un archivo `.json` con tus sesiones, tu biblioteca, tus notas, los precios que has apuntado, tu lista de deseados y tus logros.
