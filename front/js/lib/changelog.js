@@ -21,6 +21,14 @@ export const KINDS = {
 
 export const CHANGELOG = [
   {
+    from: '2.40', to: '2.40', date: '2026-11-10',
+    title: 'Novedades y tus ids de jugador',
+    items: [
+      ['new', 'Novedades: una página que cuenta lo que va cambiando en la app, con un enlace a la documentación completa. Se abre pulsando la versión al pie del menú.'],
+      ['new', 'Puedes añadir tus ids de Nintendo, Xbox, PlayStation, Steam y Discord en Perfil → Ajustes, y el grupo los ve en tu página de jugador, con un toque para copiarlos.'],
+    ],
+  },
+  {
     from: '2.35', to: '2.39', date: '2026-11-10',
     title: 'Temporada y perfil',
     items: [
