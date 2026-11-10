@@ -30,6 +30,7 @@ const ROUTES = [
   { prefix: '#/story', load: () => import('./pages/story/index.js') },
   { prefix: '#/notifications', load: () => import('./pages/notifications/index.js') },
   { prefix: '#/recap', load: () => import('./pages/recap/index.js') },
+  { prefix: '#/changelog', load: () => import('./pages/changelog/index.js') },
   { prefix: '#/season', load: () => import('./pages/season/index.js') },
   { prefix: '#/stats',load: () => import('./pages/stats/index.js') },
   { prefix: '#/games', load: () => import('./pages/games/index.js') },

@@ -28,7 +28,7 @@ function openMenu(button, { user, onLogout }) {
           ${section.items.map((it) => item(it, current))}`)}
       </nav>
       <div class="menu-foot"><button class="menu-item menu-logout" type="button" id="menuLogout">${icons.iconLogout()}<span>Cerrar sesión</span></button>
-        <small class="menu-version" id="menuVersion" hidden></small>
+        <a class="menu-version" id="menuVersion" href="#/changelog" title="Ver las novedades" hidden></a>
       </div>
     </aside>`);
 
@@ -43,7 +43,7 @@ function openMenu(button, { user, onLogout }) {
   const onKey = (e) => { if (e.key === 'Escape') close(); };
 
   overlay.addEventListener('click', (e) => {
-    if (e.target === overlay || e.target.closest('[data-close]') || e.target.closest('a.menu-item')) close();
+    if (e.target === overlay || e.target.closest('[data-close]') || e.target.closest('a.menu-item') || e.target.closest('a.menu-version')) close();
   });
   overlay.querySelector('#menuLogout').addEventListener('click', () => { close(); onLogout(); });
   loadVersion().then((version) => {
