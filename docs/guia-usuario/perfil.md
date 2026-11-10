@@ -17,9 +17,9 @@ Arriba, con una pastilla por **temporada** (y **Total** para todo el historial),
 | **Racha actual / Mejor racha** | Días seguidos jugando. La racha actual solo aparece en la temporada en curso y en el total. |
 | **Logros** | Logros que has conseguido. |
 
-Debajo, tus **más jugados**, tus **últimos logros** de la temporada (los cinco más recientes), tus **retos** y la lista de **juegos**, que se puede plegar (el navegador recuerda si la dejaste plegada). Cada juego tiene sus botones: *Sesiones* (despliega y deja editar las de esta temporada), *Puntuar* o *Cambiar nota* (con *Quitar nota* si ya tiene), *Marcar completado* (o, si ya lo está, *Cambiar fecha* y *Desmarcar*), *Abandonar* (o *Retomar*) y *Precio*. El nombre del juego lleva a su página.
+Debajo, tus **más jugados**, tus **últimos logros** de la temporada (los cinco más recientes), tus **retos** y la lista de **juegos**, que se puede plegar. Cada juego tiene sus botones: *Sesiones* (despliega y deja editar las de esta temporada), *Puntuar* o *Cambiar nota* (con *Quitar nota* si ya tiene), *Marcar completado* (o, si ya lo está, *Cambiar fecha* y *Desmarcar*), *Abandonar* (o *Retomar*) y *Precio*. El nombre del juego lleva a su página.
 
-Mientras te falte la foto, la ciudad o la fecha de nacimiento, arriba sale una tarjeta con el porcentaje del perfil completado y un botón **Completar**. Al abrir la app también puede salir un aviso en la parte baja: con **Ahora no** vuelve a la semana, y deja de salir un mes después de la primera vez o en cuanto el perfil esté completo.
+Mientras te falte la foto, la ciudad o la fecha de nacimiento, arriba sale una tarjeta con el porcentaje del perfil completado y un botón **Completar**. Al abrir la app también puede salir un aviso en la parte baja, con un botón **Ahora no**.
 
 Para cambiar tu foto, pulsa **Cambiar foto** (PNG o JPG).
 
@@ -33,9 +33,9 @@ Toda tu biblioteca, de todas las temporadas, con filtros por nombre (**Buscar ju
 
 Si has jugado un mismo juego en varias plataformas dentro de una temporada, sale **en una sola fila** con todas sus plataformas, no una por plataforma; las horas son las del juego entero y el filtro de plataforma encuentra la fila con cualquiera de ellas.
 
-Cada juego sin terminar tiene un **estado**: *En curso*, *Pausado* (llevas más de 30 días sin jugarlo), *Pendiente* (lo tienes pero nunca lo has jugado), *Completado*, *Abandonado* o *Sin completar* (se quedó a medias en una temporada ya cerrada). Se puede filtrar por cualquiera.
+Cada juego sin terminar tiene un **estado**: *En curso*, *Pausado* (llevas mucho sin jugarlo), *Pendiente* (lo tienes pero nunca lo has jugado), *Completado*, *Abandonado* o *Sin completar* (se quedó a medias en una temporada ya cerrada). Se puede filtrar por cualquiera.
 
-Encima de la lista, **¿Qué juego sigo?** propone a qué volver (el icono **i** de cada lista explica cómo se elige): los **casi terminados** (llevas al menos el 70 % de lo que suele durar), los **olvidados** (más de 60 días sin tocarlos) y los **cortos** (duran menos de 5 horas según HowLongToBeat, los hayas empezado o no). Usa el tiempo medio de HowLongToBeat, así que un juego sin tiempo medio solo puede salir como olvidado.
+Encima de la lista, **¿Qué juego sigo?** propone a qué volver, con listas de juegos **casi terminados**, **olvidados** y **cortos** (el icono **i** de cada lista explica cómo se elige).
 
 **Puntuar al azar** (el botón solo sale si te quedan juegos sin nota) abre un juego de los que todavía no has puntuado: pones la nota, y con cada una te sale el siguiente hasta que no queden. **Omitir, ver otro** pasa al siguiente y **Dejar de puntuar** cierra la ventana.
 

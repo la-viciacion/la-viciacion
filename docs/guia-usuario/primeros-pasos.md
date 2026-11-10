@@ -9,7 +9,7 @@ Abre la dirección de la app que te haya dado tu administrador e introduce tu **
 !!! tip "¿Has olvidado la contraseña?"
     Pulsa **¿Has olvidado tu contraseña?**, escribe tu email o tu usuario y recibirás un correo con un enlace (válido durante 1 hora) para elegir una nueva. Si tu grupo no tiene el correo configurado, pídele a un administrador que te ponga una desde el panel.
 
-Por seguridad, tras **5 intentos fallidos** seguidos la cuenta se bloquea un rato. Si cambias o restableces tu contraseña, la sesión se cierra en todos tus dispositivos. Tu sesión dura unos 7 días mientras no dejes de usar la app.
+Si cambias o restableces tu contraseña, la sesión se cierra en todos tus dispositivos.
 
 ## Moverte por la app
 

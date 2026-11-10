@@ -6,8 +6,8 @@ El **Resumen** es el «Wrapped» de La Viciación: cómo fue un mes o una tempor
 
 ## Qué incluye
 
-- **Tu resumen** (pestaña **Tú**): las horas jugadas frente al periodo anterior, tu puesto en el grupo, sesiones, días y juegos, tu mejor racha y tu sesión más larga, tu **juego estrella**, tu **mejor día**, con quién has jugado más al mismo juego, lo que has empezado y completado y tu logro más raro.
-- **El grupo** (pestaña **El grupo**): las horas totales, la clasificación con la variación de cada jugador, los juegos más jugados, el día más movido y los logros conseguidos.
+- **Tu resumen** (pestaña **Tú**): tus cifras del periodo frente al anterior y tu puesto en el grupo, con unas cuantas sorpresas.
+- **El grupo** (pestaña **El grupo**): las cifras del grupo entero y la clasificación.
 
 ![El resumen del grupo](../assets/screens/recap-group.webp){ .screenshot }
 
@@ -15,7 +15,7 @@ Si un administrador ha habilitado los resúmenes de forma permanente, arriba a l
 
 ## La historia
 
-**Ver mi historia** convierte el resumen en una secuencia de pantallas, como el resumen del año de una app de música: tus horas, tu juego estrella y tu top 5 con portadas, tu mejor día (con la cuadrícula del mes), tu día de la semana favorito, en qué momento del día juegas, tus géneros, tu racha, tu compañero habitual, tus logros y el podio del grupo. Las pantallas sin datos se omiten.
+**Ver mi historia** convierte el resumen en una secuencia de pantallas, como el resumen del año de una app de música. Las pantallas sin datos se omiten.
 
 <div class="phones" markdown>
 
@@ -27,8 +27,7 @@ Si un administrador ha habilitado los resúmenes de forma permanente, arriba a l
 
 </div>
 
-- **Avanzar**: toca el lado derecho (o `→` o espacio). **Retroceder**: el izquierdo (o `←`). Mantén pulsado para pausar, desliza para moverte, `Esc` o ✕ para salir. En una pantalla ancha se muestra como una tarjeta vertical.
-- **Compartir**: cada pantalla se puede guardar como imagen vertical (1080×1920) desde el botón de compartir de la esquina: abre el menú de compartir del móvil o descarga el PNG en el ordenador.
+Toca los lados para avanzar y retroceder, y con el botón de compartir de la esquina guardas cada pantalla como imagen.
 
 ## Los avisos
 
