@@ -9,12 +9,12 @@ export function menuSections(user) {
       { id: 'activity', label: 'Actividad', href: '#/activity', icon: 'iconActivity' },
     ] },
     { label: 'Explorar', items: [
+      { id: 'season', label: 'Temporada', href: '#/season', icon: 'iconClock' },
       { id: 'games', label: 'Juegos', href: '#/games', icon: 'iconGamepad' },
       { id: 'library', label: 'Biblioteca', href: '#/library', icon: 'iconStar' },
       { id: 'players', label: 'Jugadores', href: '#/players', icon: 'iconPerson' },
       { id: 'calendar', label: 'Calendario', href: '#/calendar', icon: 'iconCalendar' },
       { id: 'achievements', label: 'Logros', href: '#/achievements', icon: 'iconTrophy' },
-      { id: 'season', label: 'Temporada', href: '#/season', icon: 'iconClock' },
       { id: 'stats', label: 'Estadísticas', href: '#/stats', icon: 'iconChart', wip: true },
       { id: 'server', label: 'Servidor', href: '#/server', icon: 'iconServer' },
     ] },
