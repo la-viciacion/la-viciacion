@@ -50,7 +50,6 @@ export const CHANGELOG = [
       ['new', 'Los retos temáticos parten de temáticas ya preparadas.'],
       ['new', 'Encuestas en el grupo de Telegram para votar, y en algunas puedes añadir tus propias opciones.'],
       ['new', 'En el calendario de lanzamientos, al pulsar un día se abre la lista de sus juegos.'],
-      ['new', 'La tarjeta del timer en marcha brilla con un aura que va del verde al rojo según crece la sesión.'],
       ['fix', 'El calendario resalta el día de hoy.'],
     ],
   },

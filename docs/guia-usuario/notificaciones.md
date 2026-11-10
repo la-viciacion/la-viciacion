@@ -10,8 +10,8 @@ La Viciación avisa por dos canales: **Telegram** (un grupo y un bot) y las **no
 - Un juego completado, con su duración y, a veces, una recomendación.
 - Un juego jugado por primera vez por alguien.
 - Cambios en los rankings de horas y de juegos.
-- Rachas perdidas (cada día a las 05:00 se anuncian las del día anterior).
-- Los lanzamientos de la lista de deseados: según lo que haya elegido el administrador, **el día antes** de que salga un juego (lo normal), **el mismo día** o **un resumen cada domingo** con los que salen en los 7 días siguientes (o ninguno). Solo funciona una de estas formas a la vez.
+- Rachas perdidas.
+- Los lanzamientos de la lista de deseados: según lo que haya elegido el administrador, **el día antes** de que salga un juego (lo normal), **el mismo día** o **un resumen cada domingo** (o ninguno). Solo funciona una de estas formas a la vez.
 - Las **encuestas** que lanza un administrador: aparecen como una encuesta de Telegram normal en el grupo (se ve quién vota qué), puede haber una abierta a la vez, a veces dejan añadir opciones, y al cerrarse se avisa de la opción ganadora.
 - El resumen mensual o anual y los retos del grupo: cuando se lanza uno, cuando el grupo llega al total y, al día siguiente de que acabe, cómo ha terminado.
 
@@ -47,8 +47,6 @@ El bot solo atiende a los miembros del grupo con cuenta en la app. Para que te r
 2. Pide a un administrador que tu **usuario de la app** sea el mismo que tu `@usuario` de Telegram (da igual mayúsculas o minúsculas).
 3. Escribe `/activate` **en el grupo**. El bot guarda tu identificador de Telegram y, a partir de ahí, ya no importa que cambies de `@usuario`.
 
-Cuando entras al grupo, el bot te da la bienvenida y te recuerda este paso.
-
 No puedes escribir ni quitar tu **Telegram ID** a mano (nada prueba que sea tuyo): lo pone `/activate` o un administrador. En **Perfil → Ajustes → Perfil** lo ves y lo pruebas con **Enviar mensaje de prueba**.
 
 ### El menú del bot
@@ -77,4 +75,4 @@ Mientras tienes un timer en marcha, tus dispositivos muestran una notificación 
 
 En **Perfil → Ajustes → Notificaciones** hay una tabla con los avisos privados y, para cada uno, una casilla de **Telegram** y otra de **Push**. Un aviso sin ningún canal marcado simplemente no se envía. Telegram solo llega si has vinculado tu cuenta, y push solo si has activado los avisos en algún dispositivo.
 
-Los avisos que tienen opciones propias se despliegan bajo su fila mientras haya algún canal marcado, y se guardan con su botón **Guardar**. Para el aviso de **timer olvidado** eliges a partir de cuántas horas (entre 1 y 24; 4 por defecto). Se comprueba cada hora, así que puede llegar hasta una hora después.
+Los avisos que tienen opciones propias se despliegan bajo su fila mientras haya algún canal marcado, y se guardan con su botón **Guardar**. Para el aviso de **timer olvidado** eliges a partir de cuántas horas (entre 1 y 24; 4 por defecto).

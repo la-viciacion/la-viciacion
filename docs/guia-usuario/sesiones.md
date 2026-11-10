@@ -11,7 +11,7 @@ Es la forma habitual: pulsas al empezar y paras al terminar.
 3. Elige la **plataforma**. Si ya lo habías jugado, la que usaste la última vez aparece la primera.
 4. El timer empieza a correr. Cuando termines, pulsa **Detener**; si te has equivocado y no quieres que cuente, **Cancelar**.
 
-Si empezaste a jugar antes de pulsar, no hace falta pararlo: bajo el reloj, **Empezó a las HH:MM** abre una ventana para **mover el inicio hacia atrás** y el timer sigue en marcha. Las reglas son las de una sesión manual (antes de ahora, como mucho 24 horas, sin solaparse con otra sesión tuya) y el nuevo inicio debe ser de la misma temporada. El aura de la tarjeta del timer pasa del verde azulado al rojo a medida que la sesión se alarga.
+Si empezaste a jugar antes de pulsar, no hace falta pararlo: bajo el reloj, **Empezó a las HH:MM** abre una ventana para **mover el inicio hacia atrás** y el timer sigue en marcha. Las reglas son las de una sesión manual (antes de ahora, como mucho 24 horas, sin solaparse con otra sesión tuya) y el nuevo inicio debe ser de la misma temporada.
 
 <div class="grid" markdown>
 
@@ -74,5 +74,5 @@ Al pulsar el círculo se abre una ventana con las plataformas y temporadas en la
 
 ## Puntuar y abandonar
 
-- **Nota**: puedes puntuar cualquier juego de tu biblioteca de **1 a 100**, una sola vez por juego (da igual la plataforma o la temporada). Cambia la nota cuando quieras con **Puntuar** / **Cambiar nota** en la lista de juegos de tu [perfil](perfil.md) (o en la página del juego), y si te arrepientes, **Quitar nota**. Las notas aparecen como un pequeño anillo junto al nombre del juego, del rojo al verde según la puntuación, y las notas de los demás influyen un poco en las [recomendaciones](descubrir.md).
+- **Nota**: puedes puntuar cualquier juego de tu biblioteca de **1 a 100**, una sola vez por juego (da igual la plataforma o la temporada). Cambia la nota cuando quieras con **Puntuar** / **Cambiar nota** en la lista de juegos de tu [perfil](perfil.md) (o en la página del juego), y si te arrepientes, **Quitar nota**. Las notas de los demás influyen un poco en las [recomendaciones](descubrir.md).
 - **Abandonar**: si no vas a terminar un juego de esta temporada, márcalo con **Abandonar** en **Perfil → Resumen → Juegos** (te pide confirmar con otra pulsación). Es reversible y no se anuncia: con **Retomar** (también con confirmación) vuelve a estar en curso, y si vuelves a jugarlo se reanuda solo. No cambia ni tus totales ni tus logros; es solo una nota para ti.
