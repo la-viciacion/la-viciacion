@@ -9,6 +9,7 @@ export function menuSections(user) {
       { id: 'activity', label: 'Actividad', href: '#/activity', icon: 'iconActivity' },
     ] },
     { label: 'Explorar', items: [
+      { id: 'season', label: 'Temporada', href: '#/season', icon: 'iconClock' },
       { id: 'games', label: 'Juegos', href: '#/games', icon: 'iconGamepad' },
       { id: 'library', label: 'Biblioteca', href: '#/library', icon: 'iconStar' },
       { id: 'players', label: 'Jugadores', href: '#/players', icon: 'iconPerson' },
@@ -38,6 +39,7 @@ const PAGES = [
   ['#/profile', 'profile'],
   ['#/admin', 'admin'],
   ['#/activity', 'activity'],
+  ['#/season', 'season'],
   ['#/stats', 'stats'],
   ['#/server', 'server'],
   ['#/games', 'games'],

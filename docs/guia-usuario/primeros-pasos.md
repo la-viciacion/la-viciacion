@@ -22,7 +22,7 @@ El botón de la esquina superior izquierda abre el **menú lateral**, con todas 
 <div markdown>
 
 - **Principal**: Inicio y Actividad.
-- **Explorar** (lo que es de todo el grupo): Juegos, Biblioteca, Jugadores, Calendario, Logros, Estadísticas (todavía en construcción) y Servidor.
+- **Explorar** (lo que es de todo el grupo): Temporada (los rankings de la temporada en curso), Juegos, Biblioteca, Jugadores, Calendario, Logros, Estadísticas (todavía en construcción) y Servidor.
 - **Tú** (lo que es tuyo): Mi perfil, Resumen, Deseados, Recomendados, Retos y Ajustes.
 - **Administración**: solo si eres administrador.
 - **Cerrar sesión**, al final.

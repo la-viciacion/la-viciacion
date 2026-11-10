@@ -72,17 +72,19 @@ def user_ranking_achievements(
     season: int = None,
     is_active: bool | None = None,
 ):
+    """Every player with the achievements of the season (0 if none), most first."""
     season = seasons.or_current(season)
+    earned = func.count(models.UserAchievement.achievement_id)
     stmt = (
-        select(
-            models.UserAchievement.user_id,
-            func.count(models.UserAchievement.achievement_id).label("achievements"),
-            models.User.name,
+        select(models.User.id.label("user_id"), earned.label("achievements"), models.User.name)
+        .select_from(models.User)
+        .outerjoin(
+            models.UserAchievement,
+            and_(models.UserAchievement.user_id == models.User.id, models.UserAchievement.season == season),
         )
-        .filter(models.UserAchievement.season == season, models.not_god())
-        .join(models.User, models.User.id == models.UserAchievement.user_id)
-        .group_by(models.UserAchievement.user_id, models.User.name)
-        .order_by(func.count(models.UserAchievement.achievement_id).desc(), models.UserAchievement.user_id)
+        .where(models.not_god())
+        .group_by(models.User.id, models.User.name)
+        .order_by(earned.desc(), models.User.id)
         .limit(limit)
     )
     if is_active is not None:
@@ -96,26 +98,24 @@ def user_played_games(
     season: int = None,
     is_active: bool | None = None,
 ):
+    """Every player with the distinct games in their library of the season (0 if none), most first."""
     season = seasons.or_current(season)
     try:
+        played = func.count(func.distinct(models.UserGame.game_id))
         stmt = (
-            select(
-                models.UserGame.user_id,
-                func.count(func.distinct(models.UserGame.game_id)).label("played_games"),
-                models.User.name,
+            select(models.User.id.label("user_id"), played.label("played_games"), models.User.name)
+            .select_from(models.User)
+            .outerjoin(
+                models.UserGame,
+                and_(models.UserGame.user_id == models.User.id, models.UserGame.season == season),
             )
-            .filter(models.UserGame.season == season, models.not_god())
-            .join(models.User, models.User.id == models.UserGame.user_id)
+            .where(models.not_god())
         )
 
         if is_active is not None:
             stmt = stmt.where(models.User.is_active == is_active)
 
-        stmt = (
-            stmt.group_by(models.UserGame.user_id, models.User.name)
-            .order_by(func.count(func.distinct(models.UserGame.game_id)).desc(), models.UserGame.user_id)
-            .limit(limit)
-        )
+        stmt = stmt.group_by(models.User.id, models.User.name).order_by(played.desc(), models.User.id).limit(limit)
 
         return db.execute(stmt).fetchall()
     except Exception as e:
