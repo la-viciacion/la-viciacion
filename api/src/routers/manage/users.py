@@ -149,6 +149,14 @@ class UserPatch(BaseModel):
     is_active: Optional[bool] = None
 
 
+GOD_PROTECTED = "La cuenta admin es la de emergencia: se restaura sola al arrancar la API y no se puede renombrar, desactivar, quitarle el rol, cambiarle la contraseña ni borrar"
+
+
+def refuse_god(user: models.User):
+    if user.username == models.GOD_USERNAME:
+        raise HTTPException(status_code=400, detail=GOD_PROTECTED)
+
+
 @router.patch("/users/{user_id}")
 def patch_user(
     user_id: int,
@@ -158,6 +166,12 @@ def patch_user(
 ):
     user = get_or_404(db, models.User, user_id, "Usuario")
     data = body.model_dump(exclude_unset=True)
+    if user.username == models.GOD_USERNAME and any(
+        data.get(field) is not None and data[field] != current
+        for field, current in (("username", user.username), ("name", user.name), ("is_admin", bool(user.is_admin)), ("is_active", bool(user.is_active)))
+    ):
+        # the API restores these on every start (crud.users.ensure_god_user): an edit would be undone or leave a second emergency account
+        raise HTTPException(status_code=400, detail=GOD_PROTECTED)
     if user.id == admin.id and (data.get("is_admin") is False or data.get("is_active") is False):
         raise HTTPException(status_code=400, detail="No puedes quitarte el rol de admin ni desactivarte a ti mismo")
     if data.get("telegram_id") is not None:
@@ -186,6 +200,7 @@ class PasswordBody(BaseModel):
 @router.post("/users/{user_id}/password")
 def set_password(user_id: int, body: PasswordBody, db: Session = Depends(get_db)):
     user = get_or_404(db, models.User, user_id, "Usuario")
+    refuse_god(user)  # its password is GOD_ADMIN_PASS, put back on every start
     if not validate_password_requirements(body.password):
         raise HTTPException(
             status_code=400,
@@ -204,6 +219,7 @@ def delete_user(
     db: Session = Depends(get_db),
 ):
     user = get_or_404(db, models.User, user_id, "Usuario")
+    refuse_god(user)
     if user.id == admin.id:
         raise HTTPException(status_code=400, detail="No puedes borrarte a ti mismo")
     counts = {
