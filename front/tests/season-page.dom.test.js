@@ -1,0 +1,59 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { installApi, installDom, installStorage, json, settle, text } from './dom.js';
+import { current } from '../js/lib/seasons.js';
+
+installStorage();
+installDom('<main id="main"></main>');
+const page = await import('../js/pages/season/index.js');
+const main = () => document.getElementById('main');
+
+const ANSWER = [
+  { type: 'user_hours', data: [{ user_id: 1, name: 'Ana <b>', played_time: 7200 }, { user_id: 2, name: 'Bea', played_time: 3600 }, { user_id: 3, name: 'Cai', played_time: 0 }, { user_id: 4, name: 'Dan', played_time: 0 }] },
+  { type: 'user_days', data: [{ user_id: 1, name: 'Ana', played_days: 8 }, { user_id: 2, name: 'Bea', played_days: 2 }] },
+  { type: 'user_played_games', data: [{ user_id: 2, name: 'Bea', played_games: 5 }] },
+  { type: 'user_ratio', data: [{ user_id: 1, name: 'Ana', ratio: 0.5 }] },
+  { type: 'games_most_played', data: [{ game_id: 'hades', name: 'Hades', image_url: 'https://img/hades.jpg', played_time: 5400 }, { game_id: 'x', name: 'Sin portada', image_url: null, played_time: 600 }, { game_id: 'a', name: 'A', image_url: 'https://img/a.jpg', played_time: 500 }, { game_id: 'b', name: 'B', image_url: 'https://img/b.jpg', played_time: 400 }] },
+  { type: 'achievements', data: [] },
+];
+
+test('it shows the running season and a card per ranking, with names as text', async () => {
+  const calls = installApi({ 'GET /statistics/rankings?': ANSWER, 'GET /users/photo/': json({ detail: 'no' }, 404) });
+  await page.render({ main: main() });
+  await settle();
+  assert.equal(text('h1')[0], `Temporada ${current()}`);
+  assert.equal(calls[0].path.startsWith('/statistics/rankings?only_active=true&ranking=user_hours'), true);
+  assert.equal(document.querySelectorAll('.ss-card').length, 9);
+  assert.deepEqual(text('#ss-hours .ss-name'), ['Bea', 'Ana <b>', 'Cai', 'Dan']); // the podium puts the second at the left of the first; a player with nothing is still there
+  assert.equal(document.querySelectorAll('.ss-name b').length, 0);
+  assert.match(text('#ss-achievements')[0], /Todavía no hay datos/);
+});
+
+test('every ranking is a podium, the second at the left of the first', async () => {
+  installApi({ 'GET /statistics/rankings?': ANSWER, 'GET /users/photo/': json({ detail: 'no' }, 404) });
+  await page.render({ main: main() });
+  await settle();
+  assert.deepEqual(text('#ss-days .ss-name'), ['Bea', 'Ana']);
+  assert.deepEqual(text('#ss-days .ss-value'), ['2 días', '8 días']);
+  assert.equal(document.querySelectorAll('#ss-games .ss-step').length, 1);
+  assert.equal(text('#ss-ratio .ss-value')[0], '50 %');
+});
+
+test('the most played games show their cover, or a placeholder, and link to the game', async () => {
+  installApi({ 'GET /statistics/rankings?': ANSWER, 'GET /users/photo/': json({ detail: 'no' }, 404) });
+  await page.render({ main: main() });
+  await settle();
+  const covers = document.querySelectorAll('#ss-most-played .ss-cover');
+  assert.equal(covers[1].getAttribute('src'), 'https://img/hades.jpg');
+  assert.equal(covers[0].tagName, 'DIV');
+  assert.equal(document.querySelectorAll('#ss-most-played .ss-cover').length, 4);
+  assert.equal(document.querySelectorAll('#ss-most-played .ss-row .ss-cover').length, 1); // beyond the podium the cover is there too
+  assert.equal(document.querySelectorAll('#ss-most-played a')[1].getAttribute('href'), '#/game/hades');
+});
+
+test('it says so when the rankings cannot be loaded', async () => {
+  installApi({ 'GET /statistics/rankings?': json({ detail: 'no' }, 500) });
+  await page.render({ main: main() });
+  await settle();
+  assert.match(text('.pf-empty')[0], /No se han podido cargar/);
+});
