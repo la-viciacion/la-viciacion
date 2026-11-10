@@ -10,7 +10,7 @@ from ... import auth
 from ...auth import get_db
 from ...crud import recap
 from ...database import models
-from ...utils import actions, inbox, messages, my_utils, push, recap_notices, settings, welcome
+from ...utils import actions, announcement_text, inbox, messages, my_utils, push, recap_notices, settings, welcome
 from ...utils.logger import LogManager
 from .common import get_or_404, router
 
@@ -91,8 +91,8 @@ async def send_announcement(
 
 
 class TelegramAnnouncementBody(BaseModel):
-    title: str = Field(min_length=1, max_length=push.TITLE_MAX)
-    body: Optional[str] = Field(None, max_length=push.ANNOUNCEMENT_BODY_MAX)
+    title: str = Field(min_length=1, max_length=announcement_text.TITLE_MAX)
+    body: Optional[str] = Field(None, max_length=announcement_text.BODY_MAX)  # Markdown: see utils/announcement_text.py
     audience: str = Field("me", pattern="^(me|user|group)$")
     user_id: Optional[int] = None
 
@@ -104,9 +104,12 @@ async def send_telegram_announcement(
     db: Session = Depends(get_db),
 ):
     """Send a notice written by an admin by Telegram only: to their own private chat ("me"), one user's or the
-    group's. The app's devices get nothing (see /push/announce for those)."""
+    group's. The message is Markdown (utils/announcement_text.py); Telegram gets it drawn. The app's devices get
+    nothing (see /push/announce for those); the inbox keeps a plain copy."""
     if not settings.get("telegram.token"):
         raise HTTPException(status_code=409, detail="Telegram no está configurado: falta el token del bot")
+    if announcement_text.too_long(body.title, body.body):
+        raise HTTPException(status_code=400, detail="El aviso es demasiado largo para un mensaje de Telegram")
     if body.audience == "group":
         chat_id, who = settings.get("telegram.group_id"), "el grupo"
         if not chat_id:
@@ -122,7 +125,8 @@ async def send_telegram_announcement(
             raise HTTPException(status_code=409, detail=f"{target.username} no tiene Telegram ID")
     if not await my_utils.send_announcement_to_chat(chat_id, body.title, body.body):
         raise HTTPException(status_code=502, detail="Telegram no ha aceptado el mensaje")
-    notice = {"title": body.title, "body": body.body or "", "url": "/"}
+    # the app's inbox shows plain text: the message without its marks, in one line
+    notice = {"title": body.title, "body": (announcement_text.push_body(body.body) or "")[: inbox.BODY_MAX], "url": "/"}
     if body.audience == "group":
         inbox.record_group("", notice)
     else:

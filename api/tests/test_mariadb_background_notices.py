@@ -216,9 +216,19 @@ class AdminAlertTests(MessagingTestCase):
 
 
 class AnnouncementAndTestMessageTests(MessagingTestCase):
-    def test_the_announcement_escapes_whatever_an_admin_types(self):
-        self.assertEqual(my_utils.announcement_text("  Big_news  ", "A *bold* claim_"), "*Big\\_news*\n\nA \\*bold\\* claim\\_")
-        self.assertEqual(my_utils.announcement_text("Only a title"), "*Only a title*")
+    def test_the_announcement_draws_the_markdown_and_escapes_the_rest(self):
+        self.assertEqual(
+            my_utils.announcement_text("  Big_news  ", "A **bold** <b>claim</b>")[0],
+            "<b>Big_news</b>\n\nA <b>bold</b> &lt;b&gt;claim&lt;/b&gt;",
+        )
+        self.assertEqual(my_utils.announcement_text("Only a title"), ("<b>Only a title</b>", "Only a title"))
+
+    def test_an_announcement_telegram_cannot_parse_goes_again_as_plain_text(self):
+        self.configure_telegram()
+        FakeBot.failures = [telegram.error.BadRequest("can't parse entities")]
+        self.assertTrue(self.run_async(my_utils.send_announcement_to_chat(GROUP, "Title", "A **bold** claim")))
+        self.assertEqual([m["parse_mode"] for m in FakeBot.sent], [None])
+        self.assertEqual(FakeBot.sent[0]["text"], "Title\n\nA bold claim")
 
     def test_an_announcement_goes_to_one_chat_even_with_the_switch_off(self):
         self.configure_telegram()

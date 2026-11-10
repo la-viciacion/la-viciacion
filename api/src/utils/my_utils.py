@@ -16,7 +16,7 @@ from ..crud import games, users
 from ..database import models, schemas
 from .achievements import AchievementsElems
 from .outside_cache import OutsideCache
-from . import ai, ai_prompts, game_tags, hltb_sync, inbox, push, settings
+from . import ai, ai_prompts, announcement_text as announcement_text_module, game_tags, hltb_sync, inbox, push, settings
 from . import rawg_health
 from .rawg_health import RawgPaused
 from .redaction import redact_rawg_key
@@ -531,15 +531,15 @@ TELEGRAM_RETRIES = 3
 TELEGRAM_MAX_WAIT_SECONDS = 20  # the most a send waits when Telegram asks to slow down (flood control)
 
 
-async def _telegram_send(bot, chat_id, text: str, image=None) -> bool:
+async def _telegram_send(bot, chat_id, text: str, image=None, parse_mode=telegram.constants.ParseMode.MARKDOWN, plain: str | None = None) -> bool:
     """Send one message; True if Telegram took it. Never raises: a notification must not
     break the operation that triggered it.
 
-    It goes as Markdown; if Telegram cannot parse it (a name with `_` or `*` in it, an
-    unbalanced reply from the model) it is sent again as plain text, and if it still fails
-    with a picture (one Telegram cannot fetch, a caption too long) as text alone.
+    It goes as Markdown (or in the given `parse_mode`); if Telegram cannot parse it (a name with `_` or `*` in it, an
+    unbalanced reply from the model) it is sent again as plain text (`plain` when given: for a text in another mode,
+    the same without its tags), and if it still fails with a picture (one Telegram cannot fetch, a caption too
+    long) as text alone.
     """
-    parse_mode = telegram.constants.ParseMode.MARKDOWN
     for _ in range(TELEGRAM_RETRIES):
         try:
             if image is None:
@@ -555,6 +555,7 @@ async def _telegram_send(bot, chat_id, text: str, image=None) -> bool:
             logger.warning("Telegram rejected the message (" + str(e) + ")")
             if parse_mode is not None:
                 parse_mode = None
+                text = plain if plain is not None else text
             elif image is not None:
                 image = None
             else:
@@ -674,12 +675,10 @@ async def send_message_to_user(
         logger.error("Error sending telegram message to user: " + str(e), exc_info=True)
 
 
-def announcement_text(title: str, body: str | None = None) -> str:
-    """A notice written by an admin as a Telegram message: the title in bold, then the message. Plain
-    text in, so whatever they type is escaped and cannot break the Markdown."""
-    title, body = (title or "").strip(), (body or "").strip()
-    text = f"*{escape_markdown(title)}*"
-    return text + "\n\n" + escape_markdown(body) if body else text
+def announcement_text(title: str, body: str | None = None) -> tuple[str, str]:
+    """A notice written by an admin as a Telegram message: (HTML, plain). The title in bold, then the message, in the
+    Markdown subset of utils/announcement_text.py; anything else they type is escaped and cannot break the message."""
+    return announcement_text_module.telegram_message(title, body)
 
 
 async def send_announcement_to_chat(chat_id, title: str, body: str | None = None) -> bool:
@@ -687,7 +686,8 @@ async def send_announcement_to_chat(chat_id, title: str, body: str | None = None
     Only Telegram: nothing goes to the app's devices. Ignores the general notifications switch, like the test message."""
     bot = telegram.Bot(settings.get("telegram.token"))
     async with bot:
-        return await _telegram_send(bot, chat_id, announcement_text(title, body))
+        text, plain = announcement_text(title, body)
+        return await _telegram_send(bot, chat_id, text, parse_mode=telegram.constants.ParseMode.HTML, plain=plain)
 
 
 async def send_test_message_to_user(chat_id) -> bool:

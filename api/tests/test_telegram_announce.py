@@ -14,12 +14,15 @@ ADMIN = types.SimpleNamespace(id=1, username="boss", telegram_id=111)
 
 
 class TextTests(unittest.TestCase):
-    def test_title_in_bold_then_the_message_with_markdown_escaped(self):
-        self.assertEqual(my_utils.announcement_text("Hola_mundo", "un *aviso*"), "*Hola\\_mundo*\n\nun \\*aviso\\*")
+    def test_title_in_bold_then_the_message_drawn_from_its_markdown(self):
+        self.assertEqual(
+            my_utils.announcement_text("Hola_mundo", "un *aviso*"),
+            ("<b>Hola_mundo</b>\n\nun <i>aviso</i>", "Hola_mundo\n\nun aviso"),
+        )
 
     def test_without_a_message_it_is_only_the_title(self):
-        self.assertEqual(my_utils.announcement_text("Hola", None), "*Hola*")
-        self.assertEqual(my_utils.announcement_text("Hola", "  "), "*Hola*")
+        self.assertEqual(my_utils.announcement_text("Hola", None), ("<b>Hola</b>", "Hola"))
+        self.assertEqual(my_utils.announcement_text("Hola", "  "), ("<b>Hola</b>", "Hola"))
 
 
 class EndpointTests(unittest.TestCase):
@@ -77,6 +80,19 @@ class EndpointTests(unittest.TestCase):
         with self.assertRaises(HTTPException) as ctx:
             self.post(audience="group")
         self.assertEqual(ctx.exception.status_code, 502)
+
+    def test_a_long_markdown_message_is_accepted_and_the_inbox_keeps_a_plain_line(self):
+        body = "# Novedades" + chr(10) + chr(10).join(f"- **Nuevo** punto {n}" for n in range(60))
+        with mock.patch.object(notices.inbox, "record_group") as record:
+            self.post(audience="group", body=body)
+        notice = record.call_args.args[1]
+        self.assertTrue(notice["body"].startswith("Novedades · • Nuevo punto 0"))
+        self.assertLessEqual(len(notice["body"]), notices.inbox.BODY_MAX)
+        self.assertEqual(self.send.call_args.args[2], body)
+
+    def test_a_message_that_drawn_would_not_fit_in_one_telegram_message_is_refused(self):
+        # a separator is three characters written and ten drawn
+        self.refused(400, audience="group", body=("---" + chr(10)) * 700)
 
     def test_the_composer_cannot_send_to_everybody_by_telegram(self):
         with self.assertRaises(ValueError):
