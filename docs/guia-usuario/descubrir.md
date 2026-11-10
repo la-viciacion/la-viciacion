@@ -15,7 +15,7 @@ Tiene dos mitades:
 
 Cada tarjeta dice qué otros jugadores quieren el mismo juego («Lo quieren Bea y Cai») y tiene una ✕ para quitarlo. Para añadir uno, pulsa **Añadir juego** (el mismo buscador que en Juegos) o, en la página de un juego que no tengas en tu biblioteca, **Añadir a mi lista**.
 
-Un juego se queda en la lista hasta que lo quites tú con la ✕, aunque ya lo estés jugando (por ejemplo, por un acceso anticipado): su tarjeta lleva entonces la etiqueta **Ya en tu biblioteca**, y sigue contando en el calendario y en los avisos. Cada día se vuelve a consultar la fecha de salida de los juegos que se esperan, y el día antes de un lanzamiento el grupo recibe un aviso con quién lo espera.
+Un juego se queda en la lista hasta que lo quites tú con la ✕, aunque ya lo estés jugando (por ejemplo, por un acceso anticipado): su tarjeta lleva entonces la etiqueta **Ya en tu biblioteca**, y sigue contando en el calendario y en los avisos. Cada día se vuelve a consultar la fecha de salida de los juegos que se esperan, y el grupo recibe un aviso con quién lo espera (la víspera, el mismo día o en un resumen semanal, según la configuración), además del tuyo, privado, el día que sale.
 
 ## Recomendados
 
@@ -36,6 +36,8 @@ Un juego se queda en la lista hasta que lo quites tú con la ✕, aunque ya lo e
 
 - **Horas entre todos**: un mes y un total de horas que tiene que sumar el grupo entero, de cualquier juego. No hay mínimo por jugador: cada uno ve cuánto ha aportado, y cumple su parte si el grupo llega al total y él ha jugado algo.
 
+La página reúne los retos en bloques: **Del grupo**, **Tuyos**, **Duelos** (los tuyos) y **De otros jugadores** (los personales y duelos que han lanzado los demás, que puedes mirar). En cada bloque van primero los que están en marcha y luego los terminados, pero solo se enseñan los **5 últimos terminados**: **Ver todos los terminados** carga el resto. Arriba, una línea resume tus retos («3 retos en marcha · 1 cumplido · 1 con poco tiempo»). En cada tarjeta ves cuánto tiempo queda y el progreso de cada jugador.
+
 Puedes **dejar de participar** y volver mientras el reto no haya terminado. Cuando el grupo alcanza el total, se avisa una vez. Un administrador puede lanzar un reto del grupo como **voluntario**: no cuenta nadie hasta que se **apunta** (botón *Apuntarme*), y solo cuentan los que se apuntan.
 
 **Proponer un reto al grupo.** Con **Proponer al grupo** sugieres un reto de juego o un reto temático (el juego o la temática, el periodo —un mes, una semana o unas fechas— y las horas). Un administrador lo aprueba, y entonces se lanza como un reto del grupo, o lo rechaza con una nota. En **Tus propuestas** ves en qué estado está cada una y puedes **retirar** las que aún esperan respuesta. Puedes tener hasta 3 esperando a la vez.
@@ -54,7 +56,9 @@ Puedes **dejar de participar** y volver mientras el reto no haya terminado. Cuan
 
 **Cómo vas.** Cada reto en el que participas te dice, dentro de la propia app, cómo estás: *Ya has cumplido tu parte*, *Vas bien*, *Vas por detrás del ritmo* (llevas menos de lo que toca por el tiempo que ha pasado), o, en los últimos días, *Quedan 2 días: te faltan 1,5 h*. Arriba de la página se cuenta cuántos tienes en marcha, cuántos cumplidos y cuántos con poco tiempo, y en el **Inicio** aparece una tarjeta **Mis retos** con los que están en marcha, los más urgentes primero. Es solo para ti: no se avisa a nadie.
 
-- **Duelo de horas**, **Duelo en un juego** y **Duelo de completados**: retas a otro jugador a ver quién juega más (en total o a un juego concreto) o quién completa más juegos, durante una semana, un mes o tres meses. **Empieza al lanzarlo**; el retado puede **rechazarlo durante las primeras 48 horas** (el rechazo no se puede deshacer). Pasado ese plazo, el duelo sigue adelante. Gana quien más horas (o más juegos completados) sume y, si empatan, ganan los dos. Un duelo rechazado no cuenta para nadie. Los demás lo ven, pero nadie recibe aviso.
+- **Duelo de horas**, **Duelo en un juego** y **Duelo de completados**: retas a otro jugador a ver quién juega más (en total o a un juego concreto) o quién completa más juegos, durante una semana, un mes o tres meses. **Empieza al lanzarlo**; el retado puede **rechazarlo durante las primeras 48 horas** (el rechazo no se puede deshacer). Pasado ese plazo, el duelo sigue adelante. Gana quien más horas (o más juegos completados) sume y, si empatan, ganan los dos. Un duelo rechazado no cuenta para nadie. Los demás lo ven, pero nadie recibe aviso. El retado lo rechaza con **Rechazar duelo**, que desaparece pasadas las 48 horas.
+
+Un reto personal o un duelo que lanzaste lo puedes quitar con **Borrar** (pide una segunda pulsación).
 
 El administrador puede lanzar un reto del grupo (de juego o temático) **como competición**: además de cumplir el objetivo, se ve quién va primero, con medallas, y el puesto aparece en tu línea.
 

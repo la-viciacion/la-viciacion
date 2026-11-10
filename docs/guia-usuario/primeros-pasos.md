@@ -21,11 +21,11 @@ El botón de la esquina superior izquierda abre el **menú lateral**, con todas 
 
 <div markdown>
 
-- **Principal**: Inicio y Actividad.
+- **Principal**: Inicio, Actividad y Novedades.
 - **Explorar** (lo que es de todo el grupo): Temporada (los rankings de la temporada en curso), Juegos, Biblioteca, Jugadores, Calendario, Logros, Estadísticas (todavía en construcción) y Servidor.
-- **Tú** (lo que es tuyo): Mi perfil, Resumen, Deseados, Recomendados, Retos y Ajustes.
+- **Tú** (lo que es tuyo): Mi perfil, Deseados, Recomendados, Retos y Ajustes.
 - **Administración**: solo si eres administrador.
-- **Cerrar sesión**, al final.
+- **Cerrar sesión**, al final. Bajo ese botón sale la **versión** de la app (por ejemplo «v2.39.0»); al pulsarla se abre la página de Novedades.
 
 En la barra superior tienes siempre el acceso a **Inicio**, a tu **perfil** y a la campana de **[Avisos](notificaciones.md#avisos-dentro-de-la-app)** (con un número cuando tienes alguno sin leer), y a la derecha de la marca, el aviso de [quién está jugando ahora](grupo.md).
 
@@ -35,6 +35,12 @@ En la barra superior tienes siempre el acceso a **Inicio**, a tu **perfil** y a 
 En el móvil el menú ocupa toda la pantalla:
 
 ![Menú en el móvil](../assets/screens/menu-phone.webp){ .screenshot width="260" }
+
+### Novedades
+
+**Menú → Novedades** (o pulsar la versión al pie del menú) cuenta lo que ha ido cambiando en la app, de lo más reciente a lo más antiguo: lo nuevo, las mejoras y los arreglos que se notan al usarla. Las versiones pequeñas se juntan en una sola entrada, para no saturar.
+
+![La página de novedades](../assets/screens/changelog.webp){ .screenshot }
 
 ## Instalarla como app
 

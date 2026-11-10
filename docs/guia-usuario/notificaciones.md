@@ -6,12 +6,12 @@ La Viciación avisa por dos canales: **Telegram** (un grupo y un bot) y las **no
 
 **Al grupo** (en el grupo de Telegram y como notificación en los dispositivos que tengan activados los avisos del grupo):
 
-- Un logro conseguido (los secretos, sin detalles).
+- Un logro conseguido.
 - Un juego completado, con su duración y, a veces, una recomendación.
 - Un juego jugado por primera vez por alguien.
 - Cambios en los rankings de horas y de juegos.
 - Rachas perdidas (cada día a las 05:00 se anuncian las del día anterior).
-- Los lanzamientos de la lista de deseados: **el día antes** de que salga un juego (lo normal) o, si el administrador lo prefiere, **un resumen cada domingo** con los que salen en los 7 días siguientes. Nunca los dos.
+- Los lanzamientos de la lista de deseados: según lo que haya elegido el administrador, **el día antes** de que salga un juego (lo normal), **el mismo día** o **un resumen cada domingo** con los que salen en los 7 días siguientes (o ninguno). Solo funciona una de estas formas a la vez.
 - Las **encuestas** que lanza un administrador: aparecen como una encuesta de Telegram normal en el grupo (se ve quién vota qué), puede haber una abierta a la vez, a veces dejan añadir opciones, y al cerrarse se avisa de la opción ganadora.
 - El resumen mensual o anual y los retos del grupo: cuando se lanza uno, cuando el grupo llega al total y, al día siguiente de que acabe, cómo ha terminado.
 
@@ -23,7 +23,7 @@ Los textos pueden estar escritos por una IA para que sean más graciosos, si el 
 - Un aviso de **timer olvidado**, una sola vez por timer.
 - **Tus retos**: que te han retado a un duelo, que te han rechazado uno, cómo se ha contestado una propuesta tuya y cómo han terminado los retos en los que participas (un solo mensaje al día, con todos). Los retos personales y los duelos **nunca** se avisan al grupo.
 - Un **recordatorio** cuando a un reto tuyo le quedan 2 días y aún no lo has cumplido (viene **desactivado**: lo activas en **Perfil → Ajustes → Notificaciones**).
-- Los logros secretos que consigues, completos.
+- Los logros que consigues, con todo el detalle.
 - **Sale un juego deseado**: el día que sale un juego de tu lista de deseados, con quién más lo espera (un solo mensaje con todos los de ese día).
 
 Cuando un aviso nombra un juego, el nombre es un **enlace**: en Telegram te lleva a su página de IGDB o a su página en la app, según el aviso. En las notificaciones del móvil el nombre sale como texto normal; los enlaces los encuentras en Avisos.
@@ -53,7 +53,7 @@ No puedes escribir ni quitar tu **Telegram ID** a mano (nada prueba que sea tuyo
 
 ### El menú del bot
 
-Escribe `/menu` (en privado o en el grupo) para consultar tus estadísticas y los rankings sin abrir la app:
+Escribe `/start` para que el bot te salude y te recuerde cómo vincular tu cuenta, y `/menu` (en privado o en el grupo) para consultar tus estadísticas y los rankings sin abrir la app:
 
 | Menú | Opciones |
 |---|---|

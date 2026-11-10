@@ -16,6 +16,24 @@ Un timer de más de 6 horas se muestra atenuado con «¿Un timer olvidado?» y n
 
 ![La página de actividad](../assets/screens/activity.webp){ .screenshot }
 
+## Temporada
+
+![Los rankings de la temporada](../assets/screens/season.webp){ .screenshot }
+
+**Menú → Temporada** (el primero de Explorar) enseña los rankings de la **temporada en curso**, solo con los jugadores activos. No tiene selector: siempre es la de este año. Cada ranking es un **podio** con los tres primeros (el segundo a la izquierda del primero) y, debajo, el resto hasta el décimo en barras; todos los jugadores activos salen en todos los rankings, con un 0 si no tienen nada, y quien empata comparte el puesto. Los rankings son:
+
+- **Tiempo jugado**, **Días jugados** y **Juegos jugados**.
+- **Juegos completados** y **Ratio de completado** (qué parte de los juegos de tu biblioteca de la temporada has completado, en porcentaje).
+- **Logros**.
+- **Mejor racha** y **Racha actual**, en días seguidos.
+- **Juegos más jugados**, con la portada de cada juego (o un mando si no la tiene); el nombre lleva a su página.
+
+Los nombres de los jugadores no enlazan a su perfil: para eso está [Jugadores](#jugadores).
+
+## Estadísticas
+
+**Menú → Estadísticas** todavía está en construcción (lleva la etiqueta **WIP**): de momento solo avisa de que ahí irán más rankings y comparativas del grupo.
+
 ## Jugadores
 
 **Menú → Jugadores** lista a los miembros con su foto, sus horas, sus juegos y completados, y qué están jugando ahora. Los que están jugando van primero. Por defecto solo ves a los activos; el filtro **Activos / Todos** añade las cuentas desactivadas.
@@ -32,9 +50,9 @@ Al pulsar uno ves **su página**: sus cifras por temporada, sus juegos más juga
 
 ![El catálogo de juegos](../assets/screens/games.webp){ .screenshot }
 
-Puedes buscar por nombre, ordenar (actividad reciente, más jugados, mejor nota, más jugadores, fecha de lanzamiento, nombre) y filtrar por género o por lo que tienes tú. **Añadir juego** busca en IGDB (admite el nombre a medias, y los números romanos) y lleva a la página del juego recién creado.
+Puedes buscar por nombre (según escribes), **ordenar** (*Actividad reciente*, *Más jugados*, *Mejor valorados*, *Más jugadores*, *Fecha de salida*, *Nombre*) y filtrar por **género**, por **tu biblioteca** (*Los que tengo* / *Los que no tengo*) y con los botones *Jugándose ahora*, *Con jugadores*, *Completados por mí* y *Puntuados por mí*, que se pueden combinar. Debajo del buscador pone cuántos juegos coinciden y **Mostrar más** carga los siguientes. Cada tarjeta lleva etiquetas: **Jugándose** (alguien tiene un timer en marcha), **DLC**, **En tu biblioteca** y **En tu lista** (de deseados). **Añadir juego** busca en IGDB (admite el nombre a medias, y los números romanos) y lleva a la página del juego recién creado.
 
-Al pulsar un juego abres **su página**: portada, géneros, desarrollador, fecha de lanzamiento, tiempo medio para completarlo, las cifras del grupo, tu nota (que puedes poner o cambiar ahí mismo) y la lista de quién lo tiene con sus horas, completados y notas. Si el juego es de una saga, la tarjeta **Saga** (a la derecha de «Quién lo juega» en una pantalla ancha, debajo en el móvil) lista las entregas de la más reciente a la más antigua con lo que tienes de cada una (completada, en tu biblioteca o sin tener), cuántos jugadores la tienen y cuál es la **siguiente** que te falta; los datos vienen de IGDB, así que si no responde la tarjeta no sale. En el móvil se puede plegar pulsando su título, y el navegador lo recuerda; en una pantalla ancha va siempre abierta. Si ya lo has jugado, una tarjeta compara **tu ritmo**: lo que tardaste (o llevas) frente a lo que ha tardado el resto del grupo en completarlo y frente al tiempo medio de HowLongToBeat. Si es un DLC o una expansión lo indica con la marca **DLC** y enlaza al juego base.
+Al pulsar un juego abres **su página**: portada, géneros, desarrollador, fecha de lanzamiento, tiempo medio para completarlo, las cifras del grupo, tu nota (que puedes poner o cambiar ahí mismo) y la lista de **Quién lo juega** con sus horas, sesiones, temporadas, completados (y cuántas veces, si más de una), notas y las etiquetas *Jugando ahora* e *Inactivo*. Si no lo tienes en tu biblioteca, la página te deja **Añadir a mi lista** (o **Quitar de mi lista**) de deseados; arriba, **← Volver** te devuelve a donde estabas. Si el juego es de una saga, la tarjeta **Saga** (a la derecha de «Quién lo juega» en una pantalla ancha, debajo en el móvil) lista las entregas de la más reciente a la más antigua con lo que tienes de cada una (completada, en tu biblioteca o sin tener), cuántos jugadores la tienen y cuál es la **siguiente** que te falta; los datos vienen de IGDB, así que si no responde la tarjeta no sale. En el móvil se puede plegar pulsando su título, y el navegador lo recuerda; en una pantalla ancha va siempre abierta. Si ya lo has jugado, una tarjeta compara **tu ritmo**: lo que tardaste (o llevas) frente a lo que ha tardado el resto del grupo en completarlo y frente al tiempo medio de HowLongToBeat. Si es un DLC o una expansión lo indica con la marca **DLC** y enlaza al juego base.
 
 Si IGDB o Steam conocen el juego, bajo el título aparecen unos datos de fuera del grupo: la **nota de la crítica** y la de los **usuarios** de IGDB (en verde, amarillo o rojo según lo buenas que sean) y la **clasificación por edades**, en una fila junto al botón **Ver en IGDB**. La **descripción** va justo bajo el nombre (en español si Steam la tiene; si no, la de IGDB, en inglés; se recorta y se amplía al tocarla), seguida del **editor** y de las **plataformas** en las que salió el juego (en pastillas pequeñas), y una tarjeta **Multimedia** trae el **tráiler** (no se descarga hasta que le das al play) y las **capturas** en un carrusel. En una pantalla ancha el tráiler está a la derecha de la cabecera y las capturas debajo, a todo el ancho; en el móvil es un bloque bajo la cabecera, abierto, que puedes ocultar con su botón. Las etiquetas del juego se limitan a las 6 primeras, con un botón **+N** para ver el resto. Solo sale lo que haya: un juego que ni Steam ni IGDB conocen, como muchos de Nintendo, no tiene estos datos, y si esas páginas fallan simplemente no aparecen. Nada de esto se guarda en La Viciación.
 
@@ -47,7 +65,7 @@ La página tiene dos mitades, separadas por un título: arriba, **lo que dice el
 
 ## Biblioteca del grupo
 
-**Menú → Biblioteca** junta las bibliotecas de todos: cuántos juegos distintos hay, cuántos jugadores y cuántas horas, y cinco listas para curiosear:
+**Menú → Biblioteca** junta las bibliotecas de todos: cuántos juegos distintos hay, cuántos jugadores y cuántas horas, y siete secciones para curiosear (cada lista enseña los 10 primeros):
 
 - **Joyas ocultas**: juegos que tienen como mucho dos jugadores y a los que han dado una nota media de 80 o más.
 - **El cementerio**: juegos que alguien ha abandonado y no ha vuelto a tocar, con quién los dejó.
@@ -60,10 +78,10 @@ Cada juego enlaza a su página. Arriba hay una fila de **botones**, uno por secc
 
 ## Calendario
 
-**Menú → Calendario** pone en un mes (empezando en lunes) **todos los juegos del catálogo con fecha de lanzamiento**, los hayan jugado o no. Pulsa un día para ver sus juegos en una ventana y entrar en cualquiera; el panel **Juegos del mes** los lista con quién quiere cada uno. Los juegos sin fecha confirmada que alguien desea aparecen aparte, y el botón **Hoy** te devuelve al mes en curso.
+**Menú → Calendario** pone en un mes (empezando en lunes) **todos los juegos del catálogo con fecha de lanzamiento**, los hayan jugado o no. Pulsa un día para ver sus juegos en una ventana y entrar en cualquiera; el panel **Juegos del mes** los lista con quién quiere cada uno. Los juegos sin fecha confirmada que alguien desea aparecen aparte, y las flechas ‹ y › cambian de mes y el botón **Hoy** te devuelve al mes en curso (solo sale si estás en otro).
 
 ![Calendario de lanzamientos](../assets/screens/calendar.webp){ .screenshot }
 
 ## Servidor
 
-**Menú → Servidor** enseña cómo va la máquina en la que corre la app, para que cualquiera del grupo lo vea: el estado, la carga y el tiempo encendido, la CPU, la red, el disco y la memoria en gráficas de 1 hora a 30 días (con una línea de puntos en el máximo recomendado), el tráfico del mes frente al que incluye el plan y lo que cuesta mantener la app, mes a mes, con la previsión hasta diciembre. Solo sale lo que el administrador haya conectado ([Servicios externos](../configuracion/servicios.md#estado-del-servidor-hetzner-cloud)); sin eso la página lo dice. Nunca enseña la dirección del servidor.
+**Menú → Servidor** enseña cómo va la máquina en la que corre la app, para que cualquiera del grupo lo vea: el estado, la carga y el tiempo encendido, la CPU, la red, el disco y la memoria en gráficas de 1 hora a 30 días (con una línea de puntos en el máximo recomendado), el tráfico del mes frente al que incluye el plan y lo que cuesta mantener la app: tres cifras (**Este mes**, **Este año** y **Desde el inicio**, cada una con su previsión), un **desglose por concepto** y, en **Mes a mes**, unas barras de cada mes del año que eliges con los botones de año (con la previsión hasta fin de año en el en curso y el detalle del mes al pulsarlo). Los costes son una estimación. Lo que no esté disponible, la página lo dice. Nunca enseña la dirección del servidor.

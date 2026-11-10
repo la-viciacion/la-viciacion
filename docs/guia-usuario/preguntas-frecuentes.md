@@ -13,16 +13,19 @@
     Pulsa **¿No está? Añadir nuevo juego**. Si el buscador tampoco lo encuentra, **¿No aparece? Crearlo a mano**: solo hace falta el nombre.
 
 ??? question "¿Por qué no me sale un logro que creo merecer?"
-    Los logros se evalúan cada vez que paras un timer o cambias tus sesiones. Algunos requieren una duración mínima (las sesiones de menos de 10 minutos no cuentan para días ni rachas) y los nuevos solo cuentan desde 2027. Si sigues pensando que falta, pide a un administrador que **recalcule los logros**.
+    Los logros se evalúan cada vez que paras un timer o cambias tus sesiones. Algunos requieren una duración mínima (las sesiones de menos de 10 minutos no cuentan para días ni rachas) y los logros nuevos no son retroactivos. Si sigues pensando que falta, pide a un administrador que **recalcule los logros**.
 
 ??? question "No me llegan las notificaciones"
     Comprueba en **Perfil → Ajustes → Notificaciones** que tienes marcado el canal, que has vinculado Telegram (`/activate`) o activado el push en ese dispositivo, y que el navegador tiene permiso. En iPhone hay que instalar la app primero. Las notificaciones push necesitan que el servidor use HTTPS.
+
+??? question "¿Hay easter eggs?"
+    La app esconde alguno. No te diremos cuántos ni dónde: ¡a descubrirlos!
 
 ??? question "¿Qué pasa el 1 de enero?"
     Empieza una temporada nueva: tus cifras, rankings y logros de temporada vuelven a cero. Tu historial y las temporadas anteriores se conservan, y puedes consultarlas con las pastillas de temporada.
 
 ??? question "¿Quién ve mis datos?"
-    El grupo ve tus horas, juegos, notas, logros y si estás jugando (puedes ocultar lo último). Nunca ve tu email, tu Telegram ni tus ajustes. Tu ciudad y tu fecha de nacimiento solo las ven tú y los administradores.
+    El grupo ve tus horas, juegos, notas, logros y si estás jugando. Nunca ve tu email, tu Telegram ni tus ajustes. Tu ciudad y tu fecha de nacimiento solo las ven tú y los administradores.
 
 ??? question "¿Puedo llevarme mis datos?"
     Sí: **Perfil → Ajustes → Tus datos → Descargar mis datos** te da un `.json` con tus sesiones, biblioteca, notas, lista de deseados y logros.
