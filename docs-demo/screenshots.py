@@ -87,6 +87,8 @@ def shots(g, p, month):
         ("manual", "bea", "#/", D, {"do": several(click("#manualSessionBtn"), search("celeste"), pick_first)}),
         ("complete", "bea", "#/", D, {"do": click(".btn-complete:not(.done)")}),
         ("activity", "bea", "#/activity", D, {}),
+        ("season", "bea", "#/season", D, {}),
+        ("changelog", "bea", "#/changelog", D, {}),
         ("games", "bea", "#/games", D, {}),
         ("game", "bea", f"#/game/{g['Hades II']}", D, {}),
         ("calendar", "bea", "#/calendar", D, {}),
@@ -128,6 +130,8 @@ def save(png, name):
 def main(wanted):
     env = demo.read_env()
     admin = demo.login("admin", env["GOD_ADMIN_PASS"])
+    # a recap can only be opened in the first days after its month unless the admin allows it: this stack is throwaway
+    demo.call("PUT", "/manage/settings", {"values": {"recap.always_available": True}}, token=admin)
     g, p = lookups(admin)
     tokens = {u: demo.login(u, env["DEMO_PLAYER_PASS"]) for u in ("bea", "dani")}
     month = best_month(tokens["bea"], "bea")
