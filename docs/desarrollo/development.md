@@ -99,7 +99,7 @@ To inspect data: connect any MySQL client to `127.0.0.1:3307` with `MARIADB_USER
 
 ## Documentation site
 
-`docs/` is the source of a MkDocs site (Material theme, `mkdocs.yml` at the root) published to GitHub Pages by `.github/workflows/docs.yml`: a PR that touches `docs/` builds it with `--strict` (a broken link fails), `main` also deploys it. The pages for players and operators are in Spanish; the technical ones (`docs/desarrollo/`) are in English.
+`docs/` is the source of a MkDocs site (Material theme, `mkdocs.yml` at the root) published to GitHub Pages by `.github/workflows/docs.yml`: a PR that touches `docs/` builds it with `--strict` (a broken link fails), `main` also deploys it. The site only publishes the player guide (Spanish); `docs/configuracion/` and `docs/desarrollo/` (English) stay in the repository and are excluded from the build (`exclude_docs` in `mkdocs.yml`).
 
 ```bash
 pip install -r requirements-docs.txt   # in a venv
