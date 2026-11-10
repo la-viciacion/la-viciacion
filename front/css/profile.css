@@ -220,11 +220,12 @@
 .ach-count { margin: 0; }
 .ach-block { margin-bottom: 28px; }
 .pl-block, .ach-block.pl-block { margin: 32px 0 0; }
-.pl-ids { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, max-content)); gap: 10px; margin: 16px 0 0; padding: 0; list-style: none; }
-.pl-id { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; padding: 8px 14px; font: inherit; text-align: left; cursor: pointer; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-primary); }
+.pl-ids { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 0; padding: 0; list-style: none; }
+.pl-id { display: inline-flex; align-items: center; gap: 7px; max-width: 100%; padding: 4px 12px 4px 10px; font: inherit; font-size: 0.82rem; cursor: pointer; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-pill); color: var(--text-primary); }
 .pl-id:hover, .pl-id:focus-visible { background: var(--bg-card-hover); border-color: var(--accent-teal); }
-.pl-id-service { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent-teal); }
-.pl-id-value { font-weight: 600; overflow-wrap: anywhere; }
+.pl-id .svc-logo { flex: none; color: var(--accent-teal); }
+.pl-id-service { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.pl-id-value { font-weight: 600; overflow-wrap: anywhere; text-align: left; }
 .ach-note { margin: 0 0 12px; }
 .ach-fold { width: 100%; padding: 0; background: none; border: 0; font: inherit; color: inherit; cursor: pointer; text-align: left; }
 /* The toggle of every foldable section (achievements, group library, saga, media): a labelled pill, so it reads as a control

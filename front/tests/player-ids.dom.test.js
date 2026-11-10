@@ -30,3 +30,12 @@ test('an id is text, never markup', () => {
   assert.equal(el.querySelector('img'), null);
   assert.match(el.querySelector('.pl-id-value').textContent, /<img/);
 });
+
+test('every service has its own logo, and the pill still names it for who cannot see the logo', async () => {
+  const { GAME_IDS } = await import('../js/lib/game-ids.js');
+  const el = show(Object.fromEntries(GAME_IDS.map(([column]) => [column, 'x'])));
+  const pills = [...el.querySelectorAll('.pl-id')];
+  assert.equal(pills.length, GAME_IDS.length);
+  assert.equal(new Set(pills.map((pill) => pill.querySelector('svg path').getAttribute('d'))).size, GAME_IDS.length);
+  assert.deepEqual(pills.map((pill) => pill.querySelector('.pl-id-service').textContent), GAME_IDS.map(([, label]) => label));
+});

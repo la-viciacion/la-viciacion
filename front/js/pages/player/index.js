@@ -7,6 +7,7 @@ import { createFolds, toggleFold } from '../../lib/fold.js';
 import { html, mount } from '../../lib/html.js';
 import { gameHref } from '../../lib/links.js';
 import * as seasons from '../../lib/seasons.js';
+import { serviceLogo } from '../../ui/service-logos.js';
 import { toast } from '../../ui/toast.js';
 import { hydratePhotos, playerAvatar } from '../../ui/avatar.js';
 import { showChallengesHistory } from '../../ui/challenges-history.js';
@@ -33,16 +34,15 @@ export function affinityView(a) {
     </div>`;
 }
 
-/** The ids the player filled in, one card per service (nothing at all when they filled none); a click copies it. */
+/** The ids the player filled in, one pill per service (nothing at all when they filled none); a click copies it. */
 export function gameIdsView(ids) {
   const filled = GAME_IDS.filter(([column]) => ids?.[column]);
   if (!filled.length) return '';
   return html`
     <ul class="pl-ids" id="plIds" aria-label="IDs en otras plataformas">
       ${filled.map(([column, label]) => html`
-        <li><button type="button" class="pl-id" data-copy="${ids[column]}" title="Copiar ${label}" aria-label="${label}: ${ids[column]}. Copiar">
-          <span class="pl-id-service">${label}</span>
-          <span class="pl-id-value">${ids[column]}</span>
+        <li><button type="button" class="pl-id" data-copy="${ids[column]}" title="${label}: copiar" aria-label="${label}: ${ids[column]}. Copiar">
+          ${serviceLogo(column)}<span class="pl-id-service">${label}</span><span class="pl-id-value">${ids[column]}</span>
         </button></li>`)}
     </ul>`;
 }
