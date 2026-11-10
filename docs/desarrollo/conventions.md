@@ -91,6 +91,10 @@ Read it in `api/src/config.py` (or `bot/src/utils/config.py`), add a placeholder
 
 Event-driven: hook it in `utils/actions.py` where the event happens, respecting the notifications switches in `app_settings` (general, admin-alerts) and the `silent` flag used by manual edits. Texts in Spanish.
 
+### Write the changelog entry
+
+The players' changelog (`#/changelog`) is `front/js/lib/changelog.js`, written by hand; it is not the GitHub release notes. Before a release, add or extend the newest entry with what a player notices (a feature, an improvement, a fix) and leave out everything else: the admin panel, keys and secrets, how achievements are unlocked, easter eggs, infrastructure, refactors and dependency bumps. Small releases share one entry (move its `to` and `date`). `front/tests/changelog.test.js` catches the obvious forbidden words, but the judgement is yours.
+
 ### Add a dependency
 
 Pin the exact version, justify it in the commit message, and check it supports Python 3.14 (api and bot) or Node 24 LTS. Prefer the standard library. Rebuild the image to verify.

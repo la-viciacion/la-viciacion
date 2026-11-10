@@ -1,0 +1,11 @@
+/* Changelog page (#/changelog): one card per entry, its items grouped by kind */
+.cl-list { display: flex; flex-direction: column; gap: 12px; max-width: 720px; }
+.cl-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; }
+.cl-version { margin: 0; font-size: 1.05rem; font-weight: 700; }
+.cl-meta { font-size: 0.8rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.cl-group { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.cl-kind { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; padding: 2px 8px; border-radius: var(--radius-pill); border: 1px solid var(--tone); color: var(--tone); }
+.cl-new { --tone: var(--accent-teal); }
+.cl-better { --tone: var(--accent-purple); }
+.cl-fix { --tone: var(--accent-gold); }
+.cl-items { margin: 0; padding-left: 1.2rem; display: flex; flex-direction: column; gap: 4px; font-size: 0.9rem; }

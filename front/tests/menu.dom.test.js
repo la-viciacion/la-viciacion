@@ -19,7 +19,7 @@ test('the button opens the panel with the sections and tells the state', () => {
   assert.ok(panel());
   assert.equal(button().getAttribute('aria-expanded'), 'true');
   assert.deepEqual([...document.querySelectorAll('.menu-section')].map((e) => e.textContent), ['Principal', 'Explorar', 'Tú', 'Administración']);
-  assert.equal(document.querySelectorAll('a.menu-item').length, 16);
+  assert.equal(document.querySelectorAll('a.menu-item').length, 17);
   assert.equal(document.querySelector('.menu-wip').textContent, 'WIP');
 });
 
@@ -69,4 +69,5 @@ test('the version of the app shows under the logout button once the API has told
   const label = document.querySelector('.menu-foot .menu-version');
   assert.equal(label.textContent, 'v2.1.0');
   assert.equal(label.hidden, false);
+  assert.equal(label.getAttribute('href'), '#/changelog'); // the version is the way to the changelog
 });
