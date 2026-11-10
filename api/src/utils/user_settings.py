@@ -26,6 +26,22 @@ DEFAULT_CHALLENGE_REMINDERS_CHANNEL = False
 CHALLENGE_COLUMNS = ("challenge_notices_telegram", "challenge_notices_push", "challenge_reminders_telegram", "challenge_reminders_push")
 PLACE_COLUMNS = ("place_name", "place_latitude", "place_longitude")
 EARLIEST_BIRTH_DATE = datetime.date(1900, 1, 1)
+# The ids a player has on each service, free text: no service is asked whether they exist. Unlike the rest of the
+# personal data, the whole group can read them (the player page), so the friends can add each other.
+GAME_ID_COLUMNS = ("nintendo_id", "xbox_id", "playstation_id", "steam_id", "discord_id")
+
+
+def clean_game_id(value: str | None) -> str | None:
+    """The id trimmed; nothing (null, empty or only spaces) means it is removed."""
+    return (value or "").strip() or None
+
+
+def game_ids(db: Session, user_id: int) -> dict:
+    """The ids the user has filled in, by service (only those set): what the player page shows to the group."""
+    row = db.get(models.UserSettings, user_id)
+    if row is None:
+        return {}
+    return {column: getattr(row, column) for column in GAME_ID_COLUMNS if getattr(row, column)}
 
 
 def valid_forgotten_timer_hours(hours) -> bool:
@@ -131,6 +147,7 @@ def get(db: Session, user_id: int) -> dict:
         "place_latitude": None if row is None or row.place_latitude is None else float(row.place_latitude),
         "place_longitude": None if row is None or row.place_longitude is None else float(row.place_longitude),
         "birth_date": row.birth_date.isoformat() if row is not None and row.birth_date is not None else None,
+        **{column: getattr(row, column) if row else None for column in GAME_ID_COLUMNS},
         "defaults": {
             "forgotten_timer_telegram": DEFAULT_FORGOTTEN_TIMER_CHANNEL,
             "forgotten_timer_push": DEFAULT_FORGOTTEN_TIMER_CHANNEL,
@@ -162,5 +179,8 @@ def update(db: Session, user_id: int, changes: dict) -> dict:
     for column in ("forgotten_timer_telegram", "forgotten_timer_push", "wishlist_release_telegram", "wishlist_release_push", *CHALLENGE_COLUMNS, *PLACE_COLUMNS, "birth_date"):
         if column in changes:
             setattr(row, column, changes[column])
+    for column in GAME_ID_COLUMNS:
+        if column in changes:
+            setattr(row, column, clean_game_id(changes[column]))
     db.commit()
     return get(db, user_id)

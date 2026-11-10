@@ -93,6 +93,12 @@ class UserSettings(Base):
     place_longitude = Column(Numeric(8, 5), nullable=True)
     # for the birthday achievement; only the player and the admins can read it
     birth_date = Column(Date, nullable=True)
+    # the ids the player has on each service, free text (see utils/user_settings.py); the whole group can read them
+    nintendo_id = Column(String(64), nullable=True)
+    xbox_id = Column(String(64), nullable=True)
+    playstation_id = Column(String(64), nullable=True)
+    steam_id = Column(String(64), nullable=True)
+    discord_id = Column(String(64), nullable=True)
     updated_at = Column(DateTime, server_default=text("CURRENT_TIMESTAMP"), onupdate=text("CURRENT_TIMESTAMP"))
 
 

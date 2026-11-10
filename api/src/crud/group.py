@@ -11,7 +11,7 @@ from ..database import models
 from . import affinity, time_entries, users
 from .achievement_progress import Progress
 from ..utils.achievements import is_lifetime  # after the crud modules: they import each other
-from ..utils import seasons
+from ..utils import seasons, user_settings
 
 
 def describe(message: str | None) -> str:
@@ -185,9 +185,9 @@ def players(db: Session, viewer_id: int) -> list[dict]:
 
 
 def player_profile(db: Session, viewer_id: int, player_id: int, season=None) -> dict | None:
-    """What is public of a player: name, figures of a season (or all of them), most played games with their
-    ratings, streaks, latest achievements and what they are playing now. Never the email, the Telegram id, the
-    settings or the library. None if there is no such player."""
+    """What is public of a player: name, the ids they filled in for Nintendo, Xbox, PlayStation, Steam and Discord,
+    figures of a season (or all of them), most played games with their ratings, streaks, latest achievements and
+    what they are playing now. Never the email, the Telegram id, the other settings or the library. None if there is no such player."""
     user = (
         db.query(models.User)
         .filter(models.User.id == player_id, models.not_god())
@@ -204,6 +204,7 @@ def player_profile(db: Session, viewer_id: int, player_id: int, season=None) -> 
     ]
     return {
         "user": {"id": user.id, "username": user.username, "name": user.name or user.username},
+        "game_ids": user_settings.game_ids(db, user.id),
         "season": data["season"],
         "seasons": data["seasons"],
         "stats": data["stats"],

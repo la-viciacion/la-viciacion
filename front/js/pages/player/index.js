@@ -2,6 +2,7 @@
 // games with their ratings, latest achievements and what they are playing now. GET /group/players/{id}?season=.
 // It reuses the pieces of the profile summary; there is no library, email or settings here.
 import { api } from '../../lib/api.js';
+import { GAME_IDS } from '../../lib/game-ids.js';
 import { createFolds, toggleFold } from '../../lib/fold.js';
 import { html, mount } from '../../lib/html.js';
 import { gameHref } from '../../lib/links.js';
@@ -31,6 +32,16 @@ export function affinityView(a) {
     </div>`;
 }
 
+/** The ids the player filled in, one per service (nothing at all when they filled none). */
+export function gameIdsView(ids) {
+  const filled = GAME_IDS.filter(([column]) => ids?.[column]);
+  if (!filled.length) return '';
+  return html`
+    <dl class="pl-ids" id="plIds">
+      ${filled.map(([column, label]) => html`<div><dt>${label}</dt><dd>${ids[column]}</dd></div>`)}
+    </dl>`;
+}
+
 const back = () => (history.length > 1 ? history.back() : (location.hash = '#/players'));
 
 function draw(d) {
@@ -45,6 +56,8 @@ function draw(d) {
         ${d.playing ? html`<div class="pf-sub"><span class="pf-tag live">Jugando ahora</span> <a class="game-link" href="${gameHref(d.playing.game_id)}">${d.playing.game_name}</a></div>` : ''}
       </div>
     </div>
+
+    ${gameIdsView(d.game_ids)}
 
     <div class="pf-season" id="plSeasons" role="group" aria-label="Temporada">${seasonPills(d)}</div>
     <section class="pf-stats" aria-label="Estadísticas: ${seasonName(d)}">${statsView(d)}</section>

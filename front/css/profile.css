@@ -220,6 +220,10 @@
 .ach-count { margin: 0; }
 .ach-block { margin-bottom: 28px; }
 .pl-block, .ach-block.pl-block { margin: 32px 0 0; }
+.pl-ids { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 12px 0 0; }
+.pl-ids div { display: flex; gap: 6px; align-items: baseline; }
+.pl-ids dt { color: var(--text-muted); font-size: 0.85rem; }
+.pl-ids dd { margin: 0; color: var(--text-primary); overflow-wrap: anywhere; user-select: all; }
 .ach-note { margin: 0 0 12px; }
 .ach-fold { width: 100%; padding: 0; background: none; border: 0; font: inherit; color: inherit; cursor: pointer; text-align: left; }
 /* The toggle of every foldable section (achievements, group library, saga, media): a labelled pill, so it reads as a control
