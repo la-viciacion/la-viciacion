@@ -50,7 +50,13 @@ Las sesiones manuales tienen unas reglas, para que los datos sean fiables:
 - **No puede solaparse** con otra sesión tuya.
 - No se puede añadir mientras tienes un **timer en marcha** (el botón aparece desactivado).
 
-Puedes **corregir o borrar** tus sesiones desde **Inicio** (despliega el juego y pulsa **Editar**) o desde **Perfil → Resumen → Juegos → Sesiones**, pero solo las de esta temporada. El formulario deja cambiar la plataforma, el inicio y el fin (con las mismas reglas de arriba) y tiene el botón **Eliminar sesión**, que pide confirmar. Si te equivocaste de juego, bórrala y vuelve a añadirla (un administrador sí puede cambiárselo).
+Si te equivocas, mira [Editar o borrar una sesión](#editar-o-borrar-una-sesion).
+
+## Editar o borrar una sesión
+
+Cualquier sesión tuya se puede **editar**: con **Editar** junto a la sesión (en **Inicio**, despliega el juego; o en **Perfil → Resumen o Mis juegos → Sesiones**) se abre un formulario donde cambias la **plataforma**, la hora de **inicio** y la hora de **fin**, y donde el botón **Eliminar sesión** la borra (pide confirmar). Lo único que no se cambia es el **juego**: si te equivocaste de juego, bórrala y vuelve a añadirla (un administrador sí puede cambiárselo sin perder nada).
+
+Se aplican las mismas reglas que al añadirla a mano (arriba), y solo se pueden editar o borrar las sesiones de la **temporada en curso**.
 
 ## Tu historial en Inicio
 
