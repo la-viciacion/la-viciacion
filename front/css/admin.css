@@ -284,9 +284,6 @@
 
 .adm-details > div { margin-top: 8px; }
 
-.adm-awardees summary { cursor: pointer; }
-.adm-awardees-list { margin-top: 8px; }
-.adm-awardee { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; padding: 6px 0; border-bottom: 1px dashed var(--border); }
 
 .adm-amb { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 0; border-bottom: 1px dashed var(--border); }
 
@@ -337,3 +334,7 @@ textarea.adm-grow { resize: none; min-height: 0; overflow: hidden; }
 .adm-md-rule { margin: 6px 0; border-top: 1px solid var(--border); }
 .adm-md-code { margin: 4px 0; padding: 6px 8px; background: rgba(255, 255, 255, 0.06); border-radius: 6px; font-family: ui-monospace, monospace; white-space: pre-wrap; }
 .adm-md-quote { margin: 4px 0; padding-left: 8px; border-left: 3px solid var(--accent-teal); }
+.adm-badges { display: flex; flex-wrap: wrap; gap: 4px; }
+.adm-badges .adm-badge { white-space: nowrap; }
+.adm-badges.nowrap { flex-wrap: nowrap; }
+.adm-nowrap { white-space: nowrap; }
