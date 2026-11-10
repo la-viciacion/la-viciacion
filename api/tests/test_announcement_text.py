@@ -71,9 +71,15 @@ class PlainTests(unittest.TestCase):
         self.assertEqual(plain, "Título\nUna gran versión con guía\n• uno\ncita")
 
     def test_push_body_is_one_line_or_nothing(self):
-        self.assertEqual(text.push_body("# Título\n- uno\n- dos"), "Título · • uno · • dos")
+        self.assertEqual(text.push_body("# Título\n- uno\n- dos"), "Título · uno · dos")
         self.assertIsNone(text.push_body("  "))
         self.assertIsNone(text.push_body(None))
+
+    def test_a_long_push_body_is_cut_at_a_word_with_an_ellipsis(self):
+        body = text.push_body("- " + "palabra " * 60, 40)
+        self.assertLessEqual(len(body), 40)
+        self.assertTrue(body.endswith("palabra…"))
+        self.assertEqual(text.push_body("corto", 40), "corto")
 
 
 class MessageTests(unittest.TestCase):

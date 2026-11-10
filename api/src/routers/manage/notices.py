@@ -126,7 +126,7 @@ async def send_telegram_announcement(
     if not await my_utils.send_announcement_to_chat(chat_id, body.title, body.body):
         raise HTTPException(status_code=502, detail="Telegram no ha aceptado el mensaje")
     # the app's inbox shows plain text: the message without its marks, in one line
-    notice = {"title": body.title, "body": (announcement_text.push_body(body.body) or "")[: inbox.BODY_MAX], "url": "/"}
+    notice = {"title": body.title, "body": announcement_text.push_body(body.body, inbox.BODY_MAX) or "", "url": "/"}
     if body.audience == "group":
         inbox.record_group("", notice)
     else:

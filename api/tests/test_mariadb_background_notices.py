@@ -36,9 +36,12 @@ class FakeBot:
         if FakeBot.failures:
             raise FakeBot.failures.pop(0)
 
-    async def send_message(self, text, chat_id, parse_mode=None):
+    async def send_message(self, text, chat_id, parse_mode=None, link_preview_options=None):
         self._next_failure()
-        FakeBot.sent.append({"kind": "text", "chat_id": chat_id, "text": text, "parse_mode": parse_mode})
+        record = {"kind": "text", "chat_id": chat_id, "text": text, "parse_mode": parse_mode}
+        if link_preview_options is not None:  # only the calls that ask for it, so the other tests compare what they always did
+            record["link_preview_options"] = link_preview_options
+        FakeBot.sent.append(record)
 
     async def send_photo(self, chat_id, photo, caption, parse_mode=None):
         self._next_failure()
@@ -229,6 +232,7 @@ class AnnouncementAndTestMessageTests(MessagingTestCase):
         self.assertTrue(self.run_async(my_utils.send_announcement_to_chat(GROUP, "Title", "A **bold** claim")))
         self.assertEqual([m["parse_mode"] for m in FakeBot.sent], [None])
         self.assertEqual(FakeBot.sent[0]["text"], "Title\n\nA bold claim")
+        self.assertTrue(FakeBot.sent[0]["link_preview_options"].is_disabled)  # no card under a link of an announcement
 
     def test_an_announcement_goes_to_one_chat_even_with_the_switch_off(self):
         self.configure_telegram()

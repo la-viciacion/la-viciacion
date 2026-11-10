@@ -531,19 +531,20 @@ TELEGRAM_RETRIES = 3
 TELEGRAM_MAX_WAIT_SECONDS = 20  # the most a send waits when Telegram asks to slow down (flood control)
 
 
-async def _telegram_send(bot, chat_id, text: str, image=None, parse_mode=telegram.constants.ParseMode.MARKDOWN, plain: str | None = None) -> bool:
+async def _telegram_send(bot, chat_id, text: str, image=None, parse_mode=telegram.constants.ParseMode.MARKDOWN, plain: str | None = None, link_preview: bool = True) -> bool:
     """Send one message; True if Telegram took it. Never raises: a notification must not
     break the operation that triggered it.
 
     It goes as Markdown (or in the given `parse_mode`); if Telegram cannot parse it (a name with `_` or `*` in it, an
     unbalanced reply from the model) it is sent again as plain text (`plain` when given: for a text in another mode,
     the same without its tags), and if it still fails with a picture (one Telegram cannot fetch, a caption too
-    long) as text alone.
+    long) as text alone. `link_preview=False` keeps Telegram from drawing a card under a link (an announcement's).
     """
+    options = {} if link_preview else {"link_preview_options": telegram.LinkPreviewOptions(is_disabled=True)}
     for _ in range(TELEGRAM_RETRIES):
         try:
             if image is None:
-                await bot.send_message(text=text, chat_id=chat_id, parse_mode=parse_mode)
+                await bot.send_message(text=text, chat_id=chat_id, parse_mode=parse_mode, **options)
             else:
                 await bot.send_photo(chat_id=chat_id, photo=image, caption=text, parse_mode=parse_mode)
             return True
@@ -687,7 +688,7 @@ async def send_announcement_to_chat(chat_id, title: str, body: str | None = None
     bot = telegram.Bot(settings.get("telegram.token"))
     async with bot:
         text, plain = announcement_text(title, body)
-        return await _telegram_send(bot, chat_id, text, parse_mode=telegram.constants.ParseMode.HTML, plain=plain)
+        return await _telegram_send(bot, chat_id, text, parse_mode=telegram.constants.ParseMode.HTML, plain=plain, link_preview=False)
 
 
 async def send_test_message_to_user(chat_id) -> bool:
