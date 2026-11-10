@@ -327,3 +327,13 @@ textarea.adm-grow { resize: none; min-height: 0; overflow: hidden; }
 .adm-ai-fragment { margin: 0 0 0 48px; padding: 8px 0 0 12px; border-top: 0; border-left: 2px solid var(--border); }
 .adm-ai-fragment .adm-ai-prompt { margin-left: 48px; }
 .adm-tag { margin-left: 8px; padding: 1px 8px; border-radius: 999px; font-size: 0.7rem; font-weight: 600; color: var(--accent-teal); background: rgba(61, 217, 179, 0.12); vertical-align: middle; }
+
+/* Notice composer: the message box and the Markdown preview of a Telegram notice */
+.adm-ann-body { min-height: 9rem; resize: vertical; font-family: inherit; }
+.adm-notif-body.markdown { white-space: normal; }
+.adm-notif-body.markdown a { color: var(--accent-teal); }
+.adm-notif-body.markdown code { font-family: ui-monospace, monospace; background: rgba(255, 255, 255, 0.08); padding: 0 3px; border-radius: 4px; }
+.adm-md-gap { height: 0.6em; }
+.adm-md-rule { margin: 6px 0; border-top: 1px solid var(--border); }
+.adm-md-code { margin: 4px 0; padding: 6px 8px; background: rgba(255, 255, 255, 0.06); border-radius: 6px; font-family: ui-monospace, monospace; white-space: pre-wrap; }
+.adm-md-quote { margin: 4px 0; padding-left: 8px; border-left: 3px solid var(--accent-teal); }
