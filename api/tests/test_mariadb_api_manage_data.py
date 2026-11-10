@@ -576,6 +576,27 @@ class AchievementsAdminTests(ManageTestCase):
         self.assertEqual((done["date"], done["season"]), ("2024-02-03", 2024))
         self.assertEqual(self.admin("PATCH", "/user-achievements/99999", json={"date": "2024-01-01"}).status_code, 404)
 
+    def test_the_game_of_an_award_can_change_or_be_cleared(self):
+        award = self.award(self.ana, self.ids()[0], datetime.date.today())
+        self.assertEqual(self.admin("PATCH", f"/user-achievements/{award}", json={"game_id": "celeste"}).json()["game"], "Celeste")
+        kept = self.admin("PATCH", f"/user-achievements/{award}", json={"date": "2024-02-03"}).json()
+        self.assertEqual(kept["game_id"], "celeste")  # a field that is not sent is left alone
+        self.assertEqual((kept["user"], kept["key"]), ("ana", next(a["key"] for a in self.admin("GET", "/achievements").json() if a["id"] == kept["achievement_id"])))
+        self.assertIsNone(self.admin("PATCH", f"/user-achievements/{award}", json={"game_id": None}).json()["game_id"])
+        self.assertEqual(self.admin("PATCH", f"/user-achievements/{award}", json={"game_id": "nope"}).status_code, 404)
+
+    def test_an_award_cannot_move_to_a_season_where_the_player_already_has_it(self):
+        first = self.ids()[0]
+        today = datetime.date.today()
+        self.award(self.ana, first, datetime.date(today.year - 1, 5, 5))
+        current = self.award(self.ana, first, today)
+        self.assertEqual(self.admin("PATCH", f"/user-achievements/{current}", json={"date": f"{today.year - 1}-06-06"}).status_code, 409)
+
+    def test_the_user_list_counts_awards_and_scores(self):
+        self.award(self.ana, self.ids()[0], datetime.date.today())
+        ana = next(u for u in self.admin("GET", "/users").json()["items"] if u["id"] == self.ana)
+        self.assertEqual((ana["awards"], ana["scores"]), (1, 0))
+
     def test_an_award_can_be_revoked(self):
         award = self.award(self.ana, self.ids()[0], datetime.date.today())
         self.assertEqual(self.admin("DELETE", f"/user-achievements/{award}").status_code, 200)
