@@ -23,21 +23,15 @@ export const KINDS = {
 export const CHANGELOG = [
   {
     version: '2.40', date: '2026-11-10',
-    title: 'Novedades y tus ids de jugador',
-    items: [
-      ['new', 'Novedades: una página que cuenta lo que va cambiando en la app, con un enlace a la documentación completa. Se abre pulsando la versión al pie del menú.'],
-      ['new', 'Puedes añadir tus ids de Nintendo, Xbox, PlayStation, Steam y Discord en Perfil → Ajustes, y el grupo los ve en tu página de jugador, con un toque para copiarlos.'],
-    ],
-  },
-  {
-    version: '2.39', date: '2026-11-10',
-    title: 'Temporada y perfil',
+    title: 'Temporada, Novedades y tus ids de jugador',
     items: [
       ['new', 'Temporada: en Explorar, los rankings de la temporada en curso.'],
+      ['new', 'Novedades: una página que cuenta lo que va cambiando en la app, con un enlace a la documentación completa. Se abre pulsando la versión al pie del menú.'],
+      ['new', 'Puedes añadir tus ids de Nintendo, Xbox, PlayStation, Steam y Discord en Perfil → Ajustes, y el grupo los ve en tu página de jugador, con un toque para copiarlos.'],
       ['new', 'Puedes retrasar la hora de inicio de un timer en marcha sin pararlo.'],
+      ['new', 'Servidor: una página abierta a todos con el estado del server y los costes de mantenimiento de la app.'],
       ['better', 'En el perfil, tus juegos se pueden plegar y la lista de juegos cortos se entiende mejor.'],
       ['better', 'Iconos de ayuda junto a los apartados que necesitan una explicación.'],
-      ['new', 'Servidor: una página abierta a todos con el estado del server y los costes de mantenimiento de la app.'],
       ['better', 'El menú Explorar tiene un orden nuevo.'],
       ['better', 'La página de logros y el perfil están más pulidos.'],
     ],
