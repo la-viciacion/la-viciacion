@@ -6,7 +6,8 @@
 // not change what a player sees or does, it is not an entry.
 //
 // To add a release: put a new entry FIRST. While a group of releases is still small, extend the newest entry (move its
-// `to` and `date`) instead of adding another one; open a new entry when a release brings something worth its own title.
+// `to` and `date`, adding it if it had none) instead of adding another one; open a new entry when a release brings something
+// worth its own title. An entry of a single release has only `from`.
 // Item kinds: 'new' (something that was not there), 'better' (something that was already there and now is nicer or
 // easier), 'fix' (something that did not work and now does).
 
@@ -21,7 +22,7 @@ export const KINDS = {
 
 export const CHANGELOG = [
   {
-    from: '2.40', to: '2.40', date: '2026-11-10',
+    from: '2.40', date: '2026-11-10',
     title: 'Novedades y tus ids de jugador',
     items: [
       ['new', 'Novedades: una página que cuenta lo que va cambiando en la app, con un enlace a la documentación completa. Se abre pulsando la versión al pie del menú.'],
@@ -145,7 +146,7 @@ export const CHANGELOG = [
 ];
 
 /** "2.39" or "2.35 – 2.39": the versions an entry covers. */
-export const versions = (entry) => (entry.from === entry.to ? entry.to : `${entry.from} – ${entry.to}`);
+export const versions = (entry) => (entry.to && entry.to !== entry.from ? `${entry.from} – ${entry.to}` : entry.from);
 
 /** The items of an entry grouped by kind, in the order of KINDS, leaving out the kinds with none. */
 export function groups(entry) {
