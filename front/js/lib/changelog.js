@@ -5,9 +5,9 @@
 // keys, how an achievement is unlocked, easter eggs, the inner workings of the app or its infrastructure. If it does
 // not change what a player sees or does, it is not an entry.
 //
-// To add a release: put a new entry FIRST. While a group of releases is still small, extend the newest entry (move its
-// `to` and `date`, adding it if it had none) instead of adding another one; open a new entry when a release brings something
-// worth its own title. An entry of a single release has only `from`.
+// To add a release: put a new entry FIRST, with the number of the newest release it covers (`version`) and its date.
+// While a group of releases is still small, extend the newest entry (move its `version` and `date`) instead of adding
+// another one; open a new entry when a release brings something worth its own title.
 // Item kinds: 'new' (something that was not there), 'better' (something that was already there and now is nicer or
 // easier), 'fix' (something that did not work and now does).
 
@@ -22,7 +22,7 @@ export const KINDS = {
 
 export const CHANGELOG = [
   {
-    from: '2.40', date: '2026-11-10',
+    version: '2.40', date: '2026-11-10',
     title: 'Novedades y tus ids de jugador',
     items: [
       ['new', 'Novedades: una página que cuenta lo que va cambiando en la app, con un enlace a la documentación completa. Se abre pulsando la versión al pie del menú.'],
@@ -30,7 +30,7 @@ export const CHANGELOG = [
     ],
   },
   {
-    from: '2.35', to: '2.39', date: '2026-11-10',
+    version: '2.39', date: '2026-11-10',
     title: 'Temporada y perfil',
     items: [
       ['new', 'Temporada: en Explorar, los rankings de la temporada en curso dibujados como podios.'],
@@ -43,7 +43,7 @@ export const CHANGELOG = [
     ],
   },
   {
-    from: '2.31', to: '2.34', date: '2026-11-03',
+    version: '2.34', date: '2026-11-03',
     title: 'Nuevos datos de juegos y retos más flexibles',
     items: [
       ['new', 'Las fichas de los juegos usan una fuente de datos nueva, más completa, y enseñan la nota de los usuarios.'],
@@ -55,7 +55,7 @@ export const CHANGELOG = [
     ],
   },
   {
-    from: '2.24', to: '2.30', date: '2026-10-31',
+    version: '2.30', date: '2026-10-31',
     title: 'Más retos y un calendario más útil',
     items: [
       ['new', 'Retos para terminar los juegos que tienes empezados, para sumar horas entre todos y un duelo de juegos completados.'],
@@ -66,7 +66,7 @@ export const CHANGELOG = [
     ],
   },
   {
-    from: '2.15', to: '2.23', date: '2026-10-27',
+    version: '2.23', date: '2026-10-27',
     title: 'La ficha del juego, la biblioteca y los lanzamientos',
     items: [
       ['new', 'La ficha de un juego enseña su descripción, desarrollador, plataformas y multimedia, y los juegos nombrados en la app enlazan a ella.'],
@@ -85,7 +85,7 @@ export const CHANGELOG = [
     ],
   },
   {
-    from: '2.9', to: '2.14', date: '2026-10-21',
+    version: '2.14', date: '2026-10-21',
     title: 'Bandeja de avisos y asistente',
     items: [
       ['new', 'Una bandeja dentro de la app guarda tus avisos.'],
@@ -94,7 +94,7 @@ export const CHANGELOG = [
     ],
   },
   {
-    from: '2.5', to: '2.8', date: '2026-10-19',
+    version: '2.8', date: '2026-10-19',
     title: 'Tu resumen',
     items: [
       ['new', 'Resumen mensual en forma de historias, para ver tu mes de un vistazo y compartirlo.'],
@@ -104,7 +104,7 @@ export const CHANGELOG = [
     ],
   },
   {
-    from: '2.2', to: '2.4', date: '2026-10-15',
+    version: '2.4', date: '2026-10-15',
     title: 'Calendario de lanzamientos, afinidad y retos',
     items: [
       ['new', 'Calendario de lanzamientos de los juegos que espera el grupo, con una lista del mes al lado.'],
@@ -119,7 +119,7 @@ export const CHANGELOG = [
     ],
   },
   {
-    from: '2.0', to: '2.1', date: '2026-10-08',
+    version: '2.1', date: '2026-10-08',
     title: 'La versión 2.0',
     items: [
       ['new', 'Puntúa los juegos de 1 a 100; las notas de los demás influyen en tus recomendaciones.'],
@@ -144,9 +144,6 @@ export const CHANGELOG = [
     ],
   },
 ];
-
-/** "2.39" or "2.35 – 2.39": the versions an entry covers. */
-export const versions = (entry) => (entry.to && entry.to !== entry.from ? `${entry.from} – ${entry.to}` : entry.from);
 
 /** The items of an entry grouped by kind, in the order of KINDS, leaving out the kinds with none. */
 export function groups(entry) {
