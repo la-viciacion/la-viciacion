@@ -143,7 +143,7 @@ class SessionTests(ApiTestCase):
         with self.engine.begin() as conn:
             conn.execute(text("UPDATE users SET is_active = 0 WHERE username = 'ana'"))
         response = self.api("GET", "/auth/active_user", headers=headers)
-        self.assertEqual((response.status_code, response.json()["detail"]), (400, "Inactive user"))
+        self.assertEqual((response.status_code, response.json()["detail"]), (401, messages.ACCOUNT_DISABLED))
 
 
 class PasswordRecoveryTests(ApiTestCase):
