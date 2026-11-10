@@ -157,7 +157,14 @@ def too_long(title: str, body: str | None) -> bool:
     return len((title or "").strip()) + 2 + len(to_plain(body or "")) > MESSAGE_MAX
 
 
-def push_body(body: str | None) -> str | None:
-    """The message for the app's notifications and the inbox: plain text, the lines joined with a dot."""
-    text = " · ".join(line.strip() for line in to_plain(body or "").splitlines() if line.strip())
+def push_body(body: str | None, limit: int | None = None) -> str | None:
+    """The message for the app's inbox: plain text in one line (the bullets taken off, the lines joined with a dot),
+    cut at a word with an ellipsis when it is longer than `limit`."""
+    lines = (re.sub(rf"^[{INDENT}\s]*[{''.join(BULLETS)}]\s+", "", line.strip()) for line in to_plain(body or "").splitlines())
+    text = " · ".join(line for line in lines if line)
+    if limit and len(text) > limit:
+        cut = text[: limit - 1]
+        if " " in cut and text[limit - 1] != " ":
+            cut = cut.rsplit(" ", 1)[0]
+        text = cut.rstrip(" ·,;:") + "…"
     return text or None

@@ -86,7 +86,7 @@ class EndpointTests(unittest.TestCase):
         with mock.patch.object(notices.inbox, "record_group") as record:
             self.post(audience="group", body=body)
         notice = record.call_args.args[1]
-        self.assertTrue(notice["body"].startswith("Novedades · • Nuevo punto 0"))
+        self.assertTrue(notice["body"].startswith("Novedades · Nuevo punto 0"))
         self.assertLessEqual(len(notice["body"]), notices.inbox.BODY_MAX)
         self.assertEqual(self.send.call_args.args[2], body)
 
