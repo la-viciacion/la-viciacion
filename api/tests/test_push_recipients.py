@@ -21,7 +21,7 @@ class ActiveUsersOnlyTests(unittest.TestCase):
 class DeleteUserTests(unittest.TestCase):
     def test_the_devices_of_a_deleted_user_go_with_it(self):
         db = mock.MagicMock()
-        db.get.return_value = types.SimpleNamespace(id=5)
+        db.get.return_value = types.SimpleNamespace(id=5, username="bob")
         admin = types.SimpleNamespace(id=1)
         users.delete_user(5, force=True, admin=admin, db=db)
         queried = [c.args[0] for c in db.query.call_args_list]
