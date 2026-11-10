@@ -220,10 +220,11 @@
 .ach-count { margin: 0; }
 .ach-block { margin-bottom: 28px; }
 .pl-block, .ach-block.pl-block { margin: 32px 0 0; }
-.pl-ids { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 12px 0 0; }
-.pl-ids div { display: flex; gap: 6px; align-items: baseline; }
-.pl-ids dt { color: var(--text-muted); font-size: 0.85rem; }
-.pl-ids dd { margin: 0; color: var(--text-primary); overflow-wrap: anywhere; user-select: all; }
+.pl-ids { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, max-content)); gap: 10px; margin: 16px 0 0; padding: 0; list-style: none; }
+.pl-id { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; padding: 8px 14px; font: inherit; text-align: left; cursor: pointer; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-primary); }
+.pl-id:hover, .pl-id:focus-visible { background: var(--bg-card-hover); border-color: var(--accent-teal); }
+.pl-id-service { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent-teal); }
+.pl-id-value { font-weight: 600; overflow-wrap: anywhere; }
 .ach-note { margin: 0 0 12px; }
 .ach-fold { width: 100%; padding: 0; background: none; border: 0; font: inherit; color: inherit; cursor: pointer; text-align: left; }
 /* The toggle of every foldable section (achievements, group library, saga, media): a labelled pill, so it reads as a control
