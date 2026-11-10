@@ -9,8 +9,11 @@ export const active = null; // it belongs to no item of the top bar
 const entry = (e) => html`
   <section class="pf-card cl-entry" aria-label="Versión ${e.version}">
     <header class="cl-head">
-      <h2 class="cl-version">${e.title}</h2>
-      <span class="cl-meta">v${e.version} · ${formatDate(e.date)}</span>
+      <div>
+        <h2 class="cl-version">v${e.version}</h2>
+        <div class="cl-title">${e.title}</div>
+      </div>
+      <span class="cl-meta">${formatDate(e.date)}</span>
     </header>
     ${groups(e).map((g) => html`
       <div class="cl-group">
