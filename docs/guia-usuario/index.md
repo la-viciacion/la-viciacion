@@ -18,7 +18,7 @@ La Viciación es la app del grupo para llevar la cuenta de **cuánto y a qué ju
 
     Entrar, moverte por la app e instalarla en el móvil.
 
-- :material-timer-outline: **[Timers y sesiones](sesiones.md)**
+- :material-timer-outline: **[Inicio: timers y sesiones](sesiones.md)**
 
     Cómo registrar lo que juegas, completar juegos y puntuarlos.
 
@@ -28,19 +28,31 @@ La Viciación es la app del grupo para llevar la cuenta de **cuánto y a qué ju
 
 - :material-account-group: **[El grupo](grupo.md)**
 
-    Actividad, temporada, jugadores, catálogo de juegos, biblioteca y calendario.
+    Quién juega ahora, actividad, temporada, jugadores y servidor.
+
+- :material-gamepad-variant: **[Juegos, biblioteca y calendario](juegos.md)**
+
+    El catálogo, las bibliotecas de todos y los lanzamientos.
 
 - :material-trophy: **[Logros](logros.md)**
 
     La página de logros y cómo consultarla.
 
+- :material-heart: **[Deseados y recomendados](descubrir.md)**
+
+    Qué jugar a continuación.
+
+- :material-flag-checkered: **[Retos](retos.md)**
+
+    Objetivos con fecha, tuyos y del grupo.
+
 - :material-star-circle: **[Resumen e historia](resumen.md)**
 
     El «Wrapped» mensual y anual del grupo.
 
-- :material-heart: **[Deseados, recomendados y retos](descubrir.md)**
+- :material-robot-outline: **[Asistente](asistente.md)**
 
-    Qué jugar a continuación y objetivos con fecha.
+    El chat para preguntar sobre juegos y sobre la app.
 
 - :material-bell: **[Notificaciones y Telegram](notificaciones.md)**
 
