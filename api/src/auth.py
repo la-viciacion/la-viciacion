@@ -114,7 +114,12 @@ async def get_current_active_user(
     current_user: Annotated[models.User, Depends(get_current_user)]
 ):
     if not current_user.is_active:
-        raise HTTPException(status_code=400, detail="Inactive user")
+        # 401, not 400: the front ends the session on a 401 and shows the login, where the reason is told
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=messages.ACCOUNT_DISABLED,
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     return current_user
 
 
