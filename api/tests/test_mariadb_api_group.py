@@ -352,9 +352,14 @@ class PlayersTests(ApiTestCase):
         self.assertEqual(body["stats"]["played_time"], 5400)
         self.assertEqual([(g["game_name"], g["score"]) for g in body["top_games"]], [("Celeste", 77)])
         self.assertEqual(body["is_me"], False)
-        self.assertEqual(set(body), {"user", "season", "seasons", "stats", "top_games", "achievements", "hidden_achievements", "playing", "is_active", "is_me", "affinity"})
+        self.assertEqual(set(body), {"user", "game_ids", "season", "seasons", "stats", "top_games", "achievements", "hidden_achievements", "playing", "is_active", "is_me", "affinity"})
         self.assertNotIn("111", str(body))  # the Telegram id
         self.assertNotIn("example.com", str(body))  # the email
+        self.assertEqual(body["game_ids"], {})  # none filled in
+        self.api("PATCH", "/users/ana/settings", as_user="ana", json={"steam_id": " ana_steam ", "xbox_id": "  ", "birth_date": "1990-01-01"})
+        body = self.api("GET", f"/group/players/{self.ana}", as_user="bea").json()
+        self.assertEqual(body["game_ids"], {"steam_id": "ana_steam"})  # trimmed, the empty one left out
+        self.assertNotIn("1990", str(body))  # the birth date stays private
 
     def test_the_page_of_another_player_says_how_alike_the_taste_is_and_your_own_does_not(self):
         self.game("tetris", "Tetris")
