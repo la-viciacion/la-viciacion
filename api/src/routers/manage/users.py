@@ -16,7 +16,7 @@ from ...utils.my_utils import normalize_email, validate_email_format, validate_p
 from .common import commit, confirm_or_409, get_or_404, like, router
 
 
-def _user_out(u: models.User, sessions: int = 0, library: int = 0) -> dict:
+def _user_out(u: models.User, sessions: int = 0, library: int = 0, awards: int = 0, scores: int = 0) -> dict:
     return {
         "id": u.id,
         "name": u.name,
@@ -27,6 +27,8 @@ def _user_out(u: models.User, sessions: int = 0, library: int = 0) -> dict:
         "is_active": bool(u.is_active),
         "sessions": sessions,
         "library": library,
+        "awards": awards,
+        "scores": scores,
     }
 
 
@@ -56,7 +58,22 @@ def list_users(
         .group_by(models.UserGame.user_id)
         .all()
     )
-    return {"total": total, "items": [_user_out(u, sessions.get(u.id, 0), library.get(u.id, 0)) for u in users]}
+    awards = dict(
+        db.query(models.UserAchievement.user_id, func.count(models.UserAchievement.id))
+        .filter(models.UserAchievement.user_id.in_(ids))
+        .group_by(models.UserAchievement.user_id)
+        .all()
+    )
+    scores = dict(
+        db.query(models.GameScore.user_id, func.count(models.GameScore.id))
+        .filter(models.GameScore.user_id.in_(ids))
+        .group_by(models.GameScore.user_id)
+        .all()
+    )
+    return {
+        "total": total,
+        "items": [_user_out(u, sessions.get(u.id, 0), library.get(u.id, 0), awards.get(u.id, 0), scores.get(u.id, 0)) for u in users],
+    }
 
 
 def _checked_email(db: Session, email, *, exclude_user_id=None):

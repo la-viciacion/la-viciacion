@@ -122,6 +122,9 @@ def _award_out(ua: models.UserAchievement, username, ach, game_name) -> dict:
         "achievement_id": ua.achievement_id,
         "key": ach.key if ach else None,
         "title": ach.title if ach else None,
+        "secret": bool(ach.secret) if ach else False,
+        "special": ach.special if ach else 0,
+        "lifetime": is_lifetime(ach.key) if ach else False,
         "game_id": ua.game_id,
         "game": game_name,
         "date": ua.date,
@@ -168,17 +171,29 @@ def list_user_achievements(
 
 
 class UserAchievementPatch(BaseModel):
-    date: datetime.date
+    date: Optional[datetime.date] = None  # its year decides the season
+    game_id: Optional[str] = None  # the game that earned it; null leaves it with none
 
 
 @router.patch("/user-achievements/{award_id}")
 def patch_user_achievement(award_id: int, body: UserAchievementPatch, db: Session = Depends(get_db)):
-    """Change the date an achievement was unlocked (its year decides the season)."""
+    """Change the date an achievement was unlocked (its year decides the season) and the game it came from.
+    Nothing is announced. The user cannot have it twice in a season, so moving it onto one where they already do is refused."""
     ua = get_or_404(db, models.UserAchievement, award_id, "Logro concedido")
-    ua.date = body.date
+    data = body.model_dump(exclude_unset=True)
+    if data.get("date") is not None:
+        ua.date = data["date"]
+    if "game_id" in data:
+        game_id = data["game_id"] or None
+        if game_id is not None:
+            get_or_404(db, models.Game, game_id, "Juego")
+        ua.game_id = game_id
     commit(db, "Logro concedido")
     db.refresh(ua)
-    return _award_out(ua, None, None, None)
+    ach = db.get(models.Achievement, ua.achievement_id)
+    game = db.get(models.Game, ua.game_id) if ua.game_id else None
+    user = db.get(models.User, ua.user_id)
+    return _award_out(ua, user.username if user else None, ach, game.name if game else None)
 
 
 @router.delete("/user-achievements/{award_id}")
