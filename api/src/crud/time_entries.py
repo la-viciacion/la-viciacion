@@ -140,16 +140,16 @@ def players_played_dates(db: Session, season: int = None, is_active: bool | None
 
 
 def games_played_time(db: Session, season: int = None, limit: int | None = None, is_active: bool | None = None) -> list[dict]:
-    """Games with the seconds played in the season, most first (only games that were played)."""
+    """Games with the seconds played in the season, most first (only games that were played), each with its cover."""
     season = seasons.or_current(season)
     sessions = sessions_subquery()
     played = cast(func.sum(sessions.c.duration), Integer).label("played_time")
     stmt = (
-        select(sessions.c.game_id.label("game_id"), models.Game.name, played)
+        select(sessions.c.game_id.label("game_id"), models.Game.name, models.Game.image_url, played)
         .join(models.User, sessions.c.user_id == models.User.id)
         .join(models.Game, models.Game.id == sessions.c.game_id)
         .where(sessions.c.season == season, models.not_god())
-        .group_by(sessions.c.game_id, models.Game.name)
+        .group_by(sessions.c.game_id, models.Game.name, models.Game.image_url)
         .having(func.sum(sessions.c.duration) > 0)
         .order_by(desc(played), models.Game.name)
     )
