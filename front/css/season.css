@@ -1,17 +1,55 @@
-/* Season page (#/season): the rankings of the running season as bars */
+/* Season page (#/season): the rankings of the running season, each drawn its own way */
 .ss-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 12px; align-items: start; }
 .ss-card { min-width: 0; }
 .ss-title { margin: 0; font-size: 1rem; font-weight: 700; }
+.ss-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.ss-value { font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+
+/* The colour of each place */
+.place-1 { --tone: var(--accent-gold); }
+.place-2 { --tone: var(--accent-purple); }
+.place-3 { --tone: var(--accent-pink); }
+.place-4 { --tone: var(--accent-teal); }
+
+/* Bars */
 .ss-list { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 .ss-row { display: flex; align-items: center; gap: 10px; }
 .ss-row .pl-avatar { width: 32px; height: 32px; border: 0; flex: none; }
 .ss-place { width: 1.6rem; flex: none; text-align: center; font-weight: 700; font-size: 0.9rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .ss-main { flex: 1; min-width: 0; }
 .ss-line { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 4px; }
-.ss-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
-.ss-value { flex: none; font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+.ss-line .ss-value { flex: none; }
 .ss-bar { height: 8px; border-radius: var(--radius-pill); background: var(--bg-card-hover); overflow: hidden; }
-.ss-fill { height: 100%; border-radius: var(--radius-pill); background: var(--accent-teal); }
-.ss-fill.place-1 { background: var(--accent-gold); }
-.ss-fill.place-2 { background: var(--accent-purple); }
-.ss-fill.place-3 { background: var(--accent-pink); }
+.ss-fill { height: 100%; border-radius: var(--radius-pill); background: var(--tone, var(--accent-teal)); }
+
+/* Podium */
+.ss-podium { display: flex; align-items: flex-end; justify-content: center; gap: 8px; margin: 14px 0 12px; }
+.ss-step { flex: 1; min-width: 0; max-width: 130px; display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; }
+.ss-medal { font-size: 1.3rem; line-height: 1; }
+.ss-step .pl-avatar { width: 48px; height: 48px; border: 2px solid var(--tone); }
+.ss-step .ss-cover.big { border: 2px solid var(--tone); }
+.ss-step .ss-name { max-width: 100%; }
+.ss-pedestal { width: 100%; margin-top: 6px; border-radius: var(--radius-sm) var(--radius-sm) 0 0; background: linear-gradient(to top, transparent, var(--tone)); opacity: 0.75; }
+.ss-step.place-1 .ss-pedestal { height: 56px; }
+.ss-step.place-2 .ss-pedestal { height: 38px; }
+.ss-step.place-3 .ss-pedestal { height: 26px; }
+
+/* Tiles and rings */
+.ss-tiles { list-style: none; margin: 12px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 10px; }
+.ss-tile { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px 6px; text-align: center; min-width: 0; background: var(--bg-card-hover); border: 1px solid var(--border); border-radius: var(--radius-md); }
+.ss-tile.place-1 { border-color: var(--accent-gold); }
+.ss-tile .pl-avatar { width: 36px; height: 36px; border: 0; }
+.ss-tile .ss-name { max-width: 100%; font-size: 0.82rem; }
+.ss-tile-place { position: absolute; top: 4px; left: 6px; font-size: 0.8rem; }
+.ss-big { font-size: 1.7rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.ss-unit { font-size: 0.72rem; color: var(--text-muted); }
+.ss-ring { --p: 0%; width: 72px; height: 72px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 0.85rem; font-variant-numeric: tabular-nums;
+  background: conic-gradient(var(--tone, var(--accent-teal)) var(--p), var(--bg-surface) 0); position: relative; }
+.ss-ring::before { content: ""; position: absolute; inset: 7px; border-radius: 50%; background: var(--bg-surface); }
+.ss-ring span { position: relative; }
+
+/* Games with their cover */
+.ss-covers .ss-row { align-items: center; }
+.ss-cover { width: 48px; height: 48px; border-radius: var(--radius-sm); object-fit: cover; flex: none; }
+.ss-cover.big { width: 72px; height: 72px; }
+.ss-cover-empty { display: flex; align-items: center; justify-content: center; background: var(--bg-surface); font-size: 1.3rem; }

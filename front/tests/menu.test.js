@@ -5,13 +5,13 @@ import { activeItem, menuSections } from '../js/lib/menu.js';
 const ids = (user) => menuSections(user).flatMap((s) => s.items.map((i) => i.id));
 
 test('a player sees every section but the administration', () => {
-  assert.deepEqual(ids({ is_admin: false }), ['home', 'activity', 'games', 'library', 'players', 'calendar', 'achievements', 'season', 'stats', 'server', 'profile', 'wishlist', 'recommendations', 'challenges', 'settings']);
+  assert.deepEqual(ids({ is_admin: false }), ['home', 'activity', 'season', 'games', 'library', 'players', 'calendar', 'achievements', 'stats', 'server', 'profile', 'wishlist', 'recommendations', 'challenges', 'settings']);
   assert.deepEqual(menuSections({ is_admin: false }).map((s) => s.label), ['Principal', 'Explorar', 'Tú']);
 });
 
 test('Explorar lists the pages in order, the server last, the same for players and admins', () => {
   const explorar = (user) => menuSections(user).find((s) => s.label === 'Explorar').items.map((i) => i.id);
-  const order = ['games', 'library', 'players', 'calendar', 'achievements', 'season', 'stats', 'server'];
+  const order = ['season', 'games', 'library', 'players', 'calendar', 'achievements', 'stats', 'server'];
   assert.deepEqual(explorar({ is_admin: false }), order);
   assert.deepEqual(explorar({ is_admin: true }), order);
 });
