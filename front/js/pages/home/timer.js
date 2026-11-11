@@ -106,7 +106,7 @@ const resumeCard = (last) => html`
 const actions = (withNew) => html`
   <div class="home-actions">
     ${withNew ? html`<button class="btn-action" id="chooseGameBtn">${iconPlus()} Nuevo timer</button>` : ''}
-    <button class="btn-action" id="manualSessionBtn">${iconPlus()} Sesión manual</button>
+    <button class="btn-action" id="manualSessionBtn">${iconPencil(16)} Sesión manual</button>
   </div>`;
 
 /** The game played last (the first of the grouped history), or null when there is none or it can't be fetched. */
