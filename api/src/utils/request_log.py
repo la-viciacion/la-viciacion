@@ -2,6 +2,7 @@
 import datetime
 import time
 
+from . import request_context
 from .logger import LogManager
 from .redaction import redact_query
 
@@ -20,6 +21,8 @@ class RequestLogMiddleware:
         if scope["type"] != "http" or scope["path"] in self.excluded_paths:
             return await self.app(scope, receive, send)
         started = time.perf_counter()
+        client = scope.get("client")
+        context = request_context.begin(client[0] if client else None)
         status = 500  # what a crash that never reached the response will be
 
         async def send_and_note_status(message):
@@ -33,6 +36,9 @@ class RequestLogMiddleware:
         finally:
             duration = datetime.timedelta(seconds=time.perf_counter() - started)
             query = redact_query(scope.get("query_string", b"").decode("latin-1"))
-            logger.info(
-                f'REQUEST - "{scope["method"]} {scope["path"]}{"?" + query if query else ""}" - {status} - {duration}'
-            )
+            try:
+                logger.info(
+                    f'REQUEST - "{scope["method"]} {scope["path"]}{"?" + query if query else ""}" - {status} - {duration}'
+                )
+            finally:
+                request_context.end(context)
