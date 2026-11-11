@@ -101,3 +101,19 @@
   .hf-cell .hf-who { flex-direction: row; gap: 8px; }
   .hf-cell .pl-avatar { width: 28px; height: 28px; }
 }
+
+/* The timeline view: a line with a dot per season, the grand champion large and the other categories in small */
+.hf-timeline { list-style: none; margin: 0; padding: 0 0 0 14px; border-left: 2px solid var(--border); }
+.hf-step { position: relative; padding: 0 0 16px 18px; }
+.hf-dot { position: absolute; left: -23px; top: 22px; width: 12px; height: 12px; border-radius: 50%; background: var(--accent-gold); box-shadow: 0 0 0 4px var(--bg-base); }
+.hf-step-body { margin: 0; }
+.hf-hero { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 18px; }
+.hf-year-big { font-size: 1.8rem; }
+.hf-hero-who { gap: 12px; }
+.hf-hero-who .pl-avatar { width: 52px; height: 52px; box-shadow: 0 0 0 3px var(--hf, var(--border)); }
+.hf-hero-name { display: flex; flex-direction: column; min-width: 0; }
+.hf-hero-name .ss-name { font-size: 1.1rem; font-weight: 800; color: var(--hf); }
+.hf-others { list-style: none; margin: 14px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.hf-others li { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-width: 0; padding: 10px; border-radius: var(--radius-sm); background: var(--bg-card-hover); }
+.hf-others .pl-avatar { width: 26px; height: 26px; }
+.hf-label { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }

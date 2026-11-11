@@ -1,6 +1,7 @@
-// The hall of fame of the Temporada page (#/season/fame), in two views of the same answer (GET /statistics/hall-of-fame):
-// a row per season with a column per category, or a cabinet per player with what they have won. Each player with titles
-// keeps one colour in both (the ring of their photo), so who dominates a season shows without reading names.
+// The hall of fame of the Temporada page (#/season/fame), in three views of the same answer (GET /statistics/hall-of-fame):
+// a row per season with a column per category, a cabinet per player with what they have won, or a timeline that puts the
+// grand champion of each season first. Each player with titles
+// keeps one colour in every view (the ring of their photo), so who dominates a season shows without reading names.
 import { html } from '../../lib/html.js';
 import { CATEGORIES, VIEWS, cabinets, grandChampions, playerHues, seasonsWithChampions, titleRanking, titlesText } from '../../lib/hall-of-fame.js';
 import { playerAvatar } from '../../ui/avatar.js';
@@ -55,14 +56,39 @@ const cabinet = (player, hues) => html`
 
 const players = (answer, hues) => html`<div class="ss-grid hf-grid">${cabinets(answer).map((player) => cabinet(player, hues))}</div>`;
 
+// A timeline, the newest season first: the grand champion large, then the champion of every category in small.
+const step = (entry, hues) => {
+  const { winners, wins, decided } = grandChampions(entry);
+  return html`
+    <li class="hf-step" aria-label="Temporada ${entry.season}">
+      <span class="hf-dot" aria-hidden="true"></span>
+      <div class="pf-card hf-step-body">
+        <div class="hf-hero">
+          <span class="hf-year hf-year-big">${entry.season}</span>
+          ${winners.map((w) => html`<span class="hf-who hf-hero-who ${hueClass(hues, w.user_id)}">${playerAvatar(w)}<span class="hf-hero-name"><span class="ss-name">👑 ${w.name}</span><span class="pf-sub">${wins} de ${decided} categorías</span></span></span>`)}
+        </div>
+        <ul class="hf-others">${CATEGORIES.map((category) => html`
+          <li><span class="hf-label">${category.title}</span>
+            ${entry.champions[category.id]?.length
+              ? html`${entry.champions[category.id].map((w) => who(hues, w))}<span class="hf-figure">${category.text(entry.champions[category.id][0].value)}</span>`
+              : html`<span class="pf-sub">—</span>`}
+          </li>`)}
+        </ul>
+      </div>
+    </li>`;
+};
+
+const timeline = (answer, hues) => html`${lead(answer, hues)}<ol class="hf-timeline">${seasonsWithChampions(answer).map((entry) => step(entry, hues))}</ol>`;
+
 const pills = (view) => html`
   <div class="pf-season" role="group" aria-label="Vista">${VIEWS.map(([id, label]) => html`
     <button type="button" class="pf-season-badge" data-fame-view="${id}" aria-pressed="${String(id === view)}">${label}</button>`)}
   </div>`;
 
-/** The hall of fame in `view` ('matrix' or 'players'). */
+/** The hall of fame in `view` ('matrix', 'players' or 'timeline'). */
 export function fameView(answer, view) {
   if (!seasonsWithChampions(answer).length) return html`<div class="pf-empty">Todavía no ha terminado ninguna temporada con datos.</div>`;
   const hues = playerHues(answer);
-  return html`${pills(view)}${view === 'players' ? players(answer, hues) : matrix(answer, hues)}`;
+  const views = { matrix, players, timeline };
+  return html`${pills(view)}${(views[view] ?? matrix)(answer, hues)}`;
 }
