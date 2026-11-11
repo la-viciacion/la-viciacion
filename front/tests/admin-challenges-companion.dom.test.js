@@ -24,7 +24,7 @@ test('the schedules are the second table of the challenges, and their buttons ac
   const main = document.getElementById('main');
   await admin.render({ main, user: { id: 1 } });
   await settle();
-  assert.equal(document.querySelectorAll('.adm-tab').length, 2); // no tab of their own
+  assert.equal(document.querySelectorAll('.adm-tab').length, 4); // the tabs of Comunidad; the schedules have none of their own
   assert.equal(main.querySelectorAll('table').length, 2);
   assert.match(main.textContent, /Se lanzan solos cada mes/);
   assert.match(main.textContent, /Terror cada mes/);

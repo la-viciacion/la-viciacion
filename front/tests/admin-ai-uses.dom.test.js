@@ -67,13 +67,14 @@ const openSections = async (sections, values = VALUES, aiModel = GOOGLE, chat = 
   await settle();
 };
 
-test('Notificaciones → IA has only the switch, the test and the notices: no provider, key or model', async () => {
+test('IA → Avisos con IA has the switch, the test and the provider, key and model read only', async () => {
   await open();
   assert.equal(panel().querySelector('[name="ai.enabled"]').type, 'checkbox');
   assert.ok(panel().querySelector('[data-set-act="test-ai"]'));
-  assert.equal(panel().querySelector('.adm-ai-provider'), null);
-  assert.equal(panel().querySelector('.adm-ai-model'), null);
-  assert.equal(panel().querySelectorAll('input:disabled').length, 0);
+  assert.equal(panel().querySelector('.adm-ai-provider').value, 'Google (Gemini)');
+  assert.equal(panel().querySelector('.adm-ai-model').value, 'gemini-test');
+  assert.equal(panel().querySelectorAll('input:disabled').length, 4); // provider, key, admin key, model: nothing to type
+  assert.equal(panel().querySelector('select[name="ai.provider"]'), null);
   assert.match(panel().textContent, /Usa Google \(Gemini\) \(gemini-test\)/);
   assert.equal(panel().querySelector('.adm-warn'), null);
 });
@@ -93,49 +94,26 @@ test('saving the AI switch never sends the provider, the key or the model', asyn
   assert.deepEqual(Object.keys(saved.values).filter((key) => /provider|api_key|model/.test(key)), []);
 });
 
-test('Sistema → Servicios shows the AI provider, key and models read only, the chat one apart', async () => {
-  await openSections(['aiconfig']);
-  assert.equal(panel().querySelector('.adm-ai-provider').value, 'Google (Gemini)');
-  assert.equal(panel().querySelector('.adm-ai-model').value, 'gemini-test');
-  assert.equal(panel().querySelector('.adm-chat-model').value, 'gpt-chat');
-  assert.equal(panel().querySelectorAll('input:disabled').length, 5);
-  assert.equal(panel().querySelector('select[name="ai.provider"]'), null);
-  assert.equal(panel().querySelector('.adm-warn'), null);
-  assert.match(panel().textContent, /CHAT_AI_MODEL si está en el \.env/);
-  assert.doesNotMatch(panel().textContent, /ahora no lo está/);
-});
-
-test('without a model of its own the chat says it uses AI_MODEL', async () => {
-  await openSections(['aiconfig'], VALUES, GOOGLE, { ...CHAT, model: 'gemini-test', own_model: false });
-  assert.equal(panel().querySelector('.adm-chat-model').value, 'gemini-test');
-  assert.match(panel().textContent, /ahora no lo está: usa AI_MODEL/);
-});
-
-test('without AI_MODEL or AI_PROVIDER both pages say the AI writes nothing and which one is missing', async () => {
-  await openSections(['aiconfig'], VALUES, { provider: 'google', model: null });
+test('without AI_MODEL or AI_PROVIDER the page says the AI writes nothing and which one is missing', async () => {
+  await openSections(['ai', 'aiuses'], VALUES, { provider: 'google', model: null });
   assert.equal(panel().querySelector('.adm-ai-model').value, 'Sin configurar');
   assert.match(panel().querySelector('.adm-warn').textContent, /Falta AI_MODEL en el \.env/);
-  await openSections(['aiconfig'], VALUES, { provider: null, model: null });
+  await openSections(['ai', 'aiuses'], VALUES, { provider: null, model: null });
   assert.equal(panel().querySelector('.adm-ai-provider').value, 'Sin configurar');
   assert.match(panel().querySelector('.adm-warn').textContent, /Falta AI_PROVIDER, AI_MODEL en el \.env/);
-  await openSections(['ai', 'aiuses'], VALUES, { provider: null, model: null });
-  assert.match(panel().querySelector('.adm-warn').textContent, /Falta AI_PROVIDER, AI_MODEL en el \.env/);
+  assert.equal(panel().querySelectorAll('.adm-warn').length, 1); // said once, not once per card
 });
 
-test('Servicios also holds Telegram, the push contact and keys and the mail, and Canales keeps only the sending', async () => {
-  await openSections(['aiconfig', 'telegramconfig', 'pushconfig', 'mail']);
-  assert.equal(panel().querySelectorAll('.adm-set-card').length, 4);
-  assert.equal(panel().querySelectorAll('input[disabled]').length >= 7, true); // AI x4, Telegram x3
+test('Canales holds Telegram, the app notices (with their contact and keys) and the mail, each in one card', async () => {
+  await openSections(['telegram', 'push', 'mail']);
+  assert.equal(panel().querySelectorAll('.adm-set-card').length, 3);
+  assert.equal(panel().querySelectorAll('input[disabled]').length, 3); // the bot's token and two ids, read only
+  assert.ok(panel().querySelector('[data-set-act="test"]'));
+  assert.equal(panel().querySelector('[name="push.enabled"]').type, 'checkbox');
   assert.ok(panel().querySelector('[name="push.contact"]'));
   assert.ok(panel().querySelector('[data-set-act="push-keys"]'));
   assert.ok(panel().querySelector('[data-set-act="test-email"]'));
-  assert.equal(panel().querySelector('[data-set-act="test"]'), null);
-  await openSections(['telegram', 'push']);
-  assert.equal(panel().querySelectorAll('input[disabled]').length, 0);
-  assert.equal(panel().querySelector('[name="push.contact"]'), null);
-  assert.equal(panel().querySelector('[data-set-act="push-keys"]'), null);
-  assert.equal(panel().querySelector('[name="push.enabled"]').type, 'checkbox');
-  assert.ok(panel().querySelector('[data-set-act="test"]'));
+  assert.equal(panel().querySelector('.adm-ai-provider'), null); // the AI is not here
 });
 
 test('Canales says whether Telegram is set and only allows the test when it is', async () => {
@@ -155,11 +133,14 @@ const openWithChat = async (values = VALUES, chat = CHAT) => {
 const chatCard = () => panel().querySelector('.adm-chat-card');
 const state = () => chatCard().querySelector('.adm-chat-state').textContent;
 
-test('the chat card shows its switch and its instructions, and where its model comes from', async () => {
+test('the chat card shows its switch, its instructions and the model it uses, read only', async () => {
   await openWithChat();
   assert.equal(chatCard().querySelector('input[type="checkbox"]').name, 'chat.enabled');
   assert.ok(chatCard().querySelector('textarea[name="chat.prompt"]'));
-  assert.equal(chatCard().querySelectorAll('input:disabled').length, 0); // what comes from the .env is in Servicios
+  assert.equal(chatCard().querySelectorAll('input:disabled').length, 1); // only its model, read only: it comes from the .env
+  assert.equal(chatCard().querySelector('.adm-chat-model').value, 'gpt-chat');
+  assert.match(chatCard().textContent, /CHAT_AI_MODEL si está en el \.env/);
+  assert.doesNotMatch(chatCard().textContent, /ahora no lo está/);
   assert.equal(chatCard().querySelector('.adm-warn'), null);
   assert.match(state(), /^Disponible/);
   assert.equal(panel().querySelector('[name="ai.enabled"]'), null); // the notices' AI is not on this page
@@ -243,4 +224,10 @@ test('changing a limit sends that number, and only that one', async () => {
   assert.deepEqual(Object.fromEntries(Object.entries(saved.values).filter(([key]) => key.startsWith('chat.limit_'))), {
     'chat.limit_user_day': 0, 'chat.limit_group_minute': 20, // numbers, not texts, and zero is a value
   });
+});
+
+test('without a model of its own the chat says it uses AI_MODEL', async () => {
+  await openWithChat(VALUES, { ...CHAT, model: 'gemini-test', own_model: false });
+  assert.equal(chatCard().querySelector('.adm-chat-model').value, 'gemini-test');
+  assert.match(chatCard().textContent, /ahora no lo está: usa AI_MODEL/);
 });

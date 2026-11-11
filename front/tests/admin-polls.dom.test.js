@@ -22,8 +22,8 @@ const poll = (extra = {}) => ({
   ...extra,
 });
 
-test('the polls are listed under the notifications and launched with a question, its options, a choice of several and a deadline', () => {
-  assert.ok(SECTIONS.find((s) => s.label === 'Notificaciones').tabs.includes('polls'));
+test('the polls are listed under the community and launched with a question, its options, a choice of several and a deadline', () => {
+  assert.ok(SECTIONS.find((s) => s.label === 'Comunidad').tabs.includes('polls'));
   assert.ok(!SECTIONS.find((s) => s.label === 'Jugadores').tabs.includes('polls'));
   const [create] = ENTITIES.polls.creates;
   assert.deepEqual(create.fields.map((f) => [f.key, f.type]), [['question', 'textarea'], ['options', 'options'], ['multiple', 'checkbox'], ['allow_adding_options', 'checkbox'], ['closes_at', 'datetime']]);

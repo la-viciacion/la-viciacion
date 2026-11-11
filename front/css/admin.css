@@ -39,6 +39,9 @@
 
 .adm-tab:hover { color: var(--text-primary); }
 
+/* on a phone the tabs of a section of three fit without scrolling (the one with most has four or five) */
+@media (max-width: 520px) { .adm-tab { padding: 10px 10px; font-size: 0.9rem; } }
+
 .adm-tab.active { color: var(--accent-teal); border-bottom-color: var(--accent-teal); }
 
 .adm-desc { color: var(--text-secondary); font-size: 0.92rem; margin-top: 4px; }

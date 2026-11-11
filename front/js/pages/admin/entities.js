@@ -621,32 +621,26 @@ ENTITIES.sends = {
 };
 ENTITIES.channels = {
   label: 'Canales',
-  description: 'Por dónde salen los avisos: Telegram y las notificaciones de la app.',
+  description: 'Por dónde salen los avisos y lo que cada canal necesita: Telegram, las notificaciones de la app y el correo.',
   custom: 'settings',
-  sections: ['telegram', 'push'],
+  sections: ['telegram', 'push', 'mail'],
 };
 ENTITIES.ai = {
-  label: 'IA',
-  description: 'Inteligencia artificial que redacta algunos avisos: el interruptor, la prueba y cuáles la usan.',
+  label: 'Avisos con IA',
+  description: 'Inteligencia artificial que redacta algunos avisos: el interruptor, la prueba, el proveedor y el modelo (solo lectura) y cuáles la usan.',
   custom: 'settings',
   sections: ['ai', 'aiuses'],
 };
 ENTITIES.chat = {
   label: 'Chat',
-  description: 'Asistente de la app: interruptor, instrucciones y si los jugadores lo tienen disponible.',
+  description: 'Asistente de la app: interruptor, instrucciones, límites y si los jugadores lo tienen disponible.',
   custom: 'settings',
   sections: ['chat'],
 };
 ENTITIES.aiusage = {
-  label: 'Uso de IA',
+  label: 'Uso y coste',
   description: 'Cuánto ha facturado OpenAI en el último año (lo que conserva): el total, mes a mes y por concepto.',
   custom: 'ai-usage',
-};
-ENTITIES.services = {
-  label: 'Servicios',
-  description: 'Lo que se configura en el .env del servidor y la app usa: la IA, Telegram, los avisos en la app y el correo.',
-  custom: 'settings',
-  sections: ['aiconfig', 'telegramconfig', 'pushconfig', 'mail'],
 };
 ENTITIES.backup = {
   label: 'Copia de seguridad',
