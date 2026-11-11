@@ -1,8 +1,9 @@
 // Admin dialogs and one-off actions (confirm, game picker, delete...).
 // Everything that changes data takes `admin` = { reload } to refresh the view.
 import { api, jsonRequest } from '../../lib/api.js';
-import { toLocalISO } from '../../lib/format.js';
+import { formatDate, toLocalISO } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
+import { platformName } from '../../lib/platforms.js';
 import { modalHeader, openModal } from '../../ui/modal.js';
 import { toast } from '../../ui/toast.js';
 
@@ -60,6 +61,26 @@ export function pickGame(title = 'Elegir juego') {
     });
     input.focus();
   });
+}
+
+/** Who has a game in their library and who wishes for it (GET /manage/games/{id}/people); the list the admin asked for (`first`) goes on top. */
+export async function showGamePeople(game, first = 'players') {
+  const { players, wishes } = await api(`/manage/games/${encodeURIComponent(game.id)}/people`);
+  const who = (p) => html`<a class="adm-link" href="#/player/${p.user_id}" data-close>${p.name}</a>${p.is_active ? '' : html` <span class="adm-sub">(inactivo)</span>`}`;
+  const owned = (p) => p.entries.map((e) => `${e.platform ? platformName(e.platform) : 'sin plataforma'} ${e.season}`).join(', ');
+  const section = (title, rows, line) => html`
+    <section class="adm-people">
+      <h4>${title} <span class="adm-sub">${rows.length}</span></h4>
+      ${rows.length ? html`<ul class="adm-list">${rows.map((p) => html`<li>${who(p)} <span class="adm-sub">· ${line(p)}</span></li>`)}</ul>` : html`<p class="adm-sub">Nadie.</p>`}
+    </section>`;
+  const parts = [
+    section('Lo tienen en su biblioteca', players, owned),
+    section('Lo desean', wishes, (p) => `desde el ${formatDate(p.added_at)}`),
+  ];
+  openModal(html`
+    ${modalHeader(game.name)}
+    <div class="adm-body adm-people-body">${first === 'wishes' ? parts.reverse() : parts}</div>
+    <div class="adm-actions"><button class="adm-btn" data-close>Cerrar</button></div>`);
 }
 
 /** Delete a row; rows with dependants come back as 409 + counts and need a second, explicit confirmation. */

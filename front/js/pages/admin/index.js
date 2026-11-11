@@ -7,7 +7,7 @@ import { append, html, mount } from '../../lib/html.js';
 import { loadPlatforms } from '../../lib/platforms.js';
 import { toast } from '../../ui/toast.js';
 import { errorState, store } from './components.js';
-import { deleteRow, pickGame } from './dialogs.js';
+import { deleteRow, pickGame, showGamePeople } from './dialogs.js';
 import { ENTITIES, TABS } from './entities.js';
 import { openCreateForm, openForm } from './form.js';
 import { SECTIONS, TAB_IDS, hashFor, sectionOf, tabFromHash } from './nav.js';
@@ -426,6 +426,10 @@ async function onClick(e) {
       }
       case 'edit': return openForm(target, row, admin);
       case 'delete': return deleteRow(target, row, admin);
+      case 'game-people': {
+        const game = st.data?.items?.find((g) => g.id === button.dataset.game);
+        return game && showGamePeople(game, button.dataset.list);
+      }
       case 'row-action': return target.actions[Number(button.dataset.a)].run(row, admin);
       case 'clear-game':
         delete st.filters.game_id;

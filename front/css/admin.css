@@ -338,3 +338,7 @@ textarea.adm-grow { resize: none; min-height: 0; overflow: hidden; }
 .adm-badges .adm-badge { white-space: nowrap; }
 .adm-badges.nowrap { flex-wrap: nowrap; }
 .adm-nowrap { white-space: nowrap; }
+
+.adm-people h4 { margin: 14px 0 4px; color: var(--text-primary); font-size: 0.9rem; }
+
+.adm-people-body { padding-bottom: 8px; max-height: 60vh; overflow-y: auto; }
