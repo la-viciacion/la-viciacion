@@ -1,28 +1,15 @@
-// Colour of the aura around the running-timer card: it drifts from teal to red as the
-// session grows, one stop every 30 minutes and flat red from 4 hours on. Pure ambience.
+// Colour of the aura around the running-timer card: it drifts linearly from green to red
+// over 4 hours (yellow lands at exactly 2:00) and stays red from then on. Pure ambience.
 
-const STEP_SECONDS = 30 * 60;
+const FULL_SECONDS = 4 * 3600;
 
-// [hue, saturation %, lightness %] at 0:00, 0:30 ... 4:00. Green is kept short on purpose
-// so that yellow shows up early (from about 1:30).
-const STOPS = [
-  [168, 70, 45],
-  [145, 66, 45],
-  [78, 72, 48],
-  [50, 95, 52],
-  [40, 95, 52],
-  [28, 92, 52],
-  [16, 90, 54],
-  [6, 87, 55],
-  [0, 85, 56],
-];
+// [hue, saturation %, lightness %] at 0:00 and at 4:00.
+const FROM = [120, 72, 46];
+const TO = [0, 85, 56];
 
-/** The aura colour after `seconds` of play, as a CSS `h s% l%` triple, blended between neighbouring stops. */
+/** The aura colour after `seconds` of play, as a CSS `h s% l%` triple. */
 export function auraColor(seconds) {
-  const last = STOPS.length - 1;
-  const position = Math.min(Math.max(seconds, 0) / STEP_SECONDS, last);
-  const index = Math.min(Math.floor(position), last - 1);
-  const fraction = position - index;
-  const [h, s, l] = STOPS[index].map((from, i) => from + (STOPS[index + 1][i] - from) * fraction);
+  const fraction = Math.min(Math.max(seconds, 0) / FULL_SECONDS, 1);
+  const [h, s, l] = FROM.map((from, i) => from + (TO[i] - from) * fraction);
   return `${Math.round(h)} ${Math.round(s)}% ${Math.round(l)}%`;
 }
