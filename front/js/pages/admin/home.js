@@ -62,10 +62,10 @@ function integrations(cfg) {
   const mail = cfg.mail.configured ? ['green', 'Configurado', `Envía como ${cfg.mail.from}`] : ['gray', 'Sin configurar', 'Nadie puede recuperar su contraseña por correo'];
   return [
     { name: 'Catálogo de juegos', tab: 'games', state: games },
-    { name: 'Telegram', tab: 'services', state: telegram },
-    { name: 'Inteligencia artificial', tab: 'services', state: ai },
+    { name: 'Telegram', tab: 'channels', state: telegram },
+    { name: 'Inteligencia artificial', tab: 'ai', state: ai },
     { name: 'Avisos en la app', tab: 'channels', state: push },
-    { name: 'Correo', tab: 'services', state: mail },
+    { name: 'Correo', tab: 'channels', state: mail },
   ];
 }
 

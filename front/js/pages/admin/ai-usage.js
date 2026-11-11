@@ -74,7 +74,7 @@ function view() {
 async function load(refresh) {
   const result = await api(`/manage/ai-usage${refresh ? '?refresh=true' : ''}`);
   if (!result.configured) {
-    mount(panel, html`<section class="adm-set-card"><h3>Gasto en OpenAI</h3><div class="adm-warn">Falta <code>OPENAI_ADMIN_KEY</code> en el .env del servidor (una clave de administración de OpenAI, o una restringida con el permiso <code>api.usage.read</code>) y reiniciar la API. Mira Sistema → Servicios.</div></section>`);
+    mount(panel, html`<section class="adm-set-card"><h3>Gasto en OpenAI</h3><div class="adm-warn">Falta <code>OPENAI_ADMIN_KEY</code> en el .env del servidor (una clave de administración de OpenAI, o una restringida con el permiso <code>api.usage.read</code>) y reiniciar la API. Mira Avisos → Canales.</div></section>`);
     return;
   }
   data = result;

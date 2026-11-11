@@ -1,4 +1,4 @@
-"""The text of a notice an admin writes (Notificaciones → Redactar aviso): a small subset of Markdown, drawn for Telegram
+"""The text of a notice an admin writes (Comunidad → Redactar aviso): a small subset of Markdown, drawn for Telegram
 (HTML, which is the one Telegram parse mode whose escaping is simple and safe) or as plain text for the app's push
 notifications and inbox, which cannot show any format.
 

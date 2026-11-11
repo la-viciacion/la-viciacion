@@ -201,54 +201,41 @@ function view(values, jobs, pushDevices, mail, aiUses, aiModel, chat) {
         </label>
       </section>`,
 
-    // Notificaciones → Canales: only what is about sending (whether it is set, and the test); the configuration is in Sistema → Servicios
+    // Avisos → Canales: the bot as the server's .env has it (read only), and the test
     telegram: html`
-      <section class="adm-set-card">
-        <h3>Telegram</h3>
-        ${telegramReady(values)
-          ? html`<div class="adm-sub">Bot configurado: los avisos del grupo salen por Telegram.</div>`
-          : html`<div class="adm-warn">Telegram no está configurado: faltan ${[['telegram.token', 'TELEGRAM_TOKEN'], ['telegram.group_id', 'TELEGRAM_GROUP_ID']].filter(([key]) => !values[key].is_set).map(([, name]) => name).join(' y ')} en el .env del servidor (ver Sistema → Servicios). La aplicación funciona, pero no envía nada por Telegram y el bot no arranca.</div>`}
-        <div><button type="button" class="adm-btn" data-set-act="test" ${telegramReady(values) ? '' : html`disabled`}>Enviar mensaje de prueba al grupo</button></div>
-      </section>`,
-
-    // Notificaciones → IA: the switch and the test; the provider, key and model are in Sistema → Servicios
-    ai: html`
-      <section class="adm-set-card">
-        <h3>Inteligencia artificial</h3>
-        ${check('ai.enabled', 'Usar IA en los avisos', 'Apagada, los avisos salen con el texto original. Necesita una clave guardada para funcionar.')}
-        ${aiMissing(values, aiModel).length ? html`<div class="adm-warn">Falta <code>${aiMissing(values, aiModel).join(', ')}</code> en el .env del servidor: la aplicación no tiene ningún proveedor ni modelo por defecto, así que la IA no escribe ningún aviso hasta que los definas (ver Sistema → Servicios) y reinicies la API.</div>` : html`<div class="adm-sub">Usa ${AI_PROVIDERS.find(([id]) => id === aiModel.provider)?.[1] ?? aiModel.provider} (${aiModel.model}).</div>`}
-        <div><button type="button" class="adm-btn" data-set-act="test-ai" ${aiKey.is_set ? '' : html`disabled`}>Probar la IA</button></div>
-      </section>`,
-
-    // Sistema → Servicios: what comes from the server's .env, read only
-    aiconfig: html`
-      <section class="adm-set-card">
-        <h3>Inteligencia artificial</h3>
-        <label>Proveedor <input class="adm-input adm-ai-provider" type="text" value="${AI_PROVIDERS.find(([id]) => id === aiModel.provider)?.[1] ?? aiModel.provider ?? 'Sin configurar'}" disabled /></label>
-        <label>Clave de la API <input class="adm-input" type="text" value="${state('ai.api_key')}" disabled /></label>
-        <label>Clave de administración de OpenAI <input class="adm-input" type="text" value="${state('ai.openai_admin_key')}" disabled /></label>
-        <label>Modelo de los avisos <input class="adm-input adm-ai-model" type="text" value="${aiModel.model || 'Sin configurar'}" disabled /></label>
-        <label>Modelo del chat <input class="adm-input adm-chat-model" type="text" value="${chat.model || 'Sin configurar'}" disabled /></label>
-        ${aiMissing(values, aiModel).length ? html`<div class="adm-warn">Falta <code>${aiMissing(values, aiModel).join(', ')}</code> en el .env del servidor: la aplicación no tiene ningún proveedor ni modelo por defecto, así que la IA no escribe ningún aviso hasta que los definas (y reinicies la API).</div>` : ''}
-        <div class="adm-sub">El proveedor (<code>AI_PROVIDER</code>), la clave (<code>AI_API_KEY</code>) y el modelo (<code>AI_MODEL</code>) están en el .env del servidor y los comparten los avisos y el chat: desde el panel solo se ven. El modelo debe ser uno del proveedor.</div>
-        <div class="adm-sub">La clave de administración (<code>OPENAI_ADMIN_KEY</code>, opcional) solo sirve para leer el gasto en Sistema → Uso de IA; no escribe nada.</div>
-        <div class="adm-sub">El chat usa <code>CHAT_AI_MODEL</code> si está en el .env${chat.own_model ? '' : html` (ahora no lo está: usa <code>AI_MODEL</code>)`}, para darle un modelo distinto del de los avisos.</div>
-      </section>`,
-
-    telegramconfig: html`
       <section class="adm-set-card">
         <h3>Telegram</h3>
         <label>Token del bot <input class="adm-input" type="text" value="${state('telegram.token')}" disabled /></label>
         <label>ID del canal o grupo <input class="adm-input" type="text" value="${state('telegram.group_id')}" disabled /></label>
         <label>ID del chat de administración <input class="adm-input" type="text" value="${state('telegram.admin_chat_id')}" disabled /></label>
-        ${telegramReady(values) ? '' : html`<div class="adm-warn">Telegram no está configurado: faltan ${[['telegram.token', 'TELEGRAM_TOKEN'], ['telegram.group_id', 'TELEGRAM_GROUP_ID']].filter(([key]) => !values[key].is_set).map(([, name]) => name).join(' y ')} en el .env del servidor. La aplicación funciona, pero no envía nada por Telegram y el bot no arranca.</div>`}
-        <div class="adm-sub">Se configuran en el .env del servidor: desde el panel solo se ve si están definidos. El mensaje de prueba está en Notificaciones → Canales.</div>
+        ${telegramReady(values)
+          ? html`<div class="adm-sub">Bot configurado: los avisos del grupo salen por Telegram.</div>`
+          : html`<div class="adm-warn">Telegram no está configurado: faltan ${[['telegram.token', 'TELEGRAM_TOKEN'], ['telegram.group_id', 'TELEGRAM_GROUP_ID']].filter(([key]) => !values[key].is_set).map(([, name]) => name).join(' y ')} en el .env del servidor. La aplicación funciona, pero no envía nada por Telegram y el bot no arranca.</div>`}
+        <div class="adm-sub">Se configuran en el .env del servidor: desde el panel solo se ve si están definidos.</div>
+        <div><button type="button" class="adm-btn" data-set-act="test" ${telegramReady(values) ? '' : html`disabled`}>Enviar mensaje de prueba al grupo</button></div>
+      </section>`,
+
+    // IA → Avisos con IA: the switch and the test, and the provider, key and model as the server's .env has them (read only)
+    ai: html`
+      <section class="adm-set-card">
+        <h3>Inteligencia artificial</h3>
+        ${check('ai.enabled', 'Usar IA en los avisos', 'Apagada, los avisos salen con el texto original. Necesita una clave guardada para funcionar.')}
+        <label>Proveedor <input class="adm-input adm-ai-provider" type="text" value="${AI_PROVIDERS.find(([id]) => id === aiModel.provider)?.[1] ?? aiModel.provider ?? 'Sin configurar'}" disabled /></label>
+        <label>Clave de la API <input class="adm-input" type="text" value="${state('ai.api_key')}" disabled /></label>
+        <label>Clave de administración de OpenAI <input class="adm-input" type="text" value="${state('ai.openai_admin_key')}" disabled /></label>
+        <label>Modelo de los avisos <input class="adm-input adm-ai-model" type="text" value="${aiModel.model || 'Sin configurar'}" disabled /></label>
+        ${aiMissing(values, aiModel).length ? html`<div class="adm-warn">Falta <code>${aiMissing(values, aiModel).join(', ')}</code> en el .env del servidor: la aplicación no tiene ningún proveedor ni modelo por defecto, así que la IA no escribe ningún aviso hasta que los definas (y reinicies la API).</div>` : html`<div class="adm-sub">Usa ${AI_PROVIDERS.find(([id]) => id === aiModel.provider)?.[1] ?? aiModel.provider} (${aiModel.model}).</div>`}
+        <div class="adm-sub">El proveedor (<code>AI_PROVIDER</code>), la clave (<code>AI_API_KEY</code>) y el modelo (<code>AI_MODEL</code>) están en el .env del servidor y los comparten los avisos y el chat: desde el panel solo se ven. El modelo debe ser uno del proveedor.</div>
+        <div class="adm-sub">La clave de administración (<code>OPENAI_ADMIN_KEY</code>, opcional) solo sirve para leer el gasto en IA → Uso y coste; no escribe nada.</div>
+        <div><button type="button" class="adm-btn" data-set-act="test-ai" ${aiKey.is_set ? '' : html`disabled`}>Probar la IA</button></div>
       </section>`,
 
     chat: html`
       <section class="adm-set-card adm-chat-card">
         <h3>Chat</h3>
-        <div class="adm-sub">Un botón flotante, abajo a la derecha de cada pantalla, abre un asistente que responde solo sobre videojuegos y los datos del grupo. Usa el proveedor y la clave de la IA de los avisos y su propio modelo si lo hay (ver Sistema → Servicios). Quien ya tenga la página abierta lo ve desaparecer al preguntar o al recargar.</div>
+        <div class="adm-sub">Un botón flotante, abajo a la derecha de cada pantalla, abre un asistente que responde solo sobre videojuegos y los datos del grupo. Usa el proveedor y la clave de la IA de los avisos (ver IA → Avisos con IA) y su propio modelo si lo hay. Quien ya tenga la página abierta lo ve desaparecer al preguntar o al recargar.</div>
+        <label>Modelo del chat <input class="adm-input adm-chat-model" type="text" value="${chat.model || 'Sin configurar'}" disabled /></label>
+        <div class="adm-sub">El chat usa <code>CHAT_AI_MODEL</code> si está en el .env${chat.own_model ? '' : html` (ahora no lo está: usa <code>AI_MODEL</code>)`}, para darle un modelo distinto del de los avisos.</div>
         ${check('chat.enabled', 'Chat activado', 'Apagado, el botón desaparece para todos y el chat deja de responder.')}
         <div class="adm-sub">Preguntas que se pueden hacer al chat; 0 es sin límite. Cada pregunta gasta varias llamadas a la IA y el cupo de la IA es del proyecto entero, no de cada jugador: por eso hay un límite por jugador y otro para todo el grupo. «Día» son las últimas 24 horas, no desde medianoche. Se cuentan en memoria: reiniciar la API los pone a cero. Quien se pasa ve cuál ha superado y cuánto esperar.</div>
         <div class="adm-set-row adm-chat-limits">
@@ -281,17 +268,12 @@ function view(values, jobs, pushDevices, mail, aiUses, aiModel, chat) {
         <h3>Avisos en la app (push)</h3>
         ${check('push.enabled', 'Enviar avisos a la app instalada', 'Función activa para todos por defecto; nadie recibe nada hasta que cada usuario lo active en su perfil (Ajustes → Notificaciones) y elija en qué dispositivos. Los avisos del grupo llegan a quien los marque y los privados (timer olvidado…) solo a su usuario. Necesita las notificaciones activadas y HTTPS.')}
         <div class="adm-sub">${pushDevices.devices} dispositivo${pushDevices.devices === 1 ? '' : 's'} suscrito${pushDevices.devices === 1 ? '' : 's'} (${pushDevices.users} usuario${pushDevices.users === 1 ? '' : 's'}).</div>
-        <div class="adm-sub">Para redactar y enviar avisos (o probarlos en tus dispositivos) usa la pestaña <strong>Redactar aviso</strong>.</div>
-      </section>`,
-
-    pushconfig: html`
-      <section class="adm-set-card">
-        <h3>Avisos en la app (push)</h3>
         <label>Contacto para los servicios push
           <input class="adm-input" type="text" name="push.contact" placeholder="mailto:tu@correo.com (vacío: usa el remitente del correo o la dirección pública)" />
         </label>
         <div class="adm-sub">${vapid.is_set ? 'Las claves del servidor se crearon solas al arrancar; son las mismas para todos los usuarios.' : 'Sin claves (se crean al arrancar la API).'}</div>
         <div><button type="button" class="adm-btn" data-set-act="push-keys">Regenerar claves…</button></div>
+        <div class="adm-sub">Para redactar y enviar avisos (o probarlos en tus dispositivos) usa la pestaña <strong>Comunidad → Redactar aviso</strong>.</div>
       </section>`,
 
     backup: html`

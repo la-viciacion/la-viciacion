@@ -74,8 +74,8 @@ test('rejecting sends the note, and none when it is left empty', async () => {
 });
 
 test('the panel lists the proposals in their own tab, the schedules under the challenges, and only a waiting proposal can be decided', () => {
-  assert.ok(SECTIONS.find((s) => s.label === 'Retos').tabs.includes('proposals'));
-  assert.ok(!SECTIONS.find((s) => s.label === 'Retos').tabs.includes('schedules'));
+  assert.ok(SECTIONS.find((s) => s.label === 'Comunidad').tabs.includes('proposals'));
+  assert.ok(!SECTIONS.find((s) => s.label === 'Comunidad').tabs.includes('schedules'));
   assert.equal(ENTITIES.challenges.companion, 'schedules');
   const { actions } = ENTITIES.proposals;
   assert.deepEqual(actions.map((a) => a.show({ status: 'pending' })), [true, true]);

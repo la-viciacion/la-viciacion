@@ -8,10 +8,14 @@ export const SECTIONS = [
   { label: 'Inicio', tabs: [HOME] },
   { label: 'Catálogo', tabs: ['games', 'platforms', 'achievements'] },
   { label: 'Jugadores', tabs: ['users', 'timers', 'library', 'scores', 'awards'] },
-  { label: 'Retos', tabs: ['challenges', 'proposals'] },
-  { label: 'Notificaciones', tabs: ['sends', 'channels', 'ai', 'recap', 'announce', 'polls'] },
-  { label: 'Sistema', tabs: ['chat', 'aiusage', 'costs', 'services', 'backup', 'audit'] },
+  { label: 'Comunidad', tabs: ['challenges', 'proposals', 'polls', 'announce'] },
+  { label: 'Avisos', tabs: ['sends', 'channels', 'recap'] },
+  { label: 'IA', tabs: ['ai', 'chat', 'aiusage'] },
+  { label: 'Sistema', tabs: ['costs', 'backup', 'audit'] },
 ];
+
+// Tabs that no longer exist and the one that took their content, so an old link or bookmark still lands somewhere useful.
+export const MOVED = { services: 'channels' };
 
 export const TAB_IDS = SECTIONS.flatMap((section) => section.tabs);
 
@@ -19,8 +23,9 @@ export const sectionOf = (tab) => SECTIONS.find((section) => section.tabs.includ
 
 export const hashFor = (tab) => (tab === HOME ? '#/admin' : `#/admin/${tab}`);
 
-/** The tab an address points at; anything unknown (or no tab) is the home page. */
+/** The tab an address points at; a tab that was folded into another goes to that one, anything unknown (or no tab) is the home page. */
 export function tabFromHash(hash, valid = TAB_IDS) {
   const match = /^#\/admin\/([a-z]+)\/?$/.exec(hash);
-  return match && valid.includes(match[1]) ? match[1] : HOME;
+  const id = match && (MOVED[match[1]] ?? match[1]);
+  return id && valid.includes(id) ? id : HOME;
 }

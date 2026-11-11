@@ -1,4 +1,4 @@
-// What the AI has cost (admin panel, Sistema → Uso de IA): the figures of one month or of everything. Pure, so it can be tested.
+// What the AI has cost (admin panel, IA → Uso y coste): the figures of one month or of everything. Pure, so it can be tested.
 // `data` is GET /manage/ai-usage: { currency, total, items, months: [{ month, total, items }], days: [{ date, total }] }.
 
 export const ALL = 'all';
