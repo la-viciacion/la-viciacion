@@ -5,7 +5,8 @@
 import { api } from '../../lib/api.js';
 import { html, mount } from '../../lib/html.js';
 import { gameHref } from '../../lib/links.js';
-import { barWidths, participantsOf, podiumOrder, positions, rankingsOf, rankingsPath, ringPercent, rowsOf, seasonFromHash } from '../../lib/season-stats.js';
+import { CATEGORIES, FAME, seasonsWithChampions, titleRanking, titlesText } from '../../lib/hall-of-fame.js';
+import { barWidths, isFameHash, participantsOf, podiumOrder, positions, rankingsOf, rankingsPath, ringPercent, rowsOf, seasonFromHash } from '../../lib/season-stats.js';
 import { available, current } from '../../lib/seasons.js';
 import { hydratePhotos, playerAvatar } from '../../ui/avatar.js';
 
@@ -107,10 +108,44 @@ const card = (ranking, answer, players) => {
 };
 
 const header = (season) => html`
-  <h1 class="pf-title pg-title">Temporada ${season}</h1>
+  <h1 class="pf-title pg-title">${season === FAME ? 'Salón de la fama' : `Temporada ${season}`}</h1>
   <div class="pf-season" role="group" aria-label="Temporada">${available().map((year) => html`
     <button type="button" class="pf-season-badge" data-season="${year}" aria-pressed="${String(year === season)}">${year}</button>`)}
+    <button type="button" class="pf-season-badge" data-season="${FAME}" aria-pressed="${String(season === FAME)}">Salón de la fama</button>
   </div>`;
+
+// A winner of a category: the photo, the name and the figure.
+const winner = (category, w) => html`
+  <li class="hf-winner">${playerAvatar(w)}<span class="ss-name">${w.name}</span><strong class="ss-value">${category.text(w.value)}</strong></li>`;
+
+const seasonCard = (entry) => html`
+  <section class="pf-card ss-card hf-card" aria-label="Temporada ${entry.season}">
+    <h2 class="ss-title">Temporada ${entry.season}</h2>
+    <dl class="hf-list">
+      ${CATEGORIES.map((category) => html`
+        <div class="hf-row">
+          <dt>${category.title}</dt>
+          <dd>${entry.champions[category.id]?.length
+            ? html`<ul class="hf-winners">${entry.champions[category.id].map((w) => winner(category, w))}</ul>`
+            : html`<span class="pf-sub">—</span>`}</dd>
+        </div>`)}
+    </dl>
+  </section>`;
+
+// The players with most titles, then the seasons one by one, the newest first.
+function fame(answer) {
+  const history = seasonsWithChampions(answer);
+  if (!history.length) return html`<div class="pf-empty">Todavía no ha terminado ninguna temporada con datos.</div>`;
+  const titles = titleRanking(answer).slice(0, SHOWN);
+  return html`
+    <section class="pf-card ss-card hf-card" aria-label="Más títulos">
+      <h2 class="ss-title">Más títulos</h2>
+      <ol class="ss-list">${titles.map((t, i) => html`
+        <li class="ss-row"><span class="ss-place" aria-label="Puesto ${i + 1}">${medal(i + 1)}</span>${playerAvatar(t)}<span class="ss-name">${t.name}</span><strong class="ss-value">${titlesText(t.titles)}</strong></li>`)}
+      </ol>
+    </section>
+    <div class="ss-grid hf-grid">${history.map(seasonCard)}</div>`;
+}
 
 export async function render({ main }) {
   let latest = 0; // an answer to a season left meanwhile must not replace the one on screen
@@ -120,12 +155,17 @@ export async function render({ main }) {
     mount(main, html`${header(season)}<div class="pf-empty">Cargando…</div>`);
     let answer;
     try {
-      answer = await api(rankingsPath(season));
+      answer = await api(season === FAME ? '/statistics/hall-of-fame' : rankingsPath(season));
     } catch {
       if (mine === latest) mount(main, html`${header(season)}<div class="pf-empty">No se han podido cargar los rankings.</div>`);
       return;
     }
     if (mine !== latest) return;
+    if (season === FAME) {
+      mount(main, html`${header(season)}${fame(answer)}`);
+      hydratePhotos(main);
+      return;
+    }
     const rankings = rankingsOf(season);
     // an older season lists everybody who took part, active today or not
     const players = season === current() ? null : participantsOf(answer, rankings);
@@ -138,10 +178,10 @@ export async function render({ main }) {
   main.addEventListener('click', (e) => {
     const pill = e.target.closest('[data-season]');
     if (!pill || pill.getAttribute('aria-pressed') === 'true') return;
-    const season = Number(pill.dataset.season);
+    const season = pill.dataset.season === FAME ? FAME : Number(pill.dataset.season);
     // the address follows the pill (so it can be shared) without going through the router again
     history.replaceState(null, '', season === current() ? '#/season' : `#/season/${season}`);
     show(season);
   });
-  await show(seasonFromHash(location.hash));
+  await show(isFameHash(location.hash) ? FAME : seasonFromHash(location.hash));
 }

@@ -53,3 +53,15 @@
 .ss-cover { width: 48px; height: 48px; border-radius: var(--radius-sm); object-fit: cover; flex: none; }
 .ss-cover.big { width: 72px; height: 72px; }
 .ss-cover-empty { display: flex; align-items: center; justify-content: center; background: var(--bg-surface); font-size: 1.3rem; }
+
+/* Hall of fame (#/season/fame): the champions of each closed season */
+.hf-card { margin-bottom: 12px; }
+.hf-grid .hf-card { margin-bottom: 0; }
+.hf-list { margin: 10px 0 0; display: flex; flex-direction: column; }
+.hf-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 8px 0; border-top: 1px solid var(--border); }
+.hf-row:first-child { border-top: 0; }
+.hf-row dt { flex: none; color: var(--text-secondary); font-size: 0.85rem; padding-top: 4px; }
+.hf-row dd { margin: 0; min-width: 0; }
+.hf-winners { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
+.hf-winner { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.hf-winner .pl-avatar { width: 26px; height: 26px; border: 0; flex: none; }

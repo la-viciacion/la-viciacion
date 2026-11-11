@@ -68,7 +68,7 @@ test('there is a pill per season, the running one pressed, and the address picks
   await settle();
   assert.equal(text('h1')[0], `Temporada ${current() - 1}`);
   assert.match(calls[0].path, new RegExp(`season=${current() - 1}&`));
-  assert.equal(document.querySelectorAll('#main [data-season]').length, current() - 2023 + 1);
+  assert.equal(document.querySelectorAll('#main [data-season]').length, current() - 2023 + 2); // a pill per season and the hall of fame
   assert.equal(document.querySelector('[data-season][aria-pressed="true"]').textContent, String(current() - 1));
   assert.equal(document.querySelectorAll('.ss-card').length, 8); // no current streak in an old season
   assert.deepEqual(text('#ss-hours .ss-name'), ['Bea', 'Ana <b>']); // Cai and Dan did nothing that season: they are not listed, however they are today
@@ -88,4 +88,39 @@ test('pressing a season loads it, follows it in the address and the last answer 
   assert.equal(text('h1')[0], `Temporada ${current()}`);
   assert.equal(document.querySelectorAll('.ss-card').length, 9);
   assert.equal(calls.filter((c) => c.path.startsWith('/statistics/rankings')).length, 3);
+});
+
+const FAME = {
+  seasons: [
+    { season: 2025, champions: { hours: [{ user_id: 2, name: 'Bea', value: 7200 }, { user_id: 3, name: 'Cai <i>', value: 7200 }], days: [{ user_id: 2, name: 'Bea', value: 1 }], games: [], completed: [], achievements: [], streak: [] } },
+    { season: 2024, champions: { hours: [], days: [], games: [], completed: [], achievements: [], streak: [] } },
+  ],
+  titles: [{ user_id: 2, name: 'Bea', titles: 2 }, { user_id: 3, name: 'Cai <i>', titles: 1 }],
+};
+
+test('the hall of fame shows who has most titles and the champions of each season, a tie giving a title to each', async () => {
+  const calls = installApi({ 'GET /statistics/hall-of-fame': FAME, 'GET /users/photo/': json({ detail: 'no' }, 404) });
+  window.location.hash = '#/season/fame';
+  await page.render({ main: freshMain() });
+  await settle();
+  assert.equal(calls[0].path, '/statistics/hall-of-fame');
+  assert.equal(text('h1')[0], 'Salón de la fama');
+  assert.equal(document.querySelector('[data-season="fame"]').getAttribute('aria-pressed'), 'true');
+  assert.deepEqual(text('[aria-label="Más títulos"] .ss-value'), ['2 títulos', '1 título']);
+  assert.equal(document.querySelectorAll('.hf-card').length, 2); // the titles and the one season with champions
+  assert.deepEqual(text('[aria-label="Temporada 2025"] .hf-row:first-child .ss-name'), ['Bea', 'Cai <i>']);
+  assert.deepEqual(text('[aria-label="Temporada 2025"] .hf-row:first-child .ss-value'), ['2 h', '2 h']);
+  assert.equal(document.querySelectorAll('.hf-card i').length, 0); // names are text
+  window.location.hash = '';
+});
+
+test('the hall of fame can be reached from the pills and says so when no season is over', async () => {
+  installApi({ 'GET /statistics/rankings?': ANSWER, 'GET /statistics/hall-of-fame': { seasons: [], titles: [] }, 'GET /users/photo/': json({ detail: 'no' }, 404) });
+  await page.render({ main: freshMain() });
+  await settle();
+  document.querySelector('[data-season="fame"]').click();
+  assert.equal(window.location.hash, '#/season/fame');
+  await settle();
+  assert.match(text('.pf-empty')[0], /ninguna temporada/);
+  window.location.hash = '';
 });

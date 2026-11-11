@@ -26,6 +26,9 @@ export const rankingsOf = (season = current()) => RANKINGS.filter((r) => r.id !=
  * only for the active players; an older one is for everybody, and `participantsOf` leaves out those who took no part in it. */
 export const rankingsPath = (season = current()) => `/statistics/rankings?only_active=${season === current()}&season=${season}&ranking=${rankingsOf(season).map((r) => r.api).join(',')}`;
 
+/** Does the address ask for the hall of fame (`#/season/fame`)? */
+export const isFameHash = (hash) => /^#\/season\/fame\/?$/.test(hash ?? '');
+
 /** The season an address asks for (`#/season/2025`); the running one when it names none or a season that cannot exist. */
 export function seasonFromHash(hash, now = new Date()) {
   const match = /^#\/season\/(\d{4})\/?$/.exec(hash ?? '');
