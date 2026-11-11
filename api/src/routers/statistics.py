@@ -1,6 +1,6 @@
 from enum import Enum
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import Row
 from sqlalchemy.orm import Session
 
@@ -34,22 +34,23 @@ def plain(data):
 class _SharedRankingData:
     """What several rankings need, computed the first time and reused within one request."""
 
-    def __init__(self, db: Session, is_active: bool | None = None):
+    def __init__(self, db: Session, is_active: bool | None = None, season: int | None = None):
         self._db = db
         self._is_active = is_active
+        self._season = season
         self._players = None
         self._counts = None
 
     @property
     def players(self):  # days played by every player: days, best and current streak
         if self._players is None:
-            self._players = rankings.players_with_dates(self._db, self._is_active)
+            self._players = rankings.players_with_dates(self._db, self._is_active, self._season)
         return self._players
 
     @property
     def counts(self):  # library entries and completions per player: completed games, ratio
         if self._counts is None:
-            self._counts = rankings.library_counts(self._db, is_active=self._is_active)
+            self._counts = rankings.library_counts(self._db, self._season, is_active=self._is_active)
         return self._counts
 
 
@@ -76,16 +77,20 @@ class RankingStatisticsTypes(str, Enum):
 def get_ranking_statistics(
     ranking: str = None,
     only_active: bool = False,
-    season: int = None,
+    season: int = Query(None, ge=2000, description="The season of the rankings (default: the running one)"),
     db: Session = Depends(get_db),
 ):
     """
-    Get general rankings. To retrieve only specific rankings, add 'ranking' param with desired rankings, separated by comma (,).
+    Get general rankings of a `season` (the running one by default). To retrieve only specific rankings, add 'ranking' param with desired rankings, separated by comma (,).
     With `only_active=true` the inactive users are left out (the Telegram bot asks for it; the app counts everybody).
 
     Allowed values: 'user_hours', 'user_days', 'user_played_games',
     'user_completed_games', 'achievements', 'user_ratio', 'user_current_streak',
     'user_best_streak', 'games_most_played', 'platform_played', 'debt', 'debt_total', 'games_last_played'
+
+    The `season` applies to every ranking but `platform_played`, `games_last_played` and `debt_total`, which look at
+    everything. The streaks are counted over the days of that season; `user_current_streak` only makes sense for the
+    running one (a streak counts as current if it reaches today or yesterday).
 
     `debt` is the debt of a season (`season`, the running one by default) and `debt_total` the one over every
     season: the time still to play, by the average time to complete, in the games started and not finished.
@@ -94,21 +99,23 @@ def get_ranking_statistics(
         rankings_list = ranking.split(",")
     else:
         rankings_list = [elem.value for elem in RankingStatisticsTypes]
+    if season is not None and season > seasons.current():
+        raise HTTPException(status_code=400, detail="Esa temporada todavía no existe")
     is_active = True if only_active else None
-    shared = _SharedRankingData(db, is_active)
+    shared = _SharedRankingData(db, is_active, season)
     response = []
     for ranking_type in rankings_list:
         content = {}
         if ranking_type == RankingStatisticsTypes.user_hours:
-            data = rankings.user_hours_players(db, is_active=is_active)
+            data = rankings.user_hours_players(db, is_active=is_active, season=season)
         elif ranking_type == RankingStatisticsTypes.user_days:
             data = rankings.user_days_played(db, players=shared.players)
         elif ranking_type == RankingStatisticsTypes.user_played_games:
-            data = rankings.user_played_games(db, is_active=is_active)
+            data = rankings.user_played_games(db, season=season, is_active=is_active)
         elif ranking_type == RankingStatisticsTypes.user_completed_games:
             data = rankings.user_completed_games(db, counts=shared.counts)
         elif ranking_type == RankingStatisticsTypes.achievements:
-            data = rankings.user_ranking_achievements(db, is_active=is_active)
+            data = rankings.user_ranking_achievements(db, season=season, is_active=is_active)
         elif ranking_type == RankingStatisticsTypes.user_ratio:
             data = rankings.user_ratio(db, counts=shared.counts)
         elif ranking_type == RankingStatisticsTypes.user_current_streak:
@@ -116,7 +123,7 @@ def get_ranking_statistics(
         elif ranking_type == RankingStatisticsTypes.user_best_streak:
             data = rankings.user_best_streak(db, players=shared.players)
         elif ranking_type == RankingStatisticsTypes.games_most_played:
-            data = rankings.games_most_played(db, is_active=is_active)
+            data = rankings.games_most_played(db, is_active=is_active, season=season)
         elif ranking_type == RankingStatisticsTypes.platform_played:
             data = rankings.platform_played_games(db, is_active=is_active)
         elif ranking_type == RankingStatisticsTypes.debt:

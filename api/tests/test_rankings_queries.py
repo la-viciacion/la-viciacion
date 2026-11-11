@@ -2,6 +2,7 @@ import datetime
 import unittest
 from unittest import mock
 
+from fastapi import HTTPException
 from sqlalchemy import event
 
 from src.crud import rankings, users
@@ -95,6 +96,61 @@ class SharedDataTests(unittest.TestCase):
         with mock.patch.object(statistics.rankings, "players_with_dates") as days:
             statistics._SharedRankingData(mock.MagicMock())
         days.assert_not_called()
+
+
+class SharedDataSeasonTests(unittest.TestCase):
+    def test_the_season_reaches_the_days_and_the_counts(self):
+        with mock.patch.object(statistics.rankings, "players_with_dates", return_value=[]) as days,                 mock.patch.object(statistics.rankings, "library_counts", return_value=[]) as counts:
+            shared = statistics._SharedRankingData(mock.MagicMock(), None, YEAR - 1)
+            _ = shared.players, shared.counts
+        self.assertEqual(days.call_args.args[2], YEAR - 1)
+        self.assertEqual(counts.call_args.args[1], YEAR - 1)
+
+
+class RankingsOfAnotherSeasonTests(unittest.TestCase):
+    """GET /statistics/rankings?season=: every ranking of the page looks at that season only."""
+
+    def setUp(self):
+        self.db = make_session()
+        self.db.add_all([
+            models.User(id=1, name="Ana", username="ana", is_active=1),
+            models.User(id=2, name="Bob", username="bob", is_active=1),
+            models.Game(id="g1", name="Doom"), models.Game(id="g2", name="Quake"),
+        ])
+        # Ana played 3 h of Doom on two days of last season; Bob 1 h of Quake this one
+        for user_id, game_id, start, hours in (
+            (1, "g1", datetime.datetime(YEAR - 1, 3, 1, 10), 2), (1, "g1", datetime.datetime(YEAR - 1, 3, 2, 10), 1),
+            (2, "g2", datetime.datetime(YEAR, 1, 10, 10), 1),
+        ):
+            if start.day != 2:  # one library entry per game and season, however many sessions
+                self.db.add(models.UserGame(user_id=user_id, game_id=game_id, completed=1, started_date=start.date(), platform="pc"))
+            self.db.add(models.GameTimer(
+                user_id=user_id, game_id=game_id, start_time=start, end_time=start + datetime.timedelta(hours=hours),
+                duration_seconds=hours * 3600, is_active=False,
+            ))
+        self.db.commit()
+
+    def ask(self, ranking, season=None):
+        answer = statistics.get_ranking_statistics(ranking=ranking, only_active=True, season=season, db=self.db)
+        return answer[0]["data"]
+
+    def test_each_ranking_is_the_one_of_the_season_asked(self):
+        hours = self.ask("user_hours", YEAR - 1)
+        self.assertEqual([(r["user_id"], r["played_time"]) for r in hours], [(1, 10800), (2, 0)])
+        self.assertEqual([(r["user_id"], r["played_days"]) for r in self.ask("user_days", YEAR - 1)], [(1, 2), (2, 0)])
+        self.assertEqual([(r["user_id"], r["best_streak"]) for r in self.ask("user_best_streak", YEAR - 1)], [(1, 2), (2, 0)])
+        self.assertEqual([(r["user_id"], r["played_games"]) for r in self.ask("user_played_games", YEAR - 1)], [(1, 1), (2, 0)])
+        self.assertEqual([(r["user_id"], r["completed_games"]) for r in self.ask("user_completed_games", YEAR - 1)], [(1, 1), (2, 0)])
+        self.assertEqual([g["game_id"] for g in self.ask("games_most_played", YEAR - 1)], ["g1"])
+
+    def test_without_a_season_it_is_the_running_one(self):
+        self.assertEqual([(r["user_id"], r["played_time"]) for r in self.ask("user_hours")], [(2, 3600), (1, 0)])
+        self.assertEqual([g["game_id"] for g in self.ask("games_most_played")], ["g2"])
+
+    def test_a_season_that_has_not_come_yet_is_refused(self):
+        with self.assertRaises(HTTPException) as refused:
+            statistics.get_ranking_statistics(ranking="user_hours", only_active=True, season=YEAR + 1, db=self.db)
+        self.assertEqual(refused.exception.status_code, 400)
 
 
 class GamesLastPlayedTests(unittest.TestCase):

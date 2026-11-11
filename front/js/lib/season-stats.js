@@ -1,6 +1,7 @@
 // The rankings of the Temporada page (the ones of GET /statistics/rankings), drawn as bars.
 // Pure (no DOM) so it can be tested. `value` is the number the bar is drawn from, `text` what is written next to it.
 import { formatDuration } from './format.js';
+import { FIRST, current } from './seasons.js';
 
 const count = (key) => (e) => e[key];
 const days = (n) => `${n} ${n === 1 ? 'día' : 'días'}`;
@@ -18,8 +19,18 @@ export const RANKINGS = [
   { id: 'most-played', view: 'podium', api: 'games_most_played', title: 'Juegos más jugados', rows: 'games', value: count('played_time'), text: (e) => formatDuration(e.played_time) },
 ];
 
-/** What to ask the API for: every ranking of the page in one request (the running season, which is the API's default) and only for the active players. */
-export const rankingsPath = () => `/statistics/rankings?only_active=true&ranking=${RANKINGS.map((r) => r.api).join(',')}`;
+/** The rankings a season has: a streak that is still running only makes sense for the running season. */
+export const rankingsOf = (season = current()) => RANKINGS.filter((r) => r.id !== 'current-streak' || season === current());
+
+/** What to ask the API for: every ranking of the season (the running one by default) in one request, only for the active players. */
+export const rankingsPath = (season = current()) => `/statistics/rankings?only_active=true&season=${season}&ranking=${rankingsOf(season).map((r) => r.api).join(',')}`;
+
+/** The season an address asks for (`#/season/2025`); the running one when it names none or a season that cannot exist. */
+export function seasonFromHash(hash, now = new Date()) {
+  const match = /^#\/season\/(\d{4})\/?$/.exec(hash ?? '');
+  const year = match ? Number(match[1]) : null;
+  return year !== null && year >= FIRST && year <= current(now) ? year : current(now);
+}
 
 /** The rows of a ranking from the API's answer (a list of `{ type, data }`); empty when it did not come. */
 export const rowsOf = (answer, ranking) => {
