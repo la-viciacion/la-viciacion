@@ -4,12 +4,13 @@ from typing import Optional
 
 from fastapi import Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import func
+from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session, aliased
 
 from ...auth import get_db
 from ...database import models
 from ...clients import igdb
+from ...crud.wishlist import is_upcoming
 from ...utils import hltb_sync, igdb_sync, messages, rawg_sync
 from ...utils.redaction import redact_rawg_key
 from .common import commit, confirm_or_409, get_or_404, like, router
@@ -35,7 +36,10 @@ class GamePatch(BaseModel):
     parent_game_id: Optional[str] = None
 
 
-def _game_out(g: models.Game, sessions: int = 0, players: int = 0, played_seconds: int = 0, parent_name: str | None = None) -> dict:
+def _game_out(
+    g: models.Game, sessions: int = 0, players: int = 0, parent_name: str | None = None, wishes: int = 0, unused: bool = False,
+    upcoming: bool = False,
+) -> dict:
     return {
         "id": g.id,
         "name": g.name,
@@ -58,27 +62,44 @@ def _game_out(g: models.Game, sessions: int = 0, players: int = 0, played_second
         "parent_name": parent_name,
         "sessions": sessions,
         "players": players,
-        "played_seconds": int(played_seconds or 0),
+        "wishes": wishes,
+        "unused": unused,
+        "upcoming": upcoming,
     }
+
+
+def _unused_condition():
+    """Nothing refers to the game: no session, library entry, wish, rating, achievement, price, challenge or DLC. A game
+    that is only wished for (an upcoming release, say) is not unused: it will have sessions and players once it is out."""
+    dlc = aliased(models.Game)
+    return and_(*(
+        ~select(1).where(column == models.Game.id).exists()
+        for column in (
+            models.GameTimer.game_id, models.UserGame.game_id, models.UserWishlist.game_id, models.GameScore.game_id,
+            models.UserAchievement.game_id, models.UserGamePrice.game_id, models.Challenge.game_id, dlc.parent_game_id,
+        )
+    ))
 
 
 @router.get("/games")
 def list_games(
     search: Optional[str] = None,
     data: Optional[str] = Query(None, pattern="^(unlinked|pending)$"),
-    sort: str = Query("name", pattern="^(name|release_date|played|players)$"),
+    usage: Optional[str] = Query(None, pattern="^(unused|wished|unplayed)$"),
+    sort: str = Query("name", pattern="^(name|release_date|sessions|players|wishes)$"),
     order: str = Query("asc", pattern="^(asc|desc)$"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
-    """Games with their usage (sessions, time played and players). `data=unlinked`: no IGDB id;
-    `data=pending`: what the RAWG sync would try (no id, or basic info missing)."""
+    """Games with their usage (sessions, players and wishes). `data=unlinked`: no IGDB id;
+    `data=pending`: what the RAWG sync would try (no id, or basic info missing). `usage=unused`: nothing refers to the game
+    (safe to delete); `wished`: no sessions and no players but somebody wishes for it (waiting for its release);
+    `unplayed`: no sessions and no players, whatever else refers to it."""
     session_counts = (
         db.query(
             models.GameTimer.game_id.label("gid"),
             func.count(models.GameTimer.id).label("n"),
-            func.coalesce(func.sum(models.GameTimer.duration_seconds), 0).label("secs"),
         )
         .group_by(models.GameTimer.game_id)
         .subquery()
@@ -88,16 +109,32 @@ def list_games(
         .group_by(models.UserGame.game_id)
         .subquery()
     )
+    wish_counts = (
+        db.query(models.UserWishlist.game_id.label("gid"), func.count(models.UserWishlist.id).label("n"))
+        .group_by(models.UserWishlist.game_id)
+        .subquery()
+    )
     sessions = func.coalesce(session_counts.c.n, 0)
     players = func.coalesce(player_counts.c.n, 0)
-    played = func.coalesce(session_counts.c.secs, 0)
+    wishes = func.coalesce(wish_counts.c.n, 0)
+    unused = _unused_condition()
     base = aliased(models.Game)
     q = (
-        db.query(models.Game, sessions.label("sessions"), players.label("players"), played.label("played"), base.name.label("parent_name"))
+        db.query(
+            models.Game, sessions.label("sessions"), players.label("players"), base.name.label("parent_name"),
+            wishes.label("wishes"), unused.label("unused"),
+        )
         .outerjoin(session_counts, session_counts.c.gid == models.Game.id)
         .outerjoin(player_counts, player_counts.c.gid == models.Game.id)
+        .outerjoin(wish_counts, wish_counts.c.gid == models.Game.id)
         .outerjoin(base, base.id == models.Game.parent_game_id)
     )
+    if usage == "unused":
+        q = q.filter(unused)
+    elif usage == "wished":
+        q = q.filter(sessions == 0, players == 0, wishes > 0)
+    elif usage == "unplayed":
+        q = q.filter(sessions == 0, players == 0)
     if search:
         q = q.filter(models.Game.name.like(like(search)))
     if data == "unlinked":
@@ -105,10 +142,43 @@ def list_games(
     elif data == "pending":
         q = q.filter(rawg_sync.pending_condition())
     total = q.count()
-    column = {"name": models.Game.name, "release_date": models.Game.release_date, "played": played, "players": players}[sort]
+    column = {"name": models.Game.name, "release_date": models.Game.release_date, "sessions": sessions, "players": players, "wishes": wishes}[sort]
     direction = column.desc() if order == "desc" else column.asc()
     rows = q.order_by(direction, models.Game.name, models.Game.id).limit(limit).offset(offset).all()
-    return {"total": total, "items": [_game_out(g, s, p, t, parent) for g, s, p, t, parent in rows]}
+    today = datetime.date.today()
+    return {"total": total, "items": [
+        _game_out(g, s, p, parent, w, bool(u), is_upcoming(g.release_date, today)) for g, s, p, parent, w, u in rows
+    ]}
+
+
+@router.get("/games/{game_id}/people")
+def game_people(game_id: str, db: Session = Depends(get_db)):
+    """Who has the game in their library (with the platforms and seasons of their entries) and who wishes for it, every
+    account whatever its state: it is what deleting the game would take away."""
+    get_or_404(db, models.Game, game_id, "Juego")
+    owners: dict[int, dict] = {}
+    entries = (
+        db.query(models.UserGame.user_id, models.UserGame.platform, models.UserGame.season, models.User.username, models.User.name, models.User.is_active)
+        .join(models.User, models.User.id == models.UserGame.user_id)
+        .filter(models.UserGame.game_id == game_id)
+        .order_by(models.UserGame.season.desc())
+    )
+    for user_id, platform, season, username, name, active in entries:
+        person = owners.setdefault(user_id, {"user_id": user_id, "username": username, "name": name or username, "is_active": bool(active), "entries": []})
+        person["entries"].append({"platform": platform, "season": season})
+    wishes = (
+        db.query(models.User.id, models.User.username, models.User.name, models.User.is_active, models.UserWishlist.added_at)
+        .join(models.UserWishlist, models.UserWishlist.user_id == models.User.id)
+        .filter(models.UserWishlist.game_id == game_id)
+        .order_by(models.UserWishlist.added_at, models.User.id)
+    )
+    return {
+        "players": sorted(owners.values(), key=lambda p: p["name"].lower()),
+        "wishes": [
+            {"user_id": user_id, "username": username, "name": name or username, "is_active": bool(active), "added_at": added_at}
+            for user_id, username, name, active, added_at in wishes
+        ],
+    }
 
 
 @router.patch("/games/{game_id}")

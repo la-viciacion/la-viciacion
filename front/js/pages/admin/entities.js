@@ -24,6 +24,8 @@ import { closePoll } from './poll-actions.js';
 import { closeTimerNow } from './dialogs.js';
 
 const platformField = { key: 'platform', label: 'Plataforma', type: 'platform' };
+/** A count of people that opens who they are (admin.js handles `game-people`); a zero has nobody to show. */
+const peopleCount = (r, list) => (r[list] ? html`<button class="adm-link" data-act="game-people" data-list="${list}" data-game="${r.id}">${r[list]}</button>` : r[list]);
 const duration = (sec) => (sec == null ? '—' : formatDuration(sec));
 const platform = (id) => platformName(id) || '—';
 
@@ -125,9 +127,10 @@ export const ENTITIES = {
     search: true,
     selects: [
       { key: 'data', label: 'Datos', options: [['', 'Datos: todos'], ['pending', 'Incompletos'], ['unlinked', 'Sin ID de IGDB']] },
+      { key: 'usage', label: 'Uso', options: [['', 'Uso: todos'], ['unused', 'Sin uso (nadie lo quiere)'], ['wished', 'Solo deseados (sin sesiones ni jugadores)'], ['unplayed', 'Sin sesiones ni jugadores']] },
     ],
     defaultSort: { key: 'name', dir: 'asc' },
-    orders: [['name:asc', 'Orden: alfabético'], ['release_date:desc', 'Más nuevos'], ['played:desc', 'Más jugados']],
+    orders: [['name:asc', 'Orden: alfabético'], ['release_date:desc', 'Más nuevos'], ['wishes:desc', 'Más deseados']],
     columns: [
       {
         label: 'Juego',
@@ -137,10 +140,15 @@ export const ENTITIES = {
           <div><a class="adm-link" href="${gameHref(r.id)}"><strong>${r.name}</strong></a>${r.is_dlc ? badge('DLC', 'purple') : ''}<div class="adm-sub">${r.dev || ''}</div></div>
         </div>`,
       },
-      { label: 'Géneros', render: (r) => r.genres || '—' },
-      { label: 'Lanzamiento', sort: 'release_date', render: (r) => r.release_date || '—' },
-      { label: 'Horas', sort: 'played', render: (r) => duration(r.played_seconds) },
-      { label: 'Jugadores', sort: 'players', render: (r) => r.players },
+      {
+        label: 'Lanzamiento',
+        sort: 'release_date',
+        render: (r) => html`${r.release_date || '—'}${r.upcoming ? badge('Sin salir', 'orange') : ''}`,
+      },
+      { label: 'Sesiones', sort: 'sessions', render: (r) => r.sessions },
+      { label: 'Jugadores', sort: 'players', render: (r) => peopleCount(r, 'players') },
+      { label: 'Deseado por', sort: 'wishes', render: (r) => peopleCount(r, 'wishes') },
+      { label: 'Uso', render: (r) => (r.unused ? badge('Sin uso', 'red') : r.sessions || r.players ? '' : r.wishes ? badge('Solo deseado', 'orange') : badge('Sin sesiones', 'gray')) },
     ],
     fields: [
       { key: 'name', label: 'Nombre', type: 'text', required: true },

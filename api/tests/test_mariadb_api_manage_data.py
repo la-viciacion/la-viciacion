@@ -186,7 +186,7 @@ class GamesAdminTests(ManageTestCase):
         self.assertEqual(self.admin("GET", "/games", params={"data": "all"}).status_code, 422)
 
     def test_sorting_and_paging(self):
-        self.assertEqual([g["id"] for g in self.games(sort="played", order="desc")["items"]][0], "celeste")
+        self.assertEqual([g["id"] for g in self.games(sort="sessions", order="desc")["items"]][0], "celeste")
         self.assertEqual([g["id"] for g in self.games(sort="release_date")["items"]][-1], "tetris")  # NULLs first when ascending
         self.assertEqual([g["id"] for g in self.games(limit=1, offset=2)["items"]], ["tetris"])
 
