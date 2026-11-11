@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from .. import auth
 from ..auth import get_db
-from ..crud import debt, rankings, recap, users
+from ..crud import debt, hall_of_fame, rankings, recap, users
 from ..database import models
 from ..utils import messages, seasons, settings
 from ..utils.logger import LogManager
@@ -186,6 +186,13 @@ def get_user_statistics(
         content["data"] = plain(data)
         response.append(content)
     return response
+
+
+@router.get("/hall-of-fame")
+def get_hall_of_fame(db: Session = Depends(get_db)):
+    """Who won each closed season (the champion of hours, days, games, completed games, achievements and best streak; all of
+    them on a tie) and who has won most titles. Derived when asked, nothing stored; every player counts, active or not."""
+    return hall_of_fame.hall_of_fame(db)
 
 
 @router.get("/recap-access")
