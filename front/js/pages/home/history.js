@@ -1,5 +1,6 @@
-// Latest games played: one row per game. Pressing the row unfolds its latest sessions (editable), the play button
-// starts a timer and the check button opens the completion modal.
+// Latest games played: one row per game, two lines (the name with its rating and, if it is completed, a tick; when it was
+// played, how long and how many sessions) and one button, play, which starts a timer. Pressing the row unfolds the rest: the
+// platforms, the button that opens the completion modal and the latest sessions (editable).
 import { api } from '../../lib/api.js';
 import { formatDateTime, formatDuration, formatRelative } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
@@ -77,22 +78,25 @@ function groupRow(g) {
           ? html`<img src="${g.image_url}" alt="" class="history-thumb" loading="lazy" />`
           : html`<div class="history-thumb history-thumb-placeholder" aria-hidden="true">🎮</div>`}
         <div class="history-main">
-          <div class="history-title" title="${name}"><span class="history-name">${name}</span>${scoreBadge(g.score)}</div>
+          <div class="history-title" title="${name}"><span class="history-name">${name}</span>${scoreBadge(g.score)}${g.completed
+            ? html`<span class="history-done" role="img" title="Completado esta temporada" aria-label="Completado esta temporada">${iconCircleCheckDone(16)}</span>` : ''}</div>
           <div class="history-meta">
             <span>${formatRelative(g.last_played)}</span>
             <span class="dot">·</span>
-            <span>${formatDuration(g.total_seconds)}${multi ? ' en total' : ''}</span>
+            <span>${formatDuration(g.total_seconds)}</span>
             ${multi ? html`<span class="session-pill">${g.session_count} sesiones</span>` : ''}
-            ${g.platforms.map((p) => html`<span class="platform-pill">${platformName(p)}</span>`)}
           </div>
         </div>
-        <button class="btn-complete ${g.completed ? 'done' : ''}" data-action="complete" data-game-id="${g.game_id}"
-                title="${g.completed ? 'Completado esta temporada' : 'Marcar como completado'}" aria-label="${g.completed ? `${name} ya está completado` : `Marcar ${name} como completado`}">${g.completed ? iconCircleCheckDone() : iconCircleCheck()}</button>
         <button class="btn-continue" data-action="continue" data-game-id="${g.game_id}"
                 ${hasActive ? html`disabled title="Ya tienes un timer activo"` : html`title="Seguir jugando"`} aria-label="Seguir jugando a ${name}">${iconPlay()}</button>
         <span class="history-chevron" aria-hidden="true">${iconChevron()}</span>
       </div>
       ${open ? html`
+        <div class="history-detail">
+          <span class="history-platforms">${g.platforms.map((p) => html`<span class="platform-pill">${platformName(p)}</span>`)}</span>
+          <button class="btn-complete ${g.completed ? 'done' : ''}" data-action="complete" data-game-id="${g.game_id}"
+                  aria-label="${g.completed ? `${name} ya está completado` : `Marcar ${name} como completado`}">${g.completed ? iconCircleCheckDone(18) : iconCircleCheck(18)}<span>${g.completed ? 'Completado esta temporada' : 'Marcar como completado'}</span></button>
+        </div>
         <ul class="history-sessions">
           ${g.sessions.map((s) => html`
             <li>

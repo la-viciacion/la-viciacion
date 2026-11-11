@@ -178,7 +178,7 @@
   transition: border-color 0.2s ease;
 }
 
-.history-row { display: flex; align-items: center; gap: 14px; padding: 12px 14px; cursor: pointer; }
+.history-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; cursor: pointer; }
 
 .history-row:hover { background: var(--bg-card-hover); }
 
@@ -200,7 +200,7 @@
 .history-row:hover .history-title { color: var(--accent-teal); }
 
 .history-meta {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px;
   font-size: 0.82rem; color: var(--text-secondary); margin-top: 3px;
 }
 
@@ -217,26 +217,32 @@
 }
 
 .btn-continue {
-  display: flex; align-items: center; gap: 6px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 44px; height: 44px; padding: 0;
   background: transparent; color: var(--accent-teal);
   border: 1px solid var(--border-accent); border-radius: var(--radius-sm);
-  padding: 11px 14px; font-weight: 600; font-size: 0.85rem; cursor: pointer;
-  transition: all 0.2s ease;
+  cursor: pointer; transition: all 0.2s ease;
 }
 
 .btn-continue svg { width: 18px; height: 18px; }
 
 .btn-continue:hover:not(:disabled) { background: var(--accent-teal); color: #0a0a14; }
 
-/* complete mark, no box: an empty circle in soft white while the game is open (its tick lights up on hover), a filled
-   green circle once it is completed this season. The hit area is about 44 px even though nothing draws it. */
-.btn-complete {
-  display: flex; flex-shrink: 0; padding: 8px; background: none; border: none; border-radius: 50%;
-  color: var(--check-pending); cursor: pointer; transition: color 0.2s ease;
+/* completed this season: a green tick next to the name; the button that opens the completion modal is in the detail */
+.history-done { display: inline-flex; flex-shrink: 0; color: var(--accent-teal); }
+
+.history-detail {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px;
+  padding: 10px 14px 6px 74px; border-top: 1px solid var(--border); animation: fadeIn 0.2s ease;
 }
-.btn-complete svg { width: 28px; height: 28px; }
+.history-platforms { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.btn-complete {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 6px 12px; background: none; font: inherit;
+  font-size: 0.85rem; font-weight: 600; color: var(--check-pending); border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer;
+  transition: color 0.2s ease, border-color 0.2s ease;
+}
+.btn-complete svg { flex-shrink: 0; }
 .btn-complete .ck-tick { opacity: 0.45; transition: opacity 0.2s ease; }
-.btn-complete:hover, .btn-complete:focus-visible { color: var(--text-primary); }
+.btn-complete:hover, .btn-complete:focus-visible { color: var(--text-primary); border-color: var(--border-accent); }
 .btn-complete:hover .ck-tick, .btn-complete:focus-visible .ck-tick { opacity: 1; }
 .btn-complete.done, .btn-complete.done:hover { color: var(--accent-teal); }
 
@@ -249,8 +255,7 @@
 .history-group.open .history-chevron { transform: rotate(180deg); }
 
 .history-sessions {
-  list-style: none; margin: 0; padding: 4px 14px 12px 76px;
-  border-top: 1px solid var(--border); animation: fadeIn 0.2s ease;
+  list-style: none; margin: 0; padding: 4px 14px 12px 74px; animation: fadeIn 0.2s ease;
 }
 
 .history-sessions li {
@@ -263,7 +268,7 @@
 
 .history-sessions .session-more { color: var(--text-muted); font-style: italic; justify-content: center; }
 
-.session-duration { color: var(--text-primary); font-weight: 600; }
+.session-duration { color: var(--text-primary); font-weight: 600; white-space: nowrap; }
 
 .history-more { display: flex; justify-content: center; margin-top: 16px; }
 
@@ -325,6 +330,7 @@
   .timer-resume-cover { align-self: center; }
   .timer-resume-actions { min-width: 0; }
   .history-sessions { padding-left: 14px; }
+  .history-detail { padding-left: 14px; }
   .navbar-username { display: none; }
 }
 
