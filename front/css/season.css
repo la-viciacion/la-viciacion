@@ -54,14 +54,11 @@
 .ss-cover.big { width: 72px; height: 72px; }
 .ss-cover-empty { display: flex; align-items: center; justify-content: center; background: var(--bg-surface); font-size: 1.3rem; }
 
-/* Hall of fame (#/season/fame): the champions of each closed season */
-.hf-card { margin-bottom: 12px; }
-.hf-grid .hf-card { margin-bottom: 0; }
-.hf-list { margin: 10px 0 0; display: flex; flex-direction: column; }
-.hf-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 8px 0; border-top: 1px solid var(--border); }
-.hf-row:first-child { border-top: 0; }
-.hf-row dt { flex: none; color: var(--text-secondary); font-size: 0.85rem; padding-top: 4px; }
-.hf-row dd { margin: 0; min-width: 0; }
-.hf-winners { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
+/* Hall of fame (#/season/fame): the titles on a podium and a card per closed season with a tile per category */
+.hf-card .ss-title { font-size: 1.1rem; }
+.hf-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+.hf-tile { display: flex; flex-direction: column; gap: 6px; min-width: 0; padding: 10px; border-radius: var(--radius-sm); background: var(--bg-card-hover); }
+.hf-label { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
 .hf-winner { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.hf-winner .pl-avatar { width: 26px; height: 26px; border: 0; flex: none; }
+.hf-winner .pl-avatar { width: 28px; height: 28px; border: 0; flex: none; }
+.hf-figure { margin-top: auto; font-size: 1.05rem; font-variant-numeric: tabular-nums; color: var(--accent-gold); }
