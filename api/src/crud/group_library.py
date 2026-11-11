@@ -1,5 +1,4 @@
-"""The group's library as a whole: hidden gems, the graveyard, rarities, what nobody has touched and what the libraries
-cover by genre and platform. Derived from the libraries, the sessions and the ratings when asked; nothing is stored.
+"""The group's library as a whole: hidden gems, the graveyard, rarities and what the libraries cover by genre and platform. Derived from the libraries, the sessions and the ratings when asked; nothing is stored.
 Every player counts, active or not (never the emergency account), like the rankings and the game pages."""
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -47,15 +46,6 @@ def rarities(facts: dict) -> list[dict]:
         for game, owners in facts["owners"].items() if len(owners) == 1
     ]
     return sorted(found, key=lambda g: (-g["seconds"], g["game_id"]))
-
-
-def untouched(facts: dict) -> list[dict]:
-    """The games somebody has and nobody has ever played, the most owned first."""
-    found = [
-        {"game_id": game, "players": len(owners)}
-        for game, owners in facts["owners"].items() if not facts["seconds"].get(game)
-    ]
-    return sorted(found, key=lambda g: (-g["players"], g["game_id"]))
 
 
 def by_genre(facts: dict) -> list[dict]:
@@ -150,7 +140,7 @@ def _library(db: Session) -> dict:
         found = meta[game_id]
         return {"game_id": game_id, "game_name": found.name, "image_url": found.image_url}
 
-    rare, dust = rarities(facts), untouched(facts)
+    rare = rarities(facts)
     return {
         "summary": {
             "games": len(facts["owners"]),
@@ -165,7 +155,6 @@ def _library(db: Session) -> dict:
             "total": len(rare),
             "items": [{**game(g["game_id"]), "owner": names[g["owner"]], "seconds": g["seconds"]} for g in rare[:LIST_SIZE]],
         },
-        "untouched": {"total": len(dust), "items": [{**game(g["game_id"]), "players": g["players"]} for g in dust[:LIST_SIZE]]},
         "genres": by_genre(facts)[:COVERAGE_SIZE],
         "platforms": [{**row, "platform_name": platform_names.get(row["platform"], row["platform"])} for row in by_platform(facts)[:COVERAGE_SIZE]],
     }

@@ -49,7 +49,7 @@ class GroupLibraryTests(ApiTestCase):
         body = self.library().json()
         self.assertEqual(body["summary"], {"games": 0, "players": 0, "played_seconds": 0})
         self.assertEqual((body["hidden_gems"], body["graveyard"], body["genres"], body["platforms"]), ([], [], [], []))
-        self.assertEqual((body["rarities"], body["untouched"]), ({"total": 0, "items": []}, {"total": 0, "items": []}))
+        self.assertEqual(body["rarities"], {"total": 0, "items": []})
 
     def test_the_summary_counts_distinct_games_players_and_hours_and_never_the_emergency_account(self):
         self.library_entry(self.ana, "celeste", TODAY(), "pc")
@@ -91,17 +91,15 @@ class GroupLibraryTests(ApiTestCase):
         self.abandon(gave_up, clock.now() - datetime.timedelta(hours=10))
         self.assertEqual(self.library().json()["graveyard"], [])
 
-    def test_rarities_have_one_owner_and_untouched_games_have_no_session(self):
+    def test_rarities_have_one_owner_and_the_most_played_come_first(self):
         self.library_entry(self.ana, "doom", TODAY(), "pc")
         self.session(self.ana, "doom", ago(hours=3), 30)
         self.library_entry(self.ana, "tetris", TODAY(), "pc")  # one owner, never played
         self.library_entry(self.ana, "limbo", TODAY(), "pc")
-        self.library_entry(self.bea, "limbo", TODAY(), "pc")  # two owners, never played
+        self.library_entry(self.bea, "limbo", TODAY(), "pc")  # two owners: not a rarity
         body = self.library().json()
         self.assertEqual(body["rarities"]["total"], 2)
         self.assertEqual([(g["game_id"], g["owner"], g["seconds"]) for g in body["rarities"]["items"]], [("doom", "Ana", 1800), ("tetris", "Ana", 0)])
-        self.assertEqual(body["untouched"]["total"], 2)
-        self.assertEqual([(g["game_id"], g["players"]) for g in body["untouched"]["items"]], [("limbo", 2), ("tetris", 1)])
 
     def test_the_coverage_by_genre_and_platform(self):
         self.library_entry(self.ana, "celeste", TODAY(), "pc")
@@ -122,4 +120,3 @@ class GroupLibraryTests(ApiTestCase):
             self.library_entry(self.ana, f"g{n}", TODAY(), "pc")
         body = self.library().json()
         self.assertEqual((body["rarities"]["total"], len(body["rarities"]["items"])), (12, 10))
-        self.assertEqual((body["untouched"]["total"], len(body["untouched"]["items"])), (12, 10))
