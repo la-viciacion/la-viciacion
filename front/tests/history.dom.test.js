@@ -47,9 +47,26 @@ test('one row per game, with the markup of a name shown as text and the "show mo
   assert.deepEqual(text('.history-name'), ['Celeste', 'Hades <b>']);
   assert.equal(document.querySelectorAll('.history-name b').length, 0);
   assert.equal(text('#historyMoreBtn')[0], 'Mostrar más (9)');
-  assert.ok(document.querySelector('[data-game-id="celeste"] .btn-complete.done'));
-  assert.equal(document.querySelector('[data-game-id="hades"] .btn-complete.done'), null);
   assert.match(text('[data-game-id="celeste"] .history-meta')[0], /3 sesiones/);
+});
+
+test('a row has two lines and one button: a tick for a completed game, no platforms, no completion button', () => {
+  assert.ok(document.querySelector('[data-game-id="celeste"] .history-title .history-done'));
+  assert.equal(document.querySelector('[data-game-id="celeste"] .history-done').getAttribute('aria-label'), 'Completado esta temporada');
+  assert.equal(document.querySelector('[data-game-id="hades"] .history-done'), null);
+  assert.equal(document.querySelectorAll('.history-row button').length, 2); // play, in each of the two rows
+  assert.equal(document.querySelectorAll('.history-row .platform-pill, .btn-complete').length, 0);
+  assert.equal(document.querySelectorAll('.history-detail').length, 0); // closed: nothing else
+});
+
+test('unfolded, a game shows its platforms and the button that opens the completion, saying whether it is completed', () => {
+  click('[data-game-id="celeste"] [data-action="toggle"]');
+  assert.deepEqual(text('[data-game-id="celeste"] .history-detail .platform-pill'), ['pc', 'switch']); // the id until the names of the platforms are loaded
+  assert.ok(document.querySelector('[data-game-id="celeste"] .btn-complete.done'));
+  assert.equal(text('[data-game-id="celeste"] .btn-complete')[0], 'Completado esta temporada');
+  click('[data-game-id="hades"] [data-action="toggle"]');
+  assert.equal(document.querySelector('[data-game-id="hades"] .btn-complete.done'), null);
+  assert.equal(text('[data-game-id="hades"] .btn-complete')[0], 'Marcar como completado');
 });
 
 test('pressing a row unfolds its sessions and pressing it again folds them', () => {
@@ -71,12 +88,16 @@ test('Enter and Space on the focused row unfold it; other keys do not', () => {
   assert.equal(document.querySelectorAll('.history-group.open').length, 0);
 });
 
-test('the buttons of a row call back with their game and do not unfold it', () => {
+test('the play button of a row calls back with its game and does not unfold it', () => {
   click('[data-game-id="hades"] [data-action="continue"]');
   assert.equal(picked.continue.game_id, 'hades');
+  assert.equal(document.querySelectorAll('.history-group.open').length, 0);
+});
+
+test('the completion button of the detail calls back with its game', () => {
+  click('[data-game-id="celeste"] [data-action="toggle"]');
   click('[data-game-id="celeste"] [data-action="complete"]');
   assert.equal(picked.complete.game_id, 'celeste');
-  assert.equal(document.querySelectorAll('.history-group.open').length, 0);
 });
 
 test('"Editar" hands over the game and the session of that row', () => {

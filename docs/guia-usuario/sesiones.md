@@ -62,18 +62,15 @@ Se aplican las mismas reglas que al añadirla a mano (arriba), y solo se pueden 
 
 ## Tu historial en Inicio
 
-Debajo del timer ves **tus juegos** de esta temporada, el último jugado primero, con cuánto hace que lo jugaste, el tiempo total, cuántas sesiones tiene (si más de una) y sus plataformas. Pulsa un juego para desplegar sus últimas sesiones (con su fecha, plataforma y duración y un botón **Editar** en cada una). Al final de la lista, **Ver la ficha del juego** abre su página y, si hay más sesiones de las que se enseñan, **Ver todas** las carga. Si tienes muchos juegos, **Mostrar más** carga el resto.
+Debajo del timer ves **tus juegos** de esta temporada, el último jugado primero, en dos líneas: el nombre (con tu nota y un ✓ verde si ya lo completaste esta temporada) y, debajo, cuánto hace que lo jugaste, el tiempo total y cuántas sesiones tiene (si más de una). Pulsa un juego para desplegarlo: verás sus plataformas, el botón de **completar** y sus últimas sesiones (con su fecha, plataforma y duración y un botón **Editar** en cada una). Al final de la lista, **Ver la ficha del juego** abre su página y, si hay más sesiones de las que se enseñan, **Ver todas** las carga. Si tienes muchos juegos, **Mostrar más** carga el resto.
 
 ![Sesiones de un juego desplegadas](../assets/screens/home-history.webp){ .screenshot }
 
-A la derecha de cada fila:
-
-- El **círculo** marca el juego como completado (o te dice que ya lo está).
-- El botón de **play** inicia un timer nuevo con ese juego, con la plataforma de su última sesión (aparece desactivado mientras tienes un timer en marcha).
+En cada fila hay un solo botón, a la derecha: el de **play**, que inicia un timer nuevo con ese juego, con la plataforma de su última sesión (aparece desactivado mientras tienes un timer en marcha). Marcar un juego como completado se hace al desplegarlo, con el botón **Marcar como completado** (o **Completado esta temporada**, si ya lo está).
 
 ## Completar un juego
 
-Al pulsar el círculo se abre una ventana con las plataformas y temporadas en las que lo has jugado. **Marcar completado** lo completa con un solo toque (esa ventana es la confirmación). Se avisa al grupo por Telegram y por notificación.
+Al pulsar **Marcar como completado** en el juego desplegado se abre una ventana con las plataformas y temporadas en las que lo has jugado. **Marcar completado** lo completa con un solo toque (esa ventana es la confirmación). Se avisa al grupo por Telegram y por notificación.
 
 ![Ventana para marcar un juego como completado](../assets/screens/complete.webp){ .screenshot }
 
