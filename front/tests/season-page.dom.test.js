@@ -100,7 +100,7 @@ const FAME = {
 };
 const fameApi = () => installApi({ 'GET /statistics/hall-of-fame': FAME, 'GET /users/photo/': json({ detail: 'no' }, 404) });
 
-test('the hall of fame is a row per season with a column per category, a tie showing both champions', async () => {
+test('the hall of fame is a timeline: the grand champion of each season large and a cell per category, a tie showing both champions', async () => {
   const calls = fameApi();
   window.location.hash = '#/season/fame';
   await page.render({ main: freshMain() });
@@ -108,14 +108,16 @@ test('the hall of fame is a row per season with a column per category, a tie sho
   assert.equal(calls[0].path, '/statistics/hall-of-fame');
   assert.equal(text('h1')[0], 'Salón de la fama');
   assert.equal(document.querySelector('[data-season="fame"]').getAttribute('aria-pressed'), 'true');
-  assert.equal(document.querySelector('[data-fame-view="matrix"]').getAttribute('aria-pressed'), 'true');
   assert.deepEqual(text('.hf-chip .hf-count'), ['3', '2']); // who has most titles
-  assert.deepEqual(text('.hf-matrix thead th'), ['Temporada', 'Tiempo', 'Días', 'Jugados', 'Completados', 'Logros', 'Racha']);
-  assert.deepEqual(text('.hf-matrix tbody .hf-year'), ['2025', '2023']); // 2024 had nobody
-  assert.deepEqual(text('[aria-label="Temporada 2025"] td:nth-of-type(1) .ss-name'), ['Bea', 'Cai <i>']);
-  assert.deepEqual(text('[aria-label="Temporada 2025"] td:nth-of-type(1) .hf-figure'), ['2 h']); // a tie shares one figure
-  assert.equal(text('[aria-label="Temporada 2025"] .hf-grand')[0], '👑 Bea · 3 de 3'); // the one with most categories
-  assert.equal(document.querySelectorAll('.hf-matrix i').length, 0); // names are text
+  assert.deepEqual(text('.hf-step .hf-year'), ['2025', '2023']); // newest first, 2024 had nobody
+  assert.deepEqual(text('[aria-label="Temporada 2025"] .hf-hero-name .ss-name'), ['👑 Bea']);
+  assert.deepEqual(text('[aria-label="Temporada 2025"] .hf-hero-name .pf-sub'), ['3 de 3 categorías']);
+  const cells = document.querySelectorAll('[aria-label="Temporada 2025"] .hf-others li');
+  assert.deepEqual([...cells].map((c) => c.querySelector('.hf-label').textContent), ['Tiempo', 'Días', 'Jugados', 'Completados', 'Logros', 'Racha']); // one line each, so they line up
+  assert.deepEqual([...cells[0].querySelectorAll('.ss-name')].map((n) => n.textContent), ['Bea', 'Cai <i>']);
+  assert.equal(cells[0].querySelector('.hf-figure').textContent, '2 h'); // a tie shares one figure
+  assert.equal(cells[3].querySelector('.pf-sub').textContent, '—'); // nobody won it
+  assert.equal(document.querySelectorAll('.hf-timeline i').length, 0); // names are text
   window.location.hash = '';
 });
 
@@ -124,42 +126,9 @@ test('a colour per player, by their place in the titles, in the chips and in the
   window.location.hash = '#/season/fame';
   await page.render({ main: freshMain() });
   await settle();
-  assert.ok(document.querySelector('.hf-chip.hf-h0 b').textContent === 'Bea');
-  assert.ok(document.querySelector('.hf-chip.hf-h1 b').textContent === 'Cai <i>');
-  assert.equal(document.querySelectorAll('.hf-matrix .hf-h1').length > 0, true);
-  window.location.hash = '';
-});
-
-test('the other view is a cabinet per player with the categories won, season by season', async () => {
-  fameApi();
-  window.location.hash = '#/season/fame';
-  await page.render({ main: freshMain() });
-  await settle();
-  document.querySelector('[data-fame-view="players"]').click();
-  assert.equal(document.querySelector('[data-fame-view="players"]').getAttribute('aria-pressed'), 'true');
-  assert.equal(document.querySelectorAll('.hf-matrix').length, 0);
-  assert.deepEqual(text('.hf-card .ss-title'), ['Bea', 'Cai <i>']);
-  assert.deepEqual(text('[aria-label="Bea"] .pf-sub'), ['3 títulos']);
-  assert.deepEqual(text('[aria-label="Bea"] .hf-trophies .hf-year'), ['2025']);
-  assert.deepEqual(text('[aria-label="Bea"] .hf-medal'), ['Tiempo', 'Días', 'Racha']);
-  assert.deepEqual(text('[aria-label="Cai <i>"] .hf-trophies .hf-year'), ['2025', '2023']); // newest first
-  document.querySelector('[data-fame-view="matrix"]').click();
-  assert.equal(document.querySelectorAll('.hf-matrix').length, 1);
-  window.location.hash = '';
-});
-
-test('the timeline puts the grand champion of each season first and the champion of every category under it', async () => {
-  fameApi();
-  window.location.hash = '#/season/fame';
-  await page.render({ main: freshMain() });
-  await settle();
-  document.querySelector('[data-fame-view="timeline"]').click();
-  assert.equal(document.querySelector('[data-fame-view="timeline"]').getAttribute('aria-pressed'), 'true');
-  assert.deepEqual(text('.hf-step .hf-year'), ['2025', '2023']); // newest first, 2024 had nobody
-  assert.deepEqual(text('[aria-label="Temporada 2025"] .hf-hero-name .ss-name'), ['👑 Bea']);
-  assert.deepEqual(text('[aria-label="Temporada 2025"] .hf-hero-name .pf-sub'), ['3 de 3 categorías']);
-  assert.equal(document.querySelectorAll('[aria-label="Temporada 2025"] .hf-others li').length, 6);
-  assert.equal(document.querySelectorAll('.hf-timeline i').length, 0); // names are text
+  assert.equal(document.querySelector('.hf-chip.hf-h0 b').textContent, 'Bea');
+  assert.equal(document.querySelector('.hf-chip.hf-h1 b').textContent, 'Cai <i>');
+  assert.equal(document.querySelectorAll('.hf-others .hf-h1').length > 0, true);
   window.location.hash = '';
 });
 

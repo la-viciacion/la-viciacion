@@ -117,13 +117,6 @@ const header = (season) => html`
 
 export async function render({ main }) {
   let latest = 0; // an answer to a season left meanwhile must not replace the one on screen
-  let fameAnswer = null;
-  let fameMode = 'matrix'; // how the hall of fame is shown: a row per season or a cabinet per player
-
-  function drawFame() {
-    mount(main, html`${header(FAME)}${fameView(fameAnswer, fameMode)}`);
-    hydratePhotos(main);
-  }
 
   async function show(season) {
     const mine = ++latest;
@@ -137,8 +130,8 @@ export async function render({ main }) {
     }
     if (mine !== latest) return;
     if (season === FAME) {
-      fameAnswer = answer;
-      drawFame();
+      mount(main, html`${header(FAME)}${fameView(answer)}`);
+      hydratePhotos(main);
       return;
     }
     const rankings = rankingsOf(season);
@@ -151,12 +144,6 @@ export async function render({ main }) {
   }
 
   main.addEventListener('click', (e) => {
-    const mode = e.target.closest('[data-fame-view]');
-    if (mode) {
-      fameMode = mode.dataset.fameView;
-      drawFame();
-      return;
-    }
     const pill = e.target.closest('[data-season]');
     if (!pill || pill.getAttribute('aria-pressed') === 'true') return;
     const season = pill.dataset.season === FAME ? FAME : Number(pill.dataset.season);

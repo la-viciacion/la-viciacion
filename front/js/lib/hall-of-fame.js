@@ -17,12 +17,6 @@ export const CATEGORIES = [
   { id: 'streak', title: 'Mejor racha', short: 'Racha', text: days },
 ];
 
-/** The ways to look at the hall: a row per season, a cabinet per player, or a timeline with the grand champion of each season. */
-export const VIEWS = [['matrix', 'Por temporada'], ['players', 'Por jugador'], ['timeline', 'Línea temporal']];
-
-/** "1 título", "3 títulos". */
-export const titlesText = (n) => `${n} ${n === 1 ? 'título' : 'títulos'}`;
-
 /** The seasons of the answer that have at least a champion (a season in which nobody did anything says nothing). */
 export const seasonsWithChampions = (answer) =>
   (Array.isArray(answer?.seasons) ? answer.seasons : []).filter((entry) => Object.values(entry.champions ?? {}).some((winners) => winners?.length));
@@ -48,17 +42,4 @@ export function grandChampions(entry) {
   }
   const top = Math.max(0, ...[...wins.values()].map((w) => w.wins));
   return { winners: [...wins.values()].filter((w) => w.wins === top && top > 0), wins: top, decided };
-}
-
-/** What each player with titles has won, in the order of the ranking of titles: [{ user_id, name, titles, seasons: [{ season, categories }] }],
- * the seasons newest first and the categories in the order of CATEGORIES. */
-export function cabinets(answer) {
-  const byPlayer = new Map(titleRanking(answer).map((player) => [player.user_id, { ...player, seasons: [] }]));
-  for (const entry of seasonsWithChampions(answer)) {
-    for (const player of byPlayer.values()) {
-      const categories = CATEGORIES.filter((c) => entry.champions[c.id]?.some((w) => w.user_id === player.user_id)).map((c) => c.id);
-      if (categories.length) player.seasons.push({ season: entry.season, categories });
-    }
-  }
-  return [...byPlayer.values()];
 }

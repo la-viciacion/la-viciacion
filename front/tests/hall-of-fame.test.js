@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { CATEGORIES, HUES, cabinets, grandChampions, playerHues, seasonsWithChampions, titleRanking, titlesText } from '../js/lib/hall-of-fame.js';
+import { CATEGORIES, HUES, grandChampions, playerHues, seasonsWithChampions, titleRanking } from '../js/lib/hall-of-fame.js';
 import { isFameHash } from '../js/lib/season-stats.js';
 
 const by = (id) => CATEGORIES.find((c) => c.id === id);
@@ -11,11 +11,7 @@ test('each category writes its figure the way the rankings do', () => {
   assert.equal(by('streak').text(12), '12 días');
   assert.equal(by('completed').text(3), '3');
   assert.deepEqual(CATEGORIES.map((c) => c.id), ['hours', 'days', 'games', 'completed', 'achievements', 'streak']);
-});
-
-test('titles are counted in singular and plural', () => {
-  assert.equal(titlesText(1), '1 título');
-  assert.equal(titlesText(4), '4 títulos');
+  assert.ok(CATEGORIES.every((c) => !c.short.includes(' '))); // one word, so a cell label never takes two lines
 });
 
 test('a season in which nobody won anything is left out, and a missing answer is empty', () => {
@@ -62,12 +58,4 @@ test('each player with titles has a colour by their place in the ranking, starti
   const many = { titles: Array.from({ length: HUES + 1 }, (_, i) => ({ user_id: i + 1, name: `P${i}`, titles: 1 })) };
   assert.equal(playerHues(many).get(HUES + 1), 0);
   assert.equal(playerHues(null).size, 0);
-});
-
-test('the cabinet of a player lists what they won season by season, the newest first, in the order of the categories', () => {
-  const [bob, ana] = cabinets(ANSWER);
-  assert.deepEqual(bob.seasons, [{ season: 2025, categories: ['games', 'streak'] }, { season: 2024, categories: ['hours', 'completed'] }]);
-  assert.deepEqual(ana.seasons, [{ season: 2025, categories: ['hours', 'days', 'streak'] }]);
-  assert.equal(bob.titles, 4);
-  assert.deepEqual(cabinets(null), []);
 });

@@ -54,66 +54,39 @@
 .ss-cover.big { width: 72px; height: 72px; }
 .ss-cover-empty { display: flex; align-items: center; justify-content: center; background: var(--bg-surface); font-size: 1.3rem; }
 
-/* Hall of fame (#/season/fame): a row per season (a card per season on a phone) or a cabinet per player. Each player
-   with titles has one colour, the ring of their photo. */
+/* Hall of fame (#/season/fame): a timeline with a dot per season, the grand champion large and the champion of each
+   category in a cell of the same size. Each player with titles has one colour, the ring of their photo. */
 .hf-h0 { --hf: #a78bfa; } .hf-h1 { --hf: #fb923c; } .hf-h2 { --hf: #3dd9b3; } .hf-h3 { --hf: #f472b6; }
 .hf-h4 { --hf: #60a5fa; } .hf-h5 { --hf: #f5c542; } .hf-h6 { --hf: #4ade80; } .hf-h7 { --hf: #f87171; }
 .hf-who { display: inline-flex; align-items: center; gap: 8px; min-width: 0; max-width: 100%; }
-.hf-who .pl-avatar, .hf-chip .pl-avatar, .hf-head .pl-avatar { box-shadow: 0 0 0 2px var(--hf, var(--border)); border: 0; }
-.hf-grand .hf-who { color: var(--hf); font-weight: 600; }
+.hf-who .pl-avatar, .hf-chip .pl-avatar { box-shadow: 0 0 0 2px var(--hf, var(--border)); border: 0; }
 
 .hf-lead { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
 .hf-chip { display: inline-flex; align-items: center; gap: 8px; padding: 4px 12px 4px 6px; border-radius: var(--radius-pill); background: var(--bg-card); border: 1px solid var(--border); }
 .hf-chip .pl-avatar { width: 26px; height: 26px; }
 .hf-count { color: var(--accent-gold); font-weight: 800; font-variant-numeric: tabular-nums; }
 
-.hf-matrix { width: 100%; border-collapse: separate; border-spacing: 0; table-layout: fixed; }
-.hf-matrix th { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); padding: 0 4px 10px; text-align: center; }
-.hf-matrix thead th:first-child { text-align: left; width: 21%; }
-.hf-matrix td, .hf-matrix tbody th { padding: 12px 4px; border-top: 1px solid var(--border); vertical-align: top; }
-.hf-matrix tbody th { text-align: left; text-transform: none; letter-spacing: 0; font-size: 0.85rem; }
-.hf-matrix td { text-align: center; }
-.hf-year { display: block; font-size: 1.25rem; font-weight: 800; color: var(--text-primary); line-height: 1.1; }
-.hf-grand { display: block; margin-top: 6px; font-size: 0.78rem; font-weight: 400; color: var(--text-secondary); }
-.hf-cell { display: flex; flex-direction: column; align-items: center; gap: 6px; }
-.hf-cell .hf-who { flex-direction: column; gap: 4px; font-size: 0.8rem; }
-.hf-cell .pl-avatar { width: 34px; height: 34px; }
-.hf-cell .ss-name { max-width: 100%; font-size: 0.8rem; }
-.hf-figure { font-size: 0.8rem; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--accent-gold); }
-
-.hf-head { display: flex; align-items: center; gap: 12px; }
-.hf-head .pl-avatar { width: 44px; height: 44px; }
-.hf-head .ss-title { font-size: 1.1rem; }
-.hf-trophies { list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
-.hf-trophies li { display: flex; align-items: baseline; gap: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
-.hf-trophies .hf-year { flex: none; width: 3.2rem; font-size: 1rem; }
-.hf-medals { display: flex; flex-wrap: wrap; gap: 6px; }
-.hf-medal { font-size: 0.72rem; font-weight: 700; padding: 3px 9px; border-radius: var(--radius-pill); background: rgba(245, 197, 66, 0.14); color: var(--accent-gold); }
-
-@media (max-width: 720px) {
-  .hf-matrix, .hf-matrix tbody { display: block; }
-  .hf-matrix thead { display: none; }
-  .hf-matrix tr { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-card); }
-  .hf-matrix tbody th { grid-column: 1 / -1; display: block; padding: 0 0 4px; border: 0; }
-  .hf-matrix td { display: block; padding: 8px; border: 0; border-radius: var(--radius-sm); background: var(--bg-card-hover); text-align: left; }
-  .hf-matrix td::before { content: attr(data-label); display: block; margin-bottom: 6px; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
-  .hf-cell { flex-direction: column; align-items: flex-start; }
-  .hf-cell .hf-who { flex-direction: row; gap: 8px; }
-  .hf-cell .pl-avatar { width: 28px; height: 28px; }
-}
-
-/* The timeline view: a line with a dot per season, the grand champion large and the other categories in small */
 .hf-timeline { list-style: none; margin: 0; padding: 0 0 0 14px; border-left: 2px solid var(--border); }
 .hf-step { position: relative; padding: 0 0 16px 18px; }
 .hf-dot { position: absolute; left: -23px; top: 22px; width: 12px; height: 12px; border-radius: 50%; background: var(--accent-gold); box-shadow: 0 0 0 4px var(--bg-base); }
 .hf-step-body { margin: 0; }
 .hf-hero { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 18px; }
-.hf-year-big { font-size: 1.8rem; }
+.hf-year { font-size: 1.8rem; font-weight: 800; line-height: 1.1; color: var(--text-primary); }
 .hf-hero-who { gap: 12px; }
-.hf-hero-who .pl-avatar { width: 52px; height: 52px; box-shadow: 0 0 0 3px var(--hf, var(--border)); }
+.hf-hero-who .pl-avatar { width: 52px; height: 52px; box-shadow: 0 0 0 3px var(--hf, var(--border)); border: 0; }
 .hf-hero-name { display: flex; flex-direction: column; min-width: 0; }
 .hf-hero-name .ss-name { font-size: 1.1rem; font-weight: 800; color: var(--hf); }
-.hf-others { list-style: none; margin: 14px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
-.hf-others li { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-width: 0; padding: 10px; border-radius: var(--radius-sm); background: var(--bg-card-hover); }
+
+/* Six cells of the same size: 6 in a row, 3 + 3 and 2 + 2 + 2 as the screen narrows (never 5 + 1). Each cell is label, champion and
+   figure in rows of their own, so a long name or a tie cannot push the others out of line. */
+.hf-others { list-style: none; margin: 14px 0 0; padding: 0; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+.hf-others li { display: grid; grid-template-rows: auto 1fr auto; gap: 8px; min-width: 0; padding: 10px; border-radius: var(--radius-sm); background: var(--bg-card-hover); }
+.hf-label { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hf-winners { display: flex; flex-direction: column; gap: 6px; align-self: start; min-width: 0; }
 .hf-others .pl-avatar { width: 26px; height: 26px; }
-.hf-label { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
+.hf-figure { font-size: 0.85rem; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--accent-gold); white-space: nowrap; }
+@media (max-width: 900px) { .hf-others { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 520px) {
+  .hf-others { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .hf-year { font-size: 1.5rem; }
+}
