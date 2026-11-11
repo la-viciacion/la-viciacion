@@ -22,6 +22,20 @@ export const KINDS = {
 
 export const CHANGELOG = [
   {
+    version: '2.41', date: '2026-11-11',
+    title: 'Salón de la fama, temporadas anteriores y una app más cómoda',
+    items: [
+      ['new', 'Salón de la fama: en Temporada, una línea del tiempo con los campeones de cada temporada cerrada y quién acumula más títulos.'],
+      ['new', 'Temporada te deja elegir qué temporada ver, y en las anteriores aparecen todos los que jugaron, estén activos hoy o no.'],
+      ['new', 'Buscador global: encuentra páginas, jugadores y juegos.'],
+      ['new', 'Barra inferior en el móvil, parte de una interfaz renovada.'],
+      ['new', 'La biblioteca del grupo suma los más deseados, lo que une al grupo, los terminados por varios y las sagas.'],
+      ['better', '«Seguir donde lo dejaste» se ha rediseñado: la tarjeta se queda con Continuar y Nuevo timer y Sesión manual pasan a una fila propia justo debajo.'],
+      ['better', 'En la lista de sesiones de Inicio, el botón de completar el juego ahora está dentro del desplegable, y cada juego ocupa mucho menos en el móvil.'],
+      ['better', 'El menú lateral se ha reorganizado.'],
+    ],
+  },
+  {
     version: '2.40', date: '2026-11-10',
     title: 'Temporada, Novedades y tus ids de jugador',
     items: [
@@ -32,7 +46,6 @@ export const CHANGELOG = [
       ['new', 'Servidor: una página abierta a todos con el estado del server y los costes de mantenimiento de la app.'],
       ['better', 'En el perfil, tus juegos se pueden plegar y la lista de juegos cortos se entiende mejor.'],
       ['better', 'Iconos de ayuda junto a los apartados que necesitan una explicación.'],
-      ['better', 'El menú Explorar tiene un orden nuevo.'],
       ['better', 'La página de logros y el perfil están más pulidos.'],
     ],
   },
