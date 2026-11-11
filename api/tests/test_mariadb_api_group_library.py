@@ -49,7 +49,7 @@ class GroupLibraryTests(ApiTestCase):
         body = self.library().json()
         self.assertEqual(body["summary"], {"games": 0, "players": 0, "played_seconds": 0})
         self.assertEqual((body["hidden_gems"], body["graveyard"], body["genres"], body["platforms"]), ([], [], [], []))
-        self.assertEqual((body["rarities"], body["untouched"]), ({"total": 0, "items": []}, {"total": 0, "items": []}))
+        self.assertEqual(body["rarities"], {"total": 0, "items": []})
 
     def test_the_summary_counts_distinct_games_players_and_hours_and_never_the_emergency_account(self):
         self.library_entry(self.ana, "celeste", TODAY(), "pc")
@@ -91,17 +91,15 @@ class GroupLibraryTests(ApiTestCase):
         self.abandon(gave_up, clock.now() - datetime.timedelta(hours=10))
         self.assertEqual(self.library().json()["graveyard"], [])
 
-    def test_rarities_have_one_owner_and_untouched_games_have_no_session(self):
+    def test_rarities_have_one_owner_and_the_most_played_come_first(self):
         self.library_entry(self.ana, "doom", TODAY(), "pc")
         self.session(self.ana, "doom", ago(hours=3), 30)
         self.library_entry(self.ana, "tetris", TODAY(), "pc")  # one owner, never played
         self.library_entry(self.ana, "limbo", TODAY(), "pc")
-        self.library_entry(self.bea, "limbo", TODAY(), "pc")  # two owners, never played
+        self.library_entry(self.bea, "limbo", TODAY(), "pc")  # two owners: not a rarity
         body = self.library().json()
         self.assertEqual(body["rarities"]["total"], 2)
         self.assertEqual([(g["game_id"], g["owner"], g["seconds"]) for g in body["rarities"]["items"]], [("doom", "Ana", 1800), ("tetris", "Ana", 0)])
-        self.assertEqual(body["untouched"]["total"], 2)
-        self.assertEqual([(g["game_id"], g["players"]) for g in body["untouched"]["items"]], [("limbo", 2), ("tetris", 1)])
 
     def test_the_coverage_by_genre_and_platform(self):
         self.library_entry(self.ana, "celeste", TODAY(), "pc")
@@ -122,4 +120,30 @@ class GroupLibraryTests(ApiTestCase):
             self.library_entry(self.ana, f"g{n}", TODAY(), "pc")
         body = self.library().json()
         self.assertEqual((body["rarities"]["total"], len(body["rarities"]["items"])), (12, 10))
-        self.assertEqual((body["untouched"]["total"], len(body["untouched"]["items"])), (12, 10))
+
+    def test_what_the_group_waits_for_plays_and_finishes_together_and_its_sagas(self):
+        with database.SessionLocal() as db:
+            db.get(models.Game, "celeste").franchises = "Madeline"
+            db.get(models.Game, "hades").collections = "Gods"  # no franchise: the collection is the saga
+            db.get(models.Game, "doom").franchises = "Madeline"
+            db.get(models.Game, "limbo").collections = "Gods"
+            db.get(models.Game, "tetris").release_date = TODAY() + datetime.timedelta(days=20)
+            db.add_all([
+                models.UserWishlist(user_id=self.ana, game_id="tetris"), models.UserWishlist(user_id=self.bea, game_id="tetris"),
+                models.UserWishlist(user_id=self.cai, game_id="limbo"),  # inactive: does not count
+                models.UserWishlist(user_id=self.god, game_id="limbo"),  # the emergency account: never counts
+            ])
+            db.commit()
+        for user in (self.ana, self.bea):
+            self.library_entry(user, "celeste", TODAY(), "pc", completed=1, completed_date=TODAY())
+            self.session(user, "celeste", ago(hours=3), 60)
+        self.library_entry(self.ana, "doom", TODAY(), "pc")
+        self.library_entry(self.bea, "hades", TODAY(), "pc")
+        self.library_entry(self.ana, "limbo", TODAY(), "pc")
+        body = self.library().json()
+        self.assertEqual(body["wanted"]["total"], 1)
+        wanted = body["wanted"]["items"][0]
+        self.assertEqual((wanted["game_id"], wanted["wanters"], wanted["upcoming"]), ("tetris", ["Ana", "Bea"], True))
+        self.assertEqual([(g["game_id"], g["players"], g["season"], g["seconds"]) for g in body["together"]["items"]], [("celeste", 2, TODAY().year, 7200)])
+        self.assertEqual([(g["game_id"], g["completed"], g["players"], g["mean_seconds"]) for g in body["finished"]["items"]], [("celeste", 2, 2, 3600)])
+        self.assertEqual(sorted((s["saga"], s["games"], s["players"]) for s in body["sagas"]["items"]), [("Gods", 2, 2), ("Madeline", 2, 2)])

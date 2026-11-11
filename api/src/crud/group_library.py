@@ -1,23 +1,30 @@
-"""The group's library as a whole: hidden gems, the graveyard, rarities, what nobody has touched and what the libraries
-cover by genre and platform. Derived from the libraries, the sessions and the ratings when asked; nothing is stored.
+"""The group's library as a whole: hidden gems, the graveyard, rarities, what the group waits for, plays and finishes together,
+its sagas and what the libraries cover by genre and platform. Derived from the libraries, the sessions and the ratings when asked; nothing is stored.
 Every player counts, active or not (never the emergency account), like the rankings and the game pages."""
+import datetime
+
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..database import models
 from ..utils.ttl_cache import TtlCache
 from . import games, users
+from .wishlist import is_upcoming
 
 LIST_SIZE = 10  # items of each list
 HIDDEN_MAX_PLAYERS = 2  # a hidden gem is had by this many players at most...
 HIDDEN_MIN_SCORE = 80  # ...and rated this well (the mean of the ratings) at least
+MIN_PLAYERS = 2  # a game is listed as played or completed together from this many players
+MIN_SAGA_GAMES = 2  # a saga has this many games in the libraries at least
 COVERAGE_SIZE = 10  # genres and platforms listed
 _cache = TtlCache(120)  # the whole group's library changes slowly and costs a scan of every library: a couple of minutes old is fine
 
 
 # ── the lists (pure, from the facts) ────────────────────────────
 # facts: {"owners": {game: {users}}, "seconds": {game: total}, "scores": {game: [ratings]}, "abandoned_by": {game: {users}},
-# "completed": {game: {users}}, "genres": {game: [genres]}, "platforms": {platform: {game: {users}}}}
+# "completed": {game: {users}}, "genres": {game: [genres]}, "platforms": {platform: {game: {users}}},
+# "wishes": {game: [active users who wish for it]}, "released": {game: date or None}, "played_by": {game: {season: {users}}},
+# "seconds_by": {game: {user: seconds}}, "franchises": {game: [franchises]}}
 
 
 def hidden_gems(facts: dict) -> list[dict]:
@@ -49,13 +56,55 @@ def rarities(facts: dict) -> list[dict]:
     return sorted(found, key=lambda g: (-g["seconds"], g["game_id"]))
 
 
-def untouched(facts: dict) -> list[dict]:
-    """The games somebody has and nobody has ever played, the most owned first."""
-    found = [
-        {"game_id": game, "players": len(owners)}
-        for game, owners in facts["owners"].items() if not facts["seconds"].get(game)
-    ]
-    return sorted(found, key=lambda g: (-g["players"], g["game_id"]))
+def most_wanted(facts: dict) -> list[dict]:
+    """The games the most active players wish for; on a tie the soonest release first (games without a date last)."""
+    found = [{"game_id": game, "wanters": list(wanters)} for game, wanters in facts["wishes"].items() if wanters]
+
+    def key(g):
+        released = facts["released"].get(g["game_id"])
+        return (-len(g["wanters"]), released is None, released or datetime.date.min, g["game_id"])
+
+    return sorted(found, key=key)
+
+
+def played_together(facts: dict) -> list[dict]:
+    """The games MIN_PLAYERS players or more played in the same season (the one with the most of them), the most players
+    first, then the hours put into the game."""
+    found = []
+    for game, per_season in facts["played_by"].items():
+        count, season = max((len(users_), season) for season, users_ in per_season.items())
+        if count >= MIN_PLAYERS:
+            found.append({"game_id": game, "players": count, "season": season, "seconds": facts["seconds"].get(game, 0)})
+    return sorted(found, key=lambda g: (-g["players"], -g["seconds"], g["game_id"]))
+
+
+def finished_by_many(facts: dict) -> list[dict]:
+    """The games MIN_PLAYERS players or more completed, with how many of the players who have it did and the mean time
+    those who finished it put in (None when none has sessions); the most completions first, then the fewest owners."""
+    found = []
+    for game, done in facts["completed"].items():
+        if len(done) < MIN_PLAYERS:
+            continue
+        times = [t for t in (facts["seconds_by"].get(game, {}).get(user) for user in done) if t]
+        found.append({
+            "game_id": game, "completed": len(done), "players": len(facts["owners"].get(game, done)),
+            "mean_seconds": round(sum(times) / len(times)) if times else None,
+        })
+    return sorted(found, key=lambda g: (-g["completed"], g["players"], g["game_id"]))
+
+
+def sagas(facts: dict) -> list[dict]:
+    """The franchises with MIN_SAGA_GAMES games or more in the libraries: how many, the players who have any and their
+    hours, the most games first."""
+    found: dict[str, dict] = {}
+    for game, owners in facts["owners"].items():
+        for name in facts["franchises"].get(game, []):
+            row = found.setdefault(name, {"saga": name, "games": 0, "players": set(), "seconds": 0})
+            row["games"] += 1
+            row["players"] |= owners
+            row["seconds"] += facts["seconds"].get(game, 0)
+    rows = [{**row, "players": len(row["players"])} for row in found.values() if row["games"] >= MIN_SAGA_GAMES]
+    return sorted(rows, key=lambda r: (-r["games"], -r["seconds"], r["saga"]))
 
 
 def by_genre(facts: dict) -> list[dict]:
@@ -128,10 +177,33 @@ def _facts(db: Session) -> dict:
         played = last.get(key)
         if key not in done_keys and (played is None or played <= max(marks)):
             abandoned_by.setdefault(key[1], set()).add(key[0])
-    meta = {game.id: game for game in db.query(models.Game).filter(models.Game.id.in_(list(owners) or [""]))}
+    wishes: dict[str, list] = {}  # active players only, like every "who wants it" of the app
+    for game_id, user_id in (
+        db.query(models.UserWishlist.game_id, models.UserWishlist.user_id)
+        .join(models.User, models.User.id == models.UserWishlist.user_id)
+        .filter(models.User.is_active == 1, models.not_god())
+        .order_by(models.UserWishlist.added_at, models.User.id)
+    ):
+        wishes.setdefault(game_id, []).append(user_id)
+    played_by: dict[str, dict] = {}
+    seconds_by: dict[str, dict] = {}
+    for game_id, user_id, season, total in (
+        db.query(models.GameTimer.game_id, models.GameTimer.user_id, models.GameTimer.season, func.sum(models.GameTimer.duration_seconds))
+        .filter(models.GameTimer.is_active == False)  # noqa: E712
+        .group_by(models.GameTimer.game_id, models.GameTimer.user_id, models.GameTimer.season)
+    ):
+        if user_id in players:
+            played_by.setdefault(game_id, {}).setdefault(season, set()).add(user_id)
+            by_user = seconds_by.setdefault(game_id, {})
+            by_user[user_id] = by_user.get(user_id, 0) + int(total or 0)
+    meta = {game.id: game for game in db.query(models.Game).filter(models.Game.id.in_(list({*owners, *wishes} or [""])))}
     return {
         "owners": owners, "seconds": seconds, "scores": scores, "abandoned_by": abandoned_by, "completed": completed,
         "genres": {game_id: games.genre_list(game.genres) for game_id, game in meta.items()}, "platforms": platforms, "meta": meta,
+        "wishes": wishes, "played_by": played_by, "seconds_by": seconds_by,
+        "released": {game_id: game.release_date for game_id, game in meta.items()},
+        # IGDB's franchises; a game that has none may still belong to a collection (a series)
+        "franchises": {game_id: games.genre_list(game.franchises) or games.genre_list(game.collections) for game_id, game in meta.items()},
     }
 
 
@@ -150,7 +222,8 @@ def _library(db: Session) -> dict:
         found = meta[game_id]
         return {"game_id": game_id, "game_name": found.name, "image_url": found.image_url}
 
-    rare, dust = rarities(facts), untouched(facts)
+    rare, wanted, together, finished, series = rarities(facts), most_wanted(facts), played_together(facts), finished_by_many(facts), sagas(facts)
+    today = datetime.date.today()
     return {
         "summary": {
             "games": len(facts["owners"]),
@@ -165,7 +238,26 @@ def _library(db: Session) -> dict:
             "total": len(rare),
             "items": [{**game(g["game_id"]), "owner": names[g["owner"]], "seconds": g["seconds"]} for g in rare[:LIST_SIZE]],
         },
-        "untouched": {"total": len(dust), "items": [{**game(g["game_id"]), "players": g["players"]} for g in dust[:LIST_SIZE]]},
+        "wanted": {
+            "total": len(wanted),
+            "items": [
+                {**game(g["game_id"]), "wanters": [names[u] for u in g["wanters"]], "release_date": meta[g["game_id"]].release_date,
+                 "upcoming": is_upcoming(meta[g["game_id"]].release_date, today)}
+                for g in wanted[:LIST_SIZE]
+            ],
+        },
+        "together": {
+            "total": len(together),
+            "items": [{**game(g["game_id"]), "players": g["players"], "season": g["season"], "seconds": g["seconds"]} for g in together[:LIST_SIZE]],
+        },
+        "finished": {
+            "total": len(finished),
+            "items": [
+                {**game(g["game_id"]), "completed": g["completed"], "players": g["players"], "mean_seconds": g["mean_seconds"]}
+                for g in finished[:LIST_SIZE]
+            ],
+        },
+        "sagas": {"total": len(series), "items": series[:LIST_SIZE]},
         "genres": by_genre(facts)[:COVERAGE_SIZE],
         "platforms": [{**row, "platform_name": platform_names.get(row["platform"], row["platform"])} for row in by_platform(facts)[:COVERAGE_SIZE]],
     }

@@ -1,14 +1,13 @@
 // Group library page (#/library): the libraries of the whole group at once. Hidden gems (few have them, those who rated
-// them like them), the graveyard (games players gave up), rarities (games only one player has), what nobody has touched
-// and what the libraries cover by genre and platform. GET /group/library; derived, nothing is stored.
+// them like them), the graveyard (games players gave up), rarities (games only one player has), the most wished games, what several players play or finish,
+// the sagas (franchises with two games or more) and what the libraries cover by genre and platform. GET /group/library; derived, nothing is stored.
 // A row of pills at the top reaches every section at once (it unfolds the section and scrolls to it), and each section
 // folds on its own; what the viewer folded is remembered in this browser.
 import { api } from '../../lib/api.js';
 import { createFolds, showFold, toggleFold } from '../../lib/fold.js';
-import { formatDuration } from '../../lib/format.js';
+import { formatDate, formatDuration } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
 import { gameHref } from '../../lib/links.js';
-import { perHour } from '../../lib/money.js';
 import { iconChevron } from '../../ui/icons.js';
 import { scoreBadge } from '../../ui/score-badge.js';
 
@@ -16,7 +15,6 @@ export const active = 'library';
 
 let main;
 let data;
-let value = null; // the group's cost per hour (GET /group/value), or null when it could not be loaded
 let folded = createFolds('gl-folded'); // the sections the viewer has folded: they start open
 
 const tile = (label, value) => html`<div class="pf-stat"><div class="pf-stat-value">${value}</div><div class="pf-stat-label">${label}</div></div>`;
@@ -61,22 +59,16 @@ const sectionsOf = (d) => [
   ['gems', 'Joyas ocultas', d.hidden_gems.length],
   ['graveyard', 'El cementerio', d.graveyard.length],
   ['rarities', 'Rarezas', d.rarities.total],
-  ['untouched', 'Sin tocar', d.untouched.total],
+  ['wanted', 'Los más deseados', d.wanted.total],
+  ['together', 'Lo que une al grupo', d.together.total],
+  ['finished', 'Terminados por varios', d.finished.total],
+  ['sagas', 'Sagas', d.sagas.total],
   ['genres', 'Por género', d.genres.length],
   ['platforms', 'Por plataforma', d.platforms.length],
-  ...(value ? [['value', 'Rentabilidad', value.games]] : []),
 ];
 
-/** The cheapest and the dearest per hour of the group (never a player, never a price): `value` is GET /group/value. */
-function valueView(v) {
-  if (!v.games) return html`<div class="pf-empty">Todavía ningún juego tiene precio de ${v.min_contributors} jugadores o más.</div>`;
-  const list = (title, games) => html`
-    <div class="pv-list"><h3>${title}</h3>
-      ${games.map((g) => html`<div class="pv-item"><a class="game-link" href="${gameHref(g.game_id)}">${g.game_name}</a>
-        <div class="pf-sub">${perHour(g.per_hour_cents)} · ${plural(g.contributors, 'jugador', 'jugadores')}</div></div>`)}
-    </div>`;
-  return html`<div class="pv-lists">${list('Más baratos por hora', v.cheapest)}${v.games > v.cheapest.length ? list('Más caros por hora', v.priciest) : ''}</div>`;
-}
+/** When a wished game comes out: the date, "sin fecha" for an announced one without it or that it is already out. */
+const releaseLine = (g) => (g.upcoming ? (g.release_date ? `sale el ${formatDate(g.release_date)}` : 'sin fecha de salida') : 'ya ha salido');
 
 const more = (total, shown) => (total > shown ? html`<div class="pf-sub">y ${total - shown} más</div>` : '');
 
@@ -85,7 +77,7 @@ function draw(d) {
   const count = Object.fromEntries(sectionsOf(d).map(([key, , n]) => [key, n]));
   mount(main, html`
     <div class="wl-head"><h1 class="pf-title">Biblioteca del grupo</h1></div>
-    <p class="pf-sub cal-intro">Las bibliotecas de todos juntas: lo que casi nadie conoce, lo que se abandona y lo que nadie ha tocado.</p>
+    <p class="pf-sub cal-intro">Las bibliotecas de todos juntas: lo que casi nadie conoce, lo que se abandona, lo que se espera y lo que se juega y se termina entre varios.</p>
     <section class="pf-stats" aria-label="La biblioteca del grupo">
       ${tile('Juegos distintos', summary.games)}
       ${tile('Jugadores', summary.players)}
@@ -107,10 +99,24 @@ function draw(d) {
       ${more(d.rarities.total, d.rarities.items.length)}`,
       'Juegos que solo tiene una persona del grupo, los más jugados primero.')}
 
-    ${section('untouched', 'Sin tocar', count.untouched, html`
-      ${gameList(d.untouched.items, (g) => `${plural(g.players, 'jugador lo tiene', 'jugadores lo tienen')} y nadie lo ha jugado`, 'Todos los juegos de la biblioteca se han jugado alguna vez.')}
-      ${more(d.untouched.total, d.untouched.items.length)}`,
-      'Juegos que alguien tiene y que nadie ha llegado a jugar.')}
+    ${section('wanted', 'Los más deseados', count.wanted, html`
+      ${gameList(d.wanted.items, (g) => `${g.wanters.join(', ')} · ${releaseLine(g)}`, 'Nadie tiene nada en su lista de deseos.')}
+      ${more(d.wanted.total, d.wanted.items.length)}`,
+      'Lo que más jugadores activos esperan, con quién lo desea y cuándo sale.')}
+
+    ${section('together', 'Lo que une al grupo', count.together, html`
+      ${gameList(d.together.items, (g) => `${plural(g.players, 'jugador', 'jugadores')} en ${g.season} · ${formatDuration(g.seconds)} entre todos`, 'Todavía ningún juego lo han jugado dos personas en la misma temporada.')}
+      ${more(d.together.total, d.together.items.length)}`,
+      'Juegos que dos o más jugadores han jugado en una misma temporada (se enseña la temporada con más gente).')}
+
+    ${section('finished', 'Terminados por varios', count.finished, html`
+      ${gameList(d.finished.items, (g) => `${g.completed} de ${g.players} lo han terminado${g.mean_seconds ? ` · de media ${formatDuration(g.mean_seconds)}` : ''}`, 'Ningún juego lo han terminado dos personas.')}
+      ${more(d.finished.total, d.finished.items.length)}`,
+      'Juegos que han completado dos o más jugadores y lo que han tardado de media.')}
+
+    ${section('sagas', 'Sagas', count.sagas, html`
+      ${d.sagas.items.length ? html`${bars(d.sagas.items, (r) => r.saga, (r) => r.games, (r) => ` · ${plural(r.players, 'jugador', 'jugadores')} · ${formatDuration(r.seconds)}`)}${more(d.sagas.total, d.sagas.items.length)}` : html`<div class="pf-empty">Ninguna franquicia tiene dos juegos en las bibliotecas.</div>`}`,
+      'Franquicias (según IGDB) con al menos dos juegos en las bibliotecas del grupo.')}
 
     <div class="pf-cols">
       <div>${section('genres', 'Por género', count.genres, d.genres.length ? bars(d.genres, (r) => r.genre, (r) => r.games, (r) => ` · ${formatDuration(r.seconds)}`) : html`<div class="pf-empty">Sin datos de géneros todavía.</div>`,
@@ -118,9 +124,7 @@ function draw(d) {
       <div>${section('platforms', 'Por plataforma', count.platforms, d.platforms.length ? bars(d.platforms, (r) => r.platform_name, (r) => r.games, (r) => ` · ${plural(r.players, 'jugador', 'jugadores')}`) : html`<div class="pf-empty">Sin datos de plataformas todavía.</div>`,
         'Cuántos juegos se han tenido en cada plataforma.')}</div>
     </div>
-
-    ${value ? section('value', 'Rentabilidad', count.value, valueView(value),
-      `Cuánto cuesta de media cada hora de un juego, según lo que han apuntado los jugadores. Solo salen los juegos con al menos ${value.min_contributors} jugadores con precio y tiempo jugado, y nunca se enseña el de nadie.`) : ''}`);
+`);
 }
 
 function onClick(e) {
@@ -142,7 +146,7 @@ export async function render(ctx) {
   main.onclick = onClick;
   mount(main, html`<div class="loading-spinner">Cargando la biblioteca...</div>`);
   try {
-    [data, value] = await Promise.all([api('/group/library'), api('/group/value').catch(() => null)]); // the rest works without it
+    data = await api('/group/library');
     if (data) draw(data);
   } catch (err) {
     mount(main, html`<div class="pf-empty">Error cargando la biblioteca del grupo: ${err.message}</div>`);
