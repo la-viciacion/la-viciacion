@@ -5,10 +5,11 @@
 import { api } from '../../lib/api.js';
 import { html, mount } from '../../lib/html.js';
 import { gameHref } from '../../lib/links.js';
-import { CATEGORIES, FAME, seasonsWithChampions, titleRanking, titlesText } from '../../lib/hall-of-fame.js';
+import { FAME } from '../../lib/hall-of-fame.js';
 import { barWidths, isFameHash, participantsOf, podiumOrder, positions, rankingsOf, rankingsPath, ringPercent, rowsOf, seasonFromHash } from '../../lib/season-stats.js';
 import { available, current } from '../../lib/seasons.js';
 import { hydratePhotos, playerAvatar } from '../../ui/avatar.js';
+import { fameView } from './fame.js';
 
 export const active = null; // it belongs to no item of the top bar
 
@@ -114,43 +115,15 @@ const header = (season) => html`
     <button type="button" class="pf-season-badge" data-season="${FAME}" aria-pressed="${String(season === FAME)}">Salón de la fama</button>
   </div>`;
 
-// One category of a season: its name, the champion (every one on a tie) and the figure they share.
-const tile = (category, winners) => html`
-  <div class="hf-tile">
-    <span class="hf-label">${category.title}</span>
-    ${winners?.length
-      ? html`${winners.map((w) => html`<span class="hf-winner">${playerAvatar(w)}<span class="ss-name">${w.name}</span></span>`)}
-        <strong class="hf-figure">${category.text(winners[0].value)}</strong>`
-      : html`<span class="pf-sub">—</span>`}
-  </div>`;
-
-const seasonCard = (entry) => html`
-  <section class="pf-card ss-card hf-card" aria-label="Temporada ${entry.season}">
-    <h2 class="ss-title">🏆 Temporada ${entry.season}</h2>
-    <div class="hf-tiles">${CATEGORIES.map((category) => tile(category, entry.champions[category.id]))}</div>
-  </section>`;
-
-// Who has won most titles, on the same podium as the rankings (a ranking of players with `titles` as its figure).
-const TITLES = { value: (t) => t.titles, text: (t) => titlesText(t.titles) };
-
-const titlesCard = (answer) => {
-  const rows = titleRanking(answer).slice(0, SHOWN);
-  return html`
-    <section class="pf-card ss-card hf-card" aria-label="Más títulos">
-      <h2 class="ss-title">👑 Más títulos</h2>
-      ${podium(TITLES, rows, barWidths(rows, TITLES), positions(rows, TITLES))}
-    </section>`;
-};
-
-// The titles first, then the seasons one by one, the newest first, all of them cards of the same grid.
-function fame(answer) {
-  const history = seasonsWithChampions(answer);
-  if (!history.length) return html`<div class="pf-empty">Todavía no ha terminado ninguna temporada con datos.</div>`;
-  return html`<div class="ss-grid hf-grid">${titlesCard(answer)}${history.map(seasonCard)}</div>`;
-}
-
 export async function render({ main }) {
   let latest = 0; // an answer to a season left meanwhile must not replace the one on screen
+  let fameAnswer = null;
+  let fameMode = 'matrix'; // how the hall of fame is shown: a row per season or a cabinet per player
+
+  function drawFame() {
+    mount(main, html`${header(FAME)}${fameView(fameAnswer, fameMode)}`);
+    hydratePhotos(main);
+  }
 
   async function show(season) {
     const mine = ++latest;
@@ -164,8 +137,8 @@ export async function render({ main }) {
     }
     if (mine !== latest) return;
     if (season === FAME) {
-      mount(main, html`${header(season)}${fame(answer)}`);
-      hydratePhotos(main);
+      fameAnswer = answer;
+      drawFame();
       return;
     }
     const rankings = rankingsOf(season);
@@ -178,6 +151,12 @@ export async function render({ main }) {
   }
 
   main.addEventListener('click', (e) => {
+    const mode = e.target.closest('[data-fame-view]');
+    if (mode) {
+      fameMode = mode.dataset.fameView;
+      drawFame();
+      return;
+    }
     const pill = e.target.closest('[data-season]');
     if (!pill || pill.getAttribute('aria-pressed') === 'true') return;
     const season = pill.dataset.season === FAME ? FAME : Number(pill.dataset.season);

@@ -7,15 +7,18 @@ export const FAME = 'fame';
 
 const days = (n) => `${n} ${n === 1 ? 'día' : 'días'}`;
 
-/** The categories a season has a champion in, in the order the page shows them; `text` writes a figure. */
+/** The categories a season has a champion in, in the order the page shows them; `short` heads a column and `text` writes a figure. */
 export const CATEGORIES = [
-  { id: 'hours', title: 'Tiempo jugado', text: formatDuration },
-  { id: 'days', title: 'Días jugados', text: days },
-  { id: 'games', title: 'Juegos jugados', text: String },
-  { id: 'completed', title: 'Juegos completados', text: String },
-  { id: 'achievements', title: 'Logros', text: String },
-  { id: 'streak', title: 'Mejor racha', text: days },
+  { id: 'hours', title: 'Tiempo jugado', short: 'Tiempo', text: formatDuration },
+  { id: 'days', title: 'Días jugados', short: 'Días', text: days },
+  { id: 'games', title: 'Juegos jugados', short: 'Jugados', text: String },
+  { id: 'completed', title: 'Juegos completados', short: 'Completados', text: String },
+  { id: 'achievements', title: 'Logros', short: 'Logros', text: String },
+  { id: 'streak', title: 'Mejor racha', short: 'Racha', text: days },
 ];
+
+/** The two ways to look at the hall: a row per season, or a cabinet per player. */
+export const VIEWS = [['matrix', 'Por temporada'], ['players', 'Por jugador']];
 
 /** "1 título", "3 títulos". */
 export const titlesText = (n) => `${n} ${n === 1 ? 'título' : 'títulos'}`;
@@ -26,3 +29,36 @@ export const seasonsWithChampions = (answer) =>
 
 /** The players with titles, most first (the API sends them sorted; a missing answer is nobody). */
 export const titleRanking = (answer) => (Array.isArray(answer?.titles) ? answer.titles : []);
+
+/** How many colours tell the players apart (`hf-h0` to `hf-h7` in season.css). */
+export const HUES = 8;
+
+/** A colour for each player with titles, by their place in the ranking of titles (so the ones that matter most never share
+ * one; past the eighth they start over). Returns a Map of user id to a number from 0 to HUES - 1. */
+export const playerHues = (answer) => new Map(titleRanking(answer).map((player, i) => [player.user_id, i % HUES]));
+
+/** The player (or players, on a tie) who won most categories of a season, with how many, and how many categories had a champion. */
+export function grandChampions(entry) {
+  const wins = new Map();
+  let decided = 0;
+  for (const winners of Object.values(entry.champions ?? {})) {
+    if (!winners?.length) continue;
+    decided += 1;
+    for (const winner of winners) wins.set(winner.user_id, { user_id: winner.user_id, name: winner.name, wins: (wins.get(winner.user_id)?.wins ?? 0) + 1 });
+  }
+  const top = Math.max(0, ...[...wins.values()].map((w) => w.wins));
+  return { winners: [...wins.values()].filter((w) => w.wins === top && top > 0), wins: top, decided };
+}
+
+/** What each player with titles has won, in the order of the ranking of titles: [{ user_id, name, titles, seasons: [{ season, categories }] }],
+ * the seasons newest first and the categories in the order of CATEGORIES. */
+export function cabinets(answer) {
+  const byPlayer = new Map(titleRanking(answer).map((player) => [player.user_id, { ...player, seasons: [] }]));
+  for (const entry of seasonsWithChampions(answer)) {
+    for (const player of byPlayer.values()) {
+      const categories = CATEGORIES.filter((c) => entry.champions[c.id]?.some((w) => w.user_id === player.user_id)).map((c) => c.id);
+      if (categories.length) player.seasons.push({ season: entry.season, categories });
+    }
+  }
+  return [...byPlayer.values()];
+}
