@@ -1,12 +1,14 @@
 import asyncio
+import logging
 import unittest
 from unittest import mock
 
-from src.utils import request_log
+from src.utils import request_context, request_log
+from src.utils.logger import RETENTION_DAYS, _RequestTag
 
 
-async def run(app, path="/api/v1/x", query=b"a=1", method="GET"):
-    scope = {"type": "http", "method": method, "path": path, "query_string": query}
+async def run(app, path="/api/v1/x", query=b"a=1", method="GET", client=("203.0.113.5", 5000)):
+    scope = {"type": "http", "method": method, "path": path, "query_string": query, "client": client}
     sent = []
 
     async def receive():
@@ -71,6 +73,53 @@ class RequestLogTests(unittest.TestCase):
             asyncio.run(request_log.RequestLogMiddleware(app)({"type": "lifespan"}, None, None))
         self.assertEqual(seen, ["lifespan"])
         info.assert_not_called()
+
+
+class RequestContextTests(unittest.TestCase):
+    def tag_during(self, app, **kwargs):
+        seen = []
+
+        async def watching(scope, receive, send):
+            await app(scope, receive, send)
+            seen.append(request_context.tag())
+
+        with mock.patch.object(request_log.logger, "info"):
+            asyncio.run(run(watching, **kwargs))
+        return seen[0]
+
+    def test_a_line_carries_request_id_player_and_address(self):
+        async def logged_in(scope, receive, send):
+            request_context.set_user("jose")
+            await send({"type": "http.response.start", "status": 200, "headers": []})
+
+        self.assertRegex(self.tag_during(logged_in), r"^\[[0-9a-f]{6} jose 203\.0\.113\.5\] $")
+
+    def test_an_anonymous_request_shows_a_dash(self):
+        self.assertRegex(self.tag_during(app_returning(200)), r"^\[[0-9a-f]{6} - 203\.0\.113\.5\] $")
+
+    def test_the_player_set_in_a_worker_thread_reaches_the_request(self):
+        async def threaded(scope, receive, send):
+            await asyncio.to_thread(request_context.set_user, "ana")
+            await send({"type": "http.response.start", "status": 200, "headers": []})
+
+        self.assertIn(" ana ", self.tag_during(threaded))
+
+    def test_nothing_is_tagged_outside_a_request(self):
+        self.assertEqual(request_context.tag(), "")
+        asyncio.run(run(app_returning(200)))
+        self.assertEqual(request_context.tag(), "")
+
+    def test_the_filter_stamps_the_record(self):
+        record = logging.LogRecord("x", logging.INFO, __file__, 1, "hello", None, None)
+        token = request_context.begin("10.0.0.1")
+        try:
+            _RequestTag().filter(record)
+        finally:
+            request_context.end(token)
+        self.assertIn("10.0.0.1", record.request_tag)
+
+    def test_the_files_are_kept_for_months(self):
+        self.assertGreaterEqual(RETENTION_DAYS, 90)
 
 
 if __name__ == "__main__":

@@ -16,7 +16,7 @@ from .config import Config
 from .crud import users
 from .database import models
 from .database.database import SessionLocal
-from .utils import messages
+from .utils import messages, request_context
 
 config = Config()
 ALGORITHM = "HS256"
@@ -107,6 +107,7 @@ def get_current_user(
         raise credentials_exception
     if not hmac.compare_digest(str(payload.get("pwv", "")), password_fingerprint(user)):
         raise credentials_exception  # issued before the last password change
+    request_context.set_user(user.username)
     return user
 
 
