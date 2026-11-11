@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { RANKINGS, barWidths, podiumOrder, positions, rankingsOf, rankingsPath, ringPercent, rowsOf, seasonFromHash } from '../js/lib/season-stats.js';
+import { RANKINGS, barWidths, podiumOrder, positions, participantsOf, rankingsOf, rankingsPath, ringPercent, rowsOf, seasonFromHash } from '../js/lib/season-stats.js';
 import { current } from '../js/lib/seasons.js';
 
 const by = (id) => RANKINGS.find((r) => r.id === id);
@@ -17,6 +17,8 @@ test('an older season has no current streak and is asked for by its year', () =>
   assert.equal(rankingsOf(current() - 1).length, 8);
   assert.ok(!rankingsOf(current() - 1).some((r) => r.id === 'current-streak'));
   assert.match(rankingsPath(current() - 1), new RegExp(`season=${current() - 1}&ranking=`));
+  assert.ok(rankingsPath(current() - 1).startsWith('/statistics/rankings?only_active=false&')); // everybody who took part, active or not
+  assert.ok(rankingsPath().includes('only_active=true&'));
   assert.ok(!rankingsPath(current() - 1).includes('user_current_streak'));
 });
 
@@ -64,4 +66,19 @@ test('a ring never goes past the circle', () => {
 
 test('every ranking has a way of being drawn the page knows', () => {
   assert.ok(RANKINGS.every((r) => ['bars', 'covers', 'podium', 'rings', 'tiles'].includes(r.view)));
+});
+
+test('the players of an older season are the ones with something in any ranking, whatever their state today', () => {
+  const answer = [
+    { type: 'user_hours', data: [{ user_id: 1, played_time: 600 }, { user_id: 2, played_time: 0 }, { user_id: 3, played_time: 0 }, { user_id: 4, played_time: 0 }] },
+    { type: 'user_days', data: [{ user_id: 1, played_days: 1 }, { user_id: 2, played_days: 0 }, { user_id: 3, played_days: 0 }, { user_id: 4, played_days: 0 }] },
+    { type: 'achievements', data: [{ user_id: 3, achievements: 2 }, { user_id: 1, achievements: 0 }, { user_id: 2, achievements: 0 }, { user_id: 4, achievements: 0 }] },
+    { type: 'games_most_played', data: [{ game_id: 'x', name: 'X', played_time: 900 }] },
+  ];
+  const players = participantsOf(answer, RANKINGS);
+  assert.deepEqual([...players].sort(), [1, 3]); // 2 and 4 have nothing that season
+  assert.deepEqual(rowsOf(answer, by('hours'), players).map((r) => r.user_id), [1, 3]); // 3 only earned achievements: in every ranking, with a 0
+  assert.deepEqual(rowsOf(answer, by('achievements'), players).map((r) => r.user_id), [3, 1]);
+  assert.equal(rowsOf(answer, by('most-played'), players).length, 1); // a game is not a player
+  assert.equal(rowsOf(answer, by('hours')).length, 4); // without the set nothing is left out
 });

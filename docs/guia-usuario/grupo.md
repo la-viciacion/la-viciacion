@@ -18,7 +18,7 @@ En la barra superior aparece un grupito de avatares cuando alguien tiene un time
 
 ![Los rankings de la temporada](../assets/screens/season.webp){ .screenshot }
 
-**Menú → Temporada** (el primero de Grupo) enseña los rankings de la **temporada en curso**, solo con los jugadores activos. Arriba tienes una **pestaña por temporada** (desde 2023) para ver cómo quedó cada año; en las pasadas no sale la racha actual. Cada ranking es un **podio** con los tres primeros (el segundo a la izquierda del primero) y, debajo, el resto hasta el décimo en barras; todos los jugadores activos salen en todos los rankings, con un 0 si no tienen nada, y quien empata comparte el puesto. Los rankings son:
+**Menú → Temporada** (el primero de Grupo) enseña los rankings de la **temporada en curso**, solo con los jugadores activos. Arriba tienes una **pestaña por temporada** (desde 2023) para ver cómo quedó cada año; en las pasadas salen todos los que jugaron o hicieron algo esa temporada, aunque ya no estén activos, y no sale la racha actual. Cada ranking es un **podio** con los tres primeros (el segundo a la izquierda del primero) y, debajo, el resto hasta el décimo en barras; todos los jugadores activos salen en todos los rankings, con un 0 si no tienen nada, y quien empata comparte el puesto. Los rankings son:
 
 - **Tiempo jugado**, **Días jugados** y **Juegos jugados**.
 - **Juegos completados** y **Ratio de completado** (qué parte de los juegos de tu biblioteca de la temporada has completado, en porcentaje).

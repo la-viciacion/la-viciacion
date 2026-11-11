@@ -22,8 +22,9 @@ export const RANKINGS = [
 /** The rankings a season has: a streak that is still running only makes sense for the running season. */
 export const rankingsOf = (season = current()) => RANKINGS.filter((r) => r.id !== 'current-streak' || season === current());
 
-/** What to ask the API for: every ranking of the season (the running one by default) in one request, only for the active players. */
-export const rankingsPath = (season = current()) => `/statistics/rankings?only_active=true&season=${season}&ranking=${rankingsOf(season).map((r) => r.api).join(',')}`;
+/** What to ask the API for: every ranking of the season (the running one by default) in one request. The running season is
+ * only for the active players; an older one is for everybody, and `participantsOf` leaves out those who took no part in it. */
+export const rankingsPath = (season = current()) => `/statistics/rankings?only_active=${season === current()}&season=${season}&ranking=${rankingsOf(season).map((r) => r.api).join(',')}`;
 
 /** The season an address asks for (`#/season/2025`); the running one when it names none or a season that cannot exist. */
 export function seasonFromHash(hash, now = new Date()) {
@@ -32,11 +33,23 @@ export function seasonFromHash(hash, now = new Date()) {
   return year !== null && year >= FIRST && year <= current(now) ? year : current(now);
 }
 
-/** The rows of a ranking from the API's answer (a list of `{ type, data }`); empty when it did not come. */
-export const rowsOf = (answer, ranking) => {
+/** The rows of a ranking from the API's answer (a list of `{ type, data }`); empty when it did not come. With `players` (a
+ * set of ids, see participantsOf) a ranking of players keeps only those. */
+export const rowsOf = (answer, ranking, players = null) => {
   const data = (Array.isArray(answer) ? answer : []).find((r) => r.type === ranking.api)?.data;
-  return Array.isArray(data) ? data : [];
+  const rows = Array.isArray(data) ? data : [];
+  return players && ranking.rows !== 'games' ? rows.filter((row) => players.has(row.user_id)) : rows;
 };
+
+/** The ids of the players who took part in a season: those with something in any ranking of players (the API lists everybody,
+ * with zeros). Whether they are active today does not matter. */
+export function participantsOf(answer, rankings) {
+  const ids = new Set();
+  for (const ranking of rankings.filter((r) => r.rows !== 'games')) {
+    for (const row of rowsOf(answer, ranking)) if (ranking.value(row) > 0) ids.add(row.user_id);
+  }
+  return ids;
+}
 
 /** How far each bar goes, 0 to 100: the longest is full and the rest go in proportion. */
 export function barWidths(rows, ranking) {
