@@ -62,7 +62,7 @@ Lo que los administradores lanzan al grupo.
 
 ![Redactar un aviso](../assets/screens/admin-announce.webp){ .screenshot }
 
-## Avisos
+## Notificaciones
 
 - **Envíos**: el interruptor general de notificaciones, el de avisos a administradores, y los envíos programados: resumen semanal (día y hora), resumen mensual y resumen anual (apagados por defecto). En **Retos**: los avisos privados de retos (duelos, propuestas y resultados), avisar al grupo de cómo ha terminado un reto de grupo y permitir los recordatorios (cada jugador los activa en su perfil), con la hora de los resultados (09:30) y de los recordatorios (10:00). Los retos personales y los duelos nunca se avisan al grupo. Las propuestas nuevas llegan a la bandeja de avisos de los administradores.
 - **Canales**: por dónde salen los avisos y lo que cada canal necesita, cada uno en su tarjeta. **Telegram**: el token y los chats (solo si están puestos: se configuran en el `.env`) y **Enviar mensaje de prueba al grupo**. **Avisos en la app (push)**: el interruptor, cuántos dispositivos hay suscritos, el contacto para los servicios push (lo único editable) y **Regenerar claves**. **Correo** de recuperación de contraseña, con su correo de prueba (ver [Cuentas y acceso](cuentas.md)).

@@ -137,7 +137,7 @@ REGISTRY: dict[str, Spec] = {
     # The time of any of them: every day for "eve" and "day", on Sundays (scheduler.WISHLIST_WEEKLY_WEEKDAY) for "weekly".
     # After the 09:00 release-date refresh, so a date that slipped is already corrected when the group is told
     "wishlist.time": Spec("str", "12:30", check=_time),
-    # Off until an admin has seen it in the panel (Avisos → Probar resumen)
+    # Off until an admin has seen it in the panel (Notificaciones → Probar resumen)
     "monthly.enabled": Spec("bool", False),
     "monthly.day": Spec("int", 1, check=_monthly_day),  # day of the month, in the first days: the app offers it from the 1st to the 5th
     "monthly.time": Spec("str", "10:00", check=_time),

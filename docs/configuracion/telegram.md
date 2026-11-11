@@ -46,7 +46,7 @@ La API y el bot leen estas variables cada vez que las necesitan y **no las guard
 
 ## 5. Revisa el panel
 
-En **Avisos → Canales** ves si el token y los identificadores están puestos (sin enseñarlos) y puedes **Enviar mensaje de prueba al grupo**.
+En **Notificaciones → Canales** ves si el token y los identificadores están puestos (sin enseñarlos) y puedes **Enviar mensaje de prueba al grupo**.
 
 ![Canales de notificación en el panel](../assets/screens/admin-channels.webp){ .screenshot }
 
@@ -62,4 +62,4 @@ Cuando alguien entra al grupo, el bot le da la bienvenida y le dice que escriba 
 
 ## Qué avisos salen
 
-Desde **Avisos → Envíos** (ver el [panel](panel-admin.md)) controlas el interruptor general de notificaciones, el de los avisos a administradores (independiente), el **resumen semanal** (día y hora), el **resumen mensual** y el **anual** (apagados por defecto) y otros avisos programados. Los trabajos corren dentro de la API: no necesitas cron.
+Desde **Notificaciones → Envíos** (ver el [panel](panel-admin.md)) controlas el interruptor general de notificaciones, el de los avisos a administradores (independiente), el **resumen semanal** (día y hora), el **resumen mensual** y el **anual** (apagados por defecto) y otros avisos programados. Los trabajos corren dentro de la API: no necesitas cron.

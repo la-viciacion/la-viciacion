@@ -201,7 +201,7 @@ function view(values, jobs, pushDevices, mail, aiUses, aiModel, chat) {
         </label>
       </section>`,
 
-    // Avisos → Canales: the bot as the server's .env has it (read only), and the test
+    // Notificaciones → Canales: the bot as the server's .env has it (read only), and the test
     telegram: html`
       <section class="adm-set-card">
         <h3>Telegram</h3>

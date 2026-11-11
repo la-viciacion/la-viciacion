@@ -9,7 +9,7 @@ export const SECTIONS = [
   { label: 'Catálogo', tabs: ['games', 'platforms', 'achievements'] },
   { label: 'Jugadores', tabs: ['users', 'timers', 'library', 'scores', 'awards'] },
   { label: 'Comunidad', tabs: ['challenges', 'proposals', 'polls', 'announce'] },
-  { label: 'Avisos', tabs: ['sends', 'channels', 'recap'] },
+  { label: 'Notificaciones', tabs: ['sends', 'channels', 'recap'] },
   { label: 'IA', tabs: ['ai', 'chat', 'aiusage'] },
   { label: 'Sistema', tabs: ['costs', 'backup', 'audit'] },
 ];

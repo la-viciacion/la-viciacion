@@ -13,7 +13,7 @@ test('the section of a tab is the one that lists it', () => {
   assert.equal(sectionOf('users').label, 'Jugadores');
   assert.equal(sectionOf('awards').label, 'Jugadores');
   for (const tab of ['challenges', 'proposals', 'polls', 'announce']) assert.equal(sectionOf(tab).label, 'Comunidad', tab);
-  for (const tab of ['sends', 'channels', 'recap']) assert.equal(sectionOf(tab).label, 'Avisos', tab);
+  for (const tab of ['sends', 'channels', 'recap']) assert.equal(sectionOf(tab).label, 'Notificaciones', tab);
   for (const tab of ['ai', 'chat', 'aiusage']) assert.equal(sectionOf(tab).label, 'IA', tab);
   for (const tab of ['costs', 'backup', 'audit']) assert.equal(sectionOf(tab).label, 'Sistema', tab);
   assert.equal(sectionOf('nothing'), undefined);
