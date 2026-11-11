@@ -4,9 +4,12 @@ import { installApi, installDom, installStorage, json, settle, text } from './do
 import { current } from '../js/lib/seasons.js';
 
 installStorage();
-installDom('<main id="main"></main>');
+const window = installDom('<main id="main"></main>', 'http://localhost/');
+globalThis.location = window.location;
+globalThis.history = window.history;
 const page = await import('../js/pages/season/index.js');
 const main = () => document.getElementById('main');
+const freshMain = () => { main().replaceWith(main().cloneNode(false)); return main(); }; // a page listens on its own <main>, as the router gives it
 
 const ANSWER = [
   { type: 'user_hours', data: [{ user_id: 1, name: 'Ana <b>', played_time: 7200 }, { user_id: 2, name: 'Bea', played_time: 3600 }, { user_id: 3, name: 'Cai', played_time: 0 }, { user_id: 4, name: 'Dan', played_time: 0 }] },
@@ -22,7 +25,7 @@ test('it shows the running season and a card per ranking, with names as text', a
   await page.render({ main: main() });
   await settle();
   assert.equal(text('h1')[0], `Temporada ${current()}`);
-  assert.equal(calls[0].path.startsWith('/statistics/rankings?only_active=true&ranking=user_hours'), true);
+  assert.equal(calls[0].path.startsWith(`/statistics/rankings?only_active=true&season=${current()}&ranking=user_hours`), true);
   assert.equal(document.querySelectorAll('.ss-card').length, 9);
   assert.deepEqual(text('#ss-hours .ss-name'), ['Bea', 'Ana <b>', 'Cai', 'Dan']); // the podium puts the second at the left of the first; a player with nothing is still there
   assert.equal(document.querySelectorAll('.ss-name b').length, 0);
@@ -56,4 +59,31 @@ test('it says so when the rankings cannot be loaded', async () => {
   await page.render({ main: main() });
   await settle();
   assert.match(text('.pf-empty')[0], /No se han podido cargar/);
+});
+
+test('there is a pill per season, the running one pressed, and the address picks another', async () => {
+  const calls = installApi({ 'GET /statistics/rankings?': ANSWER, 'GET /users/photo/': json({ detail: 'no' }, 404) });
+  window.location.hash = '#/season/' + (current() - 1);
+  await page.render({ main: freshMain() });
+  await settle();
+  assert.equal(text('h1')[0], `Temporada ${current() - 1}`);
+  assert.match(calls[0].path, new RegExp(`season=${current() - 1}&`));
+  assert.equal(document.querySelectorAll('#main [data-season]').length, current() - 2023 + 1);
+  assert.equal(document.querySelector('[data-season][aria-pressed="true"]').textContent, String(current() - 1));
+  assert.equal(document.querySelectorAll('.ss-card').length, 8); // no current streak in an old season
+  window.location.hash = '';
+});
+
+test('pressing a season loads it, follows it in the address and the last answer wins', async () => {
+  const calls = installApi({ 'GET /statistics/rankings?': ANSWER, 'GET /users/photo/': json({ detail: 'no' }, 404) });
+  await page.render({ main: freshMain() });
+  await settle();
+  document.querySelector(`[data-season="${current() - 1}"]`).click();
+  assert.equal(window.location.hash, `#/season/${current() - 1}`);
+  document.querySelector(`[data-season="${current()}"]`).click(); // pressed before the older one answered
+  assert.equal(window.location.hash, '#/season');
+  await settle();
+  assert.equal(text('h1')[0], `Temporada ${current()}`);
+  assert.equal(document.querySelectorAll('.ss-card').length, 9);
+  assert.equal(calls.filter((c) => c.path.startsWith('/statistics/rankings')).length, 3);
 });

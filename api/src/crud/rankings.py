@@ -18,18 +18,18 @@ config = Config()
 ####################
 
 
-def user_hours_players(db: Session, limit: int = None, is_active: bool | None = None) -> list[dict]:
-    rows = time_entries.players_played_time(db, is_active=is_active)
+def user_hours_players(db: Session, limit: int = None, is_active: bool | None = None, season: int = None) -> list[dict]:
+    rows = time_entries.players_played_time(db, season, is_active=is_active)
     return rows[:limit] if limit else rows
 
 
-def players_with_dates(db: Session, is_active: bool | None = None):
-    """(user_id, name, played days) of every player, for the rankings derived from the days played.
+def players_with_dates(db: Session, is_active: bool | None = None, season: int = None):
+    """(user_id, name, played days of the season) of every player, for the rankings derived from the days played.
 
     Three rankings need it (days, best and current streak): a caller that asks for several
     computes it once and passes it as `players`."""
-    names = {row["user_id"]: row["name"] for row in time_entries.players_played_time(db, is_active=is_active)}
-    return [(user_id, names[user_id], days) for user_id, days in time_entries.players_played_dates(db, is_active=is_active).items()]
+    names = {row["user_id"]: row["name"] for row in time_entries.players_played_time(db, season, is_active=is_active)}
+    return [(user_id, names[user_id], days) for user_id, days in time_entries.players_played_dates(db, season, is_active=is_active).items()]
 
 
 def user_days_played(db: Session, limit: int = None, is_active: bool | None = None, players=None) -> list[dict]:
@@ -186,8 +186,8 @@ def games_last_played(db: Session, limit: int = 10, is_active: bool | None = Non
     return db.execute(stmt).mappings().all()
 
 
-def games_most_played(db: Session, limit: int = 10, is_active: bool | None = None) -> list[dict]:
-    return time_entries.games_played_time(db, limit=limit, is_active=is_active)
+def games_most_played(db: Session, limit: int = 10, is_active: bool | None = None, season: int = None) -> list[dict]:
+    return time_entries.games_played_time(db, season, limit=limit, is_active=is_active)
 
 
 def platform_played_games(db: Session, limit: int = None, is_active: bool | None = None):

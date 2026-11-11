@@ -1,12 +1,12 @@
-// Season page (#/season): the rankings of the running season (active players only). It always shows the current season
-// (there is no selector). One request (GET /statistics/rankings); everything is derived from the sessions, the library and
-// the achievements: nothing is stored. Each ranking has its own way of being drawn (`view` in lib/season-stats.js): a podium,
+// Season page (#/season[/<year>]): the rankings of a season (active players only), the running one by default, with a pill
+// per season to look at the older ones. One request (GET /statistics/rankings?season=); everything is derived from the
+// sessions, the library and the achievements: nothing is stored. Each ranking has its own way of being drawn (`view` in lib/season-stats.js): a podium,
 // bars, tiles, rings or game covers.
 import { api } from '../../lib/api.js';
 import { html, mount } from '../../lib/html.js';
 import { gameHref } from '../../lib/links.js';
-import { RANKINGS, barWidths, podiumOrder, positions, rankingsPath, ringPercent, rowsOf } from '../../lib/season-stats.js';
-import { current } from '../../lib/seasons.js';
+import { barWidths, podiumOrder, positions, rankingsOf, rankingsPath, ringPercent, rowsOf, seasonFromHash } from '../../lib/season-stats.js';
+import { available, current } from '../../lib/seasons.js';
 import { hydratePhotos, playerAvatar } from '../../ui/avatar.js';
 
 export const active = null; // it belongs to no item of the top bar
@@ -106,19 +106,39 @@ const card = (ranking, answer) => {
     </section>`;
 };
 
-const title = html`<h1 class="pf-title pg-title">Temporada ${current()}</h1>`;
+const header = (season) => html`
+  <h1 class="pf-title pg-title">Temporada ${season}</h1>
+  <div class="pf-season" role="group" aria-label="Temporada">${available().map((year) => html`
+    <button type="button" class="pf-season-badge" data-season="${year}" aria-pressed="${String(year === season)}">${year}</button>`)}
+  </div>`;
 
 export async function render({ main }) {
-  mount(main, html`${title}<div class="pf-empty">Cargando…</div>`);
-  let answer;
-  try {
-    answer = await api(rankingsPath());
-  } catch {
-    mount(main, html`${title}<div class="pf-empty">No se han podido cargar los rankings.</div>`);
-    return;
+  let latest = 0; // an answer to a season left meanwhile must not replace the one on screen
+
+  async function show(season) {
+    const mine = ++latest;
+    mount(main, html`${header(season)}<div class="pf-empty">Cargando…</div>`);
+    let answer;
+    try {
+      answer = await api(rankingsPath(season));
+    } catch {
+      if (mine === latest) mount(main, html`${header(season)}<div class="pf-empty">No se han podido cargar los rankings.</div>`);
+      return;
+    }
+    if (mine !== latest) return;
+    mount(main, html`
+      ${header(season)}
+      <div class="ss-grid">${rankingsOf(season).map((ranking) => card(ranking, answer))}</div>`);
+    hydratePhotos(main);
   }
-  mount(main, html`
-    ${title}
-    <div class="ss-grid">${RANKINGS.map((ranking) => card(ranking, answer))}</div>`);
-  hydratePhotos(main);
+
+  main.addEventListener('click', (e) => {
+    const pill = e.target.closest('[data-season]');
+    if (!pill || pill.getAttribute('aria-pressed') === 'true') return;
+    const season = Number(pill.dataset.season);
+    // the address follows the pill (so it can be shared) without going through the router again
+    history.replaceState(null, '', season === current() ? '#/season' : `#/season/${season}`);
+    show(season);
+  });
+  await show(seasonFromHash(location.hash));
 }

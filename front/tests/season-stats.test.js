@@ -1,12 +1,30 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { RANKINGS, barWidths, podiumOrder, positions, rankingsPath, ringPercent, rowsOf } from '../js/lib/season-stats.js';
+import { RANKINGS, barWidths, podiumOrder, positions, rankingsOf, rankingsPath, ringPercent, rowsOf, seasonFromHash } from '../js/lib/season-stats.js';
+import { current } from '../js/lib/seasons.js';
 
 const by = (id) => RANKINGS.find((r) => r.id === id);
 
 test('it asks for every ranking of the active players in one request, with the names the API knows', () => {
   assert.equal(RANKINGS.length, 9);
-  assert.match(rankingsPath(), /^\/statistics\/rankings\?only_active=true&ranking=user_hours,user_days,.*,games_most_played$/);
+  const path = rankingsPath();
+  assert.ok(path.startsWith(`/statistics/rankings?only_active=true&season=${current()}&ranking=user_hours,user_days,`));
+  assert.ok(path.endsWith(',user_current_streak,games_most_played'));
+});
+
+test('an older season has no current streak and is asked for by its year', () => {
+  assert.equal(rankingsOf(current()).length, 9);
+  assert.equal(rankingsOf(current() - 1).length, 8);
+  assert.ok(!rankingsOf(current() - 1).some((r) => r.id === 'current-streak'));
+  assert.match(rankingsPath(current() - 1), new RegExp(`season=${current() - 1}&ranking=`));
+  assert.ok(!rankingsPath(current() - 1).includes('user_current_streak'));
+});
+
+test('the address names the season, and the running one is the answer to anything else', () => {
+  const now = new Date(2026, 5, 1);
+  assert.equal(seasonFromHash('#/season/2024', now), 2024);
+  assert.equal(seasonFromHash('#/season/2024/', now), 2024);
+  for (const hash of ['#/season', '', undefined, '#/season/2027', '#/season/2022', '#/season/abc', '#/season/20244']) assert.equal(seasonFromHash(hash, now), 2026);
 });
 
 test('each ranking writes its value the way the bot does', () => {
