@@ -4,7 +4,7 @@
     python docs-demo/screenshots.py home game  # only these
 
 Needs Playwright and Pillow (pip install playwright pillow); it drives the Edge or Chrome that is installed,
-nothing is downloaded. The pictures go to docs/assets/screens/ as WebP.
+nothing is downloaded. (Without installing them: uv run --with playwright --with pillow python docs-demo/screenshots.py.) The pictures go to docs/assets/screens/ as WebP.
 """
 import datetime
 import io
@@ -56,6 +56,21 @@ def search(text):
     return do
 
 
+def type_into(selector, text, wait=1500):
+    def do(page):
+        page.locator(selector).press_sequentially(text, delay=60)
+        page.wait_for_timeout(wait)
+    return do
+
+
+def scroll_to(selector):
+    """Brings an element into view, for a card that is not at the top of its page."""
+    def do(page):
+        page.locator(selector).first.scroll_into_view_if_needed()
+        page.wait_for_timeout(500)
+    return do
+
+
 def pick_first(page):
     page.locator(".modal-result-row").first.click()
     page.wait_for_timeout(1000)
@@ -78,6 +93,8 @@ def shots(g, p, month):
     return [
         ("login", "", "#/", D, {}),
         ("home", "bea", "#/", D, {}),
+        ("home-phone", "bea", "#/", P, {}),
+        ("search", "bea", "#/", D, {"do": several(click(".navbar-search"), type_into("#searchInput", "ha"))}),
         ("home-history", "bea", "#/", D, {"do": click(".history-row"), "full": False}),
         ("menu", "bea", "#/", D, {"do": click("#menuBtn")}),
         ("menu-phone", "bea", "#/", P, {"do": click("#menuBtn")}),
@@ -85,9 +102,11 @@ def shots(g, p, month):
         ("picker", "bea", "#/", D, {"do": several(click("#chooseGameBtn"), search("hol"))}),
         ("picker-platform", "bea", "#/", D, {"do": several(click("#chooseGameBtn"), search("hades ii"), pick_first)}),
         ("manual", "bea", "#/", D, {"do": several(click("#manualSessionBtn"), search("celeste"), pick_first)}),
-        ("complete", "bea", "#/", D, {"do": click(".btn-complete:not(.done)")}),
+        # the button is in the unfolded game: one that is not completed yet
+        ("complete", "bea", "#/", D, {"do": several(click(".history-group:not(:has(.history-done)) .history-row"), click(".btn-complete:not(.done)"))}),
         ("activity", "bea", "#/activity", D, {}),
         ("season", "bea", "#/season", D, {}),
+        ("season-fame", "bea", "#/season/fame", D, {}),
         ("changelog", "bea", "#/changelog", D, {}),
         ("library", "bea", "#/library", D, {}),
         ("session-edit", "bea", "#/", D, {"do": several(click(".history-row"), click('[data-action="edit-session"]'))}),
@@ -120,7 +139,7 @@ def shots(g, p, month):
         ("admin-channels", *admin("channels")),
         ("admin-ai", *admin("ai")),
         ("admin-announce", *admin("announce")),
-        ("admin-mail", *admin("mail")),
+        ("admin-mail", "dani", "#/admin/channels", D, {"do": scroll_to(".adm-set-card:has-text('Correo')")}),
         ("admin-audit", *admin("audit")),
     ]
 

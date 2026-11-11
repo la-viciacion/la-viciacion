@@ -112,11 +112,11 @@ The screenshots in `docs/assets/screens/` are taken from a throwaway demo stack,
 ```bash
 python docs-demo/demo.py up           # writes docs-demo/.env (random secrets, gitignored), builds and starts it
 python docs-demo/demo.py seed         # players, games, ~1,500 sessions, completions, ratings, challenges
-python docs-demo/screenshots.py       # retakes every picture (needs playwright and pillow; uses the installed Edge or Chrome)
+python docs-demo/screenshots.py       # retakes every picture (needs playwright and pillow: pip install playwright pillow; uses the installed Edge or Chrome, nothing is downloaded)
 python docs-demo/demo.py down         # stops it and deletes its database
 ```
 
-Run them with a Python that has Pillow (the API's venv does). A change to the UI is a reason to rerun `screenshots.py`.
+Run them with a Python that has Pillow (the API's venv does). A change to the UI is a reason to rerun `screenshots.py` (all of it, or only some: `python docs-demo/screenshots.py home menu`). Without installing anything: `uv run --with playwright --with pillow python docs-demo/screenshots.py`.
 
 ## Debugging tips
 
