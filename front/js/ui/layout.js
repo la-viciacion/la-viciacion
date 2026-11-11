@@ -4,9 +4,12 @@ import { html, mount } from '../lib/html.js';
 import { skinFor } from '../lib/easter-eggs.js';
 import { knownBirthDate } from './birthday.js';
 import { startPresence } from '../lib/presence.js';
-import { iconBell, iconHome, iconMenu, iconShield } from './icons.js';
+import { activeItem, bottomTabs, sectionOf } from '../lib/menu.js';
+import * as icons from './icons.js';
+import { iconBell, iconHome, iconMenu, iconSearch, iconShield } from './icons.js';
 import { mountMenu } from './menu.js';
 import { mountPlaying } from './playing.js';
+import { mountSearch } from './search.js';
 
 const app = () => document.getElementById('app');
 
@@ -58,7 +61,8 @@ function navbar(user, active) {
       </div>
       <div class="navbar-actions">
         <div class="playing-slot" id="playingSlot"></div>
-        ${link('#', 'home', 'Inicio', iconHome())}
+        <button type="button" class="navbar-link navbar-search" data-search aria-label="Buscar" title="Buscar ( / )">${iconSearch()}<span class="navbar-link-text">Buscar</span></button>
+        <span class="navbar-home">${link('#', 'home', 'Inicio', iconHome())}</span>
         <a href="#/notifications" class="navbar-link bell ${active === 'notifications' ? 'active' : ''}" aria-label="Avisos" title="Avisos">${iconBell()}<span class="navbar-link-text">Avisos</span><span class="bell-badge" id="bellBadge" hidden></span></a>
         <a href="#/profile" class="navbar-user ${active === 'profile' ? 'active' : ''}" title="Mi perfil (@${user.username})">
           <div class="navbar-avatar navbar-avatar-placeholder" aria-hidden="true">${initial}</div>
@@ -66,6 +70,20 @@ function navbar(user, active) {
         </a>
         ${user.is_admin ? link('#/admin', 'admin', 'Panel de administración', iconShield()) : ''}
       </div>
+    </nav>`;
+}
+
+// The bar at the foot of a phone (hidden on a wide screen, where the top bar and the menu do the same): the four
+// sections and the search in the middle. A tab leads to the main page of its section and is lit on any of them.
+function bottomBar() {
+  const current = sectionOf(activeItem(location.hash));
+  const tab = (t) => html`<a class="bottom-tab ${current === t.id ? 'active' : ''}" href="${t.href}" ${current === t.id ? html`aria-current="page"` : ''}>${icons[t.icon]()}<span>${t.label}</span></a>`;
+  const [first, second, third, fourth] = bottomTabs();
+  return html`
+    <nav class="bottom-bar" aria-label="Secciones">
+      ${tab(first)}${tab(second)}
+      <button type="button" class="bottom-tab" data-search aria-label="Buscar">${iconSearch()}<span>Buscar</span></button>
+      ${tab(third)}${tab(fourth)}
     </nav>`;
 }
 
@@ -86,8 +104,10 @@ export function renderShell({ user, active, mainClass = '', onLogout }) {
     <div class="home-page">
       ${navbar(user, active)}
       <main class="home-main ${mainClass}"></main>
+      ${bottomBar()}
     </div>`);
   mountMenu(document.getElementById('menuBtn'), { user, onLogout });
+  mountSearch(app(), user);
   mountPlaying(document.getElementById('playingSlot'), user);
   startPresence();
   api('/notifications/unread').then((data) => data && setUnread(data.unread)).catch(() => {});

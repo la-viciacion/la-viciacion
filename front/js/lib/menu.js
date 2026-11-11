@@ -1,36 +1,60 @@
-// Structure of the side menu. Pure: no DOM, so it can be tested. Each item is { id, label, href, icon, wip? }
-// (icon is the name of a function of ui/icons.js; `admin`: only the administrators see it, none does now); `logout` is not a link, the menu draws it apart at the foot.
+// Structure of the side menu and of the bottom bar of a phone. Pure: no DOM, so it can be tested.
+// Each item is { id, label, href, icon } (icon is the name of a function of ui/icons.js).
 
-/** The sections of the menu for `user`; an empty section (the admin one for a player) is left out. */
-export function menuSections(user) {
-  return [
-    { label: 'Principal', items: [
-      { id: 'home', label: 'Inicio', href: '#', icon: 'iconHome' },
-      { id: 'activity', label: 'Actividad', href: '#/activity', icon: 'iconActivity' },
-    ] },
-    { label: 'Explorar', items: [
-      { id: 'season', label: 'Temporada', href: '#/season', icon: 'iconClock' },
-      { id: 'games', label: 'Juegos', href: '#/games', icon: 'iconGamepad' },
-      { id: 'library', label: 'Biblioteca', href: '#/library', icon: 'iconStar' },
-      { id: 'players', label: 'Jugadores', href: '#/players', icon: 'iconPerson' },
-      { id: 'calendar', label: 'Calendario', href: '#/calendar', icon: 'iconCalendar' },
-      { id: 'achievements', label: 'Logros', href: '#/achievements', icon: 'iconTrophy' },
-      { id: 'stats', label: 'Estadísticas', href: '#/stats', icon: 'iconChart', wip: true },
-      { id: 'server', label: 'Servidor', href: '#/server', icon: 'iconServer' },
-    ] },
-    { label: 'Tú', items: [
-      { id: 'profile', label: 'Mi perfil', href: '#/profile/resumen', icon: 'iconProfile' },
-      { id: 'wishlist', label: 'Deseados', href: '#/wishlist', icon: 'iconHeart' },
-      { id: 'recommendations', label: 'Recomendados', href: '#/recommendations', icon: 'iconDice' },
-      { id: 'challenges', label: 'Retos', href: '#/challenges', icon: 'iconFlag' },
-      { id: 'settings', label: 'Ajustes', href: '#/profile/ajustes', icon: 'iconSettings' },
-    ] },
-    { label: 'Administración', items: user?.is_admin ? [
-      { id: 'admin', label: 'Panel de administración', href: '#/admin', icon: 'iconShield' },
-    ] : [] },
-  ]
-    .map((section) => ({ ...section, items: section.items.filter((item) => !item.admin || user?.is_admin) }))
-    .filter((section) => section.items.length);
+const SECTIONS = [
+  { id: 'principal', label: 'Principal', items: [
+    { id: 'home', label: 'Inicio', href: '#', icon: 'iconHome' },
+    { id: 'activity', label: 'Actividad', href: '#/activity', icon: 'iconActivity' },
+  ] },
+  { id: 'group', label: 'Grupo', items: [
+    { id: 'season', label: 'Temporada', href: '#/season', icon: 'iconClock' },
+    { id: 'players', label: 'Jugadores', href: '#/players', icon: 'iconPerson' },
+    { id: 'challenges', label: 'Retos', href: '#/challenges', icon: 'iconFlag' },
+    { id: 'achievements', label: 'Logros', href: '#/achievements', icon: 'iconTrophy' },
+  ] },
+  { id: 'games', label: 'Juegos', items: [
+    { id: 'games', label: 'Juegos', href: '#/games', icon: 'iconGamepad' },
+    { id: 'library', label: 'Biblioteca', href: '#/library', icon: 'iconStar' },
+    { id: 'calendar', label: 'Calendario', href: '#/calendar', icon: 'iconCalendar' },
+  ] },
+  { id: 'you', label: 'Tú', items: [
+    { id: 'profile', label: 'Mi perfil', href: '#/profile/resumen', icon: 'iconProfile' },
+    { id: 'wishlist', label: 'Deseados', href: '#/wishlist', icon: 'iconHeart' },
+    { id: 'recommendations', label: 'Recomendados', href: '#/recommendations', icon: 'iconDice' },
+  ] },
+];
+
+// What is not about the games nor the group: the last section of the menu ("Más"), scrolling with the rest.
+const FOOT = [
+  { id: 'settings', label: 'Ajustes', href: '#/profile/ajustes', icon: 'iconSettings' },
+  { id: 'server', label: 'Servidor', href: '#/server', icon: 'iconServer' },
+  { id: 'admin', label: 'Panel de administración', href: '#/admin', icon: 'iconShield', admin: true },
+];
+
+/** The sections of the menu: { label, items }. */
+export const menuSections = () => SECTIONS.map(({ label, items }) => ({ label, items }));
+
+/** The items of the last section of the menu for `user` (the administration only for an admin). */
+export const menuFoot = (user) => FOOT.filter((item) => !item.admin || user?.is_admin);
+
+/** Every page the menu reaches, in order (the search looks among them). */
+export const menuPages = (user) => [...SECTIONS.flatMap((section) => section.items), ...menuFoot(user)];
+
+// The tabs of the bottom bar of a phone: each leads to the main page of its section and is lit on any of them.
+// The settings belong to "Tú" (they are a part of the profile); the server and the admin panel to none.
+const TABS = [
+  { id: 'principal', label: 'Inicio', href: '#', icon: 'iconHome' },
+  { id: 'group', label: 'Grupo', href: '#/season', icon: 'iconPerson' },
+  { id: 'games', label: 'Juegos', href: '#/games', icon: 'iconGamepad' },
+  { id: 'you', label: 'Tú', href: '#/profile/resumen', icon: 'iconProfile' },
+];
+
+export const bottomTabs = () => TABS;
+
+/** The id of the section (and so of the tab) a menu item belongs to; null for the ones of the foot. */
+export function sectionOf(itemId) {
+  if (itemId === 'settings') return 'you';
+  return SECTIONS.find((section) => section.items.some((item) => item.id === itemId))?.id ?? null;
 }
 
 // The item a page address belongs to, longest prefix first so '#/profile/ajustes' is not just 'profile'.
@@ -40,7 +64,6 @@ const PAGES = [
   ['#/admin', 'admin'],
   ['#/activity', 'activity'],
   ['#/season', 'season'],
-  ['#/stats', 'stats'],
   ['#/server', 'server'],
   ['#/games', 'games'],
   ['#/library', 'library'],

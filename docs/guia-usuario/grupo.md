@@ -1,6 +1,6 @@
 # El grupo
 
-Las páginas del grupo: lo que está en **Principal** y **Explorar** del menú es del grupo entero. Los juegos, la biblioteca y el calendario tienen su propia página: [Juegos, biblioteca y calendario](juegos.md). Aquí: ves lo que hacen los demás y ellos ven lo tuyo (nunca tu email, tu Telegram ni tus ajustes).
+Las páginas del grupo: lo que está en **Principal** y **Grupo** del menú es del grupo entero. Los juegos, la biblioteca y el calendario tienen su propia página: [Juegos, biblioteca y calendario](juegos.md). Aquí: ves lo que hacen los demás y ellos ven lo tuyo (nunca tu email, tu Telegram ni tus ajustes).
 
 ## Quién está jugando ahora
 
@@ -18,7 +18,7 @@ En la barra superior aparece un grupito de avatares cuando alguien tiene un time
 
 ![Los rankings de la temporada](../assets/screens/season.webp){ .screenshot }
 
-**Menú → Temporada** (el primero de Explorar) enseña los rankings de la **temporada en curso**, solo con los jugadores activos. No tiene selector: siempre es la de este año. Cada ranking es un **podio** con los tres primeros (el segundo a la izquierda del primero) y, debajo, el resto hasta el décimo en barras; todos los jugadores activos salen en todos los rankings, con un 0 si no tienen nada, y quien empata comparte el puesto. Los rankings son:
+**Menú → Temporada** (el primero de Grupo) enseña los rankings de la **temporada en curso**, solo con los jugadores activos. No tiene selector: siempre es la de este año. Cada ranking es un **podio** con los tres primeros (el segundo a la izquierda del primero) y, debajo, el resto hasta el décimo en barras; todos los jugadores activos salen en todos los rankings, con un 0 si no tienen nada, y quien empata comparte el puesto. Los rankings son:
 
 - **Tiempo jugado**, **Días jugados** y **Juegos jugados**.
 - **Juegos completados** y **Ratio de completado** (qué parte de los juegos de tu biblioteca de la temporada has completado, en porcentaje).
@@ -27,10 +27,6 @@ En la barra superior aparece un grupito de avatares cuando alguien tiene un time
 - **Juegos más jugados**, con la portada de cada juego (o un mando si no la tiene); el nombre lleva a su página.
 
 Los nombres de los jugadores no enlazan a su perfil: para eso está [Jugadores](#jugadores).
-
-## Estadísticas
-
-**Menú → Estadísticas** todavía está en construcción (lleva la etiqueta **WIP**): de momento solo avisa de que ahí irán más rankings y comparativas del grupo.
 
 ## Jugadores
 

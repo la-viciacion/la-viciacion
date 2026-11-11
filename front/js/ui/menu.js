@@ -1,6 +1,6 @@
 // The side menu: a button in the top bar that slides a panel in from the left. It closes with Escape, a tap
 // outside or after choosing a page; the page it is on is highlighted. What is in it: lib/menu.js.
-import { activeItem, menuSections } from '../lib/menu.js';
+import { activeItem, menuFoot, menuSections } from '../lib/menu.js';
 import { html, mount } from '../lib/html.js';
 import { loadVersion } from '../lib/version.js';
 import * as icons from './icons.js';
@@ -9,7 +9,7 @@ let open = null; // the close function of the menu that is on screen
 
 const item = (it, current) => html`
   <a class="menu-item ${current === it.id ? 'active' : ''}" href="${it.href}" ${current === it.id ? html`aria-current="page"` : ''}>
-    ${icons[it.icon]()}<span>${it.label}</span>${it.wip ? html`<span class="menu-wip">WIP</span>` : ''}
+    ${icons[it.icon]()}<span>${it.label}</span>
   </a>`;
 
 function openMenu(button, { user, onLogout }) {
@@ -23,11 +23,14 @@ function openMenu(button, { user, onLogout }) {
         <button class="menu-close" type="button" data-close aria-label="Cerrar el menú">${icons.iconClose()}</button>
       </div>
       <nav class="menu-nav" aria-label="Secciones">
-        ${menuSections(user).map((section) => html`
+        ${menuSections().map((section) => html`
           <div class="menu-section">${section.label}</div>
           ${section.items.map((it) => item(it, current))}`)}
+        <div class="menu-section">Más</div>
+        ${menuFoot(user).map((it) => item(it, current))}
       </nav>
-      <div class="menu-foot"><button class="menu-item menu-logout" type="button" id="menuLogout">${icons.iconLogout()}<span>Cerrar sesión</span></button>
+      <div class="menu-foot">
+        <button class="menu-item menu-logout" type="button" id="menuLogout">${icons.iconLogout()}<span>Cerrar sesión</span></button>
         <a class="menu-version" id="menuVersion" href="#/changelog" title="Ver las novedades" hidden></a>
       </div>
     </aside>`);

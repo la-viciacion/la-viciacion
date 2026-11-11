@@ -16,6 +16,7 @@ export const iconBell = () => svg(18, '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9
 export const iconPencil = () => svg(13, '<path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>');
 export const iconHome = () => svg(18, '<path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v10h5v-6h4v6h5V10"/>');
 export const iconShield = () => svg(18, '<path d="M12 3 4 6v6c0 4.5 3.2 8 8 9 4.8-1 8-4.5 8-9V6l-8-3z"/><polyline points="9 12 11 14 15 10"/>');
+export const iconSearch = () => svg(18, '<circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>');
 export const iconMenu = () => svg(20, '<line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>');
 export const iconClose = () => svg(18, '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>');
 export const iconChart = () => svg(18, '<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>');
