@@ -42,7 +42,7 @@ AI_API_KEY=tu_clave
 AI_MODEL=gemini-3.5-flash-lite   # un modelo de ese proveedor
 ```
 
-El código no trae proveedor ni modelo por defecto, y desde el panel no se pueden cambiar (solo se muestran). Se ven en **Sistema → Servicios**. Lo que sí se edita desde el panel, en **Notificaciones → IA**:
+El código no trae proveedor ni modelo por defecto, y desde el panel no se pueden cambiar (solo se muestran). Se ven en **IA → Avisos con IA**, donde también se edita lo único que sí se puede cambiar desde el panel:
 
 - El **interruptor** de la IA.
 - Los **avisos que la usan**, cada uno con su propio interruptor y sus **instrucciones** (prompt) editables. **Restaurar las originales** vuelve a seguir las del código.
@@ -52,7 +52,7 @@ El código no trae proveedor ni modelo por defecto, y desde el panel no se puede
 
 ### Cuánto ha gastado la IA (solo OpenAI)
 
-OpenAI no dice por API cuánto crédito queda, pero sí cuánto se ha facturado. Para verlo en **Sistema → Uso de IA** hace falta una segunda clave, distinta de `AI_API_KEY`:
+OpenAI no dice por API cuánto crédito queda, pero sí cuánto se ha facturado. Para verlo en **IA → Uso y coste** hace falta una segunda clave, distinta de `AI_API_KEY`:
 
 1. En platform.openai.com → Settings → Organization → **Admin keys** (solo un propietario de la organización las ve), crea una clave de administración. También sirve una clave restringida con solo el permiso de lectura de uso (`api.usage.read`), que es más segura porque no puede hacer nada más.
 2. Ponla en el `.env` como `OPENAI_ADMIN_KEY=` y reinicia la API.
@@ -85,11 +85,11 @@ El botón flotante de abajo a la derecha abre un asistente que responde sobre vi
 CHAT_AI_MODEL=gemini-3.5-flash   # opcional: un modelo del mismo proveedor; sin ella se usa AI_MODEL
 ```
 
-Sirve para dar al chat un modelo más potente que el de los avisos (que solo reescriben frases cortas). Como las demás claves y modelos, vive solo en el `.env` y desde el panel solo se ve. Lo que se edita desde el panel, en **Sistema → Chat**, es el **interruptor** (independiente del de los avisos), las **instrucciones** y el botón **Probar el chat**; la pestaña dice si los jugadores lo tienen disponible y, si no, qué falta; el modelo que usa se ve en **Sistema → Servicios**.
+Sirve para dar al chat un modelo más potente que el de los avisos (que solo reescriben frases cortas). Como las demás claves y modelos, vive solo en el `.env` y desde el panel solo se ve. Lo que se edita desde el panel, en **IA → Chat**, es el **interruptor** (independiente del de los avisos), las **instrucciones** y el botón **Probar el chat**; la pestaña dice si los jugadores lo tienen disponible y, si no, qué falta; el modelo que usa se ve en **Avisos → Canales**.
 
 ## Notificaciones push
 
-Es un segundo canal junto a Telegram, **activado por defecto** y sin nada que configurar: la API crea sus claves VAPID (un par para todo el servidor) en el primer arranque y las asocia al entorno y a la dirección pública (`ENVIRONMENT` y `PUBLIC_URL`) de esa instalación. Si copias una base de datos a otra instalación (por ejemplo, producción a tu equipo), los avisos quedan apagados allí hasta que generes claves nuevas, para no notificar a dispositivos reales. Solo necesita **HTTPS** delante de la app, y que cada jugador acepte los avisos en cada dispositivo. Si lo necesitas, **Sistema → Servicios** permite cambiar el contacto (por defecto, `SMTP_EMAIL`) o regenerar las claves (lo que desuscribe todos los dispositivos), y **Notificaciones → Canales** apagarlo.
+Es un segundo canal junto a Telegram, **activado por defecto** y sin nada que configurar: la API crea sus claves VAPID (un par para todo el servidor) en el primer arranque y las asocia al entorno y a la dirección pública (`ENVIRONMENT` y `PUBLIC_URL`) de esa instalación. Si copias una base de datos a otra instalación (por ejemplo, producción a tu equipo), los avisos quedan apagados allí hasta que generes claves nuevas, para no notificar a dispositivos reales. Solo necesita **HTTPS** delante de la app, y que cada jugador acepte los avisos en cada dispositivo. Si lo necesitas, **Avisos → Canales** permite cambiar el contacto (por defecto, `SMTP_EMAIL`) o regenerar las claves (lo que desuscribe todos los dispositivos), y **Avisos → Canales** apagarlo.
 
 ## Open-Meteo: el tiempo y las ciudades
 
