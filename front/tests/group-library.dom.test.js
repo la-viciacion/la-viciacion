@@ -12,6 +12,10 @@ const DATA = {
   hidden_gems: [game('hades', 'Hades <b>', { players: 1, score_mean: 92.5, score_count: 2 })],
   graveyard: [game('doom', 'Doom', { players: 3, abandoned_by: ['Ana', 'Bea'] })],
   rarities: { total: 14, items: [game('limbo', 'Limbo', { owner: 'Cai', seconds: 5400 }), game('inside', 'Inside', { owner: 'Ana', seconds: 0 })] },
+  wanted: { total: 3, items: [game('hollow', 'Hollow Knight: Silksong', { wanters: ['Ana', 'Bea'], release_date: '2099-01-02', upcoming: true }), game('dune', 'Dune', { wanters: ['Cai'], release_date: null, upcoming: true }), game('out', 'Out', { wanters: ['Ana'], release_date: '2020-01-01', upcoming: false })] },
+  together: { total: 1, items: [game('celeste', 'Celeste', { players: 3, season: 2026, seconds: 7200 })] },
+  finished: { total: 2, items: [game('hades', 'Hades', { completed: 3, players: 4, mean_seconds: 36000 }), game('inside', 'Inside', { completed: 2, players: 2, mean_seconds: null })] },
+  sagas: { total: 3, items: [{ saga: 'Zelda <i>', games: 4, players: 3, seconds: 7200 }] },
   genres: [{ genre: 'Indie', games: 12, players: 4, seconds: 7200, completed: 3 }, { genre: 'RPG', games: 6, players: 2, seconds: 3600, completed: 1 }],
   platforms: [{ platform: 'pc', platform_name: 'PC', games: 30, players: 4 }, { platform: 'switch', platform_name: 'Switch', games: 10, players: 2 }],
 };
@@ -25,7 +29,7 @@ const open = async (data = DATA) => {
 test('it shows the totals and every list with links to the games, as text', async () => {
   await open();
   assert.deepEqual(text('.pf-stat-value'), ['40', '4', '100 h']);
-  assert.deepEqual(text('.section-title'), ['Joyas ocultas', 'El cementerio', 'Rarezas', 'Por género', 'Por plataforma']);
+  assert.deepEqual(text('.section-title'), ['Joyas ocultas', 'El cementerio', 'Rarezas', 'Los más deseados', 'Lo que une al grupo', 'Terminados por varios', 'Sagas', 'Por género', 'Por plataforma']);
   assert.equal(document.querySelector('.gl-game .game-link').getAttribute('href'), '#/game/hades');
   assert.equal(document.querySelectorAll('.gl-game b').length, 0); // the name is text, never markup
   assert.match(main().textContent, /Hades <b>/);
@@ -43,13 +47,13 @@ test('a list that was cut says how many more there are', async () => {
 
 test('the coverage is drawn as bars relative to the largest one', async () => {
   await open();
-  assert.deepEqual([...document.querySelectorAll('.gl-bar i')].map((el) => el.getAttribute('style')), ['width:100%', 'width:50%', 'width:100%', 'width:33%']);
-  assert.deepEqual(text('.gl-bar-name'), ['Indie', 'RPG', 'PC', 'Switch']);
+  assert.deepEqual([...document.querySelectorAll('#gl-genres .gl-bar i, #gl-platforms .gl-bar i')].map((el) => el.getAttribute('style')), ['width:100%', 'width:50%', 'width:100%', 'width:33%']);
+  assert.deepEqual(text('#gl-genres .gl-bar-name, #gl-platforms .gl-bar-name'), ['Indie', 'RPG', 'PC', 'Switch']);
   assert.match(main().textContent, /30 juegos · 4 jugadores/);
 });
 
 test('a group with nothing says so in every list', async () => {
-  await open({ summary: { games: 0, players: 0, played_seconds: 0 }, hidden_gems: [], graveyard: [], rarities: { total: 0, items: [] }, genres: [], platforms: [] });
+  await open({ summary: { games: 0, players: 0, played_seconds: 0 }, hidden_gems: [], graveyard: [], rarities: { total: 0, items: [] }, wanted: { total: 0, items: [] }, together: { total: 0, items: [] }, finished: { total: 0, items: [] }, sagas: { total: 0, items: [] }, genres: [], platforms: [] });
   assert.match(main().textContent, /Todavía no hay ningún juego poco conocido/);
   assert.match(main().textContent, /Nadie ha abandonado nada/);
   assert.match(main().textContent, /Sin datos de géneros todavía/);
@@ -63,7 +67,7 @@ test('an error loading is shown', async () => {
   assert.match(main().textContent, /Error cargando la biblioteca del grupo: Sin conexión/);
 });
 
-const SECTIONS = ['gems', 'graveyard', 'rarities', 'genres', 'platforms'];
+const SECTIONS = ['gems', 'graveyard', 'rarities', 'wanted', 'together', 'finished', 'sagas', 'genres', 'platforms'];
 const scrolled = [];
 window.Element.prototype.scrollIntoView = function scrollIntoView() { scrolled.push(this.id); };
 
@@ -71,7 +75,7 @@ test('a row of pills reaches every section from the start, each with how many it
   await open();
   const pills = [...document.querySelectorAll('.gl-pills [data-go]')];
   assert.deepEqual(pills.map((p) => p.dataset.go), SECTIONS);
-  assert.deepEqual(pills.map((p) => p.textContent.replace(/\s+/g, ' ').trim()), ['Joyas ocultas 1', 'El cementerio 1', 'Rarezas 14', 'Por género 2', 'Por plataforma 2']);
+  assert.deepEqual(pills.map((p) => p.textContent.replace(/\s+/g, ' ').trim()), ['Joyas ocultas 1', 'El cementerio 1', 'Rarezas 14', 'Los más deseados 3', 'Lo que une al grupo 1', 'Terminados por varios 2', 'Sagas 3', 'Por género 2', 'Por plataforma 2']);
   pills[2].click();
   assert.deepEqual(scrolled.at(-1), 'gl-rarities');
 });
@@ -81,7 +85,7 @@ test('each section folds on its own, and a pill opens one that was folded', asyn
   await open();
   const fold = (key) => document.querySelector(`[data-fold="${key}"]`);
   const sectionOf = (key) => document.getElementById(`gl-${key}`);
-  assert.deepEqual(SECTIONS.map((key) => fold(key).getAttribute('aria-expanded')), Array(5).fill('true')); // all open at first
+  assert.deepEqual(SECTIONS.map((key) => fold(key).getAttribute('aria-expanded')), Array(9).fill('true')); // all open at first
   fold('graveyard').click();
   assert.equal(sectionOf('graveyard').classList.contains('folded'), true);
   assert.equal(fold('graveyard').getAttribute('aria-expanded'), 'false');
@@ -112,34 +116,27 @@ test('what was folded is remembered, and a browser without storage still works',
   localStorage.getItem = original;
 });
 
-const VALUE = {
-  min_contributors: 3, games: 3,
-  cheapest: [{ game_id: 'hades', game_name: 'Hades', image_url: null, contributors: 4, per_hour_cents: 120 }],
-  priciest: [{ game_id: 'doom', game_name: 'Doom', image_url: null, contributors: 3, per_hour_cents: 950 }],
-};
-const openWithValue = async (value) => {
-  installApi({ 'GET /group/library': DATA, 'GET /group/value': value });
-  await page.render({ main: main() });
-  await settle();
-};
-
-test('the cost per hour of the group is a section with its pill, never with a player or a price', async () => {
-  localStorage.removeItem('gl-folded');
-  await openWithValue(VALUE);
-  assert.ok(document.querySelector('.gl-pills [data-go="value"]'));
-  assert.deepEqual(text('#gl-value .game-link'), ['Hades', 'Doom']);
-  assert.match(document.querySelector('#gl-value').textContent.replace(/\u00a0/g, ' '), /1,20 €\/h · 4 jugadores/);
-  assert.match(document.querySelector('#gl-value').textContent, /al menos 3 jugadores con precio/);
-  assert.match(document.querySelector('#gl-value').textContent.replace(/\u00a0/g, ' '), /9,50 €\/h · 3 jugadores/);
+test('what the group waits for says who wants each game and when it comes out', async () => {
+  await open();
+  const rows = text('#gl-wanted .gl-game').map((t) => t.replace(/\s+/g, ' '));
+  assert.match(rows[0], /Hollow Knight: SilksongAna, Bea · sale el 2 ene 2099/);
+  assert.match(rows[1], /DuneCai · sin fecha de salida/);
+  assert.match(rows[2], /OutAna · ya ha salido/);
 });
 
-test('with no game that enough players priced the section says so, and without the data there is no section', async () => {
-  await openWithValue({ min_contributors: 3, games: 0, cheapest: [], priciest: [] });
-  assert.match(document.querySelector('#gl-value').textContent, /Todavía ningún juego tiene precio de 3 jugadores o más/);
-  installApi({ 'GET /group/library': DATA, 'GET /group/value': () => { throw new Error('boom'); } });
-  await page.render({ main: main() });
-  await settle();
+test('together, finished and sagas read as sentences and escape what comes from the data', async () => {
+  await open();
+  assert.match(text('#gl-together .gl-game')[0].replace(/\s+/g, ' '), /3 jugadores en 2026 · 2 h entre todos/);
+  const finished = text('#gl-finished .gl-game').map((t) => t.replace(/\s+/g, ' '));
+  assert.match(finished[0], /3 de 4 lo han terminado · de media 10 h/);
+  assert.doesNotMatch(finished[1], /de media/); // no sessions: no mean
+  assert.match(main().querySelector('#gl-sagas').textContent.replace(/\s+/g, ' '), /Zelda <i> 4 juegos · 3 jugadores · 2 h/);
+  assert.equal(main().querySelector('#gl-sagas i:not(.gl-bar i)'), null);
+  assert.match(main().querySelector('#gl-sagas').textContent, /y 2 más/);
+});
+
+test('the cost per hour is no longer on the page', async () => {
+  await open();
   assert.equal(document.querySelector('#gl-value'), null);
   assert.equal(document.querySelector('.gl-pills [data-go="value"]'), null);
-  assert.deepEqual(text('.pf-stat-value'), ['40', '4', '100 h']); // the rest of the page is as it was
 });

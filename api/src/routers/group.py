@@ -63,8 +63,8 @@ def get_group_library(
     db: Session = Depends(get_db),
 ):
     """The group's library as a whole: hidden gems, the graveyard (games players gave up), rarities (games one player
-    has), what nobody has touched and the coverage by genre and platform. Derived from the libraries, the sessions and
-    the ratings; readable by every logged-in user on purpose, like the game pages it is made of."""
+    has), the most wished games, what several players play or finish together, the sagas and the coverage by genre and
+    platform. Derived from the libraries, the sessions, the wishlists and the ratings; readable by every logged-in user on purpose, like the game pages it is made of."""
     return group_library.library(db)
 
 
