@@ -68,7 +68,7 @@ El compose publica la app en el puerto `3000` por HTTP, y la API y la base de da
 ## Salud y registros
 
 - `GET /api/v1/keepalive` es el endpoint de comprobación ligero. La base de datos y la API tienen healthcheck en el compose, y el bot espera a que la API esté sana.
-- `docker compose logs -f laviciacion-api` (o `laviciacion-bot`) para seguirlos. Docker conserva como máximo tres ficheros de 10 MB por contenedor, y los registros propios de la API (`api/logs`) rotan cada día y guardan una semana.
+- `docker compose logs -f laviciacion-api` (o `laviciacion-bot`) para seguirlos. Docker conserva como máximo tres ficheros de 10 MB por contenedor, y los registros propios de la API (`api/logs`) rotan cada día y guardan 90 días. Cada línea escrita mientras se atiende una petición lleva delante `[id jugador IP]`: el mismo id agrupa todo lo que provocó una petición (el aviso enviado, el timer iniciado…), y `-` significa que no había sesión. La IP es la real solo si `FORWARDED_ALLOW_IPS` está bien puesto (ver arriba).
 - Con `API_LOG_LEVEL=DEBUG` (y recrear el contenedor) verás más detalle. Sentry se activa si pones su DSN en `SENTRY_URL_API` / `SENTRY_URL_BOT`.
 
 ## Zona horaria y cambio de temporada
