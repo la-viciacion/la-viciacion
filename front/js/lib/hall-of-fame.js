@@ -17,8 +17,8 @@ export const CATEGORIES = [
   { id: 'streak', title: 'Mejor racha', short: 'Racha', text: days },
 ];
 
-/** The two ways to look at the hall: a row per season, or a cabinet per player. */
-export const VIEWS = [['matrix', 'Por temporada'], ['players', 'Por jugador']];
+/** The ways to look at the hall: a row per season, a cabinet per player, or a timeline with the grand champion of each season. */
+export const VIEWS = [['matrix', 'Por temporada'], ['players', 'Por jugador'], ['timeline', 'Línea temporal']];
 
 /** "1 título", "3 títulos". */
 export const titlesText = (n) => `${n} ${n === 1 ? 'título' : 'títulos'}`;

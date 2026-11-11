@@ -148,6 +148,21 @@ test('the other view is a cabinet per player with the categories won, season by 
   window.location.hash = '';
 });
 
+test('the timeline puts the grand champion of each season first and the champion of every category under it', async () => {
+  fameApi();
+  window.location.hash = '#/season/fame';
+  await page.render({ main: freshMain() });
+  await settle();
+  document.querySelector('[data-fame-view="timeline"]').click();
+  assert.equal(document.querySelector('[data-fame-view="timeline"]').getAttribute('aria-pressed'), 'true');
+  assert.deepEqual(text('.hf-step .hf-year'), ['2025', '2023']); // newest first, 2024 had nobody
+  assert.deepEqual(text('[aria-label="Temporada 2025"] .hf-hero-name .ss-name'), ['👑 Bea']);
+  assert.deepEqual(text('[aria-label="Temporada 2025"] .hf-hero-name .pf-sub'), ['3 de 3 categorías']);
+  assert.equal(document.querySelectorAll('[aria-label="Temporada 2025"] .hf-others li').length, 6);
+  assert.equal(document.querySelectorAll('.hf-timeline i').length, 0); // names are text
+  window.location.hash = '';
+});
+
 test('the hall of fame can be reached from the pills and says so when no season is over', async () => {
   installApi({ 'GET /statistics/rankings?': ANSWER, 'GET /statistics/hall-of-fame': { seasons: [], titles: [] }, 'GET /users/photo/': json({ detail: 'no' }, 404) });
   await page.render({ main: freshMain() });
