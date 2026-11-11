@@ -92,26 +92,59 @@ test('pressing a season loads it, follows it in the address and the last answer 
 
 const FAME = {
   seasons: [
-    { season: 2025, champions: { hours: [{ user_id: 2, name: 'Bea', value: 7200 }, { user_id: 3, name: 'Cai <i>', value: 7200 }], days: [{ user_id: 2, name: 'Bea', value: 1 }], games: [], completed: [], achievements: [], streak: [] } },
+    { season: 2025, champions: { hours: [{ user_id: 2, name: 'Bea', value: 7200 }, { user_id: 3, name: 'Cai <i>', value: 7200 }], days: [{ user_id: 2, name: 'Bea', value: 1 }], games: [], completed: [], achievements: [], streak: [{ user_id: 2, name: 'Bea', value: 1 }] } },
     { season: 2024, champions: { hours: [], days: [], games: [], completed: [], achievements: [], streak: [] } },
+    { season: 2023, champions: { hours: [{ user_id: 3, name: 'Cai <i>', value: 600 }], days: [], games: [], completed: [], achievements: [], streak: [] } },
   ],
-  titles: [{ user_id: 2, name: 'Bea', titles: 2 }, { user_id: 3, name: 'Cai <i>', titles: 1 }],
+  titles: [{ user_id: 2, name: 'Bea', titles: 3 }, { user_id: 3, name: 'Cai <i>', titles: 2 }],
 };
+const fameApi = () => installApi({ 'GET /statistics/hall-of-fame': FAME, 'GET /users/photo/': json({ detail: 'no' }, 404) });
 
-test('the hall of fame shows who has most titles and the champions of each season, a tie giving a title to each', async () => {
-  const calls = installApi({ 'GET /statistics/hall-of-fame': FAME, 'GET /users/photo/': json({ detail: 'no' }, 404) });
+test('the hall of fame is a row per season with a column per category, a tie showing both champions', async () => {
+  const calls = fameApi();
   window.location.hash = '#/season/fame';
   await page.render({ main: freshMain() });
   await settle();
   assert.equal(calls[0].path, '/statistics/hall-of-fame');
   assert.equal(text('h1')[0], 'Salón de la fama');
   assert.equal(document.querySelector('[data-season="fame"]').getAttribute('aria-pressed'), 'true');
-  assert.deepEqual(text('[aria-label="Más títulos"] .ss-value'), ['1 título', '2 títulos']); // on the podium the second stands at the left of the first
-  assert.equal(document.querySelectorAll('.hf-card').length, 2); // the titles and the one season with champions
-  assert.deepEqual(text('[aria-label="Temporada 2025"] .hf-tile:first-child .ss-name'), ['Bea', 'Cai <i>']);
-  assert.deepEqual(text('[aria-label="Temporada 2025"] .hf-tile:first-child .hf-figure'), ['2 h']); // a tie shares one figure
-  assert.equal(document.querySelectorAll('[aria-label="Temporada 2025"] .hf-tile').length, 6);
-  assert.equal(document.querySelectorAll('.hf-card i').length, 0); // names are text
+  assert.equal(document.querySelector('[data-fame-view="matrix"]').getAttribute('aria-pressed'), 'true');
+  assert.deepEqual(text('.hf-chip .hf-count'), ['3', '2']); // who has most titles
+  assert.deepEqual(text('.hf-matrix thead th'), ['Temporada', 'Tiempo', 'Días', 'Jugados', 'Completados', 'Logros', 'Racha']);
+  assert.deepEqual(text('.hf-matrix tbody .hf-year'), ['2025', '2023']); // 2024 had nobody
+  assert.deepEqual(text('[aria-label="Temporada 2025"] td:nth-of-type(1) .ss-name'), ['Bea', 'Cai <i>']);
+  assert.deepEqual(text('[aria-label="Temporada 2025"] td:nth-of-type(1) .hf-figure'), ['2 h']); // a tie shares one figure
+  assert.equal(text('[aria-label="Temporada 2025"] .hf-grand')[0], '👑 Bea · 3 de 3'); // the one with most categories
+  assert.equal(document.querySelectorAll('.hf-matrix i').length, 0); // names are text
+  window.location.hash = '';
+});
+
+test('a colour per player, by their place in the titles, in the chips and in the cells', async () => {
+  fameApi();
+  window.location.hash = '#/season/fame';
+  await page.render({ main: freshMain() });
+  await settle();
+  assert.ok(document.querySelector('.hf-chip.hf-h0 b').textContent === 'Bea');
+  assert.ok(document.querySelector('.hf-chip.hf-h1 b').textContent === 'Cai <i>');
+  assert.equal(document.querySelectorAll('.hf-matrix .hf-h1').length > 0, true);
+  window.location.hash = '';
+});
+
+test('the other view is a cabinet per player with the categories won, season by season', async () => {
+  fameApi();
+  window.location.hash = '#/season/fame';
+  await page.render({ main: freshMain() });
+  await settle();
+  document.querySelector('[data-fame-view="players"]').click();
+  assert.equal(document.querySelector('[data-fame-view="players"]').getAttribute('aria-pressed'), 'true');
+  assert.equal(document.querySelectorAll('.hf-matrix').length, 0);
+  assert.deepEqual(text('.hf-card .ss-title'), ['Bea', 'Cai <i>']);
+  assert.deepEqual(text('[aria-label="Bea"] .pf-sub'), ['3 títulos']);
+  assert.deepEqual(text('[aria-label="Bea"] .hf-trophies .hf-year'), ['2025']);
+  assert.deepEqual(text('[aria-label="Bea"] .hf-medal'), ['Tiempo', 'Días', 'Racha']);
+  assert.deepEqual(text('[aria-label="Cai <i>"] .hf-trophies .hf-year'), ['2025', '2023']); // newest first
+  document.querySelector('[data-fame-view="matrix"]').click();
+  assert.equal(document.querySelectorAll('.hf-matrix').length, 1);
   window.location.hash = '';
 });
 

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { CATEGORIES, seasonsWithChampions, titleRanking, titlesText } from '../js/lib/hall-of-fame.js';
+import { CATEGORIES, HUES, cabinets, grandChampions, playerHues, seasonsWithChampions, titleRanking, titlesText } from '../js/lib/hall-of-fame.js';
 import { isFameHash } from '../js/lib/season-stats.js';
 
 const by = (id) => CATEGORIES.find((c) => c.id === id);
@@ -37,4 +37,37 @@ test('the address of the hall of fame', () => {
   assert.equal(isFameHash('#/season/fame/'), true);
   assert.equal(isFameHash('#/season/2025'), false);
   assert.equal(isFameHash(undefined), false);
+});
+
+const w = (user_id, name, value = 1) => ({ user_id, name, value });
+const ANSWER = {
+  seasons: [
+    { season: 2025, champions: { hours: [w(1, 'Ana')], days: [w(1, 'Ana')], games: [w(2, 'Bob')], completed: [], achievements: [], streak: [w(1, 'Ana'), w(2, 'Bob')] } },
+    { season: 2024, champions: { hours: [w(2, 'Bob')], days: [], games: [], completed: [w(2, 'Bob')], achievements: [], streak: [] } },
+  ],
+  titles: [{ user_id: 2, name: 'Bob', titles: 4 }, { user_id: 1, name: 'Ana', titles: 3 }],
+};
+
+test('the grand champion of a season is who won most categories, both on a tie, and none when nobody won', () => {
+  assert.deepEqual(grandChampions(ANSWER.seasons[0]), { winners: [{ user_id: 1, name: 'Ana', wins: 3 }], wins: 3, decided: 4 });
+  const tied = grandChampions({ champions: { hours: [w(1, 'Ana')], days: [w(2, 'Bob')] } });
+  assert.deepEqual(tied.winners.map((x) => x.name), ['Ana', 'Bob']);
+  assert.equal(tied.decided, 2);
+  assert.deepEqual(grandChampions({ champions: { hours: [] } }), { winners: [], wins: 0, decided: 0 });
+  assert.deepEqual(grandChampions({}), { winners: [], wins: 0, decided: 0 });
+});
+
+test('each player with titles has a colour by their place in the ranking, starting over past the last one', () => {
+  assert.deepEqual([...playerHues(ANSWER)], [[2, 0], [1, 1]]);
+  const many = { titles: Array.from({ length: HUES + 1 }, (_, i) => ({ user_id: i + 1, name: `P${i}`, titles: 1 })) };
+  assert.equal(playerHues(many).get(HUES + 1), 0);
+  assert.equal(playerHues(null).size, 0);
+});
+
+test('the cabinet of a player lists what they won season by season, the newest first, in the order of the categories', () => {
+  const [bob, ana] = cabinets(ANSWER);
+  assert.deepEqual(bob.seasons, [{ season: 2025, categories: ['games', 'streak'] }, { season: 2024, categories: ['hours', 'completed'] }]);
+  assert.deepEqual(ana.seasons, [{ season: 2025, categories: ['hours', 'days', 'streak'] }]);
+  assert.equal(bob.titles, 4);
+  assert.deepEqual(cabinets(null), []);
 });
