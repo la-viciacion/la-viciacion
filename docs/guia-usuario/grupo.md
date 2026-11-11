@@ -20,6 +20,8 @@ En la barra superior aparece un grupito de avatares cuando alguien tiene un time
 
 **Menú → Temporada** (el primero de Grupo) enseña los rankings de la **temporada en curso**, solo con los jugadores activos. Arriba tienes una **pestaña por temporada** (desde 2023) para ver cómo quedó cada año; en las pasadas salen todos los que jugaron o hicieron algo esa temporada, aunque ya no estén activos, y no sale la racha actual. La última pestaña, **Salón de la fama**, enseña quién ganó cada temporada ya terminada (tiempo jugado, días, juegos jugados y completados, logros y mejor racha; si hay empate, ganan los dos) y quién acumula más títulos. Es una **línea temporal**: arriba, los títulos de cada jugador; debajo, un paso por año con el **gran campeón** (el que ganó más categorías) en grande y, en celdas iguales, el campeón de cada categoría. Cada jugador con títulos tiene su color en la foto. Cada ranking es un **podio** con los tres primeros (el segundo a la izquierda del primero) y, debajo, el resto hasta el décimo en barras; todos los jugadores activos salen en todos los rankings, con un 0 si no tienen nada, y quien empata comparte el puesto. Los rankings son:
 
+![El salón de la fama](../assets/screens/season-fame.webp){ .screenshot }
+
 - **Tiempo jugado**, **Días jugados** y **Juegos jugados**.
 - **Juegos completados** y **Ratio de completado** (qué parte de los juegos de tu biblioteca de la temporada has completado, en porcentaje).
 - **Logros**.

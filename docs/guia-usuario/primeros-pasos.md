@@ -30,7 +30,11 @@ El botón de la esquina superior izquierda abre el **menú lateral**, con todas 
 
 En la barra superior tienes siempre el acceso a la **búsqueda** (la lupa; también con la tecla **/** o **Ctrl+K**: encuentra páginas, jugadores y juegos), a **Inicio**, a tu **perfil** y a la campana de **[Avisos](notificaciones.md#avisos-dentro-de-la-app)** (con un número cuando tienes alguno sin leer), y a la derecha de la marca, el aviso de [quién está jugando ahora](grupo.md).
 
+![La búsqueda](../assets/screens/search.webp){ .screenshot }
+
 En el móvil, abajo hay además una **barra de pestañas** con **Inicio**, **Grupo**, **Buscar**, **Juegos** y **Tú**: cada una te lleva a la página principal de su sección, y el resto de páginas están en el menú.
+
+![Inicio en el móvil, con la barra de pestañas](../assets/screens/home-phone.webp){ .screenshot width="260" }
 
 </div>
 </div>

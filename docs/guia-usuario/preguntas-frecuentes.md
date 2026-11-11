@@ -43,7 +43,7 @@
     Con **Puntuar** (o **Cambiar nota**) en la lista de tus juegos del perfil o en la página del juego, o al completarlo. La nota va de 1 a 100, una por juego, y puedes cambiarla o quitarla cuando quieras. Más en [Inicio](sesiones.md#puntuar-y-abandonar).
 
 ??? question "¿Qué es completar un juego? ¿Puedo deshacerlo?"
-    Es marcar que has terminado un juego esta temporada, con el círculo junto al juego en **Inicio** o con **Marcar completado** en tu perfil. Si te equivocas, en **Perfil → Mis juegos** puedes **Cambiar fecha** o **Desmarcar**, mientras la temporada siga abierta. Más en [Inicio](sesiones.md#completar-un-juego).
+    Es marcar que has terminado un juego esta temporada, con **Marcar como completado** al desplegar el juego en **Inicio** o con **Marcar completado** en tu perfil. Si te equivocas, en **Perfil → Mis juegos** puedes **Cambiar fecha** o **Desmarcar**, mientras la temporada siga abierta. Más en [Inicio](sesiones.md#completar-un-juego).
 
 ??? question "¿Puedo marcar un juego como abandonado?"
     Sí, con **Abandonar** en tu perfil (y **Retomar** para deshacerlo), solo para juegos de la temporada en curso. No cambia tus totales. Más en [Inicio](sesiones.md#puntuar-y-abandonar).

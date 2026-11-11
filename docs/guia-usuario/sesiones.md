@@ -77,7 +77,7 @@ Al pulsar **Marcar como completado** en el juego desplegado se abre una ventana 
 - Un juego se completa **una vez por temporada**, y solo en la temporada en curso. Cuando la temporada se cierra, la fecha de completado queda congelada.
 - Justo después te ofrece **puntuarlo** (de 1 a 100). Puedes decir **Ahora no**.
 - Si te has equivocado, en **Perfil → Resumen → Juegos** (o **Mis juegos**) un juego completado esta temporada tiene **Cambiar fecha** (elige otro día, desde que empezaste a jugarlo ese año hasta hoy (o el fin de esa temporada)) y **Desmarcar**, que lo deja otra vez sin completar (pide confirmar). Cuando la temporada se cierra, esas dos opciones desaparecen.
-- Si el botón de completar está apagado, la propia fila te dice por qué con un 🔒: la temporada ya está cerrada o ya lo completaste esta temporada en otra plataforma.
+- Si un juego no se puede completar, la ventana (y la lista de tus juegos del perfil) te dice por qué con un 🔒: la temporada ya está cerrada o ya lo completaste esta temporada en otra plataforma.
 
 ## Puntuar y abandonar
 
