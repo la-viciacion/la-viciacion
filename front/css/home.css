@@ -117,18 +117,15 @@
 .timer-resume .timer-idle-title .score-badge { font-size: 0.78rem; margin-left: 4px; }
 .timer-resume-actions { display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; min-width: 170px; }
 
-.btn-new-timer {
-  background: transparent;
-  color: var(--text-primary);
-  border: 1px solid var(--border-accent);
-  padding: 12px 24px;
-  border-radius: var(--radius-md);
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
+/* the row under the card of a timer that is not running: a new timer and a manual session, side by side */
+.home-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; margin: 12px 0 20px; }
+.btn-action {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 20px;
+  background: transparent; color: var(--text-primary); border: 1px solid var(--border-accent); border-radius: var(--radius-md);
+  font: inherit; font-weight: 600; cursor: pointer; transition: all 0.2s ease;
 }
-.btn-new-timer:hover { border-color: var(--accent-teal); color: var(--accent-teal); }
+.btn-action:hover { border-color: var(--accent-teal); color: var(--accent-teal); }
+.btn-action svg { color: var(--accent-teal); }
 
 .live-dot {
   display: inline-block; width: 8px; height: 8px; border-radius: 50%;
@@ -282,15 +279,7 @@
 
 .btn-load-more:disabled { opacity: 0.6; cursor: wait; }
 
-/* Manual sessions: entry point, per-session actions and the form */
-.btn-manual {
-  background: transparent; color: var(--accent-teal); border: 1px solid var(--border-accent);
-  border-radius: var(--radius-pill); padding: 5px 14px; font: inherit; font-size: 0.8rem; font-weight: 600;
-  cursor: pointer; white-space: nowrap; transition: all 0.2s ease;
-}
-.btn-manual:hover:not(:disabled) { background: var(--bg-card-hover); }
-.btn-manual:disabled { opacity: 0.35; cursor: not-allowed; }
-.manual-session-row { display: flex; justify-content: center; margin: 4px 0 16px; }
+/* Manual sessions: per-session actions and the form */
 .session-end { display: flex; align-items: center; gap: 10px; }
 .btn-session {
   background: transparent; border: 1px solid var(--border); color: var(--text-secondary);
@@ -326,6 +315,7 @@
 @media (max-width: 640px) {
   .timer-idle, .timer-active { flex-direction: column; align-items: stretch; text-align: center; }
   .btn-start-timer, .btn-stop-timer { justify-content: center; }
+  .home-actions .btn-action { flex: 1; padding: 0 8px; }
   .timer-actions { flex-direction: column-reverse; align-items: stretch; }
   .timer-resume-cover { align-self: center; }
   .timer-resume-actions { min-width: 0; }

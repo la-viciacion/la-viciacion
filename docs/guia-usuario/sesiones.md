@@ -8,7 +8,7 @@ Una **sesión** es un rato jugando a un juego en una plataforma. Es lo único qu
 
 Es la forma habitual: pulsas al empezar y paras al terminar.
 
-1. En **Inicio**, pulsa **Nuevo timer**. Si ya has jugado antes, la tarjeta te ofrece primero **Seguir donde lo dejaste**: tu último juego, cuánto hace que lo jugaste y las horas que llevas, con un botón **Continuar** que arranca el timer con la misma plataforma de un toque. **+ Nuevo timer** sigue a mano para otro juego.
+1. En **Inicio**, pulsa **Nuevo timer**. Si ya has jugado antes, la tarjeta te ofrece primero **Seguir donde lo dejaste**: tu último juego, cuánto hace que lo jugaste y las horas que llevas, con un botón **Continuar** que arranca el timer con la misma plataforma de un toque. **Nuevo timer**, justo debajo de la tarjeta (junto a **Sesión manual**), sirve para empezar con otro juego.
 2. Busca el juego en el catálogo del grupo y elígelo.
 3. Elige la **plataforma**. Si ya lo habías jugado, la que usaste la última vez aparece la primera.
 4. El timer empieza a correr. Cuando termines, pulsa **Detener**; si te has equivocado y no quieres que cuente, **Cancelar**.
@@ -38,7 +38,7 @@ Si el juego que eliges es un **DLC o una expansión**, te lo dice antes de añad
 
 ## A mano, después de jugar
 
-Si no has usado el timer, pulsa **+ Sesión manual** en Inicio, elige el juego y rellena la plataforma y las horas de **inicio** y **fin**. Antes de guardar, la app te dice cuánto tiempo vas a añadir («Vas a añadir 1 h 30 min a …») y te pide confirmar.
+Si no has usado el timer, pulsa **Sesión manual** en Inicio (justo debajo de la tarjeta del timer), elige el juego y rellena la plataforma y las horas de **inicio** y **fin**. Antes de guardar, la app te dice cuánto tiempo vas a añadir («Vas a añadir 1 h 30 min a …») y te pide confirmar.
 
 ![Formulario de sesión manual](../assets/screens/manual.webp){ .screenshot }
 

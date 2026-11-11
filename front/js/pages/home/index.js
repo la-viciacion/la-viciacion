@@ -11,19 +11,10 @@ import { hasActive, initTimer, loadTimerCard, startTimer, stopClock } from './ti
 
 export const active = 'home';
 
-/** A manual session is refused while a timer runs (the API says so too): stop or cancel it first. */
-function syncManualButton() {
-  const button = document.getElementById('manualSessionBtn');
-  if (!button) return;
-  button.disabled = hasActive;
-  button.title = hasActive ? 'Para o cancela el timer en curso para añadir una sesión manual' : '';
-}
-
 /** Re-render only the timer card and the history, keeping the page in place. */
 async function refresh() {
   stopClock();
-  const timer = loadTimerCard();
-  await Promise.all([timer.then(syncManualButton), loadHistory(true, timer)]);
+  await loadHistory(true, loadTimerCard());
 }
 
 export async function render({ user, main, isCurrent }) {
@@ -38,9 +29,6 @@ export async function render({ user, main, isCurrent }) {
       <h2 class="section-title">Mis sesiones</h2>
       <div class="section-line"></div>
     </div>
-    <div class="manual-session-row">
-      <button class="btn-manual" id="manualSessionBtn">+ Sesión manual</button>
-    </div>
     <div id="historyList" class="history-list">
       <div class="loading-spinner">Cargando historial...</div>
     </div>
@@ -51,6 +39,7 @@ export async function render({ user, main, isCurrent }) {
     onChange: refresh,
     onChoose: startTimerFlow,
     onContinue: (group) => startTimer(group.game_id, group.platform),
+    onManual: openManualSession,
   });
   initGamePicker(user.id);
   initSessions({ userId: user.id, onChange: refresh });
@@ -60,7 +49,6 @@ export async function render({ user, main, isCurrent }) {
     onComplete: (group) => openCompletion({ username: user.username, game: { id: group.game_id, name: group.game_name || group.game_id, score: group.score }, onChange: refresh }),
     onEditSession: (group, session) => openSessionForm({ game: { id: group.game_id, name: group.game_name || group.game_id }, session }),
   });
-  main.querySelector('#manualSessionBtn').addEventListener('click', openManualSession);
   main.querySelector('#historyList').addEventListener('click', onHistoryClick);
   main.querySelector('#historyList').addEventListener('keydown', onHistoryKey);
   main.querySelector('#historyMore').addEventListener('click', onHistoryClick);
@@ -69,7 +57,7 @@ export async function render({ user, main, isCurrent }) {
   // the platforms (it names them) are known.
   showMyChallenges(main.querySelector('#myChallenges'), user.id);
   const ready = Promise.all([ensurePlatforms(), loadTimerCard()]);
-  await Promise.all([ready.then(() => isCurrent() && syncManualButton()), loadHistory(true, ready)]);
+  await loadHistory(true, ready);
   if (!isCurrent()) return;
 
   if (location.hash === '#/new') {

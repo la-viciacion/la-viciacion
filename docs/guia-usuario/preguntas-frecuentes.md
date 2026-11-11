@@ -29,7 +29,7 @@
     No hace falta pararlo: con el timer en marcha, **Empezó a las HH:MM**, bajo el reloj, te deja **mover el inicio hacia atrás**. Si ya lo has parado, añade o corrige la sesión a mano. Más en [Inicio](sesiones.md#con-un-timer).
 
 ??? question "No me deja añadir una sesión manual"
-    Comprueba que (1) no tienes un timer en marcha, (2) el fin es posterior al inicio y no está en el futuro, (3) no dura más de 24 horas, (4) no se solapa con otra sesión tuya y (5) es de la temporada en curso. Las temporadas cerradas solo las puede tocar un administrador.
+    Comprueba que (1) no tienes un timer en marcha (mientras corre, los botones **Nuevo timer** y **Sesión manual** no aparecen), (2) el fin es posterior al inicio y no está en el futuro, (3) no dura más de 24 horas, (4) no se solapa con otra sesión tuya y (5) es de la temporada en curso. Las temporadas cerradas solo las puede tocar un administrador.
 
 ??? question "Me he equivocado de juego en una sesión"
     Borra la sesión y añádela otra vez con el juego correcto. Un administrador puede cambiarle el juego sin perder nada.
