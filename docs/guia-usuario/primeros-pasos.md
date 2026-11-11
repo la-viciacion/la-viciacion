@@ -22,12 +22,15 @@ El botón de la esquina superior izquierda abre el **menú lateral**, con todas 
 <div markdown>
 
 - **Principal**: [Inicio](sesiones.md) y [Actividad](grupo.md#actividad).
-- **Explorar** (lo que es de todo el grupo): [Temporada](grupo.md#temporada) (los rankings de la temporada en curso), [Juegos](juegos.md#juegos), [Biblioteca](juegos.md#biblioteca-del-grupo), [Jugadores](grupo.md#jugadores), [Calendario](juegos.md#calendario), [Logros](logros.md), [Estadísticas](grupo.md#estadisticas) (todavía en construcción) y [Servidor](grupo.md#servidor).
-- **Tú** (lo que es tuyo): [Mi perfil](perfil.md), [Deseados](descubrir.md#deseados), [Recomendados](descubrir.md#recomendados), [Retos](retos.md) y [Ajustes](perfil.md#ajustes).
-- **Administración**: solo si eres administrador.
+- **Grupo** (lo que va de las personas): [Temporada](grupo.md#temporada) (los rankings de la temporada en curso), [Jugadores](grupo.md#jugadores), [Retos](retos.md) y [Logros](logros.md).
+- **Juegos**: [Juegos](juegos.md#juegos), [Biblioteca](juegos.md#biblioteca-del-grupo) y [Calendario](juegos.md#calendario).
+- **Tú** (lo que es tuyo): [Mi perfil](perfil.md), [Deseados](descubrir.md#deseados) y [Recomendados](descubrir.md#recomendados).
+- **Más**: [Ajustes](perfil.md#ajustes), [Servidor](grupo.md#servidor) y, solo si eres administrador, el panel de **Administración**.
 - **Cerrar sesión**, al final. Bajo ese botón sale la **versión** de la app (por ejemplo «v2.39.0»); al pulsarla se abre la página de Novedades.
 
-En la barra superior tienes siempre el acceso a **Inicio**, a tu **perfil** y a la campana de **[Avisos](notificaciones.md#avisos-dentro-de-la-app)** (con un número cuando tienes alguno sin leer), y a la derecha de la marca, el aviso de [quién está jugando ahora](grupo.md).
+En la barra superior tienes siempre el acceso a la **búsqueda** (la lupa; también con la tecla **/** o **Ctrl+K**: encuentra páginas, jugadores y juegos), a **Inicio**, a tu **perfil** y a la campana de **[Avisos](notificaciones.md#avisos-dentro-de-la-app)** (con un número cuando tienes alguno sin leer), y a la derecha de la marca, el aviso de [quién está jugando ahora](grupo.md).
+
+En el móvil, abajo hay además una **barra de pestañas** con **Inicio**, **Grupo**, **Buscar**, **Juegos** y **Tú**: cada una te lleva a la página principal de su sección, y el resto de páginas están en el menú.
 
 </div>
 </div>

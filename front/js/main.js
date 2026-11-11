@@ -15,6 +15,7 @@ import { showForgotPassword, showResetPassword } from './pages/auth/recover.js';
 import { stopPresence } from './lib/presence.js';
 import { renderShell, showLoadError, showLoading } from './ui/layout.js';
 import { closeMenu } from './ui/menu.js';
+import { closeSearch } from './ui/search.js';
 import { openPlayingSheet } from './ui/playing.js';
 import { inviteToPush } from './ui/push-invite.js';
 import { inviteToProfile } from './ui/profile-invite.js';
@@ -53,6 +54,7 @@ const loadPage = (hash) => ROUTES.find((r) => hash.startsWith(r.prefix))?.load()
 
 function leaveCurrentPage() {
   closeMenu();
+  closeSearch();
   currentPage?.dispose?.();
   currentPage = null;
 }

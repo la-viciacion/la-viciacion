@@ -1,42 +1,49 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { activeItem, menuSections } from '../js/lib/menu.js';
+import { activeItem, bottomTabs, menuFoot, menuPages, menuSections, sectionOf } from '../js/lib/menu.js';
 
-const ids = (user) => menuSections(user).flatMap((s) => s.items.map((i) => i.id));
+const ids = () => menuSections().flatMap((s) => s.items.map((i) => i.id));
 
-test('a player sees every section but the administration', () => {
-  assert.deepEqual(ids({ is_admin: false }), ['home', 'activity', 'season', 'games', 'library', 'players', 'calendar', 'achievements', 'stats', 'server', 'profile', 'wishlist', 'recommendations', 'challenges', 'settings']);
-  assert.deepEqual(menuSections({ is_admin: false }).map((s) => s.label), ['Principal', 'Explorar', 'Tú']);
+test('the sections group the pages by what they are about', () => {
+  assert.deepEqual(menuSections().map((s) => s.label), ['Principal', 'Grupo', 'Juegos', 'Tú']);
+  const section = (label) => menuSections().find((s) => s.label === label).items.map((i) => i.id);
+  assert.deepEqual(section('Principal'), ['home', 'activity']);
+  assert.deepEqual(section('Grupo'), ['season', 'players', 'challenges', 'achievements']);
+  assert.deepEqual(section('Juegos'), ['games', 'library', 'calendar']);
+  assert.deepEqual(section('Tú'), ['profile', 'wishlist', 'recommendations']);
 });
 
-test('Explorar lists the pages in order, the server last, the same for players and admins', () => {
-  const explorar = (user) => menuSections(user).find((s) => s.label === 'Explorar').items.map((i) => i.id);
-  const order = ['season', 'games', 'library', 'players', 'calendar', 'achievements', 'stats', 'server'];
-  assert.deepEqual(explorar({ is_admin: false }), order);
-  assert.deepEqual(explorar({ is_admin: true }), order);
+test('the statistics have no entry until they are ready (their page still opens by its address)', () => {
+  assert.ok(![...ids(), ...menuFoot({ is_admin: true }).map((i) => i.id)].includes('stats'));
+  assert.equal(activeItem('#/stats'), null);
 });
 
-test('an admin also gets the panel, in a section of its own at the end', () => {
-  assert.deepEqual(ids({ is_admin: true }).at(-1), 'admin');
-  assert.equal(menuSections({ is_admin: true }).at(-1).label, 'Administración');
-});
-
-test('statistics are marked as work in progress and nothing else is', () => {
-  const items = menuSections({ is_admin: true }).flatMap((s) => s.items);
-  assert.deepEqual(items.filter((i) => i.wip).map((i) => i.id), ['stats']);
+test('the last section has the settings and the server for everybody and the administration only for an admin', () => {
+  assert.deepEqual(menuFoot({ is_admin: false }).map((i) => i.id), ['settings', 'server']);
+  assert.deepEqual(menuFoot({ is_admin: true }).map((i) => i.id), ['settings', 'server', 'admin']);
 });
 
 test('every id and address is unique', () => {
-  const items = menuSections({ is_admin: true }).flatMap((s) => s.items);
+  const items = menuPages({ is_admin: true });
   assert.equal(new Set(items.map((i) => i.id)).size, items.length);
   assert.equal(new Set(items.map((i) => i.href)).size, items.length);
+});
+
+test('the bottom tabs lead to the main page of a section and every item belongs to one', () => {
+  assert.deepEqual(bottomTabs().map((t) => t.label), ['Inicio', 'Grupo', 'Juegos', 'Tú']);
+  for (const [item, tab] of [['home', 'principal'], ['activity', 'principal'], ['challenges', 'group'], ['players', 'group'], ['library', 'games'], ['wishlist', 'you'], ['settings', 'you']]) {
+    assert.equal(sectionOf(item), tab);
+  }
+  assert.equal(sectionOf('server'), null);
+  assert.equal(sectionOf('admin'), null);
+  assert.equal(sectionOf(null), null);
+  for (const tab of bottomTabs()) assert.equal(sectionOf(activeItem(tab.href)), tab.id, tab.label);
 });
 
 test('an address highlights its item, the most specific one first', () => {
   assert.equal(activeItem(''), 'home');
   assert.equal(activeItem('#'), 'home');
   assert.equal(activeItem('#/activity'), 'activity');
-  assert.equal(activeItem('#/stats'), 'stats');
   assert.equal(activeItem('#/recap'), null);
   assert.equal(activeItem('#/story/2026-09'), null);
   assert.equal(activeItem('#/profile'), 'profile');

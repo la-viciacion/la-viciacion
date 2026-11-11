@@ -18,9 +18,9 @@ test('the button opens the panel with the sections and tells the state', () => {
   button().click();
   assert.ok(panel());
   assert.equal(button().getAttribute('aria-expanded'), 'true');
-  assert.deepEqual([...document.querySelectorAll('.menu-section')].map((e) => e.textContent), ['Principal', 'Explorar', 'Tú', 'Administración']);
-  assert.equal(document.querySelectorAll('a.menu-item').length, 16);
-  assert.equal(document.querySelector('.menu-wip').textContent, 'WIP');
+  assert.deepEqual([...document.querySelectorAll('.menu-section')].map((e) => e.textContent), ['Principal', 'Grupo', 'Juegos', 'Tú', 'Más']);
+  assert.equal(document.querySelectorAll('.menu-nav a.menu-item').length, 15);
+  assert.deepEqual([...document.querySelectorAll('.menu-nav .menu-section:last-of-type ~ a.menu-item')].map((e) => e.textContent.trim()), ['Ajustes', 'Servidor', 'Panel de administración']);
 });
 
 test('it highlights the page it is on and puts the focus there', () => {

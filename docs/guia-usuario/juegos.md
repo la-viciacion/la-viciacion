@@ -1,6 +1,6 @@
 # Juegos, biblioteca y calendario
 
-Las páginas de **Explorar** que giran en torno a los juegos: el catálogo compartido (**Juegos**), las bibliotecas de todos juntas (**Biblioteca**) y el **Calendario** de lanzamientos. Lo que haces con tus propios juegos está en [Tu perfil](perfil.md) y en [Inicio](sesiones.md).
+Las páginas de **Juegos** del menú que giran en torno a los juegos: el catálogo compartido (**Juegos**), las bibliotecas de todos juntas (**Biblioteca**) y el **Calendario** de lanzamientos. Lo que haces con tus propios juegos está en [Tu perfil](perfil.md) y en [Inicio](sesiones.md).
 
 ## Juegos
 
