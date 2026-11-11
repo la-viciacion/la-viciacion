@@ -1,6 +1,6 @@
 // Group library page (#/library): the libraries of the whole group at once. Hidden gems (few have them, those who rated
-// them like them), the graveyard (games players gave up), rarities (games only one player has), what nobody has touched
-// and what the libraries cover by genre and platform. GET /group/library; derived, nothing is stored.
+// them like them), the graveyard (games players gave up), rarities (games only one player has) and what the
+// libraries cover by genre and platform. GET /group/library; derived, nothing is stored.
 // A row of pills at the top reaches every section at once (it unfolds the section and scrolls to it), and each section
 // folds on its own; what the viewer folded is remembered in this browser.
 import { api } from '../../lib/api.js';
@@ -61,7 +61,6 @@ const sectionsOf = (d) => [
   ['gems', 'Joyas ocultas', d.hidden_gems.length],
   ['graveyard', 'El cementerio', d.graveyard.length],
   ['rarities', 'Rarezas', d.rarities.total],
-  ['untouched', 'Sin tocar', d.untouched.total],
   ['genres', 'Por género', d.genres.length],
   ['platforms', 'Por plataforma', d.platforms.length],
   ...(value ? [['value', 'Rentabilidad', value.games]] : []),
@@ -85,7 +84,7 @@ function draw(d) {
   const count = Object.fromEntries(sectionsOf(d).map(([key, , n]) => [key, n]));
   mount(main, html`
     <div class="wl-head"><h1 class="pf-title">Biblioteca del grupo</h1></div>
-    <p class="pf-sub cal-intro">Las bibliotecas de todos juntas: lo que casi nadie conoce, lo que se abandona y lo que nadie ha tocado.</p>
+    <p class="pf-sub cal-intro">Las bibliotecas de todos juntas: lo que casi nadie conoce y lo que se abandona.</p>
     <section class="pf-stats" aria-label="La biblioteca del grupo">
       ${tile('Juegos distintos', summary.games)}
       ${tile('Jugadores', summary.players)}
@@ -106,11 +105,6 @@ function draw(d) {
       ${gameList(d.rarities.items, (g) => `Solo lo tiene ${g.owner}${g.seconds ? ` · ${formatDuration(g.seconds)}` : ' · sin jugar'}`, 'Todos los juegos los tiene más de una persona.')}
       ${more(d.rarities.total, d.rarities.items.length)}`,
       'Juegos que solo tiene una persona del grupo, los más jugados primero.')}
-
-    ${section('untouched', 'Sin tocar', count.untouched, html`
-      ${gameList(d.untouched.items, (g) => `${plural(g.players, 'jugador lo tiene', 'jugadores lo tienen')} y nadie lo ha jugado`, 'Todos los juegos de la biblioteca se han jugado alguna vez.')}
-      ${more(d.untouched.total, d.untouched.items.length)}`,
-      'Juegos que alguien tiene y que nadie ha llegado a jugar.')}
 
     <div class="pf-cols">
       <div>${section('genres', 'Por género', count.genres, d.genres.length ? bars(d.genres, (r) => r.genre, (r) => r.games, (r) => ` · ${formatDuration(r.seconds)}`) : html`<div class="pf-empty">Sin datos de géneros todavía.</div>`,

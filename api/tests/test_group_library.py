@@ -33,14 +33,10 @@ class GraveyardTests(unittest.TestCase):
         self.assertEqual([(g["game_id"], g["abandoned_by"], g["players"]) for g in found], [("a", [1, 2], 3), ("b", [1], 1), ("c", [2], 2)])
 
 
-class RaritiesAndDustTests(unittest.TestCase):
+class RaritiesTests(unittest.TestCase):
     def test_a_rarity_has_one_owner_and_the_most_played_come_first(self):
         f = facts(owners={"a": {1}, "b": {2}, "c": {1, 2}}, seconds={"a": 5, "b": 50})
         self.assertEqual([(g["game_id"], g["owner"], g["seconds"]) for g in gl.rarities(f)], [("b", 2, 50), ("a", 1, 5)])
-
-    def test_dust_is_a_game_somebody_has_and_nobody_played_the_most_owned_first(self):
-        f = facts(owners={"a": {1}, "b": {1, 2, 3}, "c": {1, 2}, "d": {1}}, seconds={"a": 60, "c": 0})
-        self.assertEqual([(g["game_id"], g["players"]) for g in gl.untouched(f)], [("b", 3), ("c", 2), ("d", 1)])
 
 
 class CoverageTests(unittest.TestCase):
@@ -62,7 +58,7 @@ class CoverageTests(unittest.TestCase):
 
     def test_nothing_gives_empty_lists(self):
         empty = facts()
-        self.assertEqual([gl.hidden_gems(empty), gl.graveyard(empty), gl.rarities(empty), gl.untouched(empty), gl.by_genre(empty), gl.by_platform(empty)], [[]] * 6)
+        self.assertEqual([gl.hidden_gems(empty), gl.graveyard(empty), gl.rarities(empty), gl.by_genre(empty), gl.by_platform(empty)], [[]] * 5)
 
 
 if __name__ == "__main__":

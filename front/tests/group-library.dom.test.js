@@ -12,7 +12,6 @@ const DATA = {
   hidden_gems: [game('hades', 'Hades <b>', { players: 1, score_mean: 92.5, score_count: 2 })],
   graveyard: [game('doom', 'Doom', { players: 3, abandoned_by: ['Ana', 'Bea'] })],
   rarities: { total: 14, items: [game('limbo', 'Limbo', { owner: 'Cai', seconds: 5400 }), game('inside', 'Inside', { owner: 'Ana', seconds: 0 })] },
-  untouched: { total: 1, items: [game('tetris', 'Tetris', { players: 2 })] },
   genres: [{ genre: 'Indie', games: 12, players: 4, seconds: 7200, completed: 3 }, { genre: 'RPG', games: 6, players: 2, seconds: 3600, completed: 1 }],
   platforms: [{ platform: 'pc', platform_name: 'PC', games: 30, players: 4 }, { platform: 'switch', platform_name: 'Switch', games: 10, players: 2 }],
 };
@@ -26,7 +25,7 @@ const open = async (data = DATA) => {
 test('it shows the totals and every list with links to the games, as text', async () => {
   await open();
   assert.deepEqual(text('.pf-stat-value'), ['40', '4', '100 h']);
-  assert.deepEqual(text('.section-title'), ['Joyas ocultas', 'El cementerio', 'Rarezas', 'Sin tocar', 'Por género', 'Por plataforma']);
+  assert.deepEqual(text('.section-title'), ['Joyas ocultas', 'El cementerio', 'Rarezas', 'Por género', 'Por plataforma']);
   assert.equal(document.querySelector('.gl-game .game-link').getAttribute('href'), '#/game/hades');
   assert.equal(document.querySelectorAll('.gl-game b').length, 0); // the name is text, never markup
   assert.match(main().textContent, /Hades <b>/);
@@ -50,7 +49,7 @@ test('the coverage is drawn as bars relative to the largest one', async () => {
 });
 
 test('a group with nothing says so in every list', async () => {
-  await open({ summary: { games: 0, players: 0, played_seconds: 0 }, hidden_gems: [], graveyard: [], rarities: { total: 0, items: [] }, untouched: { total: 0, items: [] }, genres: [], platforms: [] });
+  await open({ summary: { games: 0, players: 0, played_seconds: 0 }, hidden_gems: [], graveyard: [], rarities: { total: 0, items: [] }, genres: [], platforms: [] });
   assert.match(main().textContent, /Todavía no hay ningún juego poco conocido/);
   assert.match(main().textContent, /Nadie ha abandonado nada/);
   assert.match(main().textContent, /Sin datos de géneros todavía/);
@@ -64,7 +63,7 @@ test('an error loading is shown', async () => {
   assert.match(main().textContent, /Error cargando la biblioteca del grupo: Sin conexión/);
 });
 
-const SECTIONS = ['gems', 'graveyard', 'rarities', 'untouched', 'genres', 'platforms'];
+const SECTIONS = ['gems', 'graveyard', 'rarities', 'genres', 'platforms'];
 const scrolled = [];
 window.Element.prototype.scrollIntoView = function scrollIntoView() { scrolled.push(this.id); };
 
@@ -72,7 +71,7 @@ test('a row of pills reaches every section from the start, each with how many it
   await open();
   const pills = [...document.querySelectorAll('.gl-pills [data-go]')];
   assert.deepEqual(pills.map((p) => p.dataset.go), SECTIONS);
-  assert.deepEqual(pills.map((p) => p.textContent.replace(/\s+/g, ' ').trim()), ['Joyas ocultas 1', 'El cementerio 1', 'Rarezas 14', 'Sin tocar 1', 'Por género 2', 'Por plataforma 2']);
+  assert.deepEqual(pills.map((p) => p.textContent.replace(/\s+/g, ' ').trim()), ['Joyas ocultas 1', 'El cementerio 1', 'Rarezas 14', 'Por género 2', 'Por plataforma 2']);
   pills[2].click();
   assert.deepEqual(scrolled.at(-1), 'gl-rarities');
 });
@@ -82,7 +81,7 @@ test('each section folds on its own, and a pill opens one that was folded', asyn
   await open();
   const fold = (key) => document.querySelector(`[data-fold="${key}"]`);
   const sectionOf = (key) => document.getElementById(`gl-${key}`);
-  assert.deepEqual(SECTIONS.map((key) => fold(key).getAttribute('aria-expanded')), Array(6).fill('true')); // all open at first
+  assert.deepEqual(SECTIONS.map((key) => fold(key).getAttribute('aria-expanded')), Array(5).fill('true')); // all open at first
   fold('graveyard').click();
   assert.equal(sectionOf('graveyard').classList.contains('folded'), true);
   assert.equal(fold('graveyard').getAttribute('aria-expanded'), 'false');
