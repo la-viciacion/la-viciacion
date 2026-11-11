@@ -1,11 +1,15 @@
 """The lists of the group's library, from plain facts (pure: no database)."""
+import datetime
 import unittest
 
 from src.crud import group_library as gl
 
 
 def facts(**over):
-    base = {"owners": {}, "seconds": {}, "scores": {}, "abandoned_by": {}, "completed": {}, "genres": {}, "platforms": {}}
+    base = {
+        "owners": {}, "seconds": {}, "scores": {}, "abandoned_by": {}, "completed": {}, "genres": {}, "platforms": {},
+        "wishes": {}, "released": {}, "played_by": {}, "seconds_by": {}, "franchises": {},
+    }
     base.update(over)
     return base
 
@@ -59,7 +63,44 @@ class CoverageTests(unittest.TestCase):
     def test_nothing_gives_empty_lists(self):
         empty = facts()
         self.assertEqual([gl.hidden_gems(empty), gl.graveyard(empty), gl.rarities(empty), gl.by_genre(empty), gl.by_platform(empty)], [[]] * 5)
+        self.assertEqual([gl.most_wanted(empty), gl.played_together(empty), gl.finished_by_many(empty), gl.sagas(empty)], [[]] * 4)
 
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TogetherAndSagasTests(unittest.TestCase):
+    def test_the_most_wished_first_then_the_soonest_release_and_games_without_a_date_last(self):
+        day = datetime.date
+        f = facts(wishes={"a": [1], "b": [1, 2], "c": [1], "d": [], "e": [3]},
+                  released={"a": day(2027, 5, 1), "b": None, "c": day(2027, 2, 1), "e": None})
+        self.assertEqual([(g["game_id"], g["wanters"]) for g in gl.most_wanted(f)], [("b", [1, 2]), ("c", [1]), ("a", [1]), ("e", [3])])
+
+    def test_played_together_needs_two_players_in_one_season_and_shows_the_fullest_one(self):
+        f = facts(
+            played_by={"a": {2025: {1, 2}, 2026: {1}}, "b": {2025: {1}, 2026: {2}}, "c": {2025: {1, 2, 3}, 2026: {1, 2}}, "d": {2026: {1, 2}}},
+            seconds={"a": 10, "c": 5, "d": 50},
+        )
+        self.assertEqual([(g["game_id"], g["players"], g["season"]) for g in gl.played_together(f)], [("c", 3, 2025), ("d", 2, 2026), ("a", 2, 2025)])
+
+    def test_finished_by_many_needs_two_completions_and_averages_the_time_of_those_who_finished(self):
+        f = facts(
+            owners={"a": {1, 2, 3}, "b": {1, 2}, "c": {1}, "d": {1, 2}},
+            completed={"a": {1, 2}, "b": {1, 2}, "c": {1}, "d": {1, 2}},
+            seconds_by={"a": {1: 100, 2: 300, 3: 9000}, "b": {1: 60}},
+        )
+        found = {g["game_id"]: g for g in gl.finished_by_many(f)}
+        self.assertEqual(set(found), {"a", "b", "d"})
+        self.assertEqual((found["a"]["mean_seconds"], found["a"]["players"]), (200, 3))  # the third player did not finish it: not in the mean
+        self.assertEqual(found["b"]["mean_seconds"], 60)
+        self.assertIsNone(found["d"]["mean_seconds"])
+        self.assertEqual([g["game_id"] for g in gl.finished_by_many(f)], ["b", "d", "a"])  # same completions: the fewest owners first
+
+    def test_a_saga_has_two_games_or_more_in_the_libraries(self):
+        f = facts(
+            owners={"a": {1, 2}, "b": {2}, "c": {1}, "d": {3}},
+            seconds={"a": 100, "b": 50, "c": 10},
+            franchises={"a": ["Zelda"], "b": ["Zelda", "Link"], "c": ["Mario"], "d": ["Mario"], "e": ["Zelda"]},  # e is in nobody's library
+        )
+        self.assertEqual(gl.sagas(f), [{"saga": "Zelda", "games": 2, "players": 2, "seconds": 150}, {"saga": "Mario", "games": 2, "players": 2, "seconds": 10}])

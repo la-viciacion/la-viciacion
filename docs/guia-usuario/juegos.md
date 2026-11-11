@@ -25,13 +25,16 @@ La página tiene dos mitades, separadas por un título: arriba, **lo que dice el
 
 ![La biblioteca del grupo](../assets/screens/library.webp){ .screenshot }
 
-**Menú → Biblioteca** junta las bibliotecas de todos: cuántos juegos distintos hay, cuántos jugadores y cuántas horas, y seis secciones para curiosear (cada lista enseña los 10 primeros):
+**Menú → Biblioteca** junta las bibliotecas de todos: cuántos juegos distintos hay, cuántos jugadores y cuántas horas, y nueve secciones para curiosear (cada lista enseña los 10 primeros):
 
 - **Joyas ocultas**: juegos que tienen pocos jugadores y a los que han dado muy buena nota.
 - **El cementerio**: juegos que alguien ha abandonado y no ha vuelto a tocar, con quién los dejó.
 - **Rarezas**: juegos que solo tiene una persona, los más jugados primero.
+- **Los más deseados**: lo que más jugadores activos tienen en su lista de deseos, con quién lo desea y cuándo sale.
+- **Lo que une al grupo**: juegos que dos o más jugadores han jugado en la misma temporada.
+- **Terminados por varios**: juegos que han completado dos o más jugadores, cuántos de los que lo tienen lo han terminado y lo que han tardado de media.
+- **Sagas**: franquicias con al menos dos juegos en las bibliotecas del grupo (los datos de franquicia vienen de IGDB, así que un juego sin ellos no cuenta), con cuántos juegos, jugadores y horas suman.
 - **Por género** y **por plataforma**: cuántos juegos de las bibliotecas hay de cada género y de cada plataforma.
-- **Rentabilidad**: cuánto cuesta de media cada hora de un juego, los más baratos y los más caros. Sale de los precios que apuntan los jugadores, pero **solo aparece un juego si al menos 3 jugadores han puesto su precio y lo han jugado**, y nunca se enseña el precio ni la identidad de nadie (las horas de cada uno sí son públicas, y con ellas se podría deducir lo que pagó). En la página del juego sale como **Coste por hora**.
 
 Cada juego enlaza a su página. Arriba hay una fila de **botones**, uno por sección, que te lleva directo a ella (y la abre si estaba plegada), y cada sección se puede **plegar** pulsando su título.
 
