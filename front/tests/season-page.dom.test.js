@@ -106,10 +106,11 @@ test('the hall of fame shows who has most titles and the champions of each seaso
   assert.equal(calls[0].path, '/statistics/hall-of-fame');
   assert.equal(text('h1')[0], 'Salón de la fama');
   assert.equal(document.querySelector('[data-season="fame"]').getAttribute('aria-pressed'), 'true');
-  assert.deepEqual(text('[aria-label="Más títulos"] .ss-value'), ['2 títulos', '1 título']);
+  assert.deepEqual(text('[aria-label="Más títulos"] .ss-value'), ['1 título', '2 títulos']); // on the podium the second stands at the left of the first
   assert.equal(document.querySelectorAll('.hf-card').length, 2); // the titles and the one season with champions
-  assert.deepEqual(text('[aria-label="Temporada 2025"] .hf-row:first-child .ss-name'), ['Bea', 'Cai <i>']);
-  assert.deepEqual(text('[aria-label="Temporada 2025"] .hf-row:first-child .ss-value'), ['2 h', '2 h']);
+  assert.deepEqual(text('[aria-label="Temporada 2025"] .hf-tile:first-child .ss-name'), ['Bea', 'Cai <i>']);
+  assert.deepEqual(text('[aria-label="Temporada 2025"] .hf-tile:first-child .hf-figure'), ['2 h']); // a tie shares one figure
+  assert.equal(document.querySelectorAll('[aria-label="Temporada 2025"] .hf-tile').length, 6);
   assert.equal(document.querySelectorAll('.hf-card i').length, 0); // names are text
   window.location.hash = '';
 });

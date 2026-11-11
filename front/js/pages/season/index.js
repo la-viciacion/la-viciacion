@@ -114,37 +114,39 @@ const header = (season) => html`
     <button type="button" class="pf-season-badge" data-season="${FAME}" aria-pressed="${String(season === FAME)}">Salón de la fama</button>
   </div>`;
 
-// A winner of a category: the photo, the name and the figure.
-const winner = (category, w) => html`
-  <li class="hf-winner">${playerAvatar(w)}<span class="ss-name">${w.name}</span><strong class="ss-value">${category.text(w.value)}</strong></li>`;
+// One category of a season: its name, the champion (every one on a tie) and the figure they share.
+const tile = (category, winners) => html`
+  <div class="hf-tile">
+    <span class="hf-label">${category.title}</span>
+    ${winners?.length
+      ? html`${winners.map((w) => html`<span class="hf-winner">${playerAvatar(w)}<span class="ss-name">${w.name}</span></span>`)}
+        <strong class="hf-figure">${category.text(winners[0].value)}</strong>`
+      : html`<span class="pf-sub">—</span>`}
+  </div>`;
 
 const seasonCard = (entry) => html`
   <section class="pf-card ss-card hf-card" aria-label="Temporada ${entry.season}">
-    <h2 class="ss-title">Temporada ${entry.season}</h2>
-    <dl class="hf-list">
-      ${CATEGORIES.map((category) => html`
-        <div class="hf-row">
-          <dt>${category.title}</dt>
-          <dd>${entry.champions[category.id]?.length
-            ? html`<ul class="hf-winners">${entry.champions[category.id].map((w) => winner(category, w))}</ul>`
-            : html`<span class="pf-sub">—</span>`}</dd>
-        </div>`)}
-    </dl>
+    <h2 class="ss-title">🏆 Temporada ${entry.season}</h2>
+    <div class="hf-tiles">${CATEGORIES.map((category) => tile(category, entry.champions[category.id]))}</div>
   </section>`;
 
-// The players with most titles, then the seasons one by one, the newest first.
+// Who has won most titles, on the same podium as the rankings (a ranking of players with `titles` as its figure).
+const TITLES = { value: (t) => t.titles, text: (t) => titlesText(t.titles) };
+
+const titlesCard = (answer) => {
+  const rows = titleRanking(answer).slice(0, SHOWN);
+  return html`
+    <section class="pf-card ss-card hf-card" aria-label="Más títulos">
+      <h2 class="ss-title">👑 Más títulos</h2>
+      ${podium(TITLES, rows, barWidths(rows, TITLES), positions(rows, TITLES))}
+    </section>`;
+};
+
+// The titles first, then the seasons one by one, the newest first, all of them cards of the same grid.
 function fame(answer) {
   const history = seasonsWithChampions(answer);
   if (!history.length) return html`<div class="pf-empty">Todavía no ha terminado ninguna temporada con datos.</div>`;
-  const titles = titleRanking(answer).slice(0, SHOWN);
-  return html`
-    <section class="pf-card ss-card hf-card" aria-label="Más títulos">
-      <h2 class="ss-title">Más títulos</h2>
-      <ol class="ss-list">${titles.map((t, i) => html`
-        <li class="ss-row"><span class="ss-place" aria-label="Puesto ${i + 1}">${medal(i + 1)}</span>${playerAvatar(t)}<span class="ss-name">${t.name}</span><strong class="ss-value">${titlesText(t.titles)}</strong></li>`)}
-      </ol>
-    </section>
-    <div class="ss-grid hf-grid">${history.map(seasonCard)}</div>`;
+  return html`<div class="ss-grid hf-grid">${titlesCard(answer)}${history.map(seasonCard)}</div>`;
 }
 
 export async function render({ main }) {
