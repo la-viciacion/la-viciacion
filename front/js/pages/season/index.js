@@ -1,11 +1,11 @@
-// Season page (#/season[/<year>]): the rankings of a season (active players only), the running one by default, with a pill
+// Season page (#/season[/<year>]): the rankings of a season (the active players for the running one, everybody who took part for an older one), the running one by default, with a pill
 // per season to look at the older ones. One request (GET /statistics/rankings?season=); everything is derived from the
 // sessions, the library and the achievements: nothing is stored. Each ranking has its own way of being drawn (`view` in lib/season-stats.js): a podium,
 // bars, tiles, rings or game covers.
 import { api } from '../../lib/api.js';
 import { html, mount } from '../../lib/html.js';
 import { gameHref } from '../../lib/links.js';
-import { barWidths, podiumOrder, positions, rankingsOf, rankingsPath, ringPercent, rowsOf, seasonFromHash } from '../../lib/season-stats.js';
+import { barWidths, participantsOf, podiumOrder, positions, rankingsOf, rankingsPath, ringPercent, rowsOf, seasonFromHash } from '../../lib/season-stats.js';
 import { available, current } from '../../lib/seasons.js';
 import { hydratePhotos, playerAvatar } from '../../ui/avatar.js';
 
@@ -95,8 +95,8 @@ const VIEWS = {
   covers,
 };
 
-const card = (ranking, answer) => {
-  const rows = rowsOf(answer, ranking).slice(0, SHOWN);
+const card = (ranking, answer, players) => {
+  const rows = rowsOf(answer, ranking, players).slice(0, SHOWN);
   return html`
     <section class="pf-card ss-card ss-${ranking.view}-card" id="ss-${ranking.id}" aria-label="${ranking.title}">
       <h2 class="ss-title">${ranking.title}</h2>
@@ -126,9 +126,12 @@ export async function render({ main }) {
       return;
     }
     if (mine !== latest) return;
+    const rankings = rankingsOf(season);
+    // an older season lists everybody who took part, active today or not
+    const players = season === current() ? null : participantsOf(answer, rankings);
     mount(main, html`
       ${header(season)}
-      <div class="ss-grid">${rankingsOf(season).map((ranking) => card(ranking, answer))}</div>`);
+      <div class="ss-grid">${rankings.map((ranking) => card(ranking, answer, players))}</div>`);
     hydratePhotos(main);
   }
 
