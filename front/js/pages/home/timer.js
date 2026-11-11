@@ -1,10 +1,10 @@
-// Timer card: shows the running timer (live clock) or the "start one" prompt,
-// and starts/stops timers through the API.
+// Timer card: shows the running timer (live clock) or the "start one" prompt, and starts/stops timers through the API.
+// Under the card of a timer that is not running there is a row with the two ways to add time: a new timer and a manual session.
 import { api, jsonRequest } from '../../lib/api.js';
 import { formatClock, formatDuration, formatRelative, fromInputValue, toInputValue } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
 import { auraColor } from '../../lib/timer-aura.js';
-import { iconPencil, iconPlay, iconStop } from '../../ui/icons.js';
+import { iconPencil, iconPlay, iconPlus, iconStop } from '../../ui/icons.js';
 import { modalHeader, openModal } from '../../ui/modal.js';
 import { scoreBadge } from '../../ui/score-badge.js';
 import { toast } from '../../ui/toast.js';
@@ -14,6 +14,7 @@ let userId = null;
 let onChange = () => {};
 let onChoose = () => {};
 let onContinue = () => {};
+let onManual = () => {};
 let clock = null;
 let loadedAt = 0;
 let listening = false;
@@ -22,9 +23,10 @@ const REFRESH_AFTER_MS = 20_000; // coming back to the tab after longer than thi
 /** True while the user has a running timer (the history disables "Seguir"). */
 export let hasActive = false;
 
-/** onChange: a timer was started/stopped; onChoose: "Nuevo timer" was pressed; onContinue(group): "Continuar" on the last game. */
+/** onChange: a timer was started/stopped; onChoose: "Nuevo timer" was pressed; onContinue(group): "Continuar" on the last game;
+ * onManual: "Sesión manual" was pressed. */
 export function initTimer(options) {
-  ({ userId, onChange, onChoose, onContinue } = options);
+  ({ userId, onChange, onChoose, onContinue, onManual } = options);
   hasActive = false;
   if (!listening) {
     listening = true;
@@ -84,7 +86,7 @@ const idleCard = () => html`
     <button class="btn-start-timer" id="chooseGameBtn">${iconPlay()} Nuevo timer</button>
   </div>`;
 
-// With a latest game, "Continuar" is the main action and "Nuevo timer" stays one press away.
+// With a latest game, "Continuar" is the only action of the card; "Nuevo timer" is in the row under it.
 const resumeCard = (last) => html`
   <div class="timer-idle timer-resume">
     ${last.image_url
@@ -97,8 +99,14 @@ const resumeCard = (last) => html`
     </div>
     <div class="timer-resume-actions">
       <button class="btn-start-timer" id="continueGameBtn">${iconPlay()} Continuar</button>
-      <button class="btn-new-timer" id="chooseGameBtn">+ Nuevo timer</button>
     </div>
+  </div>`;
+
+// The two ways to add time that are not "go on with the last game". Without a latest game the card itself is the "Nuevo timer" button.
+const actions = (withNew) => html`
+  <div class="home-actions">
+    ${withNew ? html`<button class="btn-action" id="chooseGameBtn">${iconPlus()} Nuevo timer</button>` : ''}
+    <button class="btn-action" id="manualSessionBtn">${iconPlus()} Sesión manual</button>
   </div>`;
 
 /** The game played last (the first of the grouped history), or null when there is none or it can't be fetched. */
@@ -144,9 +152,10 @@ export async function loadTimerCard() {
   stopClock();
   const last = await fetchLastGame();
   if (!section.isConnected) return;
-  mount(section, last ? resumeCard(last) : idleCard());
+  mount(section, html`${last ? resumeCard(last) : idleCard()}${actions(Boolean(last))}`);
   document.getElementById('chooseGameBtn').addEventListener('click', () => onChoose());
   document.getElementById('continueGameBtn')?.addEventListener('click', () => onContinue(last));
+  document.getElementById('manualSessionBtn').addEventListener('click', () => onManual());
 }
 
 export async function startTimer(gameId, platform = null) {
