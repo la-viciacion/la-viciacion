@@ -424,7 +424,7 @@ def add_new_game(
     start_date: str = None,
 ) -> models.UserGame:
     """Add a library entry for the game. Announcing it is a separate, slow step (announce_new_game)."""
-    logger.info("Adding new user game...")
+    logger.info(f"Adding new user game: user={user.id} game={game.game_id} platform={game.platform}")
     try:
         if start_date is None:
             started_date = datetime.datetime.now()
@@ -456,7 +456,7 @@ def add_new_game(
                 .order_by(models.UserGame.season.desc())
                 .first()
             )
-        logger.info("Game added!")
+        logger.info(f"Library entry ready: id={user_game.id} user={user.id} game={game_db.id} season={user_game.season}")
         return user_game
     except SQLAlchemyError as e:
         db.rollback()

@@ -13,7 +13,9 @@ def db_with(timer):
 
 
 def running(start):
-    return types.SimpleNamespace(start_time=start, end_time=None, duration_seconds=None, is_active=True)
+    return types.SimpleNamespace(
+        id=1, game_id="g1", platform="pc", start_time=start, end_time=None, duration_seconds=None, is_active=True
+    )
 
 
 class StopTimerTests(unittest.TestCase):
@@ -35,7 +37,7 @@ class StopTimerTests(unittest.TestCase):
 class CancelTimerTests(unittest.TestCase):
     def test_cancelling_deletes_the_timer_and_drops_its_empty_library_entry(self):
         timer = types.SimpleNamespace(
-            start_time=datetime.datetime.now(), platform="pc", game_id="g1", is_active=True
+            id=1, start_time=datetime.datetime.now(), platform="pc", game_id="g1", is_active=True
         )
         db = db_with(timer)
         with mock.patch.object(timers.users_crud, "drop_empty_entry") as drop:
