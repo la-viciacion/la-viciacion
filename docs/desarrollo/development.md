@@ -34,7 +34,7 @@ It is an alternative to the main stack, not a second one next to it: same projec
 - API: http://127.0.0.1:5000 (interactive docs at `/api/v1/docs` only with `API_DOCS_ENABLED=true` in `.env`)
 - DB: `127.0.0.1:3307`
 - The API container runs `alembic upgrade head` on every start (`api/entrypoint.sh`).
-- Logs are written to `api/logs/` and `bot/logs/` (gitignored).
+- Logs are written to `api/logs/` and `bot/logs/` (gitignored), one file a day, 90 days kept. Every API line written while serving a request is prefixed `[request-id user ip]` (`utils/request_context.py`; the login check fills the user). Business events (timer started/stopped/cancelled, manual sessions, library entries, notices sent with their text) log `key=value` pairs so they can be grepped by user or game.
 
 ## Tests and lint
 
