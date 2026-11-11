@@ -8,7 +8,7 @@ from src.crud import timers
 from tests import clock
 from tests.sqlite_db import make_session
 
-ADMIN = types.SimpleNamespace(id=99, is_admin=1)
+ADMIN = types.SimpleNamespace(id=99, username="admin", is_admin=1)
 START = clock.PIN - datetime.timedelta(hours=3)
 END = START + datetime.timedelta(hours=1)
 

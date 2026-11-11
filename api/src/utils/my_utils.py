@@ -633,7 +633,7 @@ async def send_message(
             try:
                 bot = telegram.Bot(settings.get("telegram.token"))
                 async with bot:
-                    logger.info("Sending message to group...")
+                    logger.info(f"Sending message to group ({ai_use or 'plain'}): {msg!r}")
                     if await _telegram_send(bot, settings.get("telegram.group_id"), msg, image):
                         logger.info("Message sent successfully!")
             except Exception as e:  # e.g. Telegram unreachable when the bot session opens

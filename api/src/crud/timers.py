@@ -18,7 +18,10 @@ from ..database.schemas import (
     SessionUpdate,
 )
 from ..utils import seasons
+from ..utils.logger import LogManager
 from ..utils.refusal import Refused
+
+logger = LogManager().get_logger()
 
 MAX_SESSION = datetime.timedelta(hours=24)
 FUTURE_SLACK = datetime.timedelta(minutes=1)
@@ -102,6 +105,10 @@ def create_timer(db: Session, timer: GameTimerCreate) -> tuple[GameTimer, bool]:
         )
         users_crud.add_new_game(db, game=NewGameUser(game_id=timer.game_id, platform=timer.platform), user=user)
 
+    logger.info(
+        f"Timer {db_timer.id} started: user={timer.user_id} game={timer.game_id} platform={timer.platform} "
+        f"season={season} new_library_entry={already_playing is None} announce={announce}"
+    )
     return db_timer, announce
 
 
@@ -134,6 +141,10 @@ def stop_timer(db: Session, timer_id: int, user_id: int) -> GameTimer:
     timer.is_active = False
     db.commit()
     db.refresh(timer)
+    logger.info(
+        f"Timer {timer.id} stopped: user={user_id} game={timer.game_id} platform={timer.platform} "
+        f"seconds={timer.duration_seconds}"
+    )
     return timer
 
 
@@ -165,8 +176,12 @@ def cancel_timer(db: Session, timer_id: int, user_id: int) -> GameTimer:
     day = timer.start_time.date()
     db.delete(timer)
     db.flush()
-    users_crud.drop_empty_entry(db, user_id, timer.game_id, *entry, created_on=day)
+    dropped = users_crud.drop_empty_entry(db, user_id, timer.game_id, *entry, created_on=day)
     db.commit()
+    logger.info(
+        f"Timer {timer.id} cancelled: user={user_id} game={timer.game_id} platform={timer.platform} "
+        f"library_entry_dropped={dropped}"
+    )
     return timer
 
 
@@ -378,6 +393,10 @@ def create_manual_session(db: Session, current_user: User, user_id: int, body: M
     users_crud.ensure_library_entry(db, user_id, body.game_id, platform, body.start_time)
     _commit_session(db)
     db.refresh(timer)
+    logger.info(
+        f"Manual session {timer.id} added: user={user_id} game={timer.game_id} platform={platform} "
+        f"{body.start_time.isoformat()} -> {body.end_time.isoformat()} by={current_user.username}"
+    )
     return timer
 
 
@@ -419,6 +438,10 @@ def update_session(db: Session, current_user: User, timer: GameTimer, body: Sess
         users_crud.drop_empty_entry(db, timer.user_id, timer.game_id, *old_entry, created_on=old_day)
     _commit_session(db)
     db.refresh(timer)
+    logger.info(
+        f"Session {timer.id} edited ({', '.join(sorted(data)) or 'nothing'}): user={timer.user_id} game={timer.game_id} "
+        f"platform={timer.platform} {start.isoformat()} -> {end.isoformat()} by={current_user.username}"
+    )
     return timer
 
 
@@ -432,3 +455,7 @@ def delete_session(db: Session, current_user: User, timer: GameTimer) -> None:
     # a session entered on the wrong game must not leave an empty entry that counts as a game played
     users_crud.drop_empty_entry(db, timer.user_id, timer.game_id, *entry, created_on=day)
     db.commit()
+    logger.info(
+        f"Session {timer.id} deleted: user={timer.user_id} game={timer.game_id} platform={timer.platform} "
+        f"seconds={timer.duration_seconds} by={current_user.username}"
+    )
