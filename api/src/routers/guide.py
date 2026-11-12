@@ -11,7 +11,7 @@ from ..clients.ai_error import AIError, ProviderError, QuotaError, wait_text
 from ..crud import game_overview
 from ..database import models
 from ..guide import agent, limits
-from ..utils import messages
+from ..utils import ai_ledger, messages
 from ..utils.logger import LogManager
 from .chat import PROVIDER_MESSAGES, ChatTurn, refusal
 
@@ -56,8 +56,15 @@ def ask(
         raise HTTPException(status_code=404, detail="Game not exists")
     refused = limits.limiter.acquire(limits.scopes_of(current_user.id))
     if refused:
+        ai_ledger.record(
+            db, user_id=current_user.id, feature="guide", key_source=ai_ledger.GROUP, status=ai_ledger.LIMITED,
+            question=body.message, turns=len(body.history), game_id=game_id,
+        )
         raise refusal(refused)
-    deps = agent.GuideDeps(game=agent.game_context(data), level=body.level, user_name=current_user.name or current_user.username)
+    deps = agent.GuideDeps(
+        game=agent.game_context(data), level=body.level, user_name=current_user.name or current_user.username,
+        db=db, user_id=current_user.id, game_id=game_id,
+    )
     try:
         answer = agent.ask(deps, body.message.strip(), [(t.role, t.content) for t in body.history])
     except QuotaError as e:

@@ -18,7 +18,7 @@ from ..clients import failure as provider_failure
 from ..clients.ai_error import AIError, ProviderError, QuotaError
 from ..clients.quota import classify
 from ..database import models
-from ..utils import ai_quota, messages, seasons, settings
+from ..utils import ai_ledger, ai_quota, messages, seasons, settings
 from ..utils.logger import LogManager
 from . import model as chat_model
 from .limits import LIMITS, MAX_HISTORY
@@ -83,8 +83,11 @@ def failure(e: Exception, source: str) -> AIError:
 
 
 def ask(db: Session, user: models.User, question: str, history: list[tuple[str, str]], model=None) -> Answer:
-    """Blocking: call it from a worker thread. Raises AIError if the provider fails. `model` is for the tests."""
+    """Blocking: call it from a worker thread. Raises AIError if the provider fails. `model` is for the tests. Every outcome
+    leaves a row in the AI usage record (utils/ai_ledger.py), with the numbers and never the text."""
     started = time.monotonic()
+    provider, name = settings.get("ai.provider"), chat_model.model_name()
+    recorded = dict(user_id=user.id, feature="chat", key_source=ai_ledger.GROUP, question=question, turns=len(history), provider=provider, model=name)
     try:
         result = agent.run_sync(
             question,
@@ -96,15 +99,22 @@ def ask(db: Session, user: models.User, question: str, history: list[tuple[str, 
     except UsageLimitExceeded as e:
         # which limit it was is what tells whether a question is too big or a limit too tight
         logger.warning(f"Chat question stopped by a usage limit: {e}")
+        ai_ledger.record(db, status=ai_ledger.TOO_BIG, **recorded)
         return Answer(messages.CHAT_TOO_COMPLEX, True)
     except Exception as e:
-        raise failure(e, "chat") from None
+        error = failure(e, "chat")
+        ai_ledger.record(db, status=ai_ledger.QUOTA if isinstance(error, QuotaError) else ai_ledger.ERROR, **recorded)
+        raise error from None
     used = result.usage
     logger.info(
         f"Chat question answered in {time.monotonic() - started:.1f} s: {used.requests} model requests, {used.tool_calls} tool calls, "
         f"{used.input_tokens} tokens in and {used.output_tokens} out"
     )
     reply = result.output
+    ai_ledger.record(
+        db, status=ai_ledger.OK if reply.in_scope else ai_ledger.OFF_TOPIC,
+        spent=ai_ledger.measure(result, provider, name, started, time.monotonic()), **recorded,
+    )
     return Answer(reply.answer.strip() if reply.in_scope else messages.CHAT_OFF_TOPIC, reply.in_scope)
 
 

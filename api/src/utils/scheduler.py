@@ -23,6 +23,7 @@ what nothing else can trigger remains here:
   wishlist_week     every Sunday at `wishlist.time`, tells the group which wished games come out in the next 7 days.
                     Only one of wishlist_eve, wishlist_day and wishlist_week runs: `wishlist.group_notice`
   inbox_purge       every day at 04:00, deletes the inbox notices older than `inbox.retention_days`
+  ai_usage_purge    every day at 04:10, deletes the AI usage rows older than `ai.usage_retention_days` (never, by default)
   challenge_results every day at `challenges.results_time` (09:30), tells who took part how the challenges that ended
                     yesterday went, the group how each group challenge did and which ones launched earlier begin today
   challenge_reminders  every day at `challenges.reminders_time` (10:00), reminds (only whoever turned it on) of the
@@ -52,7 +53,7 @@ from ..config import Config
 from ..crud import challenge_schedules, costs, group_polls, users
 from ..database import models
 from ..database.database import SessionLocal
-from . import actions, challenge_notices, igdb_sync, inbox, polls, push, recap_notices, server_status, settings
+from . import actions, ai_ledger, challenge_notices, igdb_sync, inbox, polls, push, recap_notices, server_status, settings
 from .logger import LogManager
 
 log_manager = LogManager()
@@ -69,6 +70,7 @@ HOURLY_GRACE = datetime.timedelta(minutes=10)
 DAILY_GRACE = datetime.timedelta(hours=3)
 DAILY_STREAKS_HOUR = 5
 INBOX_PURGE_HOUR = 4
+AI_USAGE_PURGE_TIME = (4, 10)
 DAILY_WISHLIST_HOUR = 9
 CHALLENGE_SCHEDULES_HOUR = 6
 SERVER_COSTS_HOUR = 7
@@ -286,6 +288,10 @@ async def _inbox_purge(db: Session) -> str:
     return f"{inbox.purge(db)} deleted"
 
 
+async def _ai_usage_purge(db: Session) -> str:
+    return f"{ai_ledger.purge(db)} deleted"
+
+
 async def _wishlist_eve(db: Session) -> str:
     return await actions.announce_wishlist_eve(db, datetime.date.today() + datetime.timedelta(days=1))
 
@@ -349,6 +355,11 @@ def tick(now: datetime.datetime | None = None) -> None:
         slot = daily_slot(now, INBOX_PURGE_HOUR)
         if is_due(now, slot, _last_run(db, "inbox_purge"), DAILY_GRACE) and _claim(db, "inbox_purge", slot, now):
             _run(db, "inbox_purge", lambda: _inbox_purge(db))
+
+        if settings.get("ai.usage_retention_days"):
+            slot = daily_slot(now, *AI_USAGE_PURGE_TIME)
+            if is_due(now, slot, _last_run(db, "ai_usage_purge"), DAILY_GRACE) and _claim(db, "ai_usage_purge", slot, now):
+                _run(db, "ai_usage_purge", lambda: _ai_usage_purge(db))
 
         if notifications and (settings.get("challenges.private_notices") or settings.get("challenges.result_notice") or settings.get("challenges.start_notice")):
             slot = daily_slot(now, *(int(part) for part in settings.get("challenges.results_time").split(":")))

@@ -309,7 +309,10 @@ class AgentTests(unittest.TestCase):
         self.db = make_session()
         seed(self.db)
         self.user = self.db.get(models.User, 1)
-        patcher = mock.patch.object(agent.settings, "get", side_effect=lambda key: {"chat.prompt": "Eres un bot.", "ai.api_key": "KEY"}[key])
+        values = {key: spec.default for key, spec in settings.REGISTRY.items()} | {
+            "chat.prompt": "Eres un bot.", "ai.api_key": "KEY", "ai.provider": "openai", "ai.model": "gpt-4.1-mini", "chat.model": None,
+        }
+        patcher = mock.patch.object(agent.settings, "get", side_effect=lambda key: values[key])
         patcher.start()
         self.addCleanup(patcher.stop)
 

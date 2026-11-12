@@ -553,3 +553,45 @@ class AuditLog(Base):
     event = Column(String(40), nullable=True, index=True)
     ip = Column(String(45), nullable=True)
     user_agent = Column(String(255), nullable=True)
+
+
+class AiUsage(Base):
+    """One call to the AI that a player asked for (see utils/ai_ledger.py): who paid (`key_source`), the tokens it used,
+    what it cost at that day's prices and what kind of question it was, never the text of it. It is a record of events,
+    not a total: every figure the panels show is summed from these rows when asked."""
+
+    __tablename__ = "ai_usage"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    created_at = Column(DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP"))
+    # the account may be deleted later: what the group spent stays, the key is set to NULL
+    user_id = Column(Integer, ForeignKey("users.id", name="fk_ai_usage_user", ondelete="SET NULL"), nullable=True)
+    feature = Column(String(20), nullable=False)  # chat, guide
+    key_source = Column(String(10), nullable=False)  # group (the key of the .env) or user (their own)
+    provider = Column(String(20), nullable=True)
+    model = Column(String(80), nullable=True)
+    # ok, off_topic (answered, but it was not about the app or the game), too_big (stopped by a usage limit), quota,
+    # error and limited (the player's own limit stopped it before it reached the provider)
+    status = Column(String(12), nullable=False)
+    input_tokens = Column(Integer, nullable=False, server_default=text("0"))
+    cached_tokens = Column(Integer, nullable=False, server_default=text("0"))
+    output_tokens = Column(Integer, nullable=False, server_default=text("0"))
+    reasoning_tokens = Column(Integer, nullable=False, server_default=text("0"))
+    requests = Column(SmallInteger, nullable=False, server_default=text("0"))  # calls to the model
+    tool_calls = Column(SmallInteger, nullable=False, server_default=text("0"))
+    web_searches = Column(SmallInteger, nullable=False, server_default=text("0"))  # billed apart from the tokens
+    latency_ms = Column(Integer, nullable=True)
+    # millionths of a dollar, estimated when the call was made; NULL when the price of the model was not known
+    cost_micros = Column(Integer, nullable=True)
+    # when the prices that estimated it were published (NULL: the ones the code was built with)
+    price_stamp = Column(DateTime, nullable=True)
+    tools = Column(String(255), nullable=True)  # the tools it called, comma separated: the kind of question it was
+    question_chars = Column(SmallInteger, nullable=True)  # how long the question was, not what it said
+    turns = Column(SmallInteger, nullable=True)  # messages of the conversation that went with it
+    game_id = Column(String(255), ForeignKey("games.id", name="fk_ai_usage_game", ondelete="SET NULL"), nullable=True)
+
+    __table_args__ = (
+        Index("ix_ai_usage_created_at", "created_at"),
+        Index("ix_ai_usage_user_created", "user_id", "created_at"),
+        Index("ix_ai_usage_source_created", "key_source", "created_at"),
+    )
