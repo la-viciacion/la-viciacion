@@ -1,6 +1,6 @@
 // "Presupuesto de la clave del grupo": how much of the month's budget the group's key has spent and what each player may spend of
 // it (GET /manage/ai-usage/budgets, PUT /manage/ai-usage/budgets/{user_id}). Only what the group's key pays counts: what a player
-// pays with their own key is never here. The default caps are settings (IA → Avisos con IA → Coste de la IA); here an admin gives one
+// pays with their own key is never here. The default caps are settings (IA → Chat y guía → Presupuesto mensual (dinero)); here an admin gives one
 // player another amount.
 import { api, jsonRequest } from '../../lib/api.js';
 import { budgetLine, capLabel, isNearly, isSpent, parseCap, spentShare } from '../../lib/ai-budget.js';
@@ -36,7 +36,7 @@ function view(data) {
   const group = data.group;
   return html`
     <section class="adm-set-card adm-budgets-card">
-      ${cardTitle('Presupuesto de la clave del grupo', html`Lo que el grupo puede gastar al mes en preguntas que paga su clave (la del .env). Solo cuenta eso: lo que cada jugador paga con su propia clave no suma ni se limita. Los topes son en dólares enteros, y 0 es sin límite; el coste es una estimación y una pregunta puede pasarse del tope porque su precio se conoce al acabar. Se renuevan el día 1. Los topes por defecto se cambian en <strong>IA → Avisos con IA → Coste de la IA</strong>.`)}
+      ${cardTitle('Presupuesto de la clave del grupo', html`Lo que el grupo puede gastar al mes en preguntas que paga su clave (la del .env). Solo cuenta eso: lo que cada jugador paga con su propia clave no suma ni se limita. Los topes son en dólares enteros, y 0 es sin límite; el coste es una estimación y una pregunta puede pasarse del tope porque su precio se conoce al acabar. Se renuevan el día 1. Los topes por defecto se cambian en <strong>IA → Chat y guía → Presupuesto mensual (dinero)</strong>.`)}
       ${unpricedWarning(data)}
       <div class="adm-stats">${statTile(group.cap ? `Gastado este mes de ${money(group.cap)}` : 'Gastado este mes', money(group.spent))}</div>
       ${group.cap ? html`${bar(group.spent, group.cap)}<div class="adm-sub">${budgetLine('Grupo', group, data.resets_on)} ${state(group.spent, group.cap)}</div>` : html`<div class="adm-sub">El grupo no tiene tope: la clave del grupo no se limita por coste.</div>`}
