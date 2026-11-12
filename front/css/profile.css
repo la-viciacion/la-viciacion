@@ -499,3 +499,17 @@ video.gm-trailer, iframe.gm-trailer { cursor: auto; background: #000; }
 .pv-lists { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin: 10px 0; }
 .pv-list h3 { margin: 0 0 6px; font-size: 0.95rem; color: var(--accent-teal); }
 .pv-item { margin-bottom: 8px; }
+
+/* Mi IA: where the cost of the chat and the guide goes, as a small information box above the key and not a section of its own */
+.ai-cost-note {
+  display: flex; align-items: flex-start; gap: 10px; margin: 6px 0 16px; padding: 10px 14px;
+  border: 1px solid var(--border-accent); border-left-width: 3px; border-radius: var(--radius-md); background: rgba(61, 217, 179, 0.06);
+  font-size: 0.92rem; line-height: 1.45; color: var(--text-primary);
+}
+.ai-cost-icon {
+  flex: none; display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; margin-top: 1px;
+  border: 1.5px solid var(--accent-teal); border-radius: 50%; color: var(--accent-teal); font-size: 0.75rem; font-weight: 700; font-style: italic; font-family: serif;
+}
+.ai-cost-text > div + div { margin-top: 4px; }
+.ai-cost-text .ai-budget { color: var(--text-secondary); font-size: 0.86rem; }
+.ai-cost-note .ai-stopped { color: #fca5a5; }

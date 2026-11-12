@@ -23,13 +23,23 @@ export function modelLabel(model) {
   return `${model.id} · ${TIERS[model.tier] ?? TIERS.sin_precio}${price}`;
 }
 
-/** Who pays for a feature now, in one sentence, from its state ({ available, needs_key, paid_by, mode }). */
-export function payerText(state) {
-  if (!state.available) return 'Ahora mismo no está disponible.';
-  if (state.needs_key) return 'Se paga con tu propia clave: guárdala para poder usarla.';
-  if (state.paid_by === 'user') return 'Se paga con tu clave, de tu cuenta de OpenAI.';
-  if (state.mode === 'group_only') return 'Lo paga el grupo, tengas clave o no.';
-  return 'Lo paga el grupo mientras no guardes tu propia clave; con ella, lo pagas tú.';
+/** A short, quiet note on where the cost of the chat and the guide goes, from their states ({ available, needs_key, paid_by, mode }):
+ * it says what is true for this player now and nothing more. */
+export function costNote({ chat, guide }) {
+  const notes = [];
+  if (!chat.available) notes.push('El chat no está disponible ahora mismo.');
+  if (!guide.available) notes.push('La guía de cada juego no está disponible ahora mismo.');
+  const features = [chat, guide].filter((f) => f.available);
+  if (features.some((f) => f.paid_by === 'user')) {
+    notes.push('Con tu clave, el coste de lo que preguntes va a tu cuenta de OpenAI.');
+  } else if (chat.available && chat.paid_by === 'group' && guide.available && guide.needs_key) {
+    notes.push('El coste del chat lo cubre el grupo. La guía de cada juego busca en internet y cuesta más: funciona con tu propia clave.');
+  } else if (features.length && features.every((f) => f.paid_by === 'group')) {
+    notes.push(features.every((f) => f.mode === 'group_only') ? 'El coste lo cubre el grupo, tengas clave o no.' : 'El coste lo cubre el grupo; con tu propia clave pasa a tu cuenta.');
+  } else if (guide.available && guide.needs_key) {
+    notes.push('La guía de cada juego busca en internet y cuesta más: funciona con tu propia clave.');
+  }
+  return notes.join(' ');
 }
 
 /** What the player paid with their own key and what the group's key covered for them, from the usage's `by_source` (dollars). */

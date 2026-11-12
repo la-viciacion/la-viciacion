@@ -34,7 +34,7 @@ const needsKey = (dialog) => html`
   ${dialog ? '' : html`<div class="section-header"><h2 class="section-title">Guía del juego</h2><div class="section-line"></div></div>`}
   <div class="${dialog ? 'gd-card' : 'pf-card gd-card'} gd-needs-key">
     <div class="gd-intro">
-      <span class="pf-sub">La guía se paga con tu propia clave de OpenAI (el grupo no la cubre). Guárdala en tus ajustes y te ayuda a desatascarte en este juego.</span>
+      <span class="pf-sub">La guía busca en internet y tiene un coste mayor, así que funciona con tu propia clave de OpenAI. Guárdala en tus ajustes y te ayuda a desatascarte en este juego.</span>
       <a class="pf-btn" href="#/profile/ajustes/ia">Añadir mi clave</a>
     </div>
   </div>`;

@@ -36,7 +36,7 @@ const KEY_SOURCES = [
   ['group_only', 'Siempre la del grupo (ignora las claves de los jugadores)'],
 ];
 const keySource = (name) => html`
-  <label>Quién paga
+  <label>Quién asume el coste
     <select class="adm-input" name="${name}">${KEY_SOURCES.map(([id, label]) => html`<option value="${id}">${label}</option>`)}</select>
   </label>`;
 const READ_ONLY = ['mail', 'backup']; // cards with nothing to save

@@ -21,7 +21,7 @@ test('a player whose key must pay and has none is shown how to add it, instead o
   assert.equal(slot().querySelector('.chat-input'), null);
   const link = slot().querySelector('a.pf-btn');
   assert.equal(link.getAttribute('href'), '#/profile/ajustes/ia');
-  assert.match(slot().textContent, /se paga con tu propia clave de OpenAI/);
+  assert.match(slot().textContent, /tiene un coste mayor, así que funciona con tu propia clave de OpenAI/);
 });
 
 test('whoever can ask sees the guide as before', async () => {
