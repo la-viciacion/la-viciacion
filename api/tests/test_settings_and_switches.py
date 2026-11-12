@@ -114,10 +114,10 @@ class AnnualRecapStoreTests(unittest.TestCase):
 class EncryptionTests(unittest.TestCase):
     def test_secret_is_encrypted_and_round_trips(self):
         key = "sk-AAE_abcdefghijklmnopqrstuvwxyz012345"
-        stored = settings._encode("ai.api_key", key)
+        stored = settings._encode("push.vapid_private", key)
         self.assertNotIn(key, stored)
         self.assertNotIn("AAE_", stored)
-        self.assertEqual(settings._decode("ai.api_key", stored), key)
+        self.assertEqual(settings._decode("push.vapid_private", stored), key)
 
     def test_plain_values_are_not_encrypted(self):
         self.assertEqual(settings._encode("weekly.time", "09:00"), "09:00")
@@ -127,15 +127,16 @@ class EncryptionTests(unittest.TestCase):
 
     def test_missing_value_uses_the_default(self):
         self.assertEqual(settings._decode("weekly.time", None), "09:00")
-        self.assertIsNone(settings._decode("ai.api_key", None))
+        self.assertIsNone(settings._decode("push.vapid_private", None))
 
 
 class EnvOnlyTests(unittest.TestCase):
-    """The keys of outside services (the Telegram token and chats, the AI key) live in the environment: a copy of the
-    database must not carry them. The AI provider and model are there too, with no default in the code (see utils/ai.py), and so is the chat's own model (optional)."""
+    """The keys of outside services (the Telegram token and chats, the key of each AI provider) live in the environment: a copy of
+    the database must not carry them. The default models of each provider are there too, with no default in the code (see
+    utils/ai_providers.py). What the admin picks in the panel (provider and models) is stored, so it is not here."""
 
-    KEYS = ("telegram.token", "telegram.group_id", "telegram.admin_chat_id", "ai.api_key", "ai.openai_admin_key", "ai.provider",
-            "ai.model", "chat.model")
+    KEYS = ("telegram.token", "telegram.group_id", "telegram.admin_chat_id", "ai.openai_admin_key",
+            *(f"ai.{p}.{name}" for p in ("openai", "google") for name in ("api_key", "model", "chat_model")))
 
     def test_the_keys_of_outside_services_are_the_ones_that_are_env_only(self):
         self.assertEqual({key for key, spec in settings.REGISTRY.items() if spec.env_only}, set(self.KEYS))

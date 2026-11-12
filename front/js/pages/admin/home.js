@@ -52,7 +52,7 @@ function integrations(cfg) {
     : v['notifications.enabled'] ? ['green', 'Activo', 'Bot configurado y notificaciones activadas'] : ['orange', 'Notificaciones apagadas', 'El bot está configurado, pero no se envía nada'];
   const ai = !v['ai.enabled'] ? ['gray', 'Apagada', 'Los avisos salen con el texto original']
     : !v['ai.api_key'].is_set ? ['orange', 'Sin clave', 'Está activada, pero falta AI_API_KEY en el .env del servidor']
-    : !cfg.ai_model.provider || !cfg.ai_model.model ? ['orange', 'Incompleta', 'Está activada, pero faltan AI_PROVIDER o AI_MODEL en el .env del servidor']
+    : !cfg.ai_model.provider || !cfg.ai_model.model ? ['orange', 'Incompleta', 'Está activada, pero falta la clave de un proveedor (OPENAI_AI_API_KEY o GOOGLE_AI_API_KEY) o su modelo en el .env del servidor']
     : ['green', 'Activa', `${cfg.ai_model.provider} (${cfg.ai_model.model})`];
   const push = v['push.enabled']
     ? ['green', 'Activos', `${plural(cfg.push_devices.devices, 'dispositivo suscrito', 'dispositivos suscritos')}`] : ['gray', 'Apagados', 'Nadie recibe avisos en la app'];

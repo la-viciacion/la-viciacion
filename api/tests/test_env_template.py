@@ -7,6 +7,7 @@ from pathlib import Path
 from unittest import mock
 
 from src.config import Config
+from src.utils import settings
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -45,7 +46,8 @@ def variables_read() -> set[str]:
             source = path.read_text(encoding="utf-8")
             found |= {a or b for a, b in READ.findall(source)}
             found |= set(SEEDS.findall(source))
-    return found
+    # the per-provider AI variables are built in a loop, so the sources do not spell them out
+    return found | {spec.env for spec in settings.REGISTRY.values() if spec.env}
 
 
 class TemplateAgreesWithTheCodeTests(unittest.TestCase):

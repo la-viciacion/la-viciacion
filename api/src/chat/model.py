@@ -1,6 +1,6 @@
-"""The language model the chat talks to. It uses the provider and the key of the notices' AI (AI_PROVIDER, AI_API_KEY),
-and its model is the optional CHAT_AI_MODEL (`chat.model`), or AI_MODEL when that is not set: a stronger model for the
-chat is the one thing that may differ. Its switch (`chat.enabled`) is its own, apart from the notices'.
+"""The language model the chat talks to. It uses the provider chosen for the AI and its key (utils/ai_providers.py), and its
+model is the chat's own (picked in the panel, or <PROVIDER>_CHAT_AI_MODEL), or the notices' when there is none: a stronger
+model for the chat is the one thing that may differ. Its switch (`chat.enabled`) is its own, apart from the notices'.
 
 Everything is read on every call, so the panel's switch applies at once. pydantic-ai builds the provider's client;
 nothing here stores or logs the key."""
@@ -10,7 +10,7 @@ from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.google import GoogleProvider
 from pydantic_ai.providers.openai import OpenAIProvider
 
-from ..utils import settings
+from ..utils import ai_providers, settings
 
 # The same provider ids as the notices' (utils/ai.PROVIDERS)
 BUILDERS = {
@@ -21,12 +21,12 @@ BUILDERS = {
 
 def model_name() -> str | None:
     """The chat's own model if there is one, else the notices' AI model."""
-    return settings.get("chat.model") or settings.get("ai.model")
+    return ai_providers.model(ai_providers.CHAT)
 
 
 def configured() -> bool:
-    """There is a known provider, a key and a model in the environment (whether the chat is switched on or not)."""
-    return bool(settings.get("ai.api_key") and settings.get("ai.provider") in BUILDERS and model_name())
+    """There is a provider with a key and a model (whether the chat is switched on or not)."""
+    return ai_providers.group_credentials(ai_providers.CHAT) is not None
 
 
 def is_ready() -> bool:
@@ -36,11 +36,13 @@ def is_ready() -> bool:
 
 def in_use() -> dict:
     """For the panel: the provider and the model (None if missing) the chat will use, and whether the model is its own."""
-    return {"provider": settings.get("ai.provider"), "model": model_name(), "own_model": bool(settings.get("chat.model"))}
+    provider = ai_providers.selected()
+    return {"provider": provider, "model": model_name(), "own_model": bool(provider) and ai_providers.own_model(ai_providers.CHAT, provider)}
 
 
 def build_model(source=None) -> Model:
     """The model for a source of key (utils/ai_source.py): the player's own, or the group's when there is none."""
     if source is not None:
         return BUILDERS[source.provider](source.model, source.api_key)
-    return BUILDERS[settings.get("ai.provider")](model_name(), settings.get("ai.api_key"))
+    provider, key, name = ai_providers.group_credentials(ai_providers.CHAT)
+    return BUILDERS[provider](name, key)

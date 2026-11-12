@@ -1,6 +1,7 @@
 // Settings pages of the admin panel: general switches, weekly summary schedule, the Telegram bot
-// (token, group, admin chat), the AI that writes the notices (provider, key, model), the chat (its own switch and instructions;
-// it shares the AI's provider and key, and its model may be its own), push and mail.
+// (token, group, admin chat), the AI that writes the notices (the provider among those with a key in the .env, and its model, picked
+// from the provider's live list), the chat (its own switch and instructions; it shares the AI's provider and key, and its model may
+// be its own), push and mail.
 // They are all one form split in cards; each page (see entities.js) shows the cards listed in its
 // `sections`, and saving sends only the fields on screen that changed.
 // Values live in the app_settings table; the API never returns a secret (the AI key), only whether it is set.
@@ -16,7 +17,9 @@ import { cardTitle } from '../../ui/info-tip.js';
 import { renderBudgets } from './ai-budgets.js';
 
 const SECRETS = []; // never loaded back: sent only when something is typed (the keys of outside services are not: they are in the server's .env)
-const LOCKED = ['telegram.token', 'telegram.group_id', 'telegram.admin_chat_id', 'ai.api_key', 'ai.openai_admin_key', 'ai.provider', 'ai.model', 'chat.model']; // shown only as set or not, never editable
+const AI_IDS = ['openai', 'google']; // api/src/utils/settings.py AI_PROVIDERS: each has its own keys in the .env
+const LOCKED = ['telegram.token', 'telegram.group_id', 'telegram.admin_chat_id', 'ai.openai_admin_key', ...AI_IDS.flatMap((p) => [`ai.${p}.api_key`, `ai.${p}.model`, `ai.${p}.chat_model`])]; // shown only as set or not, never editable
+const MODEL_PICKS = ['ai.model.', 'chat.model.']; // what the admin picks per provider (stored); an empty choice goes back to the .env's model
 // the questions the chat answers, per player and for the whole group (api/src/utils/settings.py chat.limit_*)
 const CHAT_LIMITS = [
   ['chat.limit_user_minute', 'Por jugador, por minuto'],
@@ -43,6 +46,8 @@ const keySource = (name, label) => html`
   </label>`;
 const READ_ONLY = ['mail', 'backup']; // cards with nothing to save
 const AI_PROVIDERS = [['google', 'Google (Gemini)'], ['openai', 'OpenAI']];
+const providerName = (id) => AI_PROVIDERS.find(([known]) => known === id)?.[1] ?? id;
+const keyVariable = (id) => `${id.toUpperCase()}_AI_API_KEY`;
 
 const ANNUAL_MONTHS = [[12, 'Diciembre'], [1, 'Enero']];
 // the days the annual recap can go out on, by month (api/src/utils/settings.py ANNUAL_DAYS)
@@ -61,6 +66,7 @@ let loaded = {}; // values as the server has them
 let aiUses = []; // where the AI writes: label, original prompt and whether it was changed
 let guideInfo = {}; // the guide: the model it uses, original instructions and whether they were changed
 let chatInfo = {}; // the chat: the provider and model it uses (and whether the model is its own), original instructions and whether they were changed
+let aiProviders = { providers: [], provider: null }; // what the .env has (providers with a key, default models) and what is in use now
 
 const check = (name, label, hint, tag = '') => html`
   <label class="adm-check adm-set-check"><input type="checkbox" name="${name}" /> <span><strong>${label}${tag}</strong><span class="adm-sub">${hint}</span></span></label>`;
@@ -75,12 +81,11 @@ function mailStatus(mail) {
   return `Configurado: envía como ${mail.from} por ${mail.host}:${mail.port} (${mail.security}); los enlaces apuntan a ${mail.public_url}.`;
 }
 
-// What the chat still needs in the server's .env: the AI's provider and key, and a model (its own, or the AI's)
+// What the chat still needs: a provider with a key in the server's .env, and a model (picked in the panel, or the .env's)
 function chatMissing(values, chat) {
   return [
-    !chat.provider && 'AI_PROVIDER',
-    !values['ai.api_key'].is_set && 'AI_API_KEY',
-    !chat.model && 'AI_MODEL (o CHAT_AI_MODEL)',
+    !chat.provider && AI_IDS.map(keyVariable).join(' o '),
+    chat.provider && !chat.model && `un modelo (${chat.provider.toUpperCase()}_AI_MODEL en el .env, o elígelo aquí)`,
   ].filter(Boolean);
 }
 
@@ -88,7 +93,7 @@ function chatMissing(values, chat) {
 function chatState(values, chat) {
   const reasons = [
     !values['chat.enabled'] && 'el chat está apagado',
-    chatMissing(values, chat).length && `falta ${chatMissing(values, chat).join(', ')} en el .env`,
+    chatMissing(values, chat).length && `falta ${chatMissing(values, chat).join(', ')}`,
   ].filter(Boolean);
   return reasons.length ? `No disponible: ${reasons.join('; ')}.` : 'Disponible: los jugadores ven el botón del chat.';
 }
@@ -97,7 +102,7 @@ function chatState(values, chat) {
 function guideState(values, guide) {
   const reasons = [
     !values['guide.enabled'] && 'la guía está apagada',
-    chatMissing(values, guide).length && `falta ${chatMissing(values, guide).join(', ')} en el .env`,
+    chatMissing(values, guide).length && `falta ${chatMissing(values, guide).join(', ')}`,
   ].filter(Boolean);
   return reasons.length ? `No disponible: ${reasons.join('; ')}.` : 'Disponible: los jugadores ven la guía en la página de cada juego.';
 }
@@ -123,16 +128,41 @@ function aiUse(use, fragments) {
 
 const telegramReady = (values) => values['telegram.token'].is_set && values['telegram.group_id'].is_set;
 
-/** What the notices' AI still needs in the server's .env. */
-const aiMissing = (values, aiModel) => [
-  !aiModel.provider && 'AI_PROVIDER',
-  !values['ai.api_key'].is_set && 'AI_API_KEY',
-  !aiModel.model && 'AI_MODEL',
+/** What the notices' AI still needs. */
+const aiMissing = (aiModel) => [
+  !aiModel.provider && AI_IDS.map(keyVariable).join(' o '),
+  aiModel.provider && !aiModel.model && `un modelo (${aiModel.provider.toUpperCase()}_AI_MODEL en el .env, o elígelo aquí)`,
 ].filter(Boolean);
+
+/** The provider the AI uses: a choice among those that have a key in the .env (none: a warning; one: nothing to choose). */
+function providerPicker() {
+  const ready = aiProviders.providers.filter((p) => p.has_key);
+  if (!ready.length) return html`<div class="adm-warn">No hay ningún proveedor de IA: define <code>OPENAI_AI_API_KEY</code> o <code>GOOGLE_AI_API_KEY</code> en el .env del servidor (y reinicia la API).</div>`;
+  return html`
+    <label>Proveedor
+      <select class="adm-input adm-ai-provider" name="ai.provider" ${ready.length === 1 ? html`disabled` : ''}>
+        ${ready.map((p) => html`<option value="${p.id}">${providerName(p.id)}</option>`)}
+      </select>
+    </label>
+    <div class="adm-sub">${ready.length === 1 ? html`Solo hay clave de ${providerName(ready[0].id)} en el .env: es el que se usa. Para poder elegir, define también la clave de otro proveedor.` : 'Hay clave de varios proveedores en el .env: elige cuál usa la IA (los avisos, el chat y la guía). Se aplica al guardar, sin reiniciar nada.'}</div>`;
+}
+
+/** A model of the provider in use for `use` (notices or chat): the .env's by default, or one picked from the provider's live list. */
+function modelPicker(key, label, className, defaultModel) {
+  return html`
+    <label>${label}
+      <select class="adm-input ${className}" name="${key}" data-default="${defaultModel ?? ''}">
+        <option value="">${defaultModel ? `Por defecto (${defaultModel})` : 'Sin modelo por defecto'}</option>
+      </select>
+    </label>
+    <div class="adm-sub adm-model-note"></div>`;
+}
 
 function view(values, jobs, pushDevices, mail, aiUses, aiModel, chat, guide = {}) {
   const state = (key) => (values[key].is_set ? 'Configurado' : 'Sin configurar');
-  const aiKey = values['ai.api_key'];
+  const noKey = !aiProviders.provider;
+  const picked = aiProviders.provider;
+  const pickedInfo = aiProviders.providers.find((p) => p.id === picked);
   const vapid = values['push.vapid_private'];
   const cards = {
     notifications: html`
@@ -247,23 +277,22 @@ function view(values, jobs, pushDevices, mail, aiUses, aiModel, chat, guide = {}
       <section class="adm-set-card">
         <h3>Inteligencia artificial</h3>
         ${check('ai.enabled', 'Usar IA en los avisos', 'Apagada, los avisos salen con el texto original. Necesita una clave guardada para funcionar.')}
-        <label>Proveedor <input class="adm-input adm-ai-provider" type="text" value="${AI_PROVIDERS.find(([id]) => id === aiModel.provider)?.[1] ?? aiModel.provider ?? 'Sin configurar'}" disabled /></label>
-        <label>Clave de la API <input class="adm-input" type="text" value="${state('ai.api_key')}" disabled /></label>
+        ${providerPicker()}
+        ${noKey ? '' : modelPicker(`ai.model.${picked}`, 'Modelo de los avisos', 'adm-ai-model', pickedInfo.default_model)}
         <label>Clave de administración de OpenAI <input class="adm-input" type="text" value="${state('ai.openai_admin_key')}" disabled /></label>
-        <label>Modelo de los avisos <input class="adm-input adm-ai-model" type="text" value="${aiModel.model || 'Sin configurar'}" disabled /></label>
-        ${aiMissing(values, aiModel).length ? html`<div class="adm-warn">Falta <code>${aiMissing(values, aiModel).join(', ')}</code> en el .env del servidor: la aplicación no tiene ningún proveedor ni modelo por defecto, así que la IA no escribe ningún aviso hasta que los definas (y reinicies la API).</div>` : html`<div class="adm-sub">Usa ${AI_PROVIDERS.find(([id]) => id === aiModel.provider)?.[1] ?? aiModel.provider} (${aiModel.model}).</div>`}
-        <div class="adm-sub">El proveedor (<code>AI_PROVIDER</code>), la clave (<code>AI_API_KEY</code>) y el modelo (<code>AI_MODEL</code>) están en el .env del servidor y los comparten los avisos y el chat: desde el panel solo se ven. El modelo debe ser uno del proveedor.</div>
+        ${aiMissing(aiModel).length ? html`<div class="adm-warn">Falta ${aiMissing(aiModel).join(', ')}: la aplicación no tiene ningún modelo por defecto, así que la IA no escribe ningún aviso hasta que lo definas.</div>` : html`<div class="adm-sub">Usa ${providerName(aiModel.provider)} (${aiModel.model}).</div>`}
+        <div class="adm-sub">Las claves y los modelos por defecto de cada proveedor están en el .env del servidor (<code>OPENAI_AI_API_KEY</code>, <code>OPENAI_AI_MODEL</code>, <code>GOOGLE_AI_API_KEY</code>, <code>GOOGLE_AI_MODEL</code>): desde el panel solo se ven. La lista de modelos la da el propio proveedor en este momento, así que se puede cambiar de modelo sin redesplegar. Esa elección es solo para el proveedor en uso.</div>
         <div class="adm-sub">La clave de administración (<code>OPENAI_ADMIN_KEY</code>, opcional) solo sirve para leer el gasto en IA → Uso y coste; no escribe nada.</div>
-        <div><button type="button" class="adm-btn" data-set-act="test-ai" ${aiKey.is_set ? '' : html`disabled`}>Probar la IA</button></div>
+        <div><button type="button" class="adm-btn" data-set-act="test-ai" ${noKey ? html`disabled` : ''}>Probar la IA</button></div>
       </section>`,
 
     chat: html`
       <section class="adm-set-card adm-chat-card">
-        ${cardTitle('Chat', html`Un botón flotante, abajo a la derecha de cada pantalla, abre un asistente que responde solo sobre videojuegos y los datos del grupo. Usa el proveedor y la clave de la IA de los avisos (ver IA → Avisos con IA) y su propio modelo si lo hay. Quien ya tenga la página abierta lo ve desaparecer al preguntar o al recargar.`)}
-        <label>Modelo del chat <input class="adm-input adm-chat-model" type="text" value="${chat.model || 'Sin configurar'}" disabled /></label>
-        <div class="adm-sub">El chat usa <code>CHAT_AI_MODEL</code> si está en el .env${chat.own_model ? '' : html` (ahora no lo está: usa <code>AI_MODEL</code>)`}, para darle un modelo distinto del de los avisos.</div>
+        ${cardTitle('Chat', html`Un botón flotante, abajo a la derecha de cada pantalla, abre un asistente que responde solo sobre videojuegos y los datos del grupo. Usa el proveedor y la clave de la IA de los avisos (ver IA → Avisos con IA) y, si se elige, su propio modelo. Quien ya tenga la página abierta lo ve desaparecer al preguntar o al recargar.`)}
+        ${aiProviders.provider ? modelPicker(`chat.model.${aiProviders.provider}`, 'Modelo del chat y de la guía', 'adm-chat-model', aiProviders.providers.find((p) => p.id === aiProviders.provider).default_chat_model) : ''}
+        <div class="adm-sub">Sin elegir otro, usa <code>${(aiProviders.provider ?? 'openai').toUpperCase()}_CHAT_AI_MODEL</code> si está en el .env y, si no, el modelo de los avisos. Sirve para darle un modelo más fuerte que el de los avisos.</div>
         ${check('chat.enabled', 'Chat activado', 'Apagado, el botón desaparece para todos y el chat deja de responder.')}
-        ${chatMissing(values, chat).length ? html`<div class="adm-warn">Falta <code>${chatMissing(values, chat).join(', ')}</code> en el .env del servidor: el chat usa el proveedor y la clave de la IA de los avisos, y no tiene ningún modelo por defecto, así que no estará disponible hasta que los definas (y reinicies la API).</div>` : ''}
+        ${chatMissing(values, chat).length ? html`<div class="adm-warn">Falta ${chatMissing(values, chat).join(', ')}: el chat usa el proveedor y la clave de la IA de los avisos, y no tiene ningún modelo por defecto, así que no estará disponible hasta que lo definas.</div>` : ''}
         <details class="adm-details adm-ai-prompt">
           <summary class="adm-btn sm">Instrucciones ${chat.customized ? html`<span class="adm-tag">Personalizado</span>` : ''}</summary>
           <div>
@@ -435,6 +464,10 @@ function collect(form) {
       continue;
     }
     if (now === '' && before == null) continue; // an optional text left empty
+    if (MODEL_PICKS.some((prefix) => key.startsWith(prefix)) && now === '') {
+      changes[key] = null; // "por defecto": the .env's model applies again
+      continue;
+    }
     if (now !== before) changes[key] = now;
   }
   // not among `loaded`'s own fields: turning it on or off means unlocking this year's season or locking it again
@@ -500,7 +533,7 @@ async function sendTestEmail(mail) {
 // What was typed but not saved yet is not what the test uses: it asks the API, which uses what is stored.
 async function testAi(form) {
   // the prompts and the per-notice switches are not part of the test
-  if (Object.keys(collect(form)).some((key) => key.startsWith('ai.') && !key.startsWith('ai.prompt.') && !key.startsWith('ai.use.'))) {
+  if (Object.keys(collect(form)).some((key) => (key.startsWith('ai.') && !key.startsWith('ai.prompt.') && !key.startsWith('ai.use.')) || key.startsWith('chat.model.'))) {
     return toast('Guarda los cambios antes de probar la IA', 'err');
   }
   toast('Probando la IA…');
@@ -555,19 +588,49 @@ async function generateKeys(replace) {
   }
 }
 
+const option = (value) => Object.assign(document.createElement('option'), { value, textContent: value });
+
+/** Fills the model selectors with what the provider offers now (its own list, asked live). A failure leaves the default and says why. */
+async function loadModels(form) {
+  const picked = aiProviders.provider;
+  const selects = [...form.querySelectorAll('select[data-default]')];
+  if (!picked || !selects.length) return;
+  const notes = form.querySelectorAll('.adm-model-note');
+  const stored = (select) => loaded[select.name] ?? '';
+  for (const select of selects) { // the current pick is there from the start, so it is not lost while the list comes
+    if (stored(select)) select.append(option(stored(select)));
+    select.value = stored(select);
+  }
+  try {
+    const { models } = await api(`/manage/settings/ai-models?provider=${encodeURIComponent(picked)}`);
+    for (const select of selects) {
+      const has = new Set([...select.options].map((o) => o.value));
+      for (const id of models) if (!has.has(id)) select.append(option(id));
+      select.value = stored(select);
+    }
+    notes.forEach((note) => { note.textContent = `${models.length} modelos disponibles en ${providerName(picked)} ahora mismo.`; });
+  } catch (err) {
+    notes.forEach((note) => { note.textContent = `No se ha podido consultar la lista de modelos: ${err.message}`; });
+  }
+}
+
 export async function render(target, { entity }) {
   panel = target;
   sections = entity.sections;
   try {
-    const { values, jobs, push_devices: pushDevices, mail, ai_uses: uses, ai_model: aiModel, chat, guide } = await api('/manage/settings');
+    const { values, jobs, push_devices: pushDevices, mail, ai_uses: uses, ai_model: aiModel, ai_providers: providers, chat, guide } = await api('/manage/settings');
     aiUses = uses;
+    aiProviders = providers ?? { providers: [], provider: null };
     chatInfo = chat;
     guideInfo = guide ?? {};
     loaded = Object.fromEntries(Object.entries(values).filter(([key]) => !SECRETS.includes(key) && !LOCKED.includes(key) && !key.startsWith('push.vapid')));
     for (const key of SECRETS) loaded[key] = null;
+    loaded['ai.provider'] = aiProviders.provider; // the one in use, so that saving without touching it does not store a pick
     mount(panel, view(values, jobs, pushDevices, mail, aiUses, aiModel, chat, guideInfo));
     const form = panel.querySelector('#admSettings');
     fill(form, values);
+    if (form.elements['ai.provider']) form.elements['ai.provider'].value = aiProviders.provider ?? '';
+    loadModels(form);
     syncAnnualDay(form);
     syncAiOff(form);
     const budgets = panel.querySelector('#aicBudgets');

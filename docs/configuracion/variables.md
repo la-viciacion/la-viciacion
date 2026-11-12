@@ -3,7 +3,7 @@
 Un único `.env` en la raíz del proyecto lo leen la API, el bot y la base de datos (`env_file` en `docker-compose.yml`). La plantilla comentada es `.env.template`. Si cambias algo, recrea los contenedores: `docker compose up -d`.
 
 !!! info "Las claves de servicios externos solo viven aquí"
-    `TELEGRAM_TOKEN`, `TELEGRAM_GROUP_ID`, `TELEGRAM_ADMIN_CHAT_ID`, `AI_API_KEY`, `OPENAI_ADMIN_KEY`, `RAWG_API_KEY`, `TWITCH_CLIENT_SECRET` y las credenciales SMTP **nunca se guardan en la base de datos**, ni cifradas. Así, una copia de seguridad no sirve para manejar el bot del grupo ni gastar la cuota de la IA. El panel solo te dice si cada una está puesta o no, sin enseñarla.
+    `TELEGRAM_TOKEN`, `TELEGRAM_GROUP_ID`, `TELEGRAM_ADMIN_CHAT_ID`, `OPENAI_AI_API_KEY`, `GOOGLE_AI_API_KEY`, `OPENAI_ADMIN_KEY`, `RAWG_API_KEY`, `TWITCH_CLIENT_SECRET` y las credenciales SMTP **nunca se guardan en la base de datos**, ni cifradas. Así, una copia de seguridad no sirve para manejar el bot del grupo ni gastar la cuota de la IA. El panel solo te dice si cada una está puesta o no, sin enseñarla.
 
 ## Obligatorias
 
@@ -39,21 +39,20 @@ Detalle en [Telegram](telegram.md).
 |---|---|
 | `RAWG_API_KEY` | Opcional. El respaldo de IGDB para buscar juegos y completar la ficha. Sin ella (y sin IGDB), buscar juegos no encuentra nada. |
 | `TWITCH_CLIENT_ID`, `TWITCH_CLIENT_SECRET` | Opcionales. Una aplicación de Twitch, para que [IGDB](servicios.md#igdb-la-fuente-principal-de-los-juegos), la fuente principal, busque y describa los juegos. Sin ellas se usa solo RAWG. |
-| `AI_PROVIDER` | `google` o `openai`. |
-| `AI_API_KEY` | La clave del proveedor de IA. |
-| `AI_MODEL` | Un modelo de ese proveedor. El código no trae ninguno por defecto. |
+| `OPENAI_AI_API_KEY`, `OPENAI_AI_MODEL` | La clave de OpenAI y el modelo que se usa por defecto con ella (por ejemplo `gpt-4.1-mini`). El código no trae ningún modelo. |
+| `GOOGLE_AI_API_KEY`, `GOOGLE_AI_MODEL` | Lo mismo para Google (Gemini), por ejemplo `gemini-3.5-flash-lite`. |
 | `HETZNER_API_TOKEN` | Opcional. Un token de **solo lectura** de Hetzner Cloud, para la página **Servidor**. Sin él, la página dice que no está configurada. |
 | `PROMETHEUS_URL` | Opcional. La dirección de Prometheus, para que la página **Servidor** añada memoria, espacio en disco, carga y tiempo encendido. Con `COMPOSE_PROFILES=monitoring` la API ya la recibe sola (`http://laviciacion-prometheus:9090`), así que solo hace falta para un Prometheus que esté en otro sitio. Sin Prometheus, la página enseña solo lo que da Hetzner. |
 | `HETZNER_SERVER_ID` | Opcional. El número del servidor en Hetzner; vacío = el único servidor del proyecto. |
 | `OPENAI_ADMIN_KEY` | Opcional. Una clave de **administración** de OpenAI, solo para leer cuánto se ha gastado (**IA → Uso y coste**). No escribe avisos. |
 
-Sin las **tres** variables de la IA, esta no escribe nada y los avisos salen como texto normal. Ver [Servicios externos](servicios.md).
+No hay ninguna variable que diga qué proveedor usar: es el que tenga clave y, con los dos, el que se elige en el panel (**IA → Avisos con IA**), donde también se puede cambiar el modelo con la lista que da el proveedor. Sin la clave y el modelo de al menos un proveedor, la IA no escribe nada y los avisos salen como texto normal. Ver [Servicios externos](servicios.md).
 
-El chat de la app usa el mismo proveedor y la misma clave. Solo tiene una variable propia, **opcional**:
+El chat de la app usa el mismo proveedor y la misma clave. Solo tiene una variable propia por proveedor, **opcional**:
 
 | Variable | Para qué sirve |
 |---|---|
-| `CHAT_AI_MODEL` | El modelo que usa el chat (de ese mismo proveedor). Si no la pones, usa `AI_MODEL`. |
+| `OPENAI_CHAT_AI_MODEL`, `GOOGLE_CHAT_AI_MODEL` | El modelo que usa el chat con ese proveedor. Si no la pones, usa el modelo de los avisos (`OPENAI_AI_MODEL`, `GOOGLE_AI_MODEL`). |
 
 Ver [Servicios externos](servicios.md#chat-de-la-app).
 ### Correo (recuperar contraseña)

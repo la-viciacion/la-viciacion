@@ -153,7 +153,7 @@ test('a failure of the record is shown without hiding what OpenAI billed', async
 });
 
 const SETTINGS = {
-  values: { 'ai.price_refresh_hours': 24, 'ai.usage_retention_days': 90, 'telegram.token': { is_set: false }, 'telegram.group_id': { is_set: false }, 'telegram.admin_chat_id': { is_set: false }, 'ai.api_key': { is_set: false }, 'ai.openai_admin_key': { is_set: false }, 'push.vapid_private': { is_set: false } },
+  values: { 'ai.price_refresh_hours': 24, 'ai.usage_retention_days': 90, 'telegram.token': { is_set: false }, 'telegram.group_id': { is_set: false }, 'telegram.admin_chat_id': { is_set: false }, 'ai.openai.api_key': { is_set: false }, 'ai.openai_admin_key': { is_set: false }, 'push.vapid_private': { is_set: false } },
   jobs: {}, push_devices: { devices: 0, users: 0 }, mail: { configured: false, missing: [] }, ai_uses: [], ai_model: { provider: 'google', model: 'm' }, chat: {}, guide: {},
 };
 

@@ -18,6 +18,7 @@ from src.database import models
 from src.routers import chat as chat_router
 from src.routers.manage import system
 from src.utils import ai, ai_quota, audit, messages, settings, ai_source
+from tests import ai_env
 from tests.sqlite_db import make_session
 
 
@@ -141,7 +142,7 @@ class CallersTests(unittest.TestCase):
         self.addCleanup(patcher.stop)
 
     def settings(self):
-        base = {"ai.enabled": True, "ai.provider": "google", "ai.api_key": "KEY", "ai.model": "gemini-test", "chat.model": None, "chat.prompt": "p"}
+        base = {"ai.enabled": True, **ai_env.group("google", "KEY", "gemini-test"), "chat.prompt": "p"}
         return mock.patch.object(ai.settings, "get", side_effect=lambda key: base[key])
 
     def test_the_google_client_turns_a_429_into_a_quota_error(self):
@@ -173,7 +174,7 @@ class CallersTests(unittest.TestCase):
         self.report.assert_not_called()
 
     def test_the_chat_reports_it_and_says_so(self):
-        with mock.patch.object(agent.settings, "get", side_effect=lambda key: {"ai.provider": "google", "ai.api_key": "KEY", "chat.model": None, "ai.model": "gemini-test"}[key]):
+        with mock.patch.object(agent.settings, "get", side_effect=lambda key: ai_env.group("google", "KEY", "gemini-test")[key]):
             error = agent.failure(ModelHTTPError(429, "gemini-test", {"error": {"message": "q"}}), "chat")
         self.assertIsInstance(error, QuotaError)
         self.assertEqual(self.report.call_args.args[1:], ("chat", "google", "gemini-test"))

@@ -18,7 +18,7 @@ from ..clients import failure as provider_failure
 from ..clients.ai_error import AIError, ProviderError, QuotaError
 from ..clients.quota import classify
 from ..database import models
-from ..utils import ai_ledger, ai_quota, messages, seasons, settings
+from ..utils import ai_ledger, ai_providers, ai_quota, messages, seasons, settings
 from ..utils.logger import LogManager
 from . import model as chat_model
 from .limits import LIMITS, MAX_HISTORY
@@ -82,10 +82,12 @@ def failure(e: Exception, source: str, key: str | None = None) -> AIError:
     quota = classify(e)
     if quota:
         if key is None:
-            ai_quota.report(quota, source, settings.get("ai.provider"), chat_model.model_name())
+            ai_quota.report(quota, source, ai_providers.selected(), chat_model.model_name())
         return QuotaError(f"chat: {quota.describe()}", quota)
     # a provider library may quote what it was given: never let the key out in the message
-    text = str(e).replace(settings.get("ai.api_key") or chr(0), "***")
+    text = str(e)
+    for group_key in filter(None, (ai_providers.api_key(p) for p in ai_providers.PROVIDERS)):
+        text = text.replace(group_key, "***")
     message = f"chat: {type(e).__name__}: {text.replace(key or chr(0), '***')}"
     kind = provider_failure.kind(e)
     return ProviderError(message, kind) if kind else AIError(message)
@@ -96,7 +98,7 @@ def ask(db: Session, user: models.User, question: str, history: list[tuple[str, 
     the group's if none is given); `model` is for the tests. Every outcome leaves a row in the AI usage record
     (utils/ai_ledger.py), with the numbers and never the text."""
     started = time.monotonic()
-    provider, name = (source.provider, source.model) if source else (settings.get("ai.provider"), chat_model.model_name())
+    provider, name = (source.provider, source.model) if source else (ai_providers.selected(), chat_model.model_name())
     paid_by = source.key_source if source else ai_ledger.GROUP
     recorded = dict(user_id=user.id, feature="chat", key_source=paid_by, question=question, turns=len(history), provider=provider, model=name)
     try:

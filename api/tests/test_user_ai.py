@@ -19,6 +19,7 @@ from src.guide import limits as guide_limits
 from src.routers import chat as chat_router
 from src.routers import user_ai as route
 from src.utils import ai_ledger, ai_models, ai_source, messages, settings, user_ai
+from tests import ai_env
 from tests.sqlite_db import make_session
 from tests.test_chat import seed
 
@@ -28,7 +29,7 @@ OTHER_KEY = "sk-proj-ZyXwVuTsRqPoNmLkJiHgFeDcBa9876543210"
 
 def values(**overrides):
     base = {key: spec.default for key, spec in settings.REGISTRY.items()}
-    return {**base, "ai.api_key": "GROUPKEY", "ai.provider": "openai", "ai.model": "gpt-4.1-mini", "chat.model": None, **overrides}
+    return {**base, **ai_env.group("openai", "GROUPKEY", "gpt-4.1-mini"), **overrides}
 
 
 def patched(**overrides):
@@ -113,7 +114,7 @@ class WhoPaysTests(unittest.TestCase):
         else:
             user_ai.clear(self.db, 1)
         key = "GROUPKEY" if group else None
-        with patched(**{f"{feature}.key_source": mode, f"{feature}.enabled": enabled, "ai.api_key": key}):
+        with patched(**{f"{feature}.key_source": mode, f"{feature}.enabled": enabled, "ai.openai.api_key": key}):
             return ai_source.resolve(self.db, 1, feature), ai_source.availability(self.db, 1, feature)
 
     def test_user_only_uses_the_players_key_and_nothing_else(self):

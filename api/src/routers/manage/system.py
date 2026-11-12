@@ -16,7 +16,9 @@ from ...clients import igdb
 from ...guide import agent as guide_agent
 from ...config import Config
 from ...database import models
-from ...utils import ai, audit, my_utils, push, settings, sql_dump
+from ...clients import google_ai, open_ai
+from ...clients.ai_error import ProviderError
+from ...utils import ai, ai_models, ai_providers, audit, my_utils, push, settings, sql_dump
 from ...utils import email as mail
 from ...utils.logger import LogManager
 from .common import router
@@ -47,6 +49,7 @@ def get_settings(admin: models.User = Depends(auth.require_admin), db: Session =
         "games_sources": {"rawg": bool(config.RAWG_API_KEY), "igdb": igdb.configured()},
         "ai_uses": settings.ai_uses(db),
         "ai_model": ai.in_use(),
+        "ai_providers": ai_providers.status(),
         "chat": {**chat_model.in_use(), **settings.chat_prompt(db)},
         "guide": {**chat_model.in_use(), **settings.guide_prompt(db)},
     }
@@ -62,7 +65,7 @@ def put_settings(body: SettingsBody, admin: models.User = Depends(auth.require_a
     if any(key.startswith("push.vapid") for key in body.values):
         raise HTTPException(status_code=400, detail="Las claves VAPID se generan con «Generar claves», no se escriben")
     if any(settings.REGISTRY[key].env_only for key in body.values if key in settings.REGISTRY):
-        raise HTTPException(status_code=400, detail="El token y los IDs de Telegram y las claves, proveedores y modelos de la IA (y el del chat) se configuran en el .env del servidor, no desde el panel")
+        raise HTTPException(status_code=400, detail="El token y los IDs de Telegram y las claves y modelos por defecto de cada proveedor de IA se configuran en el .env del servidor, no desde el panel")
     try:
         changed = settings.set_values(db, body.values, user_id=admin.id)
     except ValueError as e:
@@ -95,18 +98,37 @@ async def send_test_message(admin: models.User = Depends(auth.require_admin)):
     return {"message": "Mensaje enviado"}
 
 
+@router.get("/settings/ai-models")
+def list_ai_models(provider: str = Query(..., pattern="^(" + "|".join(ai.PROVIDERS) + ")$"), admin: models.User = Depends(auth.require_admin)):
+    """The models a provider offers now, asked to the provider itself with the group's key (a call that spends nothing), so the
+    panel can pick another without redeploying. Blocking network call: a plain def, so it runs in a worker thread."""
+    key = ai_providers.api_key(provider)
+    if not key:
+        raise HTTPException(status_code=409, detail=f"No hay clave de {provider}: falta {provider.upper()}_AI_API_KEY en el .env del servidor")
+    try:
+        ids = open_ai.list_models(key) if provider == "openai" else google_ai.list_models(key)
+    except ai.QuotaError as e:
+        raise HTTPException(status_code=429, detail=e.quota.describe())
+    except ai.AIError as e:
+        logger.error(f"Listing the {provider} models for {admin.username} failed: {e}", exc_info=True)
+        raise HTTPException(status_code=502, detail=f"{provider} no ha dado la lista de modelos" + (": la clave no es válida" if isinstance(e, ProviderError) and e.kind == "denied" else ""))
+    shown = ai_models.for_chat(ids) if provider == "openai" else ids
+    return {
+        "provider": provider,
+        "models": shown,
+        "defaults": {"notices": ai_providers.default_model(provider, ai_providers.NOTICES), "chat": ai_providers.default_model(provider, ai_providers.CHAT)},
+    }
+
+
 @router.post("/settings/test-ai")
 def test_ai(admin: models.User = Depends(auth.require_admin)):
     """Ask the AI for one short sentence with the provider, model and key of the environment (blocking network call:
     a plain def, so it runs in a worker thread). Works with the AI switched off, to try a key before using it."""
-    if not settings.get("ai.api_key"):
-        raise HTTPException(status_code=409, detail="No hay ninguna clave de IA: falta AI_API_KEY en el .env del servidor")
     provider, model = ai.current()
-    if provider not in ai.PROVIDERS or not model:
-        raise HTTPException(
-            status_code=409,
-            detail="La IA no está completa: AI_PROVIDER (" + " o ".join(ai.PROVIDERS) + ") y AI_MODEL deben estar en el .env del servidor",
-        )
+    if provider is None:
+        raise HTTPException(status_code=409, detail="No hay ninguna clave de IA: falta " + " o ".join(f"{p.upper()}_AI_API_KEY" for p in ai.PROVIDERS) + " en el .env del servidor")
+    if not model:
+        raise HTTPException(status_code=409, detail=f"La IA no está completa: falta {provider.upper()}_AI_MODEL en el .env del servidor (o elige un modelo en el panel)")
     try:
         reply = ai.complete(
             "Responde solo con una frase corta y divertida sobre videojuegos.", "Saluda al grupo.", force=True, source="ai_test"
@@ -126,7 +148,7 @@ def test_chat(admin: models.User = Depends(auth.require_admin)):
     if not chat_model.configured():
         raise HTTPException(
             status_code=409,
-            detail="El chat no está completo: AI_PROVIDER (" + " o ".join(chat_model.BUILDERS) + "), AI_API_KEY y un modelo (CHAT_AI_MODEL, o AI_MODEL si no hay) deben estar en el .env del servidor",
+            detail="El chat no está completo: hace falta la clave de un proveedor (" + " o ".join(f"{p.upper()}_AI_API_KEY" for p in ai.PROVIDERS) + ") y un modelo (<PROVEEDOR>_AI_MODEL en el .env, o uno elegido en el panel)",
         )
     try:
         reply = chat_agent.probe()
@@ -146,7 +168,7 @@ def test_guide(admin: models.User = Depends(auth.require_admin)):
     if not chat_model.configured():
         raise HTTPException(
             status_code=409,
-            detail="La guía no está completa: AI_PROVIDER (" + " o ".join(chat_model.BUILDERS) + "), AI_API_KEY y un modelo (CHAT_AI_MODEL, o AI_MODEL si no hay) deben estar en el .env del servidor",
+            detail="La guía no está completa: hace falta la clave de un proveedor (" + " o ".join(f"{p.upper()}_AI_API_KEY" for p in ai.PROVIDERS) + ") y un modelo (<PROVEEDOR>_AI_MODEL en el .env, o uno elegido en el panel)",
         )
     try:
         reply = guide_agent.probe()

@@ -24,6 +24,7 @@ from src.database import models
 from src.routers import chat as chat_router
 from src.routers.manage import system
 from src.utils import ai_prompts, ai_source, messages, settings
+from tests import ai_env
 from tests.sqlite_db import make_session
 
 START = datetime.datetime(2026, 3, 1, 10, 0)
@@ -310,7 +311,7 @@ class AgentTests(unittest.TestCase):
         seed(self.db)
         self.user = self.db.get(models.User, 1)
         values = {key: spec.default for key, spec in settings.REGISTRY.items()} | {
-            "chat.prompt": "Eres un bot.", "ai.api_key": "KEY", "ai.provider": "openai", "ai.model": "gpt-4.1-mini", "chat.model": None,
+            "chat.prompt": "Eres un bot.", **ai_env.group("openai", "KEY", "gpt-4.1-mini"),
         }
         patcher = mock.patch.object(agent.settings, "get", side_effect=lambda key: values[key])
         patcher.start()
@@ -515,15 +516,15 @@ class EndpointTests(unittest.TestCase):
 class ReadinessTests(unittest.TestCase):
     def values(self, **overrides):
         base = {
-            "chat.enabled": True, "chat.model": None,
-            "ai.provider": "openai", "ai.api_key": "k", "ai.model": "m", "ai.enabled": True,
+            "chat.enabled": True,
+            **ai_env.group("openai", "k", "m"), "ai.enabled": True,
         }
         return mock.patch.object(chat_model.settings, "get", side_effect=lambda key: {**base, **overrides}[key])
 
     def test_it_needs_its_switch_and_the_ai_provider_key_and_a_model(self):
         with self.values():
             self.assertTrue(chat_model.is_ready())
-        for missing in ({"chat.enabled": False}, {"ai.api_key": None}, {"ai.provider": "other"}, {"ai.model": None}):
+        for missing in ({"chat.enabled": False}, {"ai.openai.api_key": None}, {"ai.openai.model": None}):
             with self.values(**missing):
                 self.assertFalse(chat_model.is_ready(), missing)
 
@@ -534,17 +535,19 @@ class ReadinessTests(unittest.TestCase):
     def test_its_own_model_wins_and_without_it_the_ais_is_used(self):
         with self.values():
             self.assertEqual(chat_model.in_use(), {"provider": "openai", "model": "m", "own_model": False})
-        with self.values(**{"chat.model": "strong"}):
+        with self.values(**{"chat.model.openai": "strong"}):  # picked in the panel
             self.assertEqual(chat_model.in_use(), {"provider": "openai", "model": "strong", "own_model": True})
             self.assertEqual(chat_model.build_model().model_name, "strong")
+        with self.values(**{"ai.openai.chat_model": "env-strong"}):  # the .env's default for the chat
+            self.assertEqual(chat_model.in_use(), {"provider": "openai", "model": "env-strong", "own_model": False})
 
-    def test_its_own_model_is_enough_without_ai_model(self):
-        with self.values(**{"chat.model": "strong", "ai.model": None}):
+    def test_its_own_model_is_enough_without_the_notices_model(self):
+        with self.values(**{"chat.model.openai": "strong", "ai.openai.model": None}):
             self.assertTrue(chat_model.configured())
 
     def test_the_model_is_built_for_each_provider(self):
         for provider in ("openai", "google"):
-            with self.values(**{"ai.provider": provider}):
+            with self.values(**ai_env.group(provider, "k", "m")):
                 self.assertEqual(chat_model.build_model().model_name, "m")
 
     def test_the_notices_general_switch_does_not_touch_the_chat(self):
@@ -555,16 +558,16 @@ class ReadinessTests(unittest.TestCase):
 class SettingsTests(unittest.TestCase):
     def test_the_chat_shares_the_provider_and_key_and_has_an_optional_model_of_its_own(self):
         db = make_session()
-        env = {"AI_PROVIDER": "openai", "AI_API_KEY": "sk-shared", "AI_MODEL": "gpt-cheap", "CHAT_AI_MODEL": "gpt-strong"}
-        with mock.patch.dict(os.environ, env):
-            self.assertEqual(chat_model.in_use(), {"provider": "openai", "model": "gpt-strong", "own_model": True})
-            view = settings.public_view(db)
-            self.assertEqual(view["chat.model"], {"is_set": True, "hint": None})
+        env = {"OPENAI_AI_API_KEY": "sk-shared", "OPENAI_AI_MODEL": "gpt-cheap", "OPENAI_CHAT_AI_MODEL": "gpt-strong", "GOOGLE_AI_API_KEY": ""}
+        # nothing is picked in the panel: the stored settings are empty, the environment's are read as they are
+        not_stored = lambda key: settings._from_env(settings.REGISTRY[key]) if settings.REGISTRY[key].env_only else None  # noqa: E731
+        with mock.patch.dict(os.environ, env), mock.patch.object(settings, "get", side_effect=not_stored):
+            self.assertEqual(chat_model.in_use(), {"provider": "openai", "model": "gpt-strong", "own_model": False})
+            self.assertEqual(settings.public_view(db)["ai.openai.chat_model"], {"is_set": True, "hint": None})
             with self.assertRaises(ValueError):
-                settings.set_values(db, {"chat.model": "other"})  # not from the panel
-        with mock.patch.dict(os.environ, {**env, "CHAT_AI_MODEL": ""}):
+                settings.set_values(db, {"ai.openai.chat_model": "other"})  # the default is the .env's, not the panel's
+        with mock.patch.dict(os.environ, {**env, "OPENAI_CHAT_AI_MODEL": ""}), mock.patch.object(settings, "get", side_effect=not_stored):
             self.assertEqual(chat_model.in_use(), {"provider": "openai", "model": "gpt-cheap", "own_model": False})
-        self.assertEqual(db.query(models.AppSetting).filter(models.AppSetting.key.like("chat.%")).count(), 0)
 
     def test_there_are_no_provider_or_key_settings_of_its_own(self):
         self.assertNotIn("chat.provider", settings.REGISTRY)
@@ -607,16 +610,16 @@ class TestRouteTests(unittest.TestCase):
     admin = types.SimpleNamespace(username="root")
 
     def configured(self, **overrides):
-        base = {"chat.enabled": False, "chat.model": None, "ai.provider": "openai", "ai.api_key": "k", "ai.model": "m"}
+        base = {"chat.enabled": False, **ai_env.group("openai", "k", "m")}
         return mock.patch.object(chat_model.settings, "get", side_effect=lambda key: {**base, **overrides}[key])
 
     def test_without_the_ai_variables_it_is_a_409_that_says_where_to_set_them(self):
-        for missing in ({"ai.api_key": None}, {"ai.provider": None}, {"ai.model": None}):
+        for missing in ({"ai.openai.api_key": None}, {"ai.openai.model": None}):
             with self.configured(**missing), self.assertRaises(HTTPException) as caught:
                 system.test_chat(self.admin)
             self.assertEqual(caught.exception.status_code, 409)
-            self.assertIn("AI_MODEL", caught.exception.detail)
-            self.assertIn("CHAT_AI_MODEL", caught.exception.detail)
+            self.assertIn("OPENAI_AI_API_KEY", caught.exception.detail)
+            self.assertIn("GOOGLE_AI_API_KEY", caught.exception.detail)
 
     def test_it_works_with_the_chat_switched_off_and_reports_what_was_used(self):
         with self.configured(), mock.patch.object(system.chat_agent, "probe", return_value="Hola"):
