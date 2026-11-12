@@ -57,7 +57,7 @@ def ask(
     data = game_overview.overview(db, game_id, current_user.id)
     if data is None:  # before anything is recorded: a row about a game that does not exist would break its foreign key
         raise HTTPException(status_code=404, detail="Game not exists")
-    if state["blocked"]:
+    if state["blocked"] and decision.source is None:  # with the player's own as the source it only says why the group's was not used
         ai_ledger.record(
             db, user_id=current_user.id, feature="guide", key_source=ai_ledger.GROUP, status=ai_ledger.BUDGET,
             question=body.message, turns=len(body.history), game_id=game_id,

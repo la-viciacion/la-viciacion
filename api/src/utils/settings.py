@@ -113,7 +113,7 @@ def _retention(value: int) -> str | None:
 
 
 def _key_source(value: str) -> str | None:
-    return None if value in ("user_only", "user_or_group", "group_only") else "Debe ser user_only, user_or_group o group_only"
+    return None if value in ("user_only", "group_then_user", "group_only") else "Debe ser user_only, group_then_user o group_only"
 
 
 def _budget(value: int) -> str | None:
@@ -207,8 +207,9 @@ REGISTRY: dict[str, Spec] = {
     "chat.limit_user_day": Spec("int", 100, check=_limit),
     "chat.limit_group_minute": Spec("int", 10, check=_limit),
     "chat.limit_group_day": Spec("int", 300, check=_limit),
-    # Whose key pays for the chat (utils/ai_source.py): user_only, user_or_group (their own, else the group's) or group_only
-    "chat.key_source": Spec("str", "user_or_group", check=_key_source),
+    # Whose key pays for the chat (utils/ai_source.py): user_only, group_then_user (the group's until its budget is spent, then the
+    # player's own) or group_only
+    "chat.key_source": Spec("str", "group_then_user", check=_key_source),
     "chat.prompt": Spec("str", CHAT_PROMPT.strip(), check=_prompt, resettable=True),
     # The game guide (guide/), on trial: it shares the chat's provider, key and model, but its questions search the web, so
     # it has its own switch, its own instructions and its own, lower limits (routers/guide.py); all in the admin's Chat tab.

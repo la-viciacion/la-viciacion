@@ -2,9 +2,10 @@
 
 Each feature has a mode (admin setting `chat.key_source`, `guide.key_source`):
 
-  user_only      only with the player's own key (nothing is asked of the group's quota)
-  user_or_group  the player's own if they have one, else the group's
-  group_only     always the group's, whatever the players have saved (for the day the group agrees to pay for everybody)
+  user_only       only with the player's own key (nothing is asked of the group's quota)
+  group_then_user the group's key first; when its monthly budget is spent (the group's or the player's share of it) the player's
+                  own, if they saved one, and if not they are told so
+  group_only      always the group's, whatever the players have saved (for the day the group agrees to pay for everybody)
 
 The answer is a `Source`: whose key it is (`key_source`, written to the usage record), the provider, the key and the model.
 The player's own is OpenAI's, with the model they chose; the group's is the one of the .env (AI_PROVIDER, AI_API_KEY and the
@@ -16,8 +17,8 @@ from sqlalchemy.orm import Session
 from ..chat import model as chat_model
 from . import ai_budget, ai_ledger, messages, settings, user_ai
 
-USER_ONLY, USER_OR_GROUP, GROUP_ONLY = "user_only", "user_or_group", "group_only"
-MODES = (USER_ONLY, USER_OR_GROUP, GROUP_ONLY)
+USER_ONLY, GROUP_THEN_USER, GROUP_ONLY = "user_only", "group_then_user", "group_only"
+MODES = (USER_ONLY, GROUP_THEN_USER, GROUP_ONLY)
 FEATURES = ("chat", "guide")
 
 
@@ -34,7 +35,9 @@ class Source:
 
 
 def mode(feature: str) -> str:
-    return settings.get(f"{feature}.key_source")
+    """The mode of a feature; a value that is not one of ours (an old name stored by an earlier version) is the feature's default."""
+    wanted = settings.get(f"{feature}.key_source")
+    return wanted if wanted in MODES else settings.REGISTRY[f"{feature}.key_source"].default
 
 
 def group_source() -> Source | None:
@@ -52,26 +55,28 @@ def own_source(db: Session, user_id: int) -> Source | None:
 @dataclass(frozen=True)
 class Decision:
     source: Source | None
-    blocked: str | None = None  # ai_budget.GROUP or ai_budget.USER: the monthly budget of the group's key stopped it
+    # ai_budget.GROUP or ai_budget.USER: the monthly budget of the group's key is spent. With no source it is what stopped the
+    # question; with the player's own as the source it is why the group's was not used (they went on with theirs)
+    blocked: str | None = None
 
 
 def decide(db: Session, user_id: int, feature: str) -> Decision:
     """The source that pays for this player's next question to `feature`, or why none can: the feature is off, the mode wants
     a key they have not saved, the group's is missing (all three: no source and nothing blocked) or the group's key is the one
-    to use and its monthly budget, the group's or the player's share, is spent (`blocked`)."""
+    to use and its monthly budget, the group's or the player's share, is spent (`blocked`). With `group_then_user` the group's
+    key comes first and the player's own takes over only when that budget is spent (or the group has none)."""
     if not settings.get(f"{feature}.enabled"):
         return Decision(None)
     wanted = mode(feature)
-    own = None if wanted == GROUP_ONLY else own_source(db, user_id)
-    if own is not None:
-        return Decision(own)
     if wanted == USER_ONLY:
-        return Decision(None)
+        return Decision(own_source(db, user_id))
     group = group_source()
-    if group is None:
-        return Decision(None)
-    blocked = ai_budget.exceeded(db, user_id)
-    return Decision(None, blocked) if blocked else Decision(group)
+    blocked = ai_budget.exceeded(db, user_id) if group is not None else None
+    if group is not None and not blocked:
+        return Decision(group)
+    if wanted == GROUP_ONLY:
+        return Decision(None, blocked)
+    return Decision(own_source(db, user_id), blocked)  # the group's is spent (or missing): the player's own, if they have one
 
 
 def resolve(db: Session, user_id: int, feature: str) -> Source | None:

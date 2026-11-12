@@ -140,16 +140,26 @@ class DecisionTests(Base):
 
     def test_a_spent_budget_stops_the_groups_key_and_says_whose_budget(self):
         self.spend(1, 6.0)
-        decision, state = self.decide("user_or_group", **{"ai.group_budget_month": 5})
+        decision, state = self.decide("group_then_user", **{"ai.group_budget_month": 5})
         self.assertEqual((decision.source, decision.blocked), (None, "group"))
         self.assertEqual((state["blocked"], state["needs_key"], state["available"]), ("group", True, True))
-        decision, _ = self.decide("user_or_group", **{"ai.group_budget_month": 100, "ai.user_budget_month": 5})
+        decision, _ = self.decide("group_then_user", **{"ai.group_budget_month": 100, "ai.user_budget_month": 5})
         self.assertEqual(decision.blocked, "user")
 
-    def test_a_player_with_their_own_key_is_never_stopped_by_the_groups_budget(self):
+    def test_when_the_budget_is_spent_a_player_with_their_own_key_goes_on_with_it_and_is_told_why(self):
         self.spend(1, 60.0)
-        decision, state = self.decide("user_or_group", own=True, **{"ai.group_budget_month": 5, "ai.user_budget_month": 5})
-        self.assertEqual((decision.source.key_source, decision.blocked, state["blocked"]), ("user", None, None))
+        decision, state = self.decide("group_then_user", own=True, **{"ai.group_budget_month": 5})
+        self.assertEqual((decision.source.key_source, decision.blocked), ("user", "group"))
+        self.assertEqual((state["paid_by"], state["blocked"], state["needs_key"]), ("user", "group", False))
+        decision, state = self.decide("group_then_user", own=True, **{"ai.group_budget_month": 100, "ai.user_budget_month": 5})
+        self.assertEqual((decision.source.key_source, decision.blocked, state["blocked"]), ("user", "user", "user"))
+
+    def test_one_players_share_spent_does_not_move_the_others_off_the_group(self):
+        self.spend(1, 60.0)
+        with patched(**{"chat.key_source": "group_then_user", "ai.group_budget_month": 1000, "ai.user_budget_month": 5}):
+            user_ai.save(self.db, 2, KEY, "gpt-5-mini")
+            self.assertEqual(ai_source.decide(self.db, 1, "chat").blocked, "user")
+            self.assertEqual(ai_source.decide(self.db, 2, "chat").source.key_source, "group")
 
     def test_a_feature_that_is_only_the_players_has_no_budget_to_spend(self):
         self.spend(1, 60.0)
@@ -164,11 +174,11 @@ class DecisionTests(Base):
 
     def test_under_budget_the_group_pays_as_before(self):
         self.spend(1, 1.0)
-        decision, state = self.decide("user_or_group", **{"ai.group_budget_month": 5})
+        decision, state = self.decide("group_then_user", **{"ai.group_budget_month": 5})
         self.assertEqual((decision.source.key_source, decision.blocked, state["paid_by"]), ("group", None, "group"))
 
     def test_the_message_names_the_budget_and_offers_the_own_key_only_where_it_would_be_used(self):
-        with patched(**{"chat.key_source": "user_or_group", "guide.key_source": "group_only"}):
+        with patched(**{"chat.key_source": "group_then_user", "guide.key_source": "group_only"}):
             self.assertIn(messages.GROUP_BUDGET_REACHED, ai_source.blocked_message("group", "chat"))
             self.assertIn("Mi IA", ai_source.blocked_message("group", "chat"))
             self.assertIn(messages.USER_BUDGET_REACHED, ai_source.blocked_message("user", "chat"))
@@ -215,9 +225,29 @@ class QuestionsStoppedTests(Base):
 
     def test_the_guide_status_says_which_budget_is_spent(self):
         self.spend(1, 6.0)
-        with patched(**{"ai.group_budget_month": 5, "guide.key_source": "user_or_group"}):
+        with patched(**{"ai.group_budget_month": 5, "guide.key_source": "group_then_user"}):
             body = self.client.get("/guide/status").json()
         self.assertEqual((body["blocked"], body["needs_key"]), ("group", True))
+
+    def test_with_the_budget_spent_a_player_with_their_own_key_is_answered_with_it_and_not_stopped(self):
+        self.spend(1, 6.0)
+        user_ai.save(self.db, 1, KEY, "gpt-5-mini")
+        with patched(**{"ai.group_budget_month": 5, "chat.key_source": "group_then_user"}), \
+                mock.patch.object(chat_router.agent, "ask", return_value=chat_router.agent.Answer("Hola", True)) as ask:
+            response = self.client.post("/chat", json={"message": "hola"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual((ask.call_args.kwargs["source"].key_source, ask.call_args.kwargs["source"].model), ("user", "gpt-5-mini"))
+        self.assertEqual([r.status for r in self.db.query(models.AiUsage).order_by(models.AiUsage.id)], ["ok"], "nothing was stopped")
+
+    def test_the_guide_does_the_same_and_the_status_still_says_why(self):
+        self.spend(1, 6.0)
+        user_ai.save(self.db, 1, KEY, "gpt-5-mini")
+        with patched(**{"ai.group_budget_month": 5, "guide.key_source": "group_then_user"}), \
+                mock.patch.object(guide_router.agent, "ask", return_value="Hola") as ask:
+            self.assertEqual(self.client.post("/guide/g1", json={"message": "hola"}).status_code, 200)
+            status = self.client.get("/guide/status").json()
+        self.assertTrue(ask.call_args.args[0].source.own)
+        self.assertEqual((status["paid_by"], status["blocked"], status["needs_key"]), ("user", "group", False))
 
     def test_a_question_within_budget_goes_through(self):
         self.spend(1, 1.0)

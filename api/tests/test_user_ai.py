@@ -123,14 +123,20 @@ class WhoPaysTests(unittest.TestCase):
         source, state = self.resolve("guide", "user_only")
         self.assertEqual((source, state["needs_key"], state["available"]), (None, True, True))
 
-    def test_user_or_group_prefers_their_own_and_falls_back_to_the_groups(self):
-        self.assertEqual(self.resolve("chat", "user_or_group", own=True)[0].key_source, "user")
-        db_source, state = self.resolve("chat", "user_or_group", own=False)
-        self.assertEqual((db_source.key_source, db_source.api_key, state["paid_by"]), ("group", "GROUPKEY", "group"))
+    def test_group_then_user_uses_the_groups_key_first_whether_or_not_they_have_their_own(self):
+        for own in (False, True):
+            source, state = self.resolve("chat", "group_then_user", own=own)
+            self.assertEqual((source.key_source, source.api_key, state["paid_by"], state["blocked"]), ("group", "GROUPKEY", "group", None), own)
 
-    def test_user_or_group_with_neither_needs_a_key(self):
-        source, state = self.resolve("chat", "user_or_group", group=False)
+    def test_group_then_user_goes_on_with_their_own_when_the_group_has_none_and_needs_a_key_without_either(self):
+        source, state = self.resolve("chat", "group_then_user", own=True, group=False)
+        self.assertEqual((source.key_source, state["paid_by"]), ("user", "user"))
+        source, state = self.resolve("chat", "group_then_user", group=False)
         self.assertEqual((source, state["needs_key"], state["available"]), (None, True, True))
+
+    def test_an_unknown_mode_stored_by_an_earlier_version_is_the_default_of_the_feature(self):
+        with patched(**{"chat.key_source": "user_or_group", "guide.key_source": "everybody"}):
+            self.assertEqual((ai_source.mode("chat"), ai_source.mode("guide")), ("group_then_user", "user_only"))
 
     def test_group_only_ignores_the_players_key_and_needs_none(self):
         source, state = self.resolve("guide", "group_only", own=True)
@@ -144,7 +150,7 @@ class WhoPaysTests(unittest.TestCase):
             self.assertEqual((source, state), (None, {"available": False, "needs_key": False, "paid_by": None, "blocked": None}), mode)
 
     def test_the_defaults_are_the_chat_for_the_group_and_the_guide_for_the_player(self):
-        self.assertEqual(settings.REGISTRY["chat.key_source"].default, "user_or_group")
+        self.assertEqual(settings.REGISTRY["chat.key_source"].default, "group_then_user")
         self.assertEqual(settings.REGISTRY["guide.key_source"].default, "user_only")
         self.assertIsNone(settings.REGISTRY["chat.key_source"].check("group_only"))
         self.assertIsNotNone(settings.REGISTRY["chat.key_source"].check("everybody"))
@@ -274,7 +280,7 @@ class RouteTests(unittest.TestCase):
         self.assertNotIn(KEY, response.text)
         body = response.json()
         self.assertEqual(body["key"]["hint"], "6789")
-        self.assertEqual((body["chat"]["paid_by"], body["chat"]["mode"]), ("user", "user_or_group"))
+        self.assertEqual((body["chat"]["paid_by"], body["chat"]["mode"]), ("group", "group_then_user"))  # the group's first
         self.assertEqual((body["guide"]["paid_by"], body["guide"]["mode"]), ("user", "user_only"))
 
     def test_what_is_not_a_key_is_refused_without_calling_openai(self):
