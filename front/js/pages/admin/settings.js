@@ -269,6 +269,17 @@ function view(values, jobs, pushDevices, mail, aiUses, aiModel, chat, guide = {}
         <div><button type="button" class="adm-btn" data-set-act="test-chat" ${chatMissing(values, chat).length ? html`disabled` : ''}>Probar el chat</button></div>
       </section>`,
 
+    aicost: html`
+      <section class="adm-set-card adm-aicost-card">
+        <h3>Coste de la IA</h3>
+        <div class="adm-sub">Cada pregunta al chat o a la guía deja un registro de lo que usó (tokens, búsquedas) y lo que costó, sin guardar el texto. Lo ves en IA → Uso y coste. El coste es una estimación con los precios de cada modelo, que no están en el código: se descargan de una lista pública (genai-prices) cada cierto tiempo y, si no se puede, se usan los de la versión instalada.</div>
+        <div class="adm-set-row">
+          <label>Actualizar los precios cada (horas, 0 = nunca) <input class="adm-input" type="number" name="ai.price_refresh_hours" min="0" max="720" step="1" required /></label>
+          <label>Conservar el registro (días, 0 = siempre) <input class="adm-input" type="number" name="ai.usage_retention_days" min="0" max="3650" step="1" required /></label>
+        </div>
+        <div class="adm-sub">La lista incluye también lo que cobra cada proveedor por las búsquedas web de la guía, modelo a modelo. Un cambio en la frecuencia de actualización se aplica al arrancar la API.</div>
+      </section>`,
+
     guide: html`
       <section class="adm-set-card adm-guide-card">
         <h3>Guía de juego</h3>
