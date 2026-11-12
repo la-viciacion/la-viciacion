@@ -231,3 +231,28 @@ test('without a model of its own the chat says it uses AI_MODEL', async () => {
   assert.equal(chatCard().querySelector('.adm-chat-model').value, 'gemini-test');
   assert.match(chatCard().textContent, /ahora no lo está: usa AI_MODEL/);
 });
+
+const GUIDE = { provider: 'openai', model: 'gpt-chat', own_model: true, default_prompt: 'g', customized: false };
+const openWithGuide = async (values = VALUES, guide = GUIDE) => {
+  installApi({ 'GET /manage/settings': { values: { ...values, 'guide.enabled': true, 'guide.prompt': 'g', 'guide.limit_user_hour': 10, 'guide.limit_user_day': 30, 'guide.limit_group_day': 100, ...values }, jobs: {}, push_devices: { devices: 0, users: 0 }, mail: { configured: false, missing: [] }, ai_uses: USES, ai_model: { provider: 'google', model: 'gemini-test' }, chat: CHAT, guide } });
+  await render(panel(), { entity: { sections: ['guide'] } });
+  await settle();
+};
+const guideCard = () => panel().querySelector('.adm-guide-card');
+
+test('the guide card has its switch, its limits and its instructions, and offers the test', async () => {
+  await openWithGuide();
+  assert.equal(guideCard().querySelector('input[type="checkbox"]').name, 'guide.enabled');
+  assert.deepEqual([...guideCard().querySelectorAll('input[type="number"]')].map((i) => i.name), ['guide.limit_user_hour', 'guide.limit_user_day', 'guide.limit_group_day']);
+  assert.ok(guideCard().querySelector('textarea[name="guide.prompt"]'));
+  assert.match(guideCard().querySelector('.adm-guide-state').textContent, /^Disponible/);
+  assert.equal(guideCard().querySelector('[data-set-act="test-guide"]').disabled, false);
+});
+
+test('the guide card says why the players do not have it', async () => {
+  await openWithGuide({ ...VALUES, 'guide.enabled': false });
+  assert.match(guideCard().querySelector('.adm-guide-state').textContent, /No disponible: la guía está apagada/);
+  await openWithGuide({ ...VALUES, 'ai.api_key': { is_set: false } }, { ...GUIDE, provider: null, model: null });
+  assert.match(guideCard().querySelector('.adm-guide-state').textContent, /falta AI_PROVIDER, AI_API_KEY/);
+  assert.equal(guideCard().querySelector('[data-set-act="test-guide"]').disabled, true);
+});

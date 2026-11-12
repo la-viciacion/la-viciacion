@@ -37,7 +37,7 @@ const ACTIONS = [
 ];
 
 // Who asked the AI when its quota ran out (api/src/utils/ai_quota.py `source`)
-const AI_SOURCES = { chat: 'el chat', chat_test: 'la prueba del chat', ai_test: 'la prueba de la IA', welcome: 'la bienvenida del grupo', notice: 'un aviso' };
+const AI_SOURCES = { chat: 'el chat', chat_test: 'la prueba del chat', guide: 'la guía de juego', guide_test: 'la prueba de la guía', ai_test: 'la prueba de la IA', welcome: 'la bienvenida del grupo', notice: 'un aviso' };
 const AI_PERIODS = { minute: ' por minuto', day: ' por día', billing: ' de facturación' };
 
 function aiQuota(e) {
