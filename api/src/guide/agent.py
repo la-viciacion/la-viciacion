@@ -23,7 +23,6 @@ from pydantic_ai.usage import UsageLimits
 from sqlalchemy.orm import Session
 
 from ..chat import agent as chat_agent
-from ..chat import model as chat_model
 from ..clients.ai_error import QuotaError
 from ..chat.tools import hours
 from ..utils import ai_ledger, ai_providers, messages, settings
@@ -61,12 +60,17 @@ def build_model(source=None) -> Model:
     """The model for a source of key (utils/ai_source.py): the player's own, or the group's when none is given."""
     if source is not None:
         return BUILDERS[source.provider](source.model, source.api_key)
-    provider, key, name = ai_providers.group_credentials(ai_providers.CHAT)
+    provider, key, name = ai_providers.group_credentials(ai_providers.GUIDE)
     return BUILDERS[provider](name, key)
 
 
 def is_ready() -> bool:
-    return bool(settings.get("guide.enabled") and chat_model.configured())
+    return bool(settings.get("guide.enabled") and configured())
+
+
+def configured() -> bool:
+    """There is a provider with a key and a model for the guide (whether it is switched on or not)."""
+    return ai_providers.group_credentials(ai_providers.GUIDE) is not None
 
 
 def game_context(data: dict) -> str:
@@ -117,7 +121,7 @@ def ask(deps: GuideDeps, question: str, history: list[tuple[str, str]], model=No
     if source is not None:
         provider, name = source.provider, source.model
     else:
-        provider, name = (ai_providers.selected(), chat_model.model_name()) if deps.db is not None else (None, None)
+        provider, name = ai_providers.current(ai_providers.GUIDE) if deps.db is not None else (None, None)
     paid_by = source.key_source if source is not None else ai_ledger.GROUP
     recorded = dict(user_id=deps.user_id, feature="guide", key_source=paid_by, question=question, turns=len(history), game_id=deps.game_id, provider=provider, model=name)
 
@@ -138,7 +142,7 @@ def ask(deps: GuideDeps, question: str, history: list[tuple[str, str]], model=No
         record(ai_ledger.TOO_BIG)
         return messages.CHAT_TOO_COMPLEX
     except Exception as e:
-        error = chat_agent.failure(e, "guide", chat_agent.own_key(source))
+        error = chat_agent.failure(e, "guide", chat_agent.own_key(source), ai_providers.GUIDE)
         record(ai_ledger.QUOTA if isinstance(error, QuotaError) else ai_ledger.ERROR)
         raise error from None
     used = result.usage
@@ -161,5 +165,5 @@ def probe(model=None, source=None) -> str:
             deps=deps, model=model or build_model(source), usage_limits=LIMITS,
         )
     except Exception as e:
-        raise chat_agent.failure(e, "guide_test", chat_agent.own_key(source)) from None
+        raise chat_agent.failure(e, "guide_test", chat_agent.own_key(source), ai_providers.GUIDE) from None
     return result.output.strip()

@@ -9,7 +9,7 @@ const { render } = await import('../js/pages/admin/settings.js');
 
 const VALUES = {
   'ai.enabled': true, 'ai.provider': null, 'ai.openai.api_key': { is_set: true }, 'ai.google.api_key': { is_set: true }, 'ai.openai_admin_key': { is_set: false },
-  'ai.model.openai': null, 'ai.model.google': null, 'chat.model.openai': null, 'chat.model.google': null,
+  'ai.model.openai': null, 'ai.model.google': null, 'chat.model.openai': null, 'chat.model.google': null, 'guide.model.openai': null, 'guide.model.google': null, 'chat.provider': null, 'guide.provider': null,
   'ai.use.completed_game': true, 'ai.use.new_game': false, 'chat.enabled': true, 'chat.prompt': 'd',
   'chat.limit_user_minute': 5, 'chat.limit_user_hour': 30, 'chat.limit_user_day': 100, 'chat.limit_group_minute': 10, 'chat.limit_group_day': 300, 'completed_game.recommend': true,
   'telegram.token': { is_set: false }, 'telegram.group_id': { is_set: false }, 'telegram.admin_chat_id': { is_set: false }, 'push.vapid_private': { is_set: true },
@@ -19,7 +19,7 @@ const CHAT = { provider: 'openai', model: 'gpt-chat', own_model: true, default_p
 // what the .env has: both providers with a key; the one in use is Google's, with its default model
 const providersOf = (inUse = 'google', keys = ['openai', 'google'], models = {}) => ({
   providers: ['openai', 'google'].map((id) => ({ id, has_key: keys.includes(id), default_model: models[id] ?? (id === 'google' ? 'gemini-test' : 'gpt-test'), default_chat_model: models[id] ?? (id === 'google' ? 'gemini-test' : 'gpt-test') })),
-  provider: inUse, picked: null, notices_model: 'gemini-test', chat_model: 'gemini-test', notices_own: false, chat_own: false,
+  uses: Object.fromEntries(['notices', 'chat', 'guide'].map((use) => [use, { provider: inUse, model: inUse ? 'gemini-test' : null, own_model: false, picked: null }])),
 });
 const MODEL_LIST = { provider: 'google', models: ['gemini-2.5-flash', 'gemini-2.5-pro'], defaults: { notices: 'gemini-test', chat: 'gemini-test' } };
 const USES = [
@@ -213,10 +213,14 @@ test('the chat card shows its switch, its instructions and a picker for the mode
   assert.equal(chatCard().querySelector('input[type="checkbox"]').name, 'chat.enabled');
   assert.ok(chatCard().querySelector('textarea[name="chat.prompt"]'));
   assert.equal(chatCard().querySelectorAll('input:disabled').length, 0);
-  const model = chatCard().querySelector('select[name="chat.model.google"]'); // the provider in use
+  const provider = chatCard().querySelector('select[name="chat.provider"]'); // its own, or the notices'
+  assert.deepEqual([...provider.options].map((o) => o.value), ['', 'openai', 'google']);
+  assert.match(provider.options[0].textContent, /Igual que los avisos \(Google \(Gemini\)\)/);
+  assert.equal(provider.value, '');
+  const model = chatCard().querySelector('select[name="chat.model.google"]'); // the provider it runs on
   assert.equal(model.value, '');
   assert.deepEqual([...model.options].map((o) => o.value), ['', 'gemini-2.5-flash', 'gemini-2.5-pro']);
-  assert.match(chatCard().textContent, /GOOGLE_CHAT_AI_MODEL si está en el \.env/);
+  assert.match(chatCard().textContent, /<PROVEEDOR>_CHAT_AI_MODEL si está en el \.env/);
   assert.equal(chatCard().querySelector('.adm-warn'), null);
   assert.match(state(), /^Disponible/);
   assert.equal(panel().querySelector('[name="ai.enabled"]'), null); // the notices' AI is not on this page
@@ -233,7 +237,7 @@ test('the chat card says why the players do not have the button', async () => {
   assert.match(state(), /No disponible: el chat está apagado/);
   await openWithChat(VALUES, { ...CHAT, provider: null, model: null, own_model: false }, providersOf(null, []));
   assert.match(state(), /falta OPENAI_AI_API_KEY o GOOGLE_AI_API_KEY/);
-  assert.match(chatCard().querySelector('.adm-warn').textContent, /proveedor y la clave de la IA de los avisos/);
+  assert.match(chatCard().querySelector('.adm-warn').textContent, /proveedor de los avisos \(o el que elijas aquí\)/);
   assert.equal(chatCard().querySelector('select'), null);
   assert.equal(chatCard().querySelector('[data-set-act="test-chat"]').disabled, true);
   await openWithChat(VALUES, { ...CHAT, provider: 'google', model: null, own_model: false });
@@ -314,9 +318,44 @@ test('changing a limit sends that number, and only that one', async () => {
   });
 });
 
-test('the chat model is its own only when picked; the card says what applies otherwise', async () => {
-  await openWithChat();
-  assert.match(chatCard().textContent, /si no, el modelo de los avisos|y, si no, el modelo de los avisos/);
+test('the notices, the chat and the guide each have a provider selector, and their model lists follow it', async () => {
+  const OPENAI_LIST = { provider: 'openai', models: ['gpt-4.1', 'gpt-4.1-mini'], defaults: {} };
+  installApi({
+    'GET /manage/settings/ai-models?provider=openai': OPENAI_LIST,
+    'GET /manage/settings/ai-models': MODEL_LIST,
+    'GET /manage/settings': answer(VALUES, GOOGLE, CHAT),
+  });
+  await render(panel(), { entity: { sections: ['ai', 'chat', 'guide'] } });
+  await settle();
+  await settle();
+  const form = panel().querySelector('#admSettings');
+  for (const name of ['ai.provider', 'chat.provider', 'guide.provider']) assert.ok(form.elements[name], name);
+  assert.deepEqual([...form.elements['ai.model.google'].options].map((o) => o.value), ['', 'gemini-2.5-flash', 'gemini-2.5-pro']);
+  // the notices move to OpenAI: their list and the ones of the uses that follow them change with it
+  form.elements['ai.provider'].value = 'openai';
+  form.elements['ai.provider'].dispatchEvent(new window.Event('change', { bubbles: true }));
+  await settle();
+  await settle();
+  assert.deepEqual([...form.elements['ai.model.openai'].options].map((o) => o.value), ['', 'gpt-4.1', 'gpt-4.1-mini']);
+  assert.equal(form.elements['ai.model.google'], undefined); // the selector is named after the provider on screen
+  assert.ok(form.elements['chat.model.openai'], 'the chat follows the notices');
+  assert.ok(form.elements['guide.model.openai'], 'the guide follows the chat');
+  // the chat picks Google by itself: only its list and the guide's (which follows it) go back to Google's
+  form.elements['chat.provider'].value = 'google';
+  form.elements['chat.provider'].dispatchEvent(new window.Event('change', { bubbles: true }));
+  await settle();
+  await settle();
+  assert.ok(form.elements['ai.model.openai']);
+  assert.deepEqual([...form.elements['chat.model.google'].options].map((o) => o.value), ['', 'gemini-2.5-flash', 'gemini-2.5-pro']);
+  assert.ok(form.elements['guide.model.google']);
+  // and saving sends exactly the picks that changed
+  form.elements['guide.model.google'].value = 'gemini-2.5-pro';
+  let saved = null;
+  installApi({ 'GET /manage/settings/ai-models': MODEL_LIST, 'GET /manage/settings': answer(VALUES, GOOGLE, CHAT), 'PUT /manage/settings': ({ body }) => { saved = body; return { changed: [], values: VALUES }; } });
+  form.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+  await settle();
+  const picks = Object.fromEntries(Object.entries(saved.values).filter(([key]) => /^ai\.provider|\.model\.|^(chat|guide)\.provider/.test(key)));
+  assert.deepEqual(picks, { 'ai.provider': 'openai', 'chat.provider': 'google', 'guide.model.google': 'gemini-2.5-pro' });
 });
 
 const GUIDE = { provider: 'openai', model: 'gpt-chat', own_model: true, default_prompt: 'g', customized: false };

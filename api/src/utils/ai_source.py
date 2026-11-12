@@ -39,9 +39,9 @@ def mode(feature: str) -> str:
     return wanted if wanted in MODES else settings.REGISTRY[f"{feature}.key_source"].default
 
 
-def group_source() -> Source | None:
-    """The group's key, if the .env has a provider, a key and a model for it."""
-    found = ai_providers.group_credentials(ai_providers.CHAT)
+def group_source(feature: str = "chat") -> Source | None:
+    """The group's key for a feature, if the .env has a provider, a key and a model for it."""
+    found = ai_providers.group_credentials(feature)
     return Source(ai_ledger.GROUP, *found) if found else None
 
 
@@ -68,7 +68,7 @@ def decide(db: Session, user_id: int, feature: str) -> Decision:
     wanted = mode(feature)
     if wanted == USER_ONLY:
         return Decision(own_source(db, user_id))
-    group = group_source()
+    group = group_source(feature)
     blocked = ai_budget.exceeded(db, user_id) if group is not None else None
     if group is not None and not blocked:
         return Decision(group)
