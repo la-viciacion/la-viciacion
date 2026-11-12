@@ -1,0 +1,136 @@
+"""The game guide: a question about one game (plus a little history) in, one answer out.
+
+It differs from the chat on purpose. The chat answers from the group's data through tools; the guide answers from the
+web, so its one tool is the provider's own web search (OpenAI's through the Responses API, Google's search grounding)
+and what the app knows about the game and the player goes into the instructions, already read. With no function tools
+and a plain text answer it works the same on both providers (Gemini refuses to mix its search with function tools).
+The conversation lives in the client, like the chat's: nothing of it is stored."""
+import datetime
+import time
+from dataclasses import dataclass
+
+from pydantic_ai import Agent, RunContext
+from pydantic_ai.capabilities import NativeTool
+from pydantic_ai.exceptions import UsageLimitExceeded
+from pydantic_ai.models import Model
+from pydantic_ai.models.google import GoogleModel
+from pydantic_ai.models.openai import OpenAIResponsesModel
+from pydantic_ai.native_tools import WebSearchTool
+from pydantic_ai.providers.google import GoogleProvider
+from pydantic_ai.providers.openai import OpenAIProvider
+from pydantic_ai.settings import ModelSettings
+from pydantic_ai.usage import UsageLimits
+
+from ..chat import agent as chat_agent
+from ..chat import model as chat_model
+from ..chat.tools import hours
+from ..utils import messages, settings
+from ..utils.logger import LogManager
+from .prompt import DEFAULT_LEVEL, LEVELS
+
+logger = LogManager().get_logger()
+
+MAX_QUESTION = 500
+MAX_HISTORY = chat_agent.MAX_HISTORY
+# A search takes a while: more than the chat's 30 s, still a timeout and not patience
+SETTINGS = ModelSettings(temperature=0.3, timeout=60, thinking=False)
+LIMITS = UsageLimits(request_limit=6, total_tokens_limit=60_000)
+
+# `openai` needs the Responses API for the web search (the chat completions one has none); the ids are the same as the chat's
+BUILDERS = {
+    "openai": lambda name, key: OpenAIResponsesModel(name, provider=OpenAIProvider(api_key=key)),
+    "google": lambda name, key: GoogleModel(name, provider=GoogleProvider(api_key=key)),
+}
+
+
+@dataclass
+class GuideDeps:
+    game: str  # what the app knows about the game and the player, as text (game_context)
+    level: str
+    user_name: str
+
+
+def build_model() -> Model:
+    return BUILDERS[settings.get("ai.provider")](chat_model.model_name(), settings.get("ai.api_key"))
+
+
+def is_ready() -> bool:
+    return bool(settings.get("guide.enabled") and chat_model.configured())
+
+
+def game_context(data: dict) -> str:
+    """What the app knows about the game and the player who asks (the game page's overview, pure): enough for the model to
+    place them (how long they have played, whether they finished it, who in the group did) and nothing it has to look up."""
+    game, summary = data["game"], data["summary"]
+    lines = [f"Juego: {game['name']}"]
+    if game.get("release_date"):
+        released = game["release_date"]
+        lines.append(f"Salida: {released.isoformat() if isinstance(released, (datetime.date, datetime.datetime)) else released}")
+    for label, key in (("Géneros", "genres"), ("Desarrolladora", "dev")):
+        value = game.get(key)
+        if value:
+            lines.append(f"{label}: {', '.join(value) if isinstance(value, list) else value}")
+    if game.get("avg_time"):
+        lines.append(f"Duración media para terminarlo: {hours(game['avg_time'])} h")
+    mine = next((p for p in data["players"] if p["is_me"]), None)
+    if mine is None:
+        lines.append("La persona no lo tiene en su biblioteca.")
+    else:
+        status = "ya lo ha completado" if mine["completed"] else "todavía no lo ha completado"
+        lines.append(f"La persona lleva {hours(mine['played_seconds'])} h en {mine['sessions']} sesiones y {status}.")
+    done = [p["name"] for p in data["players"] if p["completed"] and not p["is_me"]][:5]
+    if done:
+        lines.append(f"Del grupo lo han completado: {', '.join(done)} ({summary['completed_by']} en total).")
+    return "\n".join(lines)
+
+
+agent = Agent(output_type=str, deps_type=GuideDeps, retries=1, model_settings=SETTINGS, capabilities=[NativeTool(WebSearchTool())])
+
+
+@agent.instructions
+def instructions(ctx: RunContext[GuideDeps]) -> str:
+    level = LEVELS.get(ctx.deps.level, LEVELS[DEFAULT_LEVEL])
+    return (
+        settings.get("guide.prompt")
+        + f"\n\nHoy es {datetime.date.today().isoformat()}. Hablas con {ctx.deps.user_name}."
+        + f"\n\nNivel de ayuda: {level}"
+        + f"\n\nLo que sabe la app:\n{ctx.deps.game}"
+    )
+
+
+def ask(deps: GuideDeps, question: str, history: list[tuple[str, str]], model=None) -> str:
+    """Blocking: call it from a worker thread. Raises AIError if the provider fails. `model` is for the tests."""
+    started = time.monotonic()
+    try:
+        result = agent.run_sync(
+            question,
+            deps=deps,
+            model=model or build_model(),
+            message_history=chat_agent.history_messages(history),
+            usage_limits=LIMITS,
+        )
+    except UsageLimitExceeded as e:
+        logger.warning(f"Guide question stopped by a usage limit: {e}")
+        return messages.CHAT_TOO_COMPLEX
+    except Exception as e:
+        raise chat_agent.failure(e, "guide") from None
+    used = result.usage
+    logger.info(
+        f"Guide question answered in {time.monotonic() - started:.1f} s: {used.requests} model requests, "
+        f"{used.input_tokens} tokens in and {used.output_tokens} out"
+    )
+    return result.output.strip()
+
+
+def probe(model=None) -> str:
+    """One answer that needs the web (who made a game that came out a year ago), for the panel's test button: it fails, with
+    the provider's own words, when the model cannot search. Blocking, like `ask`. Raises AIError if the provider fails."""
+    deps = GuideDeps(game="Juego: Hollow Knight", level="hint", user_name="el admin")
+    try:
+        result = agent.run_sync(
+            "Busca en la web quién desarrolló este juego y responde en una frase, citando la fuente.",
+            deps=deps, model=model or build_model(), usage_limits=LIMITS,
+        )
+    except Exception as e:
+        raise chat_agent.failure(e, "guide_test") from None
+    return result.output.strip()

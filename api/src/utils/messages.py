@@ -54,6 +54,7 @@ CHAT_DENIED = "Parece que la IA no es para gente como nosotros: no le convencen 
 CHAT_QUOTA = "Se ha acabado el cupo de la IA{when}: lo gratis dura lo que dura. Vuelve más tarde, o pídele a un administrador que rasque la cartera"
 CHAT_USER_LIMITED = "Has hecho demasiadas preguntas en {when}. Vuelve a intentarlo en {wait}"
 CHAT_GROUP_LIMITED = "El grupo ha hecho demasiadas preguntas al chat en {when}. Vuelve a intentarlo en {wait}"
+GUIDE_UNAVAILABLE = "La guía de juegos no está disponible ahora mismo"
 CHAT_OFF_TOPIC = "Solo sé de videojuegos y de los datos de La Viciación. ¡Pregúntame por juegos, horas, rankings o logros!"
 CHAT_TOO_COMPLEX = "Esa pregunta me ha quedado muy grande. ¿Puedes dividirla en otras más concretas?"
 TOO_MANY_ATTEMPTS = "Demasiados intentos fallidos. Vuelve a intentarlo en {minutes} min"

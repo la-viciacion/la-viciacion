@@ -26,6 +26,7 @@ from ..config import Config
 from ..database import models
 from ..database.database import SessionLocal
 from ..chat.prompt import CHAT_PROMPT
+from ..guide.prompt import GUIDE_PROMPT
 from .ai_prompts import USES as AI_USES
 from .logger import LogManager
 
@@ -191,6 +192,13 @@ REGISTRY: dict[str, Spec] = {
     "chat.limit_group_minute": Spec("int", 10, check=_limit),
     "chat.limit_group_day": Spec("int", 300, check=_limit),
     "chat.prompt": Spec("str", CHAT_PROMPT.strip(), check=_prompt, resettable=True),
+    # The game guide (guide/), on trial: it shares the chat's provider, key and model, but its questions search the web, so
+    # it has its own switch, its own instructions and its own, lower limits (routers/guide.py); all in the admin's Chat tab.
+    "guide.enabled": Spec("bool", True),
+    "guide.limit_user_hour": Spec("int", 10, check=_limit),
+    "guide.limit_user_day": Spec("int", 30, check=_limit),
+    "guide.limit_group_day": Spec("int", 100, check=_limit),
+    "guide.prompt": Spec("str", GUIDE_PROMPT.strip(), check=_prompt, resettable=True),
     "telegram.token": Spec("str", None, secret=True, env_only=True, env="TELEGRAM_TOKEN", check=_token),
     "telegram.group_id": Spec("str", None, env_only=True, env="TELEGRAM_GROUP_ID", check=_chat_id),
     "telegram.admin_chat_id": Spec("str", None, env_only=True, env="TELEGRAM_ADMIN_CHAT_ID", check=_chat_id),
@@ -318,6 +326,11 @@ def ai_uses(db: Session) -> list[dict]:
 def chat_prompt(db: Session) -> dict:
     """The chat's instructions, for the panel: the prompt the code brings and whether the admin changed it."""
     return {"default_prompt": REGISTRY["chat.prompt"].default, "customized": "chat.prompt" in customized(db)}
+
+
+def guide_prompt(db: Session) -> dict:
+    """The guide's instructions, for the panel: the prompt the code brings and whether the admin changed it."""
+    return {"default_prompt": REGISTRY["guide.prompt"].default, "customized": "guide.prompt" in customized(db)}
 
 
 def public_view(db: Session) -> dict[str, Any]:
