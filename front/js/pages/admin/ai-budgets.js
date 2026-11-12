@@ -8,6 +8,7 @@ import { money } from '../../lib/ai-usage.js';
 import { html, mount } from '../../lib/html.js';
 import { toast } from '../../ui/toast.js';
 import { badge, errorState, statTile } from './components.js';
+import { cardTitle } from '../../ui/info-tip.js';
 
 const state = (spent, cap) => (isSpent(spent, cap) ? badge('Agotado', 'red') : isNearly(spent, cap) ? badge('Casi agotado', 'orange') : '');
 const bar = (spent, cap) => html`<div class="adm-progress"><div style="width:${spentShare(spent, cap)}%"></div></div>`;
@@ -35,13 +36,11 @@ function view(data) {
   const group = data.group;
   return html`
     <section class="adm-set-card adm-budgets-card">
-      <h3>Presupuesto de la clave del grupo</h3>
-      <div class="adm-sub">Lo que el grupo puede gastar al mes en preguntas que paga su clave (la del .env). Solo cuenta eso: lo que cada jugador paga con su propia clave no suma ni se limita. Los topes son en dólares enteros, y 0 es sin límite; el coste es una estimación y una pregunta puede pasarse del tope porque su precio se conoce al acabar. Se renuevan el día 1. Los topes por defecto se cambian en <strong>IA → Avisos con IA → Coste de la IA</strong>.</div>
+      ${cardTitle('Presupuesto de la clave del grupo', html`Lo que el grupo puede gastar al mes en preguntas que paga su clave (la del .env). Solo cuenta eso: lo que cada jugador paga con su propia clave no suma ni se limita. Los topes son en dólares enteros, y 0 es sin límite; el coste es una estimación y una pregunta puede pasarse del tope porque su precio se conoce al acabar. Se renuevan el día 1. Los topes por defecto se cambian en <strong>IA → Avisos con IA → Coste de la IA</strong>.`)}
       ${unpricedWarning(data)}
       <div class="adm-stats">${statTile(group.cap ? `Gastado este mes de ${money(group.cap)}` : 'Gastado este mes', money(group.spent))}</div>
       ${group.cap ? html`${bar(group.spent, group.cap)}<div class="adm-sub">${budgetLine('Grupo', group, data.resets_on)} ${state(group.spent, group.cap)}</div>` : html`<div class="adm-sub">El grupo no tiene tope: la clave del grupo no se limita por coste.</div>`}
-      <h3>Tope por jugador</h3>
-      <div class="adm-sub">Por defecto: ${capLabel(data.default_user_cap)} al mes cada uno. Escribe otro número para un jugador (0 = sin límite) o déjalo vacío para volver al de por defecto.</div>
+      ${cardTitle('Tope por jugador', html`Por defecto: ${capLabel(data.default_user_cap)} al mes cada uno. Escribe otro número para un jugador (0 = sin límite) o déjalo vacío para volver al de por defecto.`)}
       ${data.players.length
         ? html`<div class="adm-table-wrap"><table class="adm-table">
             <thead><tr><th>Jugador</th><th>Llamadas</th><th>Gastado este mes</th><th></th><th>Tope</th><th></th></tr></thead>

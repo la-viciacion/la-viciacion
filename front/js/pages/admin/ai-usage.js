@@ -6,6 +6,7 @@ import { html, mount } from '../../lib/html.js';
 import { renderBudgets } from './ai-budgets.js';
 import { renderCalls } from './ai-calls.js';
 import { statTile, errorState } from './components.js';
+import { cardTitle } from '../../ui/info-tip.js';
 
 let panel; // the whole page
 let billed; // its second half: what OpenAI has billed
@@ -58,8 +59,7 @@ function view() {
   return html`
     <div class="adm-settings">
       <section class="adm-set-card">
-        <h3>Gasto en OpenAI</h3>
-        <div class="adm-sub">Lo facturado por OpenAI en toda la organización (no solo por esta app), día a día en UTC. OpenAI solo conserva el último año de gasto. Los datos pueden tardar un rato en aparecer. No es el saldo que queda: OpenAI no lo ofrece por API, míralo en platform.openai.com → Billing.</div>
+        ${cardTitle('Gasto en OpenAI', html`Lo facturado por OpenAI en toda la organización (no solo por esta app), día a día en UTC. OpenAI solo conserva el último año de gasto. Los datos pueden tardar un rato en aparecer. No es el saldo que queda: OpenAI no lo ofrece por API, míralo en platform.openai.com → Billing.`)}
         <div class="adm-set-row">
           <label>Periodo
             <select class="adm-input" id="aiuMonth">

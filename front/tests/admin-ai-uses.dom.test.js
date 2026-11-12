@@ -288,3 +288,15 @@ test('the chat and the guide each say whose key pays, and changing it is saved l
   await settle();
   assert.deepEqual(saved.values, { 'guide.key_source': 'group_only' });
 });
+
+test('the cards of the chat, the guide and the cost explain themselves in the "i" of their title and not in a paragraph under it', async () => {
+  const values = { ...VALUES, 'chat.key_source': 'group_then_user', 'guide.key_source': 'user_only', 'guide.enabled': true, 'guide.prompt': 'g', 'ai.price_refresh_hours': 24, 'ai.usage_retention_days': 0, 'ai.group_budget_month': 0, 'ai.user_budget_month': 0 };
+  installApi({ 'GET /manage/settings': { values, jobs: {}, push_devices: { devices: 0, users: 0 }, mail: { configured: false, missing: [] }, ai_uses: USES, ai_model: { provider: 'google', model: 'gemini-test' }, chat: CHAT, guide: CHAT } });
+  await render(panel(), { entity: { sections: ['chat', 'aicost', 'guide'] } });
+  await settle();
+  const heads = [...panel().querySelectorAll('.adm-set-card > .pf-info-title')];
+  assert.deepEqual(heads.map((h) => h.querySelector('h3').textContent), ['Chat', 'Coste de la IA', 'Guía de juego']);
+  assert.match(heads[0].querySelector('.pf-info-text').textContent, /botón flotante.*responde solo sobre videojuegos/);
+  assert.match(heads[2].querySelector('.pf-info-text').textContent, /buscando en la web/);
+  for (const head of heads) assert.equal(head.nextElementSibling.classList.contains('adm-sub') && head.nextElementSibling.textContent.length > 250, false, 'no long paragraph right under the title');
+});

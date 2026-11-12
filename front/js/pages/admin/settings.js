@@ -12,6 +12,7 @@ import { html, mount } from '../../lib/html.js';
 import { toast } from '../../ui/toast.js';
 import { errorState } from './components.js';
 import { confirmDialog } from './dialogs.js';
+import { cardTitle } from '../../ui/info-tip.js';
 
 const SECRETS = []; // never loaded back: sent only when something is typed (the keys of outside services are not: they are in the server's .env)
 const LOCKED = ['telegram.token', 'telegram.group_id', 'telegram.admin_chat_id', 'ai.api_key', 'ai.openai_admin_key', 'ai.provider', 'ai.model', 'chat.model']; // shown only as set or not, never editable
@@ -142,8 +143,7 @@ function view(values, jobs, pushDevices, mail, aiUses, aiModel, chat, guide = {}
 
     inbox: html`
       <section class="adm-set-card">
-        <h3>Avisos en la app</h3>
-        <div class="adm-sub">Cada usuario puede ver en la app (la campana de la barra superior) los avisos del grupo y los suyos, aunque tenga las notificaciones apagadas. No se guardan los del timer (inicio, fin y olvido) ni los enviados con las notificaciones desactivadas.</div>
+        ${cardTitle('Avisos en la app', html`Cada usuario puede ver en la app (la campana de la barra superior) los avisos del grupo y los suyos, aunque tenga las notificaciones apagadas. No se guardan los del timer (inicio, fin y olvido) ni los enviados con las notificaciones desactivadas.`)}
         <label>Días que se guardan
           <input class="adm-input" type="number" name="inbox.retention_days" min="1" max="365" step="1" required />
         </label>
@@ -258,8 +258,7 @@ function view(values, jobs, pushDevices, mail, aiUses, aiModel, chat, guide = {}
 
     chat: html`
       <section class="adm-set-card adm-chat-card">
-        <h3>Chat</h3>
-        <div class="adm-sub">Un botón flotante, abajo a la derecha de cada pantalla, abre un asistente que responde solo sobre videojuegos y los datos del grupo. Usa el proveedor y la clave de la IA de los avisos (ver IA → Avisos con IA) y su propio modelo si lo hay. Quien ya tenga la página abierta lo ve desaparecer al preguntar o al recargar.</div>
+        ${cardTitle('Chat', html`Un botón flotante, abajo a la derecha de cada pantalla, abre un asistente que responde solo sobre videojuegos y los datos del grupo. Usa el proveedor y la clave de la IA de los avisos (ver IA → Avisos con IA) y su propio modelo si lo hay. Quien ya tenga la página abierta lo ve desaparecer al preguntar o al recargar.`)}
         <label>Modelo del chat <input class="adm-input adm-chat-model" type="text" value="${chat.model || 'Sin configurar'}" disabled /></label>
         <div class="adm-sub">El chat usa <code>CHAT_AI_MODEL</code> si está en el .env${chat.own_model ? '' : html` (ahora no lo está: usa <code>AI_MODEL</code>)`}, para darle un modelo distinto del de los avisos.</div>
         ${check('chat.enabled', 'Chat activado', 'Apagado, el botón desaparece para todos y el chat deja de responder.')}
@@ -283,8 +282,7 @@ function view(values, jobs, pushDevices, mail, aiUses, aiModel, chat, guide = {}
 
     aicost: html`
       <section class="adm-set-card adm-aicost-card">
-        <h3>Coste de la IA</h3>
-        <div class="adm-sub">Cada pregunta al chat o a la guía deja un registro de lo que usó (tokens, búsquedas) y lo que costó, sin guardar el texto. Lo ves en IA → Uso y coste. El coste es una estimación con los precios de cada modelo, que no están en el código: se descargan de una lista pública (genai-prices) cada cierto tiempo y, si no se puede, se usan los de la versión instalada.</div>
+        ${cardTitle('Coste de la IA', html`Cada pregunta al chat o a la guía deja un registro de lo que usó (tokens, búsquedas) y lo que costó, sin guardar el texto. Lo ves en IA → Uso y coste. El coste es una estimación con los precios de cada modelo, que no están en el código: se descargan de una lista pública (genai-prices) cada cierto tiempo y, si no se puede, se usan los de la versión instalada.`)}
         <div class="adm-set-row">
           <label>Actualizar los precios cada (horas, 0 = nunca) <input class="adm-input" type="number" name="ai.price_refresh_hours" min="0" max="720" step="1" required /></label>
           <label>Conservar el registro (días, 0 = siempre) <input class="adm-input" type="number" name="ai.usage_retention_days" min="0" max="3650" step="1" required /></label>
@@ -299,8 +297,7 @@ function view(values, jobs, pushDevices, mail, aiUses, aiModel, chat, guide = {}
 
     guide: html`
       <section class="adm-set-card adm-guide-card">
-        <h3>Guía de juego</h3>
-        <div class="adm-sub">Una tarjeta en la página de cada juego donde el jugador pide ayuda con ese juego (desatascarse, consejos) y elige cuántos destripes admite. A diferencia del chat, responde buscando en la web. Usa el proveedor, la clave y el modelo del chat, y el modelo tiene que admitir la búsqueda web (con OpenAI, un modelo de la API Responses; con Google, la búsqueda de Gemini). Lo comprueba el botón de abajo.</div>
+        ${cardTitle('Guía de juego', html`Una tarjeta en la página de cada juego donde el jugador pide ayuda con ese juego (desatascarse, consejos) y elige cuántos destripes admite. A diferencia del chat, responde buscando en la web. Usa el proveedor, la clave y el modelo del chat, y el modelo tiene que admitir la búsqueda web (con OpenAI, un modelo de la API Responses; con Google, la búsqueda de Gemini). Lo comprueba el botón de abajo.`)}
         ${check('guide.enabled', 'Guía activada', 'Apagada, la tarjeta desaparece de la página de los juegos y la guía deja de responder.')}
         ${keySource('guide.key_source')}
         <div class="adm-sub">Una pregunta de la guía hace búsquedas web y cuesta bastante más que una del chat, así que por defecto solo se usa la clave del jugador (Ajustes → Mi IA): quien no la tiene ve cómo añadirla. Los límites de abajo son para lo que paga el grupo.</div>
@@ -321,8 +318,7 @@ function view(values, jobs, pushDevices, mail, aiUses, aiModel, chat, guide = {}
 
     aiuses: html`
       <section class="adm-set-card">
-        <h3>Avisos que usan la IA</h3>
-        <div class="adm-sub">Activa o apaga la IA aviso a aviso. Sus instrucciones se pueden cambiar; mientras no lo hagas, siguen las de la aplicación.</div>
+        ${cardTitle('Avisos que usan la IA', html`Activa o apaga la IA aviso a aviso. Sus instrucciones se pueden cambiar; mientras no lo hagas, siguen las de la aplicación.`)}
         <div class="adm-sub adm-ai-off" hidden>La IA general está apagada: ningún aviso la usa, aunque su interruptor esté activado.</div>
         <div class="adm-ai-uses">
           ${aiUses.filter((use) => !use.parent).map((use) => aiUse(use, aiUses.filter((fragment) => fragment.parent === use.id)))}
@@ -344,8 +340,7 @@ function view(values, jobs, pushDevices, mail, aiUses, aiModel, chat, guide = {}
 
     backup: html`
       <section class="adm-set-card">
-        <h3>Copia de seguridad</h3>
-        <div class="adm-sub">Descarga toda la base de datos en un archivo .sql.gz (un .sql comprimido): usuarios, sesiones, biblioteca, logros, ajustes y fotos. Se restaura en una base vacía con el cliente de MariaDB (mira docs/desarrollo/deployment.md). Contiene las contraseñas cifradas y los ajustes protegidos, así que guárdala como lo que es: fuera del repositorio y sin compartirla.</div>
+        ${cardTitle('Copia de seguridad', html`Descarga toda la base de datos en un archivo .sql.gz (un .sql comprimido): usuarios, sesiones, biblioteca, logros, ajustes y fotos. Se restaura en una base vacía con el cliente de MariaDB (mira docs/desarrollo/deployment.md). Contiene las contraseñas cifradas y los ajustes protegidos, así que guárdala como lo que es: fuera del repositorio y sin compartirla.`)}
         <div><button type="button" class="adm-btn" data-set-act="backup">Descargar copia (.sql.gz)</button></div>
       </section>`,
 

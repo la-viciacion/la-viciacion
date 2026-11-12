@@ -36,9 +36,8 @@ export async function initData(el, { username }) {
   let pending = null; // the file waiting for the person's yes
 
   mount(el, html`
-    ${sectionTitle('Tus datos')}
+    ${sectionTitle('Tus datos', undefined, html`Descarga un archivo con tus sesiones, biblioteca, puntuaciones, deseados y logros: una copia tuya para guardar.${IMPORT_ENABLED ? ' También puedes importar uno de esos archivos (por ejemplo, el de otra instalación de La Viciación).' : ''}`)}
     <div class="pf-card">
-      <div class="pf-sub">Descarga un archivo con tus sesiones, biblioteca, puntuaciones, deseados y logros: una copia tuya para guardar.${IMPORT_ENABLED ? ' También puedes importar uno de esos archivos (por ejemplo, el de otra instalación de La Viciación).' : ''}</div>
       <div><button class="pf-btn" data-act="export">Descargar mis datos</button></div>
       ${IMPORT_ENABLED ? html`<div><label class="pf-btn">Importar datos…<input type="file" accept=".json,application/json" hidden /></label></div>
       <div id="pfImportReview"></div>` : ''}

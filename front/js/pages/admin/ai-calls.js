@@ -6,6 +6,7 @@ import { ALL, featureLabel, perCall, sourceLabel, statusLabel, tokens, unpricedN
 import { money, monthChoices, monthLabel, share } from '../../lib/ai-usage.js';
 import { html, mount } from '../../lib/html.js';
 import { errorState, statTile } from './components.js';
+import { cardTitle } from '../../ui/info-tip.js';
 
 const cost = (value) => money(value, 'usd');
 const bar = (value, max) => html`<div class="adm-progress"><div style="width:${share(value, max)}%"></div></div>`;
@@ -24,8 +25,7 @@ function breakdown(id, title, items, label = (name) => name, hint = '') {
   const topCalls = Math.max(0, ...items.map((i) => i.calls));
   return html`
     <section class="adm-set-card adm-calls-${id}">
-      <h3>${title}</h3>
-      ${hint ? html`<div class="adm-sub">${hint}</div>` : ''}
+      ${hint ? cardTitle(title, hint) : html`<h3>${title}</h3>`}
       ${items.length
         ? table(['', 'Llamadas', 'Coste', ''], items.map((i) => html`
             <tr><td>${label(i.name)}</td><td>${i.calls}</td><td>${i.unpriced === i.calls && i.calls ? 'sin precio' : cost(i.cost)}</td>
@@ -37,8 +37,7 @@ function breakdown(id, title, items, label = (name) => name, hint = '') {
 function players(items) {
   return html`
     <section class="adm-set-card adm-calls-players">
-      <h3>Gasto de la clave del grupo, por jugador</h3>
-      <div class="adm-sub">Solo lo que ha pagado el grupo. Lo que cada jugador paga con su propia clave no se detalla por nombre.</div>
+      ${cardTitle('Gasto de la clave del grupo, por jugador', html`Solo lo que ha pagado el grupo. Lo que cada jugador paga con su propia clave no se detalla por nombre.`)}
       ${items.length
         ? table(['Jugador', 'Llamadas', 'Coste', 'Tokens (entrada / salida)'], items.map((i) => html`
             <tr><td>${i.name}</td><td>${i.calls}</td><td>${cost(i.cost)}</td><td>${tokens(i.input_tokens)} / ${tokens(i.output_tokens)}</td></tr>`))
@@ -93,8 +92,7 @@ function view(data, month) {
     : 'Los precios no se actualizan: se usan los de la versión instalada.';
   return html`
     <section class="adm-set-card adm-calls-head">
-      <h3>Uso de la IA de la app</h3>
-      <div class="adm-sub">Cada pregunta al chat o a la guía deja una fila con sus tokens, lo que costó y de qué tipo era (nunca el texto). El coste es una <strong>estimación</strong>: los tokens medidos por el precio de su modelo el día de la llamada, más las búsquedas web a su precio${data.price_stamp ? ` (lista de precios de ${data.price_stamp.slice(0, 10)})` : ''}. ${prices} ${data.retention_days ? `Se conservan ${data.retention_days} días.` : 'Se conservan siempre.'}</div>
+      ${cardTitle('Uso de la IA de la app', html`Cada pregunta al chat o a la guía deja una fila con sus tokens, lo que costó y de qué tipo era (nunca el texto). El coste es una <strong>estimación</strong>: los tokens medidos por el precio de su modelo el día de la llamada, más las búsquedas web a su precio${data.price_stamp ? ` (lista de precios de ${data.price_stamp.slice(0, 10)})` : ''}. ${prices} ${data.retention_days ? `Se conservan ${data.retention_days} días.` : 'Se conservan siempre.'}`)}
       <div class="adm-set-row">
         <label>Periodo
           <select class="adm-input" id="aicMonth">

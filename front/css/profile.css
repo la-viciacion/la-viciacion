@@ -410,6 +410,11 @@
 .pf-info summary::-webkit-details-marker { display: none; }
 .pf-info summary:hover, .pf-info[open] summary { color: var(--accent-teal); }
 .pf-info summary:focus-visible { outline: 2px solid var(--accent-teal); outline-offset: 2px; }
+/* beside a title the popover is as wide as a sentence, not as the title: it opens below it, from its left edge */
+.pf-info-title { margin-bottom: 0; }
+.pf-info-title .pf-info-text { right: auto; width: min(34rem, calc(100vw - 48px)); font-size: 0.85rem; }
+.pf-info-title .pf-info-text p { margin: 0; }
+.pf-info-title .pf-info-text p + p { margin-top: 8px; }
 .pf-info-text { position: absolute; left: 0; right: 0; top: 100%; z-index: 2; margin-top: 6px; padding: 10px 12px; font-size: 0.8rem; line-height: 1.4; color: var(--text-secondary); background: var(--bg-surface); border: 1px solid var(--border-accent); border-radius: var(--radius-sm); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4); }
 .lc-games { list-style: none; margin: 0 0 8px; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
 .lc-games li { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: rgba(255, 255, 255, 0.02); }
@@ -515,6 +520,16 @@ video.gm-trailer, iframe.gm-trailer { cursor: auto; background: #000; }
 .ai-cost-note .ai-stopped { color: #fca5a5; }
 
 /* Mi IA: what the chat and the guide do, side by side on a wide screen and one over the other on a phone */
+/* a section that is folded until it is wanted: its title is the summary, with a chevron */
+.ai-fold { margin-top: 20px; }
+.ai-fold > summary { list-style: none; cursor: pointer; }
+.ai-fold > summary::-webkit-details-marker { display: none; }
+.ai-fold-head { margin-bottom: 0; }
+.ai-fold[open] .ai-fold-head { margin-bottom: 14px; }
+.ai-fold-chevron { display: inline-flex; color: var(--text-secondary); transition: transform 0.15s; }
+.ai-fold[open] .ai-fold-chevron { transform: rotate(180deg); }
+.ai-fold-head:hover .section-title, .ai-fold-head:hover .ai-fold-chevron { color: var(--accent-teal); }
+.ai-fold > summary:focus-visible { outline: 2px solid var(--accent-teal); outline-offset: 4px; border-radius: var(--radius-sm); }
 .ai-about { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin-bottom: 8px; }
 .ai-about-card h3 { margin: 0 0 6px; font-size: 1rem; color: var(--accent-teal); }
 .ai-about-card h4 { margin: 12px 0 4px; font-size: 0.9rem; }
