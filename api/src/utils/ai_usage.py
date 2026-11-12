@@ -54,10 +54,10 @@ def summarize(buckets: list[dict]) -> dict:
     }
 
 
-def add_months(first: list[dict], second: list[dict]) -> list[dict]:
-    """Two lists of monthly totals ([{month, total}]) as one, adding the months they share. Pure."""
+def add_months(*lists: list[dict]) -> list[dict]:
+    """Lists of monthly totals ([{month, total}]) as one, adding the months they share. Pure."""
     summed: dict[str, float] = {}
-    for item in (*first, *second):
+    for item in (item for months in lists for item in months):
         summed[item["month"]] = summed.get(item["month"], 0.0) + float(item["total"])
     return [{"month": month, "total": total} for month, total in summed.items()]
 
