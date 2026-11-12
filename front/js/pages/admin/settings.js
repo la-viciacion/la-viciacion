@@ -32,7 +32,7 @@ const GUIDE_LIMITS = [
 // whose key pays for a feature (api/src/utils/ai_source.py): what each player may have saved in Ajustes → Mi IA, and the group's
 const KEY_SOURCES = [
   ['user_only', 'Solo la clave del propio jugador'],
-  ['user_or_group', 'La del jugador si la tiene; si no, la del grupo'],
+  ['group_then_user', 'Primero la del grupo; al agotarse su presupuesto (el total o la parte del jugador), la del jugador'],
   ['group_only', 'Siempre la del grupo (ignora las claves de los jugadores)'],
 ];
 const keySource = (name) => html`
@@ -264,7 +264,7 @@ function view(values, jobs, pushDevices, mail, aiUses, aiModel, chat, guide = {}
         <div class="adm-sub">El chat usa <code>CHAT_AI_MODEL</code> si está en el .env${chat.own_model ? '' : html` (ahora no lo está: usa <code>AI_MODEL</code>)`}, para darle un modelo distinto del de los avisos.</div>
         ${check('chat.enabled', 'Chat activado', 'Apagado, el botón desaparece para todos y el chat deja de responder.')}
         ${keySource('chat.key_source')}
-        <div class="adm-sub">Cada jugador puede guardar su propia clave de OpenAI en su perfil (Ajustes → Mi IA). Con «La del jugador si la tiene», quien no la tiene usa la del grupo (el .env) y gasta el cupo del proyecto; quien la tiene paga de su cuenta y solo le queda un límite por minuto. Cuando el grupo decida pagar la IA para todos, «Siempre la del grupo» lo hace sin tocar nada más.</div>
+        <div class="adm-sub">Cada jugador puede guardar su propia clave de OpenAI en su perfil (Ajustes → Mi IA). Con «Primero la del grupo», todos usan la del grupo (el .env) mientras quede presupuesto este mes; cuando se agota, el total o la parte de un jugador, quien tiene su propia clave sigue con ella (y solo le queda un límite por minuto) y quien no la tiene lo ve explicado. «Siempre la del grupo» ignora las claves de los jugadores, y «Solo la clave del propio jugador» no gasta nada del grupo.</div>
         <div class="adm-sub">Preguntas que se pueden hacer al chat; 0 es sin límite. Cada pregunta gasta varias llamadas a la IA y el cupo de la IA es del proyecto entero, no de cada jugador: por eso hay un límite por jugador y otro para todo el grupo. «Día» son las últimas 24 horas, no desde medianoche. Se cuentan en memoria: reiniciar la API los pone a cero. Quien se pasa ve cuál ha superado y cuánto esperar.</div>
         <div class="adm-set-row adm-chat-limits">
           ${CHAT_LIMITS.map(([name, label]) => html`<label>${label} <input class="adm-input" type="number" name="${name}" min="0" max="100000" step="1" required /></label>`)}

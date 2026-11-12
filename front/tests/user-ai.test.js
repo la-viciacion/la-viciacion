@@ -8,22 +8,37 @@ test('a model reads with its tier and its price per million tokens, or only its 
   assert.match(modelLabel({ id: 'o1-pro', tier: 'caro', input_per_million: 150, output_per_million: 600 }), /caro/);
 });
 
-const on = (extra) => ({ available: true, needs_key: false, paid_by: 'group', mode: 'user_or_group', ...extra });
+const on = (extra) => ({ available: true, needs_key: false, paid_by: 'group', mode: 'group_then_user', blocked: null, ...extra });
+const needs = (extra) => on({ paid_by: null, needs_key: true, mode: 'user_only', ...extra });
+const none = { has_key: false };
+const mine = { has_key: true };
 
 test('where the cost goes is a quiet note in words of cost, never of paying', () => {
   const cases = [
-    costNote({ chat: on(), guide: on({ paid_by: null, needs_key: true, mode: 'user_only' }) }),
-    costNote({ chat: on({ paid_by: 'user' }), guide: on({ paid_by: 'user', mode: 'user_only' }) }),
-    costNote({ chat: on(), guide: on() }),
-    costNote({ chat: on({ mode: 'group_only' }), guide: on({ mode: 'group_only' }) }),
-    costNote({ chat: { available: false }, guide: on({ paid_by: null, needs_key: true }) }),
+    costNote({ chat: on(), guide: needs(), key: none }),
+    costNote({ chat: on(), guide: on({ paid_by: 'user', mode: 'user_only' }), key: mine }),
+    costNote({ chat: on(), guide: on(), key: none }),
+    costNote({ chat: on(), guide: on(), key: mine }),
+    costNote({ chat: on({ paid_by: 'user', blocked: 'group' }), guide: on({ paid_by: 'user', blocked: 'group' }), key: mine }),
+    costNote({ chat: on({ mode: 'group_only' }), guide: on({ mode: 'group_only' }), key: none }),
+    costNote({ chat: { available: false }, guide: needs(), key: none }),
+    costNote({ chat: needs(), guide: needs(), key: none }),
   ];
   for (const note of cases) assert.doesNotMatch(note, /\bpag(a|o|ar|ado)\b/i, note);
-  assert.match(cases[0], /coste del chat lo cubre el grupo.*guía.*cuesta más.*tu propia clave/);
-  assert.match(cases[1], /Con tu clave, el coste.*tu cuenta de OpenAI/);
-  assert.match(cases[2], /lo cubre el grupo; con tu propia clave pasa a tu cuenta/);
-  assert.match(cases[3], /tengas clave o no/);
-  assert.match(cases[4], /El chat no está disponible ahora mismo\..*propia clave/);
+  assert.match(cases[0], /coste del chat lo cubre el grupo mientras haya presupuesto este mes; después necesitarás tu propia clave\. La guía.*cuesta más: funciona con tu propia clave/);
+  assert.match(cases[1], /coste del chat lo cubre el grupo.*después seguirá con tu clave.*El coste de la guía va a tu cuenta de OpenAI/);
+  assert.match(cases[2], /^El coste del chat y de la guía lo cubre el grupo mientras haya presupuesto este mes; después necesitarás tu propia clave\.$/);
+  assert.match(cases[3], /después seguirá con tu clave, a tu cuenta de OpenAI/);
+  assert.match(cases[4], /Se ha agotado el presupuesto del grupo este mes: de momento el coste del chat y de la guía va a tu cuenta de OpenAI/);
+  assert.match(cases[5], /tengas clave o no/);
+  assert.match(cases[6], /^El chat no está disponible ahora mismo\. La guía.*propia clave/);
+  assert.match(cases[7], /^El chat y la guía funcionan con tu propia clave\.$/);
+});
+
+test('the group comes first and the own key is only the way on, so a key does not move the chat off the group', () => {
+  const note = costNote({ chat: on(), guide: on(), key: mine });
+  assert.match(note, /lo cubre el grupo mientras haya presupuesto/);
+  assert.doesNotMatch(note, /^Con tu clave/);
 });
 
 test('a note says nothing when there is nothing to say', () => {
