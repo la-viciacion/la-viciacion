@@ -4,6 +4,7 @@ import { api } from '../../lib/api.js';
 import { ALL, money, monthChoices, monthLabel, selection, share } from '../../lib/ai-usage.js';
 import { html, mount } from '../../lib/html.js';
 import { renderCalls } from './ai-calls.js';
+import { render as renderSettings } from './settings.js';
 import { statTile, errorState } from './components.js';
 import { cardTitle } from '../../ui/info-tip.js';
 
@@ -87,9 +88,11 @@ async function load(refresh) {
 export async function render(target) {
   panel = target;
   month = ALL;
-  mount(panel, html`<div id="aicApp"></div><div id="aiuBilled"></div>`);
+  mount(panel, html`<div id="aicApp"></div><div id="aiuBilled"></div><div id="aicSettings"></div>`);
   billed = panel.querySelector('#aiuBilled');
   renderCalls(panel.querySelector('#aicApp')); // the record of the app's calls neither waits for OpenAI nor needs its key
+  // How the cost is worked out and how long the record is kept: the settings of what this page shows, below it, with their own Guardar
+  renderSettings(panel.querySelector('#aicSettings'), { entity: { sections: ['aicost'] } });
   try {
     await load(false);
     billed.onchange = (e) => {
