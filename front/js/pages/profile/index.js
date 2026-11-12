@@ -21,6 +21,7 @@ import { recapCard } from '../../ui/recap-invite.js';
 import { achievementsView, sectionTitle, seasonName, seasonPills, seasonSuffix, statsView, titleView, topView } from '../../ui/profile-summary.js';
 import { initAbout } from './about.js';
 import { initAccount } from './account.js';
+import { initAi } from './ai.js';
 import { initAvatar } from './avatar.js';
 import { initData } from './data.js';
 import { flash } from './flash.js';
@@ -47,6 +48,7 @@ const SETTINGS = [
   ['perfil', 'Perfil'],
   ['seguridad', 'Seguridad'],
   ['avisos', 'Notificaciones'],
+  ['ia', 'Mi IA'],
   ['datos', 'Tus datos'],
 ];
 
@@ -140,6 +142,7 @@ function showTab(id) {
     if (SHOW_PLAYING_OPTION) initPreferences(main.querySelector('#pfPrefs'), { path: userPath('settings') }).catch(() => {});
     initPush(main.querySelector('#pfPush')).catch(() => {}); // optional: never breaks the page
     initAbout(main.querySelector('#pfAbout'), { path: userPath('settings') }).then((about) => { aboutYou = about; }).catch(() => {});
+    initAi(main.querySelector('#pfAi'), { username: user.username }).catch(() => {}); // optional: never breaks the page
     initData(main.querySelector('#pfDataFiles'), { username: user.username });
   }
 }
@@ -314,6 +317,10 @@ function draw(d) {
     <div id="pfNotifs"></div>
 
     <div id="pfPush"></div>
+    </div>
+
+    <div class="pf-group-panel" id="pfGroup-ia" hidden>
+    <div id="pfAi"></div>
     </div>
 
     <div class="pf-group-panel" id="pfGroup-datos" hidden>
