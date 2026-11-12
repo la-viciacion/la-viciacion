@@ -3,7 +3,6 @@
 import { api } from '../../lib/api.js';
 import { ALL, money, monthChoices, monthLabel, selection, share } from '../../lib/ai-usage.js';
 import { html, mount } from '../../lib/html.js';
-import { renderBudgets } from './ai-budgets.js';
 import { renderCalls } from './ai-calls.js';
 import { statTile, errorState } from './components.js';
 import { cardTitle } from '../../ui/info-tip.js';
@@ -88,10 +87,9 @@ async function load(refresh) {
 export async function render(target) {
   panel = target;
   month = ALL;
-  mount(panel, html`<div id="aicApp"></div><div id="aicBudgets"></div><div id="aiuBilled"></div>`);
+  mount(panel, html`<div id="aicApp"></div><div id="aiuBilled"></div>`);
   billed = panel.querySelector('#aiuBilled');
   renderCalls(panel.querySelector('#aicApp')); // the record of the app's calls neither waits for OpenAI nor needs its key
-  renderBudgets(panel.querySelector('#aicBudgets'));
   try {
     await load(false);
     billed.onchange = (e) => {

@@ -10,7 +10,7 @@ export const SECTIONS = [
   { label: 'Jugadores', tabs: ['users', 'timers', 'library', 'scores', 'awards'] },
   { label: 'Comunidad', tabs: ['challenges', 'proposals', 'polls', 'announce'] },
   { label: 'Notificaciones', tabs: ['sends', 'channels', 'recap'] },
-  { label: 'IA', tabs: ['ai', 'chat', 'aiusage'] },
+  { label: 'IA', tabs: ['ai', 'chat', 'ailimits', 'aiusage'] },
   { label: 'Sistema', tabs: ['costs', 'backup', 'audit'] },
 ];
 

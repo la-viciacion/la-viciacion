@@ -633,9 +633,15 @@ ENTITIES.ai = {
 };
 ENTITIES.chat = {
   label: 'Chat y guía',
-  description: 'Asistente de la app y guía de juego: interruptores, instrucciones, límites y si los jugadores los tienen disponibles.',
+  description: 'Asistente de la app y guía de juego: interruptores, modelo, instrucciones y si los jugadores los tienen disponibles.',
   custom: 'settings',
-  sections: ['chat', 'guide', 'aibudget'],
+  sections: ['chat', 'guide'],
+};
+ENTITIES.ailimits = {
+  label: 'Límites',
+  description: 'Todo lo que limita el uso de la IA, junto: quién asume el coste, los límites de preguntas, el presupuesto mensual en dinero y el tope de cada jugador.',
+  custom: 'settings',
+  sections: ['ailimitkeys', 'ailimitq', 'aibudget', 'aibudgets'],
 };
 ENTITIES.aiusage = {
   label: 'Uso y coste',
