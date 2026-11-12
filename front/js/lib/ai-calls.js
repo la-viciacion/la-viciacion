@@ -3,7 +3,8 @@
 
 export const ALL = 'all';
 
-const FEATURES = { chat: 'Chat', guide: 'Guía de juego' };
+// the chat and the guide are asked by a player; the welcome and the notices are written by the AI on its own, paid by the group
+const FEATURES = { chat: 'Chat', guide: 'Guía de juego', welcome: 'Bienvenida del grupo', notice: 'Avisos con IA' };
 const SOURCES = { group: 'Clave del grupo', user: 'Clave propia de cada jugador' };
 const STATUSES = {
   ok: 'Respondidas',
