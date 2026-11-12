@@ -3,6 +3,7 @@
 import { formatDate, formatDuration } from '../lib/format.js';
 import { html } from '../lib/html.js';
 import { gameHref } from '../lib/links.js';
+import { infoTip } from './info-tip.js';
 import { specialClass, specialTag } from '../lib/special.js';
 import * as seasons from '../lib/seasons.js';
 import { scoreBadge } from './score-badge.js';
@@ -13,8 +14,11 @@ export const statTile = (label, value) => html`
 // seconds -> hours with one decimal ("12,5"), enough for a tile
 const hours = (seconds) => (seconds / 3600).toLocaleString('es-ES', { maximumFractionDigits: 1 });
 
-export const titleView = (title) => html`<h2 class="section-title">${title}</h2><div class="section-line"></div>`;
-export const sectionTitle = (title, id) => html`<div class="section-header" ${id ? html`id="${id}"` : ''}>${titleView(title)}</div>`;
+// With `info`, an "i" sits beside the title and opens the explanation that would otherwise be a paragraph under it
+export const titleView = (title, info) => (info
+  ? html`<div class="pf-info-head pf-info-title"><h2 class="section-title">${title}</h2>${infoTip(info, `Más información: ${title}`)}</div><div class="section-line"></div>`
+  : html`<h2 class="section-title">${title}</h2><div class="section-line"></div>`);
+export const sectionTitle = (title, id, info) => html`<div class="section-header" ${id ? html`id="${id}"` : ''}>${titleView(title, info)}</div>`;
 
 export const seasonName = (d) => (d.season === seasons.ALL ? 'todas las temporadas' : `temporada ${d.season}`);
 export const seasonSuffix = (d) => (d.season === seasons.ALL ? '(total)' : `en ${d.season}`);

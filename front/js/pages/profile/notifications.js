@@ -7,6 +7,7 @@
 import { api, jsonRequest } from '../../lib/api.js';
 import { HOURS_HINT, MAX_HOURS, MIN_HOURS, parseHours } from '../../lib/hours.js';
 import { html, mount } from '../../lib/html.js';
+import { sectionTitle } from '../../ui/profile-summary.js';
 
 const NOTICES = [
   { id: 'forgotten_timer', name: 'Timer olvidado', hint: 'Un recordatorio si dejas un timer activo demasiado tiempo', options: true },
@@ -22,7 +23,7 @@ export async function initNotifications(el, { path }) {
   const channel = (notice, name) => settings[`${notice}_${name}`] ?? settings.defaults[`${notice}_${name}`];
 
   mount(el, html`
-    <div class="section-header"><h2 class="section-title">Notificaciones</h2><div class="section-line"></div></div>
+    ${sectionTitle('Notificaciones', undefined, 'Telegram solo llega si has vinculado tu cuenta; push, si has activado los avisos en algún dispositivo.')}
     <div class="pf-card pf-notices">
       <div class="pf-notice-head" aria-hidden="true"><span></span><span>Telegram</span><span>Push</span></div>
       ${NOTICES.map((notice) => html`
@@ -50,7 +51,6 @@ export async function initNotifications(el, { path }) {
         <div class="pf-notice-save" data-save="${notice.id}">
           <button class="pf-btn primary" type="submit" form="pf-options-${notice.id}">Guardar</button>
         </div>`)}
-      <div class="pf-sub">Telegram solo llega si has vinculado tu cuenta; push, si has activado los avisos en algún dispositivo.</div>
       <div class="pf-msg" role="status"></div>
     </div>`);
 

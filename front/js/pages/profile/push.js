@@ -5,6 +5,7 @@
 import { api } from '../../lib/api.js';
 import { formatDate } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
+import { infoTip } from '../../ui/info-tip.js';
 import { currentSubscription, deviceLabel, enablePush, needsInstall, pushSupported, removeDevice, setReceiveGroup } from '../../lib/push.js';
 
 const isStandalone = () => window.matchMedia?.('(display-mode: standalone)').matches || navigator.standalone === true;
@@ -39,8 +40,7 @@ export async function initPush(el) {
 
     mount(el, html`
       <div class="pf-card pf-form">
-        <strong>Dispositivos con avisos en la app</strong>
-        <div class="pf-sub">Para recibir los avisos por push hay que activarlos en cada dispositivo: llegan como notificaciones aunque la app esté cerrada. Los avisos de la tabla de arriba llegan a todos los dispositivos activados si tienen marcado Push; los del grupo, solo a los que marquen «Avisos del grupo».</div>
+        <div class="pf-info-head pf-info-title"><strong>Dispositivos con avisos en la app</strong>${infoTip('Para recibir los avisos por push hay que activarlos en cada dispositivo: llegan como notificaciones aunque la app esté cerrada. Los avisos de la tabla de arriba llegan a todos los dispositivos activados si tienen marcado Push; los del grupo, solo a los que marquen «Avisos del grupo».', 'Más información: dispositivos con avisos')}</div>
         ${blocked ? html`<div class="pf-msg err">${blocked}</div>` : ''}
         ${config.devices.map((d, i) => html`
           <div class="pf-row">

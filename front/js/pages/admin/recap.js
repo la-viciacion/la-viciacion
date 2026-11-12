@@ -8,6 +8,7 @@ import { storyHref } from '../../lib/story.js';
 import { toast } from '../../ui/toast.js';
 import { errorState, store } from './components.js';
 import { confirmDialog } from './dialogs.js';
+import { cardTitle } from '../../ui/info-tip.js';
 
 let panel;
 let pick = clampPick(pickOf(lastMonth())); // what is being looked at: monthly or annual, the year and, for a month, the month
@@ -53,8 +54,7 @@ function view() {
       </section>
 
       <section class="adm-set-card">
-        <h3>El aviso</h3>
-        <div class="adm-sub">Un solo aviso, el mismo en el grupo de Telegram y en las notificaciones de la app (a quien tenga activados los avisos del grupo). Solo dice que el resumen está disponible y lleva el enlace a la historia: las cifras no van en el aviso.</div>
+        ${cardTitle('El aviso', html`Un solo aviso, el mismo en el grupo de Telegram y en las notificaciones de la app (a quien tenga activados los avisos del grupo). Solo dice que el resumen está disponible y lleva el enlace a la historia: las cifras no van en el aviso.`)}
         <div class="adm-sub">Telegram</div>
         <pre class="rc-preview" id="rcaTelegram">Cargando…</pre>
         <div class="adm-sub">En la app (al pulsarlo abre la historia)</div>

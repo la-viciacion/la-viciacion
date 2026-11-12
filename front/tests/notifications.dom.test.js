@@ -105,7 +105,7 @@ test('the hours are folded, and the one Guardar button at the end of the card is
   const save = el.querySelector('[data-save="forgotten_timer"]');
   assert.equal(save.querySelector('button').getAttribute('form'), options.id);
   assert.equal(el.querySelectorAll('button[type="submit"]').length, 1);
-  assert.equal(el.querySelector('.pf-notices').lastElementChild.previousElementSibling.previousElementSibling, save);
+  assert.equal(el.querySelector('.pf-notices').lastElementChild.previousElementSibling, save); // then only the message line: the note on the channels is the "i" of the title
   assert.equal(options.querySelector('details').open, false);
   assert.equal(save.hidden, false);
   await toggle(telegram);

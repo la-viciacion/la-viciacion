@@ -189,7 +189,7 @@ test('the player sees what they paid with their own key against what the group c
   assert.match(spend.querySelector('[data-by="model"]').textContent, /gpt-4\.1-mini/);
   const months = spend.querySelector('[data-by="month"]').textContent;
   assert.match(months, /Noviembre de 2026.*tu clave 0,25.*grupo 0,40/s);
-  assert.match(spend.textContent, /no se guarda lo que escribes/);
+  assert.match(el().textContent, /no se guarda lo que escribes/); // in the "i" of the title
 });
 
 test('choosing a month asks for that month and shows its days instead of the months', async () => {
@@ -260,4 +260,36 @@ test('the screen explains what the chat does and what the guide does, with the c
   assert.match(guide, /No sabe más que ChatGPT/);
   assert.match(guide, /Coste\..*se cobran aparte/);
   assert.ok([...el().querySelectorAll('h2')].some((h) => /Qué hacen el chat y la guía/.test(h.textContent)));
+});
+
+test('what the chat and the guide do is folded until the player opens it, and stays as they left it when the screen is drawn again', async () => {
+  await open({ 'GET /users/ana/ai/models': MODELS, 'GET /users/ana/ai': stateOf(OWN) });
+  const fold = () => el().querySelector('[data-about-fold]');
+  assert.equal(fold().open, false, 'closed by default: it takes no room');
+  assert.match(fold().querySelector('summary').textContent, /Qué hacen el chat y la guía/);
+  fold().open = true;
+  fold().dispatchEvent(new window.Event('toggle'));
+  const select = el().querySelector('select[name="spend-month"]') ?? el().querySelector('select[name="model"]');
+  select.value = select.options[select.options.length - 1].value;
+  select.dispatchEvent(new window.Event('change', { bubbles: true }));
+  await settle();
+  await settle();
+  assert.equal(fold().open, true, 'a redraw does not fold it again');
+});
+
+test('the explanations of the key, the model and the spending are one tap away in an "i" beside their titles, not paragraphs under them', async () => {
+  await open({ 'GET /users/ana/ai/models': MODELS, 'GET /users/ana/ai': stateOf(OWN) });
+  const heads = [...el().querySelectorAll('.pf-info-title')];
+  assert.deepEqual(heads.map((h) => h.querySelector('h2').textContent), ['Tu clave de OpenAI', 'Modelo', 'Tu gasto']);
+  for (const head of heads) {
+    assert.ok(head.querySelector('summary[aria-label]'), 'a button with a name');
+    assert.ok(head.querySelector('.pf-info-text').textContent.length > 40, 'with its explanation');
+  }
+  const loose = [...el().querySelectorAll('.pf-card > .pf-sub, .pf-card > .pf-form > .pf-sub')].map((n) => n.textContent);
+  assert.equal(loose.some((t) => /El modelo lo eliges tú|según el registro de tus preguntas/.test(t)), false, 'no paragraph left under a title');
+});
+
+test('the safety advice about a spending limit is still seen without opening anything', async () => {
+  await open({ 'GET /users/ana/ai': stateOf(NONE) });
+  assert.match(el().querySelector('[data-form="key"]').textContent, /límite de gasto mensual/);
 });
