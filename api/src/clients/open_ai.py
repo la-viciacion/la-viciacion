@@ -22,3 +22,22 @@ def generate(api_key: str, model: str, system_prompt: str, user_prompt: str, tem
     if not text:
         raise AIError("OpenAI ha respondido sin texto")
     return text
+
+
+def list_models(api_key: str) -> list[str]:
+    """The ids of the models a key can use (a call that spends nothing): it is how a key is checked. The client is not
+    cached, so a player's key is not kept in memory longer than the call. Raises QuotaError, ProviderError (its `kind` says
+    a refused key, a timeout...) or AIError, never with the key in the message."""
+    from . import failure
+    from .ai_error import ProviderError, QuotaError
+    from .quota import classify
+
+    try:
+        return sorted(model.id for model in OpenAI(api_key=api_key, timeout=TIMEOUT_SECONDS, max_retries=0).models.list())
+    except Exception as e:
+        message = f"openai: {type(e).__name__}: {str(e).replace(api_key, '***')}"
+        quota = classify(e)
+        if quota:
+            raise QuotaError(message, quota) from None
+        kind = failure.kind(e)
+        raise (ProviderError(message, kind) if kind else AIError(message)) from None
