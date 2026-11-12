@@ -39,5 +39,8 @@ def in_use() -> dict:
     return {"provider": settings.get("ai.provider"), "model": model_name(), "own_model": bool(settings.get("chat.model"))}
 
 
-def build_model() -> Model:
+def build_model(source=None) -> Model:
+    """The model for a source of key (utils/ai_source.py): the player's own, or the group's when there is none."""
+    if source is not None:
+        return BUILDERS[source.provider](source.model, source.api_key)
     return BUILDERS[settings.get("ai.provider")](model_name(), settings.get("ai.api_key"))

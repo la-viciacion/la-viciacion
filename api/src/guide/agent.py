@@ -54,9 +54,13 @@ class GuideDeps:
     db: Session | None = None
     user_id: int | None = None
     game_id: str | None = None
+    source: object | None = None  # whose key pays (utils/ai_source.py Source); the group's when none
 
 
-def build_model() -> Model:
+def build_model(source=None) -> Model:
+    """The model for a source of key (utils/ai_source.py): the player's own, or the group's when none is given."""
+    if source is not None:
+        return BUILDERS[source.provider](source.model, source.api_key)
     return BUILDERS[settings.get("ai.provider")](chat_model.model_name(), settings.get("ai.api_key"))
 
 
@@ -108,8 +112,13 @@ def ask(deps: GuideDeps, question: str, history: list[tuple[str, str]], model=No
     """Blocking: call it from a worker thread. Raises AIError if the provider fails. `model` is for the tests. Every outcome
     leaves a row in the AI usage record, with the numbers and never the text."""
     started = time.monotonic()
-    provider, name = (settings.get("ai.provider"), chat_model.model_name()) if deps.db is not None else (None, None)
-    recorded = dict(user_id=deps.user_id, feature="guide", key_source=ai_ledger.GROUP, question=question, turns=len(history), game_id=deps.game_id, provider=provider, model=name)
+    source = deps.source
+    if source is not None:
+        provider, name = source.provider, source.model
+    else:
+        provider, name = (settings.get("ai.provider"), chat_model.model_name()) if deps.db is not None else (None, None)
+    paid_by = source.key_source if source is not None else ai_ledger.GROUP
+    recorded = dict(user_id=deps.user_id, feature="guide", key_source=paid_by, question=question, turns=len(history), game_id=deps.game_id, provider=provider, model=name)
 
     def record(status, **more):
         if deps.db is not None:
@@ -119,7 +128,7 @@ def ask(deps: GuideDeps, question: str, history: list[tuple[str, str]], model=No
         result = agent.run_sync(
             question,
             deps=deps,
-            model=model or build_model(),
+            model=model or build_model(source),
             message_history=chat_agent.history_messages(history),
             usage_limits=LIMITS,
         )
@@ -128,7 +137,7 @@ def ask(deps: GuideDeps, question: str, history: list[tuple[str, str]], model=No
         record(ai_ledger.TOO_BIG)
         return messages.CHAT_TOO_COMPLEX
     except Exception as e:
-        error = chat_agent.failure(e, "guide")
+        error = chat_agent.failure(e, "guide", source.api_key if source is not None else None)
         record(ai_ledger.QUOTA if isinstance(error, QuotaError) else ai_ledger.ERROR)
         raise error from None
     used = result.usage
@@ -141,15 +150,15 @@ def ask(deps: GuideDeps, question: str, history: list[tuple[str, str]], model=No
     return result.output.strip()
 
 
-def probe(model=None) -> str:
+def probe(model=None, source=None) -> str:
     """One answer that needs the web (who made a game that came out a year ago), for the panel's test button: it fails, with
     the provider's own words, when the model cannot search. Blocking, like `ask`. Raises AIError if the provider fails."""
     deps = GuideDeps(game="Juego: Hollow Knight", level="hint", user_name="el admin")
     try:
         result = agent.run_sync(
             "Busca en la web quién desarrolló este juego y responde en una frase, citando la fuente.",
-            deps=deps, model=model or build_model(), usage_limits=LIMITS,
+            deps=deps, model=model or build_model(source), usage_limits=LIMITS,
         )
     except Exception as e:
-        raise chat_agent.failure(e, "guide_test") from None
+        raise chat_agent.failure(e, "guide_test", source.api_key if source is not None else None) from None
     return result.output.strip()

@@ -23,7 +23,7 @@ from src.clients.ai_error import AIError
 from src.database import models
 from src.routers import chat as chat_router
 from src.routers.manage import system
-from src.utils import ai_prompts, messages, settings
+from src.utils import ai_prompts, ai_source, messages, settings
 from tests.sqlite_db import make_session
 
 START = datetime.datetime(2026, 3, 1, 10, 0)
@@ -405,7 +405,8 @@ class EndpointTests(unittest.TestCase):
         self.client = TestClient(app)
 
     def ready(self, value=True):
-        patcher = mock.patch.object(chat_router.chat_model, "is_ready", return_value=value)
+        source = ai_source.Source("group", "openai", "KEY", "gpt-4.1-mini") if value else None
+        patcher = mock.patch.object(chat_router.ai_source, "resolve", return_value=source)
         patcher.start()
         self.addCleanup(patcher.stop)
 

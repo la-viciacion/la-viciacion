@@ -112,6 +112,10 @@ def _retention(value: int) -> str | None:
     return None if 1 <= value <= INBOX_RETENTION_MAX else f"Los días deben estar entre 1 y {INBOX_RETENTION_MAX}"
 
 
+def _key_source(value: str) -> str | None:
+    return None if value in ("user_only", "user_or_group", "group_only") else "Debe ser user_only, user_or_group o group_only"
+
+
 def _usage_days(value: int) -> str | None:
     return None if 0 <= value <= 3650 else "Los días deben estar entre 0 (sin límite) y 3650"
 
@@ -199,6 +203,8 @@ REGISTRY: dict[str, Spec] = {
     "chat.limit_user_day": Spec("int", 100, check=_limit),
     "chat.limit_group_minute": Spec("int", 10, check=_limit),
     "chat.limit_group_day": Spec("int", 300, check=_limit),
+    # Whose key pays for the chat (utils/ai_source.py): user_only, user_or_group (their own, else the group's) or group_only
+    "chat.key_source": Spec("str", "user_or_group", check=_key_source),
     "chat.prompt": Spec("str", CHAT_PROMPT.strip(), check=_prompt, resettable=True),
     # The game guide (guide/), on trial: it shares the chat's provider, key and model, but its questions search the web, so
     # it has its own switch, its own instructions and its own, lower limits (routers/guide.py); all in the admin's Chat tab.
@@ -206,6 +212,8 @@ REGISTRY: dict[str, Spec] = {
     "guide.limit_user_hour": Spec("int", 10, check=_limit),
     "guide.limit_user_day": Spec("int", 30, check=_limit),
     "guide.limit_group_day": Spec("int", 100, check=_limit),
+    # The guide costs far more per question (a web search): by default only with the player's own key
+    "guide.key_source": Spec("str", "user_only", check=_key_source),
     "guide.prompt": Spec("str", GUIDE_PROMPT.strip(), check=_prompt, resettable=True),
     # What the AI costs (utils/ai_cost.py, utils/ai_ledger.py): how often the token prices are refreshed from the public file
     # of genai-prices (0: never, the snapshot of the installed library is used; read when the API starts) and how long the

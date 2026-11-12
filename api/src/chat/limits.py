@@ -23,11 +23,14 @@ WINDOW_NAMES = {60: "minute", 3600: "hour", 86400: "day"}
 limiter = UsageLimiter()
 
 
-def scopes_of(user_id: int) -> list[Scope]:
-    """The player's limits and then the group's, as the settings have them now."""
+def scopes_of(user_id: int, own_key: bool = False) -> list[Scope]:
+    """The player's limits and then the group's, as the settings have them now. A question paid with the player's own key
+    spends nobody else's quota: only the per-minute limit stays, against a runaway loop."""
     def limits(table):
         return tuple((window, settings.get(key)) for key, window in table)
 
+    if own_key:
+        return [Scope(f"user:{user_id}", "user", limits(USER_LIMITS[:1]))]
     return [Scope(f"user:{user_id}", "user", limits(USER_LIMITS)), Scope(GROUP_KEY, "group", limits(GROUP_LIMITS))]
 
 

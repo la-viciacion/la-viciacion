@@ -99,6 +99,11 @@ class UserSettings(Base):
     playstation_id = Column(String(64), nullable=True)
     steam_id = Column(String(64), nullable=True)
     discord_id = Column(String(64), nullable=True)
+    # the player's own OpenAI key, encrypted (see utils/user_ai.py): no API returns it, and it is not loaded with the row. The
+    # last four characters tell the player which key they saved; the model is the one they chose for it
+    ai_api_key = deferred(Column(Text, nullable=True))
+    ai_key_hint = Column(String(4), nullable=True)
+    ai_model = Column(String(64), nullable=True)
     updated_at = Column(DateTime, server_default=text("CURRENT_TIMESTAMP"), onupdate=text("CURRENT_TIMESTAMP"))
 
 

@@ -12,7 +12,7 @@ from src.chat import limits as chat_limits
 from src.clients import failure
 from src.clients.ai_error import AIError, ProviderError
 from src.routers import chat as chat_router
-from src.utils import messages, settings
+from src.utils import ai_source, messages, settings
 
 
 def http(status, category=None, body=None):
@@ -73,7 +73,7 @@ class AnswersTests(unittest.TestCase):
         self.addCleanup(chat_limits.limiter.clear)
 
     def ask(self, error):
-        with mock.patch.object(chat_router.chat_model, "is_ready", return_value=True), \
+        with mock.patch.object(chat_router.ai_source, "resolve", return_value=ai_source.Source("group", "openai", "KEY", "m")), \
                 mock.patch.object(chat_router.agent, "ask", side_effect=error), \
                 mock.patch.object(settings, "get", return_value=0):
             with self.assertRaises(HTTPException) as caught:

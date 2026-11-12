@@ -69,30 +69,35 @@ def history_messages(history: list[tuple[str, str]]) -> list[ModelMessage]:
     ]
 
 
-def failure(e: Exception, source: str) -> AIError:
-    """What a provider failure becomes: a QuotaError (also written to the audit log) if a quota ran out, else an AIError
-    whose message never carries the key."""
+def failure(e: Exception, source: str, key: str | None = None) -> AIError:
+    """What a provider failure becomes: a QuotaError (also written to the audit log, if it is the group's quota) if a quota
+    ran out, else an AIError whose message never carries a key. `key` is the player's own, when it was theirs that was used:
+    its quota is not the group's, so it is not an event for the admins."""
     quota = classify(e)
     if quota:
-        ai_quota.report(quota, source, settings.get("ai.provider"), chat_model.model_name())
+        if key is None:
+            ai_quota.report(quota, source, settings.get("ai.provider"), chat_model.model_name())
         return QuotaError(f"chat: {quota.describe()}", quota)
     # a provider library may quote what it was given: never let the key out in the message
-    message = f"chat: {type(e).__name__}: {str(e).replace(settings.get('ai.api_key') or chr(0), '***')}"
+    text = str(e).replace(settings.get("ai.api_key") or chr(0), "***")
+    message = f"chat: {type(e).__name__}: {text.replace(key or chr(0), '***')}"
     kind = provider_failure.kind(e)
     return ProviderError(message, kind) if kind else AIError(message)
 
 
-def ask(db: Session, user: models.User, question: str, history: list[tuple[str, str]], model=None) -> Answer:
-    """Blocking: call it from a worker thread. Raises AIError if the provider fails. `model` is for the tests. Every outcome
-    leaves a row in the AI usage record (utils/ai_ledger.py), with the numbers and never the text."""
+def ask(db: Session, user: models.User, question: str, history: list[tuple[str, str]], model=None, source=None) -> Answer:
+    """Blocking: call it from a worker thread. Raises AIError if the provider fails. `source` is whose key pays (utils/ai_source.py:
+    the group's if none is given); `model` is for the tests. Every outcome leaves a row in the AI usage record
+    (utils/ai_ledger.py), with the numbers and never the text."""
     started = time.monotonic()
-    provider, name = settings.get("ai.provider"), chat_model.model_name()
-    recorded = dict(user_id=user.id, feature="chat", key_source=ai_ledger.GROUP, question=question, turns=len(history), provider=provider, model=name)
+    provider, name = (source.provider, source.model) if source else (settings.get("ai.provider"), chat_model.model_name())
+    paid_by = source.key_source if source else ai_ledger.GROUP
+    recorded = dict(user_id=user.id, feature="chat", key_source=paid_by, question=question, turns=len(history), provider=provider, model=name)
     try:
         result = agent.run_sync(
             question,
             deps=ChatDeps(db=db, user=user),
-            model=model or chat_model.build_model(),
+            model=model or chat_model.build_model(source),
             message_history=history_messages(history),
             usage_limits=LIMITS,
         )
@@ -102,7 +107,7 @@ def ask(db: Session, user: models.User, question: str, history: list[tuple[str, 
         ai_ledger.record(db, status=ai_ledger.TOO_BIG, **recorded)
         return Answer(messages.CHAT_TOO_COMPLEX, True)
     except Exception as e:
-        error = failure(e, "chat")
+        error = failure(e, "chat", source.api_key if source else None)
         ai_ledger.record(db, status=ai_ledger.QUOTA if isinstance(error, QuotaError) else ai_ledger.ERROR, **recorded)
         raise error from None
     used = result.usage
