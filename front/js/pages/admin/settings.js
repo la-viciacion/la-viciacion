@@ -23,6 +23,12 @@ const CHAT_LIMITS = [
   ['chat.limit_group_minute', 'Grupo, por minuto'],
   ['chat.limit_group_day', 'Grupo, por día'],
 ];
+// the questions the game guide answers (api/src/utils/settings.py guide.limit_*): fewer, a search costs more than a chat question
+const GUIDE_LIMITS = [
+  ['guide.limit_user_hour', 'Por jugador, por hora'],
+  ['guide.limit_user_day', 'Por jugador, por día'],
+  ['guide.limit_group_day', 'Grupo, por día'],
+];
 const READ_ONLY = ['mail', 'backup']; // cards with nothing to save
 const AI_PROVIDERS = [['google', 'Google (Gemini)'], ['openai', 'OpenAI']];
 
@@ -41,6 +47,7 @@ let panel;
 let sections = []; // cards of the page on screen
 let loaded = {}; // values as the server has them
 let aiUses = []; // where the AI writes: label, original prompt and whether it was changed
+let guideInfo = {}; // the guide: the model it uses, original instructions and whether they were changed
 let chatInfo = {}; // the chat: the provider and model it uses (and whether the model is its own), original instructions and whether they were changed
 
 const check = (name, label, hint, tag = '') => html`
@@ -74,6 +81,15 @@ function chatState(values, chat) {
   return reasons.length ? `No disponible: ${reasons.join('; ')}.` : 'Disponible: los jugadores ven el botón del chat.';
 }
 
+/** Whether the players get the guide on the game page now, and if not why (what is saved, not what is typed). */
+function guideState(values, guide) {
+  const reasons = [
+    !values['guide.enabled'] && 'la guía está apagada',
+    chatMissing(values, guide).length && `falta ${chatMissing(values, guide).join(', ')} en el .env`,
+  ].filter(Boolean);
+  return reasons.length ? `No disponible: ${reasons.join('; ')}.` : 'Disponible: los jugadores ven la guía en la página de cada juego.';
+}
+
 const customizedTag = (use) => (use.customized ? html`<span class="adm-tag">Personalizado</span>` : '');
 
 // One notice that can use the AI: its own switch, a "Personalizado" tag when its instructions were changed and the
@@ -102,7 +118,7 @@ const aiMissing = (values, aiModel) => [
   !aiModel.model && 'AI_MODEL',
 ].filter(Boolean);
 
-function view(values, jobs, pushDevices, mail, aiUses, aiModel, chat) {
+function view(values, jobs, pushDevices, mail, aiUses, aiModel, chat, guide = {}) {
   const state = (key) => (values[key].is_set ? 'Configurado' : 'Sin configurar');
   const aiKey = values['ai.api_key'];
   const vapid = values['push.vapid_private'];
@@ -253,6 +269,26 @@ function view(values, jobs, pushDevices, mail, aiUses, aiModel, chat) {
         <div><button type="button" class="adm-btn" data-set-act="test-chat" ${chatMissing(values, chat).length ? html`disabled` : ''}>Probar el chat</button></div>
       </section>`,
 
+    guide: html`
+      <section class="adm-set-card adm-guide-card">
+        <h3>Guía de juego</h3>
+        <div class="adm-sub">Una tarjeta en la página de cada juego donde el jugador pide ayuda con ese juego (desatascarse, consejos) y elige cuántos destripes admite. A diferencia del chat, responde buscando en la web. Usa el proveedor, la clave y el modelo del chat, y el modelo tiene que admitir la búsqueda web (con OpenAI, un modelo de la API Responses; con Google, la búsqueda de Gemini). Lo comprueba el botón de abajo.</div>
+        ${check('guide.enabled', 'Guía activada', 'Apagada, la tarjeta desaparece de la página de los juegos y la guía deja de responder.')}
+        <div class="adm-sub">Preguntas que se pueden hacer a la guía; 0 es sin límite. Cada una hace una búsqueda web y cuesta bastante más que una del chat, por eso sus límites son propios y más bajos. «Día» son las últimas 24 horas. Se cuentan en memoria: reiniciar la API los pone a cero.</div>
+        <div class="adm-set-row adm-guide-limits">
+          ${GUIDE_LIMITS.map(([name, label]) => html`<label>${label} <input class="adm-input" type="number" name="${name}" min="0" max="100000" step="1" required /></label>`)}
+        </div>
+        <details class="adm-details adm-ai-prompt">
+          <summary class="adm-btn sm">Instrucciones ${customizedTag(guide)}</summary>
+          <div>
+            <textarea class="adm-input" name="guide.prompt" rows="9" spellcheck="false"></textarea>
+            ${guide.customized ? html`<button type="button" class="adm-btn sm" data-set-act="reset-prompt" data-use="guide">Restaurar las originales</button>` : ''}
+          </div>
+        </details>
+        <div class="adm-sub adm-guide-state">${guideState(values, guide)}</div>
+        <div><button type="button" class="adm-btn" data-set-act="test-guide" ${chatMissing(values, guide).length ? html`disabled` : ''}>Probar la guía</button></div>
+      </section>`,
+
     aiuses: html`
       <section class="adm-set-card">
         <h3>Avisos que usan la IA</h3>
@@ -345,9 +381,9 @@ function collect(form) {
     }
     const isNumber = typeof before === 'number';
     const now = field.type === 'checkbox' ? field.checked : (field.type === 'select-one' || field.type === 'number') && isNumber ? Number(field.value) : field.value.trim();
-    if (key.startsWith('ai.prompt.') || key === 'chat.prompt') {
+    if (key.startsWith('ai.prompt.') || key === 'chat.prompt' || key === 'guide.prompt') {
       // the original text (or nothing) is not an override: it goes back to following the application's prompt
-      const use = key === 'chat.prompt' ? chatInfo : aiUses.find((u) => `ai.prompt.${u.id}` === key);
+      const use = key === 'chat.prompt' ? chatInfo : key === 'guide.prompt' ? guideInfo : aiUses.find((u) => `ai.prompt.${u.id}` === key);
       if (now === '' || now === use.default_prompt.trim()) {
         if (use.customized) changes[key] = null;
       } else if (now !== before) {
@@ -443,9 +479,21 @@ async function testChat() {
   }
 }
 
+async function testGuide() {
+  toast('Probando la guía (hace una búsqueda web)…');
+  try {
+    const result = await api('/manage/settings/test-guide', { method: 'POST' });
+    toast(`${result.provider} (${result.model}) responde: ${result.reply}`);
+  } catch (err) {
+    toast(err.message, 'err');
+  }
+}
+
 // Puts the original instructions back in the box; they take effect when the changes are saved.
 function resetPrompt(form, id) {
-  const [name, use] = id === 'chat' ? ['chat.prompt', chatInfo] : [`ai.prompt.${id}`, aiUses.find((u) => u.id === id)];
+  const [name, use] = id === 'chat' ? ['chat.prompt', chatInfo]
+    : id === 'guide' ? ['guide.prompt', guideInfo]
+      : [`ai.prompt.${id}`, aiUses.find((u) => u.id === id)];
   form.elements[name].value = use.default_prompt.trim();
   toast('Instrucciones originales restauradas: guarda los cambios para aplicarlo');
 }
@@ -468,12 +516,13 @@ export async function render(target, { entity }) {
   panel = target;
   sections = entity.sections;
   try {
-    const { values, jobs, push_devices: pushDevices, mail, ai_uses: uses, ai_model: aiModel, chat } = await api('/manage/settings');
+    const { values, jobs, push_devices: pushDevices, mail, ai_uses: uses, ai_model: aiModel, chat, guide } = await api('/manage/settings');
     aiUses = uses;
     chatInfo = chat;
+    guideInfo = guide ?? {};
     loaded = Object.fromEntries(Object.entries(values).filter(([key]) => !SECRETS.includes(key) && !LOCKED.includes(key) && !key.startsWith('push.vapid')));
     for (const key of SECRETS) loaded[key] = null;
-    mount(panel, view(values, jobs, pushDevices, mail, aiUses, aiModel, chat));
+    mount(panel, view(values, jobs, pushDevices, mail, aiUses, aiModel, chat, guideInfo));
     const form = panel.querySelector('#admSettings');
     fill(form, values);
     syncAnnualDay(form);
@@ -490,6 +539,7 @@ export async function render(target, { entity }) {
       else if (act === 'test-email') sendTestEmail(mail);
       else if (act === 'test-ai') testAi(form);
       else if (act === 'test-chat') testChat();
+      else if (act === 'test-guide') testGuide();
       else if (act === 'reset-prompt') resetPrompt(form, e.target.closest('[data-use]').dataset.use);
       else if (act === 'push-keys') generateKeys(values['push.vapid_private'].is_set);
     });

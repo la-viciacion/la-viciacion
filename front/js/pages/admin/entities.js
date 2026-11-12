@@ -633,9 +633,9 @@ ENTITIES.ai = {
 };
 ENTITIES.chat = {
   label: 'Chat',
-  description: 'Asistente de la app: interruptor, instrucciones, límites y si los jugadores lo tienen disponible.',
+  description: 'Asistente de la app y guía de juego: interruptores, instrucciones, límites y si los jugadores los tienen disponibles.',
   custom: 'settings',
-  sections: ['chat'],
+  sections: ['chat', 'guide'],
 };
 ENTITIES.aiusage = {
   label: 'Uso y coste',
