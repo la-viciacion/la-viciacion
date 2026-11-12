@@ -324,6 +324,8 @@ textarea.adm-grow { resize: none; min-height: 0; overflow: hidden; }
 .adm-ai-prompt { margin: 0 0 0 48px; } /* under the text, not under the switch */
 .adm-ai-prompt summary { display: inline-block; cursor: pointer; font-size: 0.8rem; font-weight: 600; }
 .adm-ai-prompt[open] summary { margin-bottom: 4px; }
+/* the chat's and the guide's own cards have no switch to line up under: their instructions start at the card's edge */
+.adm-chat-card .adm-ai-prompt, .adm-guide-card .adm-ai-prompt { margin-left: 0; }
 .adm-ai-fragment { margin: 0 0 0 48px; padding: 8px 0 0 12px; border-top: 0; border-left: 2px solid var(--border); }
 .adm-ai-fragment .adm-ai-prompt { margin-left: 48px; }
 .adm-tag { margin-left: 8px; padding: 1px 8px; border-radius: 999px; font-size: 0.7rem; font-weight: 600; color: var(--accent-teal); background: rgba(61, 217, 179, 0.12); vertical-align: middle; }
