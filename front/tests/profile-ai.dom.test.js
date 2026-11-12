@@ -240,3 +240,10 @@ test('a message of the key box survives the screen being drawn again when the sp
   await settle();
   assert.match(el().querySelector('[data-msg="key"]').textContent, /empieza por sk-/);
 });
+
+test('the explanation of the key says what it is for in the order that is true: the guide, and the chat once the group budget is spent', async () => {
+  await open({ 'GET /users/ana/ai': stateOf(NONE) });
+  const text = el().textContent;
+  assert.match(text, /Con tu propia clave puedes usar la guía de cada juego y seguir con el chat cuando se agote el presupuesto del grupo \(o tu parte\)/);
+  assert.doesNotMatch(text, /en lugar de sumarse al del grupo/);
+});

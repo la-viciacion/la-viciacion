@@ -35,7 +35,7 @@ export async function initAi(el, { username }) {
     return html`
       ${sectionTitle('Tu clave de OpenAI')}
       <div class="pf-card pf-form">
-        <div class="pf-sub">Con tu propia clave, el coste de lo que preguntes al chat y a la guía va a tu cuenta de OpenAI en lugar de sumarse al del grupo. Se guarda cifrada y <strong>nadie puede verla</strong> desde la app, ni siquiera un administrador; solo puedes quitarla o cambiarla tú.</div>
+        <div class="pf-sub">Con tu propia clave puedes usar la guía de cada juego y seguir con el chat cuando se agote el presupuesto del grupo (o tu parte). El coste de lo que preguntes con ella va a tu cuenta de OpenAI. Se guarda cifrada y <strong>nadie puede verla</strong> desde la app, ni siquiera un administrador; solo puedes quitarla o cambiarla tú.</div>
         ${key.unreadable ? html`<div class="pf-msg err">No se puede abrir la clave que tenías guardada. Vuelve a guardarla.</div>` : ''}
         ${key.has_key ? html`<div class="ai-saved"><strong>${keyText(key)}</strong> <span class="pf-sub">· modelo ${key.model}</span></div>` : ''}
         ${form ? html`
