@@ -13,6 +13,7 @@ from unittest import mock
 
 from fastapi.encoders import jsonable_encoder
 
+from src.clients import igdb
 from src.routers.manage import system
 from src.utils import email as mail
 from src.utils import settings
@@ -20,6 +21,7 @@ from tests.sqlite_db import make_session
 
 TARGET = Path(__file__).resolve().parents[2] / "front" / "tests" / "fixtures"
 AI_VARIABLES = ("OPENAI_AI_API_KEY", "OPENAI_AI_MODEL", "OPENAI_CHAT_AI_MODEL", "GOOGLE_AI_API_KEY", "GOOGLE_AI_MODEL", "GOOGLE_CHAT_AI_MODEL", "OPENAI_ADMIN_KEY")
+OTHER_SERVICES = ("RAWG_API_KEY", "TWITCH_CLIENT_ID", "TWITCH_CLIENT_SECRET")  # a machine that has them must not change the files
 
 # Environments the panel must open in: both providers set up, and an .env with nothing of the AI
 SCENARIOS = {
@@ -33,10 +35,11 @@ SCENARIOS = {
 
 def build(env: dict) -> dict:
     db = make_session()
-    clean = {key: value for key, value in os.environ.items() if key not in AI_VARIABLES and not key.startswith("TELEGRAM_")}
+    clean = {key: value for key, value in os.environ.items() if key not in AI_VARIABLES + OTHER_SERVICES and not key.startswith("TELEGRAM_")}
     with mock.patch.dict(os.environ, {**clean, **env}, clear=True):
         stored = settings.get_all(db)
         with mock.patch.object(settings, "get", side_effect=lambda key: stored[key]), \
+                mock.patch.object(igdb, "configured", return_value=False), \
                 mock.patch.object(mail, "status", return_value={"configured": False, "missing": ["SMTP_HOST"], "host": "", "port": 587, "security": "starttls", "from": "", "public_url": ""}):
             return jsonable_encoder(system.get_settings(types.SimpleNamespace(email=None), db))
 
