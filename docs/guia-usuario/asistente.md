@@ -15,7 +15,7 @@ En **Perfil → Ajustes → Mi IA** puedes guardar tu propia clave de OpenAI y e
 - La **guía de cada juego** (la tarjeta de la página del juego, o el botón «¿Atascado?» del timer) busca en internet y tiene un coste mayor: por defecto solo funciona con tu propia clave. Sin ella, la página del juego te lleva a Mi IA para añadirla.
 - El chat usa primero la del grupo mientras quede presupuesto ese mes; cuando se agota (el del grupo o tu parte), sigue con tu clave si la tienes.
 - En **Mi IA** también se explica qué hace el chat y qué hace la guía, lo que cuesta cada uno y qué aporta la guía frente a preguntárselo directamente a ChatGPT: ya sabe de qué juego hablas y cuánto llevas, respeta el nivel de destripes que elijas y busca y cita fuentes en lugar de contestar de memoria. No sabe más que ChatGPT ni sustituye a una guía completa.
-- Tu clave se guarda cifrada y **nadie puede verla**: ni otros jugadores ni los administradores. Solo tú puedes cambiarla o quitarla, y al quitarla se borra.
+- Tu clave se guarda cifrada y solo tú tienes acceso a ella: está ligada a tu cuenta, así que no sirve con otro usuario. Solo tú puedes cambiarla o quitarla, y al quitarla se borra.
 - El modelo lo eliges tú. Los más potentes cuestan mucho más por pregunta; la lista te dice si es económico, de precio medio o caro. La guía necesita un modelo que pueda buscar en la web (el botón «Probar con la guía» lo comprueba y gasta unos céntimos).
 - Te recomendamos crear en OpenAI un **proyecto solo para La Viciación con un límite de gasto mensual** y usar una clave de ese proyecto: así lo máximo que puede costarte es lo que fijes.
 
