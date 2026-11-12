@@ -23,21 +23,36 @@ export function modelLabel(model) {
   return `${model.id} · ${TIERS[model.tier] ?? TIERS.sin_precio}${price}`;
 }
 
-/** A short, quiet note on where the cost of the chat and the guide goes, from their states ({ available, needs_key, paid_by, mode }):
- * it says what is true for this player now and nothing more. */
-export function costNote({ chat, guide }) {
-  const notes = [];
-  if (!chat.available) notes.push('El chat no está disponible ahora mismo.');
-  if (!guide.available) notes.push('La guía de cada juego no está disponible ahora mismo.');
-  const features = [chat, guide].filter((f) => f.available);
-  if (features.some((f) => f.paid_by === 'user')) {
-    notes.push('Con tu clave, el coste de lo que preguntes va a tu cuenta de OpenAI.');
-  } else if (chat.available && chat.paid_by === 'group' && guide.available && guide.needs_key) {
-    notes.push('El coste del chat lo cubre el grupo. La guía de cada juego busca en internet y cuesta más: funciona con tu propia clave.');
-  } else if (features.length && features.every((f) => f.paid_by === 'group')) {
-    notes.push(features.every((f) => f.mode === 'group_only') ? 'El coste lo cubre el grupo, tengas clave o no.' : 'El coste lo cubre el grupo; con tu propia clave pasa a tu cuenta.');
-  } else if (guide.available && guide.needs_key) {
-    notes.push('La guía de cada juego busca en internet y cuesta más: funciona con tu propia clave.');
+// Where the cost of a feature goes for this player: the group's key comes first, while its monthly budget lasts, and the player's
+// own is what goes on after it (or the only one: the guide, by default). `fallback` is a question already going on with the
+// player's own key because the group's budget is spent.
+function kindOf(feature) {
+  if (feature.paid_by === 'user') return feature.blocked ? 'fallback' : 'own';
+  if (feature.paid_by === 'group') return feature.mode === 'group_only' ? 'group_only' : 'group';
+  return 'needs';
+}
+
+/** A short, quiet note on where the cost of the chat and the guide goes, from their states ({ available, needs_key, paid_by, mode,
+ * blocked }) and whether the player has a key of their own: it says what is true for this player now and nothing more. */
+export function costNote({ chat, guide, key }) {
+  const hasKey = Boolean(key?.has_key);
+  const features = [
+    { feature: chat, of: 'del chat', is: 'el chat', cap: 'El chat' },
+    { feature: guide, of: 'de la guía', is: 'la guía', cap: 'La guía' },
+  ];
+  const notes = features.filter((f) => !f.feature.available).map((f) => `${f.cap}${f.is === 'la guía' ? ' de cada juego' : ''} no está disponible ahora mismo.`);
+  const byKind = {};
+  for (const f of features.filter((x) => x.feature.available)) (byKind[kindOf(f.feature)] ??= []).push(f);
+  const subject = (list) => [list[0].cap, ...list.slice(1).map((f) => f.is)].join(' y '); // 'El chat y la guía'
+  const after = hasKey ? 'después seguirá con tu clave, a tu cuenta de OpenAI' : 'después necesitarás tu propia clave';
+  for (const [kind, list] of Object.entries(byKind)) {
+    const of = list.map((f) => f.of).join(' y ');
+    if (kind === 'group_only') notes.push(`El coste ${of} lo cubre el grupo, tengas clave o no.`);
+    else if (kind === 'group') notes.push(`El coste ${of} lo cubre el grupo mientras haya presupuesto este mes; ${after}.`);
+    else if (kind === 'own') notes.push(`El coste ${of} va a tu cuenta de OpenAI.`);
+    else if (kind === 'fallback') notes.push(`Se ha agotado el presupuesto del grupo este mes: de momento el coste ${of} va a tu cuenta de OpenAI.`);
+    else if (list.length === 1 && list[0].is === 'la guía') notes.push('La guía de cada juego busca en internet y cuesta más: funciona con tu propia clave.');
+    else notes.push(`${subject(list)} ${list.length > 1 ? 'funcionan' : 'funciona'} con tu propia clave.`);
   }
   return notes.join(' ');
 }
@@ -56,6 +71,7 @@ export function budgetLines(budget) {
 
 /** What a feature's state says when the budget stops the group's key from answering this player (else null). */
 export function blockedText(state) {
+  if (state.paid_by === 'user') return null; // the player's own key took over: the note above says so
   if (state.blocked === 'group') return 'Se ha agotado el presupuesto de IA del grupo este mes.';
   if (state.blocked === 'user') return 'Has gastado tu parte del presupuesto de IA del grupo este mes.';
   return null;

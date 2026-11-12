@@ -12,7 +12,7 @@ const NONE = { has_key: false, unreadable: false, hint: null, model: null, provi
 const OWN = { has_key: true, unreadable: false, hint: '6789', model: 'gpt-4.1-mini', provider: 'openai' };
 const stateOf = (key) => ({
   key,
-  chat: { available: true, needs_key: false, paid_by: key.has_key ? 'user' : 'group', mode: 'user_or_group' },
+  chat: { available: true, needs_key: false, paid_by: 'group', mode: 'group_then_user', blocked: null }, // the group's first, with a key or not
   guide: { available: true, needs_key: !key.has_key, paid_by: key.has_key ? 'user' : null, mode: 'user_only' },
   default_model: 'gpt-4.1-mini',
 });
@@ -51,7 +51,7 @@ beforeEach(() => el().replaceWith(el().cloneNode(false)));
 test('without a key it says, quietly, where the cost goes, offers the key box and loads no models', async () => {
   const calls = await open({ 'GET /users/ana/ai': stateOf(NONE) });
   const note = el().querySelector('.ai-cost-note').textContent;
-  assert.match(note, /El coste del chat lo cubre el grupo/);
+  assert.match(note, /El coste del chat lo cubre el grupo mientras haya presupuesto este mes; después necesitarás tu propia clave/);
   assert.match(note, /La guía de cada juego busca en internet y cuesta más: funciona con tu propia clave/);
   assert.equal([...el().querySelectorAll('h2')].some((h) => /Quién paga/.test(h.textContent)), false, 'no section of its own');
   assert.equal(el().querySelector('input[type="password"]').name, 'api_key');
@@ -76,7 +76,9 @@ test('a key is saved, then only its last characters and its model show, and the 
   await submitKey(` ${KEY} `);
   assert.deepEqual(sent(calls, 'PUT'), [{ api_key: KEY }]);
   assert.match(el().textContent, /Clave guardada, termina en …6789/);
-  assert.match(el().querySelector('.ai-cost-note').textContent, /Con tu clave, el coste de lo que preguntes va a tu cuenta de OpenAI/);
+  const kept = el().querySelector('.ai-cost-note').textContent;
+  assert.match(kept, /El coste del chat lo cubre el grupo mientras haya presupuesto este mes; después seguirá con tu clave/);
+  assert.match(kept, /El coste de la guía va a tu cuenta de OpenAI/);
   assert.equal(el().textContent.includes(KEY), false, 'the key is never drawn');
   assert.equal(el().querySelector('input[type="password"]'), null, 'the box goes away once it is saved');
   const options = [...el().querySelectorAll('select[name="model"] option')];
@@ -223,7 +225,7 @@ test('the budget of the group and their share show with what is spent and when i
 });
 
 test('when a budget stops the group key the player is told, and told how to go on if they have no key', async () => {
-  const blocked = { ...stateOf(NONE), chat: { available: true, needs_key: true, paid_by: null, mode: 'user_or_group', blocked: 'group' } };
+  const blocked = { ...stateOf(NONE), chat: { available: true, needs_key: true, paid_by: null, mode: 'group_then_user', blocked: 'group' } };
   await open({ 'GET /users/ana/ai': blocked });
   assert.match(el().textContent, /Se ha agotado el presupuesto de IA del grupo este mes/);
   assert.match(el().textContent, /puedes seguir con tu propia clave/);
