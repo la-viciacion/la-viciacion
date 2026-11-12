@@ -29,6 +29,16 @@ const GUIDE_LIMITS = [
   ['guide.limit_user_day', 'Por jugador, por día'],
   ['guide.limit_group_day', 'Grupo, por día'],
 ];
+// whose key pays for a feature (api/src/utils/ai_source.py): what each player may have saved in Ajustes → Mi IA, and the group's
+const KEY_SOURCES = [
+  ['user_only', 'Solo la clave del propio jugador'],
+  ['user_or_group', 'La del jugador si la tiene; si no, la del grupo'],
+  ['group_only', 'Siempre la del grupo (ignora las claves de los jugadores)'],
+];
+const keySource = (name) => html`
+  <label>Quién paga
+    <select class="adm-input" name="${name}">${KEY_SOURCES.map(([id, label]) => html`<option value="${id}">${label}</option>`)}</select>
+  </label>`;
 const READ_ONLY = ['mail', 'backup']; // cards with nothing to save
 const AI_PROVIDERS = [['google', 'Google (Gemini)'], ['openai', 'OpenAI']];
 
@@ -253,6 +263,8 @@ function view(values, jobs, pushDevices, mail, aiUses, aiModel, chat, guide = {}
         <label>Modelo del chat <input class="adm-input adm-chat-model" type="text" value="${chat.model || 'Sin configurar'}" disabled /></label>
         <div class="adm-sub">El chat usa <code>CHAT_AI_MODEL</code> si está en el .env${chat.own_model ? '' : html` (ahora no lo está: usa <code>AI_MODEL</code>)`}, para darle un modelo distinto del de los avisos.</div>
         ${check('chat.enabled', 'Chat activado', 'Apagado, el botón desaparece para todos y el chat deja de responder.')}
+        ${keySource('chat.key_source')}
+        <div class="adm-sub">Cada jugador puede guardar su propia clave de OpenAI en su perfil (Ajustes → Mi IA). Con «La del jugador si la tiene», quien no la tiene usa la del grupo (el .env) y gasta el cupo del proyecto; quien la tiene paga de su cuenta y solo le queda un límite por minuto. Cuando el grupo decida pagar la IA para todos, «Siempre la del grupo» lo hace sin tocar nada más.</div>
         <div class="adm-sub">Preguntas que se pueden hacer al chat; 0 es sin límite. Cada pregunta gasta varias llamadas a la IA y el cupo de la IA es del proyecto entero, no de cada jugador: por eso hay un límite por jugador y otro para todo el grupo. «Día» son las últimas 24 horas, no desde medianoche. Se cuentan en memoria: reiniciar la API los pone a cero. Quien se pasa ve cuál ha superado y cuánto esperar.</div>
         <div class="adm-set-row adm-chat-limits">
           ${CHAT_LIMITS.map(([name, label]) => html`<label>${label} <input class="adm-input" type="number" name="${name}" min="0" max="100000" step="1" required /></label>`)}
@@ -285,6 +297,8 @@ function view(values, jobs, pushDevices, mail, aiUses, aiModel, chat, guide = {}
         <h3>Guía de juego</h3>
         <div class="adm-sub">Una tarjeta en la página de cada juego donde el jugador pide ayuda con ese juego (desatascarse, consejos) y elige cuántos destripes admite. A diferencia del chat, responde buscando en la web. Usa el proveedor, la clave y el modelo del chat, y el modelo tiene que admitir la búsqueda web (con OpenAI, un modelo de la API Responses; con Google, la búsqueda de Gemini). Lo comprueba el botón de abajo.</div>
         ${check('guide.enabled', 'Guía activada', 'Apagada, la tarjeta desaparece de la página de los juegos y la guía deja de responder.')}
+        ${keySource('guide.key_source')}
+        <div class="adm-sub">Una pregunta de la guía hace búsquedas web y cuesta bastante más que una del chat, así que por defecto solo se usa la clave del jugador (Ajustes → Mi IA): quien no la tiene ve cómo añadirla. Los límites de abajo son para lo que paga el grupo.</div>
         <div class="adm-sub">Preguntas que se pueden hacer a la guía; 0 es sin límite. Cada una hace una búsqueda web y cuesta bastante más que una del chat, por eso sus límites son propios y más bajos. «Día» son las últimas 24 horas. Se cuentan en memoria: reiniciar la API los pone a cero.</div>
         <div class="adm-set-row adm-guide-limits">
           ${GUIDE_LIMITS.map(([name, label]) => html`<label>${label} <input class="adm-input" type="number" name="${name}" min="0" max="100000" step="1" required /></label>`)}
