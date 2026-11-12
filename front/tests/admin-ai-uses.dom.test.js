@@ -257,13 +257,13 @@ test('the guide card says why the players do not have it', async () => {
   assert.equal(guideCard().querySelector('[data-set-act="test-guide"]').disabled, true);
 });
 
-test('the AI cost card has the price refresh, the retention of the record and the monthly budgets', async () => {
+test('the AI cost card has the price refresh and the retention of the record', async () => {
   installApi({ 'GET /manage/settings': { values: { ...VALUES, 'ai.price_refresh_hours': 24, 'ai.usage_retention_days': 0, 'ai.group_budget_month': 20, 'ai.user_budget_month': 5 }, jobs: {}, push_devices: { devices: 0, users: 0 }, mail: { configured: false, missing: [] }, ai_uses: USES, ai_model: { provider: 'google', model: 'gemini-test' }, chat: CHAT } });
   await render(panel(), { entity: { sections: ['aicost'] } });
   await settle();
   const card = panel().querySelector('.adm-aicost-card');
   assert.deepEqual([...card.querySelectorAll('input[type="number"]')].map((i) => [i.name, i.value]), [
-    ['ai.price_refresh_hours', '24'], ['ai.usage_retention_days', '0'], ['ai.group_budget_month', '20'], ['ai.user_budget_month', '5'],
+    ['ai.price_refresh_hours', '24'], ['ai.usage_retention_days', '0'],
   ]);
   assert.match(card.textContent, /sin guardar el texto/);
 });
@@ -299,4 +299,17 @@ test('the cards of the chat, the guide and the cost explain themselves in the "i
   assert.match(heads[0].querySelector('.pf-info-text').textContent, /botón flotante.*responde solo sobre videojuegos/);
   assert.match(heads[2].querySelector('.pf-info-text').textContent, /buscando en la web/);
   for (const head of heads) assert.equal(head.nextElementSibling.classList.contains('adm-sub') && head.nextElementSibling.textContent.length > 250, false, 'no long paragraph right under the title');
+});
+
+test('the money limit of the group has a card of its own among the chat and the guide, and says it is not a number of questions', async () => {
+  const values = { ...VALUES, 'chat.key_source': 'group_then_user', 'guide.key_source': 'user_only', 'guide.enabled': true, 'guide.prompt': 'g', 'ai.group_budget_month': 20, 'ai.user_budget_month': 5 };
+  installApi({ 'GET /manage/settings': { values, jobs: {}, push_devices: { devices: 0, users: 0 }, mail: { configured: false, missing: [] }, ai_uses: USES, ai_model: { provider: 'google', model: 'gemini-test' }, chat: CHAT, guide: CHAT } });
+  await render(panel(), { entity: { sections: ['chat', 'guide', 'aibudget'] } });
+  await settle();
+  const card = panel().querySelector('.adm-aibudget-card');
+  assert.equal(card.querySelector('h3').textContent, 'Presupuesto mensual (dinero)');
+  assert.deepEqual([...card.querySelectorAll('input[type="number"]')].map((i) => [i.name, i.value]), [['ai.group_budget_month', '20'], ['ai.user_budget_month', '5']]);
+  assert.match(card.textContent, /límite de dinero, distinto de los límites de preguntas/);
+  assert.match(panel().querySelector('.adm-chat-card').textContent, /Son números de preguntas: el límite en dinero es el «Presupuesto mensual \(dinero\)»/);
+  assert.match(panel().querySelector('.adm-guide-card').textContent, /Son números de preguntas: el límite en dinero/);
 });
