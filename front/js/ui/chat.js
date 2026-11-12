@@ -4,6 +4,7 @@
 // session (unmountChat). The conversation is kept in memory only: the API stores nothing of it.
 import { api, jsonRequest } from '../lib/api.js';
 import { MAX_QUESTION, parseAnswer, pickSuggestions, toRequest } from '../lib/chat.js';
+import { DRAG_THRESHOLD, FAB_MARGIN, FAB_SIZE, parseFabPosition, snapFab } from '../lib/chat-fab.js';
 import { html, mount } from '../lib/html.js';
 import { iconClose } from './icons.js';
 
@@ -169,6 +170,7 @@ function reset() {
 function onClick(e) {
   const target = e.target.closest('button');
   if (!target) return;
+  if (swallowClick && target.matches('[data-toggle]')) return;
   if (target.matches('[data-toggle]')) setOpen(true);
   else if (target.matches('[data-close]')) setOpen(false);
   else if (target.matches('[data-reset]')) reset();
@@ -198,6 +200,60 @@ function onInput(e) {
   e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
 }
 
+// Dragging the button: it follows the finger and, on release, sticks to the nearest side edge at that height. The
+// position is a per-device convenience kept in localStorage (it may be unavailable: the default spot is used then).
+const FAB_KEY = 'lv-chat-fab';
+let drag = null; // { id, dx, dy, startX, startY, moved }
+let swallowClick = false; // the click that ends a drag must not open the chat
+
+function placeFab(position) {
+  const el = root();
+  if (!el || !position) return;
+  el.dataset.side = position.side;
+  el.style.setProperty('--fab-bottom', `${position.bottom}px`);
+}
+
+function onPointerDown(e) {
+  const fab = e.target.closest('.chat-fab');
+  if (!fab || (e.pointerType === 'mouse' && e.button !== 0)) return;
+  const rect = fab.getBoundingClientRect();
+  drag = { id: e.pointerId, dx: e.clientX - rect.left, dy: e.clientY - rect.top, startX: e.clientX, startY: e.clientY, moved: false };
+  fab.setPointerCapture?.(e.pointerId);
+}
+
+function onPointerMove(e) {
+  const fab = root()?.querySelector('.chat-fab');
+  if (!drag || e.pointerId !== drag.id || !fab) return;
+  if (!drag.moved) {
+    if (Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY) < DRAG_THRESHOLD) return;
+    drag.moved = true;
+    fab.classList.add('dragging');
+  }
+  const top = Math.min(Math.max(e.clientY - drag.dy, FAB_MARGIN), window.innerHeight - FAB_SIZE - FAB_MARGIN);
+  const left = Math.min(Math.max(e.clientX - drag.dx, 0), window.innerWidth - FAB_SIZE);
+  Object.assign(fab.style, { left: `${left}px`, top: `${top}px`, right: 'auto', bottom: 'auto' });
+}
+
+function onPointerEnd(e) {
+  const fab = root()?.querySelector('.chat-fab');
+  if (!drag || e.pointerId !== drag.id) return;
+  const { moved } = drag;
+  drag = null;
+  if (!fab) return;
+  fab.classList.remove('dragging');
+  if (!moved) return;
+  swallowClick = true;
+  setTimeout(() => { swallowClick = false; }, 0);
+  const rect = fab.getBoundingClientRect();
+  fab.removeAttribute('style');
+  root().style.removeProperty('--fab-bottom');
+  const minBottom = parseFloat(getComputedStyle(fab).bottom); // the lowest the CSS lets it rest (bar and safe area included)
+  placeFab(snapFab({ left: rect.left, top: rect.top, width: window.innerWidth, height: window.innerHeight, minBottom }));
+  try {
+    localStorage.setItem(FAB_KEY, JSON.stringify({ side: root().dataset.side, bottom: parseFloat(root().style.getPropertyValue('--fab-bottom')) }));
+  } catch { /* the position is only not remembered */ }
+}
+
 // The story player is full screen: the button would sit on top of it
 const hiddenHere = () => location.hash.startsWith('#/story');
 
@@ -219,12 +275,20 @@ export async function mountChat() {
   const el = document.createElement('div');
   el.id = ID;
   document.body.append(el);
+  document.body.classList.add('has-chat'); // the pages leave room for the button at the end of their content
+  try {
+    placeFab(parseFabPosition(localStorage.getItem(FAB_KEY)));
+  } catch { /* default spot */ }
   render();
   const onEscape = (e) => { if (e.key === 'Escape' && open) setOpen(false); };
   el.addEventListener('click', onClick);
   el.addEventListener('submit', onSubmit);
   el.addEventListener('keydown', onKeydown);
   el.addEventListener('input', onInput);
+  el.addEventListener('pointerdown', onPointerDown);
+  el.addEventListener('pointermove', onPointerMove);
+  el.addEventListener('pointerup', onPointerEnd);
+  el.addEventListener('pointercancel', onPointerEnd);
   document.addEventListener('keydown', onEscape);
   window.addEventListener('hashchange', syncVisibility);
   cleanup = () => {
@@ -239,6 +303,7 @@ export function unmountChat() {
   abort?.abort();
   followViewport(false);
   cleanup?.();
+  document.body.classList.remove('has-chat');
   root()?.remove();
   turns = [];
   suggestions = pickSuggestions();

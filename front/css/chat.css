@@ -2,14 +2,21 @@
 
 #chat-root[hidden], #chat-root [hidden] { display: none !important; }
 
+/* The player can drag it (js/ui/chat.js): it rests on the left or right edge, at the distance from the bottom that
+   #chat-root carries in --fab-bottom, never lower than --fab-min (above the bottom bar on a phone) nor off the top */
 .chat-fab {
-  position: fixed; z-index: 1040;
-  right: calc(16px + env(safe-area-inset-right)); bottom: calc(16px + env(safe-area-inset-bottom));
+  --fab-min: calc(16px + env(safe-area-inset-bottom));
+  position: fixed; z-index: 1040; touch-action: none; user-select: none; -webkit-user-select: none;
+  right: calc(16px + env(safe-area-inset-right)); bottom: clamp(var(--fab-min), var(--fab-bottom, 0px), calc(100dvh - 72px));
   width: 56px; height: 56px; border: none; border-radius: 50%; cursor: pointer;
   display: inline-flex; align-items: center; justify-content: center;
   background: var(--gradient-brand); color: #0a0a14; box-shadow: var(--shadow-btn), var(--shadow-card);
   transition: transform 0.15s ease;
 }
+#chat-root[data-side="left"] .chat-fab { right: auto; left: calc(16px + env(safe-area-inset-left)); }
+.chat-fab.dragging { transition: none; cursor: grabbing; transform: scale(1.08); }
+/* Above the bottom bar of a phone (css/navbar.css) */
+@media (max-width: 640px) { .chat-fab { --fab-min: calc(72px + env(safe-area-inset-bottom)); } }
 .chat-fab:hover { transform: scale(1.06); }
 .chat-fab:focus-visible, .chat-icon-btn:focus-visible, .chat-chip:focus-visible, .chat-send:focus-visible { outline: 2px solid var(--accent-teal); outline-offset: 2px; }
 

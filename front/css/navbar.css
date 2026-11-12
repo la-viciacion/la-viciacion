@@ -179,5 +179,6 @@
   .bottom-tab.active { color: var(--accent-teal); }
   .bottom-tab:focus-visible { outline: 2px solid var(--accent-teal); outline-offset: -3px; border-radius: var(--radius-sm); }
   .home-main { padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
-  .chat-fab { bottom: calc(72px + env(safe-area-inset-bottom)); }
+  /* with the chat button on the page, the end of the content must be able to scroll clear of it (bar + button + gaps) */
+  body.has-chat .home-main { padding-bottom: calc(148px + env(safe-area-inset-bottom)); }
 }
