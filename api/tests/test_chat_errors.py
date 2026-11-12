@@ -73,7 +73,7 @@ class AnswersTests(unittest.TestCase):
         self.addCleanup(chat_limits.limiter.clear)
 
     def ask(self, error):
-        with mock.patch.object(chat_router.ai_source, "resolve", return_value=ai_source.Source("group", "openai", "KEY", "m")), \
+        with mock.patch.object(chat_router.ai_source, "decide", return_value=ai_source.Decision(ai_source.Source("group", "openai", "KEY", "m"))), \
                 mock.patch.object(chat_router.agent, "ask", side_effect=error), \
                 mock.patch.object(settings, "get", return_value=0):
             with self.assertRaises(HTTPException) as caught:

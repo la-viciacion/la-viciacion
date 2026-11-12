@@ -2,7 +2,7 @@
 
 Only the player may use these routes, an admin included: the key is theirs and what it spends is their money. Nothing here
 returns the key, not even to its owner: they see whether they have one, its last four characters and the model."""
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -13,7 +13,7 @@ from ..clients import open_ai
 from ..clients.ai_error import AIError, ProviderError, QuotaError
 from ..database import models
 from ..guide import agent as guide_agent
-from ..utils import ai_models, ai_source, messages, user_ai
+from ..utils import ai_budget, ai_models, ai_source, ai_spend, messages, user_ai
 from ..utils.logger import LogManager
 from ..utils.rate_limit import Scope, UsageLimiter
 from .chat import PROVIDER_MESSAGES
@@ -73,7 +73,25 @@ def get_ai(username: str, active_user: models.User = Depends(auth.get_current_ac
         "chat": ai_source.availability(db, user.id, "chat") | {"mode": ai_source.mode("chat")},
         "guide": ai_source.availability(db, user.id, "guide") | {"mode": ai_source.mode("guide")},
         "default_model": DEFAULT_MODEL,
+        "budget": ai_budget.usage(db, user.id),
     }
+
+
+@router.get("/{username}/ai/usage")
+def get_ai_usage(
+    username: str,
+    month: str | None = Query(None, pattern=r"^\d{4}-(0[1-9]|1[0-2])$"),
+    active_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """What the player has used of the AI, from the record of their own calls (an estimate: the tokens measured and priced when
+    each call was made): totals, what they paid with their own key against what the group's covered, by month (and by day for
+    one month), by function and by model. Only theirs, an admin included; and the budget of the group's key this month."""
+    user = _mine(active_user, username)
+    data = ai_spend.summary(db, month, user_id=user.id)
+    for admin_only in ("group_paid_by_user", "by_tools", "price_stamp"):
+        data.pop(admin_only, None)
+    return {**data, "budget": ai_budget.usage(db, user.id)}
 
 
 @router.put("/{username}/ai")

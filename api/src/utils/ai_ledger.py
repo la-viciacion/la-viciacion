@@ -18,7 +18,7 @@ from .logger import LogManager
 logger = LogManager().get_logger()
 
 GROUP, USER = "group", "user"  # whose key paid
-OK, OFF_TOPIC, TOO_BIG, QUOTA, ERROR, LIMITED = "ok", "off_topic", "too_big", "quota", "error", "limited"
+OK, OFF_TOPIC, TOO_BIG, QUOTA, ERROR, LIMITED, BUDGET = "ok", "off_topic", "too_big", "quota", "error", "limited", "budget"
 SEARCH_TOOL = "web_search"  # the kind of pydantic-ai's WebSearchTool
 OUTPUT_TOOL = "final_result"  # how pydantic-ai names the tool that carries a structured answer: not a lookup the model made
 TOOLS_MAX = 255  # the column's length

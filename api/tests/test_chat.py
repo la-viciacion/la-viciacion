@@ -406,7 +406,7 @@ class EndpointTests(unittest.TestCase):
 
     def ready(self, value=True):
         source = ai_source.Source("group", "openai", "KEY", "gpt-4.1-mini") if value else None
-        patcher = mock.patch.object(chat_router.ai_source, "resolve", return_value=source)
+        patcher = mock.patch.object(chat_router.ai_source, "decide", return_value=ai_source.Decision(source))
         patcher.start()
         self.addCleanup(patcher.stop)
 

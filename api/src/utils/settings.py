@@ -116,6 +116,10 @@ def _key_source(value: str) -> str | None:
     return None if value in ("user_only", "user_or_group", "group_only") else "Debe ser user_only, user_or_group o group_only"
 
 
+def _budget(value: int) -> str | None:
+    return None if 0 <= value <= 10000 else "Los dólares deben estar entre 0 (sin límite) y 10000"
+
+
 def _usage_days(value: int) -> str | None:
     return None if 0 <= value <= 3650 else "Los días deben estar entre 0 (sin límite) y 3650"
 
@@ -218,6 +222,11 @@ REGISTRY: dict[str, Spec] = {
     # What the AI costs (utils/ai_cost.py, utils/ai_ledger.py): how often the token prices are refreshed from the public file
     # of genai-prices (0: never, the snapshot of the installed library is used; read when the API starts) and how long the
     # record of calls is kept (0: for ever)
+    # What the group's key may spend each calendar month, in whole dollars (0: no limit): the whole group, and each player's
+    # share of it (an admin can give one player more or less: user_settings.ai_group_budget_usd). Only what the group pays
+    # counts, never what a player pays with their own key (utils/ai_budget.py)
+    "ai.group_budget_month": Spec("int", 0, check=_budget),
+    "ai.user_budget_month": Spec("int", 0, check=_budget),
     "ai.price_refresh_hours": Spec("int", 24, check=_price_hours),
     "ai.usage_retention_days": Spec("int", 0, check=_usage_days),
     "telegram.token": Spec("str", None, secret=True, env_only=True, env="TELEGRAM_TOKEN", check=_token),

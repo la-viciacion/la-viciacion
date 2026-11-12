@@ -71,9 +71,10 @@ class ChatResponse(BaseModel):
 
 @router.get("/status")
 def get_status(current_user: models.User = Depends(auth.get_current_active_user), db: Session = Depends(get_db)):
-    """Whether the chat can answer this player now (it is on and somebody can pay for it: their own key, or the group's), so
-    the front only shows it when it works"""
-    return {"available": ai_source.resolve(db, current_user.id, "chat") is not None}
+    """Whether the chat is there for this player (it is on and somebody can pay for it: their own key, or the group's), so the
+    front only shows it when it works. One whose budget is spent still sees it: asking tells them why it does not answer."""
+    decision = ai_source.decide(db, current_user.id, "chat")
+    return {"available": decision.source is not None or decision.blocked is not None}
 
 
 @router.post("", response_model=ChatResponse)
@@ -84,7 +85,14 @@ def ask(
 ):
     """Answers a question about video games and the group's data. Read-only: the history comes from the client and
     nothing of the conversation is stored."""
-    source = ai_source.resolve(db, current_user.id, "chat")
+    decision = ai_source.decide(db, current_user.id, "chat")
+    if decision.blocked:
+        ai_ledger.record(
+            db, user_id=current_user.id, feature="chat", key_source=ai_ledger.GROUP, status=ai_ledger.BUDGET,
+            question=body.message, turns=len(body.history),
+        )
+        raise HTTPException(status_code=429, detail=ai_source.blocked_message(decision.blocked, "chat"))
+    source = decision.source
     if source is None:
         raise HTTPException(status_code=503, detail=messages.CHAT_UNAVAILABLE)
     refused = limits.limiter.acquire(limits.scopes_of(current_user.id, source.own))

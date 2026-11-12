@@ -119,7 +119,7 @@ class WhoPaysTests(unittest.TestCase):
     def test_user_only_uses_the_players_key_and_nothing_else(self):
         source, state = self.resolve("guide", "user_only", own=True)
         self.assertEqual((source.key_source, source.api_key, source.model, source.provider), ("user", KEY, "gpt-5-mini", "openai"))
-        self.assertEqual(state, {"available": True, "needs_key": False, "paid_by": "user"})
+        self.assertEqual(state, {"available": True, "needs_key": False, "paid_by": "user", "blocked": None})
         source, state = self.resolve("guide", "user_only")
         self.assertEqual((source, state["needs_key"], state["available"]), (None, True, True))
 
@@ -141,7 +141,7 @@ class WhoPaysTests(unittest.TestCase):
     def test_a_switched_off_feature_has_no_source_whoever_would_pay(self):
         for mode in ai_source.MODES:
             source, state = self.resolve("chat", mode, own=True, enabled=False)
-            self.assertEqual((source, state), (None, {"available": False, "needs_key": False, "paid_by": None}), mode)
+            self.assertEqual((source, state), (None, {"available": False, "needs_key": False, "paid_by": None, "blocked": None}), mode)
 
     def test_the_defaults_are_the_chat_for_the_group_and_the_guide_for_the_player(self):
         self.assertEqual(settings.REGISTRY["chat.key_source"].default, "user_or_group")
