@@ -9,6 +9,7 @@ import { wantedBy } from '../../lib/wishlist.js';
 import { hydratePhotos, playerAvatar } from '../../ui/avatar.js';
 import { scoreBadge } from '../../ui/score-badge.js';
 import { showExtras } from '../../ui/game-extras.js';
+import { showGuide } from '../../ui/game-guide.js';
 import { showSaga } from '../../ui/game-saga.js';
 import { toast } from '../../ui/toast.js';
 import { openRating } from '../home/rating.js';
@@ -114,6 +115,8 @@ function draw(data) {
         ${paceLines(data.pace).map((line, i) => (i === 0 ? html`<strong>${line}</strong>` : html`<span class="pf-sub">${line}</span>`))}
       </div>` : ''}
 
+    <div id="gmGuide"></div>
+
     <div class="gm-lower">
       <div>
         <div class="section-header"><h2 class="section-title">Quién lo juega</h2><div class="section-line"></div></div>
@@ -127,6 +130,7 @@ function draw(data) {
   hydratePhotos(main);
   main.querySelector('#gmMoreTags')?.addEventListener('click', () => mount(main.querySelector('.gm-tags'), html`${tagPills(tags)}`));
   showExtras({ head: main.querySelector('#gmOutside'), desc: main.querySelector('#gmDesc'), meta: main.querySelector('#gmMeta'), platforms: main.querySelector('#gmPlatforms'), media: main.querySelector('#gmMedia') }, game); // Steam and RAWG too
+  showGuide(main.querySelector('#gmGuide'), game); // only if the API says the guide is on
   showSaga(main.querySelector('#gmSaga'), game.id); // the sources may take a while: the page does not wait for them
   main.querySelector('#gmBack').addEventListener('click', back);
   main.querySelector('#gmWish')?.addEventListener('click', () => toggleWish(game.id, data.wished));

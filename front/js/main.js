@@ -61,6 +61,7 @@ function leaveCurrentPage() {
 
 function endSession() {
   import('./ui/chat.js').then((chat) => chat.unmountChat()).catch(() => {});
+  import('./lib/guide.js').then((guide) => guide.forgetConversations()).catch(() => {});
   session.clear();
   knownUser = null;
   stopPresence();
