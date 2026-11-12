@@ -13,6 +13,7 @@ from ...chat import agent as chat_agent
 from ...chat import model as chat_model
 from ...auth import get_db
 from ...clients import igdb
+from ...guide import agent as guide_agent
 from ...config import Config
 from ...database import models
 from ...utils import ai, audit, my_utils, push, settings, sql_dump
@@ -47,6 +48,7 @@ def get_settings(admin: models.User = Depends(auth.require_admin), db: Session =
         "ai_uses": settings.ai_uses(db),
         "ai_model": ai.in_use(),
         "chat": {**chat_model.in_use(), **settings.chat_prompt(db)},
+        "guide": {**chat_model.in_use(), **settings.guide_prompt(db)},
     }
 
 
@@ -134,6 +136,26 @@ def test_chat(admin: models.User = Depends(auth.require_admin)):
         logger.error(f"Chat test by {admin.username} failed: {e}", exc_info=True)
         raise HTTPException(status_code=502, detail=f"El chat no ha respondido: {e}")
     return {"message": "El chat ha respondido", "reply": reply, **chat_model.in_use()}
+
+
+@router.post("/settings/test-guide")
+def test_guide(admin: models.User = Depends(auth.require_admin)):
+    """Ask the guide a question that needs the web search, with the provider, key and model of the chat (blocking network
+    call: a plain def, so it runs in a worker thread). It is how an admin finds out that the model cannot search: the
+    provider's own refusal comes back in the message. Works with the guide switched off."""
+    if not chat_model.configured():
+        raise HTTPException(
+            status_code=409,
+            detail="La guía no está completa: AI_PROVIDER (" + " o ".join(chat_model.BUILDERS) + "), AI_API_KEY y un modelo (CHAT_AI_MODEL, o AI_MODEL si no hay) deben estar en el .env del servidor",
+        )
+    try:
+        reply = guide_agent.probe()
+    except ai.QuotaError as e:
+        raise HTTPException(status_code=429, detail=e.quota.describe())
+    except ai.AIError as e:
+        logger.error(f"Guide test by {admin.username} failed: {e}", exc_info=True)
+        raise HTTPException(status_code=502, detail=f"La guía no ha respondido (¿el modelo admite la búsqueda web?): {e}")
+    return {"message": "La guía ha respondido", "reply": reply, **chat_model.in_use()}
 
 
 @router.post("/settings/test-email")
