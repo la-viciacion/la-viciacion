@@ -289,6 +289,11 @@ function view(values, jobs, pushDevices, mail, aiUses, aiModel, chat, guide = {}
           <label>Actualizar los precios cada (horas, 0 = nunca) <input class="adm-input" type="number" name="ai.price_refresh_hours" min="0" max="720" step="1" required /></label>
           <label>Conservar el registro (días, 0 = siempre) <input class="adm-input" type="number" name="ai.usage_retention_days" min="0" max="3650" step="1" required /></label>
         </div>
+        <div class="adm-sub">Presupuesto mensual de lo que paga la clave del grupo, en dólares enteros (0 = sin límite). Cuando se agota, la IA deja de responder a quien dependa de esa clave hasta el día 1; quien usa su propia clave no se ve afectado. En IA → Uso y coste puedes darle a un jugador un tope distinto.</div>
+        <div class="adm-set-row">
+          <label>Todo el grupo (US$ al mes) <input class="adm-input" type="number" name="ai.group_budget_month" min="0" max="10000" step="1" required /></label>
+          <label>Cada jugador, por defecto (US$ al mes) <input class="adm-input" type="number" name="ai.user_budget_month" min="0" max="10000" step="1" required /></label>
+        </div>
         <div class="adm-sub">La lista incluye también lo que cobra cada proveedor por las búsquedas web de la guía, modelo a modelo. Un cambio en la frecuencia de actualización se aplica al arrancar la API.</div>
       </section>`,
 

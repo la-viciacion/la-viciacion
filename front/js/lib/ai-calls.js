@@ -12,6 +12,7 @@ const STATUSES = {
   quota: 'Sin cupo del proveedor',
   error: 'Con error',
   limited: 'Frenadas por el límite',
+  budget: 'Frenadas por el presupuesto',
 };
 
 export const featureLabel = (id) => FEATURES[id] ?? id;

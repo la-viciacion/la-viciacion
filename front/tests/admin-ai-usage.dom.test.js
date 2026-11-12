@@ -22,7 +22,7 @@ const DATA = {
 };
 
 const panel = () => document.getElementById('panel');
-const asked = (calls) => calls.filter((c) => !c.path.includes('/calls')); // what was asked of OpenAI's side, not of the app's record
+const asked = (calls) => calls.filter((c) => !c.path.includes('/calls') && !c.path.includes('/budgets')); // what was asked of OpenAI's side, not of the app's record
 const rows = (section) => [...section.querySelectorAll('tbody tr')].map((tr) => [...tr.querySelectorAll('td')].map((td) => plain(td.textContent).trim()).filter(Boolean).join('|'));
 
 test('without the admin key it says which variable is missing and asks nothing else', async () => {
@@ -98,7 +98,7 @@ const CALLS = {
   price_updates_running: true,
 };
 const open = async (calls = CALLS) => {
-  const log = installApi({ 'GET /manage/ai-usage/calls': calls, 'GET /manage/ai-usage': { configured: false } }); // the longer path first: a route matches by its start
+  const log = installApi({ 'GET /manage/ai-usage/calls': calls, 'GET /manage/ai-usage/budgets': { month: '2026-11', resets_on: '2026-12-01', group: { cap: 0, spent: 0 }, default_user_cap: 0, players: [] }, 'GET /manage/ai-usage': { configured: false } }); // the longer path first: a route matches by its start
   await render(panel());
   await settle();
   return log;

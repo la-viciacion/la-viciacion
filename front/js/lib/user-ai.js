@@ -1,5 +1,6 @@
 // "Mi IA" (profile, Ajustes): the pure part of the player's own AI key screen: who pays for each feature and how a model reads.
 // The screen is pages/profile/ai.js. Everything comes from GET /users/{username}/ai and /ai/models.
+import { budgetLine } from './ai-budget.js';
 import { money } from './ai-usage.js';
 
 export const TIERS = {
@@ -29,6 +30,25 @@ export function payerText(state) {
   if (state.paid_by === 'user') return 'Se paga con tu clave, de tu cuenta de OpenAI.';
   if (state.mode === 'group_only') return 'Lo paga el grupo, tengas clave o no.';
   return 'Lo paga el grupo mientras no guardes tu propia clave; con ella, lo pagas tú.';
+}
+
+/** What the player paid with their own key and what the group's key covered for them, from the usage's `by_source` (dollars). */
+export function paidBy(data) {
+  const cost = (name) => data.by_source.find((s) => s.name === name)?.cost ?? 0;
+  return { own: cost('user'), group: cost('group') };
+}
+
+/** The budget lines of the group's key, or none when neither has a cap: what is spent of each and when they start again. */
+export function budgetLines(budget) {
+  return [budgetLine('Presupuesto del grupo este mes', budget.group, budget.resets_on), budgetLine('Tu parte', budget.user, budget.resets_on)]
+    .filter((line, i) => (i === 0 ? budget.group.cap : budget.user.cap) > 0 && line);
+}
+
+/** What a feature's state says when the budget stops the group's key from answering this player (else null). */
+export function blockedText(state) {
+  if (state.blocked === 'group') return 'Se ha agotado el presupuesto de IA del grupo este mes.';
+  if (state.blocked === 'user') return 'Has gastado tu parte del presupuesto de IA del grupo este mes.';
+  return null;
 }
 
 /** The key as the player sees it: the last characters, never the key. */
