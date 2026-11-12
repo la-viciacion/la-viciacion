@@ -3,7 +3,7 @@
 // It reuses the chat's bubbles and answer rendering. The conversation is kept in memory only (lib/guide.js), per game.
 import { api, jsonRequest } from '../lib/api.js';
 import { parseAnswer } from '../lib/chat.js';
-import { LEVELS, MAX_QUESTION, conversationOf, guideAvailable, toGuideRequest } from '../lib/guide.js';
+import { LEVELS, MAX_QUESTION, conversationOf, guideStatus, toGuideRequest } from '../lib/guide.js';
 import { html, mount } from '../lib/html.js';
 import { modalHeader, openModal } from './modal.js';
 
@@ -29,6 +29,16 @@ function bubble(turn) {
   return html`<div class="chat-msg chat-bot">${answerMarkup(turn.content)}</div>`;
 }
 
+// The group does not pay for the guide: it is paid with the player's own OpenAI key, which they save in their settings
+const needsKey = (dialog) => html`
+  ${dialog ? '' : html`<div class="section-header"><h2 class="section-title">Guía del juego</h2><div class="section-line"></div></div>`}
+  <div class="${dialog ? 'gd-card' : 'pf-card gd-card'} gd-needs-key">
+    <div class="gd-intro">
+      <span class="pf-sub">La guía se paga con tu propia clave de OpenAI (el grupo no la cubre). Guárdala en tus ajustes y te ayuda a desatascarte en este juego.</span>
+      <a class="pf-btn" href="#/profile/ajustes/ia">Añadir mi clave</a>
+    </div>
+  </div>`;
+
 /** Opens the guide of `game` ({ id, name }) in a dialog, with the conversation of its page. */
 export function openGuide(game) {
   const modal = openModal(html`${modalHeader(`Guía: ${game.name}`)}<div class="gd-modal"></div>`, { wide: true, sheet: true });
@@ -39,7 +49,9 @@ export function openGuide(game) {
 /** Fills `el` with the guide of `game` ({ id, name }). Quiet when the API says the guide is not available.
  * In a dialog (`dialog`) it has no title of its own and starts open. */
 export async function showGuide(el, game, { dialog = false } = {}) {
-  if (!(await guideAvailable()) || !el.isConnected) return;
+  const status = await guideStatus();
+  if (!status.available || !el.isConnected) return;
+  if (status.needs_key) return mount(el, needsKey(dialog));
 
   const chat = conversationOf(game.id);
   let busy = false;
