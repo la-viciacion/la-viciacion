@@ -2,9 +2,11 @@
 // GET/PUT/DELETE /users/{username}/ai, GET /ai/models and POST /ai/test. The key is checked by the API with OpenAI before it is
 // kept, it is stored encrypted and it never comes back: the screen only knows whether there is one and its last characters.
 import { api, jsonRequest } from '../../lib/api.js';
+import { featureLabel, tokens } from '../../lib/ai-calls.js';
+import { money, monthLabel } from '../../lib/ai-usage.js';
 import { forgetGuideStatus } from '../../lib/guide.js';
 import { html, mount } from '../../lib/html.js';
-import { FEATURES, keyText, looksLikeKey, modelLabel, payerText } from '../../lib/user-ai.js';
+import { FEATURES, blockedText, budgetLines, keyText, looksLikeKey, modelLabel, paidBy, payerText } from '../../lib/user-ai.js';
 import { sectionTitle } from '../../ui/profile-summary.js';
 import { flash } from './flash.js';
 
@@ -16,8 +18,16 @@ export async function initAi(el, { username }) {
   if (!state) return;
   let models = null; // the list of the key's models, asked the first time it is needed
   let changing = false; // the key field is open although there is a key (to replace it)
+  let spend = null; // what the player has used of the AI, asked the first time and when the month changes
+  let spendMonth = ''; // '' is all of it
 
-  const say = (message, ok = false) => flash(el.querySelector('[data-msg="key"]'), message, ok);
+  // What each card last said: the screen is drawn again when the models or the spending arrive, and a message must survive it
+  const notes = { key: null, model: null };
+  const tell = (where, message, ok = false) => {
+    notes[where] = message ? { message, ok } : null;
+    flash(el.querySelector(`[data-msg="${where}"]`), message, ok);
+  };
+  const say = (message, ok = false) => tell('key', message, ok);
 
   function keyCard() {
     const { key } = state;
@@ -62,17 +72,57 @@ export async function initAi(el, { username }) {
   }
 
   function payersCard() {
+    const lines = state.budget ? budgetLines(state.budget) : [];
+    const stopped = FEATURES.map(([id]) => blockedText(state[id])).find(Boolean);
     return html`
       ${sectionTitle('Quién paga')}
       <div class="pf-card">
         <ul class="ai-payers">
           ${FEATURES.map(([id, label]) => html`<li><strong>${label}.</strong> ${payerText({ ...state[id] })}</li>`)}
         </ul>
+        ${lines.length ? html`<div class="pf-sub ai-budget">${lines.map((line) => html`<div>${line}</div>`)}</div>` : ''}
+        ${stopped ? html`<div class="pf-msg err">${stopped} ${state.key.has_key ? '' : 'Mientras tanto puedes seguir con tu propia clave de OpenAI.'}</div>` : ''}
+      </div>`;
+  }
+
+  function spendCard() {
+    if (!spend) return '';
+    const { own, group } = paidBy(spend);
+    const months = spend.months.map((m) => m.month).reverse();
+    const tile = (value, label) => html`<div class="pf-stat"><div class="pf-stat-value">${value}</div><div class="pf-stat-label">${label}</div></div>`;
+    const list = (items, label) => items.map((i) => html`<li><span>${label(i.name)}</span> <span class="pf-sub">${i.calls} ${i.calls === 1 ? 'pregunta' : 'preguntas'} · ${i.unpriced === i.calls && i.calls ? 'sin precio' : money(i.cost)}</span></li>`);
+    return html`
+      ${sectionTitle('Tu gasto')}
+      <div class="pf-card" data-spend>
+        <div class="pf-sub">Lo que has usado de la IA con tu cuenta, según el registro de tus preguntas (no se guarda lo que escribes, solo cuántas y cuánto pesaron). El coste es una <strong>estimación</strong> con los precios de cada modelo: lo que de verdad te cobra OpenAI lo ves en tu cuenta de OpenAI.</div>
+        ${months.length ? html`<label>Periodo
+          <select class="adm-input" name="spend-month">
+            <option value="" ${spendMonth === '' ? 'selected' : ''}>Todo</option>
+            ${months.map((m) => html`<option value="${m}" ${m === spendMonth ? 'selected' : ''}>${monthLabel(m)}</option>`)}
+          </select></label>` : ''}
+        ${spend.total.calls
+    ? html`
+          <div class="pf-stats">
+            ${tile(money(own), 'Pagado con tu clave')}
+            ${tile(money(group), 'Cubierto por el grupo')}
+            ${tile(spend.total.calls, 'Preguntas')}
+            ${tile(`${tokens(spend.total.input_tokens)} / ${tokens(spend.total.output_tokens)}`, 'Tokens (entrada / salida)')}
+          </div>
+          <ul class="ai-spend-list" data-by="feature">${list(spend.by_feature, featureLabel)}</ul>
+          <ul class="ai-spend-list" data-by="model">${list(spend.by_model, (name) => name)}</ul>
+          ${spendMonth
+    ? html`<ul class="ai-spend-list" data-by="day">${spend.days.map((d) => html`<li><span>${d.date}</span> <span class="pf-sub">${d.calls} · ${money(d.cost)}</span></li>`)}</ul>`
+    : html`<ul class="ai-spend-list" data-by="month">${spend.months.slice().reverse().map((m) => html`<li><span>${monthLabel(m.month)}</span> <span class="pf-sub">${m.calls} · tu clave ${money(m.user_cost)} · grupo ${money(m.group_cost)}</span></li>`)}</ul>`}`
+    : html`<div class="pf-sub">${spendMonth ? 'No has usado la IA ese mes.' : 'Todavía no has usado la IA.'}</div>`}
       </div>`;
   }
 
   function render() {
-    mount(el, html`${payersCard()}${keyCard()}${modelCard()}`);
+    const draft = el.querySelector('[name="api_key"]')?.value ?? '';
+    mount(el, html`${payersCard()}${keyCard()}${modelCard()}${spendCard()}`);
+    const field = el.querySelector('[name="api_key"]');
+    if (field && draft) field.value = draft; // what was being typed survives a redraw (the models arriving, the spending loading)
+    for (const [where, note] of Object.entries(notes)) if (note) flash(el.querySelector(`[data-msg="${where}"]`), note.message, note.ok);
   }
 
   async function loadModels() {
@@ -82,19 +132,30 @@ export async function initAi(el, { username }) {
     } catch (err) {
       models = { models: [], current: state.key.model };
       render();
-      flash(el.querySelector('[data-msg="model"]'), err.message);
+      tell('model', err.message);
       return;
+    }
+    render();
+  }
+
+  async function loadSpend() {
+    try {
+      spend = await api(`${path}/usage${spendMonth ? `?month=${spendMonth}` : ''}`);
+    } catch {
+      return; // optional: the rest of the screen works without it
     }
     render();
   }
 
   async function refresh() {
     forgetGuideStatus(); // whether the game page offers the guide depends on whose key pays
+    notes.model = null;
     state = await api(path);
     models = null;
     changing = false;
     render();
     loadModels();
+    loadSpend();
   }
 
   async function saveKey(form) {
@@ -113,25 +174,23 @@ export async function initAi(el, { username }) {
   }
 
   async function chooseModel(select) {
-    const msg = el.querySelector('[data-msg="model"]');
     try {
       await api(path, jsonRequest('PUT', { model: select.value }));
       state = await api(path);
-      flash(msg, `Modelo guardado: ${select.value}`, true);
+      tell('model', `Modelo guardado: ${select.value}`, true);
     } catch (err) {
-      flash(msg, err.message);
+      tell('model', err.message);
     }
   }
 
   async function test(button) {
-    const msg = el.querySelector('[data-msg="model"]');
     button.disabled = true;
-    flash(msg, 'Probando… (puede tardar unos segundos)', true);
+    tell('model', 'Probando… (puede tardar unos segundos)', true);
     try {
       const result = await api(`${path}/test`, { method: 'POST' });
-      flash(msg, `Funciona con ${result.model}: ${result.reply}`, true);
+      tell('model', `Funciona con ${result.model}: ${result.reply}`, true);
     } catch (err) {
-      flash(msg, err.message);
+      tell('model', err.message);
     } finally {
       button.disabled = false;
     }
@@ -155,6 +214,10 @@ export async function initAi(el, { username }) {
   });
   el.addEventListener('change', (e) => {
     if (e.target.name === 'model') chooseModel(e.target);
+    else if (e.target.name === 'spend-month') {
+      spendMonth = e.target.value;
+      loadSpend();
+    }
   });
   el.addEventListener('click', (e) => {
     const button = e.target.closest('[data-act]');
@@ -165,4 +228,5 @@ export async function initAi(el, { username }) {
 
   render();
   loadModels();
+  loadSpend();
 }

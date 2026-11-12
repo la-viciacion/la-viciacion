@@ -257,13 +257,13 @@ test('the guide card says why the players do not have it', async () => {
   assert.equal(guideCard().querySelector('[data-set-act="test-guide"]').disabled, true);
 });
 
-test('the AI cost card has the price refresh and the retention of the record', async () => {
-  installApi({ 'GET /manage/settings': { values: { ...VALUES, 'ai.price_refresh_hours': 24, 'ai.usage_retention_days': 0 }, jobs: {}, push_devices: { devices: 0, users: 0 }, mail: { configured: false, missing: [] }, ai_uses: USES, ai_model: { provider: 'google', model: 'gemini-test' }, chat: CHAT } });
+test('the AI cost card has the price refresh, the retention of the record and the monthly budgets', async () => {
+  installApi({ 'GET /manage/settings': { values: { ...VALUES, 'ai.price_refresh_hours': 24, 'ai.usage_retention_days': 0, 'ai.group_budget_month': 20, 'ai.user_budget_month': 5 }, jobs: {}, push_devices: { devices: 0, users: 0 }, mail: { configured: false, missing: [] }, ai_uses: USES, ai_model: { provider: 'google', model: 'gemini-test' }, chat: CHAT } });
   await render(panel(), { entity: { sections: ['aicost'] } });
   await settle();
   const card = panel().querySelector('.adm-aicost-card');
   assert.deepEqual([...card.querySelectorAll('input[type="number"]')].map((i) => [i.name, i.value]), [
-    ['ai.price_refresh_hours', '24'], ['ai.usage_retention_days', '0'],
+    ['ai.price_refresh_hours', '24'], ['ai.usage_retention_days', '0'], ['ai.group_budget_month', '20'], ['ai.user_budget_month', '5'],
   ]);
   assert.match(card.textContent, /sin guardar el texto/);
 });
