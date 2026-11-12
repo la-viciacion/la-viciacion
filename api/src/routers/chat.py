@@ -86,7 +86,7 @@ def ask(
     """Answers a question about video games and the group's data. Read-only: the history comes from the client and
     nothing of the conversation is stored."""
     decision = ai_source.decide(db, current_user.id, "chat")
-    if decision.blocked:
+    if decision.blocked and decision.source is None:  # with the player's own as the source it only says why the group's was not used
         ai_ledger.record(
             db, user_id=current_user.id, feature="chat", key_source=ai_ledger.GROUP, status=ai_ledger.BUDGET,
             question=body.message, turns=len(body.history),
