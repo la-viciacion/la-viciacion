@@ -267,3 +267,24 @@ test('the AI cost card has the price refresh and the retention of the record', a
   ]);
   assert.match(card.textContent, /sin guardar el texto/);
 });
+
+test('the chat and the guide each say whose key pays, and changing it is saved like any other setting', async () => {
+  const values = { ...VALUES, 'chat.key_source': 'user_or_group', 'guide.key_source': 'user_only', 'guide.enabled': true, 'guide.prompt': 'g' };
+  installApi({ 'GET /manage/settings': { values, jobs: {}, push_devices: { devices: 0, users: 0 }, mail: { configured: false, missing: [] }, ai_uses: USES, ai_model: { provider: 'google', model: 'gemini-test' }, chat: CHAT, guide: CHAT } });
+  await render(panel(), { entity: { sections: ['chat', 'guide'] } });
+  await settle();
+  const chat = panel().querySelector('select[name="chat.key_source"]');
+  const guide = panel().querySelector('select[name="guide.key_source"]');
+  assert.deepEqual([...chat.options].map((o) => o.value), ['user_only', 'user_or_group', 'group_only']);
+  assert.equal(chat.value, 'user_or_group');
+  assert.equal(guide.value, 'user_only');
+  let saved = null;
+  installApi({
+    'GET /manage/settings': { values, jobs: {}, push_devices: { devices: 0, users: 0 }, mail: { configured: false, missing: [] }, ai_uses: USES, ai_model: { provider: 'google', model: 'gemini-test' }, chat: CHAT, guide: CHAT },
+    'PUT /manage/settings': ({ body }) => { saved = body; return { changed: Object.keys(body.values), values }; },
+  });
+  guide.value = 'group_only';
+  panel().querySelector('#admSettings').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+  await settle();
+  assert.deepEqual(saved.values, { 'guide.key_source': 'group_only' });
+});
