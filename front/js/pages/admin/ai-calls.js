@@ -79,7 +79,7 @@ function detail(data, month) {
     ${players(data.group_paid_by_user)}
     ${breakdown('feature', 'Por función', data.by_feature, featureLabel)}
     ${breakdown('model', 'Por modelo', data.by_model)}
-    ${breakdown('tools', 'Por tipo de pregunta', data.by_tools, (name) => name, 'Las herramientas que ha llamado cada pregunta: dicen de qué iba sin guardar lo que se preguntó. Una pregunta sin herramientas responde de memoria; «web_search» es la guía buscando en internet.')}
+    ${breakdown('tools', 'Por tipo de pregunta', data.by_tools, (name) => name, 'Las herramientas que ha llamado cada pregunta: dicen de qué iba sin guardar lo que se preguntó. Una pregunta sin herramientas responde de memoria; «web_search» es la guía buscando en internet. De los avisos que escribe la IA sola, aquí sale cuál es (por ejemplo «completed_game»).')}
     <section class="adm-set-card adm-calls-status">
       <h3>Cómo han acabado</h3>
       ${table(['Estado', 'Llamadas'], data.by_status.map((s) => html`<tr><td>${statusLabel(s.name)}</td><td>${s.calls}</td></tr>`))}

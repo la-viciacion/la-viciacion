@@ -13,6 +13,8 @@ test('an unknown feature, source or status is shown as it came', () => {
   assert.equal(sourceLabel('group'), 'Clave del grupo');
   assert.equal(statusLabel('limited'), 'Frenadas por el límite');
   assert.equal(featureLabel('new'), 'new');
+  assert.equal(featureLabel('welcome'), 'Bienvenida del grupo');
+  assert.equal(featureLabel('notice'), 'Avisos con IA');
 });
 
 test('the note on unpriced calls is singular or plural and absent when every call has a price', () => {
