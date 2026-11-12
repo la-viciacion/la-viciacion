@@ -67,6 +67,27 @@ def exceeded(db: Session, user_id: int, now: datetime.datetime | None = None) ->
     return None
 
 
+WARN_AT = 0.8  # the share of the group's budget at which the admins are warned, once a month
+
+
+def alert_level(db: Session, now: datetime.datetime | None = None) -> int | None:
+    """How much of the group's budget this month is spent as a warning level: 100 when it is all spent, 80 from eighty percent,
+    None below that or without a cap (an admin warning is about the group's budget, not a player's)."""
+    cap = group_cap()
+    if not cap:
+        return None
+    spent_now = spent(db, None, now)
+    if spent_now >= cap * MICROS:
+        return 100
+    return int(WARN_AT * 100) if spent_now >= WARN_AT * cap * MICROS else None
+
+
+def top_spenders(db: Session, now: datetime.datetime | None = None, limit: int = 3) -> list[dict]:
+    """The players that have spent most of the group's key this month (only those that spent something)."""
+    ranked = sorted((p for p in players(db, now) if p["spent"] > 0), key=lambda p: -p["spent"])
+    return ranked[:limit]
+
+
 def usage(db: Session, user_id: int, now: datetime.datetime | None = None) -> dict:
     """For the player's screen: what the group's key has spent this month against each cap (dollars; a cap of 0 is no limit)."""
     start = month_start(now)

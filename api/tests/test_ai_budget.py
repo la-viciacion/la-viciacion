@@ -14,7 +14,7 @@ from src.routers import chat as chat_router
 from src.routers import guide as guide_router
 from src.routers import user_ai as user_route
 from src.routers.manage import ai_usage as manage_route
-from src.utils import ai_budget, ai_ledger, ai_source, messages, settings, user_ai
+from src.utils import actions, ai_budget, ai_ledger, ai_source, messages, scheduler, settings, user_ai
 from tests.sqlite_db import make_session
 from tests.test_chat import seed
 
@@ -308,6 +308,110 @@ class AdminRoutesTests(Base):
 
     def test_the_ledger_knows_the_budget_status(self):
         self.assertEqual(ai_ledger.BUDGET, "budget")
+
+
+class AlertLevelTests(Base):
+    def test_it_warns_from_eighty_percent_and_again_when_all_is_spent(self):
+        with patched(**{"ai.group_budget_month": 10}):
+            self.assertIsNone(ai_budget.alert_level(self.db, NOW))
+            self.spend(1, 7.9)
+            self.assertIsNone(ai_budget.alert_level(self.db, NOW))
+            self.spend(2, 0.1)
+            self.assertEqual(ai_budget.alert_level(self.db, NOW), 80)
+            self.spend(1, 2.0)
+            self.assertEqual(ai_budget.alert_level(self.db, NOW), 100)
+
+    def test_without_a_group_budget_there_is_nothing_to_warn_about(self):
+        self.spend(1, 1000.0)
+        with patched():
+            self.assertIsNone(ai_budget.alert_level(self.db, NOW))
+
+    def test_what_a_player_paid_with_their_own_key_does_not_bring_the_warning(self):
+        self.spend(1, 1000.0, source="user")
+        with patched(**{"ai.group_budget_month": 10}):
+            self.assertIsNone(ai_budget.alert_level(self.db, NOW))
+
+    def test_the_top_spenders_are_the_costliest_first_and_only_those_who_spent(self):
+        self.spend(1, 1.0)
+        self.spend(2, 3.0)
+        with patched():
+            self.assertEqual([(p["name"], p["spent"]) for p in ai_budget.top_spenders(self.db, NOW)], [("Beto", 3.0), ("Ana", 1.0)])
+            self.assertEqual(len(ai_budget.top_spenders(self.db, NOW, limit=1)), 1)
+
+
+class AdminMessageTests(Base):
+    def send(self, level, **settings_):
+        sent = []
+
+        async def fake(db, text):
+            sent.append(text)
+
+        import asyncio
+
+        with patched(**{"ai.group_budget_month": 10, **settings_}), mock.patch.object(actions.utils, "send_message_to_admins", fake):
+            result = asyncio.run(actions.announce_ai_budget(self.db, level, NOW))
+        return result, sent[0]
+
+    def test_the_warning_says_how_much_is_spent_of_what_who_spent_most_and_when_it_starts_again(self):
+        self.spend(1, 6.0)
+        self.spend(2, 2.5)
+        result, text = self.send(80)
+        self.assertEqual(result, "warned at 80 %")
+        self.assertIn("8,50 US$ de 10,00 US$", text)
+        self.assertIn("85 %", text)
+        self.assertIn("Ana 6,00 US$, Beto 2,50 US$", text)
+        self.assertIn("01/12", text)
+        self.assertIn("IA → Uso y coste", text)
+
+    def test_when_it_is_all_spent_it_says_what_stops_and_who_goes_on(self):
+        self.spend(1, 11.0)
+        result, text = self.send(100)
+        self.assertEqual(result, "warned at 100 %")
+        self.assertIn("todo el presupuesto", text)
+        self.assertIn("propia clave", text)
+
+    def test_a_name_with_markdown_characters_does_not_break_the_message(self):
+        self.db.get(models.User, 1).name = "An_a*"
+        self.db.commit()
+        self.spend(1, 9.0)
+        self.assertIn("An\\_a\\*", self.send(80)[1])
+
+
+class SchedulerAlertTests(Base):
+    def run_job(self, now, **settings_):
+        ran = []
+        with patched(**{"ai.group_budget_month": 10, "notifications.admin_alerts": True, "telegram.token": "T", **settings_}), \
+                mock.patch.object(scheduler, "_run", side_effect=lambda db, job, factory: ran.append(job)):
+            level = scheduler.ai_budget_alert(self.db, now)
+        return level, ran
+
+    def test_it_warns_once_per_level_and_month_and_again_the_next_month(self):
+        self.spend(1, 8.5)
+        at = datetime.datetime(2026, 11, 15, 12, 5)
+        self.assertEqual(self.run_job(at), (80, ["ai_budget_80"]))
+        self.assertEqual(self.run_job(at + datetime.timedelta(hours=1)), (None, []))
+        self.spend(1, 2.0)
+        self.assertEqual(self.run_job(at + datetime.timedelta(hours=2)), (100, ["ai_budget_100"]))
+        self.assertEqual(self.run_job(at + datetime.timedelta(hours=3)), (None, []))
+        self.spend(1, 20.0, when=datetime.datetime(2026, 12, 2, 9))
+        self.assertEqual(self.run_job(datetime.datetime(2026, 12, 2, 12, 5)), (100, ["ai_budget_100"]))
+
+    def test_it_looks_only_in_the_first_ten_minutes_of_the_hour(self):
+        self.spend(1, 9.5)
+        self.assertEqual(self.run_job(datetime.datetime(2026, 11, 15, 12, 30)), (None, []))
+
+    def test_it_stays_quiet_without_a_budget_without_alerts_or_without_the_bot(self):
+        self.spend(1, 50.0)
+        at = datetime.datetime(2026, 11, 15, 12, 5)
+        for off in ({"ai.group_budget_month": 0}, {"notifications.admin_alerts": False}, {"telegram.token": None}):
+            self.assertEqual(self.run_job(at, **off), (None, []), off)
+        self.assertEqual(self.run_job(at)[1], ["ai_budget_100"], "and warns once they are on")
+
+    def test_it_does_not_use_up_the_warning_of_a_month_when_the_admins_have_alerts_off(self):
+        self.spend(1, 50.0)
+        at = datetime.datetime(2026, 11, 15, 12, 5)
+        self.run_job(at, **{"notifications.admin_alerts": False})
+        self.assertEqual(self.run_job(at + datetime.timedelta(hours=1))[1], ["ai_budget_100"])
 
 
 if __name__ == "__main__":

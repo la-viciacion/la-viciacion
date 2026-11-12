@@ -65,6 +65,21 @@ def to_micros(dollars) -> int:
     return int((Decimal(str(dollars)) * MICROS).to_integral_value())
 
 
+def completion_cost_micros(provider: str | None, model: str | None, used) -> int | None:
+    """The cost, in millionths of a dollar, of one completion of a notice from the tokens it used (the client left them in
+    clients/used.py), or None if the price of its model is not known."""
+    try:
+        from genai_prices import Usage, calc_price
+
+        found = calc_price(
+            Usage(input_tokens=used.input_tokens, cache_read_tokens=used.cached_tokens, output_tokens=used.output_tokens),
+            model, provider_id=provider,
+        )
+        return to_micros(found.total_price)
+    except Exception:
+        return None
+
+
 def tokens_cost_micros(responses) -> int | None:
     """The cost, in millionths of a dollar, of the model responses of one call (their tokens and their web searches), or None
     if the price of a model is not known, or a response made searches that its model has no price for: a partial figure

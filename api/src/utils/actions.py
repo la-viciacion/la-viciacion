@@ -561,6 +561,28 @@ def wishlist_week_message(releases: list[tuple[str, datetime.date, list[str], st
     return _wishlist_header("Esta semana", len(lines)) + "\n\n" + "\n".join(lines)
 
 
+async def announce_ai_budget(db: Session, level: int, now: datetime.datetime | None = None) -> str:
+    """Tells the admins, in private, that the group's AI budget of the month is nearly (80) or all (100) spent, and who has spent
+    most of it. The text names no one else's key: only what the group's key paid."""
+    from . import ai_budget
+
+    cap, spent = ai_budget.group_cap(), ai_budget.spent(db, None, now) / ai_budget.MICROS
+    money = lambda value: f"{value:.2f}".replace(".", ",") + " US$"  # noqa: E731
+    top = ", ".join(f"{utils.escape_markdown(p['name'])} {money(p['spent'])}" for p in ai_budget.top_spenders(db, now))
+    resets = ai_budget.next_month(now).date().strftime("%d/%m")
+    if level >= 100:
+        text = (
+            f"🛑 *IA*: la clave del grupo ha gastado todo el presupuesto de este mes ({money(cap)}). Lo que depende de ella "
+            f"no responde hasta el {resets}; quien tiene su propia clave sigue."
+        )
+    else:
+        text = f"⚠️ *IA*: la clave del grupo lleva {money(spent)} de {money(cap)} este mes ({round(100 * spent / cap)} %). Se renueva el {resets}."
+    if top:
+        text += f"\nQuien más ha gastado: {top}."
+    await utils.send_message_to_admins(db, text + "\nPuedes cambiar los topes en IA → Uso y coste.")
+    return f"warned at {level} %"
+
+
 async def announce_wishlist_week(db: Session, today: datetime.date) -> str:
     """Once a week, tell the group which wished games come out in the next 7 days, from tomorrow (one message for all
     of them). The AI may rewrite it (`wishlist_week`). Nothing is remembered: a game comes out on one day only."""

@@ -12,6 +12,18 @@ from src.routers.manage import system
 from src.utils import ai, ai_prompts, my_utils, settings
 from tests.sqlite_db import make_session
 
+
+# `ai.complete` writes the record of a notice in a session of its own, which these tests have no database for
+_no_record = mock.patch.object(ai.ai_ledger, "record_notice")
+
+
+def setUpModule():
+    _no_record.start()
+
+
+def tearDownModule():
+    _no_record.stop()
+
 KEY = "AIzaSyFAKE-key-for-tests-0123456789"
 OTHER_KEY = "AIzaSyNEWKEY-0123456789-abcdef"
 

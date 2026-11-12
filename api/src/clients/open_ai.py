@@ -2,6 +2,7 @@ from functools import lru_cache
 
 from openai import OpenAI
 
+from . import used
 from .ai_error import AIError
 
 TIMEOUT_SECONDS = 30  # the library default is 10 minutes: far too long for a chat notice
@@ -18,10 +19,22 @@ def generate(api_key: str, model: str, system_prompt: str, user_prompt: str, tem
         temperature=temperature,
         messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
     )
+    _report(completion)
     text = (completion.choices[0].message.content or "").strip() if completion.choices else ""
     if not text:
         raise AIError("OpenAI ha respondido sin texto")
     return text
+
+
+def _report(completion) -> None:
+    """Leaves the tokens of a completion for whoever called (clients/used.py); a response without them leaves none."""
+    usage = getattr(completion, "usage", None)
+    if usage is None:
+        return
+    prompt, output = getattr(usage, "prompt_tokens", 0) or 0, getattr(usage, "completion_tokens", 0) or 0
+    cached = getattr(getattr(usage, "prompt_tokens_details", None), "cached_tokens", 0) or 0
+    reasoning = getattr(getattr(usage, "completion_tokens_details", None), "reasoning_tokens", 0) or 0
+    used.report(used.Used(input_tokens=prompt, cached_tokens=cached, output_tokens=output, reasoning_tokens=reasoning))
 
 
 def list_models(api_key: str) -> list[str]:
