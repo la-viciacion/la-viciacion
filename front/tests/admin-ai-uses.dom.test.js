@@ -332,6 +332,7 @@ test('everything that limits the AI is in one page: who takes the cost, the ques
   const card = panel().querySelector('.adm-aibudget-card');
   assert.deepEqual([...card.querySelectorAll('input[type="number"]')].map((i) => [i.name, i.value]), [['ai.group_budget_month', '20'], ['ai.user_budget_month', '5']]);
   assert.match(card.textContent, /límite de dinero, distinto de los límites de preguntas/);
+  assert.match(card.textContent, /80 % y al 100 % del total del grupo/, 'it says the admins are warned');
   assert.equal(panel().querySelector('tr[data-user="1"] [name="cap"]').value, '');
 });
 
