@@ -45,8 +45,8 @@ GOOGLE_AI_MODEL=gemini-3.5-flash-lite
 
 El código no trae ningún modelo por defecto, y las claves y los modelos por defecto no se pueden cambiar desde el panel (solo se muestran). Lo que sí se elige desde **IA → Avisos con IA**:
 
-- El **proveedor**, entre los que tienen clave: con los dos, un selector; con uno, es ese; con ninguno, la página dice qué variable falta. Se aplica al guardar, sin reiniciar.
-- El **modelo** de los avisos: el del `.env` por defecto, o uno de la lista que **consulta en ese momento el propio proveedor**, para cambiarlo sin redesplegar. La elección es por proveedor.
+- El **proveedor** de los avisos, entre los que tienen clave: con los dos, un selector; con uno, es ese; con ninguno, la página dice qué variable falta. Se aplica al guardar, sin reiniciar. El chat y la guía tienen su propio selector (en **IA → Chat y guía**), que por defecto es «Igual que los avisos» y «Igual que el chat».
+- El **modelo** de cada uso: el del `.env` por defecto, o uno de la lista que **consulta en ese momento el propio proveedor** (la lista cambia al cambiar de proveedor), para cambiarlo sin redesplegar. La elección es por proveedor y por uso.
 - El **interruptor** de la IA.
 - Los **avisos que la usan**, cada uno con su propio interruptor y sus **instrucciones** (prompt) editables. **Restaurar las originales** vuelve a seguir las del código.
 - **Probar la IA**, que le pide una frase a la configuración activa y te enseña la respuesta o por qué falló.

@@ -51,7 +51,7 @@ def get_settings(admin: models.User = Depends(auth.require_admin), db: Session =
         "ai_model": ai.in_use(),
         "ai_providers": ai_providers.status(),
         "chat": {**chat_model.in_use(), **settings.chat_prompt(db)},
-        "guide": {**chat_model.in_use(), **settings.guide_prompt(db)},
+        "guide": {**ai_providers.in_use(ai_providers.GUIDE), **settings.guide_prompt(db)},
     }
 
 
@@ -165,7 +165,7 @@ def test_guide(admin: models.User = Depends(auth.require_admin)):
     """Ask the guide a question that needs the web search, with the provider, key and model of the chat (blocking network
     call: a plain def, so it runs in a worker thread). It is how an admin finds out that the model cannot search: the
     provider's own refusal comes back in the message. Works with the guide switched off."""
-    if not chat_model.configured():
+    if not guide_agent.configured():
         raise HTTPException(
             status_code=409,
             detail="La guía no está completa: hace falta la clave de un proveedor (" + " o ".join(f"{p.upper()}_AI_API_KEY" for p in ai.PROVIDERS) + ") y un modelo (<PROVEEDOR>_AI_MODEL en el .env, o uno elegido en el panel)",
@@ -177,7 +177,7 @@ def test_guide(admin: models.User = Depends(auth.require_admin)):
     except ai.AIError as e:
         logger.error(f"Guide test by {admin.username} failed: {e}", exc_info=True)
         raise HTTPException(status_code=502, detail=f"La guía no ha respondido (¿el modelo admite la búsqueda web?): {e}")
-    return {"message": "La guía ha respondido", "reply": reply, **chat_model.in_use()}
+    return {"message": "La guía ha respondido", "reply": reply, **ai_providers.in_use(ai_providers.GUIDE)}
 
 
 @router.post("/settings/test-email")

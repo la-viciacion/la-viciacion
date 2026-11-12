@@ -36,8 +36,7 @@ def is_ready() -> bool:
 
 def in_use() -> dict:
     """For the panel: the provider and the model (None if missing) the chat will use, and whether the model is its own."""
-    provider = ai_providers.selected()
-    return {"provider": provider, "model": model_name(), "own_model": bool(provider) and ai_providers.own_model(ai_providers.CHAT, provider)}
+    return ai_providers.in_use(ai_providers.CHAT)
 
 
 def build_model(source=None) -> Model:

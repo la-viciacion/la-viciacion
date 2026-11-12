@@ -116,6 +116,45 @@ class ProviderChoiceTests(unittest.TestCase):
             self.assertEqual(ai_providers.model(ai_providers.CHAT), "gpt-chat-picked")
 
 
+class PerUseProviderTests(unittest.TestCase):
+    def table(self, **overrides):
+        base = {**ai_env.group(None), "ai.openai.api_key": "O", "ai.google.api_key": "G", "ai.openai.model": "gpt-d", "ai.google.model": "gem-d"}
+        return mock.patch.object(ai_providers.settings, "get", side_effect=lambda k: {**base, **overrides}[k])
+
+    def test_the_chat_follows_the_notices_and_the_guide_follows_the_chat_until_one_is_picked(self):
+        with self.table(**{"ai.provider": "google"}):
+            self.assertEqual([ai_providers.selected(u) for u in ai_providers.USES], ["google"] * 3)
+        with self.table(**{"ai.provider": "google", "chat.provider": "openai"}):
+            self.assertEqual([ai_providers.selected(u) for u in ai_providers.USES], ["google", "openai", "openai"])
+        with self.table(**{"ai.provider": "google", "chat.provider": "openai", "guide.provider": "google"}):
+            self.assertEqual([ai_providers.selected(u) for u in ai_providers.USES], ["google", "openai", "google"])
+
+    def test_each_use_picks_its_own_model_and_falls_back_to_what_it_follows(self):
+        with self.table(**{"chat.model.openai": "gpt-chat"}):
+            self.assertEqual(ai_providers.model(ai_providers.GUIDE), "gpt-chat")  # the guide follows the chat's model
+            self.assertEqual(ai_providers.model(ai_providers.NOTICES), "gpt-d")
+        with self.table(**{"chat.model.openai": "gpt-chat", "guide.model.openai": "gpt-search"}):
+            self.assertEqual(ai_providers.model(ai_providers.GUIDE), "gpt-search")
+            self.assertEqual(ai_providers.model(ai_providers.CHAT), "gpt-chat")
+
+    def test_a_pick_without_a_key_is_ignored_per_use(self):
+        with self.table(**{"guide.provider": "google", "ai.google.api_key": None}):
+            self.assertEqual(ai_providers.selected(ai_providers.GUIDE), "openai")
+
+    def test_the_credentials_of_a_use_are_those_of_its_provider(self):
+        with self.table(**{"chat.provider": "google", "guide.model.openai": "gpt-search"}):
+            self.assertEqual(ai_providers.group_credentials(ai_providers.CHAT), ("google", "G", "gem-d"))
+            self.assertEqual(ai_providers.group_credentials(ai_providers.GUIDE), ("google", "G", "gem-d"))
+            self.assertEqual(ai_providers.group_credentials(ai_providers.NOTICES), ("openai", "O", "gpt-d"))
+
+    def test_the_panel_is_told_what_each_use_runs_on(self):
+        with self.table(**{"chat.provider": "google"}):
+            uses = ai_providers.status()["uses"]
+        self.assertEqual(uses["notices"]["provider"], "openai")
+        self.assertEqual((uses["chat"]["provider"], uses["chat"]["picked"]), ("google", "google"))
+        self.assertEqual((uses["guide"]["provider"], uses["guide"]["picked"]), ("google", None))
+
+
 class CompleteTests(unittest.TestCase):
     def test_off_or_without_a_key_it_answers_nothing_and_calls_nobody(self):
         provider = mock.Mock()

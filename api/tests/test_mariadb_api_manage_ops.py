@@ -250,7 +250,7 @@ class SettingsTests(OpsTestCase):
         self.assertEqual(body["mail"]["test_recipient"], "root@example.com")
         self.assertTrue(body["ai_uses"])
         self.assertEqual(set(body["ai_model"]), {"provider", "model"})  # the default model is the environment's: no default in the code
-        self.assertEqual(set(body["ai_providers"]), {"providers", "provider", "picked", "notices_model", "chat_model", "notices_own", "chat_own"})
+        self.assertEqual(set(body["ai_providers"]), {"providers", "uses"})
         self.assertEqual(body["values"]["ai.openai.api_key"], {"is_set": bool(body["ai_providers"]["providers"][0]["has_key"]), "hint": None})
         self.assertIsNone(body["values"]["ai.provider"])  # what the admin picks is stored: nothing is picked yet
 

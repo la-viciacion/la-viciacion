@@ -203,8 +203,8 @@ REGISTRY: dict[str, Spec] = {
     # AI text for the notices (utils/ai.py). Each provider has its own keys in the environment (`ai.<provider>.api_key`,
     # `.model`, `.chat_model`: OPENAI_AI_API_KEY, OPENAI_AI_MODEL, OPENAI_CHAT_AI_MODEL, GOOGLE_...), declared in the loop
     # below and never stored. What the admin picks in the panel is stored: the provider (`ai.provider`) and, per provider, a
-    # model for the notices (`ai.model.<provider>`) and one for the chat and the guide (`chat.model.<provider>`); without a
-    # pick, the environment's model applies (utils/ai_providers.py).
+    # model for each use (`ai.model.<provider>`, `chat.model.<provider>`, `guide.model.<provider>`, and `chat.provider` /
+    # `guide.provider`); without a pick, the environment's model applies (utils/ai_providers.py).
     "ai.enabled": Spec("bool", True),
     "ai.provider": Spec("str", None, check=_ai_provider, resettable=True),
     # Admin key of OpenAI, only to read what the organization has spent (utils/ai_usage.py); it cannot write text
@@ -254,6 +254,11 @@ for _p in AI_PROVIDERS:
     REGISTRY[f"ai.{_p}.chat_model"] = Spec("str", None, env_only=True, env=f"{_p.upper()}_CHAT_AI_MODEL")
     REGISTRY[f"ai.model.{_p}"] = Spec("str", None, check=_model_name, resettable=True)
     REGISTRY[f"chat.model.{_p}"] = Spec("str", None, check=_model_name, resettable=True)
+    REGISTRY[f"guide.model.{_p}"] = Spec("str", None, check=_model_name, resettable=True)
+# The chat and the guide may run on another provider than the notices (and than each other); unset, the chat follows the notices
+# and the guide follows the chat
+REGISTRY["chat.provider"] = Spec("str", None, check=_ai_provider, resettable=True)
+REGISTRY["guide.provider"] = Spec("str", None, check=_ai_provider, resettable=True)
 
 # One prompt (default: the one in the code) and one switch per place the AI writes (utils/ai_prompts.py).
 for _id, _use in AI_USES.items():

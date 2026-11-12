@@ -569,8 +569,8 @@ class SettingsTests(unittest.TestCase):
         with mock.patch.dict(os.environ, {**env, "OPENAI_CHAT_AI_MODEL": ""}), mock.patch.object(settings, "get", side_effect=not_stored):
             self.assertEqual(chat_model.in_use(), {"provider": "openai", "model": "gpt-cheap", "own_model": False})
 
-    def test_there_are_no_provider_or_key_settings_of_its_own(self):
-        self.assertNotIn("chat.provider", settings.REGISTRY)
+    def test_the_chat_has_a_provider_pick_of_its_own_but_no_key_of_its_own(self):
+        self.assertIn("chat.provider", settings.REGISTRY)  # stored: it follows the notices' provider until one is picked
         self.assertNotIn("chat.api_key", settings.REGISTRY)
 
     def test_the_prompt_follows_the_code_until_the_admin_changes_it(self):
