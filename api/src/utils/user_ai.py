@@ -91,6 +91,12 @@ def status(db: Session, user_id: int) -> dict:
     }
 
 
+def model_of(db: Session, user_id: int) -> str | None:
+    """The model the player chose, even if the key it was chosen for cannot be opened any more: replacing the key keeps it."""
+    row = _row(db, user_id)
+    return row.ai_model if row else None
+
+
 def credentials(db: Session, user_id: int) -> tuple[str, str] | None:
     """(key, model) of the player's own, or None if they have none (or it cannot be opened)."""
     row = _row(db, user_id)

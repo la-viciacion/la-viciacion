@@ -56,6 +56,19 @@ def spent(db: Session, user_id: int | None = None, now: datetime.datetime | None
     return int(query.scalar() or 0)
 
 
+def unpriced(db: Session, now: datetime.datetime | None = None) -> dict:
+    """The calls of this month that the group's key paid and that spent tokens but have no cost, because the price list has no price
+    for their model: they count as nothing in any budget, so the caps cannot limit them. `calls` and the `models` they used."""
+    unknown = (
+        models.AiUsage.key_source == ai_ledger.GROUP, models.AiUsage.created_at >= month_start(now),
+        models.AiUsage.cost_micros.is_(None), models.AiUsage.input_tokens + models.AiUsage.output_tokens > 0,
+    )
+    found = db.query(models.AiUsage.provider, models.AiUsage.model, func.count(models.AiUsage.id)).filter(*unknown).group_by(
+        models.AiUsage.provider, models.AiUsage.model
+    ).all()
+    return {"calls": sum(int(n) for _, _, n in found), "models": sorted(f"{p or '?'}/{m or '?'}" for p, m, _ in found)}
+
+
 def exceeded(db: Session, user_id: int, now: datetime.datetime | None = None) -> str | None:
     """`GROUP` if the group has spent its budget of the month, `USER` if this player has spent theirs, else None."""
     cap = group_cap()

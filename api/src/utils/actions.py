@@ -583,6 +583,22 @@ async def announce_ai_budget(db: Session, level: int, now: datetime.datetime | N
     return f"warned at {level} %"
 
 
+async def announce_ai_unpriced(db: Session, now: datetime.datetime | None = None) -> str:
+    """Tells the admins, in private, that a monthly AI budget is set but the group's key made calls of a model whose price the list
+    does not have: they count as nothing, so the budget cannot limit them."""
+    from . import ai_budget
+
+    found = ai_budget.unpriced(db, now)
+    models_used = ", ".join(utils.escape_markdown(m) for m in found["models"])
+    await utils.send_message_to_admins(
+        db,
+        f"⚠️ *IA*: hay un presupuesto mensual, pero {found['calls']} llamadas de este mes de la clave del grupo ({models_used}) no tienen precio "
+        "conocido: no cuentan en el presupuesto y no se pueden limitar. Se arregla con la siguiente actualización de la lista de precios "
+        "o cambiando de modelo.",
+    )
+    return f"warned about {found['calls']} unpriced calls"
+
+
 async def announce_wishlist_week(db: Session, today: datetime.date) -> str:
     """Once a week, tell the group which wished games come out in the next 7 days, from tomorrow (one message for all
     of them). The AI may rewrite it (`wishlist_week`). Nothing is remembered: a game comes out on one day only."""

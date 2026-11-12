@@ -50,9 +50,13 @@ def ask(
     db: Session = Depends(get_db),
 ):
     """Answers a question about one game, searching the web. The history comes from the client; nothing is stored."""
-    state = ai_source.availability(db, current_user.id, "guide")
+    decision = ai_source.decide(db, current_user.id, "guide")  # once: it decrypts the key and sums the month's spending
+    state = ai_source.state_of("guide", decision)
     if not state["available"]:
         raise HTTPException(status_code=503, detail=messages.GUIDE_UNAVAILABLE)
+    data = game_overview.overview(db, game_id, current_user.id)
+    if data is None:  # before anything is recorded: a row about a game that does not exist would break its foreign key
+        raise HTTPException(status_code=404, detail="Game not exists")
     if state["blocked"]:
         ai_ledger.record(
             db, user_id=current_user.id, feature="guide", key_source=ai_ledger.GROUP, status=ai_ledger.BUDGET,
@@ -61,10 +65,7 @@ def ask(
         raise HTTPException(status_code=429, detail=ai_source.blocked_message(state["blocked"], "guide"))
     if state["needs_key"]:
         raise HTTPException(status_code=403, detail=messages.USER_KEY_REQUIRED)
-    source = ai_source.resolve(db, current_user.id, "guide")
-    data = game_overview.overview(db, game_id, current_user.id)
-    if data is None:
-        raise HTTPException(status_code=404, detail="Game not exists")
+    source = decision.source
     refused = limits.limiter.acquire(limits.scopes_of(current_user.id, source.own))
     if refused:
         ai_ledger.record(

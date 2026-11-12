@@ -67,7 +67,17 @@ def tools_called(messages) -> tuple[list[str], int]:
 
 def measure(result, provider: str | None, model: str | None, started: float, now: float) -> Spent:
     """What a finished run used. `started` and `now` are monotonic seconds. The cost is the tokens' at the prices of the
-    moment (the web searches included), or None when the price of the model is not known."""
+    moment (the web searches included), or None when the price of the model is not known. It never raises: if the result
+    cannot be read (a library that changed its shape) the call is still recorded, with no tokens, and the failure is logged,
+    because the player's answer is already paid for and must not be lost to its own bookkeeping."""
+    try:
+        return _measure(result, provider, model, started, now)
+    except Exception as e:
+        logger.error(f"Error measuring the usage of an AI call: {type(e).__name__}: {e}", exc_info=True)
+        return Spent(provider=provider, model=model, latency_ms=int((now - started) * 1000))
+
+
+def _measure(result, provider: str | None, model: str | None, started: float, now: float) -> Spent:
     usage = result.usage
     names, searches = tools_called(result.new_messages())
     cost = ai_cost.tokens_cost_micros(r for r in result.new_messages() if r.kind == "response")

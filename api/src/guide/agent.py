@@ -137,7 +137,7 @@ def ask(deps: GuideDeps, question: str, history: list[tuple[str, str]], model=No
         record(ai_ledger.TOO_BIG)
         return messages.CHAT_TOO_COMPLEX
     except Exception as e:
-        error = chat_agent.failure(e, "guide", source.api_key if source is not None else None)
+        error = chat_agent.failure(e, "guide", chat_agent.own_key(source))
         record(ai_ledger.QUOTA if isinstance(error, QuotaError) else ai_ledger.ERROR)
         raise error from None
     used = result.usage
@@ -160,5 +160,5 @@ def probe(model=None, source=None) -> str:
             deps=deps, model=model or build_model(source), usage_limits=LIMITS,
         )
     except Exception as e:
-        raise chat_agent.failure(e, "guide_test", source.api_key if source is not None else None) from None
+        raise chat_agent.failure(e, "guide_test", chat_agent.own_key(source)) from None
     return result.output.strip()
