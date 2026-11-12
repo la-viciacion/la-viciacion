@@ -48,10 +48,12 @@ const sent = (calls, method) => calls.filter((c) => c.method === method).map((c)
 
 beforeEach(() => el().replaceWith(el().cloneNode(false)));
 
-test('without a key it explains who pays, offers the key box and loads no models', async () => {
+test('without a key it says, quietly, where the cost goes, offers the key box and loads no models', async () => {
   const calls = await open({ 'GET /users/ana/ai': stateOf(NONE) });
-  assert.match(el().textContent, /Lo paga el grupo mientras no guardes tu propia clave/);
-  assert.match(el().textContent, /Se paga con tu propia clave: guárdala/);
+  const note = el().querySelector('.ai-cost-note').textContent;
+  assert.match(note, /El coste del chat lo cubre el grupo/);
+  assert.match(note, /La guía de cada juego busca en internet y cuesta más: funciona con tu propia clave/);
+  assert.equal([...el().querySelectorAll('h2')].some((h) => /Quién paga/.test(h.textContent)), false, 'no section of its own');
   assert.equal(el().querySelector('input[type="password"]').name, 'api_key');
   assert.equal(el().querySelector('select[name="model"]'), null);
   assert.equal(calls.some((c) => c.path.endsWith('/models')), false);
@@ -74,7 +76,7 @@ test('a key is saved, then only its last characters and its model show, and the 
   await submitKey(` ${KEY} `);
   assert.deepEqual(sent(calls, 'PUT'), [{ api_key: KEY }]);
   assert.match(el().textContent, /Clave guardada, termina en …6789/);
-  assert.match(el().textContent, /Se paga con tu clave, de tu cuenta de OpenAI/);
+  assert.match(el().querySelector('.ai-cost-note').textContent, /Con tu clave, el coste de lo que preguntes va a tu cuenta de OpenAI/);
   assert.equal(el().textContent.includes(KEY), false, 'the key is never drawn');
   assert.equal(el().querySelector('input[type="password"]'), null, 'the box goes away once it is saved');
   const options = [...el().querySelectorAll('select[name="model"] option')];
@@ -177,8 +179,8 @@ test('the player sees what they paid with their own key against what the group c
   await open({ 'GET /users/ana/ai/usage': USAGE, 'GET /users/ana/ai': stateOf(NONE) });
   const spend = el().querySelector('[data-spend]');
   const tiles = [...spend.querySelectorAll('.pf-stat')].map((t) => t.textContent.replace(/\s+/g, ' ').trim());
-  assert.match(tiles[0], /0,25.*Pagado con tu clave/);
-  assert.match(tiles[1], /0,50.*Cubierto por el grupo/);
+  assert.match(tiles[0], /0,25.*Coste con tu clave/);
+  assert.match(tiles[1], /0,50.*Coste cubierto por el grupo/);
   assert.match(tiles[2], /5\s*Preguntas/);
   assert.match(tiles[3], /2,5 M \/ 3\.?000/);
   assert.match(spend.querySelector('[data-by="feature"]').textContent, /Guía de juego[\s\S]*Chat/);

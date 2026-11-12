@@ -6,7 +6,7 @@ import { featureLabel, tokens } from '../../lib/ai-calls.js';
 import { money, monthLabel } from '../../lib/ai-usage.js';
 import { forgetGuideStatus } from '../../lib/guide.js';
 import { html, mount } from '../../lib/html.js';
-import { FEATURES, blockedText, budgetLines, keyText, looksLikeKey, modelLabel, paidBy, payerText } from '../../lib/user-ai.js';
+import { FEATURES, blockedText, budgetLines, costNote, keyText, looksLikeKey, modelLabel, paidBy } from '../../lib/user-ai.js';
 import { sectionTitle } from '../../ui/profile-summary.js';
 import { flash } from './flash.js';
 
@@ -35,7 +35,7 @@ export async function initAi(el, { username }) {
     return html`
       ${sectionTitle('Tu clave de OpenAI')}
       <div class="pf-card pf-form">
-        <div class="pf-sub">Con tu propia clave, lo que preguntes al chat y a la guía se paga de tu cuenta de OpenAI y no del cupo del grupo. Se guarda cifrada y <strong>nadie puede verla</strong> desde la app, ni siquiera un administrador; solo puedes quitarla o cambiarla tú.</div>
+        <div class="pf-sub">Con tu propia clave, el coste de lo que preguntes al chat y a la guía va a tu cuenta de OpenAI en lugar de sumarse al del grupo. Se guarda cifrada y <strong>nadie puede verla</strong> desde la app, ni siquiera un administrador; solo puedes quitarla o cambiarla tú.</div>
         ${key.unreadable ? html`<div class="pf-msg err">No se puede abrir la clave que tenías guardada. Vuelve a guardarla.</div>` : ''}
         ${key.has_key ? html`<div class="ai-saved"><strong>${keyText(key)}</strong> <span class="pf-sub">· modelo ${key.model}</span></div>` : ''}
         ${form ? html`
@@ -57,7 +57,7 @@ export async function initAi(el, { username }) {
     return html`
       ${sectionTitle('Modelo')}
       <div class="pf-card pf-form">
-        <div class="pf-sub">El modelo lo eliges tú y se paga de tu cuenta: los más potentes cuestan mucho más por pregunta. Los precios son orientativos, por millón de tokens (entrada / salida). La guía busca en internet, y cada búsqueda se cobra aparte; hace falta un modelo que lo admita.</div>
+        <div class="pf-sub">El modelo lo eliges tú y su coste va a tu cuenta: los más potentes cuestan mucho más por pregunta. Los precios son orientativos, por millón de tokens (entrada / salida). La guía busca en internet, y cada búsqueda se cobra aparte; hace falta un modelo que lo admita.</div>
         ${models
           ? html`<label>Modelo
               <select class="adm-input" name="model">
@@ -71,17 +71,20 @@ export async function initAi(el, { username }) {
       </div>`;
   }
 
-  function payersCard() {
+  // Where the cost goes, as a quiet note above the key and not a section of its own
+  function costNoteView() {
     const lines = state.budget ? budgetLines(state.budget) : [];
     const stopped = FEATURES.map(([id]) => blockedText(state[id])).find(Boolean);
+    const note = costNote(state);
+    if (!note && !lines.length && !stopped) return '';
     return html`
-      ${sectionTitle('Quién paga')}
-      <div class="pf-card">
-        <ul class="ai-payers">
-          ${FEATURES.map(([id, label]) => html`<li><strong>${label}.</strong> ${payerText({ ...state[id] })}</li>`)}
-        </ul>
-        ${lines.length ? html`<div class="pf-sub ai-budget">${lines.map((line) => html`<div>${line}</div>`)}</div>` : ''}
-        ${stopped ? html`<div class="pf-msg err">${stopped} ${state.key.has_key ? '' : 'Mientras tanto puedes seguir con tu propia clave de OpenAI.'}</div>` : ''}
+      <div class="ai-cost-note" role="note">
+        <span class="ai-cost-icon" aria-hidden="true">i</span>
+        <div class="ai-cost-text">
+          ${note ? html`<div>${note}</div>` : ''}
+          ${lines.length ? html`<div class="ai-budget">${lines.map((line) => html`<div>${line}</div>`)}</div>` : ''}
+          ${stopped ? html`<div class="ai-stopped">${stopped} ${state.key.has_key ? '' : 'Mientras tanto puedes seguir con tu propia clave de OpenAI.'}</div>` : ''}
+        </div>
       </div>`;
   }
 
@@ -103,8 +106,8 @@ export async function initAi(el, { username }) {
         ${spend.total.calls
     ? html`
           <div class="pf-stats">
-            ${tile(money(own), 'Pagado con tu clave')}
-            ${tile(money(group), 'Cubierto por el grupo')}
+            ${tile(money(own), 'Coste con tu clave')}
+            ${tile(money(group), 'Coste cubierto por el grupo')}
             ${tile(spend.total.calls, 'Preguntas')}
             ${tile(`${tokens(spend.total.input_tokens)} / ${tokens(spend.total.output_tokens)}`, 'Tokens (entrada / salida)')}
           </div>
@@ -119,7 +122,7 @@ export async function initAi(el, { username }) {
 
   function render() {
     const draft = el.querySelector('[name="api_key"]')?.value ?? '';
-    mount(el, html`${payersCard()}${keyCard()}${modelCard()}${spendCard()}`);
+    mount(el, html`${costNoteView()}${keyCard()}${modelCard()}${spendCard()}`);
     const field = el.querySelector('[name="api_key"]');
     if (field && draft) field.value = draft; // what was being typed survives a redraw (the models arriving, the spending loading)
     for (const [where, note] of Object.entries(notes)) if (note) flash(el.querySelector(`[data-msg="${where}"]`), note.message, note.ok);
