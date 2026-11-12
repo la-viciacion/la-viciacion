@@ -11,7 +11,7 @@ from ..chat import model as chat_model
 from ..clients import failure as provider_failure
 from ..clients.ai_error import AIError, ProviderError, QuotaError, wait_text
 from ..database import models
-from ..utils import messages
+from ..utils import ai_ledger, messages
 from ..utils.logger import LogManager
 from ..utils.rate_limit import Refused
 
@@ -76,6 +76,10 @@ def ask(
         raise HTTPException(status_code=503, detail=messages.CHAT_UNAVAILABLE)
     refused = limits.limiter.acquire(limits.scopes_of(current_user.id))
     if refused:
+        ai_ledger.record(
+            db, user_id=current_user.id, feature="chat", key_source=ai_ledger.GROUP, status=ai_ledger.LIMITED,
+            question=body.message, turns=len(body.history),
+        )
         raise refusal(refused)
     try:
         answer = agent.ask(db, current_user, body.message.strip(), [(t.role, t.content) for t in body.history])

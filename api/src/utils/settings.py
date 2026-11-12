@@ -112,6 +112,14 @@ def _retention(value: int) -> str | None:
     return None if 1 <= value <= INBOX_RETENTION_MAX else f"Los días deben estar entre 1 y {INBOX_RETENTION_MAX}"
 
 
+def _usage_days(value: int) -> str | None:
+    return None if 0 <= value <= 3650 else "Los días deben estar entre 0 (sin límite) y 3650"
+
+
+def _price_hours(value: int) -> str | None:
+    return None if 0 <= value <= 720 else "Las horas deben estar entre 0 (no actualizar) y 720"
+
+
 PROMPT_MAX = 4000
 
 LIMIT_MAX = 100000
@@ -199,6 +207,11 @@ REGISTRY: dict[str, Spec] = {
     "guide.limit_user_day": Spec("int", 30, check=_limit),
     "guide.limit_group_day": Spec("int", 100, check=_limit),
     "guide.prompt": Spec("str", GUIDE_PROMPT.strip(), check=_prompt, resettable=True),
+    # What the AI costs (utils/ai_cost.py, utils/ai_ledger.py): how often the token prices are refreshed from the public file
+    # of genai-prices (0: never, the snapshot of the installed library is used; read when the API starts) and how long the
+    # record of calls is kept (0: for ever)
+    "ai.price_refresh_hours": Spec("int", 24, check=_price_hours),
+    "ai.usage_retention_days": Spec("int", 0, check=_usage_days),
     "telegram.token": Spec("str", None, secret=True, env_only=True, env="TELEGRAM_TOKEN", check=_token),
     "telegram.group_id": Spec("str", None, env_only=True, env="TELEGRAM_GROUP_ID", check=_chat_id),
     "telegram.admin_chat_id": Spec("str", None, env_only=True, env="TELEGRAM_ADMIN_CHAT_ID", check=_chat_id),

@@ -11,7 +11,7 @@ from .database.database import SessionLocal
 from .crud import users as users_crud
 from .crud.achievements import Achievements
 from .utils import push as push_utils
-from .utils import achievement_images, scheduler
+from .utils import achievement_images, ai_cost, scheduler
 from .routers import activity, basic, challenges, chat, games, group, guide, manage, notifications, push, server, statistics, timers, users, utils
 from .utils.logger import LogManager
 from .utils.request_log import RequestLogMiddleware
@@ -68,7 +68,9 @@ with SessionLocal() as db:
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     scheduler.start()
+    ai_cost.start_updates()
     yield
+    ai_cost.stop_updates()
 
 
 # Swagger/ReDoc/openapi.json list every endpoint: only served when API_DOCS_ENABLED=true

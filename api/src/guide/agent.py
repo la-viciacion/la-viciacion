@@ -20,11 +20,13 @@ from pydantic_ai.providers.google import GoogleProvider
 from pydantic_ai.providers.openai import OpenAIProvider
 from pydantic_ai.settings import ModelSettings
 from pydantic_ai.usage import UsageLimits
+from sqlalchemy.orm import Session
 
 from ..chat import agent as chat_agent
 from ..chat import model as chat_model
+from ..clients.ai_error import QuotaError
 from ..chat.tools import hours
-from ..utils import messages, settings
+from ..utils import ai_ledger, messages, settings
 from ..utils.logger import LogManager
 from .prompt import DEFAULT_LEVEL, LEVELS
 
@@ -48,6 +50,10 @@ class GuideDeps:
     game: str  # what the app knows about the game and the player, as text (game_context)
     level: str
     user_name: str
+    # what the usage record needs (utils/ai_ledger.py); without a session nothing is recorded (the probe, the tests)
+    db: Session | None = None
+    user_id: int | None = None
+    game_id: str | None = None
 
 
 def build_model() -> Model:
@@ -99,8 +105,16 @@ def instructions(ctx: RunContext[GuideDeps]) -> str:
 
 
 def ask(deps: GuideDeps, question: str, history: list[tuple[str, str]], model=None) -> str:
-    """Blocking: call it from a worker thread. Raises AIError if the provider fails. `model` is for the tests."""
+    """Blocking: call it from a worker thread. Raises AIError if the provider fails. `model` is for the tests. Every outcome
+    leaves a row in the AI usage record, with the numbers and never the text."""
     started = time.monotonic()
+    provider, name = (settings.get("ai.provider"), chat_model.model_name()) if deps.db is not None else (None, None)
+    recorded = dict(user_id=deps.user_id, feature="guide", key_source=ai_ledger.GROUP, question=question, turns=len(history), game_id=deps.game_id, provider=provider, model=name)
+
+    def record(status, **more):
+        if deps.db is not None:
+            ai_ledger.record(deps.db, status=status, **recorded, **more)
+
     try:
         result = agent.run_sync(
             question,
@@ -111,14 +125,19 @@ def ask(deps: GuideDeps, question: str, history: list[tuple[str, str]], model=No
         )
     except UsageLimitExceeded as e:
         logger.warning(f"Guide question stopped by a usage limit: {e}")
+        record(ai_ledger.TOO_BIG)
         return messages.CHAT_TOO_COMPLEX
     except Exception as e:
-        raise chat_agent.failure(e, "guide") from None
+        error = chat_agent.failure(e, "guide")
+        record(ai_ledger.QUOTA if isinstance(error, QuotaError) else ai_ledger.ERROR)
+        raise error from None
     used = result.usage
     logger.info(
         f"Guide question answered in {time.monotonic() - started:.1f} s: {used.requests} model requests, "
         f"{used.input_tokens} tokens in and {used.output_tokens} out"
     )
+    if deps.db is not None:
+        record(ai_ledger.OK, spent=ai_ledger.measure(result, provider, name, started, time.monotonic()))
     return result.output.strip()
 
 
