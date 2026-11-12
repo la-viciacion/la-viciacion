@@ -181,7 +181,7 @@ class EndpointTests(unittest.TestCase):
         found = lambda db, game_id, viewer: data if game_id == "g1" else None
         for patch in (
             mock.patch.object(guide_router.game_overview, "overview", side_effect=found),
-            mock.patch.object(guide_router.ai_source, "availability", return_value={"available": True, "needs_key": False, "paid_by": "group"}),
+            mock.patch.object(guide_router.ai_source, "availability", return_value={"available": True, "needs_key": False, "paid_by": "group", "blocked": None}),
             mock.patch.object(guide_router.ai_source, "resolve", return_value=ai_source.Source("group", "openai", "KEY", "gpt-4.1-mini")),
             mock.patch.object(limits, "scopes_of", return_value=[]),
             mock.patch.object(limits.limiter, "acquire", return_value=None),
@@ -204,7 +204,7 @@ class EndpointTests(unittest.TestCase):
         acquire.assert_not_called()
 
     def test_a_switched_off_guide_is_a_503(self):
-        with mock.patch.object(guide_router.ai_source, "availability", return_value={"available": False, "needs_key": False, "paid_by": None}):
+        with mock.patch.object(guide_router.ai_source, "availability", return_value={"available": False, "needs_key": False, "paid_by": None, "blocked": None}):
             self.assertEqual(self.client.post("/guide/g1", json={"message": "hola"}).status_code, 503)
 
     def test_an_unknown_level_or_a_long_question_is_refused(self):

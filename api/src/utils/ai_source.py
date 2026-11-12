@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from sqlalchemy.orm import Session
 
 from ..chat import model as chat_model
-from . import ai_ledger, settings, user_ai
+from . import ai_budget, ai_ledger, messages, settings, user_ai
 
 USER_ONLY, USER_OR_GROUP, GROUP_ONLY = "user_only", "user_or_group", "group_only"
 MODES = (USER_ONLY, USER_OR_GROUP, GROUP_ONLY)
@@ -49,27 +49,52 @@ def own_source(db: Session, user_id: int) -> Source | None:
     return Source(ai_ledger.USER, user_ai.PROVIDER, found[0], found[1]) if found else None
 
 
-def resolve(db: Session, user_id: int, feature: str) -> Source | None:
-    """The source that pays for this player's next question to `feature`, or None if none can (the feature is switched
-    off, the mode wants a key they have not saved, or the group's is missing)."""
+@dataclass(frozen=True)
+class Decision:
+    source: Source | None
+    blocked: str | None = None  # ai_budget.GROUP or ai_budget.USER: the monthly budget of the group's key stopped it
+
+
+def decide(db: Session, user_id: int, feature: str) -> Decision:
+    """The source that pays for this player's next question to `feature`, or why none can: the feature is off, the mode wants
+    a key they have not saved, the group's is missing (all three: no source and nothing blocked) or the group's key is the one
+    to use and its monthly budget, the group's or the player's share, is spent (`blocked`)."""
     if not settings.get(f"{feature}.enabled"):
-        return None
+        return Decision(None)
     wanted = mode(feature)
-    if wanted == GROUP_ONLY:
-        return group_source()
-    own = own_source(db, user_id)
-    if own is not None or wanted == USER_ONLY:
-        return own
-    return group_source()
+    own = None if wanted == GROUP_ONLY else own_source(db, user_id)
+    if own is not None:
+        return Decision(own)
+    if wanted == USER_ONLY:
+        return Decision(None)
+    group = group_source()
+    if group is None:
+        return Decision(None)
+    blocked = ai_budget.exceeded(db, user_id)
+    return Decision(None, blocked) if blocked else Decision(group)
+
+
+def resolve(db: Session, user_id: int, feature: str) -> Source | None:
+    """The source that pays for this player's next question to `feature`, or None if none can (see `decide`)."""
+    return decide(db, user_id, feature).source
+
+
+def blocked_message(blocked: str, feature: str) -> str:
+    """What a player is told when the budget stops the group's key: whose it was and, where their own key would be used, the way out."""
+    base = messages.GROUP_BUDGET_REACHED if blocked == ai_budget.GROUP else messages.USER_BUDGET_REACHED
+    return base + (messages.OWN_KEY_WAY_OUT if mode(feature) != GROUP_ONLY else "")
 
 
 def availability(db: Session, user_id: int, feature: str) -> dict:
     """For the front: `available` (the feature is on and somebody could pay for it) and `needs_key` (the player has to
-    save their own key to use it: the group does not cover it). `paid_by` is who would pay now."""
+    save their own key to use it: the group does not cover it). `paid_by` is who would pay now, `blocked` which budget of the
+    group's key is spent, if that is what stops it."""
     if not settings.get(f"{feature}.enabled"):
-        return {"available": False, "needs_key": False, "paid_by": None}
+        return {"available": False, "needs_key": False, "paid_by": None, "blocked": None}
     wanted = mode(feature)
-    source = resolve(db, user_id, feature)
+    decision = decide(db, user_id, feature)
+    source = decision.source
+    paid_by = source.key_source if source else None
     if wanted == GROUP_ONLY:
-        return {"available": source is not None, "needs_key": False, "paid_by": source.key_source if source else None}
-    return {"available": True, "needs_key": source is None, "paid_by": source.key_source if source else None}
+        return {"available": source is not None or decision.blocked is not None, "needs_key": False, "paid_by": paid_by, "blocked": decision.blocked}
+    return {"available": True, "needs_key": source is None, "paid_by": paid_by, "blocked": decision.blocked}

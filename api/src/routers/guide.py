@@ -39,7 +39,7 @@ class GuideResponse(BaseModel):
 def get_status(current_user: models.User = Depends(auth.get_current_active_user), db: Session = Depends(get_db)):
     """What this player can do with the guide now: `available` (it is on and somebody could pay for it), `needs_key` (the
     group does not cover it: they have to save their own key) and `paid_by` (`user` or `group`, who would pay)."""
-    return ai_source.availability(db, current_user.id, "guide")
+    return ai_source.availability(db, current_user.id, "guide")  # `blocked`: the budget of the group's key is spent
 
 
 @router.post("/{game_id}", response_model=GuideResponse)
@@ -53,6 +53,12 @@ def ask(
     state = ai_source.availability(db, current_user.id, "guide")
     if not state["available"]:
         raise HTTPException(status_code=503, detail=messages.GUIDE_UNAVAILABLE)
+    if state["blocked"]:
+        ai_ledger.record(
+            db, user_id=current_user.id, feature="guide", key_source=ai_ledger.GROUP, status=ai_ledger.BUDGET,
+            question=body.message, turns=len(body.history), game_id=game_id,
+        )
+        raise HTTPException(status_code=429, detail=ai_source.blocked_message(state["blocked"], "guide"))
     if state["needs_key"]:
         raise HTTPException(status_code=403, detail=messages.USER_KEY_REQUIRED)
     source = ai_source.resolve(db, current_user.id, "guide")

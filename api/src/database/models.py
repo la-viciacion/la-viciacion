@@ -104,6 +104,9 @@ class UserSettings(Base):
     ai_api_key = deferred(Column(Text, nullable=True))
     ai_key_hint = Column(String(4), nullable=True)
     ai_model = Column(String(64), nullable=True)
+    # whole dollars a month this player may spend of the GROUP's key (set by an admin; NULL = the default of the settings
+    # `ai.user_budget_month`, 0 = no limit): see utils/ai_budget.py. What the player pays with their own key never counts
+    ai_group_budget_usd = Column(SmallInteger, nullable=True)
     updated_at = Column(DateTime, server_default=text("CURRENT_TIMESTAMP"), onupdate=text("CURRENT_TIMESTAMP"))
 
 
@@ -576,7 +579,8 @@ class AiUsage(Base):
     provider = Column(String(20), nullable=True)
     model = Column(String(80), nullable=True)
     # ok, off_topic (answered, but it was not about the app or the game), too_big (stopped by a usage limit), quota,
-    # error and limited (the player's own limit stopped it before it reached the provider)
+    # error, limited (the player's own limit stopped it before it reached the provider) and budget (the monthly budget of
+    # the group's key did)
     status = Column(String(12), nullable=False)
     input_tokens = Column(Integer, nullable=False, server_default=text("0"))
     cached_tokens = Column(Integer, nullable=False, server_default=text("0"))

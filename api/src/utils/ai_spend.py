@@ -3,7 +3,8 @@
 Nothing is stored here. The figures are an estimate: the tokens are measured, the cost is their price at the time of the call
 (utils/ai_cost.py), and a call whose model had no known price counts as a call with no cost (`unpriced`), never as a free one.
 The admin sees who spent what only of the calls the group paid for; what a player paid with their own key is shown without
-names."""
+names. A player sees all of their own (`user_id`), whoever paid.
+"""
 import datetime
 
 from sqlalchemy import case, func
@@ -46,8 +47,10 @@ def month_bounds(month: str | None) -> tuple[datetime.datetime | None, datetime.
     return start, (start.replace(day=28) + datetime.timedelta(days=4)).replace(day=1)
 
 
-def _query(db: Session, *columns, start, end, source: str | None = None):
+def _query(db: Session, *columns, start, end, source: str | None = None, user_id: int | None = None):
     query = db.query(*columns)
+    if user_id is not None:
+        query = query.filter(A.user_id == user_id)
     if start is not None:
         query = query.filter(A.created_at >= start)
     if end is not None:
@@ -57,15 +60,18 @@ def _query(db: Session, *columns, start, end, source: str | None = None):
     return query
 
 
-def _split(db: Session, *keys, start, end, source: str | None = None) -> list:
+def _split(db: Session, *keys, start, end, source: str | None = None, user_id: int | None = None) -> list:
     """The totals of each combination of values of `keys` (columns), the costliest first."""
-    return _query(db, *keys, *TOTALS, start=start, end=end, source=source).group_by(*keys).order_by(*BY_COST).all()
+    return _query(db, *keys, *TOTALS, start=start, end=end, source=source, user_id=user_id).group_by(*keys).order_by(*BY_COST).all()
 
 
-def _days(db: Session) -> list:
+def _days(db: Session, user_id: int | None = None) -> list:
     """The totals of every day with calls, by whose key paid: the months and the day-by-day view are made from these."""
     day = func.date(A.created_at)
-    return db.query(day.label("day"), A.key_source.label("source"), *TOTALS).group_by(day, A.key_source).order_by(day).all()
+    query = db.query(day.label("day"), A.key_source.label("source"), *TOTALS)
+    if user_id is not None:
+        query = query.filter(A.user_id == user_id)
+    return query.group_by(day, A.key_source).order_by(day).all()
 
 
 def _months(days: list) -> list[dict]:
@@ -95,11 +101,12 @@ def _by_day(days: list, month: str | None) -> list[dict]:
     return list(shown.values())
 
 
-def summary(db: Session, month: str | None = None) -> dict:
-    """The record of calls as the admin's panel shows it, for one month ('YYYY-MM') or all of it."""
+def summary(db: Session, month: str | None = None, user_id: int | None = None) -> dict:
+    """The record of calls as the admin's panel shows it, for one month ('YYYY-MM') or all of it; with `user_id`, only the
+    calls of that player (their own panel: the list by player is then left out)."""
     start, end = month_bounds(month)
-    window = {"start": start, "end": end}
-    days = _days(db)
+    window = {"start": start, "end": end, "user_id": user_id}
+    days = _days(db, user_id)
 
     def named(rows, key="name"):
         return [{key: row[0], **_figures(row)} for row in rows]
@@ -108,7 +115,7 @@ def summary(db: Session, month: str | None = None) -> dict:
         {"name": f"{row.provider or '?'}/{row.model or '?'}", **_figures(row)}
         for row in _split(db, A.provider, A.model, **window)
     ]
-    by_user = [
+    by_user = [] if user_id is not None else [
         {"user_id": row.user_id, "name": row.name or row.username or "Cuenta eliminada", **_figures(row)}
         for row in _query(db, A.user_id, models.User.name.label("name"), models.User.username.label("username"), *TOTALS, **window, source=ai_ledger.GROUP)
         .outerjoin(models.User, models.User.id == A.user_id)
