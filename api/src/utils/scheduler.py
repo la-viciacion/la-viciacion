@@ -26,6 +26,8 @@ what nothing else can trigger remains here:
   ai_budget_80      at most once a month, when the group's AI key has spent 80 % of its monthly budget (checked every hour): warns
                     the admins in private
   ai_budget_100     the same when it has spent all of it
+  ai_budget_unpriced  at most once a month, when a budget is set and the group's key made calls of a model with no known price
+                    (they count as nothing, so the budget cannot limit them)
   ai_usage_purge    every day at 04:10, deletes the AI usage rows older than `ai.usage_retention_days` (never, by default)
   challenge_results every day at `challenges.results_time` (09:30), tells who took part how the challenges that ended
                     yesterday went, the group how each group challenge did and which ones launched earlier begin today
@@ -292,22 +294,26 @@ async def _inbox_purge(db: Session) -> str:
     return f"{inbox.purge(db)} deleted"
 
 
-async def _ai_budget_alert(db: Session, level: int, now: datetime.datetime) -> str:
-    return await actions.announce_ai_budget(db, level, now)
+async def _ai_budget_alert(db: Session, kind: int | str, now: datetime.datetime) -> str:
+    if kind == "unpriced":
+        return await actions.announce_ai_unpriced(db, now)
+    return await actions.announce_ai_budget(db, kind, now)
 
 
-def ai_budget_alert(db: Session, now: datetime.datetime) -> int | None:
-    """Warns the admins, once a month for each level, that the group's AI budget is nearly or all spent; the level it warned
-    at, or None. It is checked in the first ten minutes of every hour, and only when the admins want alerts and the bot can send them."""
+def ai_budget_alert(db: Session, now: datetime.datetime) -> int | str | None:
+    """Warns the admins, once a month for each level, that the group's AI budget is nearly or all spent, and once a month that
+    it cannot see some of what the group's key spends (`unpriced`); what it warned about, or None. It is checked in the first
+    ten minutes of every hour, and only when the admins want alerts and the bot can send them."""
     if now.minute >= 10 or not ai_budget.group_cap() or not settings.get("notifications.admin_alerts") or not settings.get("telegram.token"):
         return None
     level = ai_budget.alert_level(db, now)
-    if level is None:
-        return None
-    job, slot = f"ai_budget_{level}", ai_budget.month_start(now)
-    if is_due(now, slot, _last_run(db, job), AI_BUDGET_GRACE) and _claim(db, job, slot, now):
-        _run(db, job, lambda: _ai_budget_alert(db, level, now))
-        return level
+    kinds = ([level] if level else []) + (["unpriced"] if ai_budget.unpriced(db, now)["calls"] else [])
+    slot = ai_budget.month_start(now)
+    for kind in kinds:  # one warning per hour at most; the one that is already given does not hide the next
+        job = f"ai_budget_{kind}"
+        if is_due(now, slot, _last_run(db, job), AI_BUDGET_GRACE) and _claim(db, job, slot, now):
+            _run(db, job, lambda kind=kind: _ai_budget_alert(db, kind, now))
+            return kind
     return None
 
 

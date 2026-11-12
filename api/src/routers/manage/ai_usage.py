@@ -46,6 +46,7 @@ def get_ai_budgets(db: Session = Depends(get_db)):
         "month": ai_budget.month_start().strftime("%Y-%m"),
         "resets_on": ai_budget.next_month().date().isoformat(),
         "group": {"cap": ai_budget.group_cap(), "spent": round(spent / ai_budget.MICROS, 6)},
+        "unpriced": ai_budget.unpriced(db),  # what the caps cannot see: calls of a model with no price
         "default_user_cap": int(settings.get("ai.user_budget_month") or 0),
         "players": ai_budget.players(db),
     }

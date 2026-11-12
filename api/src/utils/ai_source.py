@@ -85,16 +85,19 @@ def blocked_message(blocked: str, feature: str) -> str:
     return base + (messages.OWN_KEY_WAY_OUT if mode(feature) != GROUP_ONLY else "")
 
 
+def state_of(feature: str, decision: Decision) -> dict:
+    """What a decision means for the front (see `availability`), so a route that already decided does not decide again."""
+    if not settings.get(f"{feature}.enabled"):
+        return {"available": False, "needs_key": False, "paid_by": None, "blocked": None}
+    source = decision.source
+    paid_by = source.key_source if source else None
+    if mode(feature) == GROUP_ONLY:
+        return {"available": source is not None or decision.blocked is not None, "needs_key": False, "paid_by": paid_by, "blocked": decision.blocked}
+    return {"available": True, "needs_key": source is None, "paid_by": paid_by, "blocked": decision.blocked}
+
+
 def availability(db: Session, user_id: int, feature: str) -> dict:
     """For the front: `available` (the feature is on and somebody could pay for it) and `needs_key` (the player has to
     save their own key to use it: the group does not cover it). `paid_by` is who would pay now, `blocked` which budget of the
     group's key is spent, if that is what stops it."""
-    if not settings.get(f"{feature}.enabled"):
-        return {"available": False, "needs_key": False, "paid_by": None, "blocked": None}
-    wanted = mode(feature)
-    decision = decide(db, user_id, feature)
-    source = decision.source
-    paid_by = source.key_source if source else None
-    if wanted == GROUP_ONLY:
-        return {"available": source is not None or decision.blocked is not None, "needs_key": False, "paid_by": paid_by, "blocked": decision.blocked}
-    return {"available": True, "needs_key": source is None, "paid_by": paid_by, "blocked": decision.blocked}
+    return state_of(feature, decide(db, user_id, feature))

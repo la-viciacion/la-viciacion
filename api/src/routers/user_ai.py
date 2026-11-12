@@ -31,6 +31,9 @@ DEFAULT_MODEL = "gpt-4.1-mini"  # cheap, and it can search the web (the guide ne
 # Saving a key and trying it call OpenAI: a few a day are plenty, and a stolen session cannot be used to test keys in bulk
 limiter = UsageLimiter()
 CHANGES_PER_HOUR = 10
+# Listing the models of a key already saved tests nothing (the screen asks every time it opens), so it has its own, wider limit
+# and never uses up the saves and tests above
+LISTINGS_PER_HOUR = 60
 
 
 class AiKeyBody(BaseModel):
@@ -44,8 +47,9 @@ def _mine(active_user: models.User, username: str) -> models.User:
     return active_user
 
 
-def _limited(user: models.User) -> None:
-    refused = limiter.acquire([Scope(f"ai-key:{user.id}", "user", ((3600, CHANGES_PER_HOUR),))])
+def _limited(user: models.User, listing: bool = False) -> None:
+    scope = Scope(f"ai-models:{user.id}", "user", ((3600, LISTINGS_PER_HOUR),)) if listing else Scope(f"ai-key:{user.id}", "user", ((3600, CHANGES_PER_HOUR),))
+    refused = limiter.acquire([scope])
     if refused:
         raise HTTPException(status_code=429, detail=messages.USER_AI_TOO_MANY, headers={"Retry-After": str(refused.wait)})
 
@@ -116,7 +120,7 @@ def put_ai(username: str, body: AiKeyBody, active_user: models.User = Depends(au
         open_ai.list_models(key)
     except AIError as e:
         raise _provider_error(e) from None
-    user_ai.save(db, user.id, key, model or DEFAULT_MODEL)
+    user_ai.save(db, user.id, key, model or user_ai.model_of(db, user.id) or DEFAULT_MODEL)  # replacing a key keeps the model chosen
     return user_ai.status(db, user.id)
 
 
@@ -136,7 +140,7 @@ def get_ai_models(username: str, active_user: models.User = Depends(auth.get_cur
     found = user_ai.credentials(db, user.id)
     if found is None:
         raise HTTPException(status_code=409, detail=messages.USER_AI_NO_KEY)
-    _limited(user)
+    _limited(user, listing=True)
     try:
         ids = open_ai.list_models(found[0])
     except AIError as e:

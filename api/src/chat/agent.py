@@ -69,6 +69,12 @@ def history_messages(history: list[tuple[str, str]]) -> list[ModelMessage]:
     ]
 
 
+def own_key(source) -> str | None:
+    """The player's own key when it is theirs that a call used, else None: the group's key is the project's, and a failure of it
+    is the admins' business (see `failure`)."""
+    return source.api_key if source is not None and source.own else None
+
+
 def failure(e: Exception, source: str, key: str | None = None) -> AIError:
     """What a provider failure becomes: a QuotaError (also written to the audit log, if it is the group's quota) if a quota
     ran out, else an AIError whose message never carries a key. `key` is the player's own, when it was theirs that was used:
@@ -107,7 +113,7 @@ def ask(db: Session, user: models.User, question: str, history: list[tuple[str, 
         ai_ledger.record(db, status=ai_ledger.TOO_BIG, **recorded)
         return Answer(messages.CHAT_TOO_COMPLEX, True)
     except Exception as e:
-        error = failure(e, "chat", source.api_key if source else None)
+        error = failure(e, "chat", own_key(source))
         ai_ledger.record(db, status=ai_ledger.QUOTA if isinstance(error, QuotaError) else ai_ledger.ERROR, **recorded)
         raise error from None
     used = result.usage
