@@ -22,7 +22,7 @@ const DATA = {
 };
 
 const panel = () => document.getElementById('panel');
-const asked = (calls) => calls.filter((c) => !c.path.includes('/calls') && !c.path.includes('/budgets')); // what was asked of OpenAI's side, not of the app's record
+const asked = (calls) => calls.filter((c) => !c.path.includes('/calls') && !c.path.includes('/settings')); // what was asked of OpenAI's side, not of the app's record or of the settings below it
 const rows = (section) => [...section.querySelectorAll('tbody tr')].map((tr) => [...tr.querySelectorAll('td')].map((td) => plain(td.textContent).trim()).filter(Boolean).join('|'));
 
 test('without the admin key it says which variable is missing and asks nothing else', async () => {
@@ -150,4 +150,32 @@ test('a failure of the record is shown without hiding what OpenAI billed', async
   await settle();
   assert.match(panel().querySelector('#aicApp').textContent, /sin base de datos/);
   assert.ok(panel().querySelector('#aiuMonth'));
+});
+
+const SETTINGS = {
+  values: { 'ai.price_refresh_hours': 24, 'ai.usage_retention_days': 90, 'telegram.token': { is_set: false }, 'telegram.group_id': { is_set: false }, 'telegram.admin_chat_id': { is_set: false }, 'ai.api_key': { is_set: false }, 'ai.openai_admin_key': { is_set: false }, 'push.vapid_private': { is_set: false } },
+  jobs: {}, push_devices: { devices: 0, users: 0 }, mail: { configured: false, missing: [] }, ai_uses: [], ai_model: { provider: 'google', model: 'm' }, chat: {}, guide: {},
+};
+
+test('how the cost is worked out and how long the record is kept are settings of this same page, below what it shows, with their own Guardar', async () => {
+  let saved = null;
+  installApi({
+    'PUT /manage/settings': ({ body }) => { saved = body; return { changed: Object.keys(body.values), values: SETTINGS.values }; },
+    'GET /manage/settings': SETTINGS,
+    'GET /manage/ai-usage/calls': CALLS,
+    'GET /manage/ai-usage': { configured: false },
+  });
+  panel().replaceWith(panel().cloneNode(false));
+  await render(panel());
+  await settle();
+  await settle();
+  const card = panel().querySelector('#aicSettings .adm-aicost-card');
+  assert.equal(card.querySelector('h3').textContent, 'Coste de la IA');
+  assert.deepEqual([...card.querySelectorAll('input[type="number"]')].map((i) => [i.name, i.value]), [['ai.price_refresh_hours', '24'], ['ai.usage_retention_days', '90']]);
+  const order = [...panel().children].map((c) => c.id);
+  assert.deepEqual(order, ['aicApp', 'aiuBilled', 'aicSettings'], 'the record, what OpenAI billed, then the settings');
+  card.querySelector('input[name="ai.usage_retention_days"]').value = '30';
+  panel().querySelector('#admSettings').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+  await settle();
+  assert.deepEqual(saved.values, { 'ai.usage_retention_days': 30 });
 });

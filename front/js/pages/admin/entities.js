@@ -629,7 +629,7 @@ ENTITIES.ai = {
   label: 'Avisos con IA',
   description: 'Inteligencia artificial que redacta algunos avisos: el interruptor, la prueba, el proveedor y el modelo (solo lectura) y cuáles la usan.',
   custom: 'settings',
-  sections: ['ai', 'aicost', 'aiuses'],
+  sections: ['ai', 'aiuses'],
 };
 ENTITIES.chat = {
   label: 'Chat y guía',
@@ -645,7 +645,7 @@ ENTITIES.ailimits = {
 };
 ENTITIES.aiusage = {
   label: 'Uso y coste',
-  description: 'Qué ha usado la IA de la app y cuánto ha costado (estimado, por jugador, función y tipo de pregunta), y lo que ha facturado OpenAI en el último año.',
+  description: 'Qué ha usado la IA de la app y cuánto ha costado (estimado, por jugador, función y tipo de pregunta), lo que ha facturado OpenAI en el último año y cómo se calcula y cuánto se conserva.',
   custom: 'ai-usage',
 };
 ENTITIES.backup = {
