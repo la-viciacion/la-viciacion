@@ -17,3 +17,9 @@ En **Perfil → Ajustes → Mi IA** puedes guardar tu propia clave de OpenAI y e
 - Tu clave se guarda cifrada y **nadie puede verla**: ni otros jugadores ni los administradores. Solo tú puedes cambiarla o quitarla, y al quitarla se borra.
 - El modelo lo eliges tú. Los más potentes cuestan mucho más por pregunta; la lista te dice si es económico, de precio medio o caro. La guía necesita un modelo que pueda buscar en la web (el botón «Probar con la guía» lo comprueba y gasta unos céntimos).
 - Te recomendamos crear en OpenAI un **proyecto solo para La Viciación con un límite de gasto mensual** y usar una clave de ese proyecto: así lo máximo que puede costarte es lo que fijes.
+
+### Tu gasto y el presupuesto del grupo
+
+En la misma pantalla, **Tu gasto** te enseña cuántas preguntas has hecho, cuánto pesaron y una estimación de lo que han costado: lo que pagaste con tu clave y lo que cubrió el grupo, por mes, por función y por modelo. Solo lo ves tú, y no se guarda lo que escribes.
+
+Lo que paga el grupo tiene un **presupuesto mensual** (el del grupo y una parte para cada jugador) que se renueva el día 1. Si se agota, el chat te lo dice y no responde hasta entonces, salvo que uses tu propia clave: lo que pagas tú no tiene ese límite.
