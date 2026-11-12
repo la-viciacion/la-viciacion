@@ -448,6 +448,27 @@ test('everything that limits the AI is in one page: who takes the cost, the ques
   assert.equal(panel().querySelector('tr[data-user="1"] [name="cap"]').value, '');
 });
 
+test('a money budget left empty is no limit: emptying it sends null, writing a number sends the number, and a 0 is a 0', async () => {
+  const settingsAnswer = (values) => ({ values, jobs: {}, push_devices: { devices: 0, users: 0 }, mail: { configured: false, missing: [] }, ai_uses: USES, ai_model: { provider: 'google', model: 'gemini-test' }, chat: CHAT, guide: CHAT });
+  const values = { ...VALUES, 'ai.group_budget_month': 20, 'ai.user_budget_month': null };
+  let saved = null;
+  installApi({
+    'GET /manage/ai-usage/budgets': { month: '2026-11', resets_on: '2026-12-01', group: { cap: 20, spent: 3 }, default_user_cap: null, unpriced: { calls: 0, models: [] }, players: [] },
+    'PUT /manage/settings': ({ body }) => { saved = body; return { changed: Object.keys(body.values), values }; },
+    'GET /manage/settings': settingsAnswer(values),
+  });
+  await render(panel(), { entity: { sections: ['aibudget'] } });
+  await settle();
+  const group = panel().querySelector('input[name="ai.group_budget_month"]');
+  const user = panel().querySelector('input[name="ai.user_budget_month"]');
+  assert.deepEqual([group.value, user.value, user.placeholder], ['20', '', 'sin límite']);
+  group.value = '';
+  user.value = '0';
+  panel().querySelector('#admSettings').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+  await settle();
+  assert.deepEqual(saved.values, { 'ai.group_budget_month': null, 'ai.user_budget_month': 0 });
+});
+
 test('Enter in the cap of a player saves that cap and does not submit the settings of the page', async () => {
   const values = { ...VALUES, 'ai.group_budget_month': 20, 'ai.user_budget_month': 5 };
   const sent = [];

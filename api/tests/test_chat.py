@@ -591,6 +591,11 @@ class SettingsTests(unittest.TestCase):
 
 
 class ProbeTests(unittest.TestCase):
+    def setUp(self):
+        patcher = mock.patch.object(agent.ai_ledger, "record_probe")  # what it writes has its own tests (test_ai_ledger.py)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def test_the_test_button_asks_the_chat_model_for_one_sentence(self):
         with mock.patch.object(agent.settings, "get", return_value="KEY"):
             model = FunctionModel(lambda history, info: ModelResponse(parts=[TextPart(content=" Hola, gamers ")]))

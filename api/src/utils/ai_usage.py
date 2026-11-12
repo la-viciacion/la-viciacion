@@ -54,6 +54,30 @@ def summarize(buckets: list[dict]) -> dict:
     }
 
 
+def add_months(first: list[dict], second: list[dict]) -> list[dict]:
+    """Two lists of monthly totals ([{month, total}]) as one, adding the months they share. Pure."""
+    summed: dict[str, float] = {}
+    for item in (*first, *second):
+        summed[item["month"]] = summed.get(item["month"], 0.0) + float(item["total"])
+    return [{"month": month, "total": total} for month, total in summed.items()]
+
+
+def rollup(months: list[dict], today: datetime.date) -> dict:
+    """The monthly totals ([{month: 'YYYY-MM', total}], any order) as the server page shows them, in dollars (the AI is billed in
+    dollars and is never converted: the rate changes every day): this month, this year, everything there is and since when.
+    Pure."""
+    shown = sorted(({"month": m["month"], "total": round(float(m["total"]), PRECISION)} for m in months if m["total"]), key=lambda m: m["month"])
+    this_month = today.strftime("%Y-%m")
+    return {
+        "currency": "usd",
+        "month": next((m["total"] for m in shown if m["month"] == this_month), 0.0),
+        "year": round(sum(m["total"] for m in shown if m["month"][:4] == this_month[:4]), PRECISION),
+        "total": round(sum(m["total"] for m in shown), PRECISION),
+        "since": shown[0]["month"] if shown else None,
+        "months": shown,
+    }
+
+
 def first_day(now: datetime.datetime | None = None) -> int:
     """The start (unix seconds) of the oldest day OpenAI still has: midnight UTC, HISTORY_DAYS ago."""
     today = (now or datetime.datetime.now(datetime.timezone.utc)).astimezone(datetime.timezone.utc).date()

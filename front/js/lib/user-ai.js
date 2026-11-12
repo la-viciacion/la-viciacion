@@ -95,10 +95,10 @@ export function paidBy(data) {
   return { own: cost('user'), group: cost('group') };
 }
 
-/** The budget lines of the group's key, or none when neither has a cap: what is spent of each and when they start again. */
+/** The budget lines of the group's key, or none when neither has a cap (0 is a cap: nothing of the group's key): what is spent of each and when they start again. */
 export function budgetLines(budget) {
   return [budgetLine('Presupuesto del grupo este mes', budget.group, budget.resets_on), budgetLine('Tu parte', budget.user, budget.resets_on)]
-    .filter((line, i) => (i === 0 ? budget.group.cap : budget.user.cap) > 0 && line);
+    .filter((line, i) => (i === 0 ? budget.group.cap : budget.user.cap) != null && line);
 }
 
 /** What a feature's state says when the budget stops the group's key from answering this player (else null). */
@@ -106,6 +106,8 @@ export function blockedText(state) {
   if (state.paid_by === 'user') return null; // the player's own key took over: the note above says so
   if (state.blocked === 'group') return 'Se ha agotado el presupuesto de IA del grupo este mes.';
   if (state.blocked === 'user') return 'Has gastado tu parte del presupuesto de IA del grupo este mes.';
+  if (state.blocked === 'group_off') return 'Un admin ha dejado la IA del grupo sin presupuesto.';
+  if (state.blocked === 'user_off') return 'Un admin no te ha dado IA de la clave del grupo.';
   return null;
 }
 

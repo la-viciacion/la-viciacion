@@ -231,6 +231,66 @@ class SecretsEnvOnlyTests(MariaDBTestCase):
         self.assertEqual(self.keys(), ["ai.provider", "push.vapid_private", "weekly.time"])
 
 
+class AiBudgetZeroTests(MariaDBTestCase):
+    """059 turns the 0 that meant "no limit" in the AI budgets into no value at all, because 0 now means nothing of the group's key."""
+
+    DEFAULT_CAP = "5"  # what `ai.user_budget_month` holds before the migration; None = the setting was never saved
+
+    @classmethod
+    def seed(cls):
+        cls.migrate("058_ai_free_plan")
+        with cls.engine.begin() as conn:
+            for user_id, name in ((1, "ana"), (2, "beto"), (3, "cai")):
+                conn.execute(text("INSERT INTO users (id, username, email) VALUES (:id, :name, :email)"), {"id": user_id, "name": name, "email": f"{name}@example.com"})
+            # ana: exempt from the cap (0), beto: his own cap of 7, cai: no value (the default applies)
+            conn.execute(text("INSERT INTO user_settings (user_id, ai_group_budget_usd) VALUES (1, 0), (2, 7), (3, NULL)"))
+            conn.execute(text("INSERT INTO app_settings (`key`, value) VALUES ('ai.group_budget_month', '0')"))
+            if cls.DEFAULT_CAP is not None:
+                conn.execute(text("INSERT INTO app_settings (`key`, value) VALUES ('ai.user_budget_month', :cap)"), {"cap": cls.DEFAULT_CAP})
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.seed()
+        cls.migrate()
+
+    def caps(self):
+        with self.engine.connect() as conn:
+            return dict(conn.execute(text("SELECT user_id, ai_group_budget_usd FROM user_settings")).all())
+
+    def keys(self):
+        with self.engine.connect() as conn:
+            return dict(conn.execute(text("SELECT `key`, value FROM app_settings")).all())
+
+    def test_the_players_who_were_exempt_from_a_cap_stay_exempt_with_the_highest_one(self):
+        self.assertEqual(self.caps(), {1: 10000, 2: 7, 3: None})  # the default is a cap (5): only 10000 says "as good as none"
+
+    def test_a_stored_zero_is_deleted_and_a_real_cap_stays(self):
+        self.assertEqual(self.keys(), {"ai.user_budget_month": "5"})
+
+    def test_the_downgrade_gives_a_zero_of_the_new_meaning_the_nearest_the_old_code_can_say(self):
+        with self.engine.begin() as conn:
+            conn.execute(text("UPDATE user_settings SET ai_group_budget_usd = 0 WHERE user_id = 3"))
+        result = self.alembic("downgrade", "-1")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.caps()[3], 1)
+        self.migrate()
+        with self.engine.begin() as conn:  # the other cases read the state the migration left: put it back
+            conn.execute(text("UPDATE user_settings SET ai_group_budget_usd = NULL WHERE user_id = 3"))
+
+
+class AiBudgetZeroWithNoDefaultCapTests(AiBudgetZeroTests):
+    """Without a cap by default, a player exempt from it was already like everybody else: they go back to the default."""
+
+    DEFAULT_CAP = None
+
+    def test_the_players_who_were_exempt_from_a_cap_stay_exempt_with_the_highest_one(self):
+        self.assertEqual(self.caps(), {1: None, 2: 7, 3: None})
+
+    def test_a_stored_zero_is_deleted_and_a_real_cap_stays(self):
+        self.assertEqual(self.keys(), {})
+
+
 class GameDlcLinkTests(MariaDBTestCase):
     """039 turns 038's `parent_rawg_id` into `is_dlc` + `parent_game_id`: a DLC whose base is in the catalogue is
     linked, one whose base is not stays marked and unlinked, and the old column goes."""

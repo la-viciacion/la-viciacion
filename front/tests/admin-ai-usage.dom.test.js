@@ -71,7 +71,26 @@ test('Actualizar asks the API to ask OpenAI again and keeps the month if it stil
   await settle();
   panel().querySelector('#aiuRefresh').click();
   await settle();
-  assert.equal(calls.at(-1).path, '/manage/ai-usage?refresh=true');
+  assert.equal(asked(calls).at(-1).path, '/manage/ai-usage?refresh=true');
+});
+
+test('each month sets what OpenAI billed against what the app estimates, and says what is left unexplained', async () => {
+  installApi({
+    'GET /manage/ai-usage/calls': { ...CALLS, months: [{ month: '2026-10', calls: 3, cost: 2, group_cost: 2, group_openai_real_cost: 2, user_cost: 0, unpriced: 0 }] },
+    'GET /manage/ai-usage': DATA,
+  });
+  await render(panel());
+  await settle();
+  const [monthly] = panel().querySelectorAll('#aiuDetail .adm-set-card');
+  assert.match(rows(monthly)[0], /^Octubre de 2026\|2,25[^|]*\|2,00[^|]*\|0,25/);
+  assert.match(rows(monthly)[1], /^Septiembre de 2026\|1,00[^|]*\|0,00[^|]*\|1,00/);
+  const select = panel().querySelector('#aiuMonth');
+  select.value = '2026-10';
+  select.dispatchEvent(new window.Event('change', { bubbles: true }));
+  await settle();
+  const tiles = [...panel().querySelectorAll('#aiuDetail .adm-stat')].map((t) => plain(t.textContent));
+  assert.ok(tiles.some((t) => /2,00.*Estimado por la app/.test(t)), tiles.join(' / '));
+  assert.ok(tiles.some((t) => /0,25.*Sin explicar/.test(t)), tiles.join(' / '));
 });
 
 test('a failure of OpenAI is shown as the error', async () => {
@@ -115,6 +134,22 @@ test('the app record comes first and needs no OpenAI key: who paid, by player, b
   assert.deepEqual(rows(section('feature')).map((r) => r.split('|')[0]), ['Guía de juego', 'Chat']);
   assert.deepEqual(rows(section('tools')).map((r) => r.split('|')[0]), ['web_search', 'ranking', 'Sin herramientas']);
   assert.match(panel().textContent, /Falta OPENAI_ADMIN_KEY/); // OpenAI's part is still there, apart
+});
+
+test('when some calls went to Google the panel says its figure is only an estimate', async () => {
+  await open({ ...CALLS, by_model: [{ name: 'openai/gpt-4.1-mini', ...figures(3, 0.7) }, { name: 'google/gemini-2.5-flash', ...figures(1, 0.05) }] });
+  assert.match(panel().querySelector('.adm-calls-google').textContent, /solo una estimación/);
+  await open();
+  assert.equal(panel().querySelector('.adm-calls-google'), null);
+});
+
+test('calls on a free plan show the real cost beside the estimate, and say they cost nothing', async () => {
+  await open({ ...CALLS, total: figures(4, 0.75, { real_cost: 0.5, free_calls: 2 }) });
+  const tiles = [...panel().querySelectorAll('.adm-calls-head ~ #aicDetail .adm-stat, #aicDetail .adm-stat')].map((t) => plain(t.textContent));
+  assert.ok(tiles.some((t) => /0,50.*Coste real/.test(t)), tiles.join(' / '));
+  assert.match(panel().querySelector('.adm-calls-free').textContent, /2 llamadas con una clave de plan gratuito.*0 US\$/);
+  await open();
+  assert.equal(panel().querySelector('.adm-calls-free'), null);
 });
 
 test('a player who paid with their own key is never named: only the totals of that source', async () => {

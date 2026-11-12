@@ -31,5 +31,18 @@ export function selection(data, month) {
   };
 }
 
+/** What OpenAI billed against what the app estimates its group key spent, month by month (the latest first): `billed` from
+ * GET /manage/ai-usage, `calls` the months of GET /manage/ai-usage/calls (what the group's OpenAI key really cost). `difference` is billed minus estimated: positive is
+ * spend the record does not explain (a call it never saw, a price that changed, something else on the account). */
+export function reconcile(billed, calls) {
+  const estimated = new Map(calls.map((m) => [m.month, m.group_openai_real_cost ?? 0]));
+  const months = new Set([...billed.map((m) => m.month), ...estimated.keys()]);
+  return [...months].sort().reverse().map((month) => {
+    const spent = billed.find((m) => m.month === month)?.total ?? 0;
+    const guess = estimated.get(month) ?? 0;
+    return { month, billed: spent, estimated: guess, difference: Math.round((spent - guess) * 1e6) / 1e6 };
+  });
+}
+
 /** How much of `max` a figure is, as a percentage for a bar (0 when there is nothing to compare with). */
 export const share = (value, max) => (max > 0 ? Math.round((value / max) * 100) : 0);

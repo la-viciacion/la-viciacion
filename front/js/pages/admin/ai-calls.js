@@ -2,7 +2,7 @@
 // (GET /manage/ai-usage/calls). It is an estimate: the tokens are measured and priced when each call is made. Of the calls
 // the group paid for the admin sees who made them; of what a player paid with their own key, only the totals.
 import { api } from '../../lib/api.js';
-import { ALL, featureLabel, perCall, sourceLabel, statusLabel, tokens, unpricedNote } from '../../lib/ai-calls.js';
+import { ALL, featureLabel, freeNote, googleNote, perCall, sourceLabel, statusLabel, tokens, unpricedNote } from '../../lib/ai-calls.js';
 import { money, monthChoices, monthLabel, share } from '../../lib/ai-usage.js';
 import { html, mount } from '../../lib/html.js';
 import { errorState, statTile } from './components.js';
@@ -48,16 +48,21 @@ function players(items) {
 function detail(data, month) {
   const { total } = data;
   const note = unpricedNote(total);
+  const google = googleNote(data.by_model);
+  const free = freeNote(total);
   const average = perCall(total);
   return html`
     <div class="adm-stats">
       ${statTile(month === ALL ? 'Coste estimado' : monthLabel(month), cost(total.cost))}
+      ${free ? statTile('Coste real', cost(total.real_cost)) : ''}
       ${statTile('Llamadas', total.calls)}
       ${statTile('Coste medio por llamada', average == null ? '—' : cost(average))}
       ${statTile('Tokens (entrada / salida)', `${tokens(total.input_tokens)} / ${tokens(total.output_tokens)}`)}
       ${total.web_searches ? statTile('Búsquedas web', total.web_searches) : ''}
     </div>
     ${note ? html`<div class="adm-warn">${note} Si es un modelo nuevo, sus precios llegan con la siguiente actualización de la lista.</div>` : ''}
+    ${free ? html`<div class="adm-sub adm-calls-free">${free}</div>` : ''}
+    ${google ? html`<div class="adm-sub adm-calls-google">${google}</div>` : ''}
     ${breakdown('source', 'Quién ha pagado', data.by_source, sourceLabel)}
     ${month === ALL ? html`
       <section class="adm-set-card adm-calls-months">
@@ -102,7 +107,7 @@ function view(data, month) {
         </label>
       </div>
     </section>
-    <div id="aicDetail">${detail(data, month)}</div>`;
+    <div id="aicDetail" class="adm-stack">${detail(data, month)}</div>`;
 }
 
 /** Draws the page's first half into `target`: the record of the app's calls. A failure here shows only here. */

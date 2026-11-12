@@ -105,7 +105,7 @@ class UserSettings(Base):
     ai_key_hint = Column(String(4), nullable=True)
     ai_model = Column(String(64), nullable=True)
     # whole dollars a month this player may spend of the GROUP's key (set by an admin; NULL = the default of the settings
-    # `ai.user_budget_month`, 0 = no limit): see utils/ai_budget.py. What the player pays with their own key never counts
+    # `ai.user_budget_month`, which is no limit when empty; 0 = nothing of the group's key for this player): see utils/ai_budget.py. What the player pays with their own key never counts
     ai_group_budget_usd = Column(SmallInteger, nullable=True)
     updated_at = Column(DateTime, server_default=text("CURRENT_TIMESTAMP"), onupdate=text("CURRENT_TIMESTAMP"))
 
@@ -594,6 +594,9 @@ class AiUsage(Base):
     cost_micros = Column(Integer, nullable=True)
     # when the prices that estimated it were published (NULL: the ones the code was built with)
     price_stamp = Column(DateTime, nullable=True)
+    # the group's key that paid it was on a free plan (admin setting `ai.free_plan.<provider>`, read when the call was made): its real
+    # cost is 0 and `cost_micros` stays as the estimate of what it would have cost
+    free_plan = Column(Boolean, nullable=False, server_default=text("0"))
     tools = Column(String(255), nullable=True)  # the tools it called, comma separated: the kind of question it was
     question_chars = Column(SmallInteger, nullable=True)  # how long the question was, not what it said
     turns = Column(SmallInteger, nullable=True)  # messages of the conversation that went with it

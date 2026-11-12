@@ -53,7 +53,8 @@ def own_source(db: Session, user_id: int) -> Source | None:
 @dataclass(frozen=True)
 class Decision:
     source: Source | None
-    # ai_budget.GROUP or ai_budget.USER: the monthly budget of the group's key is spent. With no source it is what stopped the
+    # ai_budget.GROUP or ai_budget.USER: the monthly budget of the group's key is spent; ai_budget.GROUP_OFF / USER_OFF: it is 0 (an
+    # admin gave nothing of it to everybody or to this player). With no source it is what stopped the
     # question; with the player's own as the source it is why the group's was not used (they went on with theirs)
     blocked: str | None = None
 
@@ -84,7 +85,9 @@ def resolve(db: Session, user_id: int, feature: str) -> Source | None:
 
 def blocked_message(blocked: str, feature: str) -> str:
     """What a player is told when the budget stops the group's key: whose it was and, where their own key would be used, the way out."""
-    base = messages.GROUP_BUDGET_REACHED if blocked == ai_budget.GROUP else messages.USER_BUDGET_REACHED
+    base = {
+        ai_budget.GROUP: messages.GROUP_BUDGET_REACHED, ai_budget.GROUP_OFF: messages.GROUP_AI_OFF, ai_budget.USER_OFF: messages.USER_AI_OFF,
+    }.get(blocked, messages.USER_BUDGET_REACHED)
     return base + (messages.OWN_KEY_WAY_OUT if mode(feature) != GROUP_ONLY else "")
 
 

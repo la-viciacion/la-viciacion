@@ -133,11 +133,16 @@ def ask(db: Session, user: models.User, question: str, history: list[tuple[str, 
 
 def probe(model=None) -> str:
     """One short sentence from the chat's model, with no tools: for the panel's test button (blocking, like `ask`).
-    Raises AIError if the provider fails."""
+    Raises AIError if the provider fails. It spends the group's key, so it leaves a row in the usage record."""
+    started = time.monotonic()
+    provider, name = ai_providers.current(ai_providers.CHAT)
     try:
         result = Agent(model or chat_model.build_model(), model_settings=SETTINGS).run_sync(
             "Saluda al grupo con una frase corta y divertida sobre videojuegos.", usage_limits=LIMITS
         )
     except Exception as e:
-        raise failure(e, "chat_test") from None
+        error = failure(e, "chat_test")
+        ai_ledger.record_probe("chat_test", provider, name, ai_ledger.QUOTA if isinstance(error, QuotaError) else ai_ledger.ERROR, started)
+        raise error from None
+    ai_ledger.record_probe("chat_test", provider, name, ai_ledger.OK, started, result)
     return result.output.strip()

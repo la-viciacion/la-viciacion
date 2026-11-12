@@ -24,6 +24,9 @@ TOTALS = (
     func.coalesce(func.sum(A.output_tokens), 0).label("output"),
     func.coalesce(func.sum(A.web_searches), 0).label("searches"),
     func.coalesce(func.sum(case((A.cost_micros.is_(None), 1), else_=0)), 0).label("unpriced"),
+    # what it really cost: the estimate, except on a key of a free plan, where it cost nothing
+    func.coalesce(func.sum(ai_ledger.real_cost()), 0).label("real"),
+    func.coalesce(func.sum(case((A.free_plan.is_(True), 1), else_=0)), 0).label("free"),
 )
 BY_COST = (func.coalesce(func.sum(A.cost_micros), 0).desc(), func.count(A.id).desc())
 
@@ -36,6 +39,7 @@ def _figures(row) -> dict:
     return {
         "calls": int(row.calls), "cost": dollars(row.cost), "input_tokens": int(row.input), "cached_tokens": int(row.cached),
         "output_tokens": int(row.output), "web_searches": int(row.searches), "unpriced": int(row.unpriced),
+        "real_cost": dollars(row.real), "free_calls": int(row.free),
     }
 
 
@@ -66,25 +70,42 @@ def _split(db: Session, *keys, start, end, source: str | None = None, user_id: i
 
 
 def _days(db: Session, user_id: int | None = None) -> list:
-    """The totals of every day with calls, by whose key paid: the months and the day-by-day view are made from these."""
+    """The totals of every day with calls, by whose key paid and by provider: the months and the day-by-day view are made from these."""
     day = func.date(A.created_at)
-    query = db.query(day.label("day"), A.key_source.label("source"), *TOTALS)
+    query = db.query(day.label("day"), A.key_source.label("source"), A.provider.label("provider"), *TOTALS)
     if user_id is not None:
         query = query.filter(A.user_id == user_id)
-    return query.group_by(day, A.key_source).order_by(day).all()
+    return query.group_by(day, A.key_source, A.provider).order_by(day).all()
 
 
 def _months(days: list) -> list[dict]:
+    """The months with calls. `cost` and its split are estimates; `group_real_cost` is what the group's keys really cost (a key on a
+    free plan costs nothing) and `group_openai_real_cost` the part of it that is OpenAI's: the figure to set against what OpenAI
+    billed (utils/ai_usage.py), which is the account's, and only OpenAI's."""
     months: dict[str, dict] = {}
     for row in days:
         key = str(row.day)[:7]
-        month = months.setdefault(key, {"month": key, "calls": 0, "cost": 0.0, "group_cost": 0.0, "user_cost": 0.0, "unpriced": 0})
+        month = months.setdefault(key, {"month": key, "calls": 0, "cost": 0.0, "group_cost": 0.0, "group_real_cost": 0.0, "group_openai_real_cost": 0.0, "user_cost": 0.0, "unpriced": 0})
         month["calls"] += int(row.calls)
         month["cost"] = round(month["cost"] + dollars(row.cost), 6)
         side = "group_cost" if row.source == ai_ledger.GROUP else "user_cost"
         month[side] = round(month[side] + dollars(row.cost), 6)
+        if row.source == ai_ledger.GROUP:
+            month["group_real_cost"] = round(month["group_real_cost"] + dollars(row.real), 6)
+            if row.provider == "openai":
+                month["group_openai_real_cost"] = round(month["group_openai_real_cost"] + dollars(row.real), 6)
         month["unpriced"] += int(row.unpriced)
     return list(months.values())
+
+
+def group_months(db: Session, without_openai: bool = False) -> list[dict]:
+    """What the group's keys really cost each month, from the record: [{month, total}] in dollars (a call on a key of a free plan
+    counts as nothing, its estimate aside). It is what the server page shows when OpenAI's billed spend cannot be asked; with
+    `without_openai`, only what the other providers' keys (Google's) cost, which is what OpenAI's bill does not have."""
+    return [
+        {"month": m["month"], "total": round(m["group_real_cost"] - (m["group_openai_real_cost"] if without_openai else 0.0), 6)}
+        for m in _months(_days(db))
+    ]
 
 
 def _by_day(days: list, month: str | None) -> list[dict]:

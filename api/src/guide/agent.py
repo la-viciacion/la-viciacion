@@ -155,9 +155,13 @@ def ask(deps: GuideDeps, question: str, history: list[tuple[str, str]], model=No
     return result.output.strip()
 
 
-def probe(model=None, source=None) -> str:
+def probe(model=None, source=None, user_id: int | None = None) -> str:
     """One answer that needs the web (who made a game that came out a year ago), for the panel's test button: it fails, with
-    the provider's own words, when the model cannot search. Blocking, like `ask`. Raises AIError if the provider fails."""
+    the provider's own words, when the model cannot search. Blocking, like `ask`. Raises AIError if the provider fails. It spends
+    a key, so it leaves a row in the usage record: the group's, or the player's own (`source`, with their `user_id`)."""
+    started = time.monotonic()
+    provider, name = (source.provider, source.model) if source is not None else ai_providers.current(ai_providers.GUIDE)
+    paid_by = source.key_source if source is not None else ai_ledger.GROUP
     deps = GuideDeps(game="Juego: Hollow Knight", level="hint", user_name="el admin")
     try:
         result = agent.run_sync(
@@ -165,5 +169,8 @@ def probe(model=None, source=None) -> str:
             deps=deps, model=model or build_model(source), usage_limits=LIMITS,
         )
     except Exception as e:
-        raise chat_agent.failure(e, "guide_test", chat_agent.own_key(source), ai_providers.GUIDE) from None
+        error = chat_agent.failure(e, "guide_test", chat_agent.own_key(source), ai_providers.GUIDE)
+        ai_ledger.record_probe("guide_test", provider, name, ai_ledger.QUOTA if isinstance(error, QuotaError) else ai_ledger.ERROR, started, key_source=paid_by, user_id=user_id)
+        raise error from None
+    ai_ledger.record_probe("guide_test", provider, name, ai_ledger.OK, started, result, key_source=paid_by, user_id=user_id)
     return result.output.strip()

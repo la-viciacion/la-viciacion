@@ -295,6 +295,11 @@
 .adm-settings { display: flex; flex-direction: column; gap: 16px; max-width: 720px; }
 .adm-set-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; }
 .adm-set-card h3 { font-size: 1rem; }
+/* a page of several cards (and tiles) one under the other, spaced the same whatever block of the page draws them */
+.adm-stack { display: flex; flex-direction: column; gap: 16px; }
+.adm-stack + .adm-stack { margin-top: 16px; }
+.adm-stack .adm-stats { margin-bottom: 0; }
+.adm-stack .adm-settings { max-width: none; }
 .adm-set-card label { display: flex; flex-direction: column; gap: 6px; font-size: 0.85rem; color: var(--text-secondary); font-weight: 600; }
 /* a switch before its text: the name and what it does stay next to the control that changes it */
 .adm-set-check { flex-direction: row !important; align-items: flex-start; justify-content: flex-start; gap: 12px; cursor: pointer; }

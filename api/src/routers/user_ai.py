@@ -158,7 +158,7 @@ def test_ai(username: str, active_user: models.User = Depends(auth.get_current_a
         raise HTTPException(status_code=409, detail=messages.USER_AI_NO_KEY)
     _limited(user)
     try:
-        reply = guide_agent.probe(source=source)
+        reply = guide_agent.probe(source=source, user_id=user.id)
     except AIError as e:
         logger.warning(f"A player's own AI key failed its test: {type(e).__name__}")
         raise _provider_error(e) from None

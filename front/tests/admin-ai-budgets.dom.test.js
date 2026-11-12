@@ -47,8 +47,22 @@ test('a player with an individual cap shows it in the box, and one with the defa
 });
 
 test('without a group cap it says there is no limit instead of a bar', async () => {
-  await open({ ...DATA, group: { cap: 0, spent: 3 } });
+  await open({ ...DATA, group: { cap: null, spent: 3 } });
   assert.match(panel().textContent, /El grupo no tiene tope/);
+});
+
+test('a group budget of 0 says nobody can use the groups key, and a players 0 says so in his row', async () => {
+  await open({ ...DATA, group: { cap: 0, spent: 3 }, players: [{ ...DATA.players[0], override: 0, cap: 0 }] });
+  assert.match(panel().querySelector('.adm-budget-off').textContent, /presupuesto del grupo es 0.*nadie puede usar la clave del grupo/);
+  assert.match(row(1).textContent, /Sin IA del grupo/);
+  assert.equal(row(1).querySelector('[name="cap"]').value, '0');
+});
+
+test('an empty cap shows what applies as the placeholder: no limit, or the default', async () => {
+  await open({ ...DATA, default_user_cap: null, players: [{ ...DATA.players[0], override: null, cap: null }] });
+  assert.equal(row(1).querySelector('[name="cap"]').getAttribute('placeholder'), 'sin límite');
+  await open();
+  assert.match(row(1).querySelector('[name="cap"]').getAttribute('placeholder'), /^5,00/);
 });
 
 test('saving sends the whole dollars and draws the table again', async () => {
@@ -109,6 +123,6 @@ test('calls of a model with no price are warned about, because no budget can lim
 test('with none, or with no budget at all, there is nothing to warn about', async () => {
   await open({ ...DATA, unpriced: { calls: 0, models: [] } });
   assert.equal(panel().querySelector('.adm-warn'), null);
-  await open({ ...DATA, group: { cap: 0, spent: 0 }, default_user_cap: 0, players: [], unpriced: { calls: 2, models: ['openai/x'] } });
+  await open({ ...DATA, group: { cap: null, spent: 0 }, default_user_cap: null, players: [], unpriced: { calls: 2, models: ['openai/x'] } });
   assert.equal(panel().querySelector('.adm-warn'), null);
 });
