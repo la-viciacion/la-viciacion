@@ -20,6 +20,18 @@ from src.routers.manage import system
 from src.utils import ai, ai_quota, audit, messages, settings, ai_source
 from tests.sqlite_db import make_session
 
+
+# `ai.complete` writes the record of a notice in a session of its own, which these tests have no database for
+_no_record = mock.patch.object(ai.ai_ledger, "record_notice")
+
+
+def setUpModule():
+    _no_record.start()
+
+
+def tearDownModule():
+    _no_record.stop()
+
 DAY = "GenerateRequestsPerDayPerProjectPerModel-FreeTier"
 MINUTE = "GenerateContentInputTokensPerModelPerMinute-FreeTier"
 

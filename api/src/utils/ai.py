@@ -4,10 +4,12 @@ What is used (switch, provider, key, model) is read from the settings on every c
 (utils/settings.py), so the admin panel changes it without restarting anything. The
 functions block on the network: call them from a worker thread.
 """
-from ..clients import google_ai, open_ai
+import time
+
+from ..clients import google_ai, open_ai, used
 from ..clients.ai_error import AIError, QuotaError
 from ..clients.quota import classify
-from . import ai_quota, settings
+from . import ai_ledger, ai_quota, settings
 from .logger import LogManager
 
 log_manager = LogManager()
@@ -61,17 +63,25 @@ def complete(system_prompt: str, user_prompt: str, *, temperature: float = 1.0, 
     provider, model = current()
     if not key or provider not in PROVIDERS or not model or not (force or settings.get("ai.enabled")):
         return None
+    started = time.monotonic()
+    used.discard()
     try:
-        return PROVIDERS[provider](key, model, system_prompt, user_prompt, temperature)
+        text = PROVIDERS[provider](key, model, system_prompt, user_prompt, temperature)
+        ai_ledger.record_notice(source, provider, model, ai_ledger.OK, started, used.take())
+        return text
     except QuotaError as e:
         ai_quota.report(e.quota, source, provider, model)
+        ai_ledger.record_notice(source, provider, model, ai_ledger.QUOTA, started)
         raise
     except AIError:
+        ai_ledger.record_notice(source, provider, model, ai_ledger.ERROR, started)
         raise
     except Exception as e:
         quota = classify(e)
         if quota:
             ai_quota.report(quota, source, provider, model)
+            ai_ledger.record_notice(source, provider, model, ai_ledger.QUOTA, started)
             raise QuotaError(f"{provider}: {quota.describe()}", quota) from None
+        ai_ledger.record_notice(source, provider, model, ai_ledger.ERROR, started)
         # a provider library may quote what it was given: never let the key out in the message
         raise AIError(f"{provider}: {type(e).__name__}: {str(e).replace(key, '***')}") from None

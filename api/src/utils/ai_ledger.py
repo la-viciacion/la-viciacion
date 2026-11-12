@@ -6,6 +6,7 @@ Writing a row is best effort: if it fails, the player still gets the answer and 
 
 Nothing is cached here: the panels sum the rows when asked."""
 import datetime
+import time
 from dataclasses import dataclass
 
 from sqlalchemy import delete
@@ -129,6 +130,47 @@ def record(
     except Exception as e:
         db.rollback()
         logger.error(f"Error writing the AI usage record: {type(e).__name__}: {e}", exc_info=True)
+
+
+def notice_kind(source: str) -> tuple[str, str | None] | None:
+    """(feature, kind) of a text the AI writes on its own, from who asked (`ai.complete`'s `source`): the welcome of the group,
+    or a notice (`notice:completed_game`: its kind is the part after the colon). The test buttons are not recorded."""
+    if source == "welcome":
+        return "welcome", "welcome"
+    if source == "notice" or source.startswith("notice:"):
+        return "notice", source.partition(":")[2] or None
+    return None
+
+
+def record_notice(source: str, provider: str | None, model: str | None, status: str, started: float, used=None, now: float | None = None) -> None:
+    """Writes the row of a text the AI wrote on its own (a notice, the group's welcome): no player asked for it, so it has no
+    user, and the group's key paid. It runs in the worker thread that asked the provider, so it opens its own session. Never
+    raises, like `record`. `used` is what the client left in clients/used.py."""
+    found = notice_kind(source)
+    if found is None:
+        return
+    feature, kind = found
+    spent = Spent(
+        provider=provider, model=model, requests=1, latency_ms=int(((now if now is not None else time.monotonic()) - started) * 1000), tools=kind,
+        input_tokens=used.input_tokens if used else 0, cached_tokens=used.cached_tokens if used else 0,
+        output_tokens=used.output_tokens if used else 0, reasoning_tokens=used.reasoning_tokens if used else 0,
+        cost_micros=ai_cost.completion_cost_micros(provider, model, used) if used else None,
+    )
+    try:
+        db = open_session()
+    except Exception as e:
+        logger.error(f"Error opening a session for the AI usage record: {type(e).__name__}: {e}", exc_info=True)
+        return
+    try:
+        record(db, user_id=None, feature=feature, key_source=GROUP, status=status, spent=spent)
+    finally:
+        db.close()
+
+
+def open_session() -> Session:
+    from ..database.database import SessionLocal
+
+    return SessionLocal()
 
 
 def purge(db: Session, now: datetime.datetime | None = None) -> int:

@@ -23,6 +23,9 @@ what nothing else can trigger remains here:
   wishlist_week     every Sunday at `wishlist.time`, tells the group which wished games come out in the next 7 days.
                     Only one of wishlist_eve, wishlist_day and wishlist_week runs: `wishlist.group_notice`
   inbox_purge       every day at 04:00, deletes the inbox notices older than `inbox.retention_days`
+  ai_budget_80      at most once a month, when the group's AI key has spent 80 % of its monthly budget (checked every hour): warns
+                    the admins in private
+  ai_budget_100     the same when it has spent all of it
   ai_usage_purge    every day at 04:10, deletes the AI usage rows older than `ai.usage_retention_days` (never, by default)
   challenge_results every day at `challenges.results_time` (09:30), tells who took part how the challenges that ended
                     yesterday went, the group how each group challenge did and which ones launched earlier begin today
@@ -53,7 +56,7 @@ from ..config import Config
 from ..crud import challenge_schedules, costs, group_polls, users
 from ..database import models
 from ..database.database import SessionLocal
-from . import actions, ai_ledger, challenge_notices, igdb_sync, inbox, polls, push, recap_notices, server_status, settings
+from . import actions, ai_budget, ai_ledger, challenge_notices, igdb_sync, inbox, polls, push, recap_notices, server_status, settings
 from .logger import LogManager
 
 log_manager = LogManager()
@@ -71,6 +74,7 @@ DAILY_GRACE = datetime.timedelta(hours=3)
 DAILY_STREAKS_HOUR = 5
 INBOX_PURGE_HOUR = 4
 AI_USAGE_PURGE_TIME = (4, 10)
+AI_BUDGET_GRACE = datetime.timedelta(days=32)  # the warning of a month may come any time in it
 DAILY_WISHLIST_HOUR = 9
 CHALLENGE_SCHEDULES_HOUR = 6
 SERVER_COSTS_HOUR = 7
@@ -288,6 +292,25 @@ async def _inbox_purge(db: Session) -> str:
     return f"{inbox.purge(db)} deleted"
 
 
+async def _ai_budget_alert(db: Session, level: int, now: datetime.datetime) -> str:
+    return await actions.announce_ai_budget(db, level, now)
+
+
+def ai_budget_alert(db: Session, now: datetime.datetime) -> int | None:
+    """Warns the admins, once a month for each level, that the group's AI budget is nearly or all spent; the level it warned
+    at, or None. It is checked in the first ten minutes of every hour, and only when the admins want alerts and the bot can send them."""
+    if now.minute >= 10 or not ai_budget.group_cap() or not settings.get("notifications.admin_alerts") or not settings.get("telegram.token"):
+        return None
+    level = ai_budget.alert_level(db, now)
+    if level is None:
+        return None
+    job, slot = f"ai_budget_{level}", ai_budget.month_start(now)
+    if is_due(now, slot, _last_run(db, job), AI_BUDGET_GRACE) and _claim(db, job, slot, now):
+        _run(db, job, lambda: _ai_budget_alert(db, level, now))
+        return level
+    return None
+
+
 async def _ai_usage_purge(db: Session) -> str:
     return f"{ai_ledger.purge(db)} deleted"
 
@@ -355,6 +378,8 @@ def tick(now: datetime.datetime | None = None) -> None:
         slot = daily_slot(now, INBOX_PURGE_HOUR)
         if is_due(now, slot, _last_run(db, "inbox_purge"), DAILY_GRACE) and _claim(db, "inbox_purge", slot, now):
             _run(db, "inbox_purge", lambda: _inbox_purge(db))
+
+        ai_budget_alert(db, now)
 
         if settings.get("ai.usage_retention_days"):
             slot = daily_slot(now, *AI_USAGE_PURGE_TIME)

@@ -3,6 +3,7 @@ from functools import lru_cache
 from google import genai
 from google.genai import errors, types
 
+from . import used
 from .ai_error import AIError, QuotaError
 from .quota import classify
 
@@ -26,6 +27,7 @@ def generate(api_key: str, model: str, system_prompt: str, user_prompt: str, tem
         if quota:
             raise QuotaError(f"Google respondió {e.code}: {quota.describe()}", quota) from None
         raise AIError(f"Google respondió {e.code}: {e.message}") from None
+    _report(response)
     candidate = response.candidates[0] if response.candidates else None
     if candidate is None:
         reason = response.prompt_feedback.block_reason if response.prompt_feedback else None
@@ -34,3 +36,17 @@ def generate(api_key: str, model: str, system_prompt: str, user_prompt: str, tem
     if not text:
         raise AIError("Google ha respondido sin texto" + (f" ({candidate.finish_reason.name})" if candidate.finish_reason else ""))
     return text
+
+
+def _report(response) -> None:
+    """Leaves the tokens of a response for whoever called (clients/used.py). The thinking of the model is billed as output."""
+    meta = getattr(response, "usage_metadata", None)
+    if meta is None:
+        return
+    thoughts = getattr(meta, "thoughts_token_count", 0) or 0
+    used.report(used.Used(
+        input_tokens=getattr(meta, "prompt_token_count", 0) or 0,
+        cached_tokens=getattr(meta, "cached_content_token_count", 0) or 0,
+        output_tokens=(getattr(meta, "candidates_token_count", 0) or 0) + thoughts,
+        reasoning_tokens=thoughts,
+    ))
