@@ -34,16 +34,19 @@ Los tiempos para completar (la historia principal) vienen de [HowLongToBeat](htt
 
 La IA reescribe algunos avisos del grupo (un juego nuevo, un juego completado, cambios en los rankings…) con humor. Sin ella los avisos salen como texto normal.
 
-Necesitas **las tres** variables en el `.env`:
+Cada proveedor tiene sus propias variables en el `.env`, y no hay ninguna que diga cuál usar: un proveedor existe para la app cuando tiene su clave. Define las de uno, o las de los dos:
 
 ```ini
-AI_PROVIDER=google          # o openai
-AI_API_KEY=tu_clave
-AI_MODEL=gemini-3.5-flash-lite   # un modelo de ese proveedor
+OPENAI_AI_API_KEY=tu_clave
+OPENAI_AI_MODEL=gpt-4.1-mini            # el modelo que se usa mientras nadie elija otro
+GOOGLE_AI_API_KEY=tu_clave
+GOOGLE_AI_MODEL=gemini-3.5-flash-lite
 ```
 
-El código no trae proveedor ni modelo por defecto, y desde el panel no se pueden cambiar (solo se muestran). Se ven en **IA → Avisos con IA**, donde también se edita lo único que sí se puede cambiar desde el panel:
+El código no trae ningún modelo por defecto, y las claves y los modelos por defecto no se pueden cambiar desde el panel (solo se muestran). Lo que sí se elige desde **IA → Avisos con IA**:
 
+- El **proveedor**, entre los que tienen clave: con los dos, un selector; con uno, es ese; con ninguno, la página dice qué variable falta. Se aplica al guardar, sin reiniciar.
+- El **modelo** de los avisos: el del `.env` por defecto, o uno de la lista que **consulta en ese momento el propio proveedor**, para cambiarlo sin redesplegar. La elección es por proveedor.
 - El **interruptor** de la IA.
 - Los **avisos que la usan**, cada uno con su propio interruptor y sus **instrucciones** (prompt) editables. **Restaurar las originales** vuelve a seguir las del código.
 - **Probar la IA**, que le pide una frase a la configuración activa y te enseña la respuesta o por qué falló.
@@ -52,7 +55,7 @@ El código no trae proveedor ni modelo por defecto, y desde el panel no se puede
 
 ### Cuánto ha gastado la IA (solo OpenAI)
 
-OpenAI no dice por API cuánto crédito queda, pero sí cuánto se ha facturado. Para verlo en **IA → Uso y coste** hace falta una segunda clave, distinta de `AI_API_KEY`:
+OpenAI no dice por API cuánto crédito queda, pero sí cuánto se ha facturado. Para verlo en **IA → Uso y coste** hace falta una segunda clave, distinta de `OPENAI_AI_API_KEY`:
 
 1. En platform.openai.com → Settings → Organization → **Admin keys** (solo un propietario de la organización las ve), crea una clave de administración. También sirve una clave restringida con solo el permiso de lectura de uso (`api.usage.read`), que es más segura porque no puede hacer nada más.
 2. Ponla en el `.env` como `OPENAI_ADMIN_KEY=` y reinicia la API.
@@ -79,13 +82,14 @@ Para apagarlos, quita la línea y ejecuta `docker compose up -d --remove-orphans
 
 ## Chat de la app
 
-El botón flotante de abajo a la derecha abre un asistente que responde sobre videojuegos y los datos del grupo. **Usa el mismo proveedor y la misma clave** que la IA de los avisos (`AI_PROVIDER`, `AI_API_KEY`), así que si la IA ya está configurada no hace falta nada más. Solo hay una variable propia, opcional: el modelo.
+El botón flotante de abajo a la derecha abre un asistente que responde sobre videojuegos y los datos del grupo. **Usa el mismo proveedor y la misma clave** que la IA de los avisos, así que si la IA ya está configurada no hace falta nada más. Solo hay una variable propia por proveedor, opcional: el modelo.
 
 ```ini
-CHAT_AI_MODEL=gemini-3.5-flash   # opcional: un modelo del mismo proveedor; sin ella se usa AI_MODEL
+OPENAI_CHAT_AI_MODEL=gpt-4.1       # opcional; sin ella se usa OPENAI_AI_MODEL
+GOOGLE_CHAT_AI_MODEL=gemini-3.5-flash
 ```
 
-Sirve para dar al chat un modelo más potente que el de los avisos (que solo reescriben frases cortas). Como las demás claves y modelos, vive solo en el `.env` y desde el panel solo se ve. Lo que se edita desde el panel, en **IA → Chat y guía**, es el **interruptor** (independiente del de los avisos), las **instrucciones** y el botón **Probar el chat**; la pestaña dice si los jugadores lo tienen disponible y, si no, qué falta; el modelo que usa se ve en **Notificaciones → Canales**.
+Sirve para dar al chat un modelo más potente que el de los avisos (que solo reescriben frases cortas). Las claves y los modelos por defecto viven solo en el `.env`. Lo que se edita desde el panel, en **IA → Chat y guía**, es el **interruptor** (independiente del de los avisos), las **instrucciones**, el **modelo** (de la lista que da el proveedor en ese momento) y el botón **Probar el chat**; la pestaña dice si los jugadores lo tienen disponible y, si no, qué falta.
 
 ## Notificaciones push
 

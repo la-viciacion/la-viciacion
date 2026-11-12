@@ -5,8 +5,8 @@ it is a secret). The table stores values as text; secrets (the push private key)
 are encrypted with a key derived from SECRET_KEY and are never returned by the
 API, only a hint of their last characters.
 
-A setting with `env_only` is not in the table: the keys of outside services (the Telegram token and chats, the AI key)
-and the AI provider and model (and the chat's model, which falls back to the AI's). They are read from the environment every time and never stored, so a copy of the
+A setting with `env_only` is not in the table: the keys of outside services (the Telegram token and chats, the keys of each
+AI provider) and their default models. They are read from the environment every time and never stored, so a copy of the
 database (a backup, a dump loaded on a laptop) cannot use them, which only whoever holds the .env should be able to do,
 and the panel cannot change them.
 """
@@ -116,6 +116,18 @@ def _key_source(value: str) -> str | None:
     return None if value in ("user_only", "group_then_user", "group_only") else "Debe ser user_only, group_then_user o group_only"
 
 
+AI_PROVIDERS = ("openai", "google")  # the order is the preference when the admin has picked none
+MODEL_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:\-]{0,63}$")
+
+
+def _ai_provider(value: str) -> str | None:
+    return None if value in AI_PROVIDERS else "Debe ser " + " o ".join(AI_PROVIDERS)
+
+
+def _model_name(value: str) -> str | None:
+    return None if MODEL_NAME.fullmatch(value) else "El nombre del modelo no es válido"
+
+
 def _budget(value: int) -> str | None:
     return None if 0 <= value <= 10000 else "Los dólares deben estar entre 0 (sin límite) y 10000"
 
@@ -188,18 +200,17 @@ REGISTRY: dict[str, Spec] = {
     "challenges.reminders_time": Spec("str", "10:00", check=_time),
     # Days the app's notification inbox keeps a notice before the scheduler purges it (utils/inbox.py)
     "inbox.retention_days": Spec("int", 14, check=_retention),
-    # AI text for the notices (utils/ai.py). The key is AI_API_KEY and is never stored;
-    # the provider and the model are read from AI_PROVIDER and AI_MODEL every time; there is no default for either.
+    # AI text for the notices (utils/ai.py). Each provider has its own keys in the environment (`ai.<provider>.api_key`,
+    # `.model`, `.chat_model`: OPENAI_AI_API_KEY, OPENAI_AI_MODEL, OPENAI_CHAT_AI_MODEL, GOOGLE_...), declared in the loop
+    # below and never stored. What the admin picks in the panel is stored: the provider (`ai.provider`) and, per provider, a
+    # model for the notices (`ai.model.<provider>`) and one for the chat and the guide (`chat.model.<provider>`); without a
+    # pick, the environment's model applies (utils/ai_providers.py).
     "ai.enabled": Spec("bool", True),
-    "ai.provider": Spec("str", None, env="AI_PROVIDER", env_only=True),  # "google" or "openai" (utils/ai.py PROVIDERS)
-    "ai.api_key": Spec("str", None, secret=True, env_only=True, env="AI_API_KEY"),
-    "ai.model": Spec("str", None, env="AI_MODEL", env_only=True),  # no default in the code: without it the AI does not write
+    "ai.provider": Spec("str", None, check=_ai_provider, resettable=True),
     # Admin key of OpenAI, only to read what the organization has spent (utils/ai_usage.py); it cannot write text
     "ai.openai_admin_key": Spec("str", None, secret=True, env_only=True, env="OPENAI_ADMIN_KEY"),
-    # The chat assistant (chat/): its own switch and instructions. It talks to the same provider with the same key as the
-    # notices (ai.provider, ai.api_key); only the model may be its own (CHAT_AI_MODEL, optional: without it, ai.model).
+    # The chat assistant (chat/): its own switch and instructions. It talks to the provider chosen for the AI.
     "chat.enabled": Spec("bool", True),
-    "chat.model": Spec("str", None, env="CHAT_AI_MODEL", env_only=True),
     # Questions the chat answers (routers/chat.py), 0 = no limit: per player in the last minute, hour and 24 hours, and
     # in all for the group (the provider's quota is the project's, not each player's)
     "chat.limit_user_minute": Spec("int", 5, check=_limit),
@@ -234,6 +245,15 @@ REGISTRY: dict[str, Spec] = {
     "telegram.group_id": Spec("str", None, env_only=True, env="TELEGRAM_GROUP_ID", check=_chat_id),
     "telegram.admin_chat_id": Spec("str", None, env_only=True, env="TELEGRAM_ADMIN_CHAT_ID", check=_chat_id),
 }
+
+# The AI providers (utils/ai_providers.py): the keys and default models of each come from the environment, the model picked in
+# the panel (and live from the provider) is stored.
+for _p in AI_PROVIDERS:
+    REGISTRY[f"ai.{_p}.api_key"] = Spec("str", None, secret=True, env_only=True, env=f"{_p.upper()}_AI_API_KEY")
+    REGISTRY[f"ai.{_p}.model"] = Spec("str", None, env_only=True, env=f"{_p.upper()}_AI_MODEL")
+    REGISTRY[f"ai.{_p}.chat_model"] = Spec("str", None, env_only=True, env=f"{_p.upper()}_CHAT_AI_MODEL")
+    REGISTRY[f"ai.model.{_p}"] = Spec("str", None, check=_model_name, resettable=True)
+    REGISTRY[f"chat.model.{_p}"] = Spec("str", None, check=_model_name, resettable=True)
 
 # One prompt (default: the one in the code) and one switch per place the AI writes (utils/ai_prompts.py).
 for _id, _use in AI_USES.items():

@@ -15,13 +15,14 @@ from src.clients.ai_error import AIError, Quota, QuotaError
 from src.database import models
 from src.guide import agent as guide_agent
 from src.utils import ai, ai_cost, ai_ledger, ai_spend, settings
+from tests import ai_env
 from tests.sqlite_db import make_session
 from tests.test_chat import seed
 
 
 def values(**overrides):
     base = {key: spec.default for key, spec in settings.REGISTRY.items()}
-    return {**base, "ai.api_key": "KEY", "ai.provider": "openai", "ai.model": "gpt-4.1-mini", "chat.model": None, "chat.prompt": "Eres un bot.",
+    return {**base, **ai_env.group("openai", "KEY", "gpt-4.1-mini"), "chat.prompt": "Eres un bot.",
             "guide.prompt": "Eres un guía.", **overrides}
 
 

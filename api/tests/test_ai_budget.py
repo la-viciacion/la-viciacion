@@ -15,6 +15,7 @@ from src.routers import guide as guide_router
 from src.routers import user_ai as user_route
 from src.routers.manage import ai_usage as manage_route
 from src.utils import actions, ai_budget, ai_ledger, ai_source, messages, scheduler, settings, user_ai
+from tests import ai_env
 from tests.sqlite_db import make_session
 from tests.test_chat import seed
 
@@ -24,7 +25,7 @@ KEY = "sk-proj-AbCdEfGhIjKlMnOpQrStUvWxYz0123456789"
 
 def values(**overrides):
     base = {key: spec.default for key, spec in settings.REGISTRY.items()}
-    return {**base, "ai.api_key": "GROUPKEY", "ai.provider": "openai", "ai.model": "gpt-4.1-mini", "chat.model": None, **overrides}
+    return {**base, **ai_env.group("openai", "GROUPKEY", "gpt-4.1-mini"), **overrides}
 
 
 def patched(**overrides):

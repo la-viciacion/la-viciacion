@@ -21,6 +21,7 @@ from src.guide.prompt import GUIDE_PROMPT
 from src.routers import guide as guide_router
 from src.routers.manage import system
 from src.utils import ai_source, settings
+from tests import ai_env
 from tests.sqlite_db import make_session
 from tests.test_chat import seed
 
@@ -50,7 +51,7 @@ class ContextTests(unittest.TestCase):
 
 class AskTests(unittest.TestCase):
     def setUp(self):
-        patcher = mock.patch.object(agent.settings, "get", side_effect=lambda key: {"guide.prompt": "Eres un guía.", "ai.api_key": "KEY"}[key])
+        patcher = mock.patch.object(agent.settings, "get", side_effect=lambda key: {**ai_env.group("openai", "KEY", "m"), "guide.prompt": "Eres un guía."}[key])
         patcher.start()
         self.addCleanup(patcher.stop)
 
@@ -118,7 +119,7 @@ class PromptSettingTests(unittest.TestCase):
 
 class ModelTests(unittest.TestCase):
     def build(self, provider):
-        values = {"ai.provider": provider, "ai.api_key": "KEY", "ai.model": "m", "chat.model": None}
+        values = ai_env.group(provider, "KEY", "m")
         with mock.patch.object(settings, "get", side_effect=lambda key: values[key]):
             return agent.build_model()
 
@@ -143,14 +144,14 @@ class TestRouteTests(unittest.TestCase):
     admin = types.SimpleNamespace(username="root")
 
     def configured(self, **overrides):
-        base = {"chat.model": None, "ai.provider": "openai", "ai.api_key": "k", "ai.model": "m"}
+        base = ai_env.group("openai", "k", "m")
         return mock.patch.object(chat_model.settings, "get", side_effect=lambda key: {**base, **overrides}[key])
 
     def test_without_the_ai_variables_it_is_a_409_that_says_where_to_set_them(self):
-        with self.configured(**{"ai.api_key": None}), self.assertRaises(HTTPException) as caught:
+        with self.configured(**{"ai.openai.api_key": None}), self.assertRaises(HTTPException) as caught:
             system.test_guide(self.admin)
         self.assertEqual(caught.exception.status_code, 409)
-        self.assertIn("AI_API_KEY", caught.exception.detail)
+        self.assertIn("OPENAI_AI_API_KEY", caught.exception.detail)
 
     def test_it_reports_the_answer_and_what_was_used(self):
         with self.configured(), mock.patch.object(system.guide_agent, "probe", return_value="Team Cherry"):

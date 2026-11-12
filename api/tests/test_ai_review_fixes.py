@@ -21,6 +21,7 @@ from src.guide import agent as guide_agent
 from src.routers import guide as guide_router
 from src.routers import user_ai as route
 from src.utils import actions, ai_budget, ai_ledger, ai_source, scheduler, settings, user_ai
+from tests import ai_env
 from tests.sqlite_db import make_session
 from tests.test_chat import seed
 
@@ -33,7 +34,7 @@ OWN = ai_source.Source("user", "openai", KEY, "gpt-5-mini")
 
 def patched(**overrides):
     table = {key: spec.default for key, spec in settings.REGISTRY.items()}
-    table.update({"ai.api_key": "GROUPKEY", "ai.provider": "openai", "ai.model": "gpt-4.1-mini", "chat.model": None,
+    table.update({**ai_env.group("openai", "GROUPKEY", "gpt-4.1-mini"),
                   "chat.prompt": "Eres un bot.", "guide.prompt": "Eres un guía.", **overrides})
     return mock.patch.object(settings, "get", side_effect=lambda key: table[key])
 

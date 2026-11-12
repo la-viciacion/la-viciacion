@@ -8,13 +8,20 @@ globalThis.location = window.location;
 const { render } = await import('../js/pages/admin/settings.js');
 
 const VALUES = {
-  'ai.enabled': true, 'ai.provider': { is_set: true }, 'ai.api_key': { is_set: true }, 'ai.openai_admin_key': { is_set: false }, 'ai.model': { is_set: true },
-  'ai.use.completed_game': true, 'ai.use.new_game': false, 'chat.enabled': true, 'chat.model': { is_set: true }, 'chat.prompt': 'd',
+  'ai.enabled': true, 'ai.provider': null, 'ai.openai.api_key': { is_set: true }, 'ai.google.api_key': { is_set: true }, 'ai.openai_admin_key': { is_set: false },
+  'ai.model.openai': null, 'ai.model.google': null, 'chat.model.openai': null, 'chat.model.google': null,
+  'ai.use.completed_game': true, 'ai.use.new_game': false, 'chat.enabled': true, 'chat.prompt': 'd',
   'chat.limit_user_minute': 5, 'chat.limit_user_hour': 30, 'chat.limit_user_day': 100, 'chat.limit_group_minute': 10, 'chat.limit_group_day': 300, 'completed_game.recommend': true,
   'telegram.token': { is_set: false }, 'telegram.group_id': { is_set: false }, 'telegram.admin_chat_id': { is_set: false }, 'push.vapid_private': { is_set: true },
   'ai.prompt.completed_game': 'a', 'ai.prompt.completed_game_recommendation': 'b', 'ai.prompt.new_game': 'c',
 };
 const CHAT = { provider: 'openai', model: 'gpt-chat', own_model: true, default_prompt: 'd', customized: false };
+// what the .env has: both providers with a key; the one in use is Google's, with its default model
+const providersOf = (inUse = 'google', keys = ['openai', 'google'], models = {}) => ({
+  providers: ['openai', 'google'].map((id) => ({ id, has_key: keys.includes(id), default_model: models[id] ?? (id === 'google' ? 'gemini-test' : 'gpt-test'), default_chat_model: models[id] ?? (id === 'google' ? 'gemini-test' : 'gpt-test') })),
+  provider: inUse, picked: null, notices_model: 'gemini-test', chat_model: 'gemini-test', notices_own: false, chat_own: false,
+});
+const MODEL_LIST = { provider: 'google', models: ['gemini-2.5-flash', 'gemini-2.5-pro'], defaults: { notices: 'gemini-test', chat: 'gemini-test' } };
 const USES = [
   { id: 'new_game', label: 'Empieza un juego', help: 'h1', switchable: true, switch: 'ai.use.new_game', parent: null, default_prompt: 'c', customized: false },
   { id: 'completed_game', label: 'Completa un juego', help: 'h2', switchable: true, switch: 'ai.use.completed_game', parent: null, default_prompt: 'a', customized: true },
@@ -23,9 +30,13 @@ const USES = [
 
 const panel = () => document.getElementById('panel');
 const open = async (values = VALUES, model = 'gemini-test') => {
-  installApi({ 'GET /manage/settings': { values, jobs: {}, push_devices: { devices: 0, users: 0 }, mail: { configured: false, missing: [] }, ai_uses: USES, ai_model: { provider: 'google', model }, chat: CHAT } });
+  installApi({
+    'GET /manage/settings/ai-models': MODEL_LIST,
+    'GET /manage/settings': { values, jobs: {}, push_devices: { devices: 0, users: 0 }, mail: { configured: false, missing: [] }, ai_uses: USES, ai_model: { provider: 'google', model }, ai_providers: providersOf(), chat: CHAT },
+  });
   await render(panel(), { entity: { sections: ['ai', 'aiuses'] } });
   await settle();
+  await settle(); // the list of models is asked after the page is drawn
 };
 
 test('a fragment is drawn inside the notice it belongs to, with its own switch', async () => {
@@ -59,24 +70,83 @@ test('the notices are dimmed and the page says why while the general AI switch i
   assert.equal(panel().querySelector('.adm-ai-off').hidden, true);
 });
 
-const answer = (values, aiModel, chat) => ({ values, jobs: {}, push_devices: { devices: 2, users: 1 }, mail: { configured: false, missing: [], test_recipient: null }, ai_uses: USES, ai_model: aiModel, chat });
+const answer = (values, aiModel, chat, aiProviders = providersOf()) => ({ values, jobs: {}, push_devices: { devices: 2, users: 1 }, mail: { configured: false, missing: [], test_recipient: null }, ai_uses: USES, ai_model: aiModel, ai_providers: aiProviders, chat });
 const GOOGLE = { provider: 'google', model: 'gemini-test' };
-const openSections = async (sections, values = VALUES, aiModel = GOOGLE, chat = CHAT) => {
-  installApi({ 'GET /manage/settings': answer(values, aiModel, chat) });
+const openSections = async (sections, values = VALUES, aiModel = GOOGLE, chat = CHAT, aiProviders = providersOf()) => {
+  installApi({ 'GET /manage/settings/ai-models': MODEL_LIST, 'GET /manage/settings': answer(values, aiModel, chat, aiProviders) });
   await render(panel(), { entity: { sections } });
   await settle();
+  await settle(); // the list of models is asked after the page is drawn
 };
 
-test('IA → Avisos con IA has the switch, the test and the provider, key and model read only', async () => {
+test('IA → Avisos con IA has the switch, the test, the provider picker and the model picker', async () => {
   await open();
   assert.equal(panel().querySelector('[name="ai.enabled"]').type, 'checkbox');
   assert.ok(panel().querySelector('[data-set-act="test-ai"]'));
-  assert.equal(panel().querySelector('.adm-ai-provider').value, 'Google (Gemini)');
-  assert.equal(panel().querySelector('.adm-ai-model').value, 'gemini-test');
-  assert.equal(panel().querySelectorAll('input:disabled').length, 4); // provider, key, admin key, model: nothing to type
-  assert.equal(panel().querySelector('select[name="ai.provider"]'), null);
+  const provider = panel().querySelector('select[name="ai.provider"]');
+  assert.deepEqual([...provider.options].map((o) => o.value), ['openai', 'google']); // both have a key in the .env
+  assert.equal(provider.value, 'google'); // the one in use
+  assert.equal(provider.disabled, false);
+  const model = panel().querySelector('select[name="ai.model.google"]');
+  assert.equal(model.value, ''); // the .env's model, until another is picked
+  assert.match(model.options[0].textContent, /Por defecto \(gemini-test\)/);
+  assert.deepEqual([...model.options].map((o) => o.value), ['', 'gemini-2.5-flash', 'gemini-2.5-pro']); // asked live to the provider
+  assert.equal(panel().querySelectorAll('input:disabled').length, 1); // the admin key of OpenAI: nothing to type
   assert.match(panel().textContent, /Usa Google \(Gemini\) \(gemini-test\)/);
   assert.equal(panel().querySelector('.adm-warn'), null);
+});
+
+test('with the key of one provider only there is nothing to choose, and with none the page says which to define', async () => {
+  await openSections(['ai', 'aiuses'], VALUES, GOOGLE, CHAT, providersOf('google', ['google']));
+  const provider = panel().querySelector('select[name="ai.provider"]');
+  assert.deepEqual([...provider.options].map((o) => o.value), ['google']);
+  assert.equal(provider.disabled, true);
+  await openSections(['ai', 'aiuses'], VALUES, { provider: null, model: null }, CHAT, providersOf(null, []));
+  assert.equal(panel().querySelector('select[name="ai.provider"]'), null);
+  assert.equal(panel().querySelector('select[name^="ai.model."]'), null);
+  assert.match(panel().querySelector('.adm-warn').textContent, /OPENAI_AI_API_KEY o GOOGLE_AI_API_KEY/);
+  assert.equal(panel().querySelector('[data-set-act="test-ai"]').disabled, true);
+});
+
+test('picking a provider and a model sends them; going back to the default sends null', async () => {
+  await open();
+  const form = panel().querySelector('#admSettings');
+  form.elements['ai.provider'].value = 'openai';
+  form.elements['ai.model.google'].value = 'gemini-2.5-pro';
+  let saved = null;
+  installApi({
+    'GET /manage/settings/ai-models': MODEL_LIST,
+    'GET /manage/settings': answer(VALUES, GOOGLE, CHAT),
+    'PUT /manage/settings': ({ body }) => { saved = body; return { changed: [], values: VALUES }; },
+  });
+  form.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+  await settle();
+  const picks = () => Object.fromEntries(Object.entries(saved.values).filter(([key]) => /^ai\.(provider|model\.)|^chat\.model\./.test(key)));
+  assert.deepEqual(picks(), { 'ai.provider': 'openai', 'ai.model.google': 'gemini-2.5-pro' });
+  // a pick already stored goes back to the .env's model with an empty choice
+  const stored = { ...VALUES, 'ai.model.google': 'gemini-2.5-pro' };
+  installApi({ 'GET /manage/settings/ai-models': MODEL_LIST, 'GET /manage/settings': answer(stored, GOOGLE, CHAT) });
+  await render(panel(), { entity: { sections: ['ai', 'aiuses'] } });
+  await settle();
+  await settle();
+  const again = panel().querySelector('#admSettings');
+  assert.equal(again.elements['ai.model.google'].value, 'gemini-2.5-pro');
+  again.elements['ai.model.google'].value = '';
+  installApi({ 'GET /manage/settings/ai-models': MODEL_LIST, 'GET /manage/settings': answer(stored, GOOGLE, CHAT), 'PUT /manage/settings': ({ body }) => { saved = body; return { changed: [], values: stored }; } });
+  again.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+  await settle();
+  assert.deepEqual(picks(), { 'ai.model.google': null });
+});
+
+test('when the provider cannot list its models the page says so and keeps the default', async () => {
+  installApi({
+    'GET /manage/settings/ai-models': () => { throw new Error('google no ha dado la lista de modelos'); },
+    'GET /manage/settings': answer(VALUES, GOOGLE, CHAT),
+  });
+  await render(panel(), { entity: { sections: ['ai', 'aiuses'] } });
+  await settle();
+  assert.match(panel().querySelector('.adm-model-note').textContent, /No se ha podido consultar la lista de modelos/);
+  assert.equal(panel().querySelector('select[name="ai.model.google"]').options.length, 1);
 });
 
 test('saving the AI switch never sends the provider, the key or the model', async () => {
@@ -85,6 +155,7 @@ test('saving the AI switch never sends the provider, the key or the model', asyn
   form.querySelector('[name="ai.enabled"]').checked = false;
   let saved = null;
   installApi({
+    'GET /manage/settings/ai-models': MODEL_LIST,
     'GET /manage/settings': answer(VALUES, GOOGLE, CHAT),
     'PUT /manage/settings': ({ body }) => { saved = body; return { changed: [], values: VALUES }; },
   });
@@ -94,13 +165,9 @@ test('saving the AI switch never sends the provider, the key or the model', asyn
   assert.deepEqual(Object.keys(saved.values).filter((key) => /provider|api_key|model/.test(key)), []);
 });
 
-test('without AI_MODEL or AI_PROVIDER the page says the AI writes nothing and which one is missing', async () => {
+test('without a model the page says the AI writes nothing and which one is missing', async () => {
   await openSections(['ai', 'aiuses'], VALUES, { provider: 'google', model: null });
-  assert.equal(panel().querySelector('.adm-ai-model').value, 'Sin configurar');
-  assert.match(panel().querySelector('.adm-warn').textContent, /Falta AI_MODEL en el \.env/);
-  await openSections(['ai', 'aiuses'], VALUES, { provider: null, model: null });
-  assert.equal(panel().querySelector('.adm-ai-provider').value, 'Sin configurar');
-  assert.match(panel().querySelector('.adm-warn').textContent, /Falta AI_PROVIDER, AI_MODEL en el \.env/);
+  assert.match(panel().querySelector('.adm-warn').textContent, /Falta un modelo \(GOOGLE_AI_MODEL en el \.env, o elígelo aquí\)/);
   assert.equal(panel().querySelectorAll('.adm-warn').length, 1); // said once, not once per card
 });
 
@@ -125,28 +192,31 @@ test('Canales says whether Telegram is set and only allows the test when it is',
   assert.equal(panel().querySelector('[data-set-act="test"]').disabled, false);
 });
 
-const openWithChat = async (values = VALUES, chat = CHAT) => {
-  installApi({ 'GET /manage/settings': { values, jobs: {}, push_devices: { devices: 0, users: 0 }, mail: { configured: false, missing: [] }, ai_uses: USES, ai_model: { provider: 'google', model: 'gemini-test' }, chat } });
+const openWithChat = async (values = VALUES, chat = CHAT, aiProviders = providersOf()) => {
+  installApi({ 'GET /manage/settings/ai-models': MODEL_LIST, 'GET /manage/settings': { values, jobs: {}, push_devices: { devices: 0, users: 0 }, mail: { configured: false, missing: [] }, ai_uses: USES, ai_model: { provider: 'google', model: 'gemini-test' }, ai_providers: aiProviders, chat } });
   await render(panel(), { entity: { sections: ['chat'] } });
   await settle();
+  await settle(); // the list of models is asked after the page is drawn
 };
 const openLimits = async (values = VALUES, sections = ['ailimitq']) => {
   installApi({ 'GET /manage/settings': { values, jobs: {}, push_devices: { devices: 0, users: 0 }, mail: { configured: false, missing: [] }, ai_uses: USES, ai_model: { provider: 'google', model: 'gemini-test' }, chat: CHAT, guide: CHAT } });
   await render(panel(), { entity: { sections } });
   await settle();
+  await settle(); // the list of models is asked after the page is drawn
 };
 const limitsCard = () => panel().querySelector('.adm-ailimitq-card');
 const chatCard = () => panel().querySelector('.adm-chat-card');
 const state = () => chatCard().querySelector('.adm-chat-state').textContent;
 
-test('the chat card shows its switch, its instructions and the model it uses, read only', async () => {
+test('the chat card shows its switch, its instructions and a picker for the model it uses', async () => {
   await openWithChat();
   assert.equal(chatCard().querySelector('input[type="checkbox"]').name, 'chat.enabled');
   assert.ok(chatCard().querySelector('textarea[name="chat.prompt"]'));
-  assert.equal(chatCard().querySelectorAll('input:disabled').length, 1); // only its model, read only: it comes from the .env
-  assert.equal(chatCard().querySelector('.adm-chat-model').value, 'gpt-chat');
-  assert.match(chatCard().textContent, /CHAT_AI_MODEL si está en el \.env/);
-  assert.doesNotMatch(chatCard().textContent, /ahora no lo está/);
+  assert.equal(chatCard().querySelectorAll('input:disabled').length, 0);
+  const model = chatCard().querySelector('select[name="chat.model.google"]'); // the provider in use
+  assert.equal(model.value, '');
+  assert.deepEqual([...model.options].map((o) => o.value), ['', 'gemini-2.5-flash', 'gemini-2.5-pro']);
+  assert.match(chatCard().textContent, /GOOGLE_CHAT_AI_MODEL si está en el \.env/);
   assert.equal(chatCard().querySelector('.adm-warn'), null);
   assert.match(state(), /^Disponible/);
   assert.equal(panel().querySelector('[name="ai.enabled"]'), null); // the notices' AI is not on this page
@@ -161,10 +231,13 @@ test('the chat is not among the notices that use the AI, and the general AI swit
 test('the chat card says why the players do not have the button', async () => {
   await openWithChat({ ...VALUES, 'chat.enabled': false });
   assert.match(state(), /No disponible: el chat está apagado/);
-  await openWithChat({ ...VALUES, 'ai.api_key': { is_set: false } }, { ...CHAT, provider: null, model: null, own_model: false });
-  assert.match(state(), /falta AI_PROVIDER, AI_API_KEY, AI_MODEL \(o CHAT_AI_MODEL\) en el \.env/);
+  await openWithChat(VALUES, { ...CHAT, provider: null, model: null, own_model: false }, providersOf(null, []));
+  assert.match(state(), /falta OPENAI_AI_API_KEY o GOOGLE_AI_API_KEY/);
   assert.match(chatCard().querySelector('.adm-warn').textContent, /proveedor y la clave de la IA de los avisos/);
+  assert.equal(chatCard().querySelector('select'), null);
   assert.equal(chatCard().querySelector('[data-set-act="test-chat"]').disabled, true);
+  await openWithChat(VALUES, { ...CHAT, provider: 'google', model: null, own_model: false });
+  assert.match(state(), /falta un modelo \(GOOGLE_AI_MODEL en el \.env, o elígelo aquí\)/);
 });
 
 test('switching the chat off is saved like any other switch and touches nothing else', async () => {
@@ -241,17 +314,17 @@ test('changing a limit sends that number, and only that one', async () => {
   });
 });
 
-test('without a model of its own the chat says it uses AI_MODEL', async () => {
-  await openWithChat(VALUES, { ...CHAT, model: 'gemini-test', own_model: false });
-  assert.equal(chatCard().querySelector('.adm-chat-model').value, 'gemini-test');
-  assert.match(chatCard().textContent, /ahora no lo está: usa AI_MODEL/);
+test('the chat model is its own only when picked; the card says what applies otherwise', async () => {
+  await openWithChat();
+  assert.match(chatCard().textContent, /si no, el modelo de los avisos|y, si no, el modelo de los avisos/);
 });
 
 const GUIDE = { provider: 'openai', model: 'gpt-chat', own_model: true, default_prompt: 'g', customized: false };
 const openWithGuide = async (values = VALUES, guide = GUIDE) => {
-  installApi({ 'GET /manage/settings': { values: { ...values, 'guide.enabled': true, 'guide.prompt': 'g', 'guide.limit_user_hour': 10, 'guide.limit_user_day': 30, 'guide.limit_group_day': 100, ...values }, jobs: {}, push_devices: { devices: 0, users: 0 }, mail: { configured: false, missing: [] }, ai_uses: USES, ai_model: { provider: 'google', model: 'gemini-test' }, chat: CHAT, guide } });
+  installApi({ 'GET /manage/settings/ai-models': MODEL_LIST, 'GET /manage/settings': { values: { ...values, 'guide.enabled': true, 'guide.prompt': 'g', 'guide.limit_user_hour': 10, 'guide.limit_user_day': 30, 'guide.limit_group_day': 100, ...values }, jobs: {}, push_devices: { devices: 0, users: 0 }, mail: { configured: false, missing: [] }, ai_uses: USES, ai_model: { provider: 'google', model: 'gemini-test' }, ai_providers: providersOf(), chat: CHAT, guide } });
   await render(panel(), { entity: { sections: ['guide'] } });
   await settle();
+  await settle(); // the list of models is asked after the page is drawn
 };
 const guideCard = () => panel().querySelector('.adm-guide-card');
 
@@ -267,8 +340,8 @@ test('the guide card has its switch and its instructions, and offers the test; i
 test('the guide card says why the players do not have it', async () => {
   await openWithGuide({ ...VALUES, 'guide.enabled': false });
   assert.match(guideCard().querySelector('.adm-guide-state').textContent, /No disponible: la guía está apagada/);
-  await openWithGuide({ ...VALUES, 'ai.api_key': { is_set: false } }, { ...GUIDE, provider: null, model: null });
-  assert.match(guideCard().querySelector('.adm-guide-state').textContent, /falta AI_PROVIDER, AI_API_KEY/);
+  await openWithGuide(VALUES, { ...GUIDE, provider: null, model: null });
+  assert.match(guideCard().querySelector('.adm-guide-state').textContent, /falta OPENAI_AI_API_KEY o GOOGLE_AI_API_KEY/);
   assert.equal(guideCard().querySelector('[data-set-act="test-guide"]').disabled, true);
 });
 

@@ -183,7 +183,7 @@ class AuditTests(ApiTestCase):
 
     def test_passwords_and_secrets_never_reach_the_log(self):
         self.admin("POST", f"/users/{self.ana}/password", json={"password": "N3w-secret!password"})
-        refused = self.admin("PUT", "/settings", json={"values": {"ai.api_key": "sk-very-secret"}})  # keys live in the .env
+        refused = self.admin("PUT", "/settings", json={"values": {"ai.openai.api_key": "sk-very-secret"}})  # keys live in the .env
         self.assertEqual(refused.status_code, 400)
         everything = str(self.rows("SELECT path, detail FROM audit_log"))
         self.assertNotIn("N3w-secret!password", everything)

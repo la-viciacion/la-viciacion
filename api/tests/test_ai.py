@@ -9,7 +9,8 @@ from src.clients import google_ai
 from src.clients.ai_error import AIError
 from src.database import models
 from src.routers.manage import system
-from src.utils import ai, ai_prompts, my_utils, settings
+from src.utils import ai, ai_prompts, ai_providers, my_utils, settings
+from tests import ai_env
 from tests.sqlite_db import make_session
 
 
@@ -29,45 +30,90 @@ OTHER_KEY = "AIzaSyNEWKEY-0123456789-abcdef"
 
 
 def values(**overrides):
-    base = {"ai.enabled": True, "ai.provider": "google", "ai.api_key": KEY, "ai.model": "gemini-test"}
+    base = ai_env.group("google", KEY, "gemini-test", **{"ai.enabled": True})
     return mock.patch.object(ai.settings, "get", side_effect=lambda k: {**base, **overrides}[k])
 
 
 class SettingsTests(unittest.TestCase):
-    def test_the_provider_comes_only_from_the_environment_and_has_no_default(self):
+    def test_the_keys_and_default_models_come_only_from_the_environment_per_provider(self):
         db = make_session()
-        with mock.patch.dict(os.environ, {"AI_PROVIDER": " openai "}):
-            self.assertEqual(settings.get("ai.provider"), "openai")
-            self.assertEqual(settings.public_view(db)["ai.provider"], {"is_set": True, "hint": None})
-            with self.assertRaises(ValueError):
-                settings.set_values(db, {"ai.provider": "google"})  # not from the panel
-        with mock.patch.dict(os.environ, {"AI_PROVIDER": ""}):
-            self.assertIsNone(settings.get("ai.provider"))
-        self.assertEqual(db.query(models.AppSetting).filter_by(key="ai.provider").count(), 0)
+        env = {"OPENAI_AI_API_KEY": KEY, "OPENAI_AI_MODEL": " gpt-x ", "OPENAI_CHAT_AI_MODEL": "gpt-strong", "GOOGLE_AI_API_KEY": "", "GOOGLE_AI_MODEL": "gemini-x"}
+        with mock.patch.dict(os.environ, env):
+            self.assertEqual(settings.get("ai.openai.api_key"), KEY)
+            self.assertEqual(settings.get("ai.openai.model"), "gpt-x")
+            self.assertEqual(settings.get("ai.openai.chat_model"), "gpt-strong")
+            self.assertIsNone(settings.get("ai.google.api_key"))
+            view = settings.public_view(db)
+            self.assertEqual(view["ai.openai.api_key"], {"is_set": True, "hint": None})
+            self.assertEqual(view["ai.google.api_key"], {"is_set": False, "hint": None})
+            self.assertNotIn(KEY, str(view))
+            for key in ("ai.openai.api_key", "ai.openai.model", "ai.google.chat_model"):
+                with self.assertRaises(ValueError):
+                    settings.set_values(db, {key: "other"})  # not from the panel
+        for p in settings.AI_PROVIDERS:
+            self.assertIsNone(settings.REGISTRY[f"ai.{p}.model"].default)  # nothing in the code fills the gap
+        self.assertEqual(db.query(models.AppSetting).count(), 0)
 
-    def test_the_model_comes_only_from_the_environment_and_has_no_default(self):
-        db = make_session()
-        with mock.patch.dict(os.environ, {"AI_MODEL": "gemini-x"}):
-            self.assertEqual(settings.get("ai.model"), "gemini-x")
-            self.assertEqual(settings.public_view(db)["ai.model"], {"is_set": True, "hint": None})
-            with self.assertRaises(ValueError):
-                settings.set_values(db, {"ai.model": "other"})  # not from the panel
-        with mock.patch.dict(os.environ, {"AI_MODEL": ""}):
-            self.assertIsNone(settings.get("ai.model"))  # nothing in the code fills the gap
-            self.assertEqual(settings.public_view(db)["ai.model"], {"is_set": False, "hint": None})
-        self.assertEqual(db.query(models.AppSetting).filter_by(key="ai.model").count(), 0)
+    def test_the_old_variables_are_gone(self):
+        for old in ("ai.api_key", "ai.model", "chat.model"):
+            self.assertNotIn(old, settings.REGISTRY)
+        self.assertFalse(settings.REGISTRY["ai.provider"].env_only)  # the provider is picked in the panel, not in the .env
 
-    def test_the_key_comes_from_the_environment_is_never_stored_and_never_shown(self):
+    def test_what_the_panel_picks_is_stored_and_checked(self):
         db = make_session()
-        with mock.patch.dict(os.environ, {"AI_API_KEY": KEY}):
-            self.assertEqual(settings.get("ai.api_key"), KEY)
-            self.assertEqual(settings.public_view(db)["ai.api_key"], {"is_set": True, "hint": None})
-            self.assertNotIn(KEY, str(settings.public_view(db)))
-            with self.assertRaises(ValueError):
-                settings.set_values(db, {"ai.api_key": OTHER_KEY})  # not from the panel
-        self.assertEqual(db.query(models.AppSetting).filter_by(key="ai.api_key").count(), 0)
-        with mock.patch.dict(os.environ, {"AI_API_KEY": ""}):
-            self.assertEqual(settings.public_view(db)["ai.api_key"], {"is_set": False, "hint": None})
+        settings.set_values(db, {"ai.provider": "google", "ai.model.google": "gemini-2.5-flash", "chat.model.openai": "gpt-4.1"})
+        self.assertEqual(settings.get_all(db)["ai.provider"], "google")
+        with self.assertRaises(ValueError):
+            settings.set_values(db, {"ai.provider": "claude"})
+        with self.assertRaises(ValueError):
+            settings.set_values(db, {"ai.model.openai": "no valid name!"})
+        settings.set_values(db, {"ai.provider": None})  # back to "the first with a key"
+        self.assertIsNone(settings.get_all(db)["ai.provider"])
+
+    def test_the_providers_of_the_registry_are_the_ones_that_can_write(self):
+        self.assertEqual(set(ai.PROVIDERS), set(settings.AI_PROVIDERS))
+
+
+class ProviderChoiceTests(unittest.TestCase):
+    def table(self, **overrides):
+        base = {**ai_env.group(None), "ai.openai.api_key": "O", "ai.google.api_key": "G", "ai.openai.model": "gpt-d", "ai.google.model": "gem-d"}
+        return mock.patch.object(ai_providers.settings, "get", side_effect=lambda k: {**base, **overrides}[k])
+
+    def test_the_providers_are_those_with_a_key(self):
+        with self.table():
+            self.assertEqual(ai_providers.available(), ["openai", "google"])
+        with self.table(**{"ai.openai.api_key": None}):
+            self.assertEqual(ai_providers.available(), ["google"])
+        with self.table(**{"ai.openai.api_key": None, "ai.google.api_key": None}):
+            self.assertEqual(ai_providers.available(), [])
+            self.assertIsNone(ai_providers.selected())
+            self.assertIsNone(ai_providers.group_credentials())
+
+    def test_with_both_the_pick_decides_and_with_none_the_first_is_used(self):
+        with self.table():
+            self.assertEqual(ai_providers.selected(), "openai")
+        with self.table(**{"ai.provider": "google"}):
+            self.assertEqual(ai_providers.current(), ("google", "gem-d"))
+            self.assertEqual(ai_providers.group_credentials(), ("google", "G", "gem-d"))
+
+    def test_a_pick_whose_provider_lost_its_key_is_ignored(self):
+        with self.table(**{"ai.provider": "google", "ai.google.api_key": None}):
+            self.assertEqual(ai_providers.selected(), "openai")
+
+    def test_the_model_picked_in_the_panel_wins_over_the_env_default_and_is_per_provider(self):
+        with self.table(**{"ai.model.openai": "gpt-picked", "ai.provider": "openai"}):
+            self.assertEqual(ai_providers.model(), "gpt-picked")
+            self.assertEqual(ai_providers.model(provider="google"), "gem-d")
+            self.assertTrue(ai_providers.own_model(ai_providers.NOTICES, "openai"))
+            self.assertFalse(ai_providers.own_model(ai_providers.NOTICES, "google"))
+
+    def test_the_chat_model_falls_back_to_the_notices_one(self):
+        with self.table(**{"ai.openai.chat_model": "gpt-chat"}):
+            self.assertEqual(ai_providers.model(ai_providers.CHAT), "gpt-chat")
+        with self.table(**{"ai.model.openai": "gpt-picked"}):
+            self.assertEqual(ai_providers.model(ai_providers.CHAT), "gpt-picked")  # no chat model of its own at all
+        with self.table(**{"ai.openai.chat_model": "gpt-chat", "chat.model.openai": "gpt-chat-picked"}):
+            self.assertEqual(ai_providers.model(ai_providers.CHAT), "gpt-chat-picked")
 
 
 class CompleteTests(unittest.TestCase):
@@ -77,7 +123,7 @@ class CompleteTests(unittest.TestCase):
             with values(**{"ai.enabled": False}):
                 self.assertIsNone(ai.complete("s", "u"))
                 self.assertFalse(ai.is_ready())
-            with values(**{"ai.api_key": None}):
+            with values(**{"ai.google.api_key": None}):
                 self.assertIsNone(ai.complete("s", "u"))
                 self.assertIsNone(ai.complete("s", "u", force=True))
         provider.assert_not_called()
@@ -90,14 +136,14 @@ class CompleteTests(unittest.TestCase):
     def test_the_panel_is_told_the_provider_and_the_model_in_use(self):
         with values():
             self.assertEqual(ai.in_use(), {"provider": "google", "model": "gemini-test"})
-        with values(**{"ai.provider": "openai", "ai.model": "gpt-x"}):
+        with values(**ai_env.group("openai", KEY, "gpt-x")):
             self.assertEqual(ai.in_use(), {"provider": "openai", "model": "gpt-x"})
-        with values(**{"ai.model": None, "ai.provider": None}):
+        with values(**ai_env.group(None)):
             self.assertEqual(ai.in_use(), {"provider": None, "model": None})
 
-    def test_without_a_provider_or_a_model_the_ai_writes_nothing_and_calls_nobody(self):
+    def test_without_a_key_or_a_model_the_ai_writes_nothing_and_calls_nobody(self):
         provider = mock.Mock()
-        for missing in ({"ai.model": None}, {"ai.provider": None}, {"ai.provider": "claude"}):
+        for missing in ({"ai.google.model": None}, ai_env.group(None)):
             with mock.patch.dict(ai.PROVIDERS, {"google": provider}), values(**missing):
                 self.assertFalse(ai.is_ready(), missing)
                 self.assertFalse(ai.is_ready("new_game"), missing)
@@ -111,7 +157,7 @@ class CompleteTests(unittest.TestCase):
             with values():
                 self.assertEqual(ai.complete("sys", "usr"), "g")
             google.assert_called_once_with(KEY, "gemini-test", "sys", "usr", 1.0)
-            with values(**{"ai.provider": "openai", "ai.model": "gpt-x"}):
+            with values(**ai_env.group("openai", KEY, "gpt-x")):
                 self.assertEqual(ai.complete("sys", "usr"), "o")
             openai.assert_called_once_with(KEY, "gpt-x", "sys", "usr", 1.0)
 
@@ -250,7 +296,7 @@ class PromptOverrideTests(unittest.TestCase):
 class PerUseTests(unittest.TestCase):
     def stored(self, **overrides):
         """settings.get as production answers it: what is stored, else the default of the registry."""
-        base = {"ai.enabled": True, "ai.provider": "google", "ai.api_key": KEY, "ai.model": "gemini-test"}
+        base = ai_env.group("google", KEY, "gemini-test", **{"ai.enabled": True})
         return mock.patch.object(
             ai.settings, "get", side_effect=lambda k: {**base, **overrides}.get(k, settings.REGISTRY[k].default)
         )
@@ -283,7 +329,7 @@ class NoticeSwitchTests(unittest.IsolatedAsyncioTestCase):
         FakeBot.sent = []
         base = {
             "notifications.enabled": True, "telegram.token": "123456789:AAE_abcdefghijklmnopqrstuvwxyz012345",
-            "telegram.group_id": "-100", "ai.enabled": True, "ai.provider": "google", "ai.api_key": KEY, "ai.model": "gemini-test",
+            "telegram.group_id": "-100", **ai_env.group("google", KEY, "gemini-test"), "ai.enabled": True,
         }
         complete = mock.Mock(return_value="Reescrito por la IA")
         with mock.patch.object(my_utils.telegram, "Bot", FakeBot), \
@@ -313,17 +359,21 @@ class TestRouteTests(unittest.TestCase):
     admin = mock.Mock(username="root")
 
     def test_without_a_key_it_says_so(self):
-        with values(**{"ai.api_key": None}), self.assertRaises(HTTPException) as caught:
+        with values(**ai_env.group(None)), self.assertRaises(HTTPException) as caught:
             system.test_ai(self.admin)
         self.assertEqual(caught.exception.status_code, 409)
 
-    def test_without_a_provider_or_a_model_it_is_a_409_that_says_where_to_set_them(self):
-        for missing in ({"ai.model": None}, {"ai.provider": None}):
-            with values(**missing), self.assertRaises(HTTPException) as caught:
-                system.test_ai(self.admin)
-            self.assertEqual(caught.exception.status_code, 409)
-            self.assertIn("AI_MODEL", caught.exception.detail)
-            self.assertIn("AI_PROVIDER", caught.exception.detail)
+    def test_without_a_model_it_is_a_409_that_says_where_to_set_it(self):
+        with values(**{"ai.google.model": None}), self.assertRaises(HTTPException) as caught:
+            system.test_ai(self.admin)
+        self.assertEqual(caught.exception.status_code, 409)
+        self.assertIn("GOOGLE_AI_MODEL", caught.exception.detail)
+
+    def test_without_any_key_it_names_the_variables_of_every_provider(self):
+        with values(**ai_env.group(None)), self.assertRaises(HTTPException) as caught:
+            system.test_ai(self.admin)
+        self.assertIn("OPENAI_AI_API_KEY", caught.exception.detail)
+        self.assertIn("GOOGLE_AI_API_KEY", caught.exception.detail)
 
     def test_it_works_with_the_switch_off_and_reports_what_was_used(self):
         with values(**{"ai.enabled": False}), mock.patch.dict(ai.PROVIDERS, {"google": mock.Mock(return_value="Hola")}):
@@ -338,6 +388,36 @@ class TestRouteTests(unittest.TestCase):
                 system.test_ai(self.admin)
         self.assertEqual(caught.exception.status_code, 502)
         self.assertIn("403", caught.exception.detail)
+
+class ModelListTests(unittest.TestCase):
+    admin = mock.Mock(username="root")
+
+    def test_it_asks_the_provider_for_its_models_now_and_offers_the_defaults(self):
+        table = ai_env.group("openai", KEY, "gpt-d", **{"ai.openai.chat_model": "gpt-c"})
+        with mock.patch.object(ai.settings, "get", side_effect=lambda k: table[k]),                 mock.patch.object(system.open_ai, "list_models", return_value=["gpt-4.1", "gpt-4.1-2025-04-14", "text-embedding-3-small", "whisper-1"]) as listed:
+            result = system.list_ai_models("openai", self.admin)
+        listed.assert_called_once_with(KEY)
+        self.assertEqual(result["models"], ["gpt-4.1"])  # only the ones that write text, without the dated copies
+        self.assertEqual(result["defaults"], {"notices": "gpt-d", "chat": "gpt-c"})
+
+    def test_google_lists_its_own(self):
+        table = ai_env.group("google", KEY, "gem-d")
+        with mock.patch.object(ai.settings, "get", side_effect=lambda k: table[k]),                 mock.patch.object(system.google_ai, "list_models", return_value=["gemini-2.5-flash"]):
+            self.assertEqual(system.list_ai_models("google", self.admin)["models"], ["gemini-2.5-flash"])
+
+    def test_without_the_key_of_that_provider_it_is_a_409_that_names_the_variable(self):
+        table = ai_env.group("google", KEY, "gem-d")
+        with mock.patch.object(ai.settings, "get", side_effect=lambda k: table[k]), self.assertRaises(HTTPException) as caught:
+            system.list_ai_models("openai", self.admin)
+        self.assertEqual(caught.exception.status_code, 409)
+        self.assertIn("OPENAI_AI_API_KEY", caught.exception.detail)
+
+    def test_a_provider_failure_is_a_502(self):
+        table = ai_env.group("openai", KEY, "gpt-d")
+        with mock.patch.object(ai.settings, "get", side_effect=lambda k: table[k]),                 mock.patch.object(system.open_ai, "list_models", side_effect=AIError("boom")), self.assertRaises(HTTPException) as caught:
+            system.list_ai_models("openai", self.admin)
+        self.assertEqual(caught.exception.status_code, 502)
+
 
 
 if __name__ == "__main__":

@@ -26,7 +26,7 @@ from ..chat import agent as chat_agent
 from ..chat import model as chat_model
 from ..clients.ai_error import QuotaError
 from ..chat.tools import hours
-from ..utils import ai_ledger, messages, settings
+from ..utils import ai_ledger, ai_providers, messages, settings
 from ..utils.logger import LogManager
 from .prompt import DEFAULT_LEVEL, LEVELS
 
@@ -61,7 +61,8 @@ def build_model(source=None) -> Model:
     """The model for a source of key (utils/ai_source.py): the player's own, or the group's when none is given."""
     if source is not None:
         return BUILDERS[source.provider](source.model, source.api_key)
-    return BUILDERS[settings.get("ai.provider")](chat_model.model_name(), settings.get("ai.api_key"))
+    provider, key, name = ai_providers.group_credentials(ai_providers.CHAT)
+    return BUILDERS[provider](name, key)
 
 
 def is_ready() -> bool:
@@ -116,7 +117,7 @@ def ask(deps: GuideDeps, question: str, history: list[tuple[str, str]], model=No
     if source is not None:
         provider, name = source.provider, source.model
     else:
-        provider, name = (settings.get("ai.provider"), chat_model.model_name()) if deps.db is not None else (None, None)
+        provider, name = (ai_providers.selected(), chat_model.model_name()) if deps.db is not None else (None, None)
     paid_by = source.key_source if source is not None else ai_ledger.GROUP
     recorded = dict(user_id=deps.user_id, feature="guide", key_source=paid_by, question=question, turns=len(history), game_id=deps.game_id, provider=provider, model=name)
 

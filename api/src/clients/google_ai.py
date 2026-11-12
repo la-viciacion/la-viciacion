@@ -50,3 +50,26 @@ def _report(response) -> None:
         output_tokens=(getattr(meta, "candidates_token_count", 0) or 0) + thoughts,
         reasoning_tokens=thoughts,
     ))
+
+
+def list_models(api_key: str) -> list[str]:
+    """The ids of the Gemini models a key can use to write text (a call that spends nothing), without the `models/` prefix.
+    The client is not cached. Raises QuotaError, ProviderError or AIError, never with the key in the message."""
+    from . import failure
+    from .ai_error import ProviderError
+
+    try:
+        client = genai.Client(api_key=api_key, http_options=types.HttpOptions(timeout=TIMEOUT_MS))
+        ids = [
+            model.name.removeprefix("models/")
+            for model in client.models.list()
+            if model.name and "generateContent" in (model.supported_actions or [])
+        ]
+        return sorted(i for i in ids if i.startswith("gemini"))
+    except Exception as e:
+        message = f"google: {type(e).__name__}: {str(e).replace(api_key, '***')}"
+        quota = classify(e)
+        if quota:
+            raise QuotaError(message, quota) from None
+        kind = failure.kind(e)
+        raise (ProviderError(message, kind) if kind else AIError(message)) from None

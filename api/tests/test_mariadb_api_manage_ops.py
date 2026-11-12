@@ -249,9 +249,10 @@ class SettingsTests(OpsTestCase):
         self.assertEqual(body["push_devices"], {"devices": 0, "users": 0})
         self.assertEqual(body["mail"]["test_recipient"], "root@example.com")
         self.assertTrue(body["ai_uses"])
-        self.assertEqual(set(body["ai_model"]), {"provider", "model"})  # the model is the environment's: never stored, no default
-        self.assertEqual(body["values"]["ai.model"], {"is_set": bool(body["ai_model"]["model"]), "hint": None})
-        self.assertEqual(body["values"]["ai.provider"], {"is_set": bool(body["ai_model"]["provider"]), "hint": None})
+        self.assertEqual(set(body["ai_model"]), {"provider", "model"})  # the default model is the environment's: no default in the code
+        self.assertEqual(set(body["ai_providers"]), {"providers", "provider", "picked", "notices_model", "chat_model", "notices_own", "chat_own"})
+        self.assertEqual(body["values"]["ai.openai.api_key"], {"is_set": bool(body["ai_providers"]["providers"][0]["has_key"]), "hint": None})
+        self.assertIsNone(body["values"]["ai.provider"])  # what the admin picks is stored: nothing is picked yet
 
     def test_several_settings_change_at_once_and_only_the_changed_ones_are_reported(self):
         response = self.admin("PUT", "/settings", json={"values": {"weekly.weekday": 3, "weekly.time": "10:30", "weekly.enabled": True}})
@@ -293,11 +294,18 @@ class SettingsTests(OpsTestCase):
         self.assertNotIn("private-key-1234567890", stored)
 
     def test_the_ai_key_is_never_stored_and_the_panel_refuses_it(self):
-        self.set_settings(**{"ai.api_key": "sk-test-1234567890"})
-        self.assertEqual(settings.get("ai.api_key"), "sk-test-1234567890")
-        self.assertEqual(self.scalar("SELECT COUNT(*) FROM app_settings WHERE `key` = 'ai.api_key'"), 0)
-        self.assertEqual(self.admin("PUT", "/settings", json={"values": {"ai.api_key": "sk-other"}}).status_code, 400)
-        self.assertEqual(self.admin("GET", "/settings").json()["values"]["ai.api_key"], {"is_set": True, "hint": None})
+        self.set_settings(**{"ai.openai.api_key": "sk-test-1234567890"})
+        self.assertEqual(settings.get("ai.openai.api_key"), "sk-test-1234567890")
+        self.assertEqual(self.scalar("SELECT COUNT(*) FROM app_settings WHERE `key` = 'ai.openai.api_key'"), 0)
+        self.assertEqual(self.admin("PUT", "/settings", json={"values": {"ai.openai.api_key": "sk-other"}}).status_code, 400)
+        self.assertEqual(self.admin("GET", "/settings").json()["values"]["ai.openai.api_key"], {"is_set": True, "hint": None})
+
+    def test_the_provider_and_the_models_picked_in_the_panel_are_stored(self):
+        self.assertEqual(self.admin("PUT", "/settings", json={"values": {"ai.provider": "google", "ai.model.google": "gemini-2.5-flash"}}).status_code, 200)
+        self.assertEqual(self.scalar("SELECT value FROM app_settings WHERE `key` = 'ai.provider'"), "google")
+        self.assertEqual(self.admin("PUT", "/settings", json={"values": {"ai.provider": "claude"}}).status_code, 400)
+        self.assertEqual(self.admin("PUT", "/settings", json={"values": {"ai.provider": None}}).status_code, 200)
+        self.assertEqual(self.scalar("SELECT COUNT(*) FROM app_settings WHERE `key` = 'ai.provider'"), 0)
 
     def test_a_resettable_prompt_goes_back_to_its_default_with_null(self):
         key = "ai.prompt." + self.admin("GET", "/settings").json()["ai_uses"][0]["id"]
@@ -441,11 +449,11 @@ class DiagnosticsTests(OpsTestCase):
 
     def test_the_ai_test_needs_a_key_a_provider_and_a_model_and_reports_what_the_ai_answers(self):
         self.assertEqual(self.admin("POST", "/settings/test-ai").status_code, 409)
-        self.set_settings(**{"ai.api_key": "sk-test-key-1234"})
-        incomplete = self.admin("POST", "/settings/test-ai")  # the provider and the model come from the environment too
+        self.set_settings(**{"ai.google.api_key": "sk-test-key-1234"})
+        incomplete = self.admin("POST", "/settings/test-ai")  # the default model comes from the environment too
         self.assertEqual(incomplete.status_code, 409)
-        self.assertIn("AI_PROVIDER", incomplete.json()["detail"])
-        self.set_settings(**{"ai.provider": "google", "ai.model": "gemini-x"})
+        self.assertIn("GOOGLE_AI_MODEL", incomplete.json()["detail"])
+        self.set_settings(**{"ai.google.model": "gemini-x"})
         with mock.patch.object(ai, "complete", return_value="¡Hola, jugones!") as complete, mock.patch.object(ai, "current", return_value=("google", "gemini-x")):
             done = self.admin("POST", "/settings/test-ai")
         self.assertEqual(done.json(), {"message": "La IA ha respondido", "reply": "¡Hola, jugones!", "provider": "google", "model": "gemini-x"})

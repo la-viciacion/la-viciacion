@@ -8,14 +8,13 @@ Each feature has a mode (admin setting `chat.key_source`, `guide.key_source`):
   group_only      always the group's, whatever the players have saved (for the day the group agrees to pay for everybody)
 
 The answer is a `Source`: whose key it is (`key_source`, written to the usage record), the provider, the key and the model.
-The player's own is OpenAI's, with the model they chose; the group's is the one of the .env (AI_PROVIDER, AI_API_KEY and the
-chat's model). `None` means nobody can pay for it now."""
+The player's own is OpenAI's, with the model they chose; the group's is the provider in use and its key (utils/ai_providers.py)
+with the chat's model. `None` means nobody can pay for it now."""
 from dataclasses import dataclass, field
 
 from sqlalchemy.orm import Session
 
-from ..chat import model as chat_model
-from . import ai_budget, ai_ledger, messages, settings, user_ai
+from . import ai_budget, ai_ledger, ai_providers, messages, settings, user_ai
 
 USER_ONLY, GROUP_THEN_USER, GROUP_ONLY = "user_only", "group_then_user", "group_only"
 MODES = (USER_ONLY, GROUP_THEN_USER, GROUP_ONLY)
@@ -42,9 +41,8 @@ def mode(feature: str) -> str:
 
 def group_source() -> Source | None:
     """The group's key, if the .env has a provider, a key and a model for it."""
-    if not chat_model.configured():
-        return None
-    return Source(ai_ledger.GROUP, settings.get("ai.provider"), settings.get("ai.api_key"), chat_model.model_name())
+    found = ai_providers.group_credentials(ai_providers.CHAT)
+    return Source(ai_ledger.GROUP, *found) if found else None
 
 
 def own_source(db: Session, user_id: int) -> Source | None:

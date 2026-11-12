@@ -9,7 +9,7 @@ import time
 from ..clients import google_ai, open_ai, used
 from ..clients.ai_error import AIError, QuotaError
 from ..clients.quota import classify
-from . import ai_ledger, ai_quota, settings
+from . import ai_ledger, ai_providers, ai_quota, settings
 from .logger import LogManager
 
 log_manager = LogManager()
@@ -21,13 +21,11 @@ __all__ = ["AIError", "QuotaError", "complete", "current", "is_ready", "prompt_f
 
 
 def is_ready(use: str | None = None) -> bool:
-    """Switched on, with a key, a known provider and a model; with `use` (a switchable id of ai_prompts.USES), also on
+    """Switched on, with a provider that has a key and a model; with `use` (a switchable id of ai_prompts.USES), also on
     for that notice."""
     return bool(
         settings.get("ai.enabled")
-        and settings.get("ai.api_key")
-        and settings.get("ai.provider") in PROVIDERS
-        and settings.get("ai.model")
+        and ai_providers.group_credentials()
         and (use is None or settings.get(f"ai.use.{use}"))
     )
 
@@ -45,12 +43,12 @@ def prompt_for(use: str, recommended: dict | None = None) -> str:
 
 
 def current() -> tuple[str | None, str | None]:
-    """(provider, model) in use. They come only from AI_PROVIDER and AI_MODEL (None if missing): the code has no default."""
-    return settings.get("ai.provider"), settings.get("ai.model")
+    """(provider, model) in use for the notices (None if missing): see utils/ai_providers.py."""
+    return ai_providers.current()
 
 
 def in_use() -> dict:
-    """For the panel: the provider and the model (None if AI_PROVIDER or AI_MODEL is missing) the notices will use now."""
+    """For the panel: the provider and the model (None if no provider has a key and a model) the notices will use now."""
     provider, model = current()
     return {"provider": provider, "model": model}
 
@@ -59,10 +57,10 @@ def complete(system_prompt: str, user_prompt: str, *, temperature: float = 1.0, 
     """The text the AI writes, or None when the AI is off or has no key (`force` ignores the switch,
     for the test button). Raises AIError if the provider fails, QuotaError (an AIError) if a quota ran out: that one is
     also written to the audit log (utils/ai_quota.py), `source` saying who asked."""
-    key = settings.get("ai.api_key")
-    provider, model = current()
-    if not key or provider not in PROVIDERS or not model or not (force or settings.get("ai.enabled")):
+    found = ai_providers.group_credentials()
+    if found is None or not (force or settings.get("ai.enabled")):
         return None
+    provider, key, model = found
     started = time.monotonic()
     used.discard()
     try:
