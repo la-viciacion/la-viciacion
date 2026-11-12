@@ -513,3 +513,11 @@ video.gm-trailer, iframe.gm-trailer { cursor: auto; background: #000; }
 .ai-cost-text > div + div { margin-top: 4px; }
 .ai-cost-text .ai-budget { color: var(--text-secondary); font-size: 0.86rem; }
 .ai-cost-note .ai-stopped { color: #fca5a5; }
+
+/* Mi IA: what the chat and the guide do, side by side on a wide screen and one over the other on a phone */
+.ai-about { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin-bottom: 8px; }
+.ai-about-card h3 { margin: 0 0 6px; font-size: 1rem; color: var(--accent-teal); }
+.ai-about-card h4 { margin: 12px 0 4px; font-size: 0.9rem; }
+.ai-about-list { margin: 0; padding-left: 18px; font-size: 0.92rem; line-height: 1.45; }
+.ai-about-list li + li { margin-top: 4px; }
+.ai-about-limit, .ai-about-cost { margin-top: 10px; }

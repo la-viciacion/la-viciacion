@@ -6,7 +6,7 @@ import { featureLabel, tokens } from '../../lib/ai-calls.js';
 import { money, monthLabel } from '../../lib/ai-usage.js';
 import { forgetGuideStatus } from '../../lib/guide.js';
 import { html, mount } from '../../lib/html.js';
-import { FEATURES, blockedText, budgetLines, costNote, keyText, looksLikeKey, modelLabel, paidBy } from '../../lib/user-ai.js';
+import { ABOUT, FEATURES, blockedText, budgetLines, costNote, keyText, looksLikeKey, modelLabel, paidBy } from '../../lib/user-ai.js';
 import { sectionTitle } from '../../ui/profile-summary.js';
 import { flash } from './flash.js';
 
@@ -28,6 +28,29 @@ export async function initAi(el, { username }) {
     flash(el.querySelector(`[data-msg="${where}"]`), message, ok);
   };
   const say = (message, ok = false) => tell('key', message, ok);
+
+  // What the chat and the guide do, what each costs and what the guide adds: so a player knows what they are choosing to use
+  function aboutView() {
+    const list = (items) => html`<ul class="ai-about-list">${items.map((item) => html`<li>${item}</li>`)}</ul>`;
+    const { chat, guide } = ABOUT;
+    return html`
+      ${sectionTitle('Qué hacen el chat y la guía')}
+      <div class="ai-about">
+        <div class="pf-card ai-about-card" data-about="chat">
+          <h3>${chat.title}</h3>
+          ${list(chat.what)}
+          <div class="pf-sub ai-about-cost"><strong>Coste.</strong> ${chat.cost}</div>
+        </div>
+        <div class="pf-card ai-about-card" data-about="guide">
+          <h3>${guide.title}</h3>
+          ${list(guide.what)}
+          <h4>${guide.addsTitle}</h4>
+          ${list(guide.adds)}
+          <div class="pf-sub ai-about-limit">${guide.limit}</div>
+          <div class="pf-sub ai-about-cost"><strong>Coste.</strong> ${guide.cost}</div>
+        </div>
+      </div>`;
+  }
 
   function keyCard() {
     const { key } = state;
@@ -122,7 +145,7 @@ export async function initAi(el, { username }) {
 
   function render() {
     const draft = el.querySelector('[name="api_key"]')?.value ?? '';
-    mount(el, html`${costNoteView()}${keyCard()}${modelCard()}${spendCard()}`);
+    mount(el, html`${costNoteView()}${aboutView()}${keyCard()}${modelCard()}${spendCard()}`);
     const field = el.querySelector('[name="api_key"]');
     if (field && draft) field.value = draft; // what was being typed survives a redraw (the models arriving, the spending loading)
     for (const [where, note] of Object.entries(notes)) if (note) flash(el.querySelector(`[data-msg="${where}"]`), note.message, note.ok);

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { costNote, keyText, looksLikeKey, modelLabel } from '../js/lib/user-ai.js';
+import { ABOUT, costNote, keyText, looksLikeKey, modelLabel } from '../js/lib/user-ai.js';
 
 test('a model reads with its tier and its price per million tokens, or only its tier without a price', () => {
   assert.match(modelLabel({ id: 'gpt-4.1-mini', tier: 'economico', input_per_million: 0.4, output_per_million: 1.6 }), /^gpt-4\.1-mini · económico · 0,40.*1,60.* por millón$/);
@@ -52,4 +52,22 @@ test('the key is shown by its last characters and never by itself', () => {
 test('only what looks like an OpenAI key is sent', () => {
   assert.equal(looksLikeKey(' sk-proj-AbCdEfGhIjKlMnOpQrSt '), true);
   for (const bad of ['', 'hello', 'sk-short', 'sk- con espacios dentro de la clave', 'AIzaSyFake0123456789012345']) assert.equal(looksLikeKey(bad), false, bad);
+});
+
+test('what the chat and the guide do is explained, with what each costs and what the guide adds, and its limit', () => {
+  const { chat, guide } = ABOUT;
+  assert.ok(chat.what.length >= 3 && guide.what.length >= 3);
+  assert.match(chat.cost, /fracción de céntimo/);
+  assert.match(guide.cost, /búsquedas en internet.*se cobran aparte.*varias veces lo que una del chat/);
+  assert.match(guide.addsTitle, /ChatGPT/);
+  assert.ok(guide.adds.length >= 3);
+  assert.match(guide.adds.join(' '), /qué juego|de qué juego/);
+  assert.match(guide.adds.join(' '), /destripes/);
+  assert.match(guide.limit, /No sabe más que ChatGPT/, 'it says what it does not do, not only what it does');
+});
+
+test('it speaks of cost and never of paying, and names nothing a player is not meant to discover', () => {
+  const text = JSON.stringify(ABOUT);
+  assert.doesNotMatch(text, /\bpag(a|o|ar|ado)\b/i);
+  assert.doesNotMatch(text, /logro[^.]*(se desbloquea|desbloquear|umbral|aura)/i);
 });

@@ -15,6 +15,38 @@ export const FEATURES = [
   ['guide', 'La guía de cada juego'],
 ];
 
+// What the chat and the guide do, for the player who is deciding whether to use them (Mi IA). It says what each one is for, what it
+// costs in words of cost and, for the guide, what it adds over asking ChatGPT directly: its limits too, because a claim that cannot
+// be checked is not a reason to spend. Plain text: the screen draws it with the html template.
+export const ABOUT = {
+  chat: {
+    title: 'El chat',
+    what: [
+      'Responde sobre los datos del grupo: horas, rankings, rachas, logros, juegos, lista de deseados y cómo funciona la app.',
+      'Ve lo mismo que ves tú en el grupo, nunca la biblioteca ni los datos privados de otra persona.',
+      'No guarda la conversación: al recargar la página empiezas de cero.',
+    ],
+    cost: 'Cada pregunta hace unas pocas llamadas al modelo: con uno económico, una fracción de céntimo.',
+  },
+  guide: {
+    title: 'La guía de cada juego',
+    what: [
+      'Te ayuda con un juego concreto: desatascarte, orientarte y darte consejos. La encuentras en la página de cada juego y en el botón «¿Atascado?» del timer.',
+      'Tú eliges cuánta ayuda quieres: empujón (una dirección), pista (qué hacer) o solución (paso a paso, con destripes). No sube de nivel por su cuenta.',
+      'Busca en internet y dice de dónde saca lo que cuenta; si no encuentra algo fiable, lo dice en lugar de inventarlo.',
+    ],
+    addsTitle: 'Qué aporta frente a preguntárselo directamente a ChatGPT',
+    adds: [
+      'Ya sabe de qué juego hablas, cuánto llevas, si lo has completado y quién del grupo lo terminó (a quién preguntar), sin que lo expliques cada vez.',
+      'El nivel de destripes lo eliges tú antes de preguntar y se respeta.',
+      'Viene preparada para buscar, citar la fuente y reconocer cuando no sabe, en vez de contestar de memoria con seguridad.',
+      'Está a un toque desde el timer, con la partida en marcha, y la conversación se queda en la página de ese juego.',
+    ],
+    limit: 'No sabe más que ChatGPT ni sustituye a una guía completa: depende de lo que encuentre en la web, y lo importante conviene comprobarlo.',
+    cost: 'Cada pregunta hace además búsquedas en internet, que se cobran aparte de los tokens (con OpenAI, del orden de un céntimo cada una): suele costar varias veces lo que una del chat. Por eso, por defecto, solo funciona con tu propia clave, y necesita un modelo que admita la búsqueda web (el botón «Probar con la guía» lo comprueba).',
+  },
+};
+
 /** What a model reads like in the list: its name, how much it weighs on the account and its price per million tokens. */
 export function modelLabel(model) {
   const price = model.output_per_million == null

@@ -247,3 +247,17 @@ test('the explanation of the key says what it is for in the order that is true: 
   assert.match(text, /Con tu propia clave puedes usar la guía de cada juego y seguir con el chat cuando se agote el presupuesto del grupo \(o tu parte\)/);
   assert.doesNotMatch(text, /en lugar de sumarse al del grupo/);
 });
+
+test('the screen explains what the chat does and what the guide does, with the cost of each and what the guide adds', async () => {
+  await open({ 'GET /users/ana/ai': stateOf(NONE) });
+  const chat = el().querySelector('[data-about="chat"]').textContent;
+  const guide = el().querySelector('[data-about="guide"]').textContent;
+  assert.match(chat, /Responde sobre los datos del grupo/);
+  assert.match(chat, /Coste\..*fracción de céntimo/);
+  assert.match(guide, /empujón.*pista.*solución/);
+  assert.match(guide, /Qué aporta frente a preguntárselo directamente a ChatGPT/);
+  assert.match(guide, /Ya sabe de qué juego hablas, cuánto llevas/);
+  assert.match(guide, /No sabe más que ChatGPT/);
+  assert.match(guide, /Coste\..*se cobran aparte/);
+  assert.ok([...el().querySelectorAll('h2')].some((h) => /Qué hacen el chat y la guía/.test(h.textContent)));
+});
