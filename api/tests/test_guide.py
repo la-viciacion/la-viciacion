@@ -54,6 +54,9 @@ class AskTests(unittest.TestCase):
         patcher = mock.patch.object(agent.settings, "get", side_effect=lambda key: {**ai_env.group("openai", "KEY", "m"), "guide.prompt": "Eres un guía."}[key])
         patcher.start()
         self.addCleanup(patcher.stop)
+        probe_rows = mock.patch.object(agent.ai_ledger, "record_probe")  # what the test button writes has its own tests (test_ai_ledger.py)
+        probe_rows.start()
+        self.addCleanup(probe_rows.stop)
 
     def ask(self, level="hint", history=()):
         seen = []

@@ -1,7 +1,8 @@
 // Server page (#/server): how the machine the app runs on is doing, the month's traffic and what keeping the app running
 // costs, by kind (server, domain...), for everybody. GET /server/status (Hetzner and Prometheus, the cost derived from the
-// recorded rates: nothing is stored by this page).
+// recorded rates: nothing is stored by this page). The AI's spend, in dollars, is its own block: GET /server/ai-costs.
 import { api } from '../../lib/api.js';
+import { money as formatMoney } from '../../lib/ai-usage.js';
 import { formatRelative } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
 import { KIND_ORDER, LIMITS, WINDOWS, axisTicks, axisTime, barLayout, bytes, load, money, monthName, monthShort, monthTotal, monthYear, yearTotals, last, linePoints, peak, percent, rate, sharedMax, trafficShare, uptime } from '../../lib/server.js';
@@ -171,6 +172,39 @@ const costs = (c, view) => html`
   </section>
   <section class="pf-card sv-card" id="svYear" aria-label="Costes mes a mes">${yearCard(view)}</section>`;
 
+const dollars = (amount) => formatMoney(amount, 'usd');
+
+const aiTile = (label, amount, sub) => html`
+  <div class="pf-card sv-tile"><div class="sv-tile-label">${label}</div><div class="sv-tile-value">${dollars(amount)}</div><div class="pf-sub">${sub}</div></div>`;
+
+const AI_SOURCE = {
+  billed: 'Lo que ha facturado OpenAI a la organización. OpenAI solo conserva el último año de gasto.',
+  mixed: 'OpenAI es lo que ha facturado (solo conserva el último año); lo de Google es una estimación de la app, porque Google no ofrece el gasto por API y, con una clave del plan gratuito, lo real puede ser 0 US$.',
+  estimated: 'Es una estimación de lo que ha gastado la clave del grupo: no hay clave de administración de OpenAI para consultar lo facturado, y con una clave de Google del plan gratuito lo real puede ser menos.',
+};
+
+// What the AI costs, apart from the costs above and in dollars, as OpenAI bills it: it is never converted to euros (the rate changes
+// every day), so the two currencies are two blocks. Only totals, never who spent them.
+const aiCosts = (ai) => {
+  if (!ai) return '';
+  if (ai.error) return html`<div class="pf-sub">No se ha podido consultar el gasto de IA: ${ai.error}</div>`;
+  return html`
+    <div class="sv-section"><h2 class="sv-section-title">Gasto en IA</h2></div>
+    <div class="sv-tiles" aria-label="Gasto en IA">
+      ${aiTile('Este mes', ai.month, 'en dólares')}
+      ${aiTile('Este año', ai.year, 'en dólares')}
+      ${aiTile(ai.since ? 'Desde el inicio' : 'Total', ai.total, ai.since ? `desde ${monthLabel(ai.since)}` : 'sin gasto todavía')}
+    </div>
+    <section class="pf-card sv-card" aria-label="Gasto en IA mes a mes">
+      <h2 class="sv-title">IA mes a mes</h2>
+      ${ai.months.length ? html`
+        <table class="sv-table">
+          <tbody>${ai.months.slice().reverse().map((m) => html`<tr><th scope="row">${capital(monthLabel(m.month))}</th><td>${dollars(m.total)}</td></tr>`)}</tbody>
+        </table>` : html`<div class="pf-sub">Todavía no hay gasto de IA.</div>`}
+      <div class="pf-sub">${AI_SOURCE[ai.source] ?? ''} Se muestra en dólares y no se convierte a euros: la cotización cambia cada día.</div>
+    </section>`;
+};
+
 function panel(data, range, view) {
   const { server, metrics: m } = data;
   const to = Math.max(0, ...Object.values(m).map((points) => (points.length ? points[points.length - 1][0] : 0)));
@@ -196,10 +230,11 @@ function panel(data, range, view) {
     <div class="sv-section"><h2 class="sv-section-title">Tráfico del mes</h2></div>
     ${traffic(server.traffic)}
     ${data.cost ? costs(data.cost, view) : ''}
+    <div id="svAi">${aiCosts(view.ai)}</div>
     <div class="pf-sub sv-foot">Actualizado ${formatRelative(data.fetched_at).toLowerCase()}.</div>`;
 }
 
-const emptyView = () => ({ year: null, month: null, years: new Map(), available: [], kinds: [], error: '' });
+const emptyView = () => ({ year: null, month: null, years: new Map(), available: [], kinds: [], error: '', ai: null });
 
 // The month to look at when a year is opened: the running one, else the last
 const defaultMonth = (months) => (months.find((month) => month.state === 'running') ?? months[months.length - 1]).month;
@@ -266,5 +301,17 @@ export async function render({ main }) {
     const bar = e.target.closest('[data-month]');
     if (bar) pickMonth(bar.dataset.month);
   });
+  // The AI's spend is asked once and apart: a failure of it shows only in its own block, and the window of the charts keeps it
+  const loadAi = async () => {
+    try {
+      view.ai = (await api('/server/ai-costs')) ?? null;
+    } catch (err) {
+      view.ai = { error: err.message };
+    }
+    const slot = body.querySelector('#svAi');
+    if (slot) mount(slot, aiCosts(view.ai));
+  };
+
   await draw('24h');
+  await loadAi();
 }

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { ALL, money, monthChoices, monthLabel, selection, share } from '../js/lib/ai-usage.js';
+import { ALL, money, monthChoices, monthLabel, reconcile, selection, share } from '../js/lib/ai-usage.js';
 
 const plain = (text) => text.replace(/\u00a0/g, ' '); // the locale puts a no-break space before the currency sign
 
@@ -48,4 +48,14 @@ test('a bar is a percentage of the largest, and nothing to compare with is empty
   assert.equal(share(1, 4), 25);
   assert.equal(share(4, 4), 100);
   assert.equal(share(1, 0), 0);
+});
+
+test('what OpenAI billed is set against what the app estimates, month by month, the latest first', () => {
+  const billed = [{ month: '2026-10', total: 1.5 }, { month: '2026-11', total: 0.4 }];
+  const calls = [{ month: '2026-11', group_openai_real_cost: 0.3 }, { month: '2026-09', group_openai_real_cost: 0.2 }];
+  assert.deepEqual(reconcile(billed, calls), [
+    { month: '2026-11', billed: 0.4, estimated: 0.3, difference: 0.1 },
+    { month: '2026-10', billed: 1.5, estimated: 0, difference: 1.5 },
+    { month: '2026-09', billed: 0, estimated: 0.2, difference: -0.2 },
+  ]);
 });

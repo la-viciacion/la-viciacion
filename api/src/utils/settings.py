@@ -129,7 +129,7 @@ def _model_name(value: str) -> str | None:
 
 
 def _budget(value: int) -> str | None:
-    return None if 0 <= value <= 10000 else "Los dólares deben estar entre 0 (sin límite) y 10000"
+    return None if 0 <= value <= 10000 else "Los dólares deben estar entre 0 (sin IA del grupo) y 10000; vacío es sin límite"
 
 
 def _usage_days(value: int) -> str | None:
@@ -237,8 +237,8 @@ REGISTRY: dict[str, Spec] = {
     # What the group's key may spend each calendar month, in whole dollars (0: no limit): the whole group, and each player's
     # share of it (an admin can give one player more or less: user_settings.ai_group_budget_usd). Only what the group pays
     # counts, never what a player pays with their own key (utils/ai_budget.py)
-    "ai.group_budget_month": Spec("int", 0, check=_budget),
-    "ai.user_budget_month": Spec("int", 0, check=_budget),
+    "ai.group_budget_month": Spec("int", None, check=_budget, resettable=True),
+    "ai.user_budget_month": Spec("int", None, check=_budget, resettable=True),
     "ai.price_refresh_hours": Spec("int", 24, check=_price_hours),
     "ai.usage_retention_days": Spec("int", 0, check=_usage_days),
     "telegram.token": Spec("str", None, secret=True, env_only=True, env="TELEGRAM_TOKEN", check=_token),
@@ -255,6 +255,9 @@ for _p in AI_PROVIDERS:
     REGISTRY[f"ai.model.{_p}"] = Spec("str", None, check=_model_name, resettable=True)
     REGISTRY[f"chat.model.{_p}"] = Spec("str", None, check=_model_name, resettable=True)
     REGISTRY[f"guide.model.{_p}"] = Spec("str", None, check=_model_name, resettable=True)
+# The group's Google key is on a free plan: what it answers is estimated like the rest but really costs nothing (utils/ai_ledger.py
+# records it on every call). OpenAI has no free plan for the API, so it has no such setting.
+REGISTRY["ai.free_plan.google"] = Spec("bool", False)
 # The chat and the guide may run on another provider than the notices (and than each other); unset, the chat follows the notices
 # and the guide follows the chat
 REGISTRY["chat.provider"] = Spec("str", None, check=_ai_provider, resettable=True)

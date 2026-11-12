@@ -27,7 +27,7 @@ const MODELS = {
 const figures = (calls, cost, extra = {}) => ({ calls, cost, input_tokens: 1000, cached_tokens: 0, output_tokens: 200, web_searches: 0, unpriced: 0, ...extra });
 const NOTHING = {
   total: figures(0, 0), by_source: [], by_feature: [], by_model: [], by_status: [], months: [], days: [],
-  budget: { month: '2026-11', resets_on: '2026-12-01', group: { cap: 0, spent: 0 }, user: { cap: 0, spent: 0 } },
+  budget: { month: '2026-11', resets_on: '2026-12-01', group: { cap: null, spent: 0 }, user: { cap: null, spent: 0 } },
 };
 const el = () => document.getElementById('pfAi');
 const open = async (routes) => {
@@ -222,6 +222,8 @@ test('the budget of the group and their share show with what is spent and when i
   assert.match(text, /Se renueva el 1 de diciembre/);
   await open({ 'GET /users/ana/ai': { ...stateOf(NONE), budget: NOTHING.budget } });
   assert.equal(el().querySelector('.ai-budget'), null);
+  await open({ 'GET /users/ana/ai': { ...stateOf(NONE), budget: { ...NOTHING.budget, user: { cap: 0, spent: 0 } } } });
+  assert.match(el().querySelector('.ai-budget').textContent, /Tu parte: sin IA de la clave del grupo/);
 });
 
 test('when a budget stops the group key the player is told, and told how to go on if they have no key', async () => {
@@ -232,6 +234,8 @@ test('when a budget stops the group key the player is told, and told how to go o
   await open({ 'GET /users/ana/ai/models': MODELS, 'GET /users/ana/ai': { ...blocked, key: OWN, chat: { ...blocked.chat, blocked: 'user' } } });
   assert.match(el().textContent, /Has gastado tu parte del presupuesto/);
   assert.doesNotMatch(el().textContent, /puedes seguir con tu propia clave/);
+  await open({ 'GET /users/ana/ai': { ...blocked, chat: { ...blocked.chat, blocked: 'user_off' } } });
+  assert.match(el().textContent, /Un admin no te ha dado IA de la clave del grupo/);
 });
 
 test('a message of the key box survives the screen being drawn again when the spending arrives', async () => {

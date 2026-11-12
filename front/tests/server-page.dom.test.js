@@ -122,7 +122,8 @@ test('another period asks the API again and marks its button', async () => {
   assert.equal(document.querySelector('[data-window="7d"]').getAttribute('aria-pressed'), 'true');
   document.querySelector('[data-window="7d"]').click();
   await settle();
-  assert.equal(calls.length, 2); // the one already shown is not asked again
+  assert.equal(calls.filter((c) => c.path.startsWith('/server/status')).length, 2); // the one already shown is not asked again
+  assert.equal(calls.filter((c) => c.path === '/server/ai-costs').length, 1); // the AI's spend does not depend on the period: asked once
 });
 
 test('without a token it says so, and a failure shows what Hetzner said', async () => {
@@ -291,4 +292,51 @@ test('with the period of seven days the axis names days', async () => {
   document.querySelector('[data-window="7d"]').click();
   await settle();
   assert.match(text('.sv-xaxis span', card('CPU'))[0], /^\d{1,2} \p{L}+/u);
+});
+
+const AI = {
+  currency: 'usd', source: 'billed', month: 0.5, year: 1.75, total: 5.75, since: '2025-12',
+  months: [{ month: '2025-12', total: 4 }, { month: '2026-10', total: 1.25 }, { month: '2026-11', total: 0.5 }],
+};
+
+test('the AI has its own block in dollars, apart from the euro costs, and is never converted', async () => {
+  installApi({ 'GET /server/status?range=24h': STATUS, 'GET /server/ai-costs': AI });
+  await server.render({ main: main() });
+  await settle();
+  const block = document.querySelector('[aria-label="Gasto en IA"]');
+  assert.match(block.textContent, /0,50\sUS\$/);
+  assert.match(block.textContent, /1,75\sUS\$/);
+  assert.match(block.textContent, /5,75\sUS\$.*desde diciembre de 2025/);
+  assert.doesNotMatch(block.textContent, /€/);
+  const months = document.querySelector('[aria-label="Gasto en IA mes a mes"]');
+  assert.deepEqual([...months.querySelectorAll('tbody tr')].map((tr) => tr.querySelector('th').textContent), ['Noviembre de 2026', 'Octubre de 2026', 'Diciembre de 2025']);
+  assert.match(months.textContent, /lo que ha facturado OpenAI/i);
+  assert.match(months.textContent, /no se convierte a euros/);
+  assert.match(document.querySelector('[aria-label="Costes"]').textContent, /2,30\s€/); // the euro costs are untouched
+});
+
+test('with OpenAI billed and Google estimated the block says which part is which', async () => {
+  installApi({ 'GET /server/status?range=24h': STATUS, 'GET /server/ai-costs': { ...AI, source: 'mixed' } });
+  await server.render({ main: main() });
+  await settle();
+  const text = document.querySelector('[aria-label="Gasto en IA mes a mes"]').textContent;
+  assert.match(text, /OpenAI es lo que ha facturado/);
+  assert.match(text, /lo de Google es una estimación/);
+});
+
+test('without a key of OpenAI the block says its figures are an estimate, and with no spend it says so', async () => {
+  installApi({ 'GET /server/status?range=24h': STATUS, 'GET /server/ai-costs': { ...AI, source: 'estimated', month: 0, year: 0, total: 0, since: null, months: [] } });
+  await server.render({ main: main() });
+  await settle();
+  const months = document.querySelector('[aria-label="Gasto en IA mes a mes"]');
+  assert.match(months.textContent, /Todavía no hay gasto de IA/);
+  assert.match(months.textContent, /es una estimación/i);
+});
+
+test('when the AI spend cannot be read only its block says so and the rest of the page stays', async () => {
+  installApi({ 'GET /server/status?range=24h': STATUS, 'GET /server/ai-costs': json({ detail: 'boom' }, 500) });
+  await server.render({ main: main() });
+  await settle();
+  assert.match(document.getElementById('svAi').textContent, /No se ha podido consultar el gasto de IA/);
+  assert.equal(document.querySelectorAll('.sv-line').length, 5);
 });

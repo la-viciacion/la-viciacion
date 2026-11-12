@@ -322,6 +322,7 @@ function view(values, jobs, pushDevices, mail, aiUses, aiModel, chat, guide = {}
           <label>Actualizar los precios cada (horas, 0 = nunca) <input class="adm-input" type="number" name="ai.price_refresh_hours" min="0" max="720" step="1" required /></label>
           <label>Conservar el registro (días, 0 = siempre) <input class="adm-input" type="number" name="ai.usage_retention_days" min="0" max="3650" step="1" required /></label>
         </div>
+        ${check('ai.free_plan.google', 'La clave de Google es de un plan gratuito', 'Sus llamadas se siguen estimando (sirve para saber lo que costarían), pero su coste real cuenta 0 US$ en el gasto, el presupuesto y el panel del servidor. Se apunta en cada llamada cuando se hace: cambiarlo no toca las anteriores.')}
         <div class="adm-sub">La lista incluye también lo que cobra cada proveedor por las búsquedas web de la guía, modelo a modelo. Un cambio en la frecuencia de actualización se aplica al arrancar la API.</div>
       </section>`,
 
@@ -349,11 +350,11 @@ function view(values, jobs, pushDevices, mail, aiUses, aiModel, chat, guide = {}
 
     aibudget: html`
       <section class="adm-set-card adm-aibudget-card">
-        ${cardTitle('Presupuesto mensual (dinero)', html`Cuánto puede gastar la clave del grupo cada mes, en dólares enteros (0 = sin límite): el total del grupo y la parte de cada jugador por defecto; un jugador puede tener otro tope, en la tabla de debajo. Solo cuenta lo que cubre la clave del grupo: lo que cada jugador gasta con su propia clave no suma ni se limita. Cuando se agota, lo que depende de esa clave deja de responder hasta el día 1, y quien tiene su propia clave sigue con ella si el modo de «Quién asume el coste» es «Primero la del grupo». El coste es una estimación y una pregunta puede pasarse del tope, porque su precio se conoce al acabar. Se renueva el día 1. Si «Avisos a administradores» está activo (Notificaciones → Canales), los admins reciben un mensaje privado de Telegram al llegar al 80 % y al 100 % del total del grupo, una vez al mes cada uno.`)}
+        ${cardTitle('Presupuesto mensual (dinero)', html`Cuánto puede gastar la clave del grupo cada mes, en dólares enteros (vacío = sin límite, 0 = nada de la clave del grupo): el total del grupo y la parte de cada jugador por defecto; un jugador puede tener otro tope, en la tabla de debajo. Solo cuenta lo que cubre la clave del grupo: lo que cada jugador gasta con su propia clave no suma ni se limita. Cuando se agota, lo que depende de esa clave deja de responder hasta el día 1, y quien tiene su propia clave sigue con ella si el modo de «Quién asume el coste» es «Primero la del grupo». El coste es una estimación y una pregunta puede pasarse del tope, porque su precio se conoce al acabar. Se renueva el día 1. Si «Avisos a administradores» está activo (Notificaciones → Canales), los admins reciben un mensaje privado de Telegram al llegar al 80 % y al 100 % del total del grupo, una vez al mes cada uno.`)}
         <div class="adm-sub">Es un límite de dinero, distinto de los límites de preguntas de arriba (que cuentan mensajes por minuto, hora y día). Debajo ves lo gastado este mes y puedes dar un tope distinto a cada jugador.</div>
         <div class="adm-set-row">
-          <label>Todo el grupo (US$ al mes) <input class="adm-input" type="number" name="ai.group_budget_month" min="0" max="10000" step="1" required /></label>
-          <label>Cada jugador, por defecto (US$ al mes) <input class="adm-input" type="number" name="ai.user_budget_month" min="0" max="10000" step="1" required /></label>
+          <label>Todo el grupo (US$ al mes) <input class="adm-input" type="number" name="ai.group_budget_month" min="0" max="10000" step="1" placeholder="sin límite" /></label>
+          <label>Cada jugador, por defecto (US$ al mes) <input class="adm-input" type="number" name="ai.user_budget_month" min="0" max="10000" step="1" placeholder="sin límite" /></label>
         </div>
       </section>`,
 
@@ -455,6 +456,9 @@ export function syncAiOff(form) {
   form.querySelector('.adm-ai-off').hidden = general.checked;
 }
 
+// Numbers that may be left empty: no value is no limit (the API takes null as "back to the default", which is that)
+const OPTIONAL_NUMBERS = ['ai.group_budget_month', 'ai.user_budget_month'];
+
 function collect(form) {
   const changes = {};
   for (const [key, before] of Object.entries(loaded)) {
@@ -465,7 +469,7 @@ function collect(form) {
       continue;
     }
     const isNumber = typeof before === 'number';
-    const now = field.type === 'checkbox' ? field.checked : (field.type === 'select-one' || field.type === 'number') && isNumber ? Number(field.value) : field.value.trim();
+    const now = field.type === 'checkbox' ? field.checked : OPTIONAL_NUMBERS.includes(key) ? (field.value.trim() === '' ? null : Number(field.value)) : (field.type === 'select-one' || field.type === 'number') && isNumber ? Number(field.value) : field.value.trim();
     if (key.startsWith('ai.prompt.') || key === 'chat.prompt' || key === 'guide.prompt') {
       // the original text (or nothing) is not an override: it goes back to following the application's prompt
       const use = key === 'chat.prompt' ? chatInfo : key === 'guide.prompt' ? guideInfo : aiUses.find((u) => `ai.prompt.${u.id}` === key);

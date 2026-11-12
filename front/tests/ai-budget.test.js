@@ -2,8 +2,9 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { budgetLine, capLabel, isNearly, isSpent, parseCap, spentShare } from '../js/lib/ai-budget.js';
 
-test('a cap of zero is no limit and any other is dollars', () => {
-  assert.equal(capLabel(0), 'sin límite');
+test('no cap is no limit, zero is nothing of the groups key and any other is dollars', () => {
+  assert.equal(capLabel(null), 'sin límite');
+  assert.equal(capLabel(0), 'sin IA del grupo');
   assert.match(capLabel(5), /^5,00.*US\$$/);
 });
 
@@ -32,7 +33,8 @@ test('what an admin types is the default when empty, a whole number of dollars u
 });
 
 test('the line of a budget says what is spent of what and when it starts again, or that there is no limit', () => {
-  assert.equal(budgetLine('Tu parte', { cap: 0, spent: 3 }, '2026-12-01'), 'Tu parte: sin límite.');
+  assert.equal(budgetLine('Tu parte', { cap: null, spent: 3 }, '2026-12-01'), 'Tu parte: sin límite.');
+  assert.equal(budgetLine('Tu parte', { cap: 0, spent: 0 }, '2026-12-01'), 'Tu parte: sin IA de la clave del grupo.');
   const line = budgetLine('Grupo', { cap: 20, spent: 1.5 }, '2026-12-01');
   assert.match(line, /^Grupo: 1,50.* de 20,00.*Se renueva el 1 de diciembre\.$/);
 });

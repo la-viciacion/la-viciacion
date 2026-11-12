@@ -157,5 +157,60 @@ class RouteTests(unittest.TestCase):
         self.assertNotIn(KEY, caught.exception.detail)
 
 
+class ServerPageTests(unittest.TestCase):
+    """The AI spend on the server page: in dollars, never converted, billed by OpenAI when it can be asked and estimated otherwise."""
+
+    TODAY = datetime.date(2026, 11, 12)
+
+    def test_the_months_become_this_month_this_year_and_everything_in_dollars(self):
+        months = [{"month": "2026-11", "total": 0.5}, {"month": "2025-12", "total": 4.0}, {"month": "2026-10", "total": 1.25}, {"month": "2026-09", "total": 0}]
+        data = ai_usage.rollup(months, self.TODAY)
+        self.assertEqual((data["currency"], data["month"], data["year"], data["total"], data["since"]), ("usd", 0.5, 1.75, 5.75, "2025-12"))
+        self.assertEqual([m["month"] for m in data["months"]], ["2025-12", "2026-10", "2026-11"])  # a month with no spend is not listed
+
+    def test_with_no_spend_there_is_nothing_and_no_start(self):
+        data = ai_usage.rollup([], self.TODAY)
+        self.assertEqual((data["month"], data["year"], data["total"], data["since"], data["months"]), (0.0, 0.0, 0.0, None, []))
+
+    def test_two_lists_of_months_are_added_where_they_share_a_month(self):
+        added = ai_usage.add_months([{"month": "2026-10", "total": 1.0}], [{"month": "2026-10", "total": 0.25}, {"month": "2026-11", "total": 0.5}])
+        self.assertEqual(sorted((m["month"], m["total"]) for m in added), [("2026-10", 1.25), ("2026-11", 0.5)])
+
+    def test_the_route_adds_the_estimate_of_google_to_what_openai_billed_and_says_so(self):
+        from src.routers import server
+
+        month = server.datetime.date.today().strftime("%Y-%m")
+        with mock.patch.object(server.settings, "get", return_value=KEY),                 mock.patch.object(server.ai_usage, "summary", return_value={"months": [{"month": month, "total": 2.0}]}),                 mock.patch.object(server.ai_spend, "group_months", return_value=[{"month": month, "total": 0.5}]) as others:
+            data = server.get_ai_costs(db=mock.Mock())
+        others.assert_called_once_with(mock.ANY, without_openai=True)
+        self.assertEqual((data["source"], data["month"]), ("mixed", 2.5))
+
+    def test_with_no_spend_of_other_providers_the_figure_is_the_bill_alone(self):
+        from src.routers import server
+
+        month = server.datetime.date.today().strftime("%Y-%m")
+        with mock.patch.object(server.settings, "get", return_value=KEY),                 mock.patch.object(server.ai_usage, "summary", return_value={"months": [{"month": month, "total": 2.0}]}),                 mock.patch.object(server.ai_spend, "group_months", return_value=[{"month": month, "total": 0.0}]):
+            data = server.get_ai_costs(db=mock.Mock())
+        self.assertEqual((data["source"], data["month"]), ("billed", 2.0))
+
+    def test_the_route_uses_what_openai_billed(self):
+        from src.routers import server
+
+        with mock.patch.object(server.settings, "get", return_value=KEY),                 mock.patch.object(server.ai_usage, "summary", return_value={"months": [{"month": server.datetime.date.today().strftime("%Y-%m"), "total": 2.0}]}),                 mock.patch.object(server.ai_spend, "group_months", return_value=[]):
+            data = server.get_ai_costs(db=mock.Mock())
+        self.assertEqual((data["source"], data["month"], data["currency"]), ("billed", 2.0, "usd"))
+
+    def test_without_a_key_or_when_openai_fails_it_falls_back_to_the_estimate(self):
+        from src.routers import server
+
+        estimate = [{"month": server.datetime.date.today().strftime("%Y-%m"), "total": 0.75}]
+        with mock.patch.object(server.ai_spend, "group_months", return_value=estimate):
+            with mock.patch.object(server.settings, "get", return_value=None):
+                self.assertEqual(server.get_ai_costs(db=mock.Mock())["source"], "estimated")
+            with mock.patch.object(server.settings, "get", return_value=KEY),                     mock.patch.object(server.ai_usage, "summary", side_effect=AIError("down")), self.assertLogs(server.logger, "WARNING"):
+                data = server.get_ai_costs(db=mock.Mock())
+        self.assertEqual((data["source"], data["month"]), ("estimated", 0.75))
+
+
 if __name__ == "__main__":
     unittest.main()

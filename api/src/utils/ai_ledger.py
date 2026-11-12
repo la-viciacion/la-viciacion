@@ -7,9 +7,9 @@ Writing a row is best effort: if it fails, the player still gets the answer and 
 Nothing is cached here: the panels sum the rows when asked."""
 import datetime
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
-from sqlalchemy import delete
+from sqlalchemy import case, delete
 from sqlalchemy.orm import Session
 
 from ..database import models
@@ -97,6 +97,24 @@ def _measure(result, provider: str | None, model: str | None, started: float, no
     )
 
 
+def free_plan(provider: str | None, key_source: str) -> bool:
+    """Whether a call was paid by a key of the group that is on a free plan (admin setting `ai.free_plan.<provider>`): its real cost
+    is nothing, whatever its estimate says. A player's own key is never on one."""
+    name = f"ai.free_plan.{provider}"
+    if key_source != GROUP or name not in settings.REGISTRY:
+        return False
+    try:
+        return bool(settings.get(name))
+    except Exception as e:  # the setting is not worth losing the row of a call that was already paid for: it counts at its estimate
+        logger.error(f"Error reading {name} to record an AI call: {type(e).__name__}: {e}")
+        return False
+
+
+def real_cost():
+    """The SQL expression of what a call really cost, in millionths of a dollar: its estimate, or 0 when it was on a free plan."""
+    return case((models.AiUsage.free_plan.is_(True), 0), else_=models.AiUsage.cost_micros)
+
+
 def record(
     db: Session,
     *,
@@ -131,6 +149,7 @@ def record(
             latency_ms=spent.latency_ms,
             cost_micros=spent.cost_micros,
             price_stamp=ai_cost.price_stamp() if spent.cost_micros is not None else None,
+            free_plan=free_plan(spent.provider or provider, key_source),
             tools=spent.tools,
             question_chars=min(len(question), 32767) if question is not None else None,
             turns=turns,
@@ -142,20 +161,40 @@ def record(
         logger.error(f"Error writing the AI usage record: {type(e).__name__}: {e}", exc_info=True)
 
 
+TEST = "test"  # the feature of what an admin's or a player's test button asks: it spends real tokens, so it is recorded
+TEST_KINDS = ("ai_test", "chat_test", "guide_test")
+
+
 def notice_kind(source: str) -> tuple[str, str | None] | None:
     """(feature, kind) of a text the AI writes on its own, from who asked (`ai.complete`'s `source`): the welcome of the group,
-    or a notice (`notice:completed_game`: its kind is the part after the colon). The test buttons are not recorded."""
+    a notice (`notice:completed_game`: its kind is the part after the colon) or a test button of the panel. Every use of the AI
+    is recorded: None only for a source this does not know."""
     if source == "welcome":
         return "welcome", "welcome"
     if source == "notice" or source.startswith("notice:"):
         return "notice", source.partition(":")[2] or None
+    if source in TEST_KINDS:
+        return TEST, source
     return None
 
 
+def _record_alone(feature: str, status: str, spent: Spent, key_source: str = GROUP, user_id: int | None = None) -> None:
+    """Writes a row from a worker thread that has no session of its own (a notice, a test button). Never raises, like `record`."""
+    try:
+        db = open_session()
+    except Exception as e:
+        logger.error(f"Error opening a session for the AI usage record: {type(e).__name__}: {e}", exc_info=True)
+        return
+    try:
+        record(db, user_id=user_id, feature=feature, key_source=key_source, status=status, spent=spent)
+    finally:
+        db.close()
+
+
 def record_notice(source: str, provider: str | None, model: str | None, status: str, started: float, used=None, now: float | None = None) -> None:
-    """Writes the row of a text the AI wrote on its own (a notice, the group's welcome): no player asked for it, so it has no
-    user, and the group's key paid. It runs in the worker thread that asked the provider, so it opens its own session. Never
-    raises, like `record`. `used` is what the client left in clients/used.py."""
+    """Writes the row of a text the AI wrote on its own (a notice, the group's welcome, the admin's test of the notices): no
+    player asked for it, so it has no user, and the group's key paid. It runs in the worker thread that asked the provider, so it
+    opens its own session. Never raises, like `record`. `used` is what the client left in clients/used.py."""
     found = notice_kind(source)
     if found is None:
         return
@@ -166,15 +205,18 @@ def record_notice(source: str, provider: str | None, model: str | None, status: 
         output_tokens=used.output_tokens if used else 0, reasoning_tokens=used.reasoning_tokens if used else 0,
         cost_micros=ai_cost.completion_cost_micros(provider, model, used) if used else None,
     )
-    try:
-        db = open_session()
-    except Exception as e:
-        logger.error(f"Error opening a session for the AI usage record: {type(e).__name__}: {e}", exc_info=True)
-        return
-    try:
-        record(db, user_id=None, feature=feature, key_source=GROUP, status=status, spent=spent)
-    finally:
-        db.close()
+    _record_alone(feature, status, spent)
+
+
+def record_probe(kind: str, provider: str | None, model: str | None, status: str, started: float, result=None, key_source: str = GROUP, user_id: int | None = None) -> None:
+    """Writes the row of a test button that runs an agent (the chat's and the guide's): `result` is the run's, None when it
+    failed. A player's own test (`key_source` user, with their `user_id`) is in their record and never in the group's spending."""
+    now = time.monotonic()
+    if result is not None:
+        spent = replace(measure(result, provider, model, started, now), tools=kind)
+    else:
+        spent = Spent(provider=provider, model=model, latency_ms=int((now - started) * 1000), tools=kind)
+    _record_alone(TEST, status, spent, key_source, user_id)
 
 
 def open_session() -> Session:

@@ -168,6 +168,7 @@
  },
  "values": {
   "ai.enabled": true,
+  "ai.free_plan.google": false,
   "ai.google.api_key": {
    "hint": null,
    "is_set": true
@@ -180,7 +181,7 @@
    "hint": null,
    "is_set": true
   },
-  "ai.group_budget_month": 0,
+  "ai.group_budget_month": null,
   "ai.model.google": null,
   "ai.model.openai": null,
   "ai.openai.api_key": {
@@ -219,7 +220,7 @@
   "ai.use.wishlist_day": true,
   "ai.use.wishlist_release": true,
   "ai.use.wishlist_week": true,
-  "ai.user_budget_month": 0,
+  "ai.user_budget_month": null,
   "annual.day": 1,
   "annual.enabled": false,
   "annual.month": 1,

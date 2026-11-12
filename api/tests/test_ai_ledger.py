@@ -80,6 +80,9 @@ class RecordTests(unittest.TestCase):
     def setUp(self):
         self.db = make_session()
         seed(self.db)
+        patcher = patched()
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
     def test_a_row_keeps_the_numbers_and_the_length_of_the_question_never_its_text(self):
         spent = ai_ledger.Spent(provider="openai", model="gpt-4.1-mini", input_tokens=100, output_tokens=20, requests=2, tool_calls=1, cost_micros=900, tools="ranking")
@@ -109,6 +112,20 @@ class RecordTests(unittest.TestCase):
             ModelResponse(parts=[NativeToolCallPart(tool_name="web_search", args={}), TextPart("ok")]),
         ]
         self.assertEqual(ai_ledger.tools_called(messages), (["ranking", "web_search"], 1))
+
+    def test_the_server_page_gets_the_months_of_what_the_groups_key_spent_and_never_a_players_own(self):
+        when = datetime.datetime(2026, 10, 5, 9, 0)
+        for source, cost in (("group", 1_500_000), ("group", 500_000), ("user", 9_000_000)):
+            self.db.add(models.AiUsage(feature="chat", key_source=source, status="ok", provider="openai", cost_micros=cost, created_at=when))
+        self.db.commit()
+        self.assertEqual(ai_spend.group_months(self.db), [{"month": "2026-10", "total": 2.0}])
+
+    def test_without_openai_only_what_the_other_providers_spent_is_left(self):
+        when = datetime.datetime(2026, 10, 5, 9, 0)
+        for provider, cost in (("openai", 1_500_000), ("google", 250_000)):
+            self.db.add(models.AiUsage(feature="chat", key_source="group", status="ok", provider=provider, cost_micros=cost, created_at=when))
+        self.db.commit()
+        self.assertEqual(ai_spend.group_months(self.db, without_openai=True), [{"month": "2026-10", "total": 0.25}])
 
     def test_purge_deletes_what_is_older_than_the_retention_and_keeps_everything_when_it_is_zero(self):
         now = datetime.datetime(2026, 11, 12, 12, 0)
@@ -298,6 +315,134 @@ class UsageOfAClientTests(unittest.TestCase):
         self.assertIsNone(ai_cost.completion_cost_micros("openai", "gpt-unknown-9", tokens))
 
 
+class FreePlanTests(unittest.TestCase):
+    """A key of the group on a free plan: the call keeps its estimated cost and really cost nothing."""
+
+    def setUp(self):
+        self.db = make_session()
+        seed(self.db)
+
+    def add(self, provider="google", key_source="group", cost=1_000_000, **free):
+        with patched(**free):
+            ai_ledger.record(self.db, user_id=1, feature="chat", key_source=key_source, status="ok", provider=provider, spent=ai_ledger.Spent(provider=provider, model="m", cost_micros=cost))
+
+    def test_a_call_on_a_provider_marked_as_free_records_it_and_keeps_its_estimate(self):
+        self.add(**{"ai.free_plan.google": True})
+        (row,) = rows(self.db)
+        self.assertEqual((row.free_plan, row.cost_micros), (True, 1_000_000))
+
+    def test_only_the_providers_marked_as_free_and_only_the_groups_key(self):
+        self.add(**{"ai.free_plan.google": True}, provider="openai")
+        self.add(**{"ai.free_plan.google": True}, key_source="user")
+        self.add()  # nothing marked
+        self.assertEqual([r.free_plan for r in rows(self.db)], [False, False, False])
+
+    def test_a_provider_the_app_does_not_know_is_never_free(self):
+        self.assertFalse(ai_ledger.free_plan("mystery", ai_ledger.GROUP))
+        self.assertFalse(ai_ledger.free_plan(None, ai_ledger.GROUP))
+
+    def test_what_really_cost_leaves_the_free_calls_out_and_the_estimate_leaves_them_in(self):
+        self.add(**{"ai.free_plan.google": True})
+        self.add(provider="openai", cost=250_000)
+        total = ai_spend.summary(self.db)["total"]
+        self.assertEqual((total["cost"], total["real_cost"], total["free_calls"]), (1.25, 0.25, 1))
+
+    def test_a_free_call_counts_as_nothing_in_the_budgets_and_in_the_months_the_server_page_shows(self):
+        from src.utils import ai_budget
+
+        self.add(**{"ai.free_plan.google": True}, cost=3_000_000)
+        self.add(provider="openai", cost=500_000)
+        self.assertEqual((ai_budget.spent(self.db), ai_budget.spent(self.db, 1)), (500_000, 500_000))
+        month = ai_spend.summary(self.db)["months"][0]
+        self.assertEqual((month["group_cost"], month["group_real_cost"], month["group_openai_real_cost"]), (3.5, 0.5, 0.5))
+        self.assertEqual(ai_spend.group_months(self.db)[0]["total"], 0.5)
+        self.assertEqual(ai_spend.group_months(self.db, without_openai=True)[0]["total"], 0.0)
+
+    def test_a_setting_that_cannot_be_read_never_loses_the_row_of_the_call(self):
+        with mock.patch.object(settings, "get", side_effect=RuntimeError("db down")), self.assertLogs(ai_ledger.logger, "ERROR"):
+            ai_ledger.record(self.db, user_id=1, feature="chat", key_source="group", status="ok", provider="google")
+        (row,) = rows(self.db)
+        self.assertFalse(row.free_plan)
+
+    def test_only_google_has_the_setting_and_it_starts_off(self):
+        self.assertIs(settings.REGISTRY["ai.free_plan.google"].default, False)
+        self.assertNotIn("ai.free_plan.openai", settings.REGISTRY)
+
+
+class EveryCallToAProviderIsRecordedTests(unittest.TestCase):
+    """A guard, not a behaviour: the places of the code that ask a model for text. Each one writes its row (the notices through
+    `ai.complete`, the chat and the guide through their agents, with the tests next to it). A new one fails here until it is
+    recorded and added to this list on purpose."""
+
+    ASKS = {
+        "chat/agent.py": 2,  # ask, probe
+        "guide/agent.py": 2,  # ask, probe
+        "utils/ai.py": 1,  # complete: the welcome, the notices and the test of the notices
+        "clients/open_ai.py": 1,  # generate, only reached from ai.complete
+        "clients/google_ai.py": 1,  # generate, only reached from ai.complete
+    }
+
+    def test_no_other_file_asks_a_model_for_text(self):
+        import pathlib
+        import re
+
+        src = pathlib.Path(__file__).resolve().parents[1] / "src"
+        pattern = re.compile(r"\.run_sync\(|\bPROVIDERS\[|chat\.completions\.create\(|\.generate_content\(")
+        found = {}
+        for path in src.rglob("*.py"):
+            count = len(pattern.findall(path.read_text(encoding="utf-8")))
+            if count:
+                found[path.relative_to(src).as_posix()] = count
+        self.assertEqual(found, self.ASKS)
+
+
+class ProbesAreRecordedTests(unittest.TestCase):
+    """The test buttons that run an agent (the chat's, the guide's, a player's own) spend real tokens, so they leave a row."""
+
+    def setUp(self):
+        self.db = make_session()
+        seed(self.db)
+        for patcher in (patched(), mock.patch.object(ai_ledger, "open_session", side_effect=lambda: self.db)):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    @staticmethod
+    def says(text="Hola"):
+        return FunctionModel(lambda history, info: ModelResponse(parts=[TextPart(content=text)]))
+
+    @staticmethod
+    def fails(history, info):
+        raise RuntimeError("boom")
+
+    def test_the_chat_test_leaves_a_row_of_the_group_with_its_tokens(self):
+        chat_agent.probe(model=self.says())
+        (row,) = rows(self.db)
+        self.assertEqual((row.feature, row.tools, row.key_source, row.user_id, row.status), ("test", "chat_test", "group", None, "ok"))
+        self.assertEqual((row.provider, row.model, row.requests), ("openai", "gpt-4.1-mini", 1))
+        self.assertGreater(row.input_tokens, 0)
+
+    def test_the_guide_test_leaves_a_row_of_the_group(self):
+        guide_agent.probe(model=self.says())
+        (row,) = rows(self.db)
+        self.assertEqual((row.feature, row.tools, row.key_source, row.user_id), ("test", "guide_test", "group", None))
+
+    def test_a_players_own_test_is_theirs_and_never_the_groups(self):
+        from src.utils import ai_budget, ai_source
+
+        source = ai_source.Source(ai_ledger.USER, "openai", "sk-own", "gpt-4.1-mini")
+        guide_agent.probe(model=self.says(), source=source, user_id=1)
+        (row,) = rows(self.db)
+        self.assertEqual((row.feature, row.key_source, row.user_id), ("test", "user", 1))
+        self.assertEqual(ai_budget.spent(self.db), 0)
+
+    def test_a_failing_test_is_recorded_with_no_tokens_and_still_raised(self):
+        with self.assertRaises(AIError):
+            chat_agent.probe(model=FunctionModel(self.fails))
+        with self.assertRaises(AIError):
+            guide_agent.probe(model=FunctionModel(self.fails))
+        self.assertEqual([(r.tools, r.status, r.input_tokens) for r in rows(self.db)], [("chat_test", "error", 0), ("guide_test", "error", 0)])
+
+
 class NoticesAreRecordedTests(unittest.TestCase):
     def setUp(self):
         self.db = make_session()
@@ -346,9 +491,17 @@ class NoticesAreRecordedTests(unittest.TestCase):
         self.write(None)
         self.assertIsNone(rows(self.db)[0].cost_micros)
 
-    def test_the_test_buttons_are_not_recorded(self):
-        self.write(None, source="ai_test", tokens=used.Used(input_tokens=5))
-        self.assertEqual(rows(self.db), [])
+    def test_the_test_button_of_the_notices_is_recorded_as_a_test_of_the_group(self):
+        self.write(None, source="ai_test", tokens=used.Used(input_tokens=5, output_tokens=5))
+        (row,) = rows(self.db)
+        self.assertEqual((row.feature, row.tools, row.key_source, row.user_id, row.status), ("test", "ai_test", "group", None, "ok"))
+        self.assertGreater(row.cost_micros, 0)
+
+    def test_what_a_test_button_spent_counts_in_the_groups_spending(self):
+        from src.utils import ai_budget
+
+        self.write(None, source="ai_test", tokens=used.Used(input_tokens=1_000_000, output_tokens=1_000_000))
+        self.assertEqual(ai_budget.spent(self.db), 2_000_000)
 
     def test_tokens_left_by_an_earlier_call_are_not_read_by_the_next_one(self):
         used.report(used.Used(input_tokens=999_999))
@@ -363,7 +516,9 @@ class NoticesAreRecordedTests(unittest.TestCase):
         self.assertEqual(ai_ledger.notice_kind("welcome"), ("welcome", "welcome"))
         self.assertEqual(ai_ledger.notice_kind("notice:new_game"), ("notice", "new_game"))
         self.assertEqual(ai_ledger.notice_kind("notice"), ("notice", None))
-        for other in ("ai_test", "chat_test", "chat", "guide"):
+        for test in ai_ledger.TEST_KINDS:
+            self.assertEqual(ai_ledger.notice_kind(test), ("test", test))
+        for other in ("chat", "guide", "something_new"):
             self.assertIsNone(ai_ledger.notice_kind(other), other)
 
     def test_what_the_notices_spent_counts_in_the_groups_spending_but_never_in_a_players(self):

@@ -76,16 +76,31 @@ class CapsTests(Base):
             ai_budget.set_user_cap(self.db, 1, None)
             self.assertEqual(ai_budget.user_cap(self.db, 1), 5)
 
-    def test_an_individual_zero_is_no_limit_even_when_the_default_has_one(self):
+    def test_an_individual_zero_is_nothing_of_the_groups_key_even_before_they_spend_anything(self):
         with patched(**{"ai.user_budget_month": 5}):
             ai_budget.set_user_cap(self.db, 1, 0)
-            self.spend(1, 100.0)
+            self.assertEqual(ai_budget.user_cap(self.db, 1), 0)
+            self.assertEqual(ai_budget.exceeded(self.db, 1, NOW), "user_off")
+            self.assertIsNone(ai_budget.exceeded(self.db, 2, NOW))  # the others keep the default
+
+    def test_a_zero_for_everybody_leaves_nothing_of_the_groups_key_and_a_zero_default_leaves_every_player_without_it(self):
+        with patched(**{"ai.group_budget_month": 0}):
+            self.assertEqual((ai_budget.exceeded(self.db, 1, NOW), ai_budget.exceeded(self.db, 2, NOW)), ("group_off", "group_off"))
+        with patched(**{"ai.user_budget_month": 0}):
+            self.assertEqual(ai_budget.exceeded(self.db, 1, NOW), "user_off")
+            ai_budget.set_user_cap(self.db, 1, 10)  # one player given a share anyway
             self.assertIsNone(ai_budget.exceeded(self.db, 1, NOW))
 
-    def test_nothing_is_limited_when_every_cap_is_zero(self):
+    def test_nothing_is_limited_when_no_cap_is_set(self):
         self.spend(1, 1000.0)
         with patched():
+            self.assertIsNone(ai_budget.group_cap())
+            self.assertIsNone(ai_budget.user_cap(self.db, 1))
             self.assertIsNone(ai_budget.exceeded(self.db, 1, NOW))
+
+    def test_a_budget_of_zero_is_not_something_to_warn_the_admins_about(self):
+        with patched(**{"ai.group_budget_month": 0}):
+            self.assertIsNone(ai_budget.alert_level(self.db, NOW))
 
     def test_the_group_budget_stops_everybody_and_the_players_share_stops_only_them(self):
         self.spend(1, 4.0)
@@ -177,6 +192,16 @@ class DecisionTests(Base):
         self.spend(1, 1.0)
         decision, state = self.decide("group_then_user", **{"ai.group_budget_month": 5})
         self.assertEqual((decision.source.key_source, decision.blocked, state["paid_by"]), ("group", None, "group"))
+
+    def test_a_budget_of_zero_stops_the_groups_key_and_says_that_an_admin_gave_nothing(self):
+        decision, state = self.decide("group_then_user", **{"ai.user_budget_month": 0})
+        self.assertEqual((decision.source, decision.blocked, state["blocked"]), (None, "user_off", "user_off"))
+        decision, state = self.decide("group_then_user", own=True, **{"ai.group_budget_month": 0})
+        self.assertEqual((decision.source.key_source, decision.blocked), ("user", "group_off"))
+        with patched(**{"chat.key_source": "group_then_user"}):
+            self.assertIn(messages.USER_AI_OFF, ai_source.blocked_message("user_off", "chat"))
+            self.assertIn(messages.GROUP_AI_OFF, ai_source.blocked_message("group_off", "chat"))
+            self.assertIn("Mi IA", ai_source.blocked_message("user_off", "chat"))
 
     def test_the_message_names_the_budget_and_offers_the_own_key_only_where_it_would_be_used(self):
         with patched(**{"chat.key_source": "group_then_user", "guide.key_source": "group_only"}):
@@ -330,9 +355,10 @@ class AdminRoutesTests(Base):
                 manage_route.BudgetBody(usd=bad)
         self.assertEqual(manage_route.BudgetBody(usd=0).usd, 0)
 
-    def test_the_settings_are_whole_dollars_with_zero_meaning_no_limit(self):
+    def test_the_settings_are_whole_dollars_empty_is_no_limit_and_zero_is_nothing(self):
         for key in ("ai.group_budget_month", "ai.user_budget_month"):
-            self.assertEqual(settings.REGISTRY[key].default, 0)
+            self.assertIsNone(settings.REGISTRY[key].default)
+            self.assertTrue(settings.REGISTRY[key].resettable)  # emptying the field goes back to no limit
             self.assertIsNone(settings.REGISTRY[key].check(0))
             self.assertIsNotNone(settings.REGISTRY[key].check(10001))
             self.assertIsNotNone(settings.REGISTRY[key].check(-1))
