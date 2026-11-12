@@ -4,7 +4,7 @@ import { api, jsonRequest } from '../../lib/api.js';
 import { formatClock, formatDuration, formatRelative, fromInputValue, toInputValue } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
 import { auraColor } from '../../lib/timer-aura.js';
-import { iconPencil, iconPlay, iconPlus, iconStop } from '../../ui/icons.js';
+import { iconBulb, iconPencil, iconPlay, iconPlus, iconStop } from '../../ui/icons.js';
 import { modalHeader, openModal } from '../../ui/modal.js';
 import { scoreBadge } from '../../ui/score-badge.js';
 import { toast } from '../../ui/toast.js';
@@ -61,6 +61,7 @@ const activeCard = (timer, gameName, score) => html`
       <div class="timer-game">${gameName || timer.game_id} ${scoreBadge(score)}</div>
       <div class="timer-duration" id="timerDuration">00:00:00</div>
       <button class="timer-start-edit" id="editStartBtn" title="Cambiar la hora de inicio" aria-label="Cambiar la hora de inicio">Empezó a las ${toInputValue(timer.start_time).slice(11)} ${iconPencil()}</button>
+      <button class="timer-guide-btn" id="timerGuideBtn" title="Una guía para desatascarte en este juego, sin destripes de más" hidden>${iconBulb()} ¿Atascado? Pide ayuda</button>
     </div>
     <div class="timer-actions">
       <button class="btn-cancel-timer" id="cancelTimerBtn" data-timer-id="${timer.id}">Cancelar</button>
@@ -120,6 +121,21 @@ async function fetchLastGame() {
   }
 }
 
+// The guide is optional: its button shows only when the API says it can answer, and a failure here never shows. Its code is
+// loaded when it is needed, so the home page does not carry it.
+async function offerGuide(game) {
+  try {
+    const { guideAvailable } = await import('../../lib/guide.js');
+    const available = await guideAvailable();
+    const button = document.getElementById('timerGuideBtn');
+    if (!available || !button) return;
+    button.hidden = false;
+    button.addEventListener('click', () => import('../../ui/game-guide.js').then((guide) => guide.openGuide(game)));
+  } catch (err) {
+    console.error('Error offering the guide:', err);
+  }
+}
+
 export async function loadTimerCard() {
   const section = document.getElementById('timerSection');
   if (!section) return;
@@ -147,6 +163,7 @@ export async function loadTimerCard() {
     document.getElementById('cancelTimerBtn').addEventListener('click', (e) => cancelTimer(e.currentTarget.dataset.timerId));
     document.getElementById('editStartBtn').addEventListener('click', () => editStart(active.timer));
     startClock(active.timer.start_time);
+    offerGuide({ id: active.timer.game_id, name: active.game_name || active.timer.game_id });
     return;
   }
   stopClock();

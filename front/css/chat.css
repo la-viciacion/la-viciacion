@@ -79,3 +79,22 @@
   background: var(--gradient-brand); color: #0a0a14;
 }
 .chat-send:disabled, .chat-input:disabled { opacity: 0.5; cursor: default; }
+
+/* The game guide: a card on the game page that reuses the chat's bubbles and box */
+.gd-card { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
+.gd-intro { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.gd-levels { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; border: none; padding: 0; margin: 0; }
+.gd-level { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.gd-log { flex: none; max-height: 420px; padding: 4px 0; }
+.gd-form { padding: 0; border-top: none; }
+.gd-reset { align-self: flex-start; }
+.gd-modal .gd-log { max-height: 50vh; }
+/* The way into the guide from the running timer: an outlined pill in the accent colour, on its own line under the start time */
+.timer-guide-btn {
+  display: flex; width: fit-content; align-items: center; gap: 7px; margin-top: 12px; padding: 7px 14px;
+  border: 1px solid var(--border-accent); border-radius: var(--radius-pill); background: rgba(61, 217, 179, 0.06);
+  color: var(--accent-teal); font: inherit; font-size: 0.85rem; font-weight: 600; cursor: pointer;
+}
+.timer-guide-btn:hover { background: rgba(61, 217, 179, 0.14); }
+.timer-guide-btn[hidden] { display: none; }
+@media (max-width: 640px) { .timer-guide-btn { margin-inline: auto; } }

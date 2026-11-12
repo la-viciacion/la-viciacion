@@ -6,6 +6,7 @@ installStorage();
 installDom('<section id="timerSection"></section>');
 const { initTimer, loadTimerCard, stopClock } = await import('../js/pages/home/timer.js');
 const timerModule = await import('../js/pages/home/timer.js');
+const { forgetConversations } = await import('../js/lib/guide.js');
 
 const RUNNING = { is_active: true, timer: { id: 5, game_id: 'hades', start_time: '2026-06-17T10:00:00' }, game_name: 'Hades', score: null };
 let changes;
@@ -14,6 +15,7 @@ let continued;
 let manual;
 
 beforeEach(() => {
+  forgetConversations();
   changes = 0;
   chosen = 0;
   continued = null;
@@ -119,4 +121,33 @@ test('while a timer runs, or when it cannot be checked, there is no row: neither
   timerModule.initTimer({ userId: 7, onChange: async () => {}, onChoose: () => {}, onContinue: () => {}, onManual: () => {} });
   await loadTimerCard();
   assert.equal(document.querySelector('.home-actions'), null);
+});
+
+test('the guide button stays hidden when the API says the guide is off', async () => {
+  installApi({ 'GET /timers/active/7': RUNNING, 'GET /guide/status': { available: false } });
+  await loadTimerCard();
+  await settle();
+  assert.equal(document.getElementById('timerGuideBtn').hidden, true);
+});
+
+test('the guide button shows when the guide is on and opens it for the game being played', async () => {
+  installApi({ 'GET /timers/active/7': RUNNING, 'GET /guide/status': { available: true } });
+  await loadTimerCard();
+  await settle();
+  const button = document.getElementById('timerGuideBtn');
+  assert.equal(button.hidden, false);
+  button.click();
+  await settle();
+  const dialog = document.querySelector('.modal-overlay');
+  assert.match(dialog.querySelector('h3').textContent, /Guía: Hades/);
+  assert.ok(dialog.querySelector('.gd-modal textarea.chat-input'), 'the box to ask is there without pressing anything else');
+  assert.equal(dialog.querySelector('.section-title'), null);
+  dialog.querySelector('[data-close]').click();
+});
+
+test('a guide that cannot be checked is simply not offered', async () => {
+  installApi({ 'GET /timers/active/7': RUNNING, 'GET /guide/status': () => json({ detail: 'down' }, 503) });
+  await loadTimerCard();
+  await settle();
+  assert.equal(document.getElementById('timerGuideBtn').hidden, true);
 });
