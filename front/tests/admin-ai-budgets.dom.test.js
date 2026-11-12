@@ -97,3 +97,18 @@ test('a failure shows as the error and leaves nothing half drawn', async () => {
   await renderBudgets(panel());
   assert.match(panel().textContent, /sin base de datos/);
 });
+
+test('calls of a model with no price are warned about, because no budget can limit them', async () => {
+  await open({ ...DATA, unpriced: { calls: 3, models: ['openai/gpt-9-new'] } });
+  const warn = panel().querySelector('.adm-warn').textContent;
+  assert.match(warn, /3 llamadas/);
+  assert.match(warn, /openai\/gpt-9-new/);
+  assert.match(warn, /no se pueden limitar/);
+});
+
+test('with none, or with no budget at all, there is nothing to warn about', async () => {
+  await open({ ...DATA, unpriced: { calls: 0, models: [] } });
+  assert.equal(panel().querySelector('.adm-warn'), null);
+  await open({ ...DATA, group: { cap: 0, spent: 0 }, default_user_cap: 0, players: [], unpriced: { calls: 2, models: ['openai/x'] } });
+  assert.equal(panel().querySelector('.adm-warn'), null);
+});

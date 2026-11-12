@@ -26,12 +26,18 @@ function playerRow(p) {
     </tr>`;
 }
 
+// what the caps cannot see: calls of a model whose price the list does not have
+const unpricedWarning = (data) => (data.unpriced?.calls && (data.group.cap || data.default_user_cap || data.players.some((p) => p.cap))
+  ? html`<div class="adm-warn">${data.unpriced.calls} ${data.unpriced.calls === 1 ? 'llamada' : 'llamadas'} de este mes de la clave del grupo (${data.unpriced.models.join(', ')}) no tienen precio conocido: no cuentan en ningún presupuesto y no se pueden limitar. Se arregla con la siguiente actualización de la lista de precios o cambiando de modelo.</div>`
+  : '');
+
 function view(data) {
   const group = data.group;
   return html`
     <section class="adm-set-card adm-budgets-card">
       <h3>Presupuesto de la clave del grupo</h3>
       <div class="adm-sub">Lo que el grupo puede gastar al mes en preguntas que paga su clave (la del .env). Solo cuenta eso: lo que cada jugador paga con su propia clave no suma ni se limita. Los topes son en dólares enteros, y 0 es sin límite; el coste es una estimación y una pregunta puede pasarse del tope porque su precio se conoce al acabar. Se renuevan el día 1. Los topes por defecto se cambian en <strong>IA → Avisos con IA → Coste de la IA</strong>.</div>
+      ${unpricedWarning(data)}
       <div class="adm-stats">${statTile(group.cap ? `Gastado este mes de ${money(group.cap)}` : 'Gastado este mes', money(group.spent))}</div>
       ${group.cap ? html`${bar(group.spent, group.cap)}<div class="adm-sub">${budgetLine('Grupo', group, data.resets_on)} ${state(group.spent, group.cap)}</div>` : html`<div class="adm-sub">El grupo no tiene tope: la clave del grupo no se limita por coste.</div>`}
       <h3>Tope por jugador</h3>
