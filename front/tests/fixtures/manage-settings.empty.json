@@ -139,8 +139,8 @@
   "provider": null
  },
  "games_sources": {
-  "igdb": true,
-  "rawg": true
+  "igdb": false,
+  "rawg": false
  },
  "guide": {
   "customized": false,
