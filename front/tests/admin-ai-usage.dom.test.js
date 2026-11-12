@@ -109,6 +109,7 @@ test('the app record comes first and needs no OpenAI key: who paid, by player, b
   await open();
   assert.match(panel().querySelector('.adm-calls-head').textContent, /estimación/);
   assert.match(panel().querySelector('.adm-calls-head').textContent, /2026-11-12/);
+  assert.match(panel().querySelector('.adm-calls-head').textContent, /Los límites y el presupuesto se gestionan en IA → Límites/);
   assert.deepEqual(rows(section('source')).map((r) => r.split('|')[0]), ['Clave del grupo', 'Clave propia de cada jugador']);
   assert.deepEqual(rows(section('players')).map((r) => r.split('|')[0]), ['Ana', 'Beto']);
   assert.deepEqual(rows(section('feature')).map((r) => r.split('|')[0]), ['Guía de juego', 'Chat']);

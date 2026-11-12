@@ -130,6 +130,12 @@ const openWithChat = async (values = VALUES, chat = CHAT) => {
   await render(panel(), { entity: { sections: ['chat'] } });
   await settle();
 };
+const openLimits = async (values = VALUES, sections = ['ailimitq']) => {
+  installApi({ 'GET /manage/settings': { values, jobs: {}, push_devices: { devices: 0, users: 0 }, mail: { configured: false, missing: [] }, ai_uses: USES, ai_model: { provider: 'google', model: 'gemini-test' }, chat: CHAT, guide: CHAT } });
+  await render(panel(), { entity: { sections } });
+  await settle();
+};
+const limitsCard = () => panel().querySelector('.adm-ailimitq-card');
 const chatCard = () => panel().querySelector('.adm-chat-card');
 const state = () => chatCard().querySelector('.adm-chat-state').textContent;
 
@@ -201,16 +207,25 @@ test('the test button asks the API, which uses what is stored', async () => {
 
 const LIMIT_FIELDS = ['chat.limit_user_minute', 'chat.limit_user_hour', 'chat.limit_user_day', 'chat.limit_group_minute', 'chat.limit_group_day'];
 
-test('the chat card has the limits per player and for the group, with what the server has', async () => {
-  await openWithChat();
-  const fields = LIMIT_FIELDS.map((name) => chatCard().querySelector(`input[name="${name}"]`));
+test('the limits of questions are together, those of the chat and those of the guide, with what the server has', async () => {
+  await openLimits();
+  const fields = LIMIT_FIELDS.map((name) => limitsCard().querySelector(`input[name="${name}"]`));
   assert.ok(fields.every((field) => field && field.type === 'number' && field.min === '0'));
   assert.deepEqual(fields.map((field) => field.value), ['5', '30', '100', '10', '300']);
-  assert.match(chatCard().textContent, /0 es sin límite/);
+  assert.match(limitsCard().textContent, /0 es sin límite/);
+  assert.deepEqual([...limitsCard().querySelectorAll('.adm-limit-group')].map((g) => g.textContent), ['Chat', 'Guía de juego']);
+  assert.deepEqual([...limitsCard().querySelectorAll('.adm-guide-limits input')].map((i) => i.name), ['guide.limit_user_hour', 'guide.limit_user_day', 'guide.limit_group_day']);
+});
+
+test('the card of the chat and that of the guide no longer carry limits nor the choice of who takes the cost', async () => {
+  await openLimits(VALUES, ['chat', 'guide']);
+  assert.equal(panel().querySelector('input[name^="chat.limit_"]'), null);
+  assert.equal(panel().querySelector('input[name^="guide.limit_"]'), null);
+  assert.equal(panel().querySelector('select[name$=".key_source"]'), null);
 });
 
 test('changing a limit sends that number, and only that one', async () => {
-  await openWithChat();
+  await openLimits();
   const form = panel().querySelector('#admSettings');
   form.elements['chat.limit_user_day'].value = '0';
   form.elements['chat.limit_group_minute'].value = '20';
@@ -240,10 +255,10 @@ const openWithGuide = async (values = VALUES, guide = GUIDE) => {
 };
 const guideCard = () => panel().querySelector('.adm-guide-card');
 
-test('the guide card has its switch, its limits and its instructions, and offers the test', async () => {
+test('the guide card has its switch and its instructions, and offers the test; its limits are with the others', async () => {
   await openWithGuide();
   assert.equal(guideCard().querySelector('input[type="checkbox"]').name, 'guide.enabled');
-  assert.deepEqual([...guideCard().querySelectorAll('input[type="number"]')].map((i) => i.name), ['guide.limit_user_hour', 'guide.limit_user_day', 'guide.limit_group_day']);
+  assert.equal(guideCard().querySelector('input[type="number"]'), null);
   assert.ok(guideCard().querySelector('textarea[name="guide.prompt"]'));
   assert.match(guideCard().querySelector('.adm-guide-state').textContent, /^Disponible/);
   assert.equal(guideCard().querySelector('[data-set-act="test-guide"]').disabled, false);
@@ -268,11 +283,12 @@ test('the AI cost card has the price refresh and the retention of the record', a
   assert.match(card.textContent, /sin guardar el texto/);
 });
 
-test('the chat and the guide each say whose key pays, and changing it is saved like any other setting', async () => {
+test('whose key takes the cost of the chat and of the guide is chosen in the limits, and saved like any other setting', async () => {
   const values = { ...VALUES, 'chat.key_source': 'group_then_user', 'guide.key_source': 'user_only', 'guide.enabled': true, 'guide.prompt': 'g' };
   installApi({ 'GET /manage/settings': { values, jobs: {}, push_devices: { devices: 0, users: 0 }, mail: { configured: false, missing: [] }, ai_uses: USES, ai_model: { provider: 'google', model: 'gemini-test' }, chat: CHAT, guide: CHAT } });
-  await render(panel(), { entity: { sections: ['chat', 'guide'] } });
+  await render(panel(), { entity: { sections: ['ailimitkeys'] } });
   await settle();
+  assert.equal(panel().querySelector('.adm-ailimitkeys-card h3').textContent, 'Quién asume el coste');
   const chat = panel().querySelector('select[name="chat.key_source"]');
   const guide = panel().querySelector('select[name="guide.key_source"]');
   assert.deepEqual([...chat.options].map((o) => o.value), ['user_only', 'group_then_user', 'group_only']);
@@ -301,15 +317,42 @@ test('the cards of the chat, the guide and the cost explain themselves in the "i
   for (const head of heads) assert.equal(head.nextElementSibling.classList.contains('adm-sub') && head.nextElementSibling.textContent.length > 250, false, 'no long paragraph right under the title');
 });
 
-test('the money limit of the group has a card of its own among the chat and the guide, and says it is not a number of questions', async () => {
-  const values = { ...VALUES, 'chat.key_source': 'group_then_user', 'guide.key_source': 'user_only', 'guide.enabled': true, 'guide.prompt': 'g', 'ai.group_budget_month': 20, 'ai.user_budget_month': 5 };
-  installApi({ 'GET /manage/settings': { values, jobs: {}, push_devices: { devices: 0, users: 0 }, mail: { configured: false, missing: [] }, ai_uses: USES, ai_model: { provider: 'google', model: 'gemini-test' }, chat: CHAT, guide: CHAT } });
-  await render(panel(), { entity: { sections: ['chat', 'guide', 'aibudget'] } });
+test('everything that limits the AI is in one page: who takes the cost, the question limits, the money budget and the players\' table', async () => {
+  const values = { ...VALUES, 'chat.key_source': 'group_then_user', 'guide.key_source': 'user_only', 'ai.group_budget_month': 20, 'ai.user_budget_month': 5 };
+  installApi({
+    'GET /manage/ai-usage/budgets': { month: '2026-11', resets_on: '2026-12-01', group: { cap: 20, spent: 3 }, default_user_cap: 5, unpriced: { calls: 0, models: [] }, players: [{ user_id: 1, name: 'Ana', is_active: true, override: null, cap: 5, spent: 1, calls: 2 }] },
+    'GET /manage/settings': { values, jobs: {}, push_devices: { devices: 0, users: 0 }, mail: { configured: false, missing: [] }, ai_uses: USES, ai_model: { provider: 'google', model: 'gemini-test' }, chat: CHAT, guide: CHAT },
+  });
+  const { ENTITIES } = await import('../js/pages/admin/entities.js');
+  await render(panel(), { entity: ENTITIES.ailimits });
   await settle();
+  await settle();
+  const titles = [...panel().querySelectorAll('.adm-set-card h3, .adm-budgets-card h3')].map((h) => h.textContent);
+  assert.deepEqual(titles, ['Quién asume el coste', 'Límites de preguntas', 'Presupuesto mensual (dinero)', 'Presupuesto de la clave del grupo', 'Tope por jugador']);
   const card = panel().querySelector('.adm-aibudget-card');
-  assert.equal(card.querySelector('h3').textContent, 'Presupuesto mensual (dinero)');
   assert.deepEqual([...card.querySelectorAll('input[type="number"]')].map((i) => [i.name, i.value]), [['ai.group_budget_month', '20'], ['ai.user_budget_month', '5']]);
   assert.match(card.textContent, /límite de dinero, distinto de los límites de preguntas/);
-  assert.match(panel().querySelector('.adm-chat-card').textContent, /Son números de preguntas: el límite en dinero es el «Presupuesto mensual \(dinero\)»/);
-  assert.match(panel().querySelector('.adm-guide-card').textContent, /Son números de preguntas: el límite en dinero/);
+  assert.equal(panel().querySelector('tr[data-user="1"] [name="cap"]').value, '');
+});
+
+test('Enter in the cap of a player saves that cap and does not submit the settings of the page', async () => {
+  const values = { ...VALUES, 'ai.group_budget_month': 20, 'ai.user_budget_month': 5 };
+  const sent = [];
+  installApi({
+    'PUT /manage/ai-usage/budgets/1': ({ body }) => { sent.push(body); return {}; },
+    'GET /manage/ai-usage/budgets': { month: '2026-11', resets_on: '2026-12-01', group: { cap: 20, spent: 3 }, default_user_cap: 5, unpriced: { calls: 0, models: [] }, players: [{ user_id: 1, name: 'Ana', is_active: true, override: null, cap: 5, spent: 1, calls: 2 }] },
+    'PUT /manage/settings': () => { sent.push('SETTINGS'); return { changed: [], values }; },
+    'GET /manage/settings': { values, jobs: {}, push_devices: { devices: 0, users: 0 }, mail: { configured: false, missing: [] }, ai_uses: USES, ai_model: { provider: 'google', model: 'gemini-test' }, chat: CHAT, guide: CHAT },
+  });
+  await render(panel(), { entity: { sections: ['aibudget', 'aibudgets'] } });
+  await settle();
+  await settle();
+  const input = panel().querySelector('tr[data-user="1"] [name="cap"]');
+  input.value = '7';
+  const enter = new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+  input.dispatchEvent(enter);
+  await settle();
+  await settle();
+  assert.equal(enter.defaultPrevented, true);
+  assert.deepEqual(sent, [{ usd: 7 }]);
 });

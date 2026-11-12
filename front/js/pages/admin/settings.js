@@ -13,6 +13,7 @@ import { toast } from '../../ui/toast.js';
 import { errorState } from './components.js';
 import { confirmDialog } from './dialogs.js';
 import { cardTitle } from '../../ui/info-tip.js';
+import { renderBudgets } from './ai-budgets.js';
 
 const SECRETS = []; // never loaded back: sent only when something is typed (the keys of outside services are not: they are in the server's .env)
 const LOCKED = ['telegram.token', 'telegram.group_id', 'telegram.admin_chat_id', 'ai.api_key', 'ai.openai_admin_key', 'ai.provider', 'ai.model', 'chat.model']; // shown only as set or not, never editable
@@ -36,8 +37,8 @@ const KEY_SOURCES = [
   ['group_then_user', 'Primero la del grupo; al agotarse su presupuesto (el total o la parte del jugador), la del jugador'],
   ['group_only', 'Siempre la del grupo (ignora las claves de los jugadores)'],
 ];
-const keySource = (name) => html`
-  <label>Quién asume el coste
+const keySource = (name, label) => html`
+  <label>${label}
     <select class="adm-input" name="${name}">${KEY_SOURCES.map(([id, label]) => html`<option value="${id}">${label}</option>`)}</select>
   </label>`;
 const READ_ONLY = ['mail', 'backup']; // cards with nothing to save
@@ -262,12 +263,6 @@ function view(values, jobs, pushDevices, mail, aiUses, aiModel, chat, guide = {}
         <label>Modelo del chat <input class="adm-input adm-chat-model" type="text" value="${chat.model || 'Sin configurar'}" disabled /></label>
         <div class="adm-sub">El chat usa <code>CHAT_AI_MODEL</code> si está en el .env${chat.own_model ? '' : html` (ahora no lo está: usa <code>AI_MODEL</code>)`}, para darle un modelo distinto del de los avisos.</div>
         ${check('chat.enabled', 'Chat activado', 'Apagado, el botón desaparece para todos y el chat deja de responder.')}
-        ${keySource('chat.key_source')}
-        <div class="adm-sub">Cada jugador puede guardar su propia clave de OpenAI en su perfil (Ajustes → Mi IA). Con «Primero la del grupo», todos usan la del grupo (el .env) mientras quede presupuesto este mes; cuando se agota, el total o la parte de un jugador, quien tiene su propia clave sigue con ella (y solo le queda un límite por minuto) y quien no la tiene lo ve explicado. «Siempre la del grupo» ignora las claves de los jugadores, y «Solo la clave del propio jugador» no gasta nada del grupo.</div>
-        <div class="adm-sub">Preguntas que se pueden hacer al chat; 0 es sin límite. Cada pregunta gasta varias llamadas a la IA y el cupo de la IA es del proyecto entero, no de cada jugador: por eso hay un límite por jugador y otro para todo el grupo. «Día» son las últimas 24 horas, no desde medianoche. Se cuentan en memoria: reiniciar la API los pone a cero. Quien se pasa ve cuál ha superado y cuánto esperar. Son números de preguntas: el límite en dinero es el «Presupuesto mensual (dinero)» de más abajo.</div>
-        <div class="adm-set-row adm-chat-limits">
-          ${CHAT_LIMITS.map(([name, label]) => html`<label>${label} <input class="adm-input" type="number" name="${name}" min="0" max="100000" step="1" required /></label>`)}
-        </div>
         ${chatMissing(values, chat).length ? html`<div class="adm-warn">Falta <code>${chatMissing(values, chat).join(', ')}</code> en el .env del servidor: el chat usa el proveedor y la clave de la IA de los avisos, y no tiene ningún modelo por defecto, así que no estará disponible hasta que los definas (y reinicies la API).</div>` : ''}
         <details class="adm-details adm-ai-prompt">
           <summary class="adm-btn sm">Instrucciones ${chat.customized ? html`<span class="adm-tag">Personalizado</span>` : ''}</summary>
@@ -290,26 +285,44 @@ function view(values, jobs, pushDevices, mail, aiUses, aiModel, chat, guide = {}
         <div class="adm-sub">La lista incluye también lo que cobra cada proveedor por las búsquedas web de la guía, modelo a modelo. Un cambio en la frecuencia de actualización se aplica al arrancar la API.</div>
       </section>`,
 
+    ailimitkeys: html`
+      <section class="adm-set-card adm-ailimitkeys-card">
+        ${cardTitle('Quién asume el coste', html`<p>Cada jugador puede guardar su propia clave de OpenAI en su perfil (Ajustes → Mi IA). Con «Primero la del grupo», todos usan la del grupo (el .env) mientras quede presupuesto este mes; cuando se agota, el total o la parte de un jugador, quien tiene su propia clave sigue con ella (y solo le queda un límite por minuto) y quien no la tiene lo ve explicado. «Siempre la del grupo» ignora las claves de los jugadores, y «Solo la clave del propio jugador» no gasta nada del grupo.</p><p>Una pregunta de la guía hace búsquedas web y cuesta bastante más que una del chat, así que por defecto solo se usa la clave del jugador (Ajustes → Mi IA): quien no la tiene ve cómo añadirla. Los límites de abajo son para lo que paga el grupo.</p>`)}
+        <div class="adm-set-row">
+          ${keySource('chat.key_source', 'Chat')}
+          ${keySource('guide.key_source', 'Guía de juego')}
+        </div>
+      </section>`,
+
+    ailimitq: html`
+      <section class="adm-set-card adm-ailimitq-card">
+        ${cardTitle('Límites de preguntas', html`<p>Preguntas que se pueden hacer al chat; 0 es sin límite. Cada pregunta gasta varias llamadas a la IA y el cupo de la IA es del proyecto entero, no de cada jugador: por eso hay un límite por jugador y otro para todo el grupo. «Día» son las últimas 24 horas, no desde medianoche. Se cuentan en memoria: reiniciar la API los pone a cero. Quien se pasa ve cuál ha superado y cuánto esperar. </p><p>Preguntas que se pueden hacer a la guía; 0 es sin límite. Cada una hace una búsqueda web y cuesta bastante más que una del chat, por eso sus límites son propios y más bajos. «Día» son las últimas 24 horas. Se cuentan en memoria: reiniciar la API los pone a cero.</p>`)}
+        <strong class="adm-limit-group">Chat</strong>
+        <div class="adm-set-row adm-chat-limits">
+          ${CHAT_LIMITS.map(([name, label]) => html`<label>${label} <input class="adm-input" type="number" name="${name}" min="0" max="100000" step="1" required /></label>`)}
+        </div>
+        <strong class="adm-limit-group">Guía de juego</strong>
+        <div class="adm-set-row adm-guide-limits">
+          ${GUIDE_LIMITS.map(([name, label]) => html`<label>${label} <input class="adm-input" type="number" name="${name}" min="0" max="100000" step="1" required /></label>`)}
+        </div>
+      </section>`,
+
     aibudget: html`
       <section class="adm-set-card adm-aibudget-card">
-        ${cardTitle('Presupuesto mensual (dinero)', html`Cuánto puede gastar la clave del grupo cada mes, en dólares enteros (0 = sin límite): el total del grupo y la parte de cada jugador por defecto; un jugador puede tener otro tope en IA → Uso y coste. Solo cuenta lo que cubre la clave del grupo: lo que cada jugador gasta con su propia clave no suma ni se limita. Cuando se agota, lo que depende de esa clave deja de responder hasta el día 1, y quien tiene su propia clave sigue con ella si el modo de «Quién asume el coste» es «Primero la del grupo». El coste es una estimación y una pregunta puede pasarse del tope, porque su precio se conoce al acabar. Se renueva el día 1.`)}
-        <div class="adm-sub">Es un límite de dinero, distinto de los límites de preguntas de arriba (que cuentan mensajes por minuto, hora y día). Lo gastado este mes y el tope de cada jugador se ven en IA → Uso y coste.</div>
+        ${cardTitle('Presupuesto mensual (dinero)', html`Cuánto puede gastar la clave del grupo cada mes, en dólares enteros (0 = sin límite): el total del grupo y la parte de cada jugador por defecto; un jugador puede tener otro tope, en la tabla de debajo. Solo cuenta lo que cubre la clave del grupo: lo que cada jugador gasta con su propia clave no suma ni se limita. Cuando se agota, lo que depende de esa clave deja de responder hasta el día 1, y quien tiene su propia clave sigue con ella si el modo de «Quién asume el coste» es «Primero la del grupo». El coste es una estimación y una pregunta puede pasarse del tope, porque su precio se conoce al acabar. Se renueva el día 1.`)}
+        <div class="adm-sub">Es un límite de dinero, distinto de los límites de preguntas de arriba (que cuentan mensajes por minuto, hora y día). Debajo ves lo gastado este mes y puedes dar un tope distinto a cada jugador.</div>
         <div class="adm-set-row">
           <label>Todo el grupo (US$ al mes) <input class="adm-input" type="number" name="ai.group_budget_month" min="0" max="10000" step="1" required /></label>
           <label>Cada jugador, por defecto (US$ al mes) <input class="adm-input" type="number" name="ai.user_budget_month" min="0" max="10000" step="1" required /></label>
         </div>
       </section>`,
 
+    aibudgets: html`<div id="aicBudgets"></div>`,
+
     guide: html`
       <section class="adm-set-card adm-guide-card">
         ${cardTitle('Guía de juego', html`Una tarjeta en la página de cada juego donde el jugador pide ayuda con ese juego (desatascarse, consejos) y elige cuántos destripes admite. A diferencia del chat, responde buscando en la web. Usa el proveedor, la clave y el modelo del chat, y el modelo tiene que admitir la búsqueda web (con OpenAI, un modelo de la API Responses; con Google, la búsqueda de Gemini). Lo comprueba el botón de abajo.`)}
         ${check('guide.enabled', 'Guía activada', 'Apagada, la tarjeta desaparece de la página de los juegos y la guía deja de responder.')}
-        ${keySource('guide.key_source')}
-        <div class="adm-sub">Una pregunta de la guía hace búsquedas web y cuesta bastante más que una del chat, así que por defecto solo se usa la clave del jugador (Ajustes → Mi IA): quien no la tiene ve cómo añadirla. Los límites de abajo son para lo que paga el grupo.</div>
-        <div class="adm-sub">Preguntas que se pueden hacer a la guía; 0 es sin límite. Cada una hace una búsqueda web y cuesta bastante más que una del chat, por eso sus límites son propios y más bajos. «Día» son las últimas 24 horas. Se cuentan en memoria: reiniciar la API los pone a cero. Son números de preguntas: el límite en dinero es el «Presupuesto mensual (dinero)».</div>
-        <div class="adm-set-row adm-guide-limits">
-          ${GUIDE_LIMITS.map(([name, label]) => html`<label>${label} <input class="adm-input" type="number" name="${name}" min="0" max="100000" step="1" required /></label>`)}
-        </div>
         <details class="adm-details adm-ai-prompt">
           <summary class="adm-btn sm">Instrucciones ${customizedTag(guide)}</summary>
           <div>
@@ -557,6 +570,8 @@ export async function render(target, { entity }) {
     fill(form, values);
     syncAnnualDay(form);
     syncAiOff(form);
+    const budgets = panel.querySelector('#aicBudgets');
+    if (budgets) renderBudgets(budgets); // the players' table of the money budget belongs with the limits, not with the usage
     form.addEventListener('change', (e) => {
       if (e.target.name === 'annual.month') syncAnnualDay(form);
       if (e.target.name === 'ai.enabled') syncAiOff(form);

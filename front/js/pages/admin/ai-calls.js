@@ -92,7 +92,7 @@ function view(data, month) {
     : 'Los precios no se actualizan: se usan los de la versión instalada.';
   return html`
     <section class="adm-set-card adm-calls-head">
-      ${cardTitle('Uso de la IA de la app', html`Cada pregunta al chat o a la guía deja una fila con sus tokens, lo que costó y de qué tipo era (nunca el texto). El coste es una <strong>estimación</strong>: los tokens medidos por el precio de su modelo el día de la llamada, más las búsquedas web a su precio${data.price_stamp ? ` (lista de precios de ${data.price_stamp.slice(0, 10)})` : ''}. ${prices} ${data.retention_days ? `Se conservan ${data.retention_days} días.` : 'Se conservan siempre.'}`)}
+      ${cardTitle('Uso de la IA de la app', html`Cada pregunta al chat o a la guía deja una fila con sus tokens, lo que costó y de qué tipo era (nunca el texto). El coste es una <strong>estimación</strong>: los tokens medidos por el precio de su modelo el día de la llamada, más las búsquedas web a su precio${data.price_stamp ? ` (lista de precios de ${data.price_stamp.slice(0, 10)})` : ''}. ${prices} ${data.retention_days ? `Se conservan ${data.retention_days} días.` : 'Se conservan siempre.'} Los límites y el presupuesto se gestionan en IA → Límites.`)}
       <div class="adm-set-row">
         <label>Periodo
           <select class="adm-input" id="aicMonth">
