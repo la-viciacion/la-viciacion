@@ -41,9 +41,10 @@ function view(data) {
       <div class="adm-stats">${statTile(group.cap ? `Gastado este mes de ${money(group.cap)}` : 'Gastado este mes', money(group.spent))}</div>
       ${group.cap ? html`${bar(group.spent, group.cap)}<div class="adm-sub">${budgetLine('Grupo', group, data.resets_on)} ${state(group.spent, group.cap)}</div>` : html`<div class="adm-sub">El grupo no tiene tope: la clave del grupo no se limita por coste.</div>`}
       ${cardTitle('Tope por jugador', html`Por defecto: ${capLabel(data.default_user_cap)} al mes cada uno. Escribe otro número para un jugador (0 = sin límite) o déjalo vacío para volver al de por defecto.`)}
+      <div class="adm-sub">Tope mensual en dólares enteros (por ejemplo, 5). Déjalo vacío para usar el de por defecto (${capLabel(data.default_user_cap)}) y escribe 0 para quitarle el límite. El texto gris es el tope que se aplica ahora.</div>
       ${data.players.length
         ? html`<div class="adm-table-wrap"><table class="adm-table">
-            <thead><tr><th>Jugador</th><th>Llamadas</th><th>Gastado este mes</th><th></th><th>Tope</th><th></th></tr></thead>
+            <thead><tr><th>Jugador</th><th>Llamadas</th><th>Gastado este mes</th><th></th><th>Tope (US$ al mes)</th><th></th></tr></thead>
             <tbody>${data.players.map((p) => playerRow({ ...p, default: data.default_user_cap }))}</tbody>
           </table></div>`
         : html`<div class="adm-sub">No hay jugadores.</div>`}
