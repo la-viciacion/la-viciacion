@@ -3,9 +3,11 @@
 import { api } from '../../lib/api.js';
 import { ALL, money, monthChoices, monthLabel, selection, share } from '../../lib/ai-usage.js';
 import { html, mount } from '../../lib/html.js';
+import { renderCalls } from './ai-calls.js';
 import { statTile, errorState } from './components.js';
 
-let panel;
+let panel; // the whole page
+let billed; // its second half: what OpenAI has billed
 let data;
 let month = ALL;
 
@@ -74,33 +76,36 @@ function view() {
 async function load(refresh) {
   const result = await api(`/manage/ai-usage${refresh ? '?refresh=true' : ''}`);
   if (!result.configured) {
-    mount(panel, html`<section class="adm-set-card"><h3>Gasto en OpenAI</h3><div class="adm-warn">Falta <code>OPENAI_ADMIN_KEY</code> en el .env del servidor (una clave de administración de OpenAI, o una restringida con el permiso <code>api.usage.read</code>) y reiniciar la API. Mira Notificaciones → Canales.</div></section>`);
+    mount(billed, html`<section class="adm-set-card"><h3>Gasto en OpenAI</h3><div class="adm-warn">Falta <code>OPENAI_ADMIN_KEY</code> en el .env del servidor (una clave de administración de OpenAI, o una restringida con el permiso <code>api.usage.read</code>) y reiniciar la API. Mira Notificaciones → Canales.</div></section>`);
     return;
   }
   data = result;
   if (month !== ALL && !data.months.some((m) => m.month === month)) month = ALL;
-  mount(panel, view());
+  mount(billed, view());
 }
 
 export async function render(target) {
   panel = target;
   month = ALL;
+  mount(panel, html`<div id="aicApp"></div><div id="aiuBilled"></div>`);
+  billed = panel.querySelector('#aiuBilled');
+  renderCalls(panel.querySelector('#aicApp')); // the record of the app's calls neither waits for OpenAI nor needs its key
   try {
     await load(false);
-    panel.onchange = (e) => {
+    billed.onchange = (e) => {
       if (e.target.id !== 'aiuMonth') return;
       month = e.target.value;
-      mount(panel.querySelector('#aiuDetail'), detailView(selection(data, month)));
+      mount(billed.querySelector('#aiuDetail'), detailView(selection(data, month)));
     };
-    panel.onclick = async (e) => {
+    billed.onclick = async (e) => {
       if (!e.target.closest('#aiuRefresh')) return;
       try {
         await load(true);
       } catch (err) {
-        mount(panel, errorState(err.message));
+        mount(billed, errorState(err.message));
       }
     };
   } catch (err) {
-    mount(panel, errorState(err.message));
+    mount(billed, errorState(err.message));
   }
 }
