@@ -627,13 +627,13 @@ ENTITIES.channels = {
 };
 ENTITIES.ai = {
   label: 'Avisos con IA',
-  description: 'Inteligencia artificial que redacta algunos avisos: el interruptor, la prueba, el proveedor y el modelo (solo lectura) y cuáles la usan.',
+  description: 'Inteligencia artificial que redacta algunos avisos: el interruptor, la prueba, el proveedor y el modelo y cuáles la usan.',
   custom: 'settings',
   sections: ['ai', 'aiuses'],
 };
 ENTITIES.chat = {
   label: 'Chat y guía',
-  description: 'Asistente de la app y guía de juego: interruptores, modelo, instrucciones y si los jugadores los tienen disponibles.',
+  description: 'Asistente de la app y guía de juego: interruptores, proveedor, modelo, instrucciones y si los jugadores los tienen disponibles.',
   custom: 'settings',
   sections: ['chat', 'guide'],
 };

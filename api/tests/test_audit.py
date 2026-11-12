@@ -16,8 +16,8 @@ from tests.sqlite_db import make_session
 
 class RedactTests(unittest.TestCase):
     def test_secrets_are_hidden_whatever_their_depth(self):
-        got = audit.redact({"password": "hunter2", "values": {"telegram.token": "123:abc", "ai.api_key": "k", "ai.model": "x"}})
-        self.assertEqual(got, {"password": "***", "values": {"telegram.token": "***", "ai.api_key": "***", "ai.model": "x"}})
+        got = audit.redact({"password": "hunter2", "values": {"telegram.token": "123:abc", "ai.openai.api_key": "k", "ai.model.openai": "x"}})
+        self.assertEqual(got, {"password": "***", "values": {"telegram.token": "***", "ai.openai.api_key": "***", "ai.model.openai": "x"}})
 
     def test_a_private_key_and_a_new_password_are_secrets_too(self):
         self.assertEqual(audit.redact({"push.vapid_private": "p", "new_password": "x"}), {"push.vapid_private": "***", "new_password": "***"})
