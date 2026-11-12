@@ -27,6 +27,7 @@
 ## Front (JavaScript)
 
 - Vanilla ES modules, `type: module`, ESLint rules in `eslint.config.js` (`eqeqeq`, `prefer-const`, `no-var`, unused vars error, `_` prefix to ignore args).
+- An explanation of what a card or a section is for goes in the "i" beside its title, not in a paragraph under it: `sectionTitle(title, id, info)` (`ui/profile-summary.js`) for a section, `cardTitle(title, info)` (`ui/info-tip.js`) for a card, `infoTip(text)` for a field. It opens on a tap (a native `<details>`, so it works with the keyboard and on touch) and takes no room until wanted. What the player must see to act (a warning, a status that changes, the cost of the button they are about to press) stays visible.
 - Markup only via `html` tagged template + `mount(el, html`...`)`. Interpolated values are escaped; to embed already-safe markup use `raw()` (and `mount`/`append`) from `html.js`, never string concatenation into `innerHTML`.
 - All HTTP through `js/lib/api.js` (`api(path, options)`); it adds the token and handles 401. Do not call `fetch` directly for the API.
 - Keep pure logic in `js/lib/` or a pure module of the page (e.g. `home/sessions.js`) and unit test it in `front/tests/` with `node:test`.
