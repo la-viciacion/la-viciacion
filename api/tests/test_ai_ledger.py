@@ -118,14 +118,16 @@ class RecordTests(unittest.TestCase):
         for source, cost in (("group", 1_500_000), ("group", 500_000), ("user", 9_000_000)):
             self.db.add(models.AiUsage(feature="chat", key_source=source, status="ok", provider="openai", cost_micros=cost, created_at=when))
         self.db.commit()
-        self.assertEqual(ai_spend.group_months(self.db), [{"month": "2026-10", "total": 2.0}])
+        self.assertEqual(ai_spend.group_months_by_provider(self.db), {"openai": [{"month": "2026-10", "total": 2.0}]})
 
-    def test_without_openai_only_what_the_other_providers_spent_is_left(self):
+    def test_the_months_are_split_by_provider(self):
         when = datetime.datetime(2026, 10, 5, 9, 0)
         for provider, cost in (("openai", 1_500_000), ("google", 250_000)):
             self.db.add(models.AiUsage(feature="chat", key_source="group", status="ok", provider=provider, cost_micros=cost, created_at=when))
         self.db.commit()
-        self.assertEqual(ai_spend.group_months(self.db, without_openai=True), [{"month": "2026-10", "total": 0.25}])
+        self.assertEqual(ai_spend.group_months_by_provider(self.db), {
+            "openai": [{"month": "2026-10", "total": 1.5}], "google": [{"month": "2026-10", "total": 0.25}],
+        })
 
     def test_purge_deletes_what_is_older_than_the_retention_and_keeps_everything_when_it_is_zero(self):
         now = datetime.datetime(2026, 11, 12, 12, 0)
@@ -355,8 +357,9 @@ class FreePlanTests(unittest.TestCase):
         self.assertEqual((ai_budget.spent(self.db), ai_budget.spent(self.db, 1)), (500_000, 500_000))
         month = ai_spend.summary(self.db)["months"][0]
         self.assertEqual((month["group_cost"], month["group_real_cost"], month["group_openai_real_cost"]), (3.5, 0.5, 0.5))
-        self.assertEqual(ai_spend.group_months(self.db)[0]["total"], 0.5)
-        self.assertEqual(ai_spend.group_months(self.db, without_openai=True)[0]["total"], 0.0)
+        self.assertEqual(ai_spend.group_months_by_provider(self.db), {
+            "google": [{"month": month["month"], "total": 0.0}], "openai": [{"month": month["month"], "total": 0.5}],
+        })
 
     def test_a_setting_that_cannot_be_read_never_loses_the_row_of_the_call(self):
         with mock.patch.object(settings, "get", side_effect=RuntimeError("db down")), self.assertLogs(ai_ledger.logger, "ERROR"):

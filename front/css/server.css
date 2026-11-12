@@ -43,6 +43,21 @@
 .sv-tile { gap: 2px; }
 .sv-tile-label { font-size: 0.8rem; font-weight: 700; color: var(--text-secondary); }
 .sv-tile-value { font-size: 1.5rem; font-weight: 700; }
+.sv-tile-usd { font-size: 1rem; font-weight: 700; color: var(--accent-pink); white-space: nowrap; }
+/* the blocks of one section one under the other, with room between them */
+.sv-stack { display: flex; flex-direction: column; gap: 12px; }
+.sv-stack > .sv-section { margin-bottom: 0; }
+.sv-stack > .sv-tiles { margin-bottom: 0; }
+.sv-stack > .sv-card { margin: 0; }
+.sv-subtitle { margin: 16px 0 6px; font-size: 0.9rem; font-weight: 700; color: var(--text-secondary); }
+.sv-ai-section { border-top: 1px solid var(--border); margin-top: 14px; }
+.sv-ai-chart { margin: 4px 0 10px; }
+.sv-ai-title { font-size: 0.72rem; color: var(--text-muted); margin: 2px 2px 4px; }
+.sv-ai-bars { display: flex; gap: 2px; }
+.sv-ai-cell { flex: 1; min-width: 0; height: 30px; padding: 0 2px; display: flex; align-items: flex-end; justify-content: center; border-radius: var(--radius-sm); }
+.sv-ai-cell.selected { background: rgba(255, 255, 255, 0.05); }
+.sv-ai-bar { display: block; width: min(100%, 44px); min-height: 2px; background: var(--accent-pink); border-radius: 2px 2px 0 0; }
+.sv-ai-line { margin-top: 8px; font-size: 0.9rem; }
 .sv-year-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .sv-year-head .pf-season { margin: 0; }
 .sv-cost-total { font-size: 0.95rem; color: var(--text-secondary); }

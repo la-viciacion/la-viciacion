@@ -36,22 +36,28 @@ def get_costs(year: int = Query(..., ge=2000, le=2100, description="The year who
 @router.get("/ai-costs")
 def get_ai_costs(db: Session = Depends(get_db)):
     """What the AI has cost the group, in dollars (never converted to euros: the rate changes every day), for the server page:
-    this month, this year and month by month. OpenAI's part is what it billed when `OPENAI_ADMIN_KEY` is set and answers (a blocking
-    call: a plain def, so it runs in a worker thread); Google has no spend API, so what the other providers' keys spent is always
-    the app's estimate. `source` says what the figures are: `billed` (OpenAI's bill, nothing else spent), `mixed` (OpenAI's bill plus
-    an estimate of the others) or `estimated` (all of it, when OpenAI cannot be asked). Only totals, never who spent them."""
+    this month, this year and month by month, and the same for each provider (`providers`). OpenAI's part is what it billed when
+    `OPENAI_ADMIN_KEY` is set and answers (a blocking call: a plain def, so it runs in a worker thread); Google has no spend API, so
+    what the other providers' keys spent is always the app's estimate. Each provider says how it is known (`source`: `billed` or
+    `estimated`) and so does the whole (`billed` when OpenAI's bill is all there is, `mixed` when an estimate is added to it,
+    `estimated` when all of it is). Only totals, never who spent them."""
     today = datetime.date.today()
     key = settings.get("ai.openai_admin_key")
+    figures = {provider: (months, "estimated") for provider, months in ai_spend.group_months_by_provider(db).items()}
     if key:
         try:
-            billed = ai_usage.summary(key)["months"]
+            figures["openai"] = (ai_usage.summary(key)["months"], "billed")
         except AIError as e:
             logger.warning(f"The server page could not ask OpenAI for the spend, it uses the estimate: {e}")
-        else:
-            others = ai_spend.group_months(db, without_openai=True)
-            source = "mixed" if any(m["total"] for m in others) else "billed"
-            return {**ai_usage.rollup(ai_usage.add_months(billed, others), today), "source": source}
-    return {**ai_usage.rollup(ai_spend.group_months(db), today), "source": "estimated"}
+    providers = []
+    for provider, (months, source) in sorted(figures.items()):
+        rolled = ai_usage.rollup(months, today)
+        if rolled["total"]:
+            providers.append({"provider": provider, "source": source, **{k: rolled[k] for k in ("month", "year", "total")}})
+    everything = ai_usage.rollup(ai_usage.add_months(*(months for months, _ in figures.values())), today)
+    sources = {p["source"] for p in providers}
+    source = "billed" if sources == {"billed"} else "mixed" if sources == {"billed", "estimated"} else "estimated"
+    return {**everything, "source": source, "providers": providers}
 
 
 @router.get("/status")

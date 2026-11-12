@@ -172,43 +172,48 @@ class ServerPageTests(unittest.TestCase):
         data = ai_usage.rollup([], self.TODAY)
         self.assertEqual((data["month"], data["year"], data["total"], data["since"], data["months"]), (0.0, 0.0, 0.0, None, []))
 
-    def test_two_lists_of_months_are_added_where_they_share_a_month(self):
-        added = ai_usage.add_months([{"month": "2026-10", "total": 1.0}], [{"month": "2026-10", "total": 0.25}, {"month": "2026-11", "total": 0.5}])
+    def test_lists_of_months_are_added_where_they_share_a_month(self):
+        added = ai_usage.add_months([{"month": "2026-10", "total": 1.0}], [{"month": "2026-10", "total": 0.25}, {"month": "2026-11", "total": 0.5}], [])
         self.assertEqual(sorted((m["month"], m["total"]) for m in added), [("2026-10", 1.25), ("2026-11", 0.5)])
 
-    def test_the_route_adds_the_estimate_of_google_to_what_openai_billed_and_says_so(self):
+    def ask(self, key=KEY, billed=None, estimates=None, error=None):
+        """What the route answers with OpenAI's bill (`billed`, or failing with `error`) and the app's estimates by provider."""
         from src.routers import server
 
-        month = server.datetime.date.today().strftime("%Y-%m")
-        with mock.patch.object(server.settings, "get", return_value=KEY),                 mock.patch.object(server.ai_usage, "summary", return_value={"months": [{"month": month, "total": 2.0}]}),                 mock.patch.object(server.ai_spend, "group_months", return_value=[{"month": month, "total": 0.5}]) as others:
-            data = server.get_ai_costs(db=mock.Mock())
-        others.assert_called_once_with(mock.ANY, without_openai=True)
-        self.assertEqual((data["source"], data["month"]), ("mixed", 2.5))
+        summary = mock.patch.object(server.ai_usage, "summary", **({"side_effect": error} if error else {"return_value": {"months": billed or []}}))
+        with mock.patch.object(server.settings, "get", return_value=key), summary, \
+                mock.patch.object(server.ai_spend, "group_months_by_provider", return_value=estimates or {}):
+            if error:
+                with self.assertLogs(server.logger, "WARNING"):
+                    return server.get_ai_costs(db=mock.Mock())
+            return server.get_ai_costs(db=mock.Mock())
 
-    def test_with_no_spend_of_other_providers_the_figure_is_the_bill_alone(self):
+    def month(self, total):
         from src.routers import server
 
-        month = server.datetime.date.today().strftime("%Y-%m")
-        with mock.patch.object(server.settings, "get", return_value=KEY),                 mock.patch.object(server.ai_usage, "summary", return_value={"months": [{"month": month, "total": 2.0}]}),                 mock.patch.object(server.ai_spend, "group_months", return_value=[{"month": month, "total": 0.0}]):
-            data = server.get_ai_costs(db=mock.Mock())
-        self.assertEqual((data["source"], data["month"]), ("billed", 2.0))
+        return [{"month": server.datetime.date.today().strftime("%Y-%m"), "total": total}]  # the day the route itself sees (the pinned clock)
 
-    def test_the_route_uses_what_openai_billed(self):
-        from src.routers import server
-
-        with mock.patch.object(server.settings, "get", return_value=KEY),                 mock.patch.object(server.ai_usage, "summary", return_value={"months": [{"month": server.datetime.date.today().strftime("%Y-%m"), "total": 2.0}]}),                 mock.patch.object(server.ai_spend, "group_months", return_value=[]):
-            data = server.get_ai_costs(db=mock.Mock())
+    def test_with_the_key_openai_is_what_it_billed_and_nothing_else_spent_makes_it_billed(self):
+        data = self.ask(billed=self.month(2.0), estimates={"openai": self.month(9.0)})  # the app's estimate of OpenAI is not used
         self.assertEqual((data["source"], data["month"], data["currency"]), ("billed", 2.0, "usd"))
+        self.assertEqual(data["providers"], [{"provider": "openai", "source": "billed", "month": 2.0, "year": 2.0, "total": 2.0}])
 
-    def test_without_a_key_or_when_openai_fails_it_falls_back_to_the_estimate(self):
-        from src.routers import server
+    def test_the_estimate_of_google_is_added_to_what_openai_billed_and_each_says_how_it_is_known(self):
+        data = self.ask(billed=self.month(2.0), estimates={"google": self.month(0.5)})
+        self.assertEqual((data["source"], data["month"]), ("mixed", 2.5))
+        self.assertEqual([(p["provider"], p["source"], p["month"]) for p in data["providers"]], [("google", "estimated", 0.5), ("openai", "billed", 2.0)])
 
-        estimate = [{"month": server.datetime.date.today().strftime("%Y-%m"), "total": 0.75}]
-        with mock.patch.object(server.ai_spend, "group_months", return_value=estimate):
-            with mock.patch.object(server.settings, "get", return_value=None):
-                self.assertEqual(server.get_ai_costs(db=mock.Mock())["source"], "estimated")
-            with mock.patch.object(server.settings, "get", return_value=KEY),                     mock.patch.object(server.ai_usage, "summary", side_effect=AIError("down")), self.assertLogs(server.logger, "WARNING"):
-                data = server.get_ai_costs(db=mock.Mock())
+    def test_a_provider_that_cost_nothing_is_not_listed(self):
+        data = self.ask(billed=self.month(2.0), estimates={"google": self.month(0.0)})
+        self.assertEqual(([p["provider"] for p in data["providers"]], data["source"]), (["openai"], "billed"))
+
+    def test_without_a_key_everything_is_the_estimate(self):
+        data = self.ask(key=None, estimates={"openai": self.month(0.75), "google": self.month(0.25)})
+        self.assertEqual((data["source"], data["month"]), ("estimated", 1.0))
+        self.assertEqual({p["source"] for p in data["providers"]}, {"estimated"})
+
+    def test_when_openai_fails_its_part_falls_back_to_the_estimate(self):
+        data = self.ask(error=AIError("down"), estimates={"openai": self.month(0.75)})
         self.assertEqual((data["source"], data["month"]), ("estimated", 0.75))
 
 

@@ -98,14 +98,18 @@ def _months(days: list) -> list[dict]:
     return list(months.values())
 
 
-def group_months(db: Session, without_openai: bool = False) -> list[dict]:
-    """What the group's keys really cost each month, from the record: [{month, total}] in dollars (a call on a key of a free plan
-    counts as nothing, its estimate aside). It is what the server page shows when OpenAI's billed spend cannot be asked; with
-    `without_openai`, only what the other providers' keys (Google's) cost, which is what OpenAI's bill does not have."""
-    return [
-        {"month": m["month"], "total": round(m["group_real_cost"] - (m["group_openai_real_cost"] if without_openai else 0.0), 6)}
-        for m in _months(_days(db))
-    ]
+def group_months_by_provider(db: Session) -> dict[str, list[dict]]:
+    """What the group's keys really cost each month, from the record, by provider: {provider: [{month, total}]} in dollars (a call
+    on a key of a free plan counts as nothing, its estimate aside). It is what the server page shows of every provider whose spend
+    cannot be asked (all of them without OpenAI's admin key), and the part of OpenAI's bill that is not its."""
+    found: dict[str, dict[str, float]] = {}
+    for row in _days(db):
+        if row.source != ai_ledger.GROUP:
+            continue
+        months = found.setdefault(row.provider or "?", {})
+        key = str(row.day)[:7]
+        months[key] = months.get(key, 0.0) + dollars(row.real)
+    return {provider: [{"month": month, "total": round(total, 6)} for month, total in sorted(months.items())] for provider, months in found.items()}
 
 
 def _by_day(days: list, month: str | None) -> list[dict]:

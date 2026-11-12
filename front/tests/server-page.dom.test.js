@@ -295,48 +295,106 @@ test('with the period of seven days the axis names days', async () => {
 });
 
 const AI = {
-  currency: 'usd', source: 'billed', month: 0.5, year: 1.75, total: 5.75, since: '2025-12',
-  months: [{ month: '2025-12', total: 4 }, { month: '2026-10', total: 1.25 }, { month: '2026-11', total: 0.5 }],
+  currency: 'usd', source: 'mixed', month: 0.5, year: 1.75, total: 5.75, since: '2025-12',
+  months: [{ month: '2025-12', total: 4 }, { month: '2026-09', total: 1.0 }, { month: '2026-10', total: 0.25 }],
+  providers: [
+    { provider: 'google', source: 'estimated', month: 0.1, year: 0.35, total: 0.75 },
+    { provider: 'openai', source: 'billed', month: 0.4, year: 1.4, total: 5 },
+  ],
+};
+const NO_AI = { currency: 'usd', source: 'estimated', month: 0, year: 0, total: 0, since: null, months: [], providers: [] };
+const squash = (el) => el.textContent.replace(/\s+/g, ' ').trim();
+const open = async (ai = AI) => {
+  installApi({ 'GET /server/status?range=24h': STATUS, 'GET /server/ai-costs': ai });
+  await server.render({ main: main() });
+  await settle();
 };
 
-test('the AI has its own block in dollars, apart from the euro costs, and is never converted', async () => {
-  installApi({ 'GET /server/status?range=24h': STATUS, 'GET /server/ai-costs': AI });
-  await server.render({ main: main() });
-  await settle();
-  const block = document.querySelector('[aria-label="Gasto en IA"]');
-  assert.match(block.textContent, /0,50\sUS\$/);
-  assert.match(block.textContent, /1,75\sUS\$/);
-  assert.match(block.textContent, /5,75\sUS\$.*desde diciembre de 2025/);
-  assert.doesNotMatch(block.textContent, /€/);
-  const months = document.querySelector('[aria-label="Gasto en IA mes a mes"]');
-  assert.deepEqual([...months.querySelectorAll('tbody tr')].map((tr) => tr.querySelector('th').textContent), ['Noviembre de 2026', 'Octubre de 2026', 'Diciembre de 2025']);
-  assert.match(months.textContent, /lo que ha facturado OpenAI/i);
-  assert.match(months.textContent, /no se convierte a euros/);
-  assert.match(document.querySelector('[aria-label="Costes"]').textContent, /2,30\s€/); // the euro costs are untouched
+test('the cost cards show the euros and, beside them, what the AI cost in dollars: never added together', async () => {
+  await open();
+  const tiles = [...document.querySelectorAll('.sv-tile')].map(squash);
+  assert.match(tiles[0], /^Este mes2,30 € \+ 0,50 US\$previsto 5,88 €$/);
+  assert.match(tiles[1], /^Este año40,50 € \+ 1,75 US\$previsto 44,10 €$/);
+  assert.match(tiles[2], /^Desde el inicio120,25 € \+ 5,75 US\$desde diciembre de 2023$/);
 });
 
-test('with OpenAI billed and Google estimated the block says which part is which', async () => {
-  installApi({ 'GET /server/status?range=24h': STATUS, 'GET /server/ai-costs': { ...AI, source: 'mixed' } });
-  await server.render({ main: main() });
-  await settle();
-  const text = document.querySelector('[aria-label="Gasto en IA mes a mes"]').textContent;
-  assert.match(text, /OpenAI es lo que ha facturado/);
-  assert.match(text, /lo de Google es una estimación/);
+test('with no AI spend the cards are the euros alone', async () => {
+  await open(NO_AI);
+  assert.deepEqual([...document.querySelectorAll('.sv-tile')].map(squash), ['Este mes2,30 €previsto 5,88 €', 'Este año40,50 €previsto 44,10 €', 'Desde el inicio120,25 €desde diciembre de 2023']);
 });
 
-test('without a key of OpenAI the block says its figures are an estimate, and with no spend it says so', async () => {
-  installApi({ 'GET /server/status?range=24h': STATUS, 'GET /server/ai-costs': { ...AI, source: 'estimated', month: 0, year: 0, total: 0, since: null, months: [] } });
-  await server.render({ main: main() });
-  await settle();
-  const months = document.querySelector('[aria-label="Gasto en IA mes a mes"]');
-  assert.match(months.textContent, /Todavía no hay gasto de IA/);
-  assert.match(months.textContent, /es una estimación/i);
+test('the breakdown has a section of its own for the AI, by provider and with its total, in dollars and apart from the euros', async () => {
+  await open();
+  const costs = document.querySelector('[aria-label="Desglose de costes"]');
+  assert.match(squash(costs.querySelector('table')), /Total.*€/); // the euro table is as it was
+  const ai = costs.querySelector('.sv-ai-section');
+  assert.equal(ai.querySelector('h3').textContent, 'IA · en dólares');
+  const rows = [...ai.querySelectorAll('tr')].map((tr) => [...tr.children].map((c) => squash(c)).join('|'));
+  assert.deepEqual(rows, [
+    'Proveedor|Este mes|Este año|Desde el inicio',
+    'Google (estimado)|0,10 US$|0,35 US$|0,75 US$',
+    'OpenAI (facturado)|0,40 US$|1,40 US$|5,00 US$',
+    'Total|0,50 US$|1,75 US$|5,75 US$',
+  ]);
+  assert.doesNotMatch(ai.textContent, /€/);
+  assert.match(ai.textContent, /OpenAI es lo que ha facturado.*lo de Google es una estimación/);
+  assert.match(ai.textContent, /No se suma a los euros ni se convierte/);
 });
 
-test('when the AI spend cannot be read only its block says so and the rest of the page stays', async () => {
+test('with a single provider the AI section has no total row, and says how it is known', async () => {
+  await open({ ...AI, source: 'billed', providers: [AI.providers[1]] });
+  const ai = document.querySelector('.sv-ai-section');
+  assert.equal(ai.querySelector('tfoot'), null);
+  assert.match(ai.textContent, /Lo que ha facturado OpenAI/);
+});
+
+test('with no AI spend yet the section says so', async () => {
+  await open(NO_AI);
+  assert.match(document.querySelector('.sv-ai-section').textContent, /Todavía no hay gasto de IA/);
+  assert.equal(document.querySelector('.sv-ai-chart'), null);
+});
+
+test('under the euro bars the AI has a row of its own on its own scale, and the month pressed says what the AI cost', async () => {
+  await open();
+  const chart = document.querySelector('.sv-ai-chart');
+  assert.match(chart.textContent, /dólares, con su propia escala/);
+  const cells = [...chart.querySelectorAll('.sv-ai-cell')];
+  assert.equal(cells.length, 12); // the same twelve columns as the bars
+  assert.equal(cells[8].querySelector('.sv-ai-bar').style.height, '100%'); // September, the year's highest
+  assert.equal(cells[9].querySelector('.sv-ai-bar').style.height, '25%');
+  assert.equal(cells[0].querySelector('.sv-ai-bar'), null); // a month with no AI spend draws nothing
+  document.querySelector('[data-month="2026-09"]').click();
+  await settle();
+  assert.match(squash(document.querySelector('.sv-detail-box')), /IA: 1,00 US\$ en dólares, aparte de los euros/);
+  assert.ok(document.querySelector('.sv-ai-cell.selected'));
+});
+
+test('a month with no AI spend has no AI line in its detail', async () => {
+  await open();
+  document.querySelector('[data-month="2026-03"]').click();
+  await settle();
+  assert.doesNotMatch(document.querySelector('.sv-detail-box').textContent, /IA:/);
+});
+
+test('the costs are spaced one block from the next', async () => {
+  await open();
+  assert.ok(document.getElementById('svCosts').classList.contains('sv-stack'));
+  assert.equal(document.querySelectorAll('#svCosts > .sv-card').length, 2); // the breakdown and the months
+});
+
+test('when the AI spend cannot be read only its part of the breakdown says so and the rest stays', async () => {
   installApi({ 'GET /server/status?range=24h': STATUS, 'GET /server/ai-costs': json({ detail: 'boom' }, 500) });
   await server.render({ main: main() });
   await settle();
-  assert.match(document.getElementById('svAi').textContent, /No se ha podido consultar el gasto de IA/);
+  assert.match(document.querySelector('[aria-label="Desglose de costes"]').textContent, /No se ha podido consultar el gasto de IA/);
   assert.equal(document.querySelectorAll('.sv-line').length, 5);
+  assert.deepEqual([...document.querySelectorAll('.sv-tile')].map(squash)[0], 'Este mes2,30 €previsto 5,88 €');
+});
+
+test('without euro rates but with AI spend the costs are the AI alone', async () => {
+  installApi({ 'GET /server/status?range=24h': { ...STATUS, cost: null }, 'GET /server/ai-costs': AI });
+  await server.render({ main: main() });
+  await settle();
+  assert.deepEqual([...document.querySelectorAll('.sv-tile')].map(squash), ['Este mes0,50 US$en IA', 'Este año1,75 US$en IA', 'Desde el inicio5,75 US$desde diciembre de 2025']);
+  assert.equal(document.getElementById('svYear'), null);
 });

@@ -78,8 +78,15 @@ const hostCards = (host, range) => {
 
 const COST_KINDS = { server: 'Servidor', domain: 'Dominio', other: 'Otros gastos' };
 
-const tile = (label, cost, sub) => html`
-  <div class="pf-card sv-tile"><div class="sv-tile-label">${label}</div><div class="sv-tile-value">${money(cost)}</div><div class="pf-sub">${sub}</div></div>`;
+// The AI is billed in dollars and is never converted to euros (the rate changes every day): it goes beside the euros, never added to them
+const dollars = (amount) => formatMoney(amount, 'usd');
+const hasAi = (ai) => Boolean(ai && !ai.error && ai.total > 0);
+
+// A figure of the costs: the euros of keeping the app running and, beside them, what the AI cost in dollars when it cost something
+const tile = (label, euros, sub, usd = null) => html`
+  <div class="pf-card sv-tile"><div class="sv-tile-label">${label}</div><div class="sv-tile-value">${euros === null ? '' : money(euros)}${usd === null ? '' : html`<span class="sv-tile-usd">${euros === null ? '' : ' + '}${dollars(usd)}</span>`}</div><div class="pf-sub">${sub}</div></div>`;
+
+const periodHead = (first) => html`<tr><th scope="col">${first}</th><th scope="col">Este mes</th><th scope="col">Este año</th><th scope="col">Desde el inicio</th></tr>`;
 
 const kindRow = (label, kind) => html`
   <tr><th scope="row">${label}</th><td>${money(kind.month.so_far)}</td><td>${money(kind.year.so_far)}</td><td>${money(kind.total.so_far)}</td></tr>`;
@@ -109,6 +116,27 @@ const bars = (months, selected) => {
     </div>`;
 };
 
+// What the AI cost each month, by month number: only what the AI's answer has
+const aiByMonth = (ai) => new Map((hasAi(ai) ? ai.months : []).map((m) => [m.month, m.total]));
+
+// The AI under the bars, one small bar per month in the same columns, on a scale of its own (dollars cannot be stacked on euros)
+const aiBars = (months, selected, ai) => {
+  const spent = aiByMonth(ai);
+  const values = months.map((month) => spent.get(month.month) ?? 0);
+  const top = Math.max(0, ...values);
+  if (!top) return '';
+  return html`
+    <div class="sv-ai-chart" role="group" aria-label="Gasto en IA mes a mes, en dólares">
+      <div class="sv-ai-title">IA · en dólares, con su propia escala</div>
+      <div class="sv-ai-bars">
+        ${months.map((month, i) => html`
+          <div class="sv-ai-cell${month.month === selected ? ' selected' : ''}" role="img" aria-label="${monthLabel(month.month)}: ${dollars(values[i])} en IA" title="${monthLabel(month.month)}: ${dollars(values[i])}">
+            ${values[i] ? html`<span class="sv-ai-bar" style="height: ${percentOf(values[i] / top)}"></span>` : ''}
+          </div>`)}
+      </div>
+    </div>`;
+};
+
 const kindLegend = (kinds, withForecast) => html`
   <div class="sv-legend">
     ${kinds.map((kind) => html`<span class="sv-key ${KIND_CLASS[kind] ?? 'k-other'}"><span class="sv-dot"></span>${COST_KINDS[kind] ?? kind}</span>`)}
@@ -116,7 +144,7 @@ const kindLegend = (kinds, withForecast) => html`
   </div>`;
 
 // What one month cost, by kind, with what is left to spend when it is not over
-const monthDetail = (month) => {
+const monthDetail = (month, ai) => {
   const kinds = Object.keys(month.kinds).sort((a, b) => KIND_ORDER.indexOf(a) - KIND_ORDER.indexOf(b));
   const rows = kinds.filter((kind) => month.kinds[kind] > 0).map((kind) => html`<tr><th scope="row">${COST_KINDS[kind] ?? kind}</th><td>${money(month.kinds[kind])}</td></tr>`);
   const label = { closed: 'Total', running: 'Total previsto', future: 'Total previsto' }[month.state];
@@ -129,7 +157,8 @@ const monthDetail = (month) => {
           ${month.forecast > 0 ? html`<tr class="sv-pending"><th scope="row">Lo que queda previsto</th><td>${money(month.forecast)}</td></tr>` : ''}
         </tbody>
         <tfoot><tr><th scope="row">${label}</th><td>${money(monthTotal(month))}</td></tr></tfoot>
-      </table>` : html`<div class="pf-sub">Sin gastos este mes.</div>`}`;
+      </table>` : html`<div class="pf-sub">Sin gastos este mes.</div>`}
+    ${aiByMonth(ai).get(month.month) ? html`<div class="sv-ai-line">IA: <strong>${dollars(aiByMonth(ai).get(month.month))}</strong> <span class="pf-sub">en dólares, aparte de los euros</span></div>` : ''}`;
 };
 
 // The year chosen: its months as bars (the running year with the forecast to December), the year's total and the month looked at
@@ -149,60 +178,66 @@ const yearCard = (view) => {
     ${view.error ? html`<div class="pf-msg err" role="alert">${view.error}</div>` : ''}
     <div class="sv-cost-total"><strong>${money(totals.so_far)}</strong> en ${view.year}${open ? html` · <strong>${money(totals.projected)}</strong> previstos a fin de año` : ''}</div>
     ${bars(months, current.month)}
+    ${aiBars(months, current.month, view.ai)}
     ${kindLegend(view.kinds, open)}
-    <div class="sv-detail-box" aria-live="polite">${monthDetail(current)}</div>`;
+    <div class="sv-detail-box" aria-live="polite">${monthDetail(current, view.ai)}</div>`;
 };
 
-// What keeping the app running costs: the three figures that matter, where the money goes, and the history
-const costs = (c, view) => html`
-  <div class="sv-section"><h2 class="sv-section-title">Costes</h2></div>
-  <div class="sv-tiles" aria-label="Costes">
-    ${tile('Este mes', c.month.so_far, `previsto ${money(c.month.projected)}`)}
-    ${tile('Este año', c.year.so_far, `previsto ${money(c.year.projected)}`)}
-    ${tile('Desde el inicio', c.total.so_far, `desde ${monthYear(c.total.since)}`)}
-  </div>
-  <section class="pf-card sv-card" aria-label="Desglose de costes">
-    <h2 class="sv-title">Desglose</h2>
-    <table class="sv-table">
-      <thead><tr><th scope="col">Concepto</th><th scope="col">Este mes</th><th scope="col">Este año</th><th scope="col">Desde el inicio</th></tr></thead>
-      <tbody>${c.kinds.map((kind) => kindRow(COST_KINDS[kind.kind] ?? kind.kind, kind))}</tbody>
-      ${c.kinds.length > 1 ? html`<tfoot>${kindRow('Total', c)}</tfoot>` : ''}
-    </table>
-    <div class="pf-sub">Es una estimación.</div>
-  </section>
-  <section class="pf-card sv-card" id="svYear" aria-label="Costes mes a mes">${yearCard(view)}</section>`;
-
-const dollars = (amount) => formatMoney(amount, 'usd');
-
-const aiTile = (label, amount, sub) => html`
-  <div class="pf-card sv-tile"><div class="sv-tile-label">${label}</div><div class="sv-tile-value">${dollars(amount)}</div><div class="pf-sub">${sub}</div></div>`;
-
+const PROVIDERS = { openai: 'OpenAI', google: 'Google' };
+const WAY = { billed: 'facturado', estimated: 'estimado' };
 const AI_SOURCE = {
-  billed: 'Lo que ha facturado OpenAI a la organización. OpenAI solo conserva el último año de gasto.',
+  billed: 'Lo que ha facturado OpenAI a la organización (solo conserva el último año de gasto).',
   mixed: 'OpenAI es lo que ha facturado (solo conserva el último año); lo de Google es una estimación de la app, porque Google no ofrece el gasto por API y, con una clave del plan gratuito, lo real puede ser 0 US$.',
   estimated: 'Es una estimación de lo que ha gastado la clave del grupo: no hay clave de administración de OpenAI para consultar lo facturado, y con una clave de Google del plan gratuito lo real puede ser menos.',
 };
 
-// What the AI costs, apart from the costs above and in dollars, as OpenAI bills it: it is never converted to euros (the rate changes
-// every day), so the two currencies are two blocks. Only totals, never who spent them.
-const aiCosts = (ai) => {
+const aiRow = (label, figures) => html`
+  <tr><th scope="row">${label}</th><td>${dollars(figures.month)}</td><td>${dollars(figures.year)}</td><td>${dollars(figures.total)}</td></tr>`;
+
+// Where the AI's money goes, by provider: in dollars, in a section of its own of the breakdown and never added to the euros. Only
+// totals, never who spent them.
+const aiBreakdown = (ai) => {
   if (!ai) return '';
   if (ai.error) return html`<div class="pf-sub">No se ha podido consultar el gasto de IA: ${ai.error}</div>`;
+  if (!hasAi(ai)) return html`<div class="sv-ai-section"><h3 class="sv-subtitle">IA · en dólares</h3><div class="pf-sub">Todavía no hay gasto de IA.</div></div>`;
   return html`
-    <div class="sv-section"><h2 class="sv-section-title">Gasto en IA</h2></div>
-    <div class="sv-tiles" aria-label="Gasto en IA">
-      ${aiTile('Este mes', ai.month, 'en dólares')}
-      ${aiTile('Este año', ai.year, 'en dólares')}
-      ${aiTile(ai.since ? 'Desde el inicio' : 'Total', ai.total, ai.since ? `desde ${monthLabel(ai.since)}` : 'sin gasto todavía')}
-    </div>
-    <section class="pf-card sv-card" aria-label="Gasto en IA mes a mes">
-      <h2 class="sv-title">IA mes a mes</h2>
-      ${ai.months.length ? html`
+    <div class="sv-ai-section" aria-label="Desglose del gasto en IA">
+      <h3 class="sv-subtitle">IA · en dólares</h3>
+      <table class="sv-table">
+        <thead>${periodHead('Proveedor')}</thead>
+        <tbody>${ai.providers.map((p) => aiRow(`${PROVIDERS[p.provider] ?? p.provider} (${WAY[p.source]})`, p))}</tbody>
+        ${ai.providers.length > 1 ? html`<tfoot>${aiRow('Total', ai)}</tfoot>` : ''}
+      </table>
+      <div class="pf-sub">${AI_SOURCE[ai.source] ?? ''} No se suma a los euros ni se convierte: la cotización cambia cada día.</div>
+    </div>`;
+};
+
+// What keeping the app running costs: the three figures that matter (the euros of the rates and, beside them, the AI in dollars),
+// where the money goes, and the history
+const costs = (view) => {
+  const c = view.cost;
+  const ai = hasAi(view.ai) ? view.ai : null;
+  if (!c && !ai) return html``; // with no rates and no AI spend there is nothing to say of costs
+  return html`
+    <div class="sv-section"><h2 class="sv-section-title">Costes</h2></div>
+    ${c || ai ? html`
+      <div class="sv-tiles" aria-label="Costes">
+        ${tile('Este mes', c ? c.month.so_far : null, c ? `previsto ${money(c.month.projected)}` : 'en IA', ai ? ai.month : null)}
+        ${tile('Este año', c ? c.year.so_far : null, c ? `previsto ${money(c.year.projected)}` : 'en IA', ai ? ai.year : null)}
+        ${tile('Desde el inicio', c ? c.total.so_far : null, c ? `desde ${monthYear(c.total.since)}` : `desde ${monthLabel(ai.since)}`, ai ? ai.total : null)}
+      </div>` : ''}
+    <section class="pf-card sv-card" aria-label="Desglose de costes">
+      <h2 class="sv-title">Desglose</h2>
+      ${c ? html`
         <table class="sv-table">
-          <tbody>${ai.months.slice().reverse().map((m) => html`<tr><th scope="row">${capital(monthLabel(m.month))}</th><td>${dollars(m.total)}</td></tr>`)}</tbody>
-        </table>` : html`<div class="pf-sub">Todavía no hay gasto de IA.</div>`}
-      <div class="pf-sub">${AI_SOURCE[ai.source] ?? ''} Se muestra en dólares y no se convierte a euros: la cotización cambia cada día.</div>
-    </section>`;
+          <thead>${periodHead('Concepto')}</thead>
+          <tbody>${c.kinds.map((kind) => kindRow(COST_KINDS[kind.kind] ?? kind.kind, kind))}</tbody>
+          ${c.kinds.length > 1 ? html`<tfoot>${kindRow('Total', c)}</tfoot>` : ''}
+        </table>
+        <div class="pf-sub">Es una estimación.</div>` : ''}
+      ${aiBreakdown(view.ai)}
+    </section>
+    ${c ? html`<section class="pf-card sv-card" id="svYear" aria-label="Costes mes a mes">${yearCard(view)}</section>` : ''}`;
 };
 
 function panel(data, range, view) {
@@ -229,12 +264,11 @@ function panel(data, range, view) {
     </div>
     <div class="sv-section"><h2 class="sv-section-title">Tráfico del mes</h2></div>
     ${traffic(server.traffic)}
-    ${data.cost ? costs(data.cost, view) : ''}
-    <div id="svAi">${aiCosts(view.ai)}</div>
+    <div id="svCosts" class="sv-stack">${costs(view)}</div>
     <div class="pf-sub sv-foot">Actualizado ${formatRelative(data.fetched_at).toLowerCase()}.</div>`;
 }
 
-const emptyView = () => ({ year: null, month: null, years: new Map(), available: [], kinds: [], error: '', ai: null });
+const emptyView = () => ({ year: null, month: null, years: new Map(), available: [], kinds: [], error: '', cost: null, ai: null });
 
 // The month to look at when a year is opened: the running one, else the last
 const defaultMonth = (months) => (months.find((month) => month.state === 'running') ?? months[months.length - 1]).month;
@@ -265,6 +299,7 @@ export async function render({ main }) {
         mount(body, html`<div class="pf-empty">El panel del servidor no está configurado todavía.</div>`);
         return;
       }
+      view.cost = data.cost ?? null;
       if (data.cost) take(data.cost);
       mount(body, panel(data, range, view));
     } catch (err) {
@@ -301,15 +336,15 @@ export async function render({ main }) {
     const bar = e.target.closest('[data-month]');
     if (bar) pickMonth(bar.dataset.month);
   });
-  // The AI's spend is asked once and apart: a failure of it shows only in its own block, and the window of the charts keeps it
+  // The AI's spend is asked once and apart: a failure of it shows only in its own part of the costs, and the window of the charts keeps it
   const loadAi = async () => {
     try {
       view.ai = (await api('/server/ai-costs')) ?? null;
     } catch (err) {
       view.ai = { error: err.message };
     }
-    const slot = body.querySelector('#svAi');
-    if (slot) mount(slot, aiCosts(view.ai));
+    const slot = body.querySelector('#svCosts');
+    if (slot) mount(slot, costs(view));
   };
 
   await draw('24h');
