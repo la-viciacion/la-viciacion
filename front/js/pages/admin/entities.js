@@ -632,7 +632,7 @@ ENTITIES.ai = {
   sections: ['ai', 'aicost', 'aiuses'],
 };
 ENTITIES.chat = {
-  label: 'Chat',
+  label: 'Chat y guía',
   description: 'Asistente de la app y guía de juego: interruptores, instrucciones, límites y si los jugadores los tienen disponibles.',
   custom: 'settings',
   sections: ['chat', 'guide'],

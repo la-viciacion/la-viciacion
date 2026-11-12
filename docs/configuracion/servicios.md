@@ -85,7 +85,7 @@ El botón flotante de abajo a la derecha abre un asistente que responde sobre vi
 CHAT_AI_MODEL=gemini-3.5-flash   # opcional: un modelo del mismo proveedor; sin ella se usa AI_MODEL
 ```
 
-Sirve para dar al chat un modelo más potente que el de los avisos (que solo reescriben frases cortas). Como las demás claves y modelos, vive solo en el `.env` y desde el panel solo se ve. Lo que se edita desde el panel, en **IA → Chat**, es el **interruptor** (independiente del de los avisos), las **instrucciones** y el botón **Probar el chat**; la pestaña dice si los jugadores lo tienen disponible y, si no, qué falta; el modelo que usa se ve en **Notificaciones → Canales**.
+Sirve para dar al chat un modelo más potente que el de los avisos (que solo reescriben frases cortas). Como las demás claves y modelos, vive solo en el `.env` y desde el panel solo se ve. Lo que se edita desde el panel, en **IA → Chat y guía**, es el **interruptor** (independiente del de los avisos), las **instrucciones** y el botón **Probar el chat**; la pestaña dice si los jugadores lo tienen disponible y, si no, qué falta; el modelo que usa se ve en **Notificaciones → Canales**.
 
 ## Notificaciones push
 
