@@ -359,8 +359,10 @@ test('with no AI spend yet the page is what it was: no section, no bars and no A
 test('under the euro bars the AI has a row of its own on its own scale, and the month pressed says what the AI cost', async () => {
   await open();
   const chart = document.querySelector('.sv-ai-chart');
-  assert.match(chart.textContent, /dólares, con su propia escala/);
-  const cells = [...chart.querySelectorAll('.sv-ai-cell')];
+  assert.match(chart.textContent, /en dólares \(escala distinta a la de los euros/);
+  assert.equal(chart.querySelectorAll('.sv-xy-axis span').length, 3); // the scale: the top, half of it and zero
+  assert.equal(document.querySelectorAll('.sv-euro-chart .sv-xy-axis span').length, 3);
+  const cells = [...chart.querySelectorAll('.sv-ai-col')];
   assert.equal(cells.length, 12); // the same twelve columns as the bars
   assert.equal(cells[8].querySelector('.sv-ai-bar').style.height, '100%'); // September, the year's highest
   assert.equal(cells[9].querySelector('.sv-ai-bar').style.height, '25%');
@@ -368,7 +370,7 @@ test('under the euro bars the AI has a row of its own on its own scale, and the 
   document.querySelector('[data-month="2026-09"]').click();
   await settle();
   assert.match(squash(document.querySelector('.sv-detail-box')), /IA: 1,00 US\$ en dólares, aparte de los euros/);
-  assert.ok(document.querySelector('.sv-ai-cell.selected'));
+  assert.ok(document.querySelector('.sv-ai-col.selected'));
 });
 
 test('a month with no AI spend has no AI line in its detail', async () => {

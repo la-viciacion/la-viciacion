@@ -54,8 +54,10 @@ export const yearTotals = (months) => ({
  * The bars of a year chart as fractions (0 to 1) of the tallest month: each bar the kinds stacked from the bottom
  * (in KIND_ORDER) and, above them, what is still forecast. A kind with nothing is no segment.
  */
+export const barTop = (months) => Math.max(0.01, ...months.map(monthTotal));
+
 export function barLayout(months) {
-  const tallest = Math.max(0.01, ...months.map(monthTotal));
+  const tallest = barTop(months);
   return months.map((month) => {
     const kinds = Object.keys(month.kinds).sort((a, b) => KIND_ORDER.indexOf(a) - KIND_ORDER.indexOf(b));
     return {
