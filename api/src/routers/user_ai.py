@@ -13,7 +13,7 @@ from ..clients import open_ai
 from ..clients.ai_error import AIError, ProviderError, QuotaError
 from ..database import models
 from ..guide import agent as guide_agent
-from ..utils import ai_budget, ai_models, ai_source, ai_spend, messages, user_ai
+from ..utils import ai_budget, ai_models, ai_source, ai_spend, ai_wallet, messages, user_ai
 from ..utils.logger import LogManager
 from ..utils.rate_limit import Scope, UsageLimiter
 from .chat import PROVIDER_MESSAGES
@@ -78,6 +78,7 @@ def get_ai(username: str, active_user: models.User = Depends(auth.get_current_ac
         "guide": ai_source.availability(db, user.id, "guide") | {"mode": ai_source.mode("guide")},
         "default_model": DEFAULT_MODEL,
         "budget": ai_budget.usage(db, user.id),
+        "wallet": ai_wallet.player(db, user.id),
     }
 
 
@@ -95,7 +96,7 @@ def get_ai_usage(
     data = ai_spend.summary(db, month, user_id=user.id)
     for admin_only in ("group_paid_by_user", "by_tools", "price_stamp"):
         data.pop(admin_only, None)
-    return {**data, "budget": ai_budget.usage(db, user.id)}
+    return {**data, "budget": ai_budget.usage(db, user.id), "wallet": ai_wallet.player(db, user.id)}
 
 
 @router.put("/{username}/ai")

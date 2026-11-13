@@ -12,18 +12,20 @@ cap of 0 is exactly that: nothing of the group's key (a player can still use the
 It is checked before a question that the group would pay for (utils/ai_source.py), against the usage record, which is summed when
 asked: nothing is cached or stored. The cost of a call is known only when it ends, so a budget can be passed by one question; a
 call whose model has no known price counts as nothing (the panel says how many there are). The month is the server's calendar
-month: the budgets start again on the 1st."""
+month: the budgets start again on the 1st. On top of them, once the wallet is on, a player with no balance left is stopped too
+(utils/ai_wallet.py)."""
 import datetime
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..database import models
-from . import ai_ledger, settings
+from . import ai_ledger, ai_wallet, settings
 
 MICROS = 1_000_000
 GROUP, USER = "group", "user"  # which budget is spent
 GROUP_OFF, USER_OFF = "group_off", "user_off"  # the budget is 0: nothing of the group's key for everybody, or for this player
+WALLET = "wallet"  # the wallet is on (utils/ai_wallet.py) and this player has nothing left in it
 
 
 def month_start(now: datetime.datetime | None = None) -> datetime.datetime:
@@ -83,15 +85,15 @@ def unpriced(db: Session, now: datetime.datetime | None = None) -> dict:
 
 
 def exceeded(db: Session, user_id: int, now: datetime.datetime | None = None) -> str | None:
-    """`GROUP` if the group has spent its budget of the month, `USER` if this player has spent theirs, else None. A budget of 0 has
-    nothing to spend: `GROUP_OFF` / `USER_OFF`."""
+    """`GROUP` if the group has spent its budget of the month, `USER` if this player has spent theirs, `WALLET` if the wallet is on
+    and their balance is spent, else None. A budget of 0 has nothing to spend: `GROUP_OFF` / `USER_OFF`."""
     cap = group_cap()
     if cap is not None and (cap == 0 or spent(db, None, now) >= cap * MICROS):
         return GROUP_OFF if cap == 0 else GROUP
     own = user_cap(db, user_id)
     if own is not None and (own == 0 or spent(db, user_id, now) >= own * MICROS):
         return USER_OFF if own == 0 else USER
-    return None
+    return WALLET if ai_wallet.empty(db, user_id) else None
 
 
 WARN_AT = 0.8  # the share of the group's budget at which the admins are warned, once a month

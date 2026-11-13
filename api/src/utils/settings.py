@@ -11,6 +11,7 @@ database (a backup, a dump loaded on a laptop) cannot use them, which only whoev
 and the panel cannot change them.
 """
 import base64
+import datetime
 import hashlib
 import os
 import re
@@ -132,6 +133,14 @@ def _budget(value: int) -> str | None:
     return None if 0 <= value <= 10000 else "Los dólares deben estar entre 0 (sin IA del grupo) y 10000; vacío es sin límite"
 
 
+def _wallet_start(value: str) -> str | None:
+    try:
+        datetime.date.fromisoformat(value)
+    except ValueError:
+        return "La fecha debe tener formato AAAA-MM-DD"
+    return None
+
+
 def _usage_days(value: int) -> str | None:
     return None if 0 <= value <= 3650 else "Los días deben estar entre 0 (sin límite) y 3650"
 
@@ -239,6 +248,8 @@ REGISTRY: dict[str, Spec] = {
     # counts, never what a player pays with their own key (utils/ai_budget.py)
     "ai.group_budget_month": Spec("int", None, check=_budget, resettable=True),
     "ai.user_budget_month": Spec("int", None, check=_budget, resettable=True),
+    # The day the wallet starts counting what the group's key spends (utils/ai_wallet.py); unset, it is the day of the first top-up
+    "ai.wallet_start": Spec("str", None, check=_wallet_start, resettable=True),
     "ai.price_refresh_hours": Spec("int", 24, check=_price_hours),
     "ai.usage_retention_days": Spec("int", 0, check=_usage_days),
     "telegram.token": Spec("str", None, secret=True, env_only=True, env="TELEGRAM_TOKEN", check=_token),

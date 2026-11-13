@@ -24,3 +24,5 @@ En **Perfil → Ajustes → Mi IA** puedes guardar tu propia clave de OpenAI y e
 En la misma pantalla, **Tu gasto** te enseña cuántas preguntas has hecho, cuánto pesaron y una estimación de lo que han costado: lo que costó con tu clave y lo que cubrió el grupo, por mes, por función y por modelo. Solo lo ves tú, y no se guarda lo que escribes.
 
 Lo que cubre el grupo tiene un **presupuesto mensual** (el del grupo y una parte para cada jugador) que se renueva el día 1. Si se agota, el chat sigue con tu propia clave si la tienes; si no, te lo dice y no responde hasta el día 1.
+
+Si el grupo usa un **monedero**, en la misma pantalla ves tu saldo (lo que has aportado menos lo que has gastado de la clave del grupo). Cuando se agota, el chat sigue con tu propia clave si la tienes; si no, te lo dice y no responde hasta que un admin anote otra aportación tuya.

@@ -607,3 +607,21 @@ class AiUsage(Base):
         Index("ix_ai_usage_user_created", "user_id", "created_at"),
         Index("ix_ai_usage_source_created", "key_source", "created_at"),
     )
+
+
+class AiWalletEntry(Base):
+    """One contribution to the group's AI key (see utils/ai_wallet.py): what a player put in, in millionths of a dollar. Signed, so
+    a refund or a correction is another row and none is ever edited. It is the one thing of the wallet that cannot be derived: a
+    player's balance is their contributions minus what they spent (summed from `ai_usage` when asked)."""
+
+    __tablename__ = "ai_wallet_entries"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    created_at = Column(DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP"))
+    # the account may be deleted later: the money stays in the group's total, the key is set to NULL
+    user_id = Column(Integer, ForeignKey("users.id", name="fk_ai_wallet_user", ondelete="SET NULL"), nullable=True)
+    amount_micros = Column(BigInteger, nullable=False)
+    note = Column(String(200), nullable=True)
+    created_by = Column(Integer, ForeignKey("users.id", name="fk_ai_wallet_by", ondelete="SET NULL"), nullable=True)
+
+    __table_args__ = (Index("ix_ai_wallet_user", "user_id"),)
