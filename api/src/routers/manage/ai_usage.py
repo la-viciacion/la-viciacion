@@ -1,12 +1,15 @@
 """What the AI has cost: OpenAI's billed spend, and the calls the app made (what it used, who paid, the kind of question)."""
+import datetime
+
 from fastapi import Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from ... import auth
 from ...auth import get_db
 from ...clients.ai_error import AIError
 from ...database import models
-from ...utils import ai_budget, ai_cost, ai_spend, ai_usage, messages, settings
+from ...utils import ai_budget, ai_cost, ai_spend, ai_usage, ai_wallet, messages, settings
 from .common import router
 
 
@@ -66,3 +69,42 @@ def put_ai_budget(user_id: int, body: BudgetBody, db: Session = Depends(get_db))
         raise HTTPException(status_code=404, detail=messages.USER_NOT_EXISTS)
     ai_budget.set_user_cap(db, user_id, body.usd)
     return next(p for p in ai_budget.players(db) if p["user_id"] == user_id)
+
+
+@router.get("/ai-usage/wallet")
+def get_ai_wallet(db: Session = Depends(get_db)):
+    """The wallet of the group's key: what each player has put in, what the group's key has spent of it since it started and
+    what is left (to set against the balance of the OpenAI account), and the latest contributions."""
+    return ai_wallet.overview(db)
+
+
+class WalletEntryBody(BaseModel):
+    user_id: int
+    # dollars put in (negative: a refund or a correction); two decimals are enough for a contribution
+    usd: float = Field(ge=-ai_wallet.MAX_USD, le=ai_wallet.MAX_USD)
+    note: str | None = Field(default=None, max_length=200)
+
+
+@router.post("/ai-usage/wallet/entries", status_code=201)
+def post_wallet_entry(body: WalletEntryBody, admin: models.User = Depends(auth.get_current_active_user), db: Session = Depends(get_db)):
+    """Writes down a contribution of a player to the wallet (or a refund, if negative). Entries are never edited: a mistake is
+    corrected with another one. The first one switches the wallet on."""
+    user = db.get(models.User, body.user_id)
+    if user is None or user.username == models.GOD_USERNAME:
+        raise HTTPException(status_code=404, detail=messages.USER_NOT_EXISTS)
+    if round(body.usd * ai_wallet.MICROS) == 0:
+        raise HTTPException(status_code=400, detail=messages.WALLET_AMOUNT_ZERO)
+    ai_wallet.add(db, user.id, body.usd, body.note, admin.id)
+    return ai_wallet.overview(db)
+
+
+class WalletStartBody(BaseModel):
+    # the day the wallet starts counting what the group's key spends; null goes back to the day of the first contribution
+    date: datetime.date | None = None
+
+
+@router.put("/ai-usage/wallet/start")
+def put_wallet_start(body: WalletStartBody, admin: models.User = Depends(auth.get_current_active_user), db: Session = Depends(get_db)):
+    """Chooses the day the wallet starts counting the spending (null: the day of the first contribution)."""
+    settings.set_values(db, {"ai.wallet_start": body.date.isoformat() if body.date else None}, admin.id)
+    return ai_wallet.overview(db)
