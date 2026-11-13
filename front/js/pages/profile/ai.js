@@ -7,6 +7,7 @@ import { money, monthLabel } from '../../lib/ai-usage.js';
 import { forgetGuideStatus } from '../../lib/guide.js';
 import { html, mount } from '../../lib/html.js';
 import { ABOUT, FEATURES, blockedText, budgetLines, costNote, keyText, looksLikeKey, modelLabel, paidBy } from '../../lib/user-ai.js';
+import { walletLine } from '../../lib/ai-wallet.js';
 import { iconChevron } from '../../ui/icons.js';
 import { sectionTitle } from '../../ui/profile-summary.js';
 import { flash } from './flash.js';
@@ -108,7 +109,7 @@ export async function initAi(el, { username }) {
 
   // Where the cost goes, as a quiet note above the key and not a section of its own
   function costNoteView() {
-    const lines = state.budget ? budgetLines(state.budget) : [];
+    const lines = [...(state.budget ? budgetLines(state.budget) : []), walletLine(state.wallet)].filter(Boolean);
     const stopped = FEATURES.map(([id]) => blockedText(state[id])).find(Boolean);
     const note = costNote(state);
     if (!note && !lines.length && !stopped) return '';

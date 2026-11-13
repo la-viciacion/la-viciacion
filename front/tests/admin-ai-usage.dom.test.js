@@ -117,7 +117,7 @@ const CALLS = {
   price_updates_running: true,
 };
 const open = async (calls = CALLS) => {
-  const log = installApi({ 'GET /manage/ai-usage/calls': calls, 'GET /manage/ai-usage/budgets': { month: '2026-11', resets_on: '2026-12-01', group: { cap: 0, spent: 0 }, default_user_cap: 0, players: [] }, 'GET /manage/ai-usage': { configured: false } }); // the longer path first: a route matches by its start
+  const log = installApi({ 'GET /manage/ai-usage/calls': calls, 'GET /manage/ai-usage/wallet': { active: false, start: null, start_setting: null, total: { contributed: 0, spent: 0, available: 0 }, players: [], entries: [] }, 'GET /manage/ai-usage/budgets': { month: '2026-11', resets_on: '2026-12-01', group: { cap: 0, spent: 0 }, default_user_cap: 0, players: [] }, 'GET /manage/ai-usage': { configured: false } }); // the longer path first: a route matches by its start
   await render(panel());
   await settle();
   return log;

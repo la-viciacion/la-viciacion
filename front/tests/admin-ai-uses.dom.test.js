@@ -432,7 +432,7 @@ test('the cards of the chat, the guide and the cost explain themselves in the "i
 test('everything that limits the AI is in one page: who takes the cost, the question limits, the money budget and the players\' table', async () => {
   const values = { ...VALUES, 'chat.key_source': 'group_then_user', 'guide.key_source': 'user_only', 'ai.group_budget_month': 20, 'ai.user_budget_month': 5 };
   installApi({
-    'GET /manage/ai-usage/budgets': { month: '2026-11', resets_on: '2026-12-01', group: { cap: 20, spent: 3 }, default_user_cap: 5, unpriced: { calls: 0, models: [] }, players: [{ user_id: 1, name: 'Ana', is_active: true, override: null, cap: 5, spent: 1, calls: 2 }] },
+    'GET /manage/ai-usage/wallet': { active: false, start: null, start_setting: null, total: { contributed: 0, spent: 0, available: 0 }, players: [], entries: [] }, 'GET /manage/ai-usage/budgets': { month: '2026-11', resets_on: '2026-12-01', group: { cap: 20, spent: 3 }, default_user_cap: 5, unpriced: { calls: 0, models: [] }, players: [{ user_id: 1, name: 'Ana', is_active: true, override: null, cap: 5, spent: 1, calls: 2 }] },
     'GET /manage/settings': { values, jobs: {}, push_devices: { devices: 0, users: 0 }, mail: { configured: false, missing: [] }, ai_uses: USES, ai_model: { provider: 'google', model: 'gemini-test' }, chat: CHAT, guide: CHAT },
   });
   const { ENTITIES } = await import('../js/pages/admin/entities.js');
@@ -440,7 +440,7 @@ test('everything that limits the AI is in one page: who takes the cost, the ques
   await settle();
   await settle();
   const titles = [...panel().querySelectorAll('.adm-set-card h3, .adm-budgets-card h3')].map((h) => h.textContent);
-  assert.deepEqual(titles, ['Quién asume el coste', 'Límites de preguntas', 'Presupuesto mensual (dinero)', 'Presupuesto de la clave del grupo', 'Tope por jugador']);
+  assert.deepEqual(titles, ['Quién asume el coste', 'Límites de preguntas', 'Presupuesto mensual (dinero)', 'Presupuesto de la clave del grupo', 'Tope por jugador', 'Monedero de la clave del grupo', 'Anotar una aportación', 'Desde cuándo cuenta el gasto', 'Saldo de cada jugador', 'Últimas aportaciones']);
   const card = panel().querySelector('.adm-aibudget-card');
   assert.deepEqual([...card.querySelectorAll('input[type="number"]')].map((i) => [i.name, i.value]), [['ai.group_budget_month', '20'], ['ai.user_budget_month', '5']]);
   assert.match(card.textContent, /límite de dinero, distinto de los límites de preguntas/);
@@ -453,7 +453,7 @@ test('a money budget left empty is no limit: emptying it sends null, writing a n
   const values = { ...VALUES, 'ai.group_budget_month': 20, 'ai.user_budget_month': null };
   let saved = null;
   installApi({
-    'GET /manage/ai-usage/budgets': { month: '2026-11', resets_on: '2026-12-01', group: { cap: 20, spent: 3 }, default_user_cap: null, unpriced: { calls: 0, models: [] }, players: [] },
+    'GET /manage/ai-usage/wallet': { active: false, start: null, start_setting: null, total: { contributed: 0, spent: 0, available: 0 }, players: [], entries: [] }, 'GET /manage/ai-usage/budgets': { month: '2026-11', resets_on: '2026-12-01', group: { cap: 20, spent: 3 }, default_user_cap: null, unpriced: { calls: 0, models: [] }, players: [] },
     'PUT /manage/settings': ({ body }) => { saved = body; return { changed: Object.keys(body.values), values }; },
     'GET /manage/settings': settingsAnswer(values),
   });
@@ -474,7 +474,7 @@ test('Enter in the cap of a player saves that cap and does not submit the settin
   const sent = [];
   installApi({
     'PUT /manage/ai-usage/budgets/1': ({ body }) => { sent.push(body); return {}; },
-    'GET /manage/ai-usage/budgets': { month: '2026-11', resets_on: '2026-12-01', group: { cap: 20, spent: 3 }, default_user_cap: 5, unpriced: { calls: 0, models: [] }, players: [{ user_id: 1, name: 'Ana', is_active: true, override: null, cap: 5, spent: 1, calls: 2 }] },
+    'GET /manage/ai-usage/wallet': { active: false, start: null, start_setting: null, total: { contributed: 0, spent: 0, available: 0 }, players: [], entries: [] }, 'GET /manage/ai-usage/budgets': { month: '2026-11', resets_on: '2026-12-01', group: { cap: 20, spent: 3 }, default_user_cap: 5, unpriced: { calls: 0, models: [] }, players: [{ user_id: 1, name: 'Ana', is_active: true, override: null, cap: 5, spent: 1, calls: 2 }] },
     'PUT /manage/settings': () => { sent.push('SETTINGS'); return { changed: [], values }; },
     'GET /manage/settings': { values, jobs: {}, push_devices: { devices: 0, users: 0 }, mail: { configured: false, missing: [] }, ai_uses: USES, ai_model: { provider: 'google', model: 'gemini-test' }, chat: CHAT, guide: CHAT },
   });

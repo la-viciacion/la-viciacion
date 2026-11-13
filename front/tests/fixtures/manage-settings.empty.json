@@ -221,6 +221,7 @@
   "ai.use.wishlist_release": true,
   "ai.use.wishlist_week": true,
   "ai.user_budget_month": null,
+  "ai.wallet_start": null,
   "annual.day": 1,
   "annual.enabled": false,
   "annual.month": 1,
