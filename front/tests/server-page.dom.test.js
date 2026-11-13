@@ -348,10 +348,12 @@ test('with a single provider the AI section has no total row, and says how it is
   assert.match(ai.textContent, /Lo que ha facturado OpenAI/);
 });
 
-test('with no AI spend yet the section says so', async () => {
+test('with no AI spend yet the page is what it was: no section, no bars and no AI beside the euros', async () => {
   await open(NO_AI);
-  assert.match(document.querySelector('.sv-ai-section').textContent, /Todavía no hay gasto de IA/);
+  assert.equal(document.querySelector('.sv-ai-section'), null);
   assert.equal(document.querySelector('.sv-ai-chart'), null);
+  assert.equal(document.querySelector('.sv-tile-usd'), null);
+  assert.doesNotMatch(document.getElementById('svCosts').textContent, /IA|US\$/);
 });
 
 test('under the euro bars the AI has a row of its own on its own scale, and the month pressed says what the AI cost', async () => {

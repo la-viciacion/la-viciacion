@@ -199,7 +199,7 @@ const aiRow = (label, figures) => html`
 const aiBreakdown = (ai) => {
   if (!ai) return '';
   if (ai.error) return html`<div class="pf-sub">No se ha podido consultar el gasto de IA: ${ai.error}</div>`;
-  if (!hasAi(ai)) return html`<div class="sv-ai-section"><h3 class="sv-subtitle">IA · en dólares</h3><div class="pf-sub">Todavía no hay gasto de IA.</div></div>`;
+  if (!hasAi(ai)) return html``; // the AI is not in use yet: the breakdown is what it was, with no section about it
   return html`
     <div class="sv-ai-section" aria-label="Desglose del gasto en IA">
       <h3 class="sv-subtitle">IA · en dólares</h3>
