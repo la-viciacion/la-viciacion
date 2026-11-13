@@ -1,9 +1,9 @@
 """The game guide: a question about one game (plus a little history) in, one answer out.
 
 It differs from the chat on purpose. The chat answers from the group's data through tools; the guide answers from the
-web, so its one tool is the provider's own web search (OpenAI's through the Responses API, Google's search grounding)
-and what the app knows about the game and the player goes into the instructions, already read. With no function tools
-and a plain text answer it works the same on both providers (Gemini refuses to mix its search with function tools).
+web, so its one tool is the provider's own web search (OpenAI's through the Responses API, Google's search grounding,
+Anthropic's web search tool, which its organization must have enabled) and what the app knows about the game and the player goes into the instructions, already read. With no function tools
+and a plain text answer it works the same on all of them (Gemini refuses to mix its search with function tools).
 The conversation lives in the client, like the chat's: nothing of it is stored."""
 import datetime
 import time
@@ -13,9 +13,11 @@ from pydantic_ai import Agent, RunContext
 from pydantic_ai.capabilities import NativeTool
 from pydantic_ai.exceptions import UsageLimitExceeded
 from pydantic_ai.models import Model
+from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.models.google import GoogleModel
 from pydantic_ai.models.openai import OpenAIResponsesModel
 from pydantic_ai.native_tools import WebSearchTool
+from pydantic_ai.providers.anthropic import AnthropicProvider
 from pydantic_ai.providers.google import GoogleProvider
 from pydantic_ai.providers.openai import OpenAIProvider
 from pydantic_ai.settings import ModelSettings
@@ -41,6 +43,7 @@ LIMITS = UsageLimits(request_limit=6, total_tokens_limit=60_000)
 BUILDERS = {
     "openai": lambda name, key: OpenAIResponsesModel(name, provider=OpenAIProvider(api_key=key)),
     "google": lambda name, key: GoogleModel(name, provider=GoogleProvider(api_key=key)),
+    "anthropic": lambda name, key: AnthropicModel(name, provider=AnthropicProvider(api_key=key)),
 }
 
 

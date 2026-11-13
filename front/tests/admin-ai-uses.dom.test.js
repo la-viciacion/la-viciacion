@@ -104,7 +104,7 @@ test('with the key of one provider only there is nothing to choose, and with non
   await openSections(['ai', 'aiuses'], VALUES, { provider: null, model: null }, CHAT, providersOf(null, []));
   assert.equal(panel().querySelector('select[name="ai.provider"]'), null);
   assert.equal(panel().querySelector('select[name^="ai.model."]'), null);
-  assert.match(panel().querySelector('.adm-warn').textContent, /OPENAI_AI_API_KEY o GOOGLE_AI_API_KEY/);
+  assert.match(panel().querySelector('.adm-warn').textContent, /OPENAI_AI_API_KEY, GOOGLE_AI_API_KEY o ANTHROPIC_AI_API_KEY/);
   assert.equal(panel().querySelector('[data-set-act="test-ai"]').disabled, true);
 });
 
@@ -236,7 +236,7 @@ test('the chat card says why the players do not have the button', async () => {
   await openWithChat({ ...VALUES, 'chat.enabled': false });
   assert.match(state(), /No disponible: el chat está apagado/);
   await openWithChat(VALUES, { ...CHAT, provider: null, model: null, own_model: false }, providersOf(null, []));
-  assert.match(state(), /falta OPENAI_AI_API_KEY o GOOGLE_AI_API_KEY/);
+  assert.match(state(), /falta OPENAI_AI_API_KEY o GOOGLE_AI_API_KEY o ANTHROPIC_AI_API_KEY/);
   assert.match(chatCard().querySelector('.adm-warn').textContent, /proveedor de los avisos \(o el que elijas aquí\)/);
   assert.equal(chatCard().querySelector('select'), null);
   assert.equal(chatCard().querySelector('[data-set-act="test-chat"]').disabled, true);
@@ -380,7 +380,7 @@ test('the guide card says why the players do not have it', async () => {
   await openWithGuide({ ...VALUES, 'guide.enabled': false });
   assert.match(guideCard().querySelector('.adm-guide-state').textContent, /No disponible: la guía está apagada/);
   await openWithGuide(VALUES, { ...GUIDE, provider: null, model: null });
-  assert.match(guideCard().querySelector('.adm-guide-state').textContent, /falta OPENAI_AI_API_KEY o GOOGLE_AI_API_KEY/);
+  assert.match(guideCard().querySelector('.adm-guide-state').textContent, /falta OPENAI_AI_API_KEY o GOOGLE_AI_API_KEY o ANTHROPIC_AI_API_KEY/);
   assert.equal(guideCard().querySelector('[data-set-act="test-guide"]').disabled, true);
 });
 

@@ -41,6 +41,8 @@ OPENAI_AI_API_KEY=tu_clave
 OPENAI_AI_MODEL=gpt-4.1-mini            # el modelo que se usa mientras nadie elija otro
 GOOGLE_AI_API_KEY=tu_clave
 GOOGLE_AI_MODEL=gemini-3.5-flash-lite
+ANTHROPIC_AI_API_KEY=tu_clave
+ANTHROPIC_AI_MODEL=claude-haiku-5-5
 ```
 
 El código no trae ningún modelo por defecto, y las claves y los modelos por defecto no se pueden cambiar desde el panel (solo se muestran). Lo que sí se elige desde **IA → Avisos con IA**:

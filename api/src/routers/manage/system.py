@@ -16,7 +16,7 @@ from ...clients import igdb
 from ...guide import agent as guide_agent
 from ...config import Config
 from ...database import models
-from ...clients import google_ai, open_ai
+from ...clients import anthropic_ai, google_ai, open_ai
 from ...clients.ai_error import ProviderError
 from ...utils import ai, ai_models, ai_providers, audit, my_utils, push, settings, sql_dump
 from ...utils import email as mail
@@ -98,6 +98,10 @@ async def send_test_message(admin: models.User = Depends(auth.require_admin)):
     return {"message": "Mensaje enviado"}
 
 
+# looked up when called (not bound here), so a test or a hot patch of a client module is what runs
+LISTERS = {"openai": lambda key: open_ai.list_models(key), "google": lambda key: google_ai.list_models(key), "anthropic": lambda key: anthropic_ai.list_models(key)}
+
+
 @router.get("/settings/ai-models")
 def list_ai_models(provider: str = Query(..., pattern="^(" + "|".join(ai.PROVIDERS) + ")$"), admin: models.User = Depends(auth.require_admin)):
     """The models a provider offers now, asked to the provider itself with the group's key (a call that spends nothing), so the
@@ -106,7 +110,7 @@ def list_ai_models(provider: str = Query(..., pattern="^(" + "|".join(ai.PROVIDE
     if not key:
         raise HTTPException(status_code=409, detail=f"No hay clave de {provider}: falta {provider.upper()}_AI_API_KEY en el .env del servidor")
     try:
-        ids = open_ai.list_models(key) if provider == "openai" else google_ai.list_models(key)
+        ids = LISTERS[provider](key)
     except ai.QuotaError as e:
         raise HTTPException(status_code=429, detail=e.quota.describe())
     except ai.AIError as e:
