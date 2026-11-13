@@ -8,7 +8,7 @@ on, so nothing here can stop an answer. Only OpenAI's and Google's tokens are pr
 are billed per call and apart, and the library prices them too, per model (`web_searches_kcount`): pydantic-ai counts them
 on the usage of each response, so they are already in the cost of a response.
 
-Neither provider offers an API with its price list, which is why a third party's file is used: it is what the estimate
+No provider offers an API with its price list, which is why a third party's file is used: it is what the estimate
 rests on, and the panel says so. OpenAI's own billed spend (utils/ai_usage.py) is the figure to compare it with."""
 import datetime
 from decimal import Decimal
