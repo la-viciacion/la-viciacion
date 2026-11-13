@@ -5,7 +5,7 @@ import { api } from '../../lib/api.js';
 import { money as formatMoney } from '../../lib/ai-usage.js';
 import { formatRelative } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
-import { KIND_ORDER, LIMITS, WINDOWS, axisTicks, axisTime, barLayout, bytes, load, money, monthName, monthShort, monthTotal, monthYear, yearTotals, last, linePoints, peak, percent, rate, sharedMax, trafficShare, uptime } from '../../lib/server.js';
+import { KIND_ORDER, LIMITS, WINDOWS, axisTicks, axisTime, barLayout, barTop, bytes, load, money, monthName, monthShort, monthTotal, monthYear, yearTotals, last, linePoints, peak, percent, rate, sharedMax, trafficShare, uptime } from '../../lib/server.js';
 
 export const active = null; // it belongs to no item of the top bar
 
@@ -98,11 +98,17 @@ const capital = (text) => text.charAt(0).toUpperCase() + text.slice(1);
 
 const percentOf = (share) => `${(share * 100).toFixed(1)}%`;
 
+// The vertical axis of a bar chart: the top of the scale, half of it and zero, lined up with the grid lines behind the bars
+const yAxis = (max, format) => html`<div class="sv-yaxis sv-xy-axis" aria-hidden="true">${axisTicks(max, format).map((tick) => html`<span>${tick}</span>`)}</div>`;
+
 // A year of costs month by month: what was spent by kind, and what is still forecast on top (the running month and the ones to come).
 // Real buttons, one per month, spread over the whole width with a limit to how fat a bar gets.
 const bars = (months, selected) => {
   const layout = barLayout(months);
   return html`
+    <div class="sv-xy sv-euro-chart">
+      ${yAxis(barTop(months), money)}
+      <div class="sv-xy-area">
     <div class="sv-bars" role="group" aria-label="Costes mes a mes">
       ${layout.map((bar, i) => html`
         <button type="button" class="sv-bar ${bar.state}${bar.month === selected ? ' selected' : ''}" data-month="${bar.month}"
@@ -113,6 +119,8 @@ const bars = (months, selected) => {
           </span>
           <span class="sv-bar-label">${monthShort(bar.month)}</span>
         </button>`)}
+    </div>
+      </div>
     </div>`;
 };
 
@@ -127,12 +135,18 @@ const aiBars = (months, selected, ai) => {
   if (!top) return '';
   return html`
     <div class="sv-ai-chart" role="group" aria-label="Gasto en IA mes a mes, en dólares">
-      <div class="sv-ai-title">IA · en dólares, con su propia escala</div>
-      <div class="sv-ai-bars">
-        ${months.map((month, i) => html`
-          <div class="sv-ai-cell${month.month === selected ? ' selected' : ''}" role="img" aria-label="${monthLabel(month.month)}: ${dollars(values[i])} en IA" title="${monthLabel(month.month)}: ${dollars(values[i])}">
-            ${values[i] ? html`<span class="sv-ai-bar" style="height: ${percentOf(values[i] / top)}"></span>` : ''}
-          </div>`)}
+      <div class="sv-ai-title">Gasto en IA de cada mes, en dólares (escala distinta a la de los euros de arriba)</div>
+      <div class="sv-xy">
+        ${yAxis(top, dollars)}
+        <div class="sv-xy-area">
+          <div class="sv-ai-bars">
+            ${months.map((month, i) => html`
+              <div class="sv-ai-col${month.month === selected ? ' selected' : ''}" role="img" aria-label="${monthLabel(month.month)}: ${dollars(values[i])} en IA" title="${monthLabel(month.month)}: ${dollars(values[i])}">
+                <span class="sv-ai-cell">${values[i] ? html`<span class="sv-ai-bar" style="height: ${percentOf(values[i] / top)}"></span>` : ''}</span>
+                <span class="sv-bar-label">${monthShort(month.month)}</span>
+              </div>`)}
+          </div>
+        </div>
       </div>
     </div>`;
 };

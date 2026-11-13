@@ -54,8 +54,19 @@
 .sv-ai-chart { margin: 4px 0 10px; }
 .sv-ai-title { font-size: 0.72rem; color: var(--text-muted); margin: 2px 2px 4px; }
 .sv-ai-bars { display: flex; gap: 2px; }
-.sv-ai-cell { flex: 1; min-width: 0; height: 30px; padding: 0 2px; display: flex; align-items: flex-end; justify-content: center; border-radius: var(--radius-sm); }
-.sv-ai-cell.selected { background: rgba(255, 255, 255, 0.05); }
+.sv-ai-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; padding: 0 2px 6px; border-radius: var(--radius-sm); }
+.sv-ai-col.selected { background: rgba(255, 255, 255, 0.05); }
+.sv-ai-cell { height: 60px; display: flex; align-items: flex-end; justify-content: center; }
+/* a bar chart with its vertical axis: the axis column has the same width in both charts so their months line up; the three grid
+   lines (top, half, zero) sit behind the bars at the heights the axis labels name */
+.sv-xy { display: grid; grid-template-columns: 4.6rem 1fr; gap: 8px; }
+.sv-xy-area { position: relative; min-width: 0; }
+.sv-xy-area::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 60px; pointer-events: none;
+  background: linear-gradient(var(--border), var(--border)) top / 100% 1px no-repeat, linear-gradient(var(--border), var(--border)) center / 100% 1px no-repeat, linear-gradient(var(--border), var(--border)) bottom / 100% 1px no-repeat; }
+.sv-euro-chart .sv-xy-area::before { top: 6px; height: 110px; }
+.sv-xy-area > * { position: relative; }
+.sv-xy-axis { height: 60px; }
+.sv-euro-chart .sv-xy-axis { height: 110px; margin-top: 6px; }
 .sv-ai-bar { display: block; width: min(100%, 44px); min-height: 2px; background: var(--accent-pink); border-radius: 2px 2px 0 0; }
 .sv-ai-line { margin-top: 8px; font-size: 0.9rem; }
 .sv-year-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
