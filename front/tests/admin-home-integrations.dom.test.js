@@ -20,7 +20,7 @@ test('the AI card does not need the old single key setting: it reads what the AP
 
 test('the AI card says whether the key or the model is missing', () => {
   assert.deepEqual(aiCard(config({ provider: null, model: null })).slice(0, 2), ['orange', 'Sin clave']);
-  assert.match(aiCard(config({ provider: null, model: null }))[2], /OPENAI_AI_API_KEY o GOOGLE_AI_API_KEY/);
+  assert.match(aiCard(config({ provider: null, model: null }))[2], /OPENAI_AI_API_KEY, GOOGLE_AI_API_KEY o ANTHROPIC_AI_API_KEY/);
   assert.deepEqual(aiCard(config({ provider: 'openai', model: null })).slice(0, 2), ['orange', 'Incompleta']);
   assert.deepEqual(aiCard(config({ provider: null, model: null }, false)).slice(0, 2), ['gray', 'Apagada']);
 });

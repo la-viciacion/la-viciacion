@@ -1,12 +1,14 @@
 """Recognizes a provider's "out of quota" answer (HTTP 429), whichever library raised it.
 
 Google answers 429 RESOURCE_EXHAUSTED with a QuotaFailure (which quota ran out, and its limit) and a RetryInfo (how long
-to wait); OpenAI answers 429 with a code (`insufficient_quota` when the billing ran out, `rate_limit_exceeded` for a
+to wait); Anthropic answers 429 (`rate_limit_error`, with a `retry-after` header) for a rate and a 400 when the balance of the account ran
+out; OpenAI answers 429 with a code (`insufficient_quota` when the billing ran out, `rate_limit_exceeded` for a
 rate) and a `retry-after` header. pydantic-ai wraps both in a ModelHTTPError. Everything is read defensively: a
 provider changing its answer must degrade to "a quota ran out" with less detail, never to an exception."""
 import math
 import re
 
+import anthropic
 import openai
 from google.genai import errors as google_errors
 from pydantic_ai.exceptions import ModelHTTPError
@@ -32,7 +34,7 @@ def status_and_body(exc: BaseException) -> tuple[int | None, object, dict]:
         return exc.code, exc.details, dict(getattr(response, "headers", None) or {})
     if isinstance(exc, ModelHTTPError):
         return exc.status_code, exc.body, dict(exc.headers or {})
-    if isinstance(exc, openai.APIStatusError):
+    if isinstance(exc, (openai.APIStatusError, anthropic.APIStatusError)):
         return exc.status_code, exc.body, dict(getattr(exc.response, "headers", None) or {})
     return None, None, {}
 
@@ -81,10 +83,22 @@ def _quota(body: object, headers: dict, retry_after: float | None = None) -> Quo
     return Quota(kind=_kind(tuple(ids), code), retry_after=retry, ids=tuple(ids), limit=limit, message=message)
 
 
+def _message(body: object) -> str:
+    error = body.get("error") if isinstance(body, dict) and isinstance(body.get("error"), dict) else body
+    return str(error.get("message") or "")[:MESSAGE_MAX] if isinstance(error, dict) else ""
+
+
+def _no_credit(body: object) -> bool:
+    """Anthropic has no 429 for an account without balance: it answers 400 and says so in its text."""
+    return "credit balance is too low" in _message(body).lower()
+
+
 def classify(exc: BaseException) -> Quota | None:
     """The quota that ran out if `exc` (or what it was raised from) is a provider's 429, else None."""
     for found in chain(exc):
         status, body, headers = status_and_body(found)
         if status == 429:
             return _quota(body, headers, getattr(found, "retry_after", None))
+        if status == 400 and _no_credit(body):
+            return Quota(kind="billing", message=_message(body))
     return None

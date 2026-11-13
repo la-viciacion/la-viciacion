@@ -51,7 +51,7 @@ export function integrations(cfg) {
     : !v['telegram.group_id'].is_set ? ['orange', 'Sin grupo', 'Falta TELEGRAM_GROUP_ID en el .env del servidor: los avisos del grupo no salen']
     : v['notifications.enabled'] ? ['green', 'Activo', 'Bot configurado y notificaciones activadas'] : ['orange', 'Notificaciones apagadas', 'El bot está configurado, pero no se envía nada'];
   const ai = !v['ai.enabled'] ? ['gray', 'Apagada', 'Los avisos salen con el texto original']
-    : !cfg.ai_model.provider ? ['orange', 'Sin clave', 'Está activada, pero falta la clave de un proveedor (OPENAI_AI_API_KEY o GOOGLE_AI_API_KEY) en el .env del servidor']
+    : !cfg.ai_model.provider ? ['orange', 'Sin clave', 'Está activada, pero falta la clave de un proveedor (OPENAI_AI_API_KEY, GOOGLE_AI_API_KEY o ANTHROPIC_AI_API_KEY) en el .env del servidor']
     : !cfg.ai_model.model ? ['orange', 'Incompleta', `Está activada, pero falta el modelo de ${cfg.ai_model.provider}: su variable (<PROVEEDOR>_AI_MODEL) en el .env del servidor, o elígelo en IA → Avisos con IA`]
     : ['green', 'Activa', `${cfg.ai_model.provider} (${cfg.ai_model.model})`];
   const push = v['push.enabled']

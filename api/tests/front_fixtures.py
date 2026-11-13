@@ -20,7 +20,7 @@ from src.utils import settings
 from tests.sqlite_db import make_session
 
 TARGET = Path(__file__).resolve().parents[2] / "front" / "tests" / "fixtures"
-AI_VARIABLES = ("OPENAI_AI_API_KEY", "OPENAI_AI_MODEL", "OPENAI_CHAT_AI_MODEL", "GOOGLE_AI_API_KEY", "GOOGLE_AI_MODEL", "GOOGLE_CHAT_AI_MODEL", "OPENAI_ADMIN_KEY")
+AI_VARIABLES = ("OPENAI_AI_API_KEY", "OPENAI_AI_MODEL", "OPENAI_CHAT_AI_MODEL", "GOOGLE_AI_API_KEY", "GOOGLE_AI_MODEL", "GOOGLE_CHAT_AI_MODEL", "ANTHROPIC_AI_API_KEY", "ANTHROPIC_AI_MODEL", "ANTHROPIC_CHAT_AI_MODEL", "OPENAI_ADMIN_KEY")
 OTHER_SERVICES = ("RAWG_API_KEY", "TWITCH_CLIENT_ID", "TWITCH_CLIENT_SECRET")  # a machine that has them must not change the files
 
 # Environments the panel must open in: both providers set up, and an .env with nothing of the AI
