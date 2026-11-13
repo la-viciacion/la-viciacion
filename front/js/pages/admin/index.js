@@ -285,13 +285,15 @@ function rowView(entity, r, i, companion = false) {
   return html`
     <tr>
       ${cells}
-      <td class="adm-row-actions">
-        ${entity.readOnly ? '' : html`<button class="adm-btn sm" data-act="edit" data-i="${i}"${mark}>Editar</button>`}
-        ${extras.some((x) => x !== '') ? html`
-          <details class="adm-menu">
-            <summary class="adm-btn sm" aria-label="Más acciones">⋯</summary>
-            <div class="adm-menu-list">${extras}</div>
-          </details>` : ''}
+      <td>
+        <div class="adm-row-actions">
+          ${entity.readOnly ? '' : html`<button class="adm-btn sm" data-act="edit" data-i="${i}"${mark}>Editar</button>`}
+          ${extras.some((x) => x !== '') ? html`
+            <details class="adm-menu">
+              <summary class="adm-btn sm" aria-label="Más acciones">⋯</summary>
+              <div class="adm-menu-list">${extras}</div>
+            </details>` : ''}
+        </div>
       </td>
     </tr>`;
 }
