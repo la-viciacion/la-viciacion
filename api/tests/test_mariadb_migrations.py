@@ -271,7 +271,7 @@ class AiBudgetZeroTests(MariaDBTestCase):
     def test_the_downgrade_gives_a_zero_of_the_new_meaning_the_nearest_the_old_code_can_say(self):
         with self.engine.begin() as conn:
             conn.execute(text("UPDATE user_settings SET ai_group_budget_usd = 0 WHERE user_id = 3"))
-        result = self.alembic("downgrade", "-1")
+        result = self.alembic("downgrade", "058_ai_free_plan")  # by name: later migrations are above 059
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.caps()[3], 1)
         self.migrate()
