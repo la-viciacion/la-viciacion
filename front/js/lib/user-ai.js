@@ -108,6 +108,7 @@ export function blockedText(state) {
   if (state.blocked === 'user') return 'Has gastado tu parte del presupuesto de IA del grupo este mes.';
   if (state.blocked === 'group_off') return 'Un admin ha dejado la IA del grupo sin presupuesto.';
   if (state.blocked === 'user_off') return 'Un admin no te ha dado IA de la clave del grupo.';
+  if (state.blocked === 'wallet') return 'Has gastado todo tu saldo de IA del grupo.';
   return null;
 }
 

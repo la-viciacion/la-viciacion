@@ -15,6 +15,7 @@ import { errorState } from './components.js';
 import { confirmDialog } from './dialogs.js';
 import { cardTitle } from '../../ui/info-tip.js';
 import { renderBudgets } from './ai-budgets.js';
+import { renderWallet } from './ai-wallet.js';
 
 const SECRETS = []; // never loaded back: sent only when something is typed (the keys of outside services are not: they are in the server's .env)
 const AI_IDS = ['openai', 'google']; // api/src/utils/settings.py AI_PROVIDERS: each has its own keys in the .env
@@ -360,6 +361,8 @@ function view(values, jobs, pushDevices, mail, aiUses, aiModel, chat, guide = {}
 
     aibudgets: html`<div id="aicBudgets"></div>`,
 
+    aiwallet: html`<div id="aicWallet"></div>`,
+
     guide: html`
       <section class="adm-set-card adm-guide-card">
         ${cardTitle('Guía de juego', html`Una tarjeta en la página de cada juego donde el jugador pide ayuda con ese juego (desatascarse, consejos) y elige cuántos destripes admite. A diferencia del chat, responde buscando en la web. Usa el proveedor y el modelo del chat salvo que elijas otros aquí, y el modelo tiene que admitir la búsqueda web (con OpenAI, un modelo de la API Responses; con Google, la búsqueda de Gemini). Lo comprueba el botón de abajo.`)}
@@ -679,6 +682,8 @@ export async function render(target, { entity }) {
     syncAiOff(form);
     const budgets = panel.querySelector('#aicBudgets');
     if (budgets) renderBudgets(budgets); // the players' table of the money budget belongs with the limits, not with the usage
+    const wallet = panel.querySelector('#aicWallet');
+    if (wallet) renderWallet(wallet);
     form.addEventListener('change', (e) => {
       if (e.target.name === 'annual.month') syncAnnualDay(form);
       if (e.target.name === 'ai.enabled') syncAiOff(form);

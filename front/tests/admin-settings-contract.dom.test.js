@@ -21,7 +21,7 @@ const PAGES = Object.entries(ENTITIES).filter(([, entity]) => entity.custom === 
 for (const [scenario, file] of Object.entries(SCENARIOS)) {
   for (const [tab, entity] of PAGES) {
     test(`the "${tab}" page opens with the real answer of the API: ${scenario}`, async () => {
-      installApi({ 'GET /manage/settings/ai-models': MODELS, 'GET /manage/ai-usage/budgets': { month: '2026-11', resets_on: '2026-12-01', group: { cap: 0, spent: 0 }, unpriced: { calls: 0, models: [] }, default_user_cap: 0, players: [] }, 'GET /manage/settings': fixture(file) });
+      installApi({ 'GET /manage/settings/ai-models': MODELS, 'GET /manage/ai-usage/wallet': { active: false, start: null, start_setting: null, total: { contributed: 0, spent: 0, available: 0 }, players: [], entries: [] }, 'GET /manage/ai-usage/budgets': { month: '2026-11', resets_on: '2026-12-01', group: { cap: 0, spent: 0 }, unpriced: { calls: 0, models: [] }, default_user_cap: 0, players: [] }, 'GET /manage/settings': fixture(file) });
       await renderSettings(panel(), { entity });
       await settle();
       assert.equal(panel().querySelector(".empty-state"), null, panel().querySelector(".empty-state")?.textContent); // an error state is how a page says it failed
