@@ -16,7 +16,7 @@ from ...clients import igdb
 from ...guide import agent as guide_agent
 from ...config import Config
 from ...database import models
-from ...clients import anthropic_ai, google_ai, open_ai
+from ...clients import anthropic_ai, google_ai, open_ai, openrouter_ai
 from ...clients.ai_error import ProviderError
 from ...utils import ai, ai_models, ai_providers, audit, my_utils, push, settings, sql_dump
 from ...utils import email as mail
@@ -99,7 +99,8 @@ async def send_test_message(admin: models.User = Depends(auth.require_admin)):
 
 
 # looked up when called (not bound here), so a test or a hot patch of a client module is what runs
-LISTERS = {"openai": lambda key: open_ai.list_models(key), "google": lambda key: google_ai.list_models(key), "anthropic": lambda key: anthropic_ai.list_models(key)}
+LISTERS = {"openai": lambda key: open_ai.list_models(key), "google": lambda key: google_ai.list_models(key), "anthropic": lambda key: anthropic_ai.list_models(key),
+           "openrouter": lambda key: openrouter_ai.list_models(key)}
 
 
 @router.get("/settings/ai-models")

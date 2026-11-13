@@ -383,6 +383,8 @@ class EveryCallToAProviderIsRecordedTests(unittest.TestCase):
         "utils/ai.py": 1,  # complete: the welcome, the notices and the test of the notices
         "clients/open_ai.py": 1,  # generate, only reached from ai.complete
         "clients/google_ai.py": 1,  # generate, only reached from ai.complete
+        "clients/anthropic_ai.py": 1,  # generate, only reached from ai.complete
+        "clients/openrouter_ai.py": 1,  # generate, only reached from ai.complete
     }
 
     def test_no_other_file_asks_a_model_for_text(self):
@@ -390,7 +392,7 @@ class EveryCallToAProviderIsRecordedTests(unittest.TestCase):
         import re
 
         src = pathlib.Path(__file__).resolve().parents[1] / "src"
-        pattern = re.compile(r"\.run_sync\(|\bPROVIDERS\[|chat\.completions\.create\(|\.generate_content\(")
+        pattern = re.compile(r"\.run_sync\(|\bPROVIDERS\[|chat\.completions\.create\(|\.generate_content\(|\.messages\.create\(")
         found = {}
         for path in src.rglob("*.py"):
             count = len(pattern.findall(path.read_text(encoding="utf-8")))

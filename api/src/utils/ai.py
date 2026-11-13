@@ -6,7 +6,7 @@ functions block on the network: call them from a worker thread.
 """
 import time
 
-from ..clients import anthropic_ai, google_ai, open_ai, used
+from ..clients import anthropic_ai, google_ai, open_ai, openrouter_ai, used
 from ..clients.ai_error import AIError, QuotaError
 from ..clients.quota import classify
 from . import ai_ledger, ai_providers, ai_quota, settings
@@ -15,7 +15,7 @@ from .logger import LogManager
 log_manager = LogManager()
 logger = log_manager.get_logger()
 
-PROVIDERS = {"google": google_ai.generate, "openai": open_ai.generate, "anthropic": anthropic_ai.generate}
+PROVIDERS = {"google": google_ai.generate, "openai": open_ai.generate, "anthropic": anthropic_ai.generate, "openrouter": openrouter_ai.generate}
 
 __all__ = ["AIError", "QuotaError", "complete", "current", "is_ready", "prompt_for"]
 

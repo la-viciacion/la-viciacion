@@ -197,7 +197,7 @@ const yearCard = (view) => {
     <div class="sv-detail-box" aria-live="polite">${monthDetail(current, view.ai)}</div>`;
 };
 
-const PROVIDERS = { openai: 'OpenAI', google: 'Google', anthropic: 'Anthropic' };
+const PROVIDERS = { openai: 'OpenAI', google: 'Google', anthropic: 'Anthropic', openrouter: 'OpenRouter' };
 const WAY = { billed: 'facturado', estimated: 'estimado' };
 const AI_SOURCE = {
   billed: 'Lo que ha facturado OpenAI a la organización (solo conserva el último año de gasto).',

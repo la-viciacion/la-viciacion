@@ -117,8 +117,8 @@ def _key_source(value: str) -> str | None:
     return None if value in ("user_only", "group_then_user", "group_only") else "Debe ser user_only, group_then_user o group_only"
 
 
-AI_PROVIDERS = ("openai", "google", "anthropic")  # the order is the preference when the admin has picked none
-MODEL_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:\-]{0,63}$")
+AI_PROVIDERS = ("openai", "google", "anthropic", "openrouter")  # the order is the preference when the admin has picked none
+MODEL_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/\-]{0,79}$")  # OpenRouter names a model provider/model (:free, :online...)
 
 
 def _ai_provider(value: str) -> str | None:

@@ -2,7 +2,7 @@
 
 Google answers 429 RESOURCE_EXHAUSTED with a QuotaFailure (which quota ran out, and its limit) and a RetryInfo (how long
 to wait); Anthropic answers 429 (`rate_limit_error`, with a `retry-after` header) for a rate and a 400 when the balance of the account ran
-out; OpenAI answers 429 with a code (`insufficient_quota` when the billing ran out, `rate_limit_exceeded` for a
+out (OpenRouter, 402 Payment Required); OpenAI answers 429 with a code (`insufficient_quota` when the billing ran out, `rate_limit_exceeded` for a
 rate) and a `retry-after` header. pydantic-ai wraps both in a ModelHTTPError. Everything is read defensively: a
 provider changing its answer must degrade to "a quota ran out" with less detail, never to an exception."""
 import math
@@ -89,7 +89,7 @@ def _message(body: object) -> str:
 
 
 def _no_credit(body: object) -> bool:
-    """Anthropic has no 429 for an account without balance: it answers 400 and says so in its text."""
+    """Anthropic has no 429 for an account without balance: it answers 400 and says so in its text (OpenRouter answers 402)."""
     return "credit balance is too low" in _message(body).lower()
 
 
@@ -99,6 +99,6 @@ def classify(exc: BaseException) -> Quota | None:
         status, body, headers = status_and_body(found)
         if status == 429:
             return _quota(body, headers, getattr(found, "retry_after", None))
-        if status == 400 and _no_credit(body):
+        if status == 402 or (status == 400 and _no_credit(body)):
             return Quota(kind="billing", message=_message(body))
     return None

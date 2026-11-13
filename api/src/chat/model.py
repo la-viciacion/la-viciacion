@@ -8,9 +8,11 @@ from pydantic_ai.models import Model
 from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.models.google import GoogleModel
 from pydantic_ai.models.openai import OpenAIChatModel
+from pydantic_ai.models.openrouter import OpenRouterModel
 from pydantic_ai.providers.anthropic import AnthropicProvider
 from pydantic_ai.providers.google import GoogleProvider
 from pydantic_ai.providers.openai import OpenAIProvider
+from pydantic_ai.providers.openrouter import OpenRouterProvider
 
 from ..utils import ai_providers, settings
 
@@ -19,6 +21,7 @@ BUILDERS = {
     "openai": lambda name, key: OpenAIChatModel(name, provider=OpenAIProvider(api_key=key)),
     "google": lambda name, key: GoogleModel(name, provider=GoogleProvider(api_key=key)),
     "anthropic": lambda name, key: AnthropicModel(name, provider=AnthropicProvider(api_key=key)),
+    "openrouter": lambda name, key: OpenRouterModel(name, provider=OpenRouterProvider(api_key=key)),
 }
 
 
