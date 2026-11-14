@@ -1,13 +1,13 @@
-// "Presupuesto de la clave del grupo": how much of the month's budget the group's key has spent and what each player may spend of
-// it (GET /manage/ai-usage/budgets, PUT /manage/ai-usage/budgets/{user_id}). Only what the group's key pays counts: what a player
-// pays with their own key is never here. The default caps are settings (IA → Límites → Presupuesto mensual (dinero)); here an admin gives one
-// player another amount.
+// "Tope mensual por jugador": what each player may spend of the group's key this month and what they have spent
+// (GET /manage/ai-usage/budgets, PUT /manage/ai-usage/budgets/{user_id}). Only what the group's key pays counts: what a player
+// pays with their own key is never here. The default cap is a setting (IA → Límites → Tope mensual por jugador); here an admin gives
+// one player another amount.
 import { api, jsonRequest } from '../../lib/api.js';
-import { budgetLine, capLabel, isNearly, isSpent, parseCap, spentShare } from '../../lib/ai-budget.js';
+import { capLabel, isNearly, isSpent, parseCap, spentShare } from '../../lib/ai-budget.js';
 import { money } from '../../lib/ai-usage.js';
 import { html, mount } from '../../lib/html.js';
 import { toast } from '../../ui/toast.js';
-import { badge, errorState, statTile } from './components.js';
+import { badge, errorState } from './components.js';
 import { cardTitle } from '../../ui/info-tip.js';
 
 const state = (spent, cap) => (cap === 0 ? badge('Sin IA del grupo', 'red') : isSpent(spent, cap) ? badge('Agotado', 'red') : isNearly(spent, cap) ? badge('Casi agotado', 'orange') : '');
@@ -28,23 +28,15 @@ function playerRow(p) {
 }
 
 // what the caps cannot see: calls of a model whose price the list does not have
-const unpricedWarning = (data) => (data.unpriced?.calls && (data.group.cap != null || data.default_user_cap != null || data.players.some((p) => p.cap != null))
-  ? html`<div class="adm-warn">${data.unpriced.calls} ${data.unpriced.calls === 1 ? 'llamada' : 'llamadas'} de este mes de la clave del grupo (${data.unpriced.models.join(', ')}) no tienen precio conocido: no cuentan en ningún presupuesto y no se pueden limitar. Se arregla con la siguiente actualización de la lista de precios o cambiando de modelo.</div>`
+const unpricedWarning = (data) => (data.unpriced?.calls && (data.default_user_cap != null || data.players.some((p) => p.cap != null))
+  ? html`<div class="adm-warn">${data.unpriced.calls} ${data.unpriced.calls === 1 ? 'llamada' : 'llamadas'} de este mes de la clave del grupo (${data.unpriced.models.join(', ')}) no tienen precio conocido: no cuentan en ningún tope y no se pueden limitar. Se arregla con la siguiente actualización de la lista de precios o cambiando de modelo.</div>`
   : '');
 
 function view(data) {
-  const group = data.group;
   return html`
     <section class="adm-set-card adm-budgets-card">
-      ${cardTitle('Presupuesto de la clave del grupo', html`Lo que el grupo puede gastar al mes en preguntas que paga su clave (la del .env). Solo cuenta eso: lo que cada jugador paga con su propia clave no suma ni se limita. Los topes son en dólares enteros: vacío es sin límite y 0 es nada de la clave del grupo; el coste es una estimación y una pregunta puede pasarse del tope porque su precio se conoce al acabar. Se renuevan el día 1. Los topes por defecto son los de la tarjeta <strong>Presupuesto mensual (dinero)</strong>, encima. Cada tope se guarda con su botón «Guardar», sin esperar al de la página.`)}
       ${unpricedWarning(data)}
-      <div class="adm-stats">${statTile(group.cap ? `Gastado este mes de ${money(group.cap)}` : 'Gastado este mes', money(group.spent))}</div>
-      ${group.cap
-        ? html`${bar(group.spent, group.cap)}<div class="adm-sub">${budgetLine('Grupo', group, data.resets_on)} ${state(group.spent, group.cap)}</div>`
-        : group.cap === 0
-          ? html`<div class="adm-sub adm-budget-off">El presupuesto del grupo es 0: nadie puede usar la clave del grupo. ${state(group.spent, group.cap)}</div>`
-          : html`<div class="adm-sub">El grupo no tiene tope: la clave del grupo no se limita por coste.</div>`}
-      ${cardTitle('Tope por jugador', html`Por defecto: ${capLabel(data.default_user_cap)} al mes cada uno. Escribe otro número para un jugador (0 = sin IA de la clave del grupo) o déjalo vacío para volver al de por defecto.`)}
+      ${cardTitle('Tope por jugador', html`Por defecto: ${capLabel(data.default_user_cap)} al mes cada uno. Escribe otro número para un jugador (0 = sin IA de la clave del grupo) o déjalo vacío para volver al de por defecto. Se cuenta por mes natural y se renueva el día 1.`)}
       <div class="adm-sub">Tope mensual en dólares enteros (por ejemplo, 5). Déjalo vacío para usar el de por defecto (${capLabel(data.default_user_cap)}); escribe 0 para quitarle la IA de la clave del grupo (si tiene su propia clave, sigue usándola), o un tope alto (hasta 10000) para darle más que a los demás. El texto gris es el tope que se aplica ahora.</div>
       ${data.players.length
         ? html`<div class="adm-table-wrap"><table class="adm-table">

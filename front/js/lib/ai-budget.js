@@ -1,4 +1,4 @@
-// The monthly budget of the group's AI key (see api/src/utils/ai_budget.py), as the admin's panel and the player's screen show it.
+// The monthly cap per player on the group's AI key (see api/src/utils/ai_budget.py), as the admin's panel and the player's screen show it.
 // Pure, so it can be tested. A cap is whole dollars a month; no cap (null) is no limit and 0 is nothing of the group's key.
 import { money } from './ai-usage.js';
 

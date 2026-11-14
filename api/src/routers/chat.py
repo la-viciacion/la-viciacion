@@ -10,7 +10,7 @@ from ..chat import agent, limits
 from ..clients import failure as provider_failure
 from ..clients.ai_error import AIError, ProviderError, QuotaError, wait_text
 from ..database import models
-from ..utils import ai_ledger, ai_source, messages
+from ..utils import ai_ledger, ai_source, in_flight, messages
 from ..utils.logger import LogManager
 from ..utils.rate_limit import Refused
 
@@ -90,40 +90,38 @@ def ask(
     nothing of the conversation is stored."""
     decision = ai_source.decide(db, current_user.id, "chat", dek)
     if decision.blocked and decision.source is None:  # with the player's own as the source it only says why the group's was not used
-        ai_ledger.record(
-            db, user_id=current_user.id, feature="chat", key_source=ai_ledger.GROUP, status=ai_ledger.BUDGET,
-            question=body.message, turns=len(body.history),
-        )
+        ai_ledger.record_blocked(db, user_id=current_user.id, feature="chat", question=body.message, turns=len(body.history))
         raise HTTPException(status_code=429, detail=ai_source.blocked_message(decision.blocked, "chat"))
     source = decision.source
     if source is None and decision.locked:  # they have keys, this session cannot open them: the front asks for the password
         raise HTTPException(status_code=423, detail=messages.USER_AI_LOCKED)
     if source is None:
         raise HTTPException(status_code=503, detail=messages.CHAT_UNAVAILABLE)
-    refused = limits.limiter.acquire(limits.scopes_of(current_user.id, source.own))
-    if refused:
-        ai_ledger.record(
-            db, user_id=current_user.id, feature="chat", key_source=source.key_source, status=ai_ledger.LIMITED,
-            question=body.message, turns=len(body.history),
-        )
-        raise refusal(refused)
-    try:
-        answer = agent.ask(db, current_user, body.message.strip(), [(t.role, t.content) for t in body.history], source=source)
-    except QuotaError as e:
-        # already written to the audit log by the agent; not an error of ours, so not one in Sentry either
-        retry = e.quota.retry_after
-        raise HTTPException(
-            status_code=429,
-            detail=own_key_detail(source, e) or messages.CHAT_QUOTA.format(when=f" (reintenta en {wait_text(retry)})" if retry else ""),
-            headers={"Retry-After": str(retry)} if retry else None,
-        )
-    except ProviderError as e:
-        # a provider that is slow or overloaded is not a bug of ours: a warning, not an event in Sentry. The status is 504 for a
-        # timeout and 502 for the rest, never 503: the front reads that as "the admin switched the chat off"
-        transient = e.kind in (provider_failure.TIMEOUT, provider_failure.OVERLOADED) or (source.own and e.kind == provider_failure.DENIED)
-        (logger.warning if transient else logger.error)("Chat failed: " + str(e), exc_info=not transient)
-        raise HTTPException(status_code=504 if e.kind == provider_failure.TIMEOUT else 502, detail=own_key_detail(source, e) or PROVIDER_MESSAGES[e.kind])
-    except AIError as e:
-        logger.error("Chat failed: " + str(e), exc_info=True)
-        raise HTTPException(status_code=502, detail=messages.CHAT_FAILED)
-    return ChatResponse(answer=answer.text, in_scope=answer.in_scope)
+    with in_flight.one_at_a_time(current_user.id, source.own):
+        refused = limits.limiter.acquire(limits.scopes_of(current_user.id, source.own))
+        if refused:
+            ai_ledger.record(
+                db, user_id=current_user.id, feature="chat", key_source=source.key_source, status=ai_ledger.LIMITED,
+                question=body.message, turns=len(body.history),
+            )
+            raise refusal(refused)
+        try:
+            answer = agent.ask(db, current_user, body.message.strip(), [(t.role, t.content) for t in body.history], source=source)
+        except QuotaError as e:
+            # already written to the audit log by the agent; not an error of ours, so not one in Sentry either
+            retry = e.quota.retry_after
+            raise HTTPException(
+                status_code=429,
+                detail=own_key_detail(source, e) or messages.CHAT_QUOTA.format(when=f" (reintenta en {wait_text(retry)})" if retry else ""),
+                headers={"Retry-After": str(retry)} if retry else None,
+            )
+        except ProviderError as e:
+            # a provider that is slow or overloaded is not a bug of ours: a warning, not an event in Sentry. The status is 504 for a
+            # timeout and 502 for the rest, never 503: the front reads that as "the admin switched the chat off"
+            transient = e.kind in (provider_failure.TIMEOUT, provider_failure.OVERLOADED) or (source.own and e.kind == provider_failure.DENIED)
+            (logger.warning if transient else logger.error)("Chat failed: " + str(e), exc_info=not transient)
+            raise HTTPException(status_code=504 if e.kind == provider_failure.TIMEOUT else 502, detail=own_key_detail(source, e) or PROVIDER_MESSAGES[e.kind])
+        except AIError as e:
+            logger.error("Chat failed: " + str(e), exc_info=True)
+            raise HTTPException(status_code=502, detail=messages.CHAT_FAILED)
+        return ChatResponse(answer=answer.text, in_scope=answer.in_scope)

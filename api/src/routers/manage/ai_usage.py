@@ -44,13 +44,11 @@ def get_ai_calls(month: str | None = Query(None, pattern=r"^\d{4}-(0[1-9]|1[0-2]
 
 @router.get("/ai-usage/budgets")
 def get_ai_budgets(db: Session = Depends(get_db)):
-    """The monthly budget of the group's key and each player's share of it, with what has been spent this month (only what the
-    group's key paid: what a player pays with their own key never counts, nor is shown by name)."""
-    spent = ai_budget.spent(db)
+    """What each player may spend of the group's key this month and has spent (only what the group's key paid: what a player pays
+    with their own key never counts, nor is shown by name)."""
     return {
         "month": ai_budget.month_start().strftime("%Y-%m"),
         "resets_on": ai_budget.next_month().date().isoformat(),
-        "group": {"cap": ai_budget.group_cap(), "spent": round(spent / ai_budget.MICROS, 6)},
         "unpriced": ai_budget.unpriced(db),  # what the caps cannot see: calls of a model with no price
         "default_user_cap": ai_budget.default_user_cap(),
         "players": ai_budget.players(db),
@@ -58,13 +56,13 @@ def get_ai_budgets(db: Session = Depends(get_db)):
 
 
 class BudgetBody(BaseModel):
-    # whole dollars a month of the group's key; 0 = nothing of it, null = back to the default of the settings (which may be no limit)
+    # whole dollars a month this player may spend of the group's key; 0 = nothing of it, null = back to the default of the settings (which may be no limit)
     usd: int | None = Field(default=None, ge=0, le=10000)
 
 
 @router.put("/ai-usage/budgets/{user_id}")
 def put_ai_budget(user_id: int, body: BudgetBody, db: Session = Depends(get_db)):
-    """Gives a player another monthly budget of the group's key than the default (null goes back to the default). Like every
+    """Gives a player another monthly cap of the group's key than the default (null goes back to the default). Like every
     write of the panel, it is in the audit log."""
     user = db.get(models.User, user_id)
     if user is None or user.username == models.GOD_USERNAME:
@@ -109,6 +107,22 @@ class WalletStartBody(BaseModel):
 def put_wallet_start(body: WalletStartBody, admin: models.User = Depends(auth.get_current_active_user), db: Session = Depends(get_db)):
     """Chooses the day the wallet starts counting the spending (null: the day of the first contribution)."""
     settings.set_values(db, {"ai.wallet_start": body.date.isoformat() if body.date else None}, admin.id)
+    return ai_wallet.overview(db)
+
+
+class WalletUnlimitedBody(BaseModel):
+    unlimited: bool
+
+
+@router.put("/ai-usage/wallet/unlimited/{user_id}")
+def put_wallet_unlimited(user_id: int, body: WalletUnlimitedBody, db: Session = Depends(get_db)):
+    """Takes the wallet limit off a player (or puts it back): their balance is no longer checked before the group's key pays for a
+    question. A player starts with a balance of 0, so without a contribution or this they cannot use the group's key. Like every
+    write of the panel, it is in the audit log."""
+    user = db.get(models.User, user_id)
+    if user is None or user.username == models.GOD_USERNAME:
+        raise HTTPException(status_code=404, detail=messages.USER_NOT_EXISTS)
+    ai_wallet.set_unlimited(db, user_id, body.unlimited)
     return ai_wallet.overview(db)
 
 

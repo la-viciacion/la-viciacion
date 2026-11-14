@@ -46,7 +46,7 @@ const GUIDE_LIMITS = [
 // whose key pays for a feature (api/src/utils/ai_source.py): what each player may have saved in Ajustes → Mi IA, and the group's
 const KEY_SOURCES = [
   ['user_only', 'Solo la clave del propio jugador'],
-  ['group_then_user', 'Primero la del grupo; al agotarse su presupuesto (el total o la parte del jugador), la del jugador'],
+  ['group_then_user', 'Primero la del grupo; al agotarse el saldo del jugador o su tope mensual, la del jugador'],
   ['group_only', 'Siempre la del grupo (ignora las claves de los jugadores)'],
 ];
 const keySource = (name, label) => html`
@@ -336,7 +336,7 @@ function view(values, jobs, pushDevices, mail, aiUses, aiModel, chat, guide = {}
 
     ailimitkeys: html`
       <section class="adm-set-card adm-ailimitkeys-card">
-        ${cardTitle('Quién asume el coste', html`<p>Cada jugador puede guardar su propia clave de OpenAI en su perfil (Ajustes → Mi IA). Con «Primero la del grupo», todos usan la del grupo (el .env) mientras quede presupuesto este mes; cuando se agota, el total o la parte de un jugador, quien tiene su propia clave sigue con ella (y solo le queda un límite por minuto) y quien no la tiene lo ve explicado. «Siempre la del grupo» ignora las claves de los jugadores, y «Solo la clave del propio jugador» no gasta nada del grupo.</p><p>Una pregunta de la guía hace búsquedas web y cuesta bastante más que una del chat, así que por defecto solo se usa la clave del jugador (Ajustes → Mi IA): quien no la tiene ve cómo añadirla. Los límites de abajo son para lo que paga el grupo.</p>`)}
+        ${cardTitle('Quién asume el coste', html`<p>Cada jugador puede guardar su propia clave de OpenAI en su perfil (Ajustes → Mi IA). Con «Primero la del grupo», todos usan la del grupo (el .env) mientras quede saldo en el monedero y el jugador no haya llegado a su tope mensual; cuando se agota alguno de los dos, quien tiene su propia clave sigue con ella (y solo le queda un límite por minuto) y quien no la tiene lo ve explicado. «Siempre la del grupo» ignora las claves de los jugadores, y «Solo la clave del propio jugador» no gasta nada del grupo.</p><p>Una pregunta de la guía hace búsquedas web y cuesta bastante más que una del chat; con «Solo la clave del propio jugador», quien no tiene clave ve cómo añadirla (Ajustes → Mi IA). Los límites de abajo son para lo que paga el grupo.</p>`)}
         <div class="adm-set-row">
           ${keySource('chat.key_source', 'Chat')}
           ${keySource('guide.key_source', 'Guía de juego')}
@@ -358,10 +358,9 @@ function view(values, jobs, pushDevices, mail, aiUses, aiModel, chat, guide = {}
 
     aibudget: html`
       <section class="adm-set-card adm-aibudget-card">
-        ${cardTitle('Presupuesto mensual (dinero)', html`Cuánto puede gastar la clave del grupo cada mes, en dólares enteros (vacío = sin límite, 0 = nada de la clave del grupo): el total del grupo y la parte de cada jugador por defecto; un jugador puede tener otro tope, en la tabla de debajo. Solo cuenta lo que cubre la clave del grupo: lo que cada jugador gasta con su propia clave no suma ni se limita. Cuando se agota, lo que depende de esa clave deja de responder hasta el día 1, y quien tiene su propia clave sigue con ella si el modo de «Quién asume el coste» es «Primero la del grupo». El coste es una estimación y una pregunta puede pasarse del tope, porque su precio se conoce al acabar. Se renueva el día 1. Si «Avisos a administradores» está activo (Notificaciones → Canales), los admins reciben un mensaje privado de Telegram al llegar al 80 % y al 100 % del total del grupo, una vez al mes cada uno.`)}
+        ${cardTitle('Tope mensual por jugador (dinero)', html`Cuánto puede gastar cada jugador de la clave del grupo al mes, en dólares enteros (vacío = sin límite, 0 = nada de la clave del grupo). Sirve para evitar abusos y que nadie se funda la cuota en pocos días; el grupo en conjunto se limita por el saldo del monedero. Un jugador puede tener otro tope, en la tabla de debajo. Solo cuenta lo que cubre la clave del grupo: lo que cada jugador gasta con su propia clave no suma ni se limita. Cuando un jugador llega a su tope, deja de poder usar la clave del grupo hasta el día 1, y sigue con la suya si tiene una y el modo de «Quién asume el coste» es «Primero la del grupo». El coste es una estimación y una pregunta puede pasarse del tope, porque su precio se conoce al acabar.`)}
         <div class="adm-sub">Es un límite de dinero, distinto de los límites de preguntas de arriba (que cuentan mensajes por minuto, hora y día). Debajo ves lo gastado este mes y puedes dar un tope distinto a cada jugador.</div>
         <div class="adm-set-row">
-          <label>Todo el grupo (US$ al mes) <input class="adm-input" type="number" name="ai.group_budget_month" min="0" max="10000" step="1" placeholder="sin límite" /></label>
           <label>Cada jugador, por defecto (US$ al mes) <input class="adm-input" type="number" name="ai.user_budget_month" min="0" max="10000" step="1" placeholder="sin límite" /></label>
         </div>
       </section>`,
@@ -468,7 +467,7 @@ export function syncAiOff(form) {
 }
 
 // Numbers that may be left empty: no value is no limit (the API takes null as "back to the default", which is that)
-const OPTIONAL_NUMBERS = ['ai.group_budget_month', 'ai.user_budget_month'];
+const OPTIONAL_NUMBERS = ['ai.user_budget_month'];
 
 function collect(form) {
   const changes = {};

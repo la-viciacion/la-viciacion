@@ -104,6 +104,8 @@ class UserSettings(Base):
     # whole dollars a month this player may spend of the GROUP's key (set by an admin; NULL = the default of the settings
     # `ai.user_budget_month`, which is no limit when empty; 0 = nothing of the group's key for this player): see utils/ai_budget.py. What the player pays with their own key never counts
     ai_group_budget_usd = Column(SmallInteger, nullable=True)
+    # an admin took the wallet limit off this player (see utils/ai_wallet.py): NULL or false = the wallet applies
+    ai_wallet_unlimited = Column(Boolean, nullable=True)
     updated_at = Column(DateTime, server_default=text("CURRENT_TIMESTAMP"), onupdate=text("CURRENT_TIMESTAMP"))
 
 

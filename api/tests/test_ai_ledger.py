@@ -361,7 +361,7 @@ class FreePlanTests(unittest.TestCase):
 
         self.add(**{"ai.free_plan.google": True}, cost=3_000_000)
         self.add(provider="openai", cost=500_000)
-        self.assertEqual((ai_budget.spent(self.db), ai_budget.spent(self.db, 1)), (500_000, 500_000))
+        self.assertEqual(ai_budget.spent(self.db, 1), 500_000)
         month = ai_spend.summary(self.db)["months"][0]
         self.assertEqual((month["group_cost"], month["group_real_cost"], month["group_real_cost_by_provider"]), (3.5, 0.5, {"google": 0.0, "openai": 0.5}))
         self.assertEqual(ai_spend.group_months_by_provider(self.db), {
@@ -441,7 +441,7 @@ class ProbesAreRecordedTests(unittest.TestCase):
         guide_agent.probe(model=self.says(), source=source, user_id=1)
         (row,) = rows(self.db)
         self.assertEqual((row.feature, row.key_source, row.user_id), ("test", "user", 1))
-        self.assertEqual(ai_budget.spent(self.db), 0)
+        self.assertEqual(ai_budget.spent(self.db, 1), 0)
 
     def test_a_failing_test_is_recorded_with_no_tokens_and_still_raised(self):
         with self.assertRaises(AIError):
@@ -501,10 +501,9 @@ class NoticesAreRecordedTests(unittest.TestCase):
         self.assertGreater(row.cost_micros, 0)
 
     def test_what_a_test_button_spent_counts_in_the_groups_spending(self):
-        from src.utils import ai_budget
 
         self.write(source="ai_test", tokens=(1_000_000, 1_000_000))
-        self.assertEqual(ai_budget.spent(self.db), 2_000_000)
+        self.assertEqual(ai_spend.summary(self.db)["months"][0]["group_cost"], 2.0)
 
     def test_a_failure_to_write_never_stops_the_text(self):
         with mock.patch.object(ai_ledger, "open_session", side_effect=RuntimeError("db down")), self.assertLogs(ai_ledger.logger, "ERROR"):
@@ -523,7 +522,7 @@ class NoticesAreRecordedTests(unittest.TestCase):
         from src.utils import ai_budget
 
         self.write(tokens=(1_000_000, 1_000_000))
-        self.assertEqual(ai_budget.spent(self.db), 2_000_000)
+        self.assertEqual(ai_spend.summary(self.db)["months"][0]["group_cost"], 2.0)
         self.assertEqual(ai_budget.spent(self.db, 1), 0)
 
 

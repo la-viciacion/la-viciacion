@@ -215,7 +215,6 @@
    "hint": null,
    "is_set": true
   },
-  "ai.group_budget_month": null,
   "ai.model.anthropic": null,
   "ai.model.google": null,
   "ai.model.openai": null,
@@ -296,7 +295,7 @@
   "chat.provider": null,
   "completed_game.recommend": true,
   "guide.enabled": true,
-  "guide.key_source": "user_only",
+  "guide.key_source": "group_then_user",
   "guide.limit_group_day": 100,
   "guide.limit_user_day": 30,
   "guide.limit_user_hour": 10,

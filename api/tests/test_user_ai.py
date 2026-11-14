@@ -48,6 +48,7 @@ class KeyStorageTests(unittest.TestCase):
     def setUp(self):
         self.db = make_session()
         seed(self.db)
+        ai_env.free_wallet(self.db)
         self.dek = ai_env.give_key(self.db, 1, KEY, "gpt-4.1-mini")
 
     def test_what_is_stored_is_not_the_key_and_opens_only_with_the_data_key_for_its_player_and_provider(self):
@@ -138,6 +139,7 @@ class VaultTests(unittest.TestCase):
     def setUp(self):
         self.db = make_session()
         seed(self.db)
+        ai_env.free_wallet(self.db)
         patcher = mock.patch.object(ai_vault, "KDF", ai_env.FAST_KDF)
         patcher.start()
         self.addCleanup(patcher.stop)
@@ -196,6 +198,7 @@ class WhoPaysTests(unittest.TestCase):
     def setUp(self):
         self.db = make_session()
         seed(self.db)
+        ai_env.free_wallet(self.db)
 
     def resolve(self, feature, mode, own=False, group=True, enabled=True, provider="openai", key=KEY, locked=False):
         dek = None
@@ -239,7 +242,7 @@ class WhoPaysTests(unittest.TestCase):
 
     def test_an_unknown_mode_stored_by_an_earlier_version_is_the_default_of_the_feature(self):
         with patched(**{"chat.key_source": "user_or_group", "guide.key_source": "everybody"}):
-            self.assertEqual((ai_source.mode("chat"), ai_source.mode("guide")), ("group_then_user", "user_only"))
+            self.assertEqual((ai_source.mode("chat"), ai_source.mode("guide")), ("group_then_user", "group_then_user"))
 
     def test_group_only_ignores_the_players_key_and_needs_none(self):
         source, state = self.resolve("guide", "group_only", own=True)
@@ -252,9 +255,9 @@ class WhoPaysTests(unittest.TestCase):
             source, state = self.resolve("chat", mode, own=True, enabled=False)
             self.assertEqual((source, state), (None, {"available": False, "needs_key": False, "paid_by": None, "blocked": None, "locked": False}), mode)
 
-    def test_the_defaults_are_the_chat_for_the_group_and_the_guide_for_the_player(self):
+    def test_the_defaults_are_the_groups_key_first_for_the_chat_and_the_guide(self):
         self.assertEqual(settings.REGISTRY["chat.key_source"].default, "group_then_user")
-        self.assertEqual(settings.REGISTRY["guide.key_source"].default, "user_only")
+        self.assertEqual(settings.REGISTRY["guide.key_source"].default, "group_then_user")
         self.assertIsNone(settings.REGISTRY["chat.key_source"].check("group_only"))
         self.assertIsNotNone(settings.REGISTRY["chat.key_source"].check("everybody"))
 
@@ -268,6 +271,7 @@ class WhichKeyTests(unittest.TestCase):
     def setUp(self):
         self.db = make_session()
         seed(self.db)
+        ai_env.free_wallet(self.db)
         self.dek = ai_env.give_key(self.db, 1, KEY, "gpt-5-mini")
         user_ai.save(self.db, 1, self.dek, "anthropic", ANTHROPIC_KEY)
         user_ai.save(self.db, 1, self.dek, "google", GOOGLE_KEY)
@@ -323,6 +327,7 @@ class OwnKeyInAQuestionTests(unittest.TestCase):
     def setUp(self):
         self.db = make_session()
         seed(self.db)
+        ai_env.free_wallet(self.db)
         self.user = self.db.get(models.User, 1)
         patcher = patched(**{"chat.prompt": "Eres un bot."})
         patcher.start()
@@ -407,6 +412,7 @@ class RouteTests(unittest.TestCase):
     def setUp(self):
         self.db = make_session(threads=True)
         seed(self.db)
+        ai_env.free_wallet(self.db)
         for user in self.db.query(models.User).all():
             user.password = hashpw(PASSWORD.encode(), gensalt(4)).decode()
         self.db.commit()
@@ -472,7 +478,7 @@ class RouteTests(unittest.TestCase):
         body = response.json()
         self.assertEqual((body["locked"], body["keys"]["openai"]["hint"], body["preferred"]), (False, "6789", None))
         self.assertEqual((body["chat"]["paid_by"], body["chat"]["mode"]), ("group", "group_then_user"))  # the group's first
-        self.assertEqual((body["guide"]["paid_by"], body["guide"]["mode"]), ("user", "user_only"))
+        self.assertEqual((body["guide"]["paid_by"], body["guide"]["mode"]), ("group", "group_then_user"))
         self.assertEqual(set(body["keys"]), set(user_ai.PROVIDERS))
         self.assertEqual(body["default_models"], user_ai.DEFAULT_MODELS)
 
@@ -480,6 +486,9 @@ class RouteTests(unittest.TestCase):
         self.dek = None
         body = self.client.get("/users/ana/ai").json()
         self.assertEqual((body["locked"], body["keys"]["openai"]["has_key"], body["keys"]["openai"]["hint"]), (True, True, None))
+        self.assertEqual((body["guide"]["locked"], body["guide"]["needs_key"]), (False, False))  # the group's key answers it
+        with patched(**{"guide.key_source": "user_only"}):
+            body = self.client.get("/users/ana/ai").json()
         self.assertEqual((body["guide"]["locked"], body["guide"]["needs_key"]), (True, False))
 
     def test_what_is_not_a_key_is_refused_without_calling_the_provider(self):
@@ -586,6 +595,7 @@ class UnlockRouteTests(unittest.TestCase):
     def setUp(self):
         self.db = make_session(threads=True)
         seed(self.db)
+        ai_env.free_wallet(self.db)
         for user in self.db.query(models.User).all():
             user.password = hashpw(PASSWORD.encode(), gensalt(4)).decode()
         self.db.commit()

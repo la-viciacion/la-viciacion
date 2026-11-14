@@ -23,10 +23,11 @@ test('the gap says how much more the OpenAI account holds than the wallets, roun
   assert.equal(gap(0.3, 0.1 + 0.2), 0);
 });
 
-test('the player line says the balance, or that it is spent, and is empty while the wallet is off', () => {
+test('the player line says the balance, that it is spent or that there is no limit', () => {
   assert.equal(walletLine(null), '');
+  assert.equal(walletLine({ contributed: 0, spent: 0, balance: 0, unlimited: true }), 'Tu saldo de IA del grupo: sin límite.');
   assert.match(walletLine({ contributed: 3, spent: 1, balance: 2 }), /Tu saldo de IA del grupo: 2,00.*aportado 3,00.*gastado 1,00/);
-  assert.match(walletLine({ contributed: 1, spent: 1.4, balance: -0.4 }), /agotado/);
+  assert.match(walletLine({ contributed: 1, spent: 1.4, balance: -0.4 }), /agotado.*Pide a un admin/);
 });
 
 test('the real balance adds what an admin typed for OpenAI to what the providers report, and is nothing without either', () => {

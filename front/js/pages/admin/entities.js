@@ -640,7 +640,7 @@ ENTITIES.chat = {
 };
 ENTITIES.ailimits = {
   label: 'Límites',
-  description: 'Todo lo que limita el uso de la IA, junto: quién asume el coste, los límites de preguntas, el presupuesto mensual en dinero, el tope de cada jugador y el monedero con lo que aporta cada uno.',
+  description: 'Todo lo que limita el uso de la IA, junto: quién asume el coste, los límites de preguntas, el tope mensual de cada jugador y el monedero con lo que aporta cada uno.',
   custom: 'settings',
   sections: ['ailimitkeys', 'ailimitq', 'aibudget', 'aibudgets', 'aiwallet'],
 };

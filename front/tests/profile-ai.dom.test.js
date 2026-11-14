@@ -38,7 +38,7 @@ const MODELS = {
 const figures = (calls, cost, extra = {}) => ({ calls, cost, input_tokens: 1000, cached_tokens: 0, output_tokens: 200, web_searches: 0, unpriced: 0, ...extra });
 const NOTHING = {
   total: figures(0, 0), by_source: [], by_feature: [], by_model: [], by_status: [], months: [], days: [],
-  budget: { month: '2026-11', resets_on: '2026-12-01', group: { cap: null, spent: 0 }, user: { cap: null, spent: 0 } },
+  budget: { month: '2026-11', resets_on: '2026-12-01', user: { cap: null, spent: 0 } },
 };
 const el = () => document.getElementById('pfAi');
 const card = (provider) => el().querySelector(`[data-provider="${provider}"].ai-provider`);
@@ -66,7 +66,7 @@ beforeEach(() => {
 test('without keys it says, quietly, where the cost goes, offers a card for each provider and loads no models', async () => {
   const calls = await open({ 'GET /users/ana/ai': stateOf() });
   const note = el().querySelector('.ai-cost-note').textContent;
-  assert.match(note, /El coste del chat lo cubre el grupo mientras haya presupuesto este mes; después necesitarás tu propia clave/);
+  assert.match(note, /El coste del chat lo cubre el grupo mientras haya saldo; después necesitarás tu propia clave/);
   assert.match(note, /La guía de cada juego busca en internet y cuesta más: funciona con tu propia clave/);
   assert.deepEqual([...el().querySelectorAll('.ai-provider h3')].map((h) => h.textContent), ['OpenAI', 'Anthropic (Claude)', 'Google (Gemini)', 'OpenRouter']);
   assert.equal(el().querySelectorAll('input[type="password"][name="api_key"]').length, 4);
@@ -291,7 +291,7 @@ const USAGE = {
   by_status: [{ name: 'ok', calls: 5 }],
   months: [{ month: '2026-10', calls: 1, cost: 0.1, group_cost: 0.1, user_cost: 0, unpriced: 0 }, { month: '2026-11', calls: 4, cost: 0.65, group_cost: 0.4, user_cost: 0.25, unpriced: 0 }],
   days: [],
-  budget: { month: '2026-11', resets_on: '2026-12-01', group: { cap: 20, spent: 8 }, user: { cap: 4, spent: 0.4 } },
+  budget: { month: '2026-11', resets_on: '2026-12-01', user: { cap: 4, spent: 0.4 } },
 };
 
 test('the player sees what they paid with their own key against what the group covered, by function and by model, and by month', async () => {
@@ -331,16 +331,16 @@ test('without any use it says so instead of empty figures', async () => {
   assert.equal(el().querySelector('.pf-stats'), null);
 });
 
-test('the budget of the group and their share show with what is spent and when it starts again, and nothing without a cap', async () => {
+test('their monthly share shows with what is spent and when it starts again, and nothing without a cap', async () => {
   await open({ 'GET /users/ana/ai/usage': USAGE, 'GET /users/ana/ai': { ...stateOf(), budget: USAGE.budget } });
   const text = el().querySelector('.ai-budget').textContent;
-  assert.match(text, /Presupuesto del grupo este mes: 8,00.* de 20,00/);
-  assert.match(text, /Tu parte: 0,40.* de 4,00/);
+  assert.doesNotMatch(text, /Presupuesto del grupo/);
+  assert.match(text, /Tu parte de la IA del grupo este mes: 0,40.* de 4,00/);
   assert.match(text, /Se renueva el 1 de diciembre/);
   await open({ 'GET /users/ana/ai': { ...stateOf(), budget: NOTHING.budget } });
   assert.equal(el().querySelector('.ai-budget'), null);
   await open({ 'GET /users/ana/ai': { ...stateOf(), budget: { ...NOTHING.budget, user: { cap: 0, spent: 0 } } } });
-  assert.match(el().querySelector('.ai-budget').textContent, /Tu parte: sin IA de la clave del grupo/);
+  assert.match(el().querySelector('.ai-budget').textContent, /Tu parte de la IA del grupo este mes: sin IA de la clave del grupo/);
 });
 
 test('the wallet balance shows when there is one', async () => {
@@ -348,13 +348,13 @@ test('the wallet balance shows when there is one', async () => {
   assert.match(el().querySelector('.ai-budget').textContent, /Tu saldo de IA del grupo: 2,00/);
 });
 
-test('when a budget stops the group key the player is told, and told how to go on if they have no key', async () => {
-  const blocked = { ...stateOf(), chat: { available: true, needs_key: true, paid_by: null, mode: 'group_then_user', blocked: 'group', locked: false } };
+test('when their share or balance stops the group key the player is told, and told how to go on if they have no key', async () => {
+  const blocked = { ...stateOf(), chat: { available: true, needs_key: true, paid_by: null, mode: 'group_then_user', blocked: 'user', locked: false } };
   await open({ 'GET /users/ana/ai': blocked });
-  assert.match(el().textContent, /Se ha agotado el presupuesto de IA del grupo este mes/);
+  assert.match(el().textContent, /Has gastado tu parte de la IA del grupo este mes/);
   assert.match(el().textContent, /puedes seguir con una clave tuya/);
-  await open({ 'GET /users/ana/ai/openai/models': MODELS, 'GET /users/ana/ai': { ...blocked, keys: OWN.keys, chat: { ...blocked.chat, blocked: 'user' } } });
-  assert.match(el().textContent, /Has gastado tu parte del presupuesto/);
+  await open({ 'GET /users/ana/ai/openai/models': MODELS, 'GET /users/ana/ai': { ...blocked, keys: OWN.keys, chat: { ...blocked.chat, paid_by: 'user', blocked: null } } });
+  assert.doesNotMatch(el().textContent, /Has gastado tu parte/);
   assert.doesNotMatch(el().textContent, /puedes seguir con una clave tuya/);
   await open({ 'GET /users/ana/ai': { ...blocked, chat: { ...blocked.chat, blocked: 'user_off' } } });
   assert.match(el().textContent, /Un admin no te ha dado IA de la clave del grupo/);
@@ -382,7 +382,7 @@ test('what was being typed in a key box survives a redraw', async () => {
 test('the explanation of the keys says what they are for in the order that is true and that they are sealed with the password', async () => {
   await open({ 'GET /users/ana/ai': stateOf() });
   const text = el().textContent;
-  assert.match(text, /Con tu propia clave puedes usar la guía de cada juego y seguir con el chat cuando se agote el presupuesto del grupo \(o tu parte\)/);
+  assert.match(text, /Con tu propia clave puedes usar la guía de cada juego y seguir con el chat cuando se agote el saldo del grupo \(o tu parte del mes\)/);
   assert.match(text, /cifrada con tu contraseña/);
   assert.match(text, /las claves se borran/);
   assert.doesNotMatch(text, /en lugar de sumarse al del grupo/);

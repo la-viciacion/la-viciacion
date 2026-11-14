@@ -28,9 +28,10 @@ export function realBalance(typed, balances = []) {
   return { parts, sum: parts.length ? Math.round(parts.reduce((total, p) => total + p.amount, 0) * 100) / 100 : null };
 }
 
-/** The line of the player's own screen, or '' while the wallet is off. */
+/** The line of the player's own screen. */
 export function walletLine(wallet) {
   if (!wallet) return '';
+  if (wallet.unlimited) return 'Tu saldo de IA del grupo: sin límite.';
   const left = isEmpty(wallet.balance) ? `Tu saldo de IA del grupo está agotado (${money(wallet.balance)}).` : `Tu saldo de IA del grupo: ${money(wallet.balance)}.`;
-  return `${left} Has aportado ${money(wallet.contributed)} y has gastado ${money(wallet.spent)}.`;
+  return `${left} Has aportado ${money(wallet.contributed)} y has gastado ${money(wallet.spent)}.${isEmpty(wallet.balance) ? ' Pide a un admin que te anote una aportación.' : ''}`;
 }
