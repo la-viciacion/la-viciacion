@@ -517,6 +517,7 @@ video.gm-trailer, iframe.gm-trailer { cursor: auto; background: #000; }
 }
 .ai-cost-text > div + div { margin-top: 4px; }
 .ai-cost-text .ai-budget { color: var(--text-secondary); font-size: 0.86rem; }
+.ai-cost-note .ai-beta { color: var(--accent-teal); }
 .ai-cost-note .ai-stopped { color: #fca5a5; }
 
 /* Mi IA: what the chat and the guide do, side by side on a wide screen and one over the other on a phone */
@@ -536,3 +537,8 @@ video.gm-trailer, iframe.gm-trailer { cursor: auto; background: #000; }
 .ai-about-list { margin: 0; padding-left: 18px; font-size: 0.92rem; line-height: 1.45; }
 .ai-about-list li + li { margin-top: 4px; }
 .ai-about-limit, .ai-about-cost { margin-top: 10px; }
+/* the cards of the keys and the spending are siblings with nothing between them: give each some air */
+.pf-card.ai-locked, .pf-card.ai-provider, .pf-card[data-preferred], .pf-card[data-spend] { margin-bottom: 14px; }
+
+/* a small label beside a tab's name (Mi IA: beta) */
+.pf-tag { margin-left: 4px; padding: 1px 6px; border: 1px solid var(--accent-teal); border-radius: 999px; color: var(--accent-teal); font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; vertical-align: 1px; }

@@ -48,7 +48,7 @@ const SETTINGS = [
   ['perfil', 'Perfil'],
   ['seguridad', 'Seguridad'],
   ['avisos', 'Notificaciones'],
-  ['ia', 'Mi IA'],
+  ['ia', 'Mi IA', 'beta'],
   ['datos', 'Tus datos'],
 ];
 
@@ -272,7 +272,7 @@ function draw(d) {
 
     <section class="pf-panel" role="tabpanel" id="pfPanel-ajustes" aria-labelledby="pfTab-ajustes" hidden>
     <div class="pf-season" id="pfGroups" role="group" aria-label="Grupo de ajustes">
-      ${SETTINGS.map(([id, label]) => html`<button type="button" class="pf-season-badge pf-group" data-group="${id}" aria-pressed="false">${label}</button>`)}
+      ${SETTINGS.map(([id, label, tag]) => html`<button type="button" class="pf-season-badge pf-group" data-group="${id}" aria-pressed="false">${label}${tag ? html` <span class="pf-tag">${tag}</span>` : ''}</button>`)}
     </div>
 
     <div class="pf-group-panel" id="pfGroup-perfil">
