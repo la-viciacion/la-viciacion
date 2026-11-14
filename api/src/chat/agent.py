@@ -18,9 +18,8 @@ from ..clients import failure as provider_failure
 from ..clients.ai_error import AIError, ProviderError, QuotaError
 from ..clients.quota import classify
 from ..database import models
-from ..utils import ai_ledger, ai_providers, ai_quota, messages, seasons, settings
+from ..utils import ai_build, ai_ledger, ai_providers, ai_quota, messages, seasons, settings
 from ..utils.logger import LogManager
-from . import model as chat_model
 from .limits import LIMITS, MAX_HISTORY
 from .tools import TOOLS, ChatDeps
 
@@ -105,7 +104,7 @@ def ask(db: Session, user: models.User, question: str, history: list[tuple[str, 
         result = agent.run_sync(
             question,
             deps=ChatDeps(db=db, user=user),
-            model=model or chat_model.build_model(source),
+            model=model or ai_build.model_for(ai_providers.CHAT, source),
             message_history=history_messages(history),
             usage_limits=LIMITS,
         )
@@ -137,7 +136,7 @@ def probe(model=None) -> str:
     started = time.monotonic()
     provider, name = ai_providers.current(ai_providers.CHAT)
     try:
-        result = Agent(model or chat_model.build_model(), model_settings=SETTINGS).run_sync(
+        result = Agent(model or ai_build.model_for(ai_providers.CHAT), model_settings=SETTINGS).run_sync(
             "Saluda al grupo con una frase corta y divertida sobre videojuegos.", usage_limits=LIMITS
         )
     except Exception as e:

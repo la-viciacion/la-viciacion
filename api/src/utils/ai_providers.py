@@ -5,8 +5,8 @@ Every provider has its own variables in the .env (OPENAI_AI_API_KEY, OPENAI_AI_M
 provider exists for the app when its key is set. There is no variable that says which one to use. When several have a key,
 the admin picks one for each use in the panel (`ai.provider`, `chat.provider`, `guide.provider`, stored) and, per provider, a
 model for each (`ai.model.<provider>`, `chat.model.<provider>`, `guide.model.<provider>`). Without a pick the chat follows the
-notices' provider and the guide follows the chat's; a model falls back the same way, ending in the .env's default. A pick that
-no longer fits (its provider lost its key) is ignored.
+notices' provider and the guide follows the chat's, and the notices take the first provider that has a key and a model; a model
+falls back the same way, ending in the .env's default. A pick that no longer fits (its provider lost its key) is ignored.
 
 Read on every call, so a change in the panel applies at once."""
 from . import settings
@@ -28,15 +28,16 @@ def available() -> list[str]:
 
 
 def selected(use: str = NOTICES) -> str | None:
-    """The provider a use runs on: the admin's pick for it if it still has a key, else the one it follows (the guide follows the
-    chat, the chat the notices), else the first that has a key, else None."""
+    """The provider a use runs on: the admin's pick for it if it still has a key (even if it has no model: the panel says what is
+    missing), else the one it follows (the guide follows the chat, the chat the notices), else the first that has a key **and a
+    model**, else the first with a key, else None. A provider with a key and no model must not hide one that is complete."""
     ready = available()
     picked = settings.get(f"{_PREFIX[use]}.provider")
     if picked in ready:
         return picked
     if use in _FALLBACK:
         return selected(_FALLBACK[use])
-    return ready[0] if ready else None
+    return next((p for p in ready if model(use, p)), ready[0] if ready else None)
 
 
 def default_model(provider: str, use: str = NOTICES) -> str | None:
@@ -79,10 +80,19 @@ def group_credentials(use: str = NOTICES) -> tuple[str, str, str] | None:
     return (provider, key, name) if provider and key and name else None
 
 
+def model_problem(provider: str | None, name: str | None) -> str | None:
+    """Why a model cannot work with its provider, in Spanish for the panel, or None. OpenRouter wants `vendor/model`; without the
+    vendor every call fails when its model is built, and the .env's value is not checked by anything else."""
+    if provider == "openrouter" and name and "/" not in name:
+        return f"OpenRouter nombra los modelos «proveedor/modelo» (por ejemplo openai/{name}), no «{name}»"
+    return None
+
+
 def in_use(use: str) -> dict:
-    """What a use runs on now: the provider and the model (None if missing) and whether the model was picked in the panel."""
+    """What a use runs on now: the provider and the model (None if missing), whether the model was picked in the panel and, if it
+    cannot work, why (`problem`)."""
     provider, name = current(use)
-    return {"provider": provider, "model": name, "own_model": bool(provider) and own_model(use, provider)}
+    return {"provider": provider, "model": name, "own_model": bool(provider) and own_model(use, provider), "problem": model_problem(provider, name)}
 
 
 def status() -> dict:

@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from .. import auth
 from ..auth import get_db
 from ..clients import failure as provider_failure
-from ..clients import open_ai
+from ..clients import model_list
 from ..clients.ai_error import AIError, ProviderError, QuotaError
 from ..database import models
 from ..guide import agent as guide_agent
@@ -118,7 +118,7 @@ def put_ai(username: str, body: AiKeyBody, active_user: models.User = Depends(au
         raise HTTPException(status_code=400, detail=messages.USER_AI_KEY_INVALID)
     _limited(user)
     try:
-        open_ai.list_models(key)
+        model_list.list_models("openai", key)
     except AIError as e:
         raise _provider_error(e) from None
     user_ai.save(db, user.id, key, model or user_ai.model_of(db, user.id) or DEFAULT_MODEL)  # replacing a key keeps the model chosen
@@ -143,7 +143,7 @@ def get_ai_models(username: str, active_user: models.User = Depends(auth.get_cur
         raise HTTPException(status_code=409, detail=messages.USER_AI_NO_KEY)
     _limited(user, listing=True)
     try:
-        ids = open_ai.list_models(found[0])
+        ids = model_list.list_models("openai", found[0])
     except AIError as e:
         raise _provider_error(e) from None
     return {"models": ai_models.describe(ids), "current": found[1]}

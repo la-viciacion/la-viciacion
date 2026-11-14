@@ -13,16 +13,7 @@ from dataclasses import dataclass
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.capabilities import NativeTool
 from pydantic_ai.exceptions import UsageLimitExceeded
-from pydantic_ai.models import Model
-from pydantic_ai.models.anthropic import AnthropicModel
-from pydantic_ai.models.google import GoogleModel
-from pydantic_ai.models.openai import OpenAIResponsesModel
-from pydantic_ai.models.openrouter import OpenRouterModel
 from pydantic_ai.native_tools import WebSearchTool
-from pydantic_ai.providers.anthropic import AnthropicProvider
-from pydantic_ai.providers.google import GoogleProvider
-from pydantic_ai.providers.openai import OpenAIProvider
-from pydantic_ai.providers.openrouter import OpenRouterProvider
 from pydantic_ai.settings import ModelSettings
 from pydantic_ai.usage import UsageLimits
 from sqlalchemy.orm import Session
@@ -30,7 +21,7 @@ from sqlalchemy.orm import Session
 from ..chat import agent as chat_agent
 from ..clients.ai_error import QuotaError
 from ..chat.tools import hours
-from ..utils import ai_ledger, ai_providers, messages, settings
+from ..utils import ai_build, ai_ledger, ai_providers, messages, settings
 from ..utils.logger import LogManager
 from .prompt import DEFAULT_LEVEL, LEVELS
 
@@ -42,15 +33,6 @@ MAX_HISTORY = chat_agent.MAX_HISTORY
 SETTINGS = ModelSettings(temperature=0.3, timeout=60, thinking=False)
 LIMITS = UsageLimits(request_limit=6, total_tokens_limit=60_000)
 
-# `openai` needs the Responses API for the web search (the chat completions one has none); the ids are the same as the chat's
-BUILDERS = {
-    "openai": lambda name, key: OpenAIResponsesModel(name, provider=OpenAIProvider(api_key=key)),
-    "google": lambda name, key: GoogleModel(name, provider=GoogleProvider(api_key=key)),
-    "anthropic": lambda name, key: AnthropicModel(name, provider=AnthropicProvider(api_key=key)),
-    "openrouter": lambda name, key: OpenRouterModel(name, provider=OpenRouterProvider(api_key=key)),
-}
-
-
 @dataclass
 class GuideDeps:
     game: str  # what the app knows about the game and the player, as text (game_context)
@@ -61,14 +43,6 @@ class GuideDeps:
     user_id: int | None = None
     game_id: str | None = None
     source: object | None = None  # whose key pays (utils/ai_source.py Source); the group's when none
-
-
-def build_model(source=None) -> Model:
-    """The model for a source of key (utils/ai_source.py): the player's own, or the group's when none is given."""
-    if source is not None:
-        return BUILDERS[source.provider](source.model, source.api_key)
-    provider, key, name = ai_providers.group_credentials(ai_providers.GUIDE)
-    return BUILDERS[provider](name, key)
 
 
 def is_ready() -> bool:
@@ -140,7 +114,7 @@ def ask(deps: GuideDeps, question: str, history: list[tuple[str, str]], model=No
         result = agent.run_sync(
             question,
             deps=deps,
-            model=model or build_model(source),
+            model=model or ai_build.model_for(ai_providers.GUIDE, source),
             message_history=chat_agent.history_messages(history),
             usage_limits=LIMITS,
         )
@@ -173,7 +147,7 @@ def probe(model=None, source=None, user_id: int | None = None) -> str:
     try:
         result = agent.run_sync(
             "Busca en la web quién desarrolló este juego y responde en una frase, citando la fuente.",
-            deps=deps, model=model or build_model(source), usage_limits=LIMITS,
+            deps=deps, model=model or ai_build.model_for(ai_providers.GUIDE, source), usage_limits=LIMITS,
         )
     except Exception as e:
         error = chat_agent.failure(e, "guide_test", chat_agent.own_key(source), ai_providers.GUIDE)

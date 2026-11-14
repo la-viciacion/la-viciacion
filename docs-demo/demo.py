@@ -95,7 +95,7 @@ def write_env():
         "MARIADB_DATABASE=laviciacion", "MARIADB_USER=laviciacion", f"MARIADB_PASSWORD={secrets.token_hex(12)}",
         f"GOD_ADMIN_PASS={pw()}", f"DEMO_PLAYER_PASS={pw()}", f"SECRET_KEY={secrets.token_hex(32)}",
         "ACCESS_TOKEN_EXPIRE_MINUTES=10080", 'CORS_ORIGINS=["http://localhost:3100"]',
-        "RAWG_API_KEY=", "OPENAI_AI_API_KEY=", "OPENAI_AI_MODEL=", "GOOGLE_AI_API_KEY=", "GOOGLE_AI_MODEL=", "PUBLIC_URL=",
+        "RAWG_API_KEY=", "OPENAI_AI_API_KEY=", "OPENAI_AI_MODEL=", "GOOGLE_AI_API_KEY=", "GOOGLE_AI_MODEL=", "ANTHROPIC_AI_API_KEY=", "ANTHROPIC_AI_MODEL=", "OPENROUTER_AI_API_KEY=", "OPENROUTER_AI_MODEL=", "PUBLIC_URL=",
         "SMTP_HOST=", "SMTP_PORT=587", "SMTP_SECURITY=starttls", "SMTP_EMAIL=", "SMTP_USER=", "SMTP_PASS=",
         "API_URL=http://laviciacion-api:5000/api/v1", "API_DOCS_ENABLED=false", "TZ=Europe/Madrid",
         "ENVIRONMENT=development", "SENTRY_URL_API=", "SENTRY_URL_BOT=", "API_LOG_LEVEL=INFO", "BOT_LOG_LEVEL=INFO",

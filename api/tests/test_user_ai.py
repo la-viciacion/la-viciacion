@@ -191,7 +191,7 @@ class OwnKeyInAQuestionTests(unittest.TestCase):
 
     def test_the_model_is_built_with_the_players_key_and_model(self):
         built = []
-        with mock.patch.object(chat_agent.chat_model, "build_model", side_effect=lambda source=None: built.append(source) or FunctionModel(self.reply)):
+        with mock.patch.object(chat_agent.ai_build, "model_for", side_effect=lambda use, source=None: built.append(source) or FunctionModel(self.reply)):
             chat_agent.ask(self.db, self.user, "hola", [], source=self.source)
         self.assertEqual(built, [self.source])
 
@@ -266,9 +266,9 @@ class RouteTests(unittest.TestCase):
         return self.client.put("/users/ana/ai", json=body)
 
     def test_a_valid_key_is_checked_with_openai_saved_and_never_returned(self):
-        with mock.patch.object(route.open_ai, "list_models", return_value=["gpt-4.1-mini"]) as listed:
+        with mock.patch.object(route.model_list, "list_models", return_value=["gpt-4.1-mini"]) as listed:
             response = self.put(api_key=f" {KEY} ")
-        listed.assert_called_once_with(KEY)
+        listed.assert_called_once_with("openai", KEY)
         self.assertEqual(response.status_code, 200)
         body = response.json()
         self.assertEqual((body["has_key"], body["hint"], body["model"]), (True, "6789", route.DEFAULT_MODEL))
@@ -285,23 +285,23 @@ class RouteTests(unittest.TestCase):
         self.assertEqual((body["guide"]["paid_by"], body["guide"]["mode"]), ("user", "user_only"))
 
     def test_what_is_not_a_key_is_refused_without_calling_openai(self):
-        with mock.patch.object(route.open_ai, "list_models") as listed:
+        with mock.patch.object(route.model_list, "list_models") as listed:
             for bad in ("hello", "sk-x", ""):
                 self.assertEqual(self.put(api_key=bad).status_code, 400, bad)
         self.assertFalse(listed.called)
         self.assertFalse(user_ai.status(self.db, 1)["has_key"])
 
     def test_a_key_that_openai_refuses_is_not_saved_and_the_message_does_not_repeat_it(self):
-        with mock.patch.object(route.open_ai, "list_models", side_effect=ProviderError(f"openai: 401 {KEY}", failure.DENIED)):
+        with mock.patch.object(route.model_list, "list_models", side_effect=ProviderError(f"openai: 401 {KEY}", failure.DENIED)):
             response = self.put(api_key=KEY)
         self.assertEqual((response.status_code, response.json()["detail"]), (400, messages.USER_AI_KEY_REJECTED))
         self.assertNotIn(KEY, response.text)
         self.assertFalse(user_ai.status(self.db, 1)["has_key"])
 
     def test_a_key_without_balance_says_so_and_openai_trouble_is_a_bad_gateway(self):
-        with mock.patch.object(route.open_ai, "list_models", side_effect=QuotaError("q", Quota(kind="billing"))):
+        with mock.patch.object(route.model_list, "list_models", side_effect=QuotaError("q", Quota(kind="billing"))):
             self.assertEqual(self.put(api_key=KEY).status_code, 429)
-        with mock.patch.object(route.open_ai, "list_models", side_effect=AIError("boom")):
+        with mock.patch.object(route.model_list, "list_models", side_effect=AIError("boom")):
             self.assertEqual(self.put(api_key=KEY).status_code, 502)
 
     def test_the_model_can_be_changed_without_sending_the_key_again(self):
@@ -329,7 +329,7 @@ class RouteTests(unittest.TestCase):
     def test_the_models_are_those_of_their_key_with_their_tiers(self):
         self.assertEqual(self.client.get("/users/ana/ai/models").status_code, 409)
         user_ai.save(self.db, 1, KEY, "gpt-4.1-mini")
-        with mock.patch.object(route.open_ai, "list_models", return_value=["gpt-4.1-mini", "gpt-5-nano", "text-embedding-3-small"]):
+        with mock.patch.object(route.model_list, "list_models", return_value=["gpt-4.1-mini", "gpt-5-nano", "text-embedding-3-small"]):
             body = self.client.get("/users/ana/ai/models").json()
         self.assertEqual([m["id"] for m in body["models"]], ["gpt-4.1-mini", "gpt-5-nano"])
         self.assertEqual(body["current"], "gpt-4.1-mini")
@@ -344,7 +344,7 @@ class RouteTests(unittest.TestCase):
         self.assertEqual((source.api_key, source.model, source.key_source), (KEY, "gpt-5-mini", "user"))
 
     def test_checking_and_trying_keys_is_limited_so_the_server_is_no_key_tester(self):
-        with mock.patch.object(route.open_ai, "list_models", side_effect=ProviderError("x", failure.DENIED)):
+        with mock.patch.object(route.model_list, "list_models", side_effect=ProviderError("x", failure.DENIED)):
             codes = [self.put(api_key=OTHER_KEY).status_code for _ in range(route.CHANGES_PER_HOUR + 1)]
         self.assertEqual(codes[:-1], [400] * route.CHANGES_PER_HOUR)
         self.assertEqual(codes[-1], 429)

@@ -91,6 +91,8 @@ El botón flotante de abajo a la derecha abre un asistente que responde sobre vi
 ```ini
 OPENAI_CHAT_AI_MODEL=gpt-4.1       # opcional; sin ella se usa OPENAI_AI_MODEL
 GOOGLE_CHAT_AI_MODEL=gemini-3.5-flash
+ANTHROPIC_CHAT_AI_MODEL=claude-sonnet-5-5
+OPENROUTER_CHAT_AI_MODEL=anthropic/claude-sonnet-5-5
 ```
 
 Sirve para dar al chat un modelo más potente que el de los avisos (que solo reescriben frases cortas). Las claves y los modelos por defecto viven solo en el `.env`. Lo que se edita desde el panel, en **IA → Chat y guía**, es el **interruptor** (independiente del de los avisos), las **instrucciones**, el **modelo** (de la lista que da el proveedor en ese momento) y el botón **Probar el chat**; la pestaña dice si los jugadores lo tienen disponible y, si no, qué falta.

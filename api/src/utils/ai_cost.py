@@ -4,8 +4,8 @@ The prices come from `genai-prices` (the library pydantic-ai already uses): it c
 (`start_updates`), asks a public file once every `ai.price_refresh_hours` for newer ones and keeps them in memory. A
 price that changes tomorrow does not change what a call cost today: the estimate is made when the call happens and
 stored with the date of the prices it used (`ai_usage.price_stamp`). If the file cannot be fetched the snapshot goes
-on, so nothing here can stop an answer. Only OpenAI's and Google's tokens are priced by the library; the web searches
-are billed per call and apart, and the library prices them too, per model (`web_searches_kcount`): pydantic-ai counts them
+on, so nothing here can stop an answer. The library prices the tokens of OpenAI, Google, Anthropic and the models of OpenRouter it
+knows (OpenRouter itself says what it charged, which wins: `reported_cost`); the web searches are billed per call and apart, and the library prices them too, per model (`web_searches_kcount`): pydantic-ai counts them
 on the usage of each response, so they are already in the cost of a response.
 
 No provider offers an API with its price list, which is why a third party's file is used: it is what the estimate
@@ -65,27 +65,26 @@ def to_micros(dollars) -> int:
     return int((Decimal(str(dollars)) * MICROS).to_integral_value())
 
 
-def completion_cost_micros(provider: str | None, model: str | None, used) -> int | None:
-    """The cost, in millionths of a dollar, of one completion of a notice from the tokens it used (the client left them in
-    clients/used.py), or None if the price of its model is not known."""
-    try:
-        from genai_prices import Usage, calc_price
-
-        found = calc_price(
-            Usage(input_tokens=used.input_tokens, cache_read_tokens=used.cached_tokens, output_tokens=used.output_tokens),
-            model, provider_id=provider,
-        )
-        return to_micros(found.total_price)
-    except Exception:
+def reported_cost(response) -> Decimal | None:
+    """What OpenRouter itself says a response cost, web searches included, or None if the provider does not say (every other one).
+    Its models go by many names that the price list does not know, and it knows what it charged: a call it reports with no cost
+    (a free model) cost nothing."""
+    details = getattr(response, "provider_details", None) or {}
+    if getattr(response, "provider_name", None) != "openrouter" or not ("cost" in details or "is_byok" in details):
         return None
+    return Decimal(str(details.get("cost") or 0))
 
 
 def tokens_cost_micros(responses) -> int | None:
     """The cost, in millionths of a dollar, of the model responses of one call (their tokens and their web searches), or None
     if the price of a model is not known, or a response made searches that its model has no price for: a partial figure
-    would hide that something was not counted."""
+    would hide that something was not counted. A provider that reports what it charged is believed (`reported_cost`)."""
     total = Decimal(0)
     for response in responses:
+        reported = reported_cost(response)
+        if reported is not None:
+            total += reported
+            continue
         try:
             priced = response.cost()
             searched = getattr(response.usage, "web_searches", 0)

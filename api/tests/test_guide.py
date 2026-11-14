@@ -20,7 +20,7 @@ from src.guide import agent, limits
 from src.guide.prompt import GUIDE_PROMPT
 from src.routers import guide as guide_router
 from src.routers.manage import system
-from src.utils import ai_source, settings
+from src.utils import ai_build, ai_providers, ai_source, settings
 from tests import ai_env
 from tests.sqlite_db import make_session
 from tests.test_chat import seed
@@ -124,7 +124,7 @@ class ModelTests(unittest.TestCase):
     def build(self, provider):
         values = ai_env.group(provider, "KEY", "m")
         with mock.patch.object(settings, "get", side_effect=lambda key: values[key]):
-            return agent.build_model()
+            return ai_build.model_for(ai_providers.GUIDE)
 
     def test_openai_uses_the_responses_api_because_the_chat_completions_one_cannot_search(self):
         self.assertIsInstance(self.build("openai"), OpenAIResponsesModel)
