@@ -35,6 +35,9 @@ def patched(**overrides):
 
 class Base(unittest.TestCase):
     def setUp(self):
+        patcher = mock.patch.object(ai_budget, "CAPS_ENFORCED", True)  # the caps are not applied for now: these tests are about them
+        patcher.start()
+        self.addCleanup(patcher.stop)
         self.db = make_session()
         seed(self.db)
         ai_env.free_wallet(self.db)
@@ -356,6 +359,30 @@ class AdminRoutesTests(Base):
 
     def test_the_ledger_knows_the_budget_status(self):
         self.assertEqual(ai_ledger.BUDGET, "budget")
+
+
+class IgnoredCapsTests(unittest.TestCase):
+    """For now the monthly caps do not limit anybody: only the wallet does. Their code and settings are still there."""
+
+    def setUp(self):
+        self.db = make_session()
+        seed(self.db)
+        ai_env.free_wallet(self.db)
+
+    def test_a_cap_that_would_stop_the_player_does_not(self):
+        self.assertFalse(ai_budget.CAPS_ENFORCED)
+        self.db.add(models.AiUsage(created_at=NOW, user_id=1, feature="chat", key_source="group", status="ok", cost_micros=60_000_000, provider="openai", model="m"))
+        ai_budget.set_user_cap(self.db, 2, 0)
+        self.db.commit()
+        with patched(**{"ai.user_budget_month": 5}):
+            self.assertIsNone(ai_budget.exceeded(self.db, 1, NOW))  # spent 60 of 5
+            self.assertIsNone(ai_budget.exceeded(self.db, 2, NOW))  # a cap of 0
+
+    def test_the_wallet_still_stops_them(self):
+        self.db.query(models.AiWalletEntry).delete()
+        self.db.commit()
+        with patched(**{"ai.user_budget_month": 5}):
+            self.assertEqual(ai_budget.exceeded(self.db, 1, NOW), ai_budget.WALLET)
 
 
 if __name__ == "__main__":

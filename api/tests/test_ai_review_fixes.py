@@ -131,6 +131,9 @@ class GuideRouteTests(unittest.TestCase):
         self.client = TestClient(app)
         guide_router.limits.limiter.clear()
         self.addCleanup(guide_router.limits.limiter.clear)
+        patcher = mock.patch.object(ai_budget, "CAPS_ENFORCED", True)  # the caps are not applied for now: this test is about them
+        patcher.start()
+        self.addCleanup(patcher.stop)
         self.db.add(models.AiUsage(user_id=1, feature="chat", key_source="group", status="ok", cost_micros=6_000_000, input_tokens=1, provider="openai", model="m"))
         self.db.commit()
 

@@ -9,7 +9,7 @@ import { featureLabel, tokens } from '../../lib/ai-calls.js';
 import { money, monthLabel } from '../../lib/ai-usage.js';
 import { forgetGuideStatus } from '../../lib/guide.js';
 import { html, mount } from '../../lib/html.js';
-import { ABOUT, FEATURES, PROVIDERS, blockedText, budgetLines, costNote, hasAnyKey, keyText, looksLikeKey, modelLabel, paidBy, providerName } from '../../lib/user-ai.js';
+import { ABOUT, FEATURES, PROVIDERS, blockedText, costNote, hasAnyKey, keyText, looksLikeKey, modelLabel, paidBy, providerName } from '../../lib/user-ai.js';
 import { walletLine } from '../../lib/ai-wallet.js';
 import { iconChevron } from '../../ui/icons.js';
 import { searchable } from '../../ui/combobox.js';
@@ -140,7 +140,7 @@ export async function initAi(el, { username }) {
 
   // Where the cost goes, as a quiet note above the key and not a section of its own
   function costNoteView() {
-    const lines = [...(state.budget ? budgetLines(state.budget) : []), walletLine(state.wallet)].filter(Boolean);
+    const lines = [walletLine(state.wallet)].filter(Boolean); // the monthly cap is not used for now: only the wallet limits
     const stopped = FEATURES.map(([id]) => blockedText(state[id])).find(Boolean);
     const note = costNote({ chat: state.chat, guide: state.guide, keys: state.keys });
     return html`

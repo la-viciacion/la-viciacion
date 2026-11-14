@@ -13,8 +13,8 @@ const DATA = {
   start_setting: null,
   total: { contributed: 6, spent: 2.5, available: 3.5 },
   players: [
-    { user_id: 1, name: 'Ana', is_active: true, contributed: 4, spent: 4.4, balance: -0.4 },
-    { user_id: 2, name: 'Beto', is_active: true, contributed: 2, spent: 0, balance: 2 },
+    { user_id: 1, name: 'Ana', is_active: true, contributed: 4, spent: 4.4, balance: -0.4, last_contribution: '2026-11-12T18:30:00' },
+    { user_id: 2, name: 'Beto', is_active: true, contributed: 2, spent: 0, balance: 2, last_contribution: null },
   ],
   entries: [{ id: 2, created_at: '2026-11-11T10:00:00', user_id: 2, name: 'Beto', usd: 2, note: 'bizum', by: 'Ana' }],
 };
@@ -37,20 +37,13 @@ test('it shows what is in, what is spent and what is available, and who has noth
   assert.doesNotMatch(panel().querySelector('tr[data-user="2"]').textContent, /Sin saldo|negativo/);
 });
 
-test('a player with the limit off shows it and keeps no red badge; taking it off or back is saved at once', async () => {
-  await open({ ...DATA, players: DATA.players.map((p) => (p.user_id === 1 ? { ...p, unlimited: true } : p)) });
-  assert.match(panel().querySelector('tr[data-user="1"]').textContent, /Sin límite/);
-  assert.doesNotMatch(panel().querySelector('tr[data-user="1"]').textContent, /En negativo/);
-  assert.equal(panel().querySelector('[data-unlimited="1"]').checked, true);
-  assert.equal(panel().querySelector('[data-unlimited="2"]').checked, false);
-  const sent = [];
-  installApi({ 'PUT /manage/ai-usage/wallet/unlimited/2': ({ body }) => { sent.push(body); return { ...DATA, players: DATA.players.map((p) => ({ ...p, unlimited: p.user_id === 2 })) }; } });
-  const box = panel().querySelector('[data-unlimited="2"]');
-  box.checked = true;
-  box.dispatchEvent(new window.Event('change', { bubbles: true }));
-  await settle();
-  assert.deepEqual(sent, [{ unlimited: true }]);
-  assert.equal(panel().querySelector('[data-unlimited="2"]').checked, true);
+test('the players table has the name, the date of the last contribution, what was spent and the balance, and nothing else', async () => {
+  await open();
+  const heads = [...panel().querySelectorAll('.adm-table')[0].querySelectorAll('th')].map((th) => th.textContent);
+  assert.deepEqual(heads, ['Jugador', 'Última aportación', 'Gastado', 'Saldo']);
+  assert.match(panel().querySelector('tr[data-user="1"]').textContent, /12.*nov.*2026/);
+  assert.match(panel().querySelector('tr[data-user="2"]').textContent, /Nunca/);
+  assert.equal(panel().querySelector('input[type="checkbox"], [name="cap"]'), null, 'no switch and no monthly cap for now');
 });
 
 test('the spending of no player is said apart so the total can be reconciled', async () => {
