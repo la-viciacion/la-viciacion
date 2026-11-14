@@ -18,16 +18,10 @@ Whether a question is paid with one of them or with the group's key is decided b
 import json
 import re
 
-from cryptography.fernet import Fernet, InvalidToken
 from sqlalchemy.orm import Session
 
-from ..config import Config
 from ..database import models
 from . import ai_vault, settings
-from .logger import LogManager
-
-config = Config()
-logger = LogManager().get_logger()
 
 PROVIDERS = settings.AI_PROVIDERS
 # What a key of each provider looks like. OpenAI's `sk-...` also matches the start of the other two (`sk-ant-`, `sk-or-`): they are excluded
@@ -86,13 +80,11 @@ def _open(db: Session, user_id: int, password: str) -> bytes | None:
 def unlock(db: Session, user_id: int, password: str, create: bool = True) -> bytes | None:
     """The data key for a player who has just proved their password: opened from their vault or, if they have none and `create`, a
     new vault. None if there is nothing to open (no vault, and `create` is off) or the vault does not open (it was made for another
-    password: it cannot happen unless something wrote it badly). The legacy key, if there is one, is adopted into it."""
+    password: it cannot happen unless something wrote it badly)."""
     dek = _open(db, user_id, password)
-    if dek is None and _vault_row(db, user_id) is None and (create or has_legacy(db, user_id)):
+    if dek is None and create and _vault_row(db, user_id) is None:
         record, dek = ai_vault.create(user_id, password)
         _store_vault(db, user_id, record)
-    if dek is not None:
-        adopt_legacy(db, user_id, dek)
     db.commit()
     return dek
 
@@ -121,56 +113,14 @@ def wipe(db: Session, user_id: int) -> bool:
     return bool(keys or vault)
 
 
-# ── the legacy key: one OpenAI key, kept before the vault with a key of the server ─────────────
-def _legacy_fernet() -> Fernet:
-    import base64
-    import hashlib
-
-    digest = hashlib.sha256(("lv-user-ai|" + config.SECRET_KEY).encode()).digest()
-    return Fernet(base64.urlsafe_b64encode(digest))
-
-
-def legacy_unseal(user_id: int, token: str | None) -> str | None:
-    """The key a legacy value holds, or None if it is empty, was not encrypted with this SECRET_KEY or belongs to another player."""
-    if not token:
-        return None
-    try:
-        prefix, _, key = _legacy_fernet().decrypt(token.encode()).decode().partition(":")
-    except (InvalidToken, ValueError):
-        return None
-    return key if prefix == str(user_id) and key else None
-
-
-def has_legacy(db: Session, user_id: int) -> bool:
-    row = db.get(models.UserSettings, user_id)
-    return bool(row is not None and row.ai_api_key)
-
-
-def adopt_legacy(db: Session, user_id: int, dek: bytes) -> bool:
-    """Moves the old OpenAI key of a player into their vault (sealed with `dek`) and empties the old columns. A key that cannot be
-    opened (the SECRET_KEY changed) is dropped, as it was shown to the player as unreadable. Does not commit."""
-    row = db.get(models.UserSettings, user_id)
-    if row is None or not row.ai_api_key:
-        return False
-    key = legacy_unseal(user_id, row.ai_api_key)
-    if key is not None and db.get(models.UserAiKey, (user_id, "openai")) is None:
-        db.add(models.UserAiKey(user_id=user_id, provider="openai", secret=ai_vault.seal_key(dek, user_id, "openai", key), model=row.ai_model or DEFAULT_MODELS["openai"]))
-    row.ai_api_key = None
-    row.ai_key_hint = None
-    row.ai_model = None
-    return key is not None
-
-
 # ── the keys ─────────────────────────────────────────────────────────────────
 def _row(db: Session, user_id: int, provider: str) -> models.UserAiKey | None:
     return db.get(models.UserAiKey, (user_id, provider))
 
 
 def providers_with_key(db: Session, user_id: int) -> list[str]:
-    """The providers the player has a key for (even while locked), in `ORDER`; the legacy OpenAI one counts."""
+    """The providers the player has a key for (even while locked), in `ORDER`."""
     found = {r.provider for r in db.query(models.UserAiKey.provider).filter(models.UserAiKey.user_id == user_id).all()}
-    if has_legacy(db, user_id):
-        found.add("openai")
     return [p for p in ORDER if p in found]
 
 
@@ -252,6 +202,4 @@ def clear(db: Session, user_id: int, provider: str) -> None:
     row = db.get(models.UserSettings, user_id)
     if row is not None and row.ai_provider == provider:
         row.ai_provider = None
-    if row is not None and provider == "openai":  # one that was not adopted yet is the same key
-        row.ai_api_key = row.ai_key_hint = row.ai_model = None
     db.commit()

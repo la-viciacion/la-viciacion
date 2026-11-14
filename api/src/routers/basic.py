@@ -77,8 +77,8 @@ def keepalive(request: Request):
 
 
 def _open_keys(db: Session, user: models.User, password: str) -> bytes | None:
-    """The data key of the player's own AI keys, opened with the password they have just typed (their vault, or the old key that
-    was saved before it: it is adopted into a vault now). None for a player who has neither. It never stops a login: if the vault
+    """The data key of the player's own AI keys, opened with the password they have just typed (their vault). None for a player who has
+    none. It never stops a login: if the vault
     cannot be read the session is simply locked."""
     try:
         return user_ai.unlock(db, user.id, password, create=False)

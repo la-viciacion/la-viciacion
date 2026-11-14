@@ -99,11 +99,6 @@ class UserSettings(Base):
     playstation_id = Column(String(64), nullable=True)
     steam_id = Column(String(64), nullable=True)
     discord_id = Column(String(64), nullable=True)
-    # LEGACY: the player's own OpenAI key as it was kept before the vault, encrypted with the server's SECRET_KEY. Each one is moved to
-    # `user_ai_keys` when its player logs in next (utils/user_ai.adopt_legacy) and a later migration removes these three columns
-    ai_api_key = deferred(Column(Text, nullable=True))
-    ai_key_hint = Column(String(4), nullable=True)
-    ai_model = Column(String(64), nullable=True)
     # the provider whose own key the player prefers for their questions (NULL: the app picks, see utils/ai_source.py)
     ai_provider = Column(String(20), nullable=True)
     # whole dollars a month this player may spend of the GROUP's key (set by an admin; NULL = the default of the settings
