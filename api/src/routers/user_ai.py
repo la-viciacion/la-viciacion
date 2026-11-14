@@ -132,7 +132,7 @@ def get_ai_usage(
 ):
     """What the player has used of the AI, from the record of their own calls (an estimate: the tokens measured and priced when
     each call was made): totals, what they paid with their own key against what the group's covered, by month (and by day for
-    one month), by function and by model. Only theirs, an admin included; and the budget of the group's key this month."""
+    one month), by function and by model. Only theirs, an admin included; and what the group's key has spent on them this month against their cap."""
     user = _mine(active_user, username)
     data = ai_spend.summary(db, month, user_id=user.id)
     for admin_only in ("group_paid_by_user", "by_tools", "price_stamp"):

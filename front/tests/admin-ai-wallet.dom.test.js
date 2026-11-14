@@ -9,7 +9,6 @@ const { renderWallet } = await import('../js/pages/admin/ai-wallet.js');
 
 const panel = () => document.getElementById('panel');
 const DATA = {
-  active: true,
   start: '2026-11-10',
   start_setting: null,
   total: { contributed: 6, spent: 2.5, available: 3.5 },
@@ -38,9 +37,27 @@ test('it shows what is in, what is spent and what is available, and who has noth
   assert.doesNotMatch(panel().querySelector('tr[data-user="2"]').textContent, /Sin saldo|negativo/);
 });
 
-test('with the wallet off it says so', async () => {
-  await open({ ...DATA, active: false, start: null, total: { contributed: 0, spent: 0, available: 0 }, entries: [] });
-  assert.match(panel().textContent, /apagado/);
+test('a player with the limit off shows it and keeps no red badge; taking it off or back is saved at once', async () => {
+  await open({ ...DATA, players: DATA.players.map((p) => (p.user_id === 1 ? { ...p, unlimited: true } : p)) });
+  assert.match(panel().querySelector('tr[data-user="1"]').textContent, /Sin límite/);
+  assert.doesNotMatch(panel().querySelector('tr[data-user="1"]').textContent, /En negativo/);
+  assert.equal(panel().querySelector('[data-unlimited="1"]').checked, true);
+  assert.equal(panel().querySelector('[data-unlimited="2"]').checked, false);
+  const sent = [];
+  installApi({ 'PUT /manage/ai-usage/wallet/unlimited/2': ({ body }) => { sent.push(body); return { ...DATA, players: DATA.players.map((p) => ({ ...p, unlimited: p.user_id === 2 })) }; } });
+  const box = panel().querySelector('[data-unlimited="2"]');
+  box.checked = true;
+  box.dispatchEvent(new window.Event('change', { bubbles: true }));
+  await settle();
+  assert.deepEqual(sent, [{ unlimited: true }]);
+  assert.equal(panel().querySelector('[data-unlimited="2"]').checked, true);
+});
+
+test('the spending of no player is said apart so the total can be reconciled', async () => {
+  await open({ ...DATA, total: { ...DATA.total, unassigned: 0.25 } });
+  assert.match(panel().querySelector('[data-unassigned]').textContent, /0,25.*no es de ningún jugador/);
+  await open();
+  assert.equal(panel().querySelector('[data-unassigned]'), null);
 });
 
 test('it compares the OpenAI balance typed with the total available', async () => {

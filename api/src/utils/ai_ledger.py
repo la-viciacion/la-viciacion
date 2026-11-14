@@ -20,6 +20,7 @@ logger = LogManager().get_logger()
 
 GROUP, USER = "group", "user"  # whose key paid
 OK, OFF_TOPIC, TOO_BIG, QUOTA, ERROR, LIMITED, BUDGET = "ok", "off_topic", "too_big", "quota", "error", "limited", "budget"
+BLOCKED_EVERY = datetime.timedelta(minutes=1)  # a player who is stopped and keeps asking leaves one row a minute, not one a request
 SEARCH_TOOL = "web_search"  # the kind of pydantic-ai's WebSearchTool
 OUTPUT_TOOL = "final_result"  # how pydantic-ai names the tool that carries a structured answer: not a lookup the model made
 TOOLS_MAX = 255  # the column's length
@@ -126,6 +127,18 @@ def free_plan(provider: str | None, key_source: str) -> bool:
 def real_cost():
     """The SQL expression of what a call really cost, in millionths of a dollar: its estimate, or 0 when it was on a free plan."""
     return case((models.AiUsage.free_plan.is_(True), 0), else_=models.AiUsage.cost_micros)
+
+
+def record_blocked(db: Session, *, user_id: int, feature: str, **fields) -> None:
+    """Writes the row of a question the group's key was not allowed to pay for (status `budget`), unless this player already has one
+    for this feature in the last minute: the row is there to show the demand that was stopped, not to count every retry."""
+    since = datetime.datetime.now() - BLOCKED_EVERY
+    recent = db.query(models.AiUsage.id).filter(
+        models.AiUsage.user_id == user_id, models.AiUsage.feature == feature,
+        models.AiUsage.status == BUDGET, models.AiUsage.created_at >= since,
+    ).first()
+    if recent is None:
+        record(db, user_id=user_id, feature=feature, key_source=GROUP, status=BUDGET, **fields)
 
 
 def record(

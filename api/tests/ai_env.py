@@ -62,3 +62,17 @@ def give_key(db, user_id, key, model, provider="openai", password="Una-Contrasen
         dek = user_ai.unlock(db, user_id, password)
     user_ai.save(db, user_id, dek, provider, key, model)
     return dek
+
+
+def free_wallet(db, *user_ids: int) -> None:
+    """Takes the wallet limit off the players (default: the first two of `seed`): the wallet is always on and a player starts with a
+    balance of 0, so a test about anything else than the wallet starts from players the wallet does not stop."""
+    from src.database import models
+
+    for user_id in user_ids or (1, 2):
+        row = db.get(models.UserSettings, user_id)
+        if row is None:
+            row = models.UserSettings(user_id=user_id)
+            db.add(row)
+        row.ai_wallet_unlimited = True
+    db.commit()

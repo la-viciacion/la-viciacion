@@ -561,39 +561,17 @@ def wishlist_week_message(releases: list[tuple[str, datetime.date, list[str], st
     return _wishlist_header("Esta semana", len(lines)) + "\n\n" + "\n".join(lines)
 
 
-async def announce_ai_budget(db: Session, level: int, now: datetime.datetime | None = None) -> str:
-    """Tells the admins, in private, that the group's AI budget of the month is nearly (80) or all (100) spent, and who has spent
-    most of it. The text names no one else's key: only what the group's key paid."""
-    from . import ai_budget
-
-    cap, spent = ai_budget.group_cap(), ai_budget.spent(db, None, now) / ai_budget.MICROS
-    money = lambda value: f"{value:.2f}".replace(".", ",") + " US$"  # noqa: E731
-    top = ", ".join(f"{utils.escape_markdown(p['name'])} {money(p['spent'])}" for p in ai_budget.top_spenders(db, now))
-    resets = ai_budget.next_month(now).date().strftime("%d/%m")
-    if level >= 100:
-        text = (
-            f"🛑 *IA*: la clave del grupo ha gastado todo el presupuesto de este mes ({money(cap)}). Lo que depende de ella "
-            f"no responde hasta el {resets}; quien tiene su propia clave sigue."
-        )
-    else:
-        text = f"⚠️ *IA*: la clave del grupo lleva {money(spent)} de {money(cap)} este mes ({round(100 * spent / cap)} %). Se renueva el {resets}."
-    if top:
-        text += f"\nQuien más ha gastado: {top}."
-    await utils.send_message_to_admins(db, text + "\nPuedes cambiar los topes en IA → Uso y coste.")
-    return f"warned at {level} %"
-
-
 async def announce_ai_unpriced(db: Session, now: datetime.datetime | None = None) -> str:
-    """Tells the admins, in private, that a monthly AI budget is set but the group's key made calls of a model whose price the list
-    does not have: they count as nothing, so the budget cannot limit them."""
+    """Tells the admins, in private, that the group's key made calls of a model whose price the list does not have: they count as nothing, so
+    neither the caps nor the wallet can limit them."""
     from . import ai_budget
 
     found = ai_budget.unpriced(db, now)
     models_used = ", ".join(utils.escape_markdown(m) for m in found["models"])
     await utils.send_message_to_admins(
         db,
-        f"⚠️ *IA*: hay un presupuesto mensual, pero {found['calls']} llamadas de este mes de la clave del grupo ({models_used}) no tienen precio "
-        "conocido: no cuentan en el presupuesto y no se pueden limitar. Se arregla con la siguiente actualización de la lista de precios "
+        f"⚠️ *IA*: {found['calls']} llamadas de este mes de la clave del grupo ({models_used}) no tienen precio "
+        "conocido: no cuentan en los topes ni en el monedero y no se pueden limitar. Se arregla con la siguiente actualización de la lista de precios "
         "o cambiando de modelo.",
     )
     return f"warned about {found['calls']} unpriced calls"

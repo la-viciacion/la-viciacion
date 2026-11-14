@@ -50,6 +50,7 @@ class QuotaOfTheGroupIsStillReportedTests(unittest.TestCase):
     def setUp(self):
         self.db = make_session()
         seed(self.db)
+        ai_env.free_wallet(self.db)
         self.user = self.db.get(models.User, 1)
         for patcher in (patched(), mock.patch.object(chat_agent, "classify", return_value=QUOTA)):
             patcher.start()
@@ -90,6 +91,7 @@ class MeasuringNeverLosesAnAnswerTests(unittest.TestCase):
     def setUp(self):
         self.db = make_session()
         seed(self.db)
+        ai_env.free_wallet(self.db)
         for patcher in (patched(),):
             patcher.start()
             self.addCleanup(patcher.stop)
@@ -119,6 +121,7 @@ class GuideRouteTests(unittest.TestCase):
     def setUp(self):
         self.db = make_session(threads=True)
         seed(self.db)
+        ai_env.free_wallet(self.db)
         self.user = types.SimpleNamespace(id=1, username="ana", name="Ana", is_admin=0, is_active=1)
         app = FastAPI()
         app.include_router(guide_router.router)
@@ -132,13 +135,13 @@ class GuideRouteTests(unittest.TestCase):
         self.db.commit()
 
     def test_a_game_that_does_not_exist_is_a_404_even_when_the_budget_is_spent_and_nothing_is_recorded(self):
-        with patched(**{"ai.group_budget_month": 5, "guide.key_source": "group_only"}):
+        with patched(**{"ai.user_budget_month": 5, "guide.key_source": "group_only"}):
             response = self.client.post("/guide/nope", json={"message": "hola"})
         self.assertEqual(response.status_code, 404)
         self.assertEqual(self.db.query(models.AiUsage).count(), 1, "no row about a game that does not exist")
 
     def test_a_game_that_exists_and_a_spent_budget_is_the_429_and_is_recorded_with_its_game(self):
-        with patched(**{"ai.group_budget_month": 5, "guide.key_source": "group_only"}):
+        with patched(**{"ai.user_budget_month": 5, "guide.key_source": "group_only"}):
             response = self.client.post("/guide/g1", json={"message": "hola"})
         self.assertEqual(response.status_code, 429)
         last = self.db.query(models.AiUsage).order_by(models.AiUsage.id.desc()).first()
@@ -165,6 +168,7 @@ class UnpricedCallsTests(unittest.TestCase):
     def setUp(self):
         self.db = make_session()
         seed(self.db)
+        ai_env.free_wallet(self.db)
 
     def add(self, cost, model="mystery", tokens=100, source="group", status="ok", when=NOW):
         self.db.add(models.AiUsage(
@@ -190,7 +194,7 @@ class UnpricedCallsTests(unittest.TestCase):
         from src.routers.manage import ai_usage as manage
 
         self.add(None)
-        with patched(**{"ai.group_budget_month": 10}):
+        with patched(**{"ai.user_budget_month": 10}):
             body = manage.get_ai_budgets(self.db)
         self.assertEqual(body["unpriced"]["calls"], 1)
 
@@ -204,12 +208,12 @@ class UnpricedCallsTests(unittest.TestCase):
             ran.append(job)
             asyncio.run(factory())
 
-        with patched(**{"ai.group_budget_month": 10, "notifications.admin_alerts": True, "telegram.token": "T", **settings_}), \
+        with patched(**{"ai.user_budget_month": 10, "notifications.admin_alerts": True, "telegram.token": "T", **settings_}), \
                 mock.patch.object(scheduler, "_run", side_effect=run), mock.patch.object(actions.utils, "send_message_to_admins", send):
             kind = scheduler.ai_budget_alert(self.db, now)
         return kind, ran, sent
 
-    def test_the_admins_are_told_once_a_month_that_the_budget_cannot_see_some_of_the_spending(self):
+    def test_the_admins_are_told_once_a_month_that_the_caps_cannot_see_some_of_the_spending(self):
         self.add(None, "gpt-9-new")
         kind, ran, sent = self.run_job(NOW)
         self.assertEqual((kind, ran), ("unpriced", ["ai_budget_unpriced"]))
@@ -217,15 +221,13 @@ class UnpricedCallsTests(unittest.TestCase):
         self.assertIn("1 llamadas", sent[0])
         self.assertEqual(self.run_job(NOW + datetime.timedelta(hours=1))[:2], (None, []))
 
-    def test_without_a_budget_there_is_nothing_that_could_not_be_limited(self):
+    def test_the_warning_does_not_depend_on_a_cap_because_the_wallet_cannot_see_those_calls_either(self):
         self.add(None)
-        self.assertEqual(self.run_job(NOW, **{"ai.group_budget_month": 0})[:2], (None, []))
+        self.assertEqual(self.run_job(NOW, **{"ai.user_budget_month": None})[0], "unpriced")
 
-    def test_a_warning_about_the_spending_comes_first_and_the_unpriced_one_waits_for_its_turn(self):
-        self.add(None)
-        self.add(9_500_000, "gpt-4.1-mini")
-        self.assertEqual(self.run_job(NOW)[0], 80)
-        self.assertEqual(self.run_job(NOW + datetime.timedelta(hours=1))[0], "unpriced")
+    def test_with_every_call_priced_there_is_nothing_to_warn_about(self):
+        self.add(1_000_000, "gpt-4.1-mini")
+        self.assertEqual(self.run_job(NOW)[:2], (None, []))
 
 
 if __name__ == "__main__":

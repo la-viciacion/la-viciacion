@@ -18,7 +18,7 @@ import { flash } from './flash.js';
 
 // What used to be paragraphs under the titles of Mi IA: each one is the "i" of its title now
 const KEY_INFO = html`
-  <p>Con tu propia clave puedes usar la guía de cada juego y seguir con el chat cuando se agote el presupuesto del grupo (o tu parte). Puedes guardar una clave de cada proveedor (OpenAI, Anthropic, Google u OpenRouter), y el coste de lo que preguntes con ella va a tu cuenta de ese proveedor.</p>
+  <p>Con tu propia clave puedes usar la guía de cada juego y seguir con el chat cuando se agote el saldo del grupo (o tu parte del mes). Puedes guardar una clave de cada proveedor (OpenAI, Anthropic, Google u OpenRouter), y el coste de lo que preguntes con ella va a tu cuenta de ese proveedor.</p>
   <p>Se guarda cifrada con tu contraseña: solo se abre mientras tienes la sesión iniciada con ella, y ni una copia de la base de datos ni un administrador pueden leerla. Si recuperas la contraseña por correo o te la cambia un administrador, <strong>las claves se borran</strong> (nadie puede abrirlas sin la contraseña anterior) y hay que volver a guardarlas. Cambiar tú tu propia contraseña no las pierde.</p>
   <p>Se comprueba con el proveedor al guardarla; esa comprobación no gasta nada. Te recomendamos usar una clave creada solo para La Viciación con un <strong>límite de gasto mensual</strong>: así lo máximo que puede costarte es lo que fijes.</p>
   <p>El modelo de cada clave lo eliges tú y su coste va a tu cuenta: los más potentes cuestan mucho más por pregunta. Los precios son orientativos, por millón de tokens (entrada / salida). La guía busca en internet, y cada búsqueda se cobra aparte; hace falta un modelo que lo admita.</p>`;
@@ -143,11 +143,11 @@ export async function initAi(el, { username }) {
     const lines = [...(state.budget ? budgetLines(state.budget) : []), walletLine(state.wallet)].filter(Boolean);
     const stopped = FEATURES.map(([id]) => blockedText(state[id])).find(Boolean);
     const note = costNote({ chat: state.chat, guide: state.guide, keys: state.keys });
-    if (!note && !lines.length && !stopped) return '';
     return html`
       <div class="ai-cost-note" role="note">
         <span class="ai-cost-icon" aria-hidden="true">i</span>
         <div class="ai-cost-text">
+          <div class="ai-beta"><strong>Beta.</strong> Esta sección es nueva y puede no funcionar correctamente. Si algo falla, avisa a un admin.</div>
           ${note ? html`<div>${note}</div>` : ''}
           ${lines.length ? html`<div class="ai-budget">${lines.map((line) => html`<div>${line}</div>`)}</div>` : ''}
           ${stopped ? html`<div class="ai-stopped">${stopped} ${hasAnyKey(state.keys) ? '' : 'Mientras tanto puedes seguir con una clave tuya.'}</div>` : ''}

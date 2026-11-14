@@ -239,16 +239,16 @@ REGISTRY: dict[str, Spec] = {
     "guide.limit_user_hour": Spec("int", 10, check=_limit),
     "guide.limit_user_day": Spec("int", 30, check=_limit),
     "guide.limit_group_day": Spec("int", 100, check=_limit),
-    # The guide costs far more per question (a web search): by default only with the player's own key
-    "guide.key_source": Spec("str", "user_only", check=_key_source),
+    # Like the chat: the group's key first, and the player's own once the group's budget is spent
+    "guide.key_source": Spec("str", "group_then_user", check=_key_source),
     "guide.prompt": Spec("str", GUIDE_PROMPT.strip(), check=_prompt, resettable=True),
     # What the AI costs (utils/ai_cost.py, utils/ai_ledger.py): how often the token prices are refreshed from the public file
     # of genai-prices (0: never, the snapshot of the installed library is used; read when the API starts) and how long the
     # record of calls is kept (0: for ever)
-    # What the group's key may spend each calendar month, in whole dollars (0: no limit): the whole group, and each player's
-    # share of it (an admin can give one player more or less: user_settings.ai_group_budget_usd). Only what the group pays
-    # counts, never what a player pays with their own key (utils/ai_budget.py)
-    "ai.group_budget_month": Spec("int", None, check=_budget, resettable=True),
+    # What each player may spend of the group's key each calendar month, in whole dollars (empty: no limit; an admin can give one
+    # player more or less: user_settings.ai_group_budget_usd). It is there so nobody abuses the quota or burns it in a few days;
+    # the group as a whole is limited by the wallet. Only what the group pays counts, never what a player pays with their own key
+    # (utils/ai_budget.py)
     "ai.user_budget_month": Spec("int", None, check=_budget, resettable=True),
     # The day the wallet starts counting what the group's key spends (utils/ai_wallet.py); unset, it is the day of the first top-up
     "ai.wallet_start": Spec("str", None, check=_wallet_start, resettable=True),

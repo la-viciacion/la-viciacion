@@ -34,6 +34,7 @@ class Base(unittest.TestCase):
     def setUp(self):
         self.db = make_session(threads=True)
         seed(self.db)
+        ai_env.free_wallet(self.db)
         for user in self.db.query(models.User).filter(models.User.id.in_((1, 2))).all():
             user.password = hashpw(PASSWORD.encode(), gensalt(4)).decode()
             user.email = f"{user.username}@example.com"

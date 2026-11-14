@@ -1,5 +1,6 @@
 """The wallet of the group's key: what a player put in and what is left of it. It counts only what the group's key paid, from the moment
-of the first contribution (or the date an admin chose), it stops a player whose balance is spent and it is off until something is put in."""
+of the first contribution (or the date an admin chose) and it stops a player whose balance is spent. It is always on: a player has 0
+until something is put in for them, unless an admin took the limit off them."""
 import datetime
 import unittest
 from unittest import mock
@@ -36,13 +37,12 @@ class Base(unittest.TestCase):
 
 
 class BalanceTests(Base):
-    def test_the_wallet_is_off_until_something_is_put_in_and_then_it_is_on(self):
+    def test_a_player_has_nothing_until_something_is_put_in_for_them(self):
         with patched():
-            self.assertFalse(ai_wallet.active(self.db))
-            self.assertIsNone(ai_wallet.player(self.db, 1))
-            self.assertIsNone(ai_budget.exceeded(self.db, 1, NOW))  # nothing changes for a group that does not use it
+            self.assertEqual(ai_wallet.player(self.db, 1), {"contributed": 0.0, "spent": 0.0, "balance": 0.0, "since": None, "unlimited": False})
+            self.assertEqual(ai_budget.exceeded(self.db, 1, NOW), ai_budget.WALLET)  # with no contribution at all, nobody uses the group's key
             self.put(1, 2.0)
-            self.assertTrue(ai_wallet.active(self.db))
+            self.assertIsNone(ai_budget.exceeded(self.db, 1, NOW))
 
     def test_the_balance_is_what_was_put_in_minus_what_the_groups_key_spent_for_that_player(self):
         with patched():
@@ -95,10 +95,28 @@ class EnforcementTests(Base):
             self.assertEqual(ai_wallet.balance(self.db, 1), -400_000)
             self.assertEqual(ai_budget.exceeded(self.db, 1, NOW), ai_budget.WALLET)
 
-    def test_a_player_who_never_put_anything_in_is_stopped_once_the_wallet_is_on(self):
+    def test_a_player_who_never_put_anything_in_is_stopped_whoever_else_did(self):
         with patched():
             self.put(1, 1.0)
             self.assertEqual(ai_budget.exceeded(self.db, 2, NOW), ai_budget.WALLET)
+
+    def test_an_admin_can_take_the_limit_off_a_player_and_put_it_back(self):
+        with patched():
+            self.assertEqual(ai_budget.exceeded(self.db, 1, NOW), ai_budget.WALLET)
+            ai_wallet.set_unlimited(self.db, 1, True)
+            self.assertTrue(ai_wallet.unlimited(self.db, 1))
+            self.assertIsNone(ai_budget.exceeded(self.db, 1, NOW))
+            self.spend(1, 50.0)  # whatever they spend, with no contribution
+            self.assertIsNone(ai_budget.exceeded(self.db, 1, NOW))
+            self.assertEqual(ai_budget.exceeded(self.db, 2, NOW), ai_budget.WALLET)  # the others keep the limit
+            ai_wallet.set_unlimited(self.db, 1, False)
+            self.assertEqual(ai_budget.exceeded(self.db, 1, NOW), ai_budget.WALLET)
+
+    def test_the_monthly_cap_still_stops_a_player_without_a_wallet_limit(self):
+        with patched(**{"ai.user_budget_month": 1}):
+            ai_wallet.set_unlimited(self.db, 1, True)
+            self.spend(1, 1.0)
+            self.assertEqual(ai_budget.exceeded(self.db, 1, NOW), ai_budget.USER)
 
     def test_a_top_up_gives_the_access_back(self):
         with patched():
@@ -132,11 +150,21 @@ class OverviewTests(Base):
             self.put(2, 2.0)
             self.spend(1, 0.5)
             body = ai_wallet.overview(self.db)
-        self.assertTrue(body["active"])
         self.assertEqual(body["start"], "2026-11-10")
-        self.assertEqual(body["total"], {"contributed": 5.0, "spent": 0.5, "available": 4.5})
+        self.assertEqual(body["total"], {"contributed": 5.0, "spent": 0.5, "available": 4.5, "unassigned": 0.0})
         self.assertEqual([(p["name"], p["contributed"], p["spent"], p["balance"]) for p in body["players"]], [("Ana", 3.0, 0.5, 2.5), ("Beto", 2.0, 0.0, 2.0)])
+        self.assertEqual([p["unlimited"] for p in body["players"]], [False, False])
         self.assertEqual([e["name"] for e in body["entries"]], ["Beto", "Ana"])  # newest first
+
+    def test_what_the_app_spent_with_no_player_is_in_the_total_and_shown_apart(self):
+        with patched():
+            self.put(1, 3.0)
+            self.spend(1, 0.5)
+            self.db.add(models.AiUsage(created_at=NOW, user_id=None, feature="notice", key_source="group", status="ok", cost_micros=250_000, provider="openai", model="m"))
+            self.db.commit()
+            body = ai_wallet.overview(self.db)
+        self.assertEqual(body["total"], {"contributed": 3.0, "spent": 0.75, "available": 2.25, "unassigned": 0.25})
+        self.assertEqual(sum(p["spent"] for p in body["players"]) + body["total"]["unassigned"], body["total"]["spent"])
 
     def test_the_money_of_a_deleted_account_stays_in_the_total(self):
         with patched():
@@ -152,7 +180,7 @@ class OverviewTests(Base):
             self.put(1, 3.0)
             self.put(2, 9.0)
             self.spend(1, 1.0)
-            self.assertEqual(ai_wallet.player(self.db, 1), {"contributed": 3.0, "spent": 1.0, "balance": 2.0, "since": "2026-11-10"})
+            self.assertEqual(ai_wallet.player(self.db, 1), {"contributed": 3.0, "spent": 1.0, "balance": 2.0, "since": "2026-11-10", "unlimited": False})
 
 
 class AdminRoutesTests(Base):
@@ -161,7 +189,7 @@ class AdminRoutesTests(Base):
     def test_an_admin_writes_down_a_contribution_and_it_is_in_the_overview(self):
         with patched():
             body = manage_route.post_wallet_entry(manage_route.WalletEntryBody(user_id=2, usd=2.5, note=" bizum "), self.admin, self.db)
-        self.assertEqual((body["active"], body["total"]["contributed"]), (True, 2.5))
+        self.assertEqual(body["total"]["contributed"], 2.5)
         entry = body["entries"][0]
         self.assertEqual((entry["name"], entry["usd"], entry["note"]), ("Beto", 2.5, "bizum"))
 
@@ -170,6 +198,17 @@ class AdminRoutesTests(Base):
             with self.assertRaises(HTTPException) as caught:
                 manage_route.post_wallet_entry(manage_route.WalletEntryBody(user_id=user_id, usd=usd), self.admin, self.db)
             self.assertEqual(caught.exception.status_code, status)
+
+    def test_an_admin_takes_the_limit_off_a_player_and_the_overview_says_so(self):
+        with patched():
+            body = manage_route.put_wallet_unlimited(2, manage_route.WalletUnlimitedBody(unlimited=True), self.db)
+            self.assertEqual({p["name"]: p["unlimited"] for p in body["players"]}, {"Ana": False, "Beto": True})
+            body = manage_route.put_wallet_unlimited(2, manage_route.WalletUnlimitedBody(unlimited=False), self.db)
+            self.assertEqual({p["name"]: p["unlimited"] for p in body["players"]}, {"Ana": False, "Beto": False})
+        for user_id in (3, 999):
+            with self.assertRaises(HTTPException) as caught:
+                manage_route.put_wallet_unlimited(user_id, manage_route.WalletUnlimitedBody(unlimited=True), self.db)
+            self.assertEqual(caught.exception.status_code, 404)
 
     def test_an_amount_is_within_ten_thousand_dollars_either_way(self):
         for bad in (10001, -10001):

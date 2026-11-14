@@ -71,8 +71,8 @@ def _locked(db: Session, user_id: int, dek: bytes | None) -> bool:
 @dataclass(frozen=True)
 class Decision:
     source: Source | None
-    # ai_budget.GROUP or ai_budget.USER: the monthly budget of the group's key is spent; ai_budget.GROUP_OFF / USER_OFF: it is 0 (an
-    # admin gave nothing of it to everybody or to this player); ai_budget.WALLET: the player's wallet balance is spent. With no source it is what stopped the
+    # ai_budget.USER: the player has spent their monthly share of the group's key; ai_budget.USER_OFF: it is 0 (an admin gave them
+    # nothing of it); ai_budget.WALLET: the player's wallet balance is spent. With no source it is what stopped the
     # question; with the player's own as the source it is why the group's was not used (they went on with theirs)
     blocked: str | None = None
     # the player has keys of their own but this session cannot open them (it carries no data key): the front asks for their password
@@ -82,8 +82,8 @@ class Decision:
 def decide(db: Session, user_id: int, feature: str, dek: bytes | None = None) -> Decision:
     """The source that pays for this player's next question to `feature`, or why none can: the feature is off, the mode wants
     a key they have not saved, the group's is missing (all three: no source and nothing blocked) or the group's key is the one
-    to use and its monthly budget, the group's or the player's share, is spent (`blocked`). With `group_then_user` the group's
-    key comes first and the player's own takes over only when that budget is spent (or the group has none)."""
+    to use and the player's monthly share of it, or their wallet balance, is spent (`blocked`). With `group_then_user` the group's
+    key comes first and the player's own takes over only when that is spent (or the group has none)."""
     if not settings.get(f"{feature}.enabled"):
         return Decision(None)
     wanted = mode(feature)
@@ -106,10 +106,9 @@ def resolve(db: Session, user_id: int, feature: str, dek: bytes | None = None) -
 
 
 def blocked_message(blocked: str, feature: str) -> str:
-    """What a player is told when the budget stops the group's key: whose it was and, where their own key would be used, the way out."""
+    """What a player is told when their cap or balance stops the group's key: whose it was and, where their own key would be used, the way out."""
     base = {
-        ai_budget.GROUP: messages.GROUP_BUDGET_REACHED, ai_budget.GROUP_OFF: messages.GROUP_AI_OFF, ai_budget.USER_OFF: messages.USER_AI_OFF,
-        ai_budget.WALLET: messages.WALLET_EMPTY,
+        ai_budget.USER_OFF: messages.USER_AI_OFF, ai_budget.WALLET: messages.WALLET_EMPTY,
     }.get(blocked, messages.USER_BUDGET_REACHED)
     return base + (messages.OWN_KEY_WAY_OUT if mode(feature) != GROUP_ONLY else "")
 

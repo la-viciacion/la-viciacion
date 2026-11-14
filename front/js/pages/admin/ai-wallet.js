@@ -1,5 +1,5 @@
 // "Monedero de la clave del grupo": what each player has put in for the group's AI key, what it has spent of it and what is left
-// (GET /manage/ai-usage/wallet, POST .../wallet/entries, PUT .../wallet/start). The balance of the OpenAI account is typed here only to
+// (GET /manage/ai-usage/wallet, POST .../wallet/entries, PUT .../wallet/start, PUT .../wallet/unlimited/{user_id}). The balance of the OpenAI account is typed here only to
 // compare it with the total available; it is not stored in the app, only remembered by this browser.
 import { api, jsonRequest } from '../../lib/api.js';
 import { gap, isEmpty, parseAmount, realBalance } from '../../lib/ai-wallet.js';
@@ -20,7 +20,8 @@ const playerRow = (p) => html`
     <td>${p.name}${p.is_active ? '' : html` ${badge('Inactivo', 'gray')}`}</td>
     <td>${money(p.contributed)}</td>
     <td>${money(p.spent)}</td>
-    <td class="${isEmpty(p.balance) ? 'adm-neg' : ''}">${money(p.balance)} ${isEmpty(p.balance) ? badge(p.balance < 0 ? 'En negativo' : 'Sin saldo', 'red') : ''}</td>
+    <td class="${isEmpty(p.balance) && !p.unlimited ? 'adm-neg' : ''}">${money(p.balance)} ${p.unlimited ? badge('Sin límite', 'gray') : isEmpty(p.balance) ? badge(p.balance < 0 ? 'En negativo' : 'Sin saldo', 'red') : ''}</td>
+    <td><input type="checkbox" data-unlimited="${p.user_id}" ${p.unlimited ? 'checked' : ''} aria-label="Sin límite de saldo para ${p.name}" /></td>
   </tr>`;
 
 const entryRow = (e) => html`
@@ -55,13 +56,13 @@ function view(data, balances) {
   const { total } = data;
   return html`
     <section class="adm-set-card adm-wallet-card">
-      ${cardTitle('Monedero de la clave del grupo', html`Lo que cada jugador aporta para pagar la clave del grupo y lo que le queda. Se apunta cada aportación (en dólares, como factura OpenAI; una devolución o corrección es una aportación negativa) y el saldo de cada jugador es lo aportado menos lo que ha gastado de la clave del grupo desde que empezó el monedero (a su coste real; lo que paga con su propia clave no cuenta). Está apagado hasta la primera aportación: antes solo mandan los presupuestos mensuales. Con el monedero en marcha, un jugador sin saldo (0 o en negativo, porque el coste se conoce al acabar la pregunta) no puede usar la clave del grupo hasta que se le anote otra aportación; si tiene su propia clave, sigue con ella según el modo de «Quién asume el coste». Los presupuestos mensuales siguen valiendo además. Las aportaciones no se editan ni se borran: un error se corrige con otra.`)}
-      ${data.active ? '' : html`<div class="adm-sub">El monedero está apagado: aún no hay ninguna aportación. La primera lo enciende y el gasto cuenta desde ese momento (o desde la fecha que elijas abajo).</div>`}
+      ${cardTitle('Monedero de la clave del grupo', html`Lo que cada jugador aporta para pagar la clave del grupo y lo que le queda. Se apunta cada aportación (en dólares, como factura OpenAI; una devolución o corrección es una aportación negativa) y el saldo de cada jugador es lo aportado menos lo que ha gastado de la clave del grupo desde que empezó el monedero (a su coste real; lo que paga con su propia clave no cuenta). Está apagado hasta la primera aportación: antes solo mandan los topes mensuales por jugador. Con el monedero en marcha, un jugador sin saldo (0 o en negativo, porque el coste se conoce al acabar la pregunta) no puede usar la clave del grupo hasta que se le anote otra aportación; si tiene su propia clave, sigue con ella según el modo de «Quién asume el coste». Los topes mensuales por jugador siguen valiendo además. Las aportaciones no se editan ni se borran: un error se corrige con otra.`)}
       <div class="adm-stats">
         ${statTile('Aportado', money(total.contributed))}
         ${statTile('Gastado de la clave del grupo', money(total.spent))}
         ${statTile('Disponible', money(total.available))}
       </div>
+      ${total.unassigned ? html`<div class="adm-sub" data-unassigned>De lo gastado, ${money(total.unassigned)} no es de ningún jugador (avisos, bienvenida y botones de prueba): sale del total, pero no del saldo de nadie.</div>` : ''}
       <div class="adm-set-row">
         <label>Saldo real en OpenAI (US$) <input class="adm-input" type="text" inputmode="decimal" data-field="openai" value="${remembered()}" placeholder="para comparar" /></label>
       </div>
@@ -81,12 +82,12 @@ function view(data, balances) {
         <label>Fecha de inicio <input class="adm-input" type="date" data-field="start" value="${data.start_setting ?? ''}" /></label>
         <button type="button" class="adm-btn sm" data-save-start>Guardar</button>
       </div>
-      <div class="adm-sub">${data.start ? `Ahora cuenta desde el ${day(data.start)}.` : 'Sin fecha: empezará con la primera aportación.'}</div>
+      <div class="adm-sub">${data.start ? `Ahora cuenta desde el ${day(data.start)}.` : 'Sin fecha: cuenta desde la primera aportación.'}</div>
 
-      ${cardTitle('Saldo de cada jugador', html`Aportado menos gastado de la clave del grupo desde que empezó el monedero. En rojo, quien ya no puede usar la clave del grupo.`)}
+      ${cardTitle('Saldo de cada jugador', html`Aportado menos gastado de la clave del grupo desde que empezó el monedero. Cada jugador empieza con 0 y no puede usar la clave del grupo hasta que le anotes una aportación; en rojo, quien ya no puede. Marca «Sin límite» para quitarle el límite de saldo a un jugador (su tope mensual, si lo tiene, sigue valiendo).`)}
       ${data.players.length
         ? html`<div class="adm-table-wrap"><table class="adm-table">
-            <thead><tr><th>Jugador</th><th>Aportado</th><th>Gastado</th><th>Saldo</th></tr></thead>
+            <thead><tr><th>Jugador</th><th>Aportado</th><th>Gastado</th><th>Saldo</th><th>Sin límite</th></tr></thead>
             <tbody>${data.players.map(playerRow)}</tbody>
           </table></div>`
         : html`<div class="adm-sub">No hay jugadores.</div>`}
@@ -122,6 +123,20 @@ export async function renderWallet(target) {
       if (!e.target.matches('[data-field="openai"]')) return;
       remember(e.target.value);
       mount(target.querySelector('[data-compare]'), compare(data.total, e.target.value, balances));
+    };
+    target.onchange = async (e) => {
+      const box = e.target.closest('[data-unlimited]');
+      if (!box) return;
+      box.disabled = true;
+      try {
+        data = await api(`/manage/ai-usage/wallet/unlimited/${encodeURIComponent(box.dataset.unlimited)}`, jsonRequest('PUT', { unlimited: box.checked }));
+        draw();
+        toast(box.checked ? 'Límite de saldo quitado' : 'Límite de saldo puesto');
+      } catch (err) {
+        toast(err.message, 'err');
+        box.checked = !box.checked;
+        box.disabled = false;
+      }
     };
     target.onclick = async (e) => {
       if (e.target.closest('[data-refresh-balances]')) {

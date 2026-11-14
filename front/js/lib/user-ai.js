@@ -70,7 +70,7 @@ export const ABOUT = {
       'Está a un toque desde el timer, con la partida en marcha, y la conversación se queda en la página de ese juego.',
     ],
     limit: 'No sabe más que ChatGPT ni sustituye a una guía completa: depende de lo que encuentre en la web, y lo importante conviene comprobarlo.',
-    cost: 'Cada pregunta hace además búsquedas en internet, que se cobran aparte de los tokens (con OpenAI, del orden de un céntimo cada una): suele costar varias veces lo que una del chat. Por eso, por defecto, solo funciona con tu propia clave, y necesita un modelo que admita la búsqueda web (el botón «Probar con la guía» lo comprueba).',
+    cost: 'Cada pregunta hace además búsquedas en internet, que se cobran aparte de los tokens (con OpenAI, del orden de un céntimo cada una): suele costar varias veces lo que una del chat.',
   },
 };
 
@@ -82,9 +82,9 @@ export function modelLabel(model) {
   return `${model.id} · ${TIERS[model.tier] ?? TIERS.sin_precio}${price}`;
 }
 
-// Where the cost of a feature goes for this player: the group's key comes first, while its monthly budget lasts, and the player's
-// own is what goes on after it (or the only one: the guide, by default). `fallback` is a question already going on with the
-// player's own key because the group's budget is spent.
+// Where the cost of a feature goes for this player: the group's key comes first, while the group can pay for this player, and the
+// player's own is what goes on after it (or the only one, if an admin set the feature that way). `fallback` is a question already
+// going on with the player's own key because the group's cannot be used for them (their monthly share or their balance is spent).
 function kindOf(feature) {
   if (feature.paid_by === 'user') return feature.blocked ? 'fallback' : 'own';
   if (feature.paid_by === 'group') return feature.mode === 'group_only' ? 'group_only' : 'group';
@@ -110,9 +110,9 @@ export function costNote({ chat, guide, keys }) {
   for (const [kind, list] of Object.entries(byKind)) {
     const of = list.map((f) => f.of).join(' y ');
     if (kind === 'group_only') notes.push(`El coste ${of} lo cubre el grupo, tengas clave o no.`);
-    else if (kind === 'group') notes.push(`El coste ${of} lo cubre el grupo mientras haya presupuesto este mes; ${after}.`);
+    else if (kind === 'group') notes.push(`El coste ${of} lo cubre el grupo mientras haya saldo; ${after}.`);
     else if (kind === 'own') notes.push(`El coste ${of} va a tu cuenta del proveedor de tu clave.`);
-    else if (kind === 'fallback') notes.push(`Se ha agotado el presupuesto del grupo este mes: de momento el coste ${of} va a tu cuenta del proveedor de tu clave.`);
+    else if (kind === 'fallback') notes.push(`Ya no puedes usar la clave del grupo: de momento el coste ${of} va a tu cuenta del proveedor de tu clave.`);
     else if (kind === 'locked') notes.push(`${subject(list)} ${list.length > 1 ? 'funcionan' : 'funciona'} con tu propia clave, que está bloqueada en esta sesión: escribe tu contraseña abajo.`);
     else if (list.length === 1 && list[0].is === 'la guía') notes.push('La guía de cada juego busca en internet y cuesta más: funciona con tu propia clave.');
     else notes.push(`${subject(list)} ${list.length > 1 ? 'funcionan' : 'funciona'} con tu propia clave.`);
@@ -126,20 +126,17 @@ export function paidBy(data) {
   return { own: cost('user'), group: cost('group') };
 }
 
-/** The budget lines of the group's key, or none when neither has a cap (0 is a cap: nothing of the group's key): what is spent of each and when they start again. */
+/** The line about the player's monthly share of the group's key, or none when they have no cap (0 is a cap: nothing of the group's key): what is spent of it and when it starts again. */
 export function budgetLines(budget) {
-  return [budgetLine('Presupuesto del grupo este mes', budget.group, budget.resets_on), budgetLine('Tu parte', budget.user, budget.resets_on)]
-    .filter((line, i) => (i === 0 ? budget.group.cap : budget.user.cap) != null && line);
+  return budget.user.cap == null ? [] : [budgetLine('Tu parte de la IA del grupo este mes', budget.user, budget.resets_on)];
 }
 
-/** What a feature's state says when the budget stops the group's key from answering this player (else null). */
+/** What a feature's state says when the player's cap or balance stops the group's key from answering them (else null). */
 export function blockedText(state) {
   if (state.paid_by === 'user') return null; // the player's own key took over: the note above says so
-  if (state.blocked === 'group') return 'Se ha agotado el presupuesto de IA del grupo este mes.';
-  if (state.blocked === 'user') return 'Has gastado tu parte del presupuesto de IA del grupo este mes.';
-  if (state.blocked === 'group_off') return 'Un admin ha dejado la IA del grupo sin presupuesto.';
+  if (state.blocked === 'user') return 'Has gastado tu parte de la IA del grupo este mes.';
   if (state.blocked === 'user_off') return 'Un admin no te ha dado IA de la clave del grupo.';
-  if (state.blocked === 'wallet') return 'Has gastado todo tu saldo de IA del grupo.';
+  if (state.blocked === 'wallet') return 'No tienes saldo de IA del grupo.';
   return null;
 }
 

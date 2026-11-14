@@ -19,17 +19,17 @@ test('where the cost goes is a quiet note in words of cost, never of paying', ()
     costNote({ chat: on(), guide: on({ paid_by: 'user', mode: 'user_only' }), keys: mine }),
     costNote({ chat: on(), guide: on(), keys: none }),
     costNote({ chat: on(), guide: on(), keys: mine }),
-    costNote({ chat: on({ paid_by: 'user', blocked: 'group' }), guide: on({ paid_by: 'user', blocked: 'group' }), keys: mine }),
+    costNote({ chat: on({ paid_by: 'user', blocked: 'user' }), guide: on({ paid_by: 'user', blocked: 'user' }), keys: mine }),
     costNote({ chat: on({ mode: 'group_only' }), guide: on({ mode: 'group_only' }), keys: none }),
     costNote({ chat: { available: false }, guide: needs(), keys: none }),
     costNote({ chat: needs(), guide: needs(), keys: none }),
   ];
   for (const note of cases) assert.doesNotMatch(note, /\bpag(a|o|ar|ado)\b/i, note);
-  assert.match(cases[0], /coste del chat lo cubre el grupo mientras haya presupuesto este mes; después necesitarás tu propia clave\. La guía.*cuesta más: funciona con tu propia clave/);
+  assert.match(cases[0], /coste del chat lo cubre el grupo mientras haya saldo; después necesitarás tu propia clave\. La guía.*cuesta más: funciona con tu propia clave/);
   assert.match(cases[1], /coste del chat lo cubre el grupo.*después seguirá con tu clave.*El coste de la guía va a tu cuenta del proveedor de tu clave/);
-  assert.match(cases[2], /^El coste del chat y de la guía lo cubre el grupo mientras haya presupuesto este mes; después necesitarás tu propia clave\.$/);
+  assert.match(cases[2], /^El coste del chat y de la guía lo cubre el grupo mientras haya saldo; después necesitarás tu propia clave\.$/);
   assert.match(cases[3], /después seguirá con tu clave, a tu cuenta del proveedor/);
-  assert.match(cases[4], /Se ha agotado el presupuesto del grupo este mes: de momento el coste del chat y de la guía va a tu cuenta del proveedor de tu clave/);
+  assert.match(cases[4], /Ya no puedes usar la clave del grupo: de momento el coste del chat y de la guía va a tu cuenta del proveedor de tu clave/);
   assert.match(cases[5], /tengas clave o no/);
   assert.match(cases[6], /^El chat no está disponible ahora mismo\. La guía.*propia clave/);
   assert.match(cases[7], /^El chat y la guía funcionan con tu propia clave\.$/);
@@ -43,7 +43,7 @@ test('a locked session is told that the key is there and that the password opens
 
 test('the group comes first and the own key is only the way on, so a key does not move the chat off the group', () => {
   const note = costNote({ chat: on(), guide: on(), keys: mine });
-  assert.match(note, /lo cubre el grupo mientras haya presupuesto/);
+  assert.match(note, /lo cubre el grupo mientras haya saldo/);
   assert.doesNotMatch(note, /^Con tu clave/);
 });
 
