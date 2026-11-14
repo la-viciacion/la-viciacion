@@ -48,13 +48,16 @@ def _seconds(text) -> int | None:
     return math.ceil(float(match.group(1)) * unit)
 
 
-def _kind(ids: tuple[str, ...], code) -> str:
+BILLING_CODES = ("insufficient_quota", "credit_balance_exhausted")  # what OpenAI calls an account with no credit, as its type or its code
+
+
+def _kind(ids: tuple[str, ...], code, type_=None) -> str:
     text = " ".join(ids).lower()
     if "perday" in text or "per_day" in text:
         return "day"
     if "perminute" in text or "per_minute" in text:
         return "minute"
-    if str(code).lower() == "insufficient_quota":
+    if str(code).lower() in BILLING_CODES or str(type_).lower() in BILLING_CODES:
         return "billing"
     return "unknown"
 
@@ -80,7 +83,7 @@ def _quota(body: object, headers: dict, retry_after: float | None = None) -> Quo
             retry = retry or _seconds(detail.get("retryDelay"))
     code = error.get("code") or error.get("status")
     message = str(error.get("message") or "")[:MESSAGE_MAX]
-    return Quota(kind=_kind(tuple(ids), code), retry_after=retry, ids=tuple(ids), limit=limit, message=message)
+    return Quota(kind=_kind(tuple(ids), code, error.get("type")), retry_after=retry, ids=tuple(ids), limit=limit, message=message)
 
 
 def _message(body: object) -> str:

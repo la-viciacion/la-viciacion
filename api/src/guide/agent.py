@@ -120,11 +120,11 @@ def ask(deps: GuideDeps, question: str, history: list[tuple[str, str]], model=No
         )
     except UsageLimitExceeded as e:
         logger.warning(f"Guide question stopped by a usage limit: {e}")
-        record(ai_ledger.TOO_BIG)
+        record(ai_ledger.TOO_BIG, spent=ai_ledger.waited(started))
         return messages.CHAT_TOO_COMPLEX
     except Exception as e:
         error = chat_agent.failure(e, "guide", chat_agent.own_key(source), ai_providers.GUIDE)
-        record(ai_ledger.QUOTA if isinstance(error, QuotaError) else ai_ledger.ERROR)
+        record(ai_ledger.QUOTA if isinstance(error, QuotaError) else ai_ledger.ERROR, spent=ai_ledger.waited(started))
         raise error from None
     used = result.usage
     logger.info(
