@@ -48,3 +48,17 @@ def using(model):
             yield build
     finally:
         ai._group_model.cache_clear()
+
+
+FAST_KDF = {"n": 2**8, "r": 8, "p": 1}  # the tests do not need the real cost of an attacker
+
+
+def give_key(db, user_id, key, model, provider="openai", password="Una-Contrasena-Muy-Larga-1!"):
+    """Gives a player a key of their own the way the app does: their vault (made with `password`) and the key sealed in it. Returns the data
+    key a session of theirs would carry, which is what `ai_source.decide` and the routes take."""
+    from src.utils import ai_vault, user_ai
+
+    with mock.patch.object(ai_vault, "KDF", FAST_KDF):
+        dek = user_ai.unlock(db, user_id, password)
+    user_ai.save(db, user_id, dek, provider, key, model)
+    return dek

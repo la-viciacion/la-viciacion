@@ -26,7 +26,7 @@ from ..utils import messages as msg
 from ..utils import my_utils as utils
 from ..utils.logger import LogManager
 from ..utils.rate_limit import AttemptLimiter
-from ..utils import seasons, settings, user_settings
+from ..utils import seasons, settings, user_ai, user_settings
 
 log_manager = LogManager()
 logger = log_manager.get_logger()
@@ -216,6 +216,7 @@ def change_password(
     if not utils.validate_password_requirements(body.new_password):
         raise HTTPException(status_code=400, detail=msg.PASSWORD_RULES)
     users.change_password(db, user, body.new_password)
+    user_ai.rewrap(db, user.id, body.current_password, body.new_password)  # their own AI keys follow the new password
     audit.record_event(request, "password_changed", 200, user=user)
     return {"message": "Contraseña actualizada"}
 

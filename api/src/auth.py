@@ -16,7 +16,7 @@ from .config import Config
 from .crud import users
 from .database import models
 from .database.database import SessionLocal
-from .utils import messages, request_context
+from .utils import ai_vault, messages, request_context
 
 config = Config()
 ALGORITHM = "HS256"
@@ -75,13 +75,15 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     return jwt.encode(to_encode, config.SECRET_KEY, algorithm=ALGORITHM)
 
 
-def issue_token(user: models.User) -> dict:
+def issue_token(user: models.User, dek: bytes | None = None) -> dict:
     """A session for `user`. The token only names the account: everything else about it is read from the
-    database on every request, so nothing personal sits in the browser and nothing in it goes stale."""
-    token = create_access_token(
-        {"id": user.id, "username": user.username, "pwv": password_fingerprint(user)},
-        timedelta(minutes=int(config.ACCESS_TOKEN_EXPIRE_MINUTES)),
-    )
+    database on every request, so nothing personal sits in the browser and nothing in it goes stale. The one thing it carries
+    is, for a player who has AI keys of their own and has just given their password (or whose session is being renewed), the data
+    key that opens them (`dek`, encrypted: utils/ai_vault.py): it is what keeps a copy of the server from holding any open key."""
+    claims = {"id": user.id, "username": user.username, "pwv": password_fingerprint(user)}
+    if dek is not None:
+        claims["ku"] = ai_vault.claim(user.id, dek)
+    token = create_access_token(claims, timedelta(minutes=int(config.ACCESS_TOKEN_EXPIRE_MINUTES)))
     return {"access_token": token, "token_type": "bearer"}
 
 
@@ -109,6 +111,18 @@ def get_current_user(
         raise credentials_exception  # issued before the last password change
     request_context.set_user(user.username)
     return user
+
+
+def get_unlock(
+    token: Annotated[str, Depends(oauth2_scheme)], user: Annotated[models.User, Depends(get_current_user)]
+) -> bytes | None:
+    """The data key that opens the player's own AI keys, if this session carries it and it is still good, else None (the session is
+    **locked**: the player types their password to open it, `POST /users/{username}/ai/unlock`). It lasts as long as a session."""
+    try:
+        claim = jwt.decode(token, config.SECRET_KEY, algorithms=[ALGORITHM]).get("ku")
+    except Exception:
+        return None
+    return ai_vault.open_claim(user.id, claim, int(config.ACCESS_TOKEN_EXPIRE_MINUTES) * 60)
 
 
 async def get_current_active_user(

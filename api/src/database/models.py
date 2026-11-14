@@ -99,11 +99,13 @@ class UserSettings(Base):
     playstation_id = Column(String(64), nullable=True)
     steam_id = Column(String(64), nullable=True)
     discord_id = Column(String(64), nullable=True)
-    # the player's own OpenAI key, encrypted (see utils/user_ai.py): no API returns it, and it is not loaded with the row. The
-    # last four characters tell the player which key they saved; the model is the one they chose for it
+    # LEGACY: the player's own OpenAI key as it was kept before the vault, encrypted with the server's SECRET_KEY. Each one is moved to
+    # `user_ai_keys` when its player logs in next (utils/user_ai.adopt_legacy) and a later migration removes these three columns
     ai_api_key = deferred(Column(Text, nullable=True))
     ai_key_hint = Column(String(4), nullable=True)
     ai_model = Column(String(64), nullable=True)
+    # the provider whose own key the player prefers for their questions (NULL: the app picks, see utils/ai_source.py)
+    ai_provider = Column(String(20), nullable=True)
     # whole dollars a month this player may spend of the GROUP's key (set by an admin; NULL = the default of the settings
     # `ai.user_budget_month`, which is no limit when empty; 0 = nothing of the group's key for this player): see utils/ai_budget.py. What the player pays with their own key never counts
     ai_group_budget_usd = Column(SmallInteger, nullable=True)
@@ -625,3 +627,27 @@ class AiWalletEntry(Base):
     created_by = Column(Integer, ForeignKey("users.id", name="fk_ai_wallet_by", ondelete="SET NULL"), nullable=True)
 
     __table_args__ = (Index("ix_ai_wallet_user", "user_id"),)
+
+
+class UserAiVault(Base):
+    """The data key of a player's own AI keys, wrapped with their password (see utils/ai_vault.py): `record` is a JSON with the salt, the
+    scrypt parameters and the wrapped key, nothing secret by itself. A password that is reset cannot open it: the row is deleted."""
+
+    __tablename__ = "user_ai_vault"
+
+    user_id = Column(Integer, ForeignKey("users.id", name="fk_user_ai_vault_user", ondelete="CASCADE"), primary_key=True)
+    record = Column(Text, nullable=False)
+    created_at = Column(DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP"))
+
+
+class UserAiKey(Base):
+    """A player's own key for one provider, sealed with the data key of their vault: it cannot be read from the row, and no API
+    returns it. `model` is the one they chose for it."""
+
+    __tablename__ = "user_ai_keys"
+
+    user_id = Column(Integer, ForeignKey("users.id", name="fk_user_ai_keys_user", ondelete="CASCADE"), primary_key=True)
+    provider = Column(String(20), primary_key=True)
+    secret = Column(Text, nullable=False)
+    model = Column(String(80), nullable=True)
+    updated_at = Column(DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP"), onupdate=text("CURRENT_TIMESTAMP"))

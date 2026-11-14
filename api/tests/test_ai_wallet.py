@@ -10,6 +10,7 @@ from pydantic import ValidationError
 from src.database import models
 from src.routers.manage import ai_usage as manage_route
 from src.utils import ai_budget, ai_source, ai_wallet, messages
+from tests import ai_env
 from tests.sqlite_db import make_session
 from tests.test_ai_budget import KEY, NOW, patched
 from tests.test_chat import seed
@@ -114,15 +115,13 @@ class EnforcementTests(Base):
             self.assertEqual(ai_budget.exceeded(self.db, 1, NOW), ai_budget.USER)
 
     def test_the_decision_blocks_the_groups_key_and_with_an_own_key_goes_on_with_it(self):
-        from src.utils import user_ai
-
         with patched(**{"chat.key_source": "group_then_user"}):
             self.put(2, 1.0)
             decision = ai_source.decide(self.db, 1, "chat")
             self.assertEqual((decision.source, decision.blocked), (None, ai_budget.WALLET))
             self.assertTrue(ai_source.blocked_message(ai_budget.WALLET, "chat").startswith(messages.WALLET_EMPTY))
-            user_ai.save(self.db, 1, KEY, "gpt-5-mini")
-            decision = ai_source.decide(self.db, 1, "chat")
+            dek = ai_env.give_key(self.db, 1, KEY, "gpt-5-mini")
+            decision = ai_source.decide(self.db, 1, "chat", dek)
             self.assertEqual((decision.source.key_source, decision.blocked), ("user", ai_budget.WALLET))
 
 

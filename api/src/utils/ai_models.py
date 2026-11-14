@@ -1,9 +1,10 @@
 """The models a player can choose for their own key, with what each costs.
 
-OpenAI lists everything a key can use (embeddings, audio, images...): only the ones that answer a chat are offered, without
-the dated copies of a model (`gpt-4.1-mini-2025-04-14`). Each carries its price per million tokens from the same list as the
-cost estimates (utils/ai_cost.py) and a tier read from it, so the player sees how much a model weighs on their account. It
-is only a hint: the model is their decision, and an unknown one is accepted."""
+Each provider lists everything a key can use: OpenAI also embeddings, audio and images, and only the ones that answer a chat are
+offered, without the dated copies of a model (`gpt-4.1-mini-2025-04-14`). The other providers' lists are already of models that write
+text (clients/model_list.py). Each model carries its price per million tokens from the same list as the cost estimates
+(utils/ai_cost.py) and a tier read from it, so the player sees how much a model weighs on their account. It is only a hint: the model is
+their decision, and an unknown one is accepted."""
 import re
 from decimal import Decimal
 
@@ -17,16 +18,19 @@ ECONOMIC_MAX, MEDIUM_MAX = Decimal(2), Decimal(12)  # dollars per million output
 MICRO = Decimal(1_000_000)
 
 
-def for_chat(ids: list[str]) -> list[str]:
+def for_chat(ids: list[str], provider: str = "openai") -> list[str]:
+    """The ids worth offering: for OpenAI only the chat models without dated copies, for the others what their listing gave."""
+    if provider != "openai":
+        return sorted(i for i in ids if user_ai.clean_model(i))
     return sorted(i for i in ids if CHAT_MODEL.match(i) and not DATED.search(i) and not any(word in i for word in NOT_FOR_CHAT) and user_ai.clean_model(i))
 
 
-def prices(model: str) -> tuple[Decimal, Decimal] | None:
-    """(dollars per million input tokens, per million output tokens) of an OpenAI model, or None if the list has none."""
+def prices(model: str, provider: str = "openai") -> tuple[Decimal, Decimal] | None:
+    """(dollars per million input tokens, per million output tokens) of a model, or None if the list has none."""
     try:
         from genai_prices import Usage, calc_price
 
-        cost = lambda usage: calc_price(Usage(**usage), model, provider_id=user_ai.PROVIDER).total_price  # noqa: E731
+        cost = lambda usage: calc_price(Usage(**usage), model, provider_id=provider).total_price  # noqa: E731
         return Decimal(str(cost({"input_tokens": MICRO}))), Decimal(str(cost({"output_tokens": MICRO})))
     except Exception:
         return None
@@ -38,11 +42,11 @@ def tier(output_price: Decimal | None) -> str:
     return ECONOMIC if output_price <= ECONOMIC_MAX else MEDIUM if output_price <= MEDIUM_MAX else EXPENSIVE
 
 
-def describe(ids: list[str]) -> list[dict]:
+def describe(ids: list[str], provider: str = "openai") -> list[dict]:
     """The models to offer, each with its tier and its prices in dollars per million tokens (None without a price)."""
     out = []
-    for model in for_chat(ids):
-        found = prices(model)
+    for model in for_chat(ids, provider):
+        found = prices(model, provider)
         out.append({
             "id": model,
             "tier": tier(found[1] if found else None),
