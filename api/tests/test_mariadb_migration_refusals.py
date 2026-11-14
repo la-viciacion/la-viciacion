@@ -126,6 +126,28 @@ class RepeatedArchivedKeysTests(RefusalCase, MariaDBTestCase):
         self.assertEqual(self.observed["restored"], 0, "nothing may be restored before the check")
 
 
+class PlayersKeyStillInTheOldColumnTests(RefusalCase, MariaDBTestCase):
+    """061 drops the old columns of a player's own AI key (nobody had saved one): it refuses, changing nothing, if a key is still there."""
+
+    prepare_until = "060_ai_wallet"
+    break_sql = (
+        "INSERT INTO user_settings (user_id, ai_api_key, ai_key_hint, ai_model) VALUES (1, 'gAAAAABsealed', '6789', 'gpt-4.1-mini')",
+    )
+    stays_at = "060_ai_wallet"
+    mentions = ("061", "ai_api_key", "1 player(s) still have a key", "Nothing was changed")
+    fix_sql = ("UPDATE user_settings SET ai_api_key = NULL, ai_key_hint = NULL, ai_model = NULL",)
+
+    @classmethod
+    def observe(cls):
+        tables = set(inspect(cls.engine).get_table_names())
+        columns = {c["name"] for c in inspect(cls.engine).get_columns("user_settings")}
+        return {"new_tables": tables & {"user_ai_vault", "user_ai_keys"}, "old_columns": columns & {"ai_api_key", "ai_key_hint", "ai_model"}}
+
+    def check_untouched(self):
+        self.assertEqual(self.observed["new_tables"], set(), "the check comes before anything is created")
+        self.assertEqual(self.observed["old_columns"], {"ai_api_key", "ai_key_hint", "ai_model"}, "and before anything is dropped")
+
+
 class OrphanReferencesTests(RefusalCase, MariaDBTestCase):
     """016: the foreign keys cannot be added while a row points at something that does not exist."""
 

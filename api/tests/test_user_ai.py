@@ -44,16 +44,6 @@ def patched(**overrides):
     return mock.patch.object(settings, "get", side_effect=lambda key: table[key])
 
 
-def legacy(db, user_id, key, model="gpt-4.1-mini"):
-    """A key as it was kept before the vault: encrypted with the server's SECRET_KEY, in the three old columns."""
-    row = db.get(models.UserSettings, user_id) or models.UserSettings(user_id=user_id)
-    db.add(row)
-    row.ai_api_key = user_ai._legacy_fernet().encrypt(f"{user_id}:{key}".encode()).decode()
-    row.ai_key_hint = key[-4:]
-    row.ai_model = model
-    db.commit()
-
-
 class KeyStorageTests(unittest.TestCase):
     def setUp(self):
         self.db = make_session()
@@ -134,10 +124,9 @@ class KeyStorageTests(unittest.TestCase):
         from src.database import schemas
         from src.utils import user_settings
 
-        for name in ("ai_api_key", "ai_provider"):
-            self.assertNotIn(name, schemas.UserSettingsUpdate.model_fields)
+        self.assertNotIn("ai_provider", schemas.UserSettingsUpdate.model_fields)
         self.assertNotIn(KEY, str(user_settings.get(self.db, 1)))
-        self.assertNotIn("ai_api_key", user_settings.get(self.db, 1))
+        self.assertFalse({"ai_api_key", "ai_key_hint", "ai_model"} & set(models.UserSettings.__table__.columns.keys()), "the old columns are gone")
 
     def test_the_vault_and_the_keys_go_with_the_account(self):
         for table in (models.UserAiKey.__table__, models.UserAiVault.__table__):
@@ -201,62 +190,6 @@ class VaultTests(unittest.TestCase):
         self.assertIsNone(user_ai.preferred(self.db, 1))
         self.assertEqual(user_ai.providers_with_key(self.db, 2), ["openai"], "only that player's")
         self.assertFalse(user_ai.wipe(self.db, 1), "nothing left to delete")
-
-
-class LegacyTests(unittest.TestCase):
-    """The key kept before the vault, with a key of the server: each is moved to the vault when its player logs in next."""
-
-    def setUp(self):
-        self.db = make_session()
-        seed(self.db)
-        legacy(self.db, 1, KEY, "gpt-5")
-        patcher = mock.patch.object(ai_vault, "KDF", ai_env.FAST_KDF)
-        patcher.start()
-        self.addCleanup(patcher.stop)
-
-    def test_until_it_is_adopted_it_counts_as_a_key_and_the_session_is_locked(self):
-        self.assertEqual(user_ai.providers_with_key(self.db, 1), ["openai"])
-        status = user_ai.status(self.db, 1, None)
-        self.assertEqual((status["locked"], status["keys"]["openai"]["has_key"], status["keys"]["openai"]["hint"]), (True, True, None))
-
-    def test_the_login_adopts_it_even_without_a_vault_and_empties_the_old_columns(self):
-        dek = user_ai.unlock(self.db, 1, PASSWORD, create=False)
-        self.assertIsNotNone(dek)
-        self.assertEqual(user_ai.credentials(self.db, 1, dek, "openai"), (KEY, "gpt-5"))
-        row = self.db.get(models.UserSettings, 1)
-        self.assertEqual((row.ai_api_key, row.ai_key_hint, row.ai_model), (None, None, None))
-        self.assertFalse(user_ai.has_legacy(self.db, 1))
-
-    def test_it_is_never_adopted_over_a_key_the_vault_already_has(self):
-        dek = user_ai.unlock(self.db, 1, PASSWORD)
-        user_ai.save(self.db, 1, dek, "openai", OTHER_KEY)
-        legacy(self.db, 1, KEY)
-        user_ai.unlock(self.db, 1, PASSWORD)
-        self.assertEqual(user_ai.credentials(self.db, 1, dek, "openai")[0], OTHER_KEY)
-        self.assertFalse(user_ai.has_legacy(self.db, 1))
-
-    def test_one_that_cannot_be_opened_any_more_is_dropped_not_kept(self):
-        with mock.patch.object(user_ai.config, "SECRET_KEY", "another-secret-key-of-another-server-000000"):
-            dek = user_ai.unlock(self.db, 1, PASSWORD, create=False)
-        self.assertIsNotNone(dek)
-        self.assertEqual(user_ai.providers_with_key(self.db, 1), [])
-
-    def test_a_player_with_no_old_key_adopts_nothing(self):
-        self.assertFalse(user_ai.has_legacy(self.db, 2))
-        self.assertIsNone(user_ai.unlock(self.db, 2, PASSWORD, create=False))
-
-    def test_taking_the_openai_key_away_takes_a_not_yet_adopted_one_too(self):
-        user_ai.clear(self.db, 1, "openai")
-        self.assertEqual(user_ai.providers_with_key(self.db, 1), [])
-        self.assertIsNone(self.db.get(models.UserSettings, 1).ai_api_key)
-
-    def test_the_old_value_opens_only_for_its_player_and_its_server(self):
-        token = self.db.get(models.UserSettings, 1).ai_api_key
-        self.assertEqual(user_ai.legacy_unseal(1, token), KEY)
-        self.assertIsNone(user_ai.legacy_unseal(2, token))
-        self.assertIsNone(user_ai.legacy_unseal(1, None))
-        with mock.patch.object(user_ai.config, "SECRET_KEY", "another-secret"):
-            self.assertIsNone(user_ai.legacy_unseal(1, token))
 
 
 class WhoPaysTests(unittest.TestCase):
@@ -699,12 +632,6 @@ class UnlockRouteTests(unittest.TestCase):
         codes = [self.unlock("nope").status_code for _ in range(6)]
         self.assertEqual(codes, [400] * 5 + [429])
         self.assertEqual(self.unlock(PASSWORD).status_code, 429, "even the right one waits")
-
-    def test_a_player_with_keys_already_in_the_old_scheme_gets_them_adopted_when_they_unlock(self):
-        legacy(self.db, 1, KEY, "gpt-5")
-        body = self.unlock().json()
-        self.assertEqual((body["keys"]["openai"]["hint"], body["keys"]["openai"]["model"]), ("6789", "gpt-5"))
-        self.assertFalse(user_ai.has_legacy(self.db, 1))
 
 
 if __name__ == "__main__":

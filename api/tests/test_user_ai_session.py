@@ -100,18 +100,6 @@ class LoginTests(Base):
         ai_env.give_key(self.db, 1, KEY, "gpt-4.1-mini", password=PASSWORD)
         self.assertEqual(self.login(password="nope").status_code, 401)
 
-    def test_the_old_key_is_adopted_into_a_vault_at_the_first_login_and_the_session_can_use_it(self):
-        row = models.UserSettings(user_id=1)
-        row.ai_api_key = user_ai._legacy_fernet().encrypt(f"1:{KEY}".encode()).decode()
-        row.ai_key_hint, row.ai_model = KEY[-4:], "gpt-5"
-        self.db.add(row)
-        self.db.commit()
-        token = self.login().json()["access_token"]
-        dek = auth.get_unlock(token, self.ana)
-        self.assertIsNotNone(dek)
-        self.assertEqual(user_ai.credentials(self.db, 1, dek, "openai"), (KEY, "gpt-5"))
-        self.assertFalse(user_ai.has_legacy(self.db, 1))
-
     def test_a_vault_that_cannot_be_read_never_stops_the_login_the_session_is_just_locked(self):
         ai_env.give_key(self.db, 1, KEY, "gpt-4.1-mini", password=PASSWORD)
         with mock.patch.object(basic.user_ai, "unlock", side_effect=RuntimeError("boom")), self.assertLogs(basic.logger, "ERROR"):
