@@ -199,11 +199,16 @@ const yearCard = (view) => {
 
 const PROVIDERS = { openai: 'OpenAI', google: 'Google', anthropic: 'Anthropic', openrouter: 'OpenRouter' };
 const WAY = { billed: 'facturado', estimated: 'estimado' };
-const AI_SOURCE = {
-  billed: 'Lo que ha facturado OpenAI a la organización (solo conserva el último año de gasto).',
-  mixed: 'OpenAI es lo que ha facturado (solo conserva el último año); lo demás es una estimación de la app, porque esos proveedores no ofrecen el gasto por API (OpenRouter sí dice lo que cobra cada llamada) y, con una clave de Google del plan gratuito, lo real puede ser 0 US$.',
-  estimated: 'Es una estimación de lo que ha gastado la clave del grupo: no hay clave de administración de OpenAI para consultar lo facturado, y con una clave de Google del plan gratuito lo real puede ser menos.',
-};
+const joined = (names) => (names.length > 1 ? `${names.slice(0, -1).join(', ')} y ${names.at(-1)}` : names[0] ?? '');
+/** What the AI figures rest on, from which providers billed (their admin key answered) and which are the app's estimate. */
+function aiSource(ai) {
+  const billed = ai.providers.filter((p) => p.source === 'billed').map((p) => PROVIDERS[p.provider] ?? p.provider);
+  const many = billed.length > 1;
+  const kept = `solo ${many ? 'conservan' : 'conserva'} el último año de gasto`;
+  if (ai.source === 'billed') return `Lo que ${many ? 'han' : 'ha'} facturado ${joined(billed)} a ${many ? 'sus organizaciones' : 'la organización'} (${kept}).`;
+  if (ai.source === 'mixed') return `${joined(billed)} ${many ? 'son lo que han facturado' : 'es lo que ha facturado'} (${kept}); lo demás es una estimación de la app, porque esos proveedores no ofrecen el gasto por API (OpenRouter sí dice lo que cobra cada llamada) y, con una clave de Google del plan gratuito, lo real puede ser 0 US$.`;
+  return 'Es una estimación de lo que ha gastado la clave del grupo: ningún proveedor tiene clave de administración para consultar lo facturado (OpenAI y Anthropic la admiten), y con una clave de Google del plan gratuito lo real puede ser menos.';
+}
 
 const aiRow = (label, figures) => html`
   <tr><th scope="row">${label}</th><td>${dollars(figures.month)}</td><td>${dollars(figures.year)}</td><td>${dollars(figures.total)}</td></tr>`;
@@ -222,7 +227,7 @@ const aiBreakdown = (ai) => {
         <tbody>${ai.providers.map((p) => aiRow(`${PROVIDERS[p.provider] ?? p.provider} (${WAY[p.source]})`, p))}</tbody>
         ${ai.providers.length > 1 ? html`<tfoot>${aiRow('Total', ai)}</tfoot>` : ''}
       </table>
-      <div class="pf-sub">${AI_SOURCE[ai.source] ?? ''} No se suma a los euros ni se convierte: la cotización cambia cada día.</div>
+      <div class="pf-sub">${aiSource(ai)} No se suma a los euros ni se convierte: la cotización cambia cada día.</div>
     </div>`;
 };
 

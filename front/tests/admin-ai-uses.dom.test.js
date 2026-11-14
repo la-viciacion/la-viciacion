@@ -8,7 +8,7 @@ globalThis.location = window.location;
 const { render } = await import('../js/pages/admin/settings.js');
 
 const VALUES = {
-  'ai.enabled': true, 'ai.provider': null, 'ai.openai.api_key': { is_set: true }, 'ai.google.api_key': { is_set: true }, 'ai.openai_admin_key': { is_set: false },
+  'ai.enabled': true, 'ai.provider': null, 'ai.openai.api_key': { is_set: true }, 'ai.google.api_key': { is_set: true }, 'ai.openai_admin_key': { is_set: false }, 'ai.anthropic_admin_key': { is_set: false },
   'ai.model.openai': null, 'ai.model.google': null, 'chat.model.openai': null, 'chat.model.google': null, 'guide.model.openai': null, 'guide.model.google': null, 'chat.provider': null, 'guide.provider': null,
   'ai.use.completed_game': true, 'ai.use.new_game': false, 'chat.enabled': true, 'chat.prompt': 'd',
   'chat.limit_user_minute': 5, 'chat.limit_user_hour': 30, 'chat.limit_user_day': 100, 'chat.limit_group_minute': 10, 'chat.limit_group_day': 300, 'completed_game.recommend': true,
@@ -91,7 +91,7 @@ test('IA → Avisos con IA has the switch, the test, the provider picker and the
   assert.equal(model.value, ''); // the .env's model, until another is picked
   assert.match(model.options[0].textContent, /Por defecto \(gemini-test\)/);
   assert.deepEqual([...model.options].map((o) => o.value), ['', 'gemini-2.5-flash', 'gemini-2.5-pro']); // asked live to the provider
-  assert.equal(panel().querySelectorAll('input:disabled').length, 1); // the admin key of OpenAI: nothing to type
+  assert.equal(panel().querySelectorAll('input:disabled').length, 2); // the admin keys of OpenAI and Anthropic: nothing to type
   assert.match(panel().textContent, /Usa Google \(Gemini\) \(gemini-test\)/);
   assert.equal(panel().querySelector('.adm-warn'), null);
 });

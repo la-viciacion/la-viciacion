@@ -57,7 +57,7 @@ El código no trae ningún modelo por defecto, y las claves y los modelos por de
 
 ![La IA en el panel](../assets/screens/admin-ai.webp){ .screenshot }
 
-### Cuánto ha gastado la IA (solo OpenAI)
+### Cuánto ha gastado la IA (OpenAI y Anthropic)
 
 OpenAI no dice por API cuánto crédito queda, pero sí cuánto se ha facturado. Para verlo en **IA → Uso y coste** hace falta una segunda clave, distinta de `OPENAI_AI_API_KEY`:
 
@@ -65,6 +65,16 @@ OpenAI no dice por API cuánto crédito queda, pero sí cuánto se ha facturado.
 2. Ponla en el `.env` como `OPENAI_ADMIN_KEY=` y reinicia la API.
 
 El panel enseña el gasto del **último año** (OpenAI no guarda más): el total, mes a mes, por concepto (modelo, entrada y salida) y, al elegir un mes, día a día. Es el gasto de **toda la organización de OpenAI**, no solo el de esta app. Con Google (Gemini) no hay nada equivalente, así que ahí no se ve. No es el saldo que queda: ese solo está en platform.openai.com → Billing.
+
+**Anthropic** tiene lo mismo, con otra clave:
+
+1. Solo una **organización** de la consola de Anthropic puede tener claves de administración: una cuenta individual debe crear antes su organización en platform.claude.com → Settings → Organization.
+2. Un administrador de la organización crea una **clave de administración** (`sk-ant-admin01-...`), distinta de `ANTHROPIC_AI_API_KEY`.
+3. Ponla en el `.env` como `ANTHROPIC_ADMIN_KEY=` y reinicia la API.
+
+Con ella, **IA → Uso y coste** enseña también lo facturado por Anthropic (por modelo y tipo de uso) y la página Servidor pasa su parte de «estimado» a «facturado». Es el gasto de toda la organización, no solo el de esta app, y no incluye el nivel Priority Tier. Anthropic no ofrece por API el saldo que queda: míralo en la consola, en Billing. Mientras no haya clave, el panel sigue enseñando la estimación de la app.
+
+OpenRouter es al revés: no da lo facturado, pero sí lo que queda, y el monedero de **IA → Límites** lo consulta él solo con la clave de siempre.
 
 ## Estado del servidor (Hetzner Cloud)
 

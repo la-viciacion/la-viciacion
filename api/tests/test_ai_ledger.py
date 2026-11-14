@@ -339,7 +339,7 @@ class FreePlanTests(unittest.TestCase):
         self.add(provider="openai", cost=500_000)
         self.assertEqual((ai_budget.spent(self.db), ai_budget.spent(self.db, 1)), (500_000, 500_000))
         month = ai_spend.summary(self.db)["months"][0]
-        self.assertEqual((month["group_cost"], month["group_real_cost"], month["group_openai_real_cost"]), (3.5, 0.5, 0.5))
+        self.assertEqual((month["group_cost"], month["group_real_cost"], month["group_real_cost_by_provider"]), (3.5, 0.5, {"google": 0.0, "openai": 0.5}))
         self.assertEqual(ai_spend.group_months_by_provider(self.db), {
             "google": [{"month": month["month"], "total": 0.0}], "openai": [{"month": month["month"], "total": 0.5}],
         })

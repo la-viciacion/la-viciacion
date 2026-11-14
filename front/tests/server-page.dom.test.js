@@ -348,6 +348,21 @@ test('with a single provider the AI section has no total row, and says how it is
   assert.match(ai.textContent, /Lo que ha facturado OpenAI/);
 });
 
+test('with the admin keys of OpenAI and Anthropic both are named as what was billed, and the rest is the estimate', async () => {
+  const anthropic = { provider: 'anthropic', source: 'billed', month: 0.2, year: 0.6, total: 1.5 };
+  await open({ ...AI, source: 'mixed', providers: [anthropic, ...AI.providers] });
+  const ai = document.querySelector('.sv-ai-section');
+  assert.match(squash(ai), /Anthropic \(facturado\)/);
+  assert.match(ai.textContent, /Anthropic y OpenAI son lo que han facturado \(solo conservan el último año de gasto\); lo demás es una estimación/);
+  await open({ ...AI, source: 'billed', providers: [anthropic, AI.providers[1]] });
+  assert.match(document.querySelector('.sv-ai-section').textContent, /Lo que han facturado Anthropic y OpenAI a sus organizaciones/);
+});
+
+test('with no admin key at all it says which providers could be asked and that the figure is an estimate', async () => {
+  await open({ ...AI, source: 'estimated', providers: [{ ...AI.providers[1], source: 'estimated' }] });
+  assert.match(document.querySelector('.sv-ai-section').textContent, /ningún proveedor tiene clave de administración.*OpenAI y Anthropic la admiten/);
+});
+
 test('with no AI spend yet the page is what it was: no section, no bars and no AI beside the euros', async () => {
   await open(NO_AI);
   assert.equal(document.querySelector('.sv-ai-section'), null);

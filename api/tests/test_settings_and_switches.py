@@ -135,7 +135,7 @@ class EnvOnlyTests(unittest.TestCase):
     the database must not carry them. The default models of each provider are there too, with no default in the code (see
     utils/ai_providers.py). What the admin picks in the panel (provider and models) is stored, so it is not here."""
 
-    KEYS = ("telegram.token", "telegram.group_id", "telegram.admin_chat_id", "ai.openai_admin_key",
+    KEYS = ("telegram.token", "telegram.group_id", "telegram.admin_chat_id", "ai.openai_admin_key", "ai.anthropic_admin_key",
             *(f"ai.{p}.{name}" for p in ("openai", "google", "anthropic", "openrouter") for name in ("api_key", "model", "chat_model")))
 
     def test_the_keys_of_outside_services_are_the_ones_that_are_env_only(self):

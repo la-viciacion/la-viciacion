@@ -218,6 +218,8 @@ REGISTRY: dict[str, Spec] = {
     "ai.provider": Spec("str", None, check=_ai_provider, resettable=True),
     # Admin key of OpenAI, only to read what the organization has spent (utils/ai_usage.py); it cannot write text
     "ai.openai_admin_key": Spec("str", None, secret=True, env_only=True, env="OPENAI_ADMIN_KEY"),
+    # Admin key of Anthropic (an organization of its Console has one), only to read what it has billed (utils/ai_usage.py)
+    "ai.anthropic_admin_key": Spec("str", None, secret=True, env_only=True, env="ANTHROPIC_ADMIN_KEY"),
     # The chat assistant (chat/): its own switch and instructions. It talks to the provider chosen for the AI.
     "chat.enabled": Spec("bool", True),
     # Questions the chat answers (routers/chat.py), 0 = no limit: per player in the last minute, hour and 24 hours, and

@@ -80,20 +80,20 @@ def _days(db: Session, user_id: int | None = None) -> list:
 
 def _months(days: list) -> list[dict]:
     """The months with calls. `cost` and its split are estimates; `group_real_cost` is what the group's keys really cost (a key on a
-    free plan costs nothing) and `group_openai_real_cost` the part of it that is OpenAI's: the figure to set against what OpenAI
-    billed (utils/ai_usage.py), which is the account's, and only OpenAI's."""
+    free plan costs nothing) and `group_real_cost_by_provider` the part of it of each provider: the figure to set against what a
+    provider billed (utils/ai_usage.py), which is the account's, and only that provider's."""
     months: dict[str, dict] = {}
     for row in days:
         key = str(row.day)[:7]
-        month = months.setdefault(key, {"month": key, "calls": 0, "cost": 0.0, "group_cost": 0.0, "group_real_cost": 0.0, "group_openai_real_cost": 0.0, "user_cost": 0.0, "unpriced": 0})
+        month = months.setdefault(key, {"month": key, "calls": 0, "cost": 0.0, "group_cost": 0.0, "group_real_cost": 0.0, "group_real_cost_by_provider": {}, "user_cost": 0.0, "unpriced": 0})
         month["calls"] += int(row.calls)
         month["cost"] = round(month["cost"] + dollars(row.cost), 6)
         side = "group_cost" if row.source == ai_ledger.GROUP else "user_cost"
         month[side] = round(month[side] + dollars(row.cost), 6)
         if row.source == ai_ledger.GROUP:
             month["group_real_cost"] = round(month["group_real_cost"] + dollars(row.real), 6)
-            if row.provider == "openai":
-                month["group_openai_real_cost"] = round(month["group_openai_real_cost"] + dollars(row.real), 6)
+            by_provider = month["group_real_cost_by_provider"]
+            by_provider[row.provider or "?"] = round(by_provider.get(row.provider or "?", 0.0) + dollars(row.real), 6)
         month["unpriced"] += int(row.unpriced)
     return list(months.values())
 

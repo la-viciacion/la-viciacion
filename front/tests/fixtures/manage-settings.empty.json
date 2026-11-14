@@ -197,6 +197,10 @@
    "hint": null,
    "is_set": false
   },
+  "ai.anthropic_admin_key": {
+   "hint": null,
+   "is_set": false
+  },
   "ai.enabled": true,
   "ai.free_plan.google": false,
   "ai.google.api_key": {

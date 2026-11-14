@@ -22,7 +22,7 @@ const DATA = {
 };
 
 const panel = () => document.getElementById('panel');
-const asked = (calls) => calls.filter((c) => !c.path.includes('/calls') && !c.path.includes('/settings')); // what was asked of OpenAI's side, not of the app's record or of the settings below it
+const asked = (calls) => calls.filter((c) => !c.path.includes('/calls') && !c.path.includes('/settings') && !c.path.includes('provider=')); // what was asked of OpenAI's side, not of the app's record, of Anthropic's block or of the settings below it
 const rows = (section) => [...section.querySelectorAll('tbody tr')].map((tr) => [...tr.querySelectorAll('td')].map((td) => plain(td.textContent).trim()).filter(Boolean).join('|'));
 
 test('without the admin key it says which variable is missing and asks nothing else', async () => {
@@ -30,7 +30,7 @@ test('without the admin key it says which variable is missing and asks nothing e
   await render(panel());
   await settle();
   assert.match(panel().textContent, /Falta OPENAI_ADMIN_KEY en el \.env/);
-  assert.equal(panel().querySelector('#aiuMonth'), null);
+  assert.equal(panel().querySelector('#aiuMonth-openai'), null);
   assert.equal(asked(calls).length, 1);
 });
 
@@ -38,30 +38,30 @@ test('it opens on the whole year: the total and a row per month, the latest firs
   installApi({ 'GET /manage/ai-usage': DATA });
   await render(panel());
   await settle();
-  const select = panel().querySelector('#aiuMonth');
+  const select = panel().querySelector('#aiuMonth-openai');
   assert.deepEqual([...select.options].map((o) => o.value), ['all', '2026-10', '2026-09']);
-  const [monthly, items] = panel().querySelectorAll('#aiuDetail .adm-set-card');
+  const [monthly, items] = panel().querySelectorAll('#aiuDetail-openai .adm-set-card');
   assert.equal(rows(monthly).length, 2);
   assert.match(rows(monthly)[0], /^Octubre de 2026\|2,25/);
   assert.match(rows(monthly)[1], /^Septiembre de 2026\|1,00/);
   assert.match(rows(items)[0], /^gpt-4\.1-mini, output\|1,50/);
-  assert.match(panel().querySelector('#aiuDetail .adm-stat-v').textContent, /3,25/);
-  assert.deepEqual([...panel().querySelectorAll('#aiuDetail h3')].map((h) => h.textContent), ['Por mes', 'Por concepto']);
+  assert.match(panel().querySelector('#aiuDetail-openai .adm-stat-v').textContent, /3,25/);
+  assert.deepEqual([...panel().querySelectorAll('#aiuDetail-openai h3')].map((h) => h.textContent), ['Por mes', 'Por concepto']);
 });
 
 test('choosing a month shows its items and its days without asking the API again', async () => {
   const calls = installApi({ 'GET /manage/ai-usage': DATA });
   await render(panel());
   await settle();
-  const select = panel().querySelector('#aiuMonth');
+  const select = panel().querySelector('#aiuMonth-openai');
   select.value = '2026-10';
   select.dispatchEvent(new window.Event('change', { bubbles: true }));
   await settle();
-  const sections = [...panel().querySelectorAll('#aiuDetail .adm-set-card')];
+  const sections = [...panel().querySelectorAll('#aiuDetail-openai .adm-set-card')];
   assert.equal(sections.length, 2);
   assert.deepEqual(rows(sections[0]).map((r) => r.split('|')[0]), ['gpt-4.1-mini, output', 'gpt-4.1-nano, input']);
   assert.deepEqual(rows(sections[1]).map((r) => r.split('|')[0]), ['2026-10-01', '2026-10-02']);
-  assert.match(panel().querySelector('#aiuDetail .adm-stat-v').textContent, /2,25/);
+  assert.match(panel().querySelector('#aiuDetail-openai .adm-stat-v').textContent, /2,25/);
   assert.equal(asked(calls).length, 1);
 });
 
@@ -69,26 +69,26 @@ test('Actualizar asks the API to ask OpenAI again and keeps the month if it stil
   const calls = installApi({ 'GET /manage/ai-usage': DATA });
   await render(panel());
   await settle();
-  panel().querySelector('#aiuRefresh').click();
+  panel().querySelector('#aiuRefresh-openai').click();
   await settle();
   assert.equal(asked(calls).at(-1).path, '/manage/ai-usage?refresh=true');
 });
 
 test('each month sets what OpenAI billed against what the app estimates, and says what is left unexplained', async () => {
   installApi({
-    'GET /manage/ai-usage/calls': { ...CALLS, months: [{ month: '2026-10', calls: 3, cost: 2, group_cost: 2, group_openai_real_cost: 2, user_cost: 0, unpriced: 0 }] },
+    'GET /manage/ai-usage/calls': { ...CALLS, months: [{ month: '2026-10', calls: 3, cost: 2, group_cost: 2, group_real_cost_by_provider: { openai: 2 }, user_cost: 0, unpriced: 0 }] },
     'GET /manage/ai-usage': DATA,
   });
   await render(panel());
   await settle();
-  const [monthly] = panel().querySelectorAll('#aiuDetail .adm-set-card');
+  const [monthly] = panel().querySelectorAll('#aiuDetail-openai .adm-set-card');
   assert.match(rows(monthly)[0], /^Octubre de 2026\|2,25[^|]*\|2,00[^|]*\|0,25/);
   assert.match(rows(monthly)[1], /^Septiembre de 2026\|1,00[^|]*\|0,00[^|]*\|1,00/);
-  const select = panel().querySelector('#aiuMonth');
+  const select = panel().querySelector('#aiuMonth-openai');
   select.value = '2026-10';
   select.dispatchEvent(new window.Event('change', { bubbles: true }));
   await settle();
-  const tiles = [...panel().querySelectorAll('#aiuDetail .adm-stat')].map((t) => plain(t.textContent));
+  const tiles = [...panel().querySelectorAll('#aiuDetail-openai .adm-stat')].map((t) => plain(t.textContent));
   assert.ok(tiles.some((t) => /2,00.*Estimado por la app/.test(t)), tiles.join(' / '));
   assert.ok(tiles.some((t) => /0,25.*Sin explicar/.test(t)), tiles.join(' / '));
 });
@@ -184,11 +184,11 @@ test('a failure of the record is shown without hiding what OpenAI billed', async
   await render(panel());
   await settle();
   assert.match(panel().querySelector('#aicApp').textContent, /sin base de datos/);
-  assert.ok(panel().querySelector('#aiuMonth'));
+  assert.ok(panel().querySelector('#aiuMonth-openai'));
 });
 
 const SETTINGS = {
-  values: { 'ai.price_refresh_hours': 24, 'ai.usage_retention_days': 90, 'telegram.token': { is_set: false }, 'telegram.group_id': { is_set: false }, 'telegram.admin_chat_id': { is_set: false }, 'ai.openai.api_key': { is_set: false }, 'ai.openai_admin_key': { is_set: false }, 'push.vapid_private': { is_set: false } },
+  values: { 'ai.price_refresh_hours': 24, 'ai.usage_retention_days': 90, 'telegram.token': { is_set: false }, 'telegram.group_id': { is_set: false }, 'telegram.admin_chat_id': { is_set: false }, 'ai.openai.api_key': { is_set: false }, 'ai.openai_admin_key': { is_set: false }, 'ai.anthropic_admin_key': { is_set: false }, 'push.vapid_private': { is_set: false } },
   jobs: {}, push_devices: { devices: 0, users: 0 }, mail: { configured: false, missing: [] }, ai_uses: [], ai_model: { provider: 'google', model: 'm' }, chat: {}, guide: {},
 };
 
@@ -208,9 +208,76 @@ test('how the cost is worked out and how long the record is kept are settings of
   assert.equal(card.querySelector('h3').textContent, 'Coste de la IA');
   assert.deepEqual([...card.querySelectorAll('input[type="number"]')].map((i) => [i.name, i.value]), [['ai.price_refresh_hours', '24'], ['ai.usage_retention_days', '90']]);
   const order = [...panel().children].map((c) => c.id);
-  assert.deepEqual(order, ['aicApp', 'aiuBilled', 'aicSettings'], 'the record, what OpenAI billed, then the settings');
+  assert.deepEqual(order, ['aicApp', 'aiuBilled-openai', 'aiuBilled-anthropic', 'aicSettings'], 'the record, what each provider billed, then the settings');
   card.querySelector('input[name="ai.usage_retention_days"]').value = '30';
   panel().querySelector('#admSettings').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
   await settle();
   assert.deepEqual(saved.values, { 'ai.usage_retention_days': 30 });
+});
+
+// ---- Anthropic: the same block, for the provider that bills by its own admin key
+const ANTHROPIC = {
+  ...DATA,
+  provider: 'anthropic',
+  total: 4.5,
+  items: [{ name: 'Claude Haiku 5.5 Usage - Output Tokens', amount: 3 }, { name: 'Web Search Usage', amount: 1.5 }],
+  months: [{ month: '2026-10', total: 4.5, items: [{ name: 'Claude Haiku 5.5 Usage - Output Tokens', amount: 3 }, { name: 'Web Search Usage', amount: 1.5 }] }],
+  days: [{ date: '2026-10-01', total: 4.5 }],
+};
+const anthropicBlock = () => panel().querySelector('#aiuBilled-anthropic');
+const openBoth = async (extra = {}) => {
+  panel().replaceWith(panel().cloneNode(false));
+  const own = 'GET /manage/ai-usage?provider=anthropic';
+  // a route matches by its start: the longer paths (the record, Anthropic's) go before OpenAI's
+  const log = installApi({ ...extra, [own]: extra[own] ?? { configured: false, provider: 'anthropic', provider_key: false }, 'GET /manage/ai-usage': DATA });
+  await render(panel());
+  await settle();
+  return log;
+};
+
+test('without an Anthropic key nothing is said about Anthropic, and OpenAI keeps its block', async () => {
+  await openBoth();
+  assert.equal(anthropicBlock().textContent.trim(), '');
+  assert.ok(panel().querySelector('#aiuMonth-openai'));
+});
+
+test('with a key of Anthropic to write text but no admin key it says which variable is missing and that an organization is needed', async () => {
+  await openBoth({ 'GET /manage/ai-usage?provider=anthropic': { configured: false, provider: 'anthropic', provider_key: true } });
+  assert.match(anthropicBlock().textContent, /Falta ANTHROPIC_ADMIN_KEY en el \.env/);
+  assert.match(anthropicBlock().textContent, /organización/);
+  assert.equal(anthropicBlock().querySelector('#aiuMonth-anthropic'), null);
+});
+
+test('with its admin key Anthropic gets its own block, asked with its provider and apart from OpenAI', async () => {
+  const log = await openBoth({ 'GET /manage/ai-usage?provider=anthropic': ANTHROPIC });
+  assert.match(anthropicBlock().textContent, /Gasto en Anthropic/);
+  assert.match(anthropicBlock().querySelector('.adm-stat-v').textContent, /4,50/);
+  assert.match(rows(anthropicBlock().querySelectorAll('#aiuDetail-anthropic .adm-set-card')[1])[0], /^Claude Haiku 5\.5 Usage - Output Tokens\|3,00/);
+  assert.match(panel().querySelector('#aiuBilled-openai').querySelector('.adm-stat-v').textContent, /3,25/, 'OpenAI keeps its own figures');
+  assert.ok(log.some((c) => c.path.includes('provider=anthropic')));
+});
+
+test('Anthropic is set against what the app estimates for Anthropic, not for OpenAI', async () => {
+  await openBoth({
+    'GET /manage/ai-usage?provider=anthropic': ANTHROPIC,
+    'GET /manage/ai-usage/calls': { ...CALLS, months: [{ month: '2026-10', calls: 3, cost: 2, group_cost: 2, group_real_cost_by_provider: { openai: 2, anthropic: 4 }, user_cost: 0, unpriced: 0 }] },
+  });
+  const monthly = anthropicBlock().querySelector('#aiuDetail-anthropic .adm-set-card');
+  assert.match(rows(monthly)[0], /^Octubre de 2026\|4,50.*\|4,00.*\|0,50/, 'billed 4.50, estimated 4.00 of Anthropic, 0.50 unexplained');
+});
+
+test('Actualizar of Anthropic asks for fresh data of Anthropic only', async () => {
+  const log = await openBoth({ 'GET /manage/ai-usage?provider=anthropic': ANTHROPIC });
+  const before = log.length;
+  anthropicBlock().querySelector('#aiuRefresh-anthropic').click();
+  await settle();
+  const fresh = log.slice(before).filter((c) => c.path.includes('refresh=true'));
+  assert.equal(fresh.length, 1);
+  assert.match(fresh[0].path, /provider=anthropic.*refresh=true|refresh=true.*provider=anthropic/);
+});
+
+test('a failure of Anthropic is shown in its block and OpenAI is untouched', async () => {
+  await openBoth({ 'GET /manage/ai-usage?provider=anthropic': json({ detail: 'Anthropic rechaza la clave de administración' }, 502) });
+  assert.match(anthropicBlock().textContent, /Anthropic rechaza la clave de administración/);
+  assert.ok(panel().querySelector('#aiuMonth-openai'));
 });

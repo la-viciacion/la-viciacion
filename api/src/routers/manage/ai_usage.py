@@ -9,22 +9,24 @@ from ... import auth
 from ...auth import get_db
 from ...clients.ai_error import AIError
 from ...database import models
-from ...utils import ai_balances, ai_budget, ai_cost, ai_spend, ai_usage, ai_wallet, messages, settings
+from ...utils import ai_balances, ai_budget, ai_cost, ai_providers, ai_spend, ai_usage, ai_wallet, messages, settings
 from .common import router
 
 
 @router.get("/ai-usage")
-def get_ai_usage(refresh: bool = False):
-    """The spend of the whole account since the app began, by month and by line item. It asks OpenAI (a blocking call: a
-    plain def, so it runs in a worker thread) and keeps the answer a few minutes; `refresh` asks again."""
-    key = settings.get("ai.openai_admin_key")
+def get_ai_usage(refresh: bool = False, provider: str = Query("openai", pattern="^(" + "|".join(ai_usage.ADMIN_KEYS) + ")$")):
+    """The spend of the whole account of a provider since the app began, by month and by line item: what it billed, asked with its
+    admin key (OpenAI by default, or Anthropic). It asks the provider (a blocking call: a plain def, so it runs in a worker thread)
+    and keeps the answer a few minutes; `refresh` asks again. Without the key it says so, and whether the provider has a key for
+    writing text at all (`provider_key`), so the panel shows the missing key only where it matters."""
+    key = settings.get(ai_usage.ADMIN_KEYS[provider])
     if not key:
-        return {"configured": False}
+        return {"configured": False, "provider": provider, "provider_key": bool(ai_providers.api_key(provider))}
     try:
-        data = ai_usage.summary(key, refresh=refresh)
+        data = ai_usage.summary(key, refresh=refresh, provider=provider)
     except AIError as e:
         raise HTTPException(status_code=502, detail=str(e).replace(key, "***"))
-    return {"configured": True, "provider": "openai", **data}
+    return {"configured": True, "provider": provider, **data}
 
 
 @router.get("/ai-usage/calls")
