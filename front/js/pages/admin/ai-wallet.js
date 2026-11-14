@@ -2,7 +2,7 @@
 // (GET /manage/ai-usage/wallet, POST .../wallet/entries, PUT .../wallet/start). The balance of the OpenAI account is typed here only to
 // compare it with the total available; it is not stored in the app, only remembered by this browser.
 import { api, jsonRequest } from '../../lib/api.js';
-import { gap, isEmpty, parseAmount } from '../../lib/ai-wallet.js';
+import { gap, isEmpty, parseAmount, realBalance } from '../../lib/ai-wallet.js';
 import { money } from '../../lib/ai-usage.js';
 import { html, mount } from '../../lib/html.js';
 import { toast } from '../../ui/toast.js';
@@ -32,17 +32,26 @@ const entryRow = (e) => html`
     <td>${e.by ?? ''}</td>
   </tr>`;
 
-function compare(total, typed) {
-  const openai = parseFloat(String(typed).replace(',', '.'));
-  if (!Number.isFinite(openai)) return html`<div class="adm-sub">Escribe lo que ves en tu cuenta de OpenAI para ver si cuadra.</div>`;
-  const diff = gap(openai, total.available);
-  if (diff === 0) return html`<div class="adm-sub">Cuadra: OpenAI y el monedero dicen lo mismo.</div>`;
+// The accounts the providers report by themselves (OpenRouter), each with its error if it failed
+const balancesView = (balances) => (balances.length
+  ? html`<div class="adm-sub" data-balances>${balances.map((b) => (b.error
+    ? html`<div>Saldo en ${b.provider === 'openrouter' ? 'OpenRouter' : b.provider}: no se ha podido consultar (${b.error}).</div>`
+    : html`<div>Saldo real en ${b.provider === 'openrouter' ? 'OpenRouter' : b.provider}: <strong>${money(b.remaining)}</strong> (comprado ${money(b.credits)}, gastado ${money(b.usage)}).</div>`))}
+    <button type="button" class="adm-btn sm" data-refresh-balances>Actualizar</button></div>`
+  : '');
+
+function compare(total, typed, balances) {
+  const { parts, sum } = realBalance(parseFloat(String(typed).replace(',', '.')), balances);
+  if (sum === null) return html`<div class="adm-sub">Escribe lo que ves en tu cuenta de OpenAI para ver si cuadra.</div>`;
+  const of = parts.map((p) => `${p.name} ${money(p.amount)}`).join(' + ');
+  const diff = gap(sum, total.available);
+  if (diff === 0) return html`<div class="adm-sub">Cuadra: las cuentas (${of}) y el monedero dicen lo mismo.</div>`;
   return html`<div class="adm-sub ${diff < 0 ? 'adm-warn' : ''}">${diff > 0
-    ? `En OpenAI hay ${money(diff)} más de lo que dice el monedero (saldo sin repartir o gasto estimado de más).`
-    : `En OpenAI hay ${money(-diff)} menos de lo que dice el monedero (gasto real mayor que el estimado, o saldo no anotado).`}</div>`;
+    ? `En las cuentas (${of}) hay ${money(diff)} más de lo que dice el monedero (saldo sin repartir o gasto estimado de más).`
+    : `En las cuentas (${of}) hay ${money(-diff)} menos de lo que dice el monedero (gasto real mayor que el estimado, o saldo no anotado).`}</div>`;
 }
 
-function view(data) {
+function view(data, balances) {
   const { total } = data;
   return html`
     <section class="adm-set-card adm-wallet-card">
@@ -56,7 +65,8 @@ function view(data) {
       <div class="adm-set-row">
         <label>Saldo real en OpenAI (US$) <input class="adm-input" type="text" inputmode="decimal" data-field="openai" value="${remembered()}" placeholder="para comparar" /></label>
       </div>
-      <div data-compare>${compare(total, remembered())}</div>
+      <div data-balances-box>${balancesView(balances)}</div>
+      <div data-compare>${compare(total, remembered(), balances)}</div>
 
       ${cardTitle('Anotar una aportación', html`Elige quién ha puesto el dinero y cuánto (por ejemplo 2 o 2,50; con signo menos, una devolución o corrección).`)}
       <div class="adm-set-row">
@@ -96,7 +106,10 @@ export async function renderWallet(target) {
   const field = (name) => target.querySelector(`[data-field="${name}"]`);
   try {
     let data = await api('/manage/ai-usage/wallet');
-    const draw = () => mount(target, view(data));
+    // What the providers say they hold: it must not stop the wallet from showing, so a failure here is only no balances
+    const askBalances = async (refresh = false) => api(`/manage/ai-usage/balances${refresh ? '?refresh=true' : ''}`).then((found) => found.balances ?? []).catch(() => []);
+    let balances = await askBalances();
+    const draw = () => mount(target, view(data, balances));
     draw();
     // Enter in a box does what its button does: it must not submit the page's form, where this card sits among the limits
     target.onkeydown = (e) => {
@@ -108,9 +121,15 @@ export async function renderWallet(target) {
     target.oninput = (e) => {
       if (!e.target.matches('[data-field="openai"]')) return;
       remember(e.target.value);
-      mount(target.querySelector('[data-compare]'), compare(data.total, e.target.value));
+      mount(target.querySelector('[data-compare]'), compare(data.total, e.target.value, balances));
     };
     target.onclick = async (e) => {
+      if (e.target.closest('[data-refresh-balances]')) {
+        balances = await askBalances(true);
+        mount(target.querySelector('[data-balances-box]'), balancesView(balances));
+        mount(target.querySelector('[data-compare]'), compare(data.total, field('openai').value, balances));
+        return;
+      }
       const add = e.target.closest('[data-add]');
       const start = e.target.closest('[data-save-start]');
       if (!add && !start) return;

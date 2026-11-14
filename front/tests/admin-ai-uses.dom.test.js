@@ -490,3 +490,96 @@ test('Enter in the cap of a player saves that cap and does not submit the settin
   assert.equal(enter.defaultPrevented, true);
   assert.deepEqual(sent, [{ usd: 7 }]);
 });
+
+const LONG_LIST = { provider: 'google', models: [...Array.from({ length: 30 }, (_, i) => `vendor-a/model-${i}`), 'vendor-b/special-flash', 'plain-model'], defaults: { notices: 'gemini-test', chat: 'gemini-test' } };
+const openWith = async (list, values = VALUES) => {
+  installApi({
+    'GET /manage/settings/ai-models': list,
+    'GET /manage/settings': { values, jobs: {}, push_devices: { devices: 0, users: 0 }, mail: { configured: false, missing: [] }, ai_uses: USES, ai_model: { provider: 'google', model: 'gemini-test' }, ai_providers: providersOf(), chat: CHAT },
+  });
+  await render(panel(), { entity: { sections: ['ai', 'aiuses'] } });
+  await settle();
+  await settle();
+};
+const box = () => panel().querySelector('select[data-model-for="notices"]').previousElementSibling.querySelector('input');
+const shownOptions = () => [...box().parentElement.querySelectorAll('.adm-combo-item')].map((li) => li.dataset.value);
+const type = (text) => { box().value = text; box().dispatchEvent(new window.Event('input', { bubbles: true })); };
+const key = (name) => { const e = new window.KeyboardEvent('keydown', { key: name, bubbles: true, cancelable: true }); box().dispatchEvent(e); return e; };
+
+test('the model select is one box: the select is hidden and the box shows what is chosen', async () => {
+  await openWith(LONG_LIST, { ...VALUES, 'ai.model.google': 'plain-model' });
+  const select = panel().querySelector('select[data-model-for="notices"]');
+  assert.equal(select.hidden, true);
+  assert.equal(select.value, 'plain-model', 'the select is still the field of the form');
+  assert.equal(box().value, 'plain-model');
+  assert.equal(panel().querySelectorAll('input[type="search"]').length, 0, 'no second field');
+  assert.equal(box().name, '', 'the box has no name, so saving the page never sends it');
+});
+
+test('focusing the box lists every model grouped by vendor, typing filters them case-insensitively', async () => {
+  await openWith(LONG_LIST);
+  box().dispatchEvent(new window.Event('focus'));
+  assert.equal(shownOptions().length, 33, 'the default option and the 32 models');
+  assert.deepEqual([...box().parentElement.querySelectorAll('.adm-combo-group')].map((g) => g.textContent), ['vendor-a', 'vendor-b']);
+  type('SPECIAL');
+  assert.deepEqual(shownOptions(), ['vendor-b/special-flash']);
+  assert.deepEqual([...box().parentElement.querySelectorAll('.adm-combo-group')].map((g) => g.textContent), ['vendor-b'], 'only the vendors with a match');
+  type('model-1');
+  assert.equal(shownOptions().length, 11, 'model-1 and model-10 to model-19');
+  type('nothing like this');
+  assert.deepEqual(shownOptions(), []);
+  assert.match(box().parentElement.textContent, /Ningún modelo coincide/);
+});
+
+test('picking an option sets the select, fires its change and closes the list; the page then saves it', async () => {
+  await openWith(LONG_LIST);
+  const select = panel().querySelector('select[data-model-for="notices"]');
+  let changes = 0;
+  select.addEventListener('change', () => { changes += 1; });
+  box().dispatchEvent(new window.Event('focus'));
+  type('special');
+  box().parentElement.querySelector('.adm-combo-item').click();
+  assert.equal(select.value, 'vendor-b/special-flash');
+  assert.equal(changes, 1);
+  assert.equal(box().value, 'vendor-b/special-flash');
+  assert.equal(box().parentElement.querySelector('.adm-combo-list').hidden, true);
+  assert.equal(panel().querySelector('form').elements['ai.model.google'].value, 'vendor-b/special-flash');
+});
+
+test('the keyboard picks: arrows move, Enter picks without submitting the page, Escape drops what was typed', async () => {
+  await openWith(LONG_LIST);
+  const select = panel().querySelector('select[data-model-for="notices"]');
+  box().dispatchEvent(new window.Event('focus'));
+  type('model-2');
+  key('ArrowDown');
+  assert.equal(box().parentElement.querySelector('.adm-combo-item.active').dataset.value, 'vendor-a/model-20');
+  const enter = key('Enter');
+  assert.equal(enter.defaultPrevented, true);
+  assert.equal(select.value, 'vendor-a/model-20');
+  box().dispatchEvent(new window.Event('click'));
+  type('zzz');
+  key('Escape');
+  assert.equal(select.value, 'vendor-a/model-20', 'nothing changed');
+  assert.equal(box().value, 'vendor-a/model-20', 'the half-typed text is dropped');
+});
+
+test('leaving the box without picking keeps the model and shows it again', async () => {
+  await openWith(LONG_LIST, { ...VALUES, 'ai.model.google': 'plain-model' });
+  box().dispatchEvent(new window.Event('focus'));
+  type('special');
+  box().dispatchEvent(new window.Event('blur'));
+  assert.equal(panel().querySelector('select[data-model-for="notices"]').value, 'plain-model');
+  assert.equal(box().value, 'plain-model');
+});
+
+test('a model that cannot work with its provider is said in the AI card, with how to fix it', async () => {
+  installApi({
+    'GET /manage/settings/ai-models': MODEL_LIST,
+    'GET /manage/settings': { values: VALUES, jobs: {}, push_devices: { devices: 0, users: 0 }, mail: { configured: false, missing: [] }, ai_uses: USES, ai_model: { provider: 'google', model: 'gpt-4o-mini', problem: 'OpenRouter nombra los modelos «proveedor/modelo» (por ejemplo openai/gpt-4o-mini), no «gpt-4o-mini»' }, ai_providers: providersOf(), chat: { ...CHAT, problem: null } },
+  });
+  await render(panel(), { entity: { sections: ['ai', 'aiuses'] } });
+  await settle();
+  await settle();
+  const warns = [...panel().querySelectorAll('.adm-warn')].map((w) => w.textContent);
+  assert.ok(warns.some((text) => /openai\/gpt-4o-mini.*Cámbialo en el \.env/.test(text)), warns.join(' | '));
+});

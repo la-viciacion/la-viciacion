@@ -353,3 +353,17 @@ textarea.adm-grow { resize: none; min-height: 0; overflow: hidden; }
 .adm-people h4 { margin: 14px 0 4px; color: var(--text-primary); font-size: 0.9rem; }
 
 .adm-people-body { padding-bottom: 8px; max-height: 60vh; overflow-y: auto; }
+
+/* A select that searches (ui/combobox.js): a text box with its options as a list under it */
+.adm-combo { position: relative; }
+.adm-combo-input { width: 100%; box-sizing: border-box; }
+.adm-combo-list {
+  position: absolute; z-index: 30; left: 0; right: 0; top: calc(100% + 4px); max-height: 18rem; overflow-y: auto;
+  margin: 0; padding: 4px; list-style: none; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+.adm-combo-group { padding: 8px 10px 2px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-secondary); }
+.adm-combo-item { padding: 6px 10px; border-radius: var(--radius-sm); font-size: 0.85rem; font-weight: 500; line-height: 1.35; color: var(--text-primary); cursor: pointer; overflow-wrap: anywhere; }
+.adm-combo-item:hover, .adm-combo-item.active { background: var(--bg-card-hover); }
+.adm-combo-item[aria-selected="true"] { color: var(--accent-teal); }
+.adm-combo-empty { padding: 8px 10px; font-size: 0.85rem; font-weight: 500; color: var(--text-secondary); }
