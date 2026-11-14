@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { gap, isEmpty, parseAmount, walletLine } from '../js/lib/ai-wallet.js';
+import { gap, isEmpty, parseAmount, realBalance, walletLine } from '../js/lib/ai-wallet.js';
 
 test('an amount is dollars with up to two decimals, with a comma or a point, negative for a refund, never 0', () => {
   assert.equal(parseAmount('2'), 2);
@@ -27,4 +27,12 @@ test('the player line says the balance, or that it is spent, and is empty while 
   assert.equal(walletLine(null), '');
   assert.match(walletLine({ contributed: 3, spent: 1, balance: 2 }), /Tu saldo de IA del grupo: 2,00.*aportado 3,00.*gastado 1,00/);
   assert.match(walletLine({ contributed: 1, spent: 1.4, balance: -0.4 }), /agotado/);
+});
+
+test('the real balance adds what an admin typed for OpenAI to what the providers report, and is nothing without either', () => {
+  assert.deepEqual(realBalance(NaN, []), { parts: [], sum: null });
+  assert.deepEqual(realBalance(10, []), { parts: [{ name: 'OpenAI', amount: 10 }], sum: 10 });
+  assert.equal(realBalance(NaN, [{ provider: 'openrouter', remaining: 4.5 }]).sum, 4.5);
+  assert.deepEqual(realBalance(10.1, [{ provider: 'openrouter', remaining: 4.2 }, { provider: 'openrouter', error: 'x' }]).sum, 14.3);
+  assert.equal(realBalance(0, []).sum, 0, 'a typed zero is a balance');
 });

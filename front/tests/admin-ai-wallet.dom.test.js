@@ -21,7 +21,7 @@ const DATA = {
 };
 const open = async (data = DATA, extra = {}) => {
   panel().replaceWith(panel().cloneNode(false));
-  const log = installApi({ 'GET /manage/ai-usage/wallet': data, ...extra });
+  const log = installApi({ 'GET /manage/ai-usage/wallet': data, 'GET /manage/ai-usage/balances': { balances: [] }, ...extra });
   await renderWallet(panel());
   await settle();
   return log;
@@ -87,4 +87,30 @@ test('a failure shows only in the card', async () => {
   await renderWallet(panel());
   await settle();
   assert.match(panel().textContent, /boom/);
+});
+
+test('the balance OpenRouter reports is shown and counted in the comparison with the wallet', async () => {
+  localStorage.removeItem('lv.ai.openaiBalance'); // what an earlier test typed
+  await open(DATA, { 'GET /manage/ai-usage/balances': { balances: [{ provider: 'openrouter', credits: 20, usage: 16.5, remaining: 3.5 }] } });
+  assert.match(panel().querySelector('[data-balances]').textContent, /Saldo real en OpenRouter: 3,50.*comprado 20,00.*gastado 16,50/);
+  assert.match(panel().querySelector('[data-compare]').textContent, /Cuadra: las cuentas \(OpenRouter 3,50/, 'with nothing typed, the wallet is compared with OpenRouter alone');
+  field('openai').value = '1';
+  field('openai').dispatchEvent(new window.Event('input', { bubbles: true }));
+  assert.match(panel().querySelector('[data-compare]').textContent, /OpenAI 1,00.*\+ OpenRouter 3,50.*1,00.*más/);
+});
+
+test('a provider that cannot be asked says so and the wallet still shows', async () => {
+  await open(DATA, { 'GET /manage/ai-usage/balances': { balances: [{ provider: 'openrouter', error: 'openrouter: denied' }] } });
+  assert.match(panel().querySelector('[data-balances]').textContent, /no se ha podido consultar \(openrouter: denied\)/);
+  assert.match(panel().textContent, /Aportado/);
+});
+
+test('the wallet shows even if the balances route fails, and Actualizar asks again for fresh ones', async () => {
+  await open(DATA, { 'GET /manage/ai-usage/balances': json({ detail: 'boom' }, 500) });
+  assert.equal(panel().querySelector('[data-balances]'), null);
+  assert.match(panel().textContent, /Aportado/);
+  const log = await open(DATA, { 'GET /manage/ai-usage/balances': { balances: [{ provider: 'openrouter', credits: 5, usage: 1, remaining: 4 }] } });
+  panel().querySelector('[data-refresh-balances]').click();
+  await settle();
+  assert.ok(log.some((c) => c.url?.includes('refresh=true') || c.path?.includes('refresh=true') || String(c.key ?? '').includes('refresh=true')), 'asked with refresh');
 });

@@ -14,6 +14,7 @@ import { toast } from '../../ui/toast.js';
 import { errorState } from './components.js';
 import { confirmDialog } from './dialogs.js';
 import { cardTitle } from '../../ui/info-tip.js';
+import { searchable } from '../../ui/combobox.js';
 import { renderBudgets } from './ai-budgets.js';
 import { renderWallet } from './ai-wallet.js';
 
@@ -142,6 +143,9 @@ const aiMissing = (aiModel) => [
   !aiModel.provider && AI_IDS.map(keyVariable).join(' o '),
   aiModel.provider && !aiModel.model && `un modelo (${aiModel.provider.toUpperCase()}_AI_MODEL en el .env, o elígelo aquí)`,
 ].filter(Boolean);
+
+/** A model that cannot work with its provider, and why (the API says; for example an OpenRouter name without its vendor). */
+const problemNote = (use) => (use?.problem ? html`<div class="adm-warn">${use.problem}. Cámbialo en el .env del servidor (y reinicia la API) o elige otro aquí.</div>` : '');
 
 const readyProviders = () => aiProviders.providers.filter((p) => p.has_key);
 
@@ -293,6 +297,7 @@ function view(values, jobs, pushDevices, mail, aiUses, aiModel, chat, guide = {}
         ${readyProviders().length === 1 ? html`<div class="adm-sub">Solo hay clave de ${providerName(readyProviders()[0].id)} en el .env: es el que se usa. Para poder elegir, define también la clave de otro proveedor.</div>` : ''}
         <label>Clave de administración de OpenAI <input class="adm-input" type="text" value="${state('ai.openai_admin_key')}" disabled /></label>
         ${aiMissing(aiModel).length ? html`<div class="adm-warn">Falta ${aiMissing(aiModel).join(', ')}: la aplicación no tiene ningún modelo por defecto, así que la IA no escribe ningún aviso hasta que lo definas.</div>` : html`<div class="adm-sub">Usa ${providerName(aiModel.provider)} (${aiModel.model}).</div>`}
+        ${problemNote(aiModel)}
         <div class="adm-sub">Las claves y los modelos por defecto de cada proveedor están en el .env del servidor (<code>OPENAI_AI_API_KEY</code>, <code>OPENAI_AI_MODEL</code>, <code>GOOGLE_AI_API_KEY</code>, <code>GOOGLE_AI_MODEL</code>, <code>ANTHROPIC_AI_API_KEY</code>, <code>ANTHROPIC_AI_MODEL</code>, <code>OPENROUTER_AI_API_KEY</code>, <code>OPENROUTER_AI_MODEL</code>): desde el panel solo se ven. La lista de modelos la da el propio proveedor en este momento, así que se puede cambiar de modelo sin redesplegar. Esa elección es solo para el proveedor en uso.</div>
         <div class="adm-sub">La clave de administración (<code>OPENAI_ADMIN_KEY</code>, opcional) solo sirve para leer el gasto en IA → Uso y coste; no escribe nada.</div>
         <div><button type="button" class="adm-btn" data-set-act="test-ai" ${noKey ? html`disabled` : ''}>Probar la IA</button></div>
@@ -305,6 +310,7 @@ function view(values, jobs, pushDevices, mail, aiUses, aiModel, chat, guide = {}
         <div class="adm-sub">Sin elegir otro modelo, usa <code>&lt;PROVEEDOR&gt;_CHAT_AI_MODEL</code> si está en el .env y, si no, el de los avisos. Sirve para darle un modelo más fuerte que el de los avisos.</div>
         ${check('chat.enabled', 'Chat activado', 'Apagado, el botón desaparece para todos y el chat deja de responder.')}
         ${chatMissing(values, chat).length ? html`<div class="adm-warn">Falta ${chatMissing(values, chat).join(', ')}: el chat usa el proveedor de los avisos (o el que elijas aquí) y no tiene ningún modelo por defecto, así que no estará disponible hasta que lo definas.</div>` : ''}
+        ${problemNote(chat)}
         <details class="adm-details adm-ai-prompt">
           <summary class="adm-btn sm">Instrucciones ${chat.customized ? html`<span class="adm-tag">Personalizado</span>` : ''}</summary>
           <div>
@@ -377,6 +383,7 @@ function view(values, jobs, pushDevices, mail, aiUses, aiModel, chat, guide = {}
           </div>
         </details>
         <div class="adm-sub adm-guide-state">${guideState(values, guide)}</div>
+        ${problemNote(guide)}
         <div><button type="button" class="adm-btn" data-set-act="test-guide" ${chatMissing(values, guide).length ? html`disabled` : ''}>Probar la guía</button></div>
       </section>`,
 
@@ -641,10 +648,24 @@ async function syncModels(form) {
     select.name = `${prefix}.model.${providerId}`;
     const stored = loaded[select.name] ?? '';
     const fallback = defaultModelOf(providerId, use) ?? '';
+    const combo = searchable(select); // the select stays the field of the form; the admin sees a box that searches its options
     const draw = (models) => {
       select.replaceChildren(option('', fallback ? `Por defecto (${fallback})` : 'Sin modelo por defecto'));
-      for (const id of new Set([stored, ...models].filter(Boolean))) select.append(option(id));
+      const groups = new Map(); // OpenRouter names a model vendor/model and offers hundreds: one group per vendor keeps the list usable
+      for (const id of new Set([stored, ...models].filter(Boolean))) {
+        const vendor = id.includes('/') ? id.slice(0, id.indexOf('/')) : '';
+        if (!groups.has(vendor)) groups.set(vendor, []);
+        groups.get(vendor).push(id);
+      }
+      for (const [vendor, ids] of groups) {
+        if (!vendor) { select.append(...ids.map((id) => option(id))); continue; }
+        const group = document.createElement('optgroup');
+        group.label = vendor;
+        group.append(...ids.map((id) => option(id)));
+        select.append(group);
+      }
       select.value = stored;
+      combo.refresh();
     };
     draw([]);
     note.textContent = '';

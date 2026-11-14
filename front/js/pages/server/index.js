@@ -201,7 +201,7 @@ const PROVIDERS = { openai: 'OpenAI', google: 'Google', anthropic: 'Anthropic', 
 const WAY = { billed: 'facturado', estimated: 'estimado' };
 const AI_SOURCE = {
   billed: 'Lo que ha facturado OpenAI a la organización (solo conserva el último año de gasto).',
-  mixed: 'OpenAI es lo que ha facturado (solo conserva el último año); lo de Google es una estimación de la app, porque Google no ofrece el gasto por API y, con una clave del plan gratuito, lo real puede ser 0 US$.',
+  mixed: 'OpenAI es lo que ha facturado (solo conserva el último año); lo demás es una estimación de la app, porque esos proveedores no ofrecen el gasto por API (OpenRouter sí dice lo que cobra cada llamada) y, con una clave de Google del plan gratuito, lo real puede ser 0 US$.',
   estimated: 'Es una estimación de lo que ha gastado la clave del grupo: no hay clave de administración de OpenAI para consultar lo facturado, y con una clave de Google del plan gratuito lo real puede ser menos.',
 };
 

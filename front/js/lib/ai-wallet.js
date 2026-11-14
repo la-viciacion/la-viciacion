@@ -18,6 +18,16 @@ export const isEmpty = (balance) => balance <= 0;
 /** What the OpenAI account holds beyond what the wallets say is available (negative: the account holds less). Rounded to the cent. */
 export const gap = (openai, available) => Math.round((openai - available) * 100) / 100 || 0; // || 0: never -0
 
+/** What the accounts really hold, for the comparison with the wallet: the OpenAI balance an admin typed (a number, or NaN when empty)
+ * plus what the providers that say it report (`balances`: [{ provider, remaining } | { provider, error }]). `parts` are the figures
+ * that went in, `sum` is null when there is nothing to compare. */
+export function realBalance(typed, balances = []) {
+  const parts = [];
+  if (Number.isFinite(typed)) parts.push({ name: 'OpenAI', amount: typed });
+  for (const b of balances) if (b.remaining != null) parts.push({ name: b.provider === 'openrouter' ? 'OpenRouter' : b.provider, amount: b.remaining });
+  return { parts, sum: parts.length ? Math.round(parts.reduce((total, p) => total + p.amount, 0) * 100) / 100 : null };
+}
+
 /** The line of the player's own screen, or '' while the wallet is off. */
 export function walletLine(wallet) {
   if (!wallet) return '';

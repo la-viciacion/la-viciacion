@@ -337,7 +337,7 @@ test('the breakdown has a section of its own for the AI, by provider and with it
     'Total|0,50 US$|1,75 US$|5,75 US$',
   ]);
   assert.doesNotMatch(ai.textContent, /€/);
-  assert.match(ai.textContent, /OpenAI es lo que ha facturado.*lo de Google es una estimación/);
+  assert.match(ai.textContent, /OpenAI es lo que ha facturado.*lo demás es una estimación/);
   assert.match(ai.textContent, /No se suma a los euros ni se convierte/);
 });
 

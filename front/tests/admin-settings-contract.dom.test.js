@@ -41,3 +41,16 @@ for (const [scenario, file] of Object.entries(SCENARIOS)) {
     assert.match(panel().textContent, /Inteligencia artificial/);
   });
 }
+
+test('every provider the API knows has its variable named in the card, and those with a key are offered by name, never by a raw id', async () => {
+  const answer = fixture('manage-settings.full.json');
+  const ids = answer.ai_providers.providers.map((p) => p.id);
+  assert.deepEqual(ids, ['openai', 'google', 'anthropic', 'openrouter'], 'the four providers of the API');
+  installApi({ 'GET /manage/settings/ai-models': MODELS, 'GET /manage/settings': answer, 'GET /manage/ai-usage/wallet': { active: false, start: null, start_setting: null, total: { contributed: 0, spent: 0, available: 0 }, players: [], entries: [] } });
+  await renderSettings(panel(), { entity: ENTITIES.ai });
+  await settle();
+  const options = [...panel().querySelectorAll('select[name="ai.provider"] option')].map((o) => o.textContent);
+  for (const { id } of answer.ai_providers.providers.filter((p) => p.has_key)) assert.ok(options.some((text) => text !== id && text.toLowerCase().includes(id)), `${id} has a name in the picker: ${options.join(', ')}`);
+  const text = panel().textContent;
+  for (const id of ids) assert.match(text, new RegExp(`${id.toUpperCase()}_AI_API_KEY`), `${id}'s variable is named in the card`);
+});
