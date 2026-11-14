@@ -508,7 +508,7 @@ export const ENTITIES = {
   achievements: {
     label: 'Logros',
     nav: 'Logros',
-    description: 'Logros que se pueden conseguir: su título, mensaje e imagen, y si están activos, son secretos o especiales (aura plateada, dorada o morada). Uno inactivo no lo consigue nadie, no se anuncia, no se recalcula y no aparece en la página de logros; los nuevos empiezan inactivos hasta que los actives (y luego puedes recalcularlos).',
+    description: 'Logros que se pueden conseguir: su título, descripción (cómo se consigue), mensaje del aviso e imagen, y si están activos, son secretos o especiales (aura plateada, dorada o morada). Uno inactivo no lo consigue nadie, no se anuncia, no se recalcula y no aparece en la página de logros; los nuevos empiezan inactivos hasta que los actives (y luego puedes recalcularlos).',
     toolbarActions: [{ act: 'recalculate-achievements', label: 'Recalcular logros…' }],
     endpoint: '/manage/achievements',
     paged: false,
@@ -522,7 +522,8 @@ export const ENTITIES = {
     ],
     fields: [
       { key: 'title', label: 'Título', type: 'text', required: true },
-      { key: 'message', label: 'Mensaje ({} = usuario / juego)', type: 'textarea', rows: 8 },
+      { key: 'description', label: 'Descripción (cómo se consigue; la ven todos menos en los secretos que aún no tienen)', type: 'textarea', rows: 3 },
+      { key: 'message', label: 'Mensaje del aviso ({} = usuario / juego)', type: 'textarea', rows: 8 },
       { key: 'active', label: 'Activo', type: 'checkbox' },
       { key: 'secret', label: 'Secreto (oculto para quien no lo tiene; se anuncia sin decir cuál y el jugador lo recibe en privado). Los especiales siempre lo son', type: 'checkbox' },
       {

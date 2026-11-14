@@ -298,9 +298,8 @@ async def app_help(ctx: RunContext[ChatDeps], topic: str = "") -> dict:
 
 async def achievements(ctx: RunContext[ChatDeps], query: str = "", only: Literal["mine", "missing"] | None = None) -> dict:
     """The achievements of the running season and the lifetime ones: for each its title, whether the user has it, how many
-    players do and, for the user's own, what it is about. What the user does not have comes with no description, and the
-    hidden ones only as a count: finding out what they are about is part of the game, so never say how to get one the
-    user does not have. `query` filters by title or description, `only` keeps the user's own or the ones still missing.
+    players do and how it is earned. The hidden ones come only as a count: never guess what they are or how to get one
+    that is not in the list. `query` filters by title or description, `only` keeps the user's own or the ones still missing.
     Up to 10 are listed; progress (e.g. "35 / 100") is given for the ones that add up."""
     catalog = group.achievements_catalog(ctx.deps.db, ctx.deps.user.id)
     words = (query or "").lower().split()

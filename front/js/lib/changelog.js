@@ -33,6 +33,8 @@ export const CHANGELOG = [
       ['better', '«Seguir donde lo dejaste» se ha rediseñado: la tarjeta se queda con Continuar y Nuevo timer y Sesión manual pasan a una fila propia justo debajo.'],
       ['better', 'En la lista de sesiones de Inicio, el botón de completar el juego ahora está dentro del desplegable, y cada juego ocupa mucho menos en el móvil.'],
       ['better', 'El menú lateral se ha reorganizado.'],
+      ['better', 'En Logros, los que aún no tienes ya traen su descripción, para saber qué te falta.'],
+      ['better', 'Las barras de progreso de los logros acumulativos muestran la cifra actual y la meta, por ejemplo 35 / 100 h.'],
     ],
   },
   {

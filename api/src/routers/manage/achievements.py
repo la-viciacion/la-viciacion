@@ -64,6 +64,7 @@ def list_achievements(db: Session = Depends(get_db)):
         models.Achievement.key,
         models.Achievement.title,
         models.Achievement.message,
+        models.Achievement.description,
         (models.Achievement.image.isnot(None)).label("has_image"),
         models.Achievement.active,
         models.Achievement.secret,
@@ -76,6 +77,7 @@ def list_achievements(db: Session = Depends(get_db)):
             "key": r.key,
             "title": r.title,
             "message": r.message,
+            "description": r.description,
             "has_image": bool(r.has_image),
             "active": bool(r.active),
             "secret": bool(r.secret),
@@ -91,6 +93,7 @@ def list_achievements(db: Session = Depends(get_db)):
 class AchievementPatch(BaseModel):
     title: Optional[str] = None
     message: Optional[str] = None
+    description: Optional[str] = Field(None, max_length=255)  # how it is earned, as the player reads it
     active: Optional[bool] = None  # switched off: not earned, announced, recalculated or shown
     secret: Optional[bool] = None  # hidden until unlocked; announced to the group without saying which, and to the player in full, privately
     special: Optional[int] = Field(None, ge=0, le=3)  # 0 ordinary; 1 silver, 2 gold, 3 purple aura
@@ -107,7 +110,7 @@ def patch_achievement(achievement_id: int, body: AchievementPatch, db: Session =
     db.commit()
     return {
         "id": ach.id, "key": ach.key, "title": ach.title, "message": ach.message,
-        "active": bool(ach.active), "secret": bool(ach.secret), "special": ach.special, "valid_from_season": ach.valid_from_season,
+        "description": ach.description, "active": bool(ach.active), "secret": bool(ach.secret), "special": ach.special, "valid_from_season": ach.valid_from_season,
     }
 
 

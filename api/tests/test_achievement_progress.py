@@ -39,18 +39,18 @@ class TargetTests(unittest.TestCase):
                 self.assertEqual(progress.target_of(ach.name)[1], needed, ach.name)
 
     def test_the_bar_never_goes_past_its_goal(self):
-        self.assertEqual(progress.bar(250, 200), {"percent": 100})
-        self.assertEqual(progress.bar(12.345, 100), {"percent": 12})
-        self.assertEqual(progress.bar(3, 7), {"percent": 42})
+        self.assertEqual(progress.bar(250, 200, "hours"), {"percent": 100, "current": 200, "needed": 200, "metric": "hours"})
+        self.assertEqual(progress.bar(12.345, 100, "hours"), {"percent": 12, "current": 12.3, "needed": 100, "metric": "hours"})
+        self.assertEqual(progress.bar(3, 7, "days"), {"percent": 42, "current": 3, "needed": 7, "metric": "days"})
 
     def test_a_little_progress_shows_and_none_is_empty_and_only_the_goal_fills_it(self):
-        self.assertEqual(progress.bar(0.4, 1000), {"percent": 1})
-        self.assertEqual(progress.bar(0, 10), {"percent": 0})
-        self.assertEqual(progress.bar(99.9, 100), {"percent": 99})
-        self.assertEqual(progress.bar(100, 100), {"percent": 100})
+        self.assertEqual(progress.bar(0.4, 1000)["percent"], 1)
+        self.assertEqual(progress.bar(0, 10), {"percent": 0, "current": 0, "needed": 10, "metric": None})
+        self.assertEqual((progress.bar(99.9, 100)["percent"], progress.bar(99.9, 100)["current"]), (99, 99.9))  # never reads as the goal
+        self.assertEqual(progress.bar(100, 100)["percent"], 100)
 
-    def test_the_bar_says_nothing_but_how_full_it_is(self):
-        self.assertEqual(set(progress.bar(35, 100)), {"percent"})
+    def test_the_bar_says_how_full_it_is_and_the_count_and_the_goal(self):
+        self.assertEqual(set(progress.bar(35, 100, "games")), {"percent", "current", "needed", "metric"})
 
 
 class CatalogProgressTests(unittest.TestCase):
@@ -64,7 +64,7 @@ class CatalogProgressTests(unittest.TestCase):
         self.db.add_all([models.User(id=1, username="ana", name="Ana", is_active=1, is_admin=0)])
         self.keys = [key for key, _ in keys]
         for i, (key, secret) in enumerate(keys, start=1):
-            self.db.add(models.Achievement(id=i, key=key, title=key, message="x", active=True, secret=bool(secret), special=0, valid_from_season=2023))
+            self.db.add(models.Achievement(id=i, key=key, title=key, message="x", description="D", active=True, secret=bool(secret), special=0, valid_from_season=2023))
         self.db.add_all([models.Game(id="doom", name="Doom"), models.Game(id="hades", name="Hades")])
         # three consecutive days (ending yesterday), 2 h each: 6 h, 3 days, 2 games, best game 4 h
         for n, (game, hours) in enumerate([("doom", 2), ("doom", 2), ("hades", 2)]):
@@ -83,11 +83,11 @@ class CatalogProgressTests(unittest.TestCase):
 
     def test_each_cumulative_achievement_shows_how_far_the_player_is(self):
         got = self.catalog()
-        self.assertEqual(got["PLAYED_100_HOURS"]["progress"], {"percent": 6})
-        self.assertEqual(got["PLAYED_7_DAYS"]["progress"], {"percent": 42})
-        self.assertEqual(got["PLAYED_10_GAMES"]["progress"], {"percent": 20})
-        self.assertEqual(got["PLAYED_100_HOURS_GAME"]["progress"], {"percent": 4})
-        self.assertEqual(got["STREAK_7_DAYS"]["progress"], {"percent": 42})
+        self.assertEqual(got["PLAYED_100_HOURS"]["progress"], {"percent": 6, "current": 6, "needed": 100, "metric": "hours"})
+        self.assertEqual(got["PLAYED_7_DAYS"]["progress"], {"percent": 42, "current": 3, "needed": 7, "metric": "days"})
+        self.assertEqual(got["PLAYED_10_GAMES"]["progress"], {"percent": 20, "current": 2, "needed": 10, "metric": "games"})
+        self.assertEqual(got["PLAYED_100_HOURS_GAME"]["progress"], {"percent": 4, "current": 4, "needed": 100, "metric": "game_hours"})
+        self.assertEqual(got["STREAK_7_DAYS"]["progress"], {"percent": 42, "current": 3, "needed": 7, "metric": "streak"})
 
     def test_a_lifetime_one_counts_the_whole_history(self):
         last = datetime.datetime(YEAR - 1, 3, 1, 10)
@@ -123,7 +123,7 @@ class CatalogProgressTests(unittest.TestCase):
         got = self.catalog()
         self.assertFalse(got["PLAYED_100_HOURS"]["unlocked_by_me"])  # not this season
         self.assertEqual(got["PLAYED_100_HOURS"]["progress"]["percent"], 6)
-        self.assertIsNotNone(got["PLAYED_100_HOURS"]["description"])  # but whoever earned it once knows what it is
+        self.assertIsNotNone(got["PLAYED_100_HOURS"]["description"])  # and it is how to earn it, whoever has it
 
     def test_a_lifetime_one_earned_in_a_past_season_has_no_bar(self):
         self.db.add(models.UserAchievement(user_id=1, achievement_id=8, date=datetime.date(YEAR - 1, 6, 9)))
@@ -139,10 +139,10 @@ class SeasonViewTests(unittest.TestCase):
         self.db.add_all([
             models.User(id=1, username="ana", name="Ana", is_active=1, is_admin=0),
             models.User(id=2, username="bea", name="Bea", is_active=1, is_admin=0),
-            models.Achievement(id=1, key="PLAYED_100_HOURS", title="100 h", message="*{}* 100 horas", active=True, secret=False, special=0, valid_from_season=2023),
-            models.Achievement(id=2, key="PLAYED_7_DAYS", title="7 días", message="x", active=True, secret=False, special=0, valid_from_season=YEAR),
-            models.Achievement(id=3, key="PLAYED_500_HOURS_LIFETIME", title="500 h", message="x", active=True, secret=False, special=0, valid_from_season=2023),
-            models.Achievement(id=4, key="EARLY_RISER", title="Madrugador", message="x", active=True, secret=True, special=0, valid_from_season=2023),
+            models.Achievement(id=1, key="PLAYED_100_HOURS", title="100 h", message="*{}* 100 horas", description="Juega 100 horas", active=True, secret=False, special=0, valid_from_season=2023),
+            models.Achievement(id=2, key="PLAYED_7_DAYS", title="7 días", message="x", description="D", active=True, secret=False, special=0, valid_from_season=YEAR),
+            models.Achievement(id=3, key="PLAYED_500_HOURS_LIFETIME", title="500 h", message="x", description="D", active=True, secret=False, special=0, valid_from_season=2023),
+            models.Achievement(id=4, key="EARLY_RISER", title="Madrugador", message="x", description="D", active=True, secret=True, special=0, valid_from_season=2023),
         ])
         past = datetime.date(YEAR - 1, 5, 1)
         self.db.add_all([
@@ -206,7 +206,7 @@ class WhatALockedOneGivesAwayTests(unittest.TestCase):
         self.db.add_all([
             models.User(id=1, username="ana", name="Ana", is_active=1, is_admin=0),
             models.User(id=2, username="bea", name="Bea", is_active=1, is_admin=0),
-            models.Achievement(id=1, key="PLAYED_100_HOURS", title="Cien", message="*{}* 100 horas", image=b"picture", active=True, secret=False, special=0, valid_from_season=2023),
+            models.Achievement(id=1, key="PLAYED_100_HOURS", title="Cien", message="*{}* 100 horas", description="Juega 100 horas", image=b"picture", active=True, secret=False, special=0, valid_from_season=2023),
         ])
         self.db.add(models.UserAchievement(user_id=2, achievement_id=1, date=datetime.date(YEAR - 1, 5, 1)))
         self.db.commit()
@@ -214,9 +214,9 @@ class WhatALockedOneGivesAwayTests(unittest.TestCase):
     def item(self, viewer):
         return group.achievements_catalog(self.db, viewer, TODAY)[0]
 
-    def test_whoever_never_unlocked_it_gets_no_key_no_picture_and_no_description(self):
+    def test_whoever_never_unlocked_it_gets_no_key_and_no_picture_but_does_get_how_to_earn_it(self):
         got = self.item(1)
-        self.assertEqual((got["key"], got["has_image"], got["description"]), (None, False, None))
+        self.assertEqual((got["key"], got["has_image"], got["description"]), (None, False, "Juega 100 horas"))
         self.assertEqual(got["title"], "Cien")  # the name is still shown
 
     def test_whoever_unlocked_it_in_any_season_gets_them(self):

@@ -67,13 +67,14 @@ test('a secret one says so, and being secret is not being special', async () => 
   assert.ok(![...document.querySelector('.ach-card').classList].some((c) => c.startsWith('special-')));  // no aura without a level
 });
 
-test('one the viewer has not unlocked, and is not secret, is shown dimmed with its name only', async () => {
-  installApi({ 'GET /group/achievements': [{ ...LIST[0], unlocked_by_me: false, unlocked_by: 0, players: [], description: null }, LIST[1]] });
+test('one the viewer has not unlocked, and is not secret, is shown dimmed, with its name and how to earn it', async () => {
+  installApi({ 'GET /group/achievements': [{ ...LIST[0], unlocked_by_me: false, unlocked_by: 0, players: [] }, LIST[1]] });
   await page.render({ main: main() });
   await settle();
   const [open] = document.querySelectorAll('.ach-card.locked');
   assert.match(open.textContent, /Primero <b>/);
-  assert.doesNotMatch(open.textContent, /Alguien lo hizo|null/);  // nothing about what it is
+  assert.match(open.textContent, /Alguien lo hizo/);  // how to earn it is there before having it
+  assert.doesNotMatch(open.textContent, /null/);
   assert.match(open.textContent, /Nadie lo ha conseguido/);
   assert.equal(document.querySelectorAll('.ach-card.mine').length, 0);
   assert.equal(text('.ach-count')[0], 'Tienes 0 de 2');
@@ -122,7 +123,7 @@ test('a block with nothing in it is not shown', () => {
 
 test('an achievement that adds something up shows how far the player is, and the others show no bar', async () => {
   installApi({ 'GET /group/achievements': [
-    { id: 5, key: 'PLAYED_100_HOURS', title: '100 horas', unlocked_by: 0, unlocked_by_me: false, players: [], progress: { percent: 35 } },
+    { id: 5, key: 'PLAYED_100_HOURS', title: '100 horas', unlocked_by: 0, unlocked_by_me: false, players: [], progress: { percent: 35, current: 35, needed: 100, metric: 'hours' } },
     { id: 6, key: 'EARLY', title: 'Sin barra', unlocked_by: 0, unlocked_by_me: false, players: [], progress: null },
     { id: 7, key: 'DONE', title: 'Hecho', unlocked_by: 1, unlocked_by_me: true, players: [{ user_id: 1, name: 'Ana', times: 1, last: '2026-02-01' }], progress: null },
   ] });
@@ -133,7 +134,7 @@ test('an achievement that adds something up shows how far the player is, and the
   assert.equal(bar.getAttribute('role'), 'progressbar');
   assert.equal(bar.getAttribute('aria-valuenow'), '35');
   assert.match(document.querySelector('.ach-bar-fill').getAttribute('style'), /width: 35%/);
-  assert.equal(document.querySelector('.ach-progress').textContent.trim(), ''); // no count, goal or unit
+  assert.equal(document.querySelector('.ach-progress').textContent.trim(), '35 / 100 h'); // the count against the goal
 });
 
 test('the season block has a summary pill and then a pill per season, newest first, and the running one is pressed', () => {

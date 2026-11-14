@@ -180,9 +180,9 @@ class ToolTests(unittest.TestCase):
     def seed_achievements(self):
         today = datetime.date.today()
         self.db.add_all([
-            models.Achievement(id=1, key="first_steps", title="Primeros pasos", message="Juega una hora", active=True, secret=False, special=0, valid_from_season=2023),
-            models.Achievement(id=2, key="night_owl", title="Búho", message="Juega de madrugada", active=True, secret=False, special=0, valid_from_season=2023),
-            models.Achievement(id=3, key="mystery", title="Misterio", message="No se cuenta", active=True, secret=True, special=0, valid_from_season=2023),
+            models.Achievement(id=1, key="first_steps", title="Primeros pasos", message="Juega una hora", description="Juega una hora al día", active=True, secret=False, special=0, valid_from_season=2023),
+            models.Achievement(id=2, key="night_owl", title="Búho", message="Juega de madrugada", description="Empieza a jugar de madrugada", active=True, secret=False, special=0, valid_from_season=2023),
+            models.Achievement(id=3, key="mystery", title="Misterio", message="No se cuenta", description="No se cuenta", active=True, secret=True, special=0, valid_from_season=2023),
             models.UserAchievement(user_id=1, achievement_id=1, date=today),
             models.UserAchievement(user_id=2, achievement_id=1, date=today),
             models.UserAchievement(user_id=2, achievement_id=2, date=today),
@@ -190,15 +190,15 @@ class ToolTests(unittest.TestCase):
         ])
         self.db.commit()
 
-    def test_the_achievements_tool_gives_the_description_only_of_what_the_user_has(self):
+    def test_the_achievements_tool_gives_how_to_earn_the_ones_that_are_not_hidden(self):
         self.seed_achievements()
         found = self.run_tool(tools.achievements)
         by_title = {a["title"]: a for a in found["achievements"]}
         self.assertEqual(set(by_title), {"Primeros pasos", "Búho"})
-        self.assertEqual(by_title["Primeros pasos"]["description"], "Juega una hora")
+        self.assertEqual(by_title["Primeros pasos"]["description"], "Juega una hora al día")
         self.assertTrue(by_title["Primeros pasos"]["mine"])
         self.assertEqual(by_title["Primeros pasos"]["players_who_have_it"], 2)
-        self.assertNotIn("description", by_title["Búho"])  # finding out what it is about is part of the game
+        self.assertEqual(by_title["Búho"]["description"], "Empieza a jugar de madrugada")  # how to earn it is shown even before having it
         self.assertFalse(by_title["Búho"]["mine"])
         self.assertEqual((found["mine"], found["hidden_ones_not_unlocked"]), (1, 1))
         self.assertNotIn("Misterio", str(found))  # a hidden one is only counted: neither its title nor its text
@@ -209,7 +209,8 @@ class ToolTests(unittest.TestCase):
         self.assertEqual([a["title"] for a in self.run_tool(tools.achievements, only="missing")["achievements"]], ["Búho"])
         self.assertEqual([a["title"] for a in self.run_tool(tools.achievements, only="mine")["achievements"]], ["Primeros pasos"])
         self.assertEqual([a["title"] for a in self.run_tool(tools.achievements, "pasos")["achievements"]], ["Primeros pasos"])
-        self.assertEqual(self.run_tool(tools.achievements, "madrugada")["achievements"], [])  # a text the user cannot read does not search
+        self.assertEqual([x["title"] for x in self.run_tool(tools.achievements, "madrugada")["achievements"]], ["Búho"])  # the description is searched
+        self.assertEqual(self.run_tool(tools.achievements, "misterio")["achievements"], [])  # a hidden one is never found
 
     def test_players_lists_the_group_without_the_emergency_account(self):
         names = [p["name"] for p in self.run_tool(tools.players)]
