@@ -31,11 +31,12 @@ export function selection(data, month) {
   };
 }
 
-/** What OpenAI billed against what the app estimates its group key spent, month by month (the latest first): `billed` from
- * GET /manage/ai-usage, `calls` the months of GET /manage/ai-usage/calls (what the group's OpenAI key really cost). `difference` is billed minus estimated: positive is
- * spend the record does not explain (a call it never saw, a price that changed, something else on the account). */
-export function reconcile(billed, calls) {
-  const estimated = new Map(calls.map((m) => [m.month, m.group_openai_real_cost ?? 0]));
+/** What a provider billed against what the app estimates its group key spent, month by month (the latest first): `billed` from
+ * GET /manage/ai-usage, `calls` the months of GET /manage/ai-usage/calls (what the group's key of that `provider` really cost).
+ * `difference` is billed minus estimated: positive is spend the record does not explain (a call it never saw, a price that changed,
+ * something else on the account). */
+export function reconcile(billed, calls, provider = 'openai') {
+  const estimated = new Map(calls.map((m) => [m.month, m.group_real_cost_by_provider?.[provider] ?? 0]));
   const months = new Set([...billed.map((m) => m.month), ...estimated.keys()]);
   return [...months].sort().reverse().map((month) => {
     const spent = billed.find((m) => m.month === month)?.total ?? 0;

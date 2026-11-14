@@ -3,7 +3,7 @@
 Un único `.env` en la raíz del proyecto lo leen la API, el bot y la base de datos (`env_file` en `docker-compose.yml`). La plantilla comentada es `.env.template`. Si cambias algo, recrea los contenedores: `docker compose up -d`.
 
 !!! info "Las claves de servicios externos solo viven aquí"
-    `TELEGRAM_TOKEN`, `TELEGRAM_GROUP_ID`, `TELEGRAM_ADMIN_CHAT_ID`, `OPENAI_AI_API_KEY`, `GOOGLE_AI_API_KEY`, `ANTHROPIC_AI_API_KEY`, `OPENROUTER_AI_API_KEY`, `OPENAI_ADMIN_KEY`, `RAWG_API_KEY`, `TWITCH_CLIENT_SECRET` y las credenciales SMTP **nunca se guardan en la base de datos**, ni cifradas. Así, una copia de seguridad no sirve para manejar el bot del grupo ni gastar la cuota de la IA. El panel solo te dice si cada una está puesta o no, sin enseñarla.
+    `TELEGRAM_TOKEN`, `TELEGRAM_GROUP_ID`, `TELEGRAM_ADMIN_CHAT_ID`, `OPENAI_AI_API_KEY`, `GOOGLE_AI_API_KEY`, `ANTHROPIC_AI_API_KEY`, `OPENROUTER_AI_API_KEY`, `OPENAI_ADMIN_KEY`, `ANTHROPIC_ADMIN_KEY`, `RAWG_API_KEY`, `TWITCH_CLIENT_SECRET` y las credenciales SMTP **nunca se guardan en la base de datos**, ni cifradas. Así, una copia de seguridad no sirve para manejar el bot del grupo ni gastar la cuota de la IA. El panel solo te dice si cada una está puesta o no, sin enseñarla.
 
 ## Obligatorias
 
@@ -47,6 +47,7 @@ Detalle en [Telegram](telegram.md).
 | `PROMETHEUS_URL` | Opcional. La dirección de Prometheus, para que la página **Servidor** añada memoria, espacio en disco, carga y tiempo encendido. Con `COMPOSE_PROFILES=monitoring` la API ya la recibe sola (`http://laviciacion-prometheus:9090`), así que solo hace falta para un Prometheus que esté en otro sitio. Sin Prometheus, la página enseña solo lo que da Hetzner. |
 | `HETZNER_SERVER_ID` | Opcional. El número del servidor en Hetzner; vacío = el único servidor del proyecto. |
 | `OPENAI_ADMIN_KEY` | Opcional. Una clave de **administración** de OpenAI, solo para leer cuánto se ha gastado (**IA → Uso y coste**). No escribe avisos. |
+| `ANTHROPIC_ADMIN_KEY` | Opcional. Lo mismo para Anthropic: una clave de **administración** (`sk-ant-admin01-...`), que solo tiene una organización de la consola de Anthropic (una cuenta individual debe crear antes su organización). No escribe avisos. |
 
 No hay ninguna variable que diga qué proveedor usar: es el que tenga clave y, con los dos, el que se elige en el panel (**IA → Avisos con IA**), donde también se puede cambiar el modelo con la lista que da el proveedor. Sin la clave y el modelo de al menos un proveedor, la IA no escribe nada y los avisos salen como texto normal. Ver [Servicios externos](servicios.md).
 

@@ -36,19 +36,21 @@ def get_costs(year: int = Query(..., ge=2000, le=2100, description="The year who
 @router.get("/ai-costs")
 def get_ai_costs(db: Session = Depends(get_db)):
     """What the AI has cost the group, in dollars (never converted to euros: the rate changes every day), for the server page:
-    this month, this year and month by month, and the same for each provider (`providers`). OpenAI's part is what it billed when
-    `OPENAI_ADMIN_KEY` is set and answers (a blocking call: a plain def, so it runs in a worker thread); Google has no spend API, so
-    what the other providers' keys spent is always the app's estimate. Each provider says how it is known (`source`: `billed` or
+    this month, this year and month by month, and the same for each provider (`providers`). A provider's part is what it billed when
+    its admin key is set (`OPENAI_ADMIN_KEY`, `ANTHROPIC_ADMIN_KEY`) and answers (a blocking call: a plain def, so it runs in a
+    worker thread); what the other providers' keys spent (Google, OpenRouter, and those with no admin key) is the app's estimate. Each provider says how it is known (`source`: `billed` or
     `estimated`) and so does the whole (`billed` when OpenAI's bill is all there is, `mixed` when an estimate is added to it,
     `estimated` when all of it is). Only totals, never who spent them."""
     today = datetime.date.today()
-    key = settings.get("ai.openai_admin_key")
     figures = {provider: (months, "estimated") for provider, months in ai_spend.group_months_by_provider(db).items()}
-    if key:
+    for provider, setting in ai_usage.ADMIN_KEYS.items():
+        key = settings.get(setting)
+        if not key:
+            continue
         try:
-            figures["openai"] = (ai_usage.summary(key)["months"], "billed")
+            figures[provider] = (ai_usage.summary(key, provider=provider)["months"], "billed")
         except AIError as e:
-            logger.warning(f"The server page could not ask OpenAI for the spend, it uses the estimate: {e}")
+            logger.warning(f"The server page could not ask {provider} for the spend, it uses the estimate: {e}")
     providers = []
     for provider, (months, source) in sorted(figures.items()):
         rolled = ai_usage.rollup(months, today)

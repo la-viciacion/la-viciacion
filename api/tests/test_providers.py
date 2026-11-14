@@ -46,6 +46,18 @@ class DocumentedTests(unittest.TestCase):
                     self.assertIn(variable, template)
                     self.assertIn(variable, docs)
 
+    def test_the_admin_keys_are_in_the_template_the_docs_and_the_rule_too(self):
+        template = (self.ROOT / ".env.template").read_text(encoding="utf-8")
+        docs = (self.ROOT / "docs" / "configuracion" / "variables.md").read_text(encoding="utf-8")
+        rules = (self.ROOT / "AGENTS.md").read_text(encoding="utf-8")
+        from src.utils import ai_usage
+
+        for setting in ai_usage.ADMIN_KEYS.values():
+            variable = settings.REGISTRY[setting].env
+            with self.subTest(variable=variable):
+                for text in (template, docs, rules):
+                    self.assertIn(variable, text)
+
     def test_the_keys_are_in_the_rule_that_says_they_never_go_in_the_database(self):
         rules = (self.ROOT / "AGENTS.md").read_text(encoding="utf-8")
         for provider in settings.AI_PROVIDERS:

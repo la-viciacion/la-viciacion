@@ -20,7 +20,7 @@ import { renderWallet } from './ai-wallet.js';
 
 const SECRETS = []; // never loaded back: sent only when something is typed (the keys of outside services are not: they are in the server's .env)
 const AI_IDS = ['openai', 'google', 'anthropic', 'openrouter']; // api/src/utils/settings.py AI_PROVIDERS: each has its own keys in the .env
-const LOCKED = ['telegram.token', 'telegram.group_id', 'telegram.admin_chat_id', 'ai.openai_admin_key', ...AI_IDS.flatMap((p) => [`ai.${p}.api_key`, `ai.${p}.model`, `ai.${p}.chat_model`])]; // shown only as set or not, never editable
+const LOCKED = ['telegram.token', 'telegram.group_id', 'telegram.admin_chat_id', 'ai.openai_admin_key', 'ai.anthropic_admin_key', ...AI_IDS.flatMap((p) => [`ai.${p}.api_key`, `ai.${p}.model`, `ai.${p}.chat_model`])]; // shown only as set or not, never editable
 // What the AI does and what each one follows when nothing is picked for it: the notices, the chat (follows the notices) and the guide
 // (follows the chat). `prefix` is the start of its settings: `<prefix>.provider` and `<prefix>.model.<provider>` (api/src/utils/ai_providers.py)
 const AI_USES = [
@@ -296,10 +296,11 @@ function view(values, jobs, pushDevices, mail, aiUses, aiModel, chat, guide = {}
         ${noKey ? html`<div class="adm-warn">No hay ningún proveedor de IA: define <code>OPENAI_AI_API_KEY</code>, <code>GOOGLE_AI_API_KEY</code>, <code>ANTHROPIC_AI_API_KEY</code> u <code>OPENROUTER_AI_API_KEY</code> en el .env del servidor (y reinicia la API).</div>` : usePicker(AI_USES[0])}
         ${readyProviders().length === 1 ? html`<div class="adm-sub">Solo hay clave de ${providerName(readyProviders()[0].id)} en el .env: es el que se usa. Para poder elegir, define también la clave de otro proveedor.</div>` : ''}
         <label>Clave de administración de OpenAI <input class="adm-input" type="text" value="${state('ai.openai_admin_key')}" disabled /></label>
+        <label>Clave de administración de Anthropic <input class="adm-input" type="text" value="${state('ai.anthropic_admin_key')}" disabled /></label>
         ${aiMissing(aiModel).length ? html`<div class="adm-warn">Falta ${aiMissing(aiModel).join(', ')}: la aplicación no tiene ningún modelo por defecto, así que la IA no escribe ningún aviso hasta que lo definas.</div>` : html`<div class="adm-sub">Usa ${providerName(aiModel.provider)} (${aiModel.model}).</div>`}
         ${problemNote(aiModel)}
         <div class="adm-sub">Las claves y los modelos por defecto de cada proveedor están en el .env del servidor (<code>OPENAI_AI_API_KEY</code>, <code>OPENAI_AI_MODEL</code>, <code>GOOGLE_AI_API_KEY</code>, <code>GOOGLE_AI_MODEL</code>, <code>ANTHROPIC_AI_API_KEY</code>, <code>ANTHROPIC_AI_MODEL</code>, <code>OPENROUTER_AI_API_KEY</code>, <code>OPENROUTER_AI_MODEL</code>): desde el panel solo se ven. La lista de modelos la da el propio proveedor en este momento, así que se puede cambiar de modelo sin redesplegar. Esa elección es solo para el proveedor en uso.</div>
-        <div class="adm-sub">La clave de administración (<code>OPENAI_ADMIN_KEY</code>, opcional) solo sirve para leer el gasto en IA → Uso y coste; no escribe nada.</div>
+        <div class="adm-sub">Las claves de administración (<code>OPENAI_ADMIN_KEY</code> y <code>ANTHROPIC_ADMIN_KEY</code>, opcionales; la de Anthropic solo la tiene una organización de su consola) solo sirven para leer el gasto en IA → Uso y coste; no escriben nada.</div>
         <div><button type="button" class="adm-btn" data-set-act="test-ai" ${noKey ? html`disabled` : ''}>Probar la IA</button></div>
       </section>`,
 

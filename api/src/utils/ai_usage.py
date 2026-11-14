@@ -1,20 +1,29 @@
-"""What the AI has cost: OpenAI's billed spend of the last year, by month, by day and by line item.
+"""What the AI has cost: what a provider billed in the last year, by month, by day and by line item.
 
-Nothing is stored (rule 2): it is asked to OpenAI's Costs API (clients/openai_usage.py) and kept in memory for a few
-minutes, so the panel opening again and again asks once. OpenAI only keeps a year of spend (it refuses an older start
-date), so that is as far back as the panel can go. Only OpenAI for now: Google has no API for what was spent."""
+Nothing is stored (rule 2): it is asked to the provider's cost API and kept in memory for a few minutes, so the panel opening again
+and again asks once. Two providers say what they billed, each with an admin key of its own: OpenAI (clients/openai_usage.py) and
+Anthropic (clients/anthropic_usage.py, which returns the same shape). OpenAI only keeps a year of spend (it refuses an older start
+date), so that is as far back as the panel goes. Google has no API for what was spent, and OpenRouter says what is left instead
+(utils/ai_balances.py)."""
 import datetime
 import threading
 import time
 
-from ..clients import openai_usage
+from ..clients import anthropic_usage, openai_usage
 
 CACHE_SECONDS = 600
 HISTORY_DAYS = 364  # OpenAI refuses a start date older than 365 days (UTC): one day less, so the date changing in between cannot fail
 PRECISION = 6  # a call of a small model costs a fraction of a cent
 
-_lock = threading.Lock()
-_cached: tuple[float, dict] | None = None  # (when it expires, the summary)
+# provider -> the setting that holds its admin key; looked up and called when asked (not bound here), so a test patches the client
+ADMIN_KEYS = {"openai": "ai.openai_admin_key", "anthropic": "ai.anthropic_admin_key"}
+_COSTS = {
+    "openai": lambda key, start: openai_usage.costs(key, start),
+    "anthropic": lambda key, start: anthropic_usage.costs(key, start),
+}
+
+_locks = {provider: threading.Lock() for provider in ADMIN_KEYS}  # one provider asking does not make the other wait
+_cached: dict[str, tuple[float, dict]] = {}  # provider -> (when it expires, the summary)
 
 
 def _ranked(amounts: dict[str, float]) -> list[dict]:
@@ -85,19 +94,18 @@ def first_day(now: datetime.datetime | None = None) -> int:
     return int(start.timestamp())
 
 
-def summary(admin_key: str, refresh: bool = False) -> dict:
-    """The summary of everything spent, from memory while it is fresh. Blocks on the network: call it from a worker
-    thread. Raises AIError if OpenAI refuses or does not answer."""
-    global _cached
-    with _lock:
-        if not refresh and _cached and _cached[0] > time.time():
-            return _cached[1]
-        data = summarize(openai_usage.costs(admin_key, first_day()))
-        _cached = (time.time() + CACHE_SECONDS, data)
+def summary(admin_key: str, refresh: bool = False, provider: str = "openai") -> dict:
+    """The summary of everything `provider` billed, from memory while it is fresh. Blocks on the network: call it from a worker
+    thread. Raises AIError if the provider refuses or does not answer."""
+    with _locks[provider]:
+        hit = _cached.get(provider)
+        if not refresh and hit and hit[0] > time.time():
+            return hit[1]
+        data = summarize(_COSTS[provider](admin_key, first_day()))
+        _cached[provider] = (time.time() + CACHE_SECONDS, data)
         return data
 
 
 def clear() -> None:
-    """Forget what is kept (the tests, and anybody who changes the key)."""
-    global _cached
-    _cached = None
+    """Forget what is kept (the tests, and anybody who changes a key)."""
+    _cached.clear()

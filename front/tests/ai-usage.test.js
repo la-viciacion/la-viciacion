@@ -52,7 +52,7 @@ test('a bar is a percentage of the largest, and nothing to compare with is empty
 
 test('what OpenAI billed is set against what the app estimates, month by month, the latest first', () => {
   const billed = [{ month: '2026-10', total: 1.5 }, { month: '2026-11', total: 0.4 }];
-  const calls = [{ month: '2026-11', group_openai_real_cost: 0.3 }, { month: '2026-09', group_openai_real_cost: 0.2 }];
+  const calls = [{ month: '2026-11', group_real_cost_by_provider: { openai: 0.3, anthropic: 5 } }, { month: '2026-09', group_real_cost_by_provider: { openai: 0.2 } }];
   assert.deepEqual(reconcile(billed, calls), [
     { month: '2026-11', billed: 0.4, estimated: 0.3, difference: 0.1 },
     { month: '2026-10', billed: 1.5, estimated: 0, difference: 1.5 },

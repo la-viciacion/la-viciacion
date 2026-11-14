@@ -1,6 +1,6 @@
 """OpenAI's Costs API: what the organization has been billed, one bucket per day (UTC), split by line item.
 
-It takes an admin key (OPENAI_ADMIN_KEY), not the key that writes text. OpenAI has no endpoint for the credit that is left,
+It takes an admin key (OPENAI_ADMIN_KEY), not the key that writes text. Anthropic's equivalent is clients/anthropic_usage.py. OpenAI has no endpoint for the credit that is left,
 only for what was spent."""
 import requests
 
