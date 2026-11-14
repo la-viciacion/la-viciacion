@@ -77,11 +77,11 @@ class KeyStorageTests(unittest.TestCase):
 
     def test_the_status_never_shows_the_key_and_a_locked_session_sees_no_hint(self):
         status = user_ai.status(self.db, 1, self.dek)
-        self.assertEqual((status["locked"], status["keys"]["openai"]["has_key"], status["keys"]["openai"]["model"]), (False, True, "gpt-4.1-mini"))
+        self.assertEqual((status["unlocked"], status["locked"], status["keys"]["openai"]["has_key"], status["keys"]["openai"]["model"]), (True, False, True, "gpt-4.1-mini"))
         self.assertNotIn(KEY, str(status))
         locked = user_ai.status(self.db, 1, None)
         self.assertEqual((locked["locked"], locked["keys"]["openai"]["has_key"], locked["keys"]["openai"]["hint"], locked["keys"]["openai"]["model"]), (True, True, None, "gpt-4.1-mini"))
-        self.assertFalse(user_ai.status(self.db, 2, None)["locked"], "a player with no keys has nothing to unlock")
+        self.assertEqual((user_ai.status(self.db, 2, None)["locked"], user_ai.status(self.db, 2, None)["unlocked"]), (False, False), "no keys: nothing to unlock, but nothing can be saved either")
 
     def test_a_key_that_does_not_open_with_the_data_key_is_unreadable_and_the_player_is_asked_for_it_again(self):
         status = user_ai.status(self.db, 1, b"\x09" * 32)

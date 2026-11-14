@@ -1,5 +1,5 @@
-// "Mi IA" (profile, Ajustes): the pure part of the player's own AI key screen: who pays for each feature and how a model reads.
-// The screen is pages/profile/ai.js. Everything comes from GET /users/{username}/ai and /ai/models.
+// "Mi IA" (profile, Ajustes): the pure part of the player's own AI keys screen: the providers, who pays for each feature and how a model
+// reads. The screen is pages/profile/ai.js. Everything comes from GET /users/{username}/ai and /ai/{provider}/models.
 import { budgetLine } from './ai-budget.js';
 import { money } from './ai-usage.js';
 
@@ -9,6 +9,33 @@ export const TIERS = {
   caro: 'caro',
   sin_precio: 'sin precio conocido',
 };
+
+// The providers a player can have a key for, in the order the screen shows them. `pattern` is what their keys look like (the API checks it
+// again and then asks the provider, which spends nothing): OpenAI's `sk-` also starts the other two, so they are told apart by their prefix.
+export const PROVIDERS = [
+  {
+    id: 'openai', name: 'OpenAI', placeholder: 'sk-…', pattern: /^sk-(?!ant-|or-)[A-Za-z0-9_-]{16,300}$/,
+    url: 'https://platform.openai.com/api-keys', where: 'platform.openai.com',
+    limit: 'Crea en platform.openai.com un proyecto solo para La Viciación con un límite de gasto mensual y usa una clave de ese proyecto.',
+  },
+  {
+    id: 'anthropic', name: 'Anthropic (Claude)', placeholder: 'sk-ant-…', pattern: /^sk-ant-[A-Za-z0-9_-]{16,300}$/,
+    url: 'https://platform.claude.com/settings/keys', where: 'platform.claude.com',
+    limit: 'En la consola de Anthropic crea una clave solo para La Viciación (en su propio espacio de trabajo, con un límite de gasto mensual).',
+  },
+  {
+    id: 'google', name: 'Google (Gemini)', placeholder: 'AIza…', pattern: /^AIza[A-Za-z0-9_-]{20,60}$/,
+    url: 'https://aistudio.google.com/apikey', where: 'aistudio.google.com',
+    limit: 'Una clave de Google AI Studio del plan gratuito no gasta nada, pero la búsqueda web de la guía necesita un plan de pago.',
+  },
+  {
+    id: 'openrouter', name: 'OpenRouter', placeholder: 'sk-or-…', pattern: /^sk-or-[A-Za-z0-9_-]{16,300}$/,
+    url: 'https://openrouter.ai/settings/keys', where: 'openrouter.ai',
+    limit: 'En OpenRouter puedes poner a cada clave un límite de crédito: crea una solo para La Viciación. Los modelos se escriben proveedor/modelo.',
+  },
+];
+
+export const providerName = (id) => PROVIDERS.find((p) => p.id === id)?.name ?? id;
 
 export const FEATURES = [
   ['chat', 'El chat'],
@@ -61,13 +88,16 @@ export function modelLabel(model) {
 function kindOf(feature) {
   if (feature.paid_by === 'user') return feature.blocked ? 'fallback' : 'own';
   if (feature.paid_by === 'group') return feature.mode === 'group_only' ? 'group_only' : 'group';
-  return 'needs';
+  return feature.locked ? 'locked' : 'needs';
 }
 
+/** Whether the player has a key of their own for any provider (`keys` of GET /users/{username}/ai). */
+export const hasAnyKey = (keys) => Object.values(keys ?? {}).some((k) => k.has_key);
+
 /** A short, quiet note on where the cost of the chat and the guide goes, from their states ({ available, needs_key, paid_by, mode,
- * blocked }) and whether the player has a key of their own: it says what is true for this player now and nothing more. */
-export function costNote({ chat, guide, key }) {
-  const hasKey = Boolean(key?.has_key);
+ * blocked, locked }) and whether the player has a key of their own: it says what is true for this player now and nothing more. */
+export function costNote({ chat, guide, keys }) {
+  const hasKey = hasAnyKey(keys);
   const features = [
     { feature: chat, of: 'del chat', is: 'el chat', cap: 'El chat' },
     { feature: guide, of: 'de la guía', is: 'la guía', cap: 'La guía' },
@@ -76,13 +106,14 @@ export function costNote({ chat, guide, key }) {
   const byKind = {};
   for (const f of features.filter((x) => x.feature.available)) (byKind[kindOf(f.feature)] ??= []).push(f);
   const subject = (list) => [list[0].cap, ...list.slice(1).map((f) => f.is)].join(' y '); // 'El chat y la guía'
-  const after = hasKey ? 'después seguirá con tu clave, a tu cuenta de OpenAI' : 'después necesitarás tu propia clave';
+  const after = hasKey ? 'después seguirá con tu clave, a tu cuenta del proveedor' : 'después necesitarás tu propia clave';
   for (const [kind, list] of Object.entries(byKind)) {
     const of = list.map((f) => f.of).join(' y ');
     if (kind === 'group_only') notes.push(`El coste ${of} lo cubre el grupo, tengas clave o no.`);
     else if (kind === 'group') notes.push(`El coste ${of} lo cubre el grupo mientras haya presupuesto este mes; ${after}.`);
-    else if (kind === 'own') notes.push(`El coste ${of} va a tu cuenta de OpenAI.`);
-    else if (kind === 'fallback') notes.push(`Se ha agotado el presupuesto del grupo este mes: de momento el coste ${of} va a tu cuenta de OpenAI.`);
+    else if (kind === 'own') notes.push(`El coste ${of} va a tu cuenta del proveedor de tu clave.`);
+    else if (kind === 'fallback') notes.push(`Se ha agotado el presupuesto del grupo este mes: de momento el coste ${of} va a tu cuenta del proveedor de tu clave.`);
+    else if (kind === 'locked') notes.push(`${subject(list)} ${list.length > 1 ? 'funcionan' : 'funciona'} con tu propia clave, que está bloqueada en esta sesión: escribe tu contraseña abajo.`);
     else if (list.length === 1 && list[0].is === 'la guía') notes.push('La guía de cada juego busca en internet y cuesta más: funciona con tu propia clave.');
     else notes.push(`${subject(list)} ${list.length > 1 ? 'funcionan' : 'funciona'} con tu propia clave.`);
   }
@@ -112,8 +143,8 @@ export function blockedText(state) {
   return null;
 }
 
-/** The key as the player sees it: the last characters, never the key. */
-export const keyText = (status) => `Clave guardada, termina en …${status.hint}`;
+/** The key as the player sees it: the last characters (only while their session is unlocked), never the key. */
+export const keyText = (status) => (status.hint ? `Clave guardada, termina en …${status.hint}` : 'Clave guardada');
 
-/** The key field's value looks like an OpenAI key (the API checks it for real with OpenAI). */
-export const looksLikeKey = (value) => /^sk-[A-Za-z0-9_-]{16,}$/.test(String(value).trim());
+/** The key field's value looks like a key of `provider` (the API checks it for real with the provider). */
+export const looksLikeKey = (provider, value) => Boolean(PROVIDERS.find((p) => p.id === provider)?.pattern.test(String(value).trim()));

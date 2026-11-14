@@ -8,9 +8,11 @@ Si el administrador tiene la IA activada, verás un botón redondo abajo a la de
 - Ve lo mismo que ves tú en el grupo (nunca la biblioteca ni los datos privados de otra persona).
 - Hay un límite de preguntas, para que nadie gaste el cupo de la IA. Si te pasas, el chat te dice cuánto esperar.
 
-## Tu propia clave de OpenAI
+## Tus propias claves de IA
 
-En **Perfil → Ajustes → Mi IA** puedes guardar tu propia clave de OpenAI y elegir el modelo. Con ella puedes seguir usando el chat cuando se agota el presupuesto del grupo (o tu parte): el coste de lo que preguntes va entonces a **tu cuenta**, y no te afectan los límites de preguntas por hora ni por día.
+En **Perfil → Ajustes → Mi IA** puedes guardar tu propia clave de cada proveedor (OpenAI, Anthropic, Google u OpenRouter) y elegir el modelo de cada una. Con ella puedes seguir usando el chat cuando se agota el presupuesto del grupo (o tu parte): el coste de lo que preguntes va entonces a **tu cuenta**, y no te afectan los límites de preguntas por hora ni por día. Si tienes varias, eliges cuál se usa primero; si no eliges, la app usa la del proveedor que usa el grupo (si tienes clave de él) y, si no, la primera que tengas.
+
+Tus claves se guardan **cifradas con tu contraseña**: se abren al iniciar sesión con ella y ni una copia de la base de datos ni un administrador pueden leerlas. Si tenías la sesión abierta antes de este cambio, o vas a guardar tu primera clave, la pantalla te pide la contraseña una vez. Si recuperas la contraseña por correo o te la cambia un administrador, **las claves se borran** (nadie puede abrirlas sin la anterior) y las vuelves a guardar; cambiar tú tu contraseña no las pierde.
 
 - La **guía de cada juego** (la tarjeta de la página del juego, o el botón «¿Atascado?» del timer) busca en internet y tiene un coste mayor: por defecto solo funciona con tu propia clave. Sin ella, la página del juego te lleva a Mi IA para añadirla.
 - El chat usa primero la del grupo mientras quede presupuesto ese mes; cuando se agota (el del grupo o tu parte), sigue con tu clave si la tienes.
