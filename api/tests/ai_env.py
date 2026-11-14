@@ -65,14 +65,12 @@ def give_key(db, user_id, key, model, provider="openai", password="Una-Contrasen
 
 
 def free_wallet(db, *user_ids: int) -> None:
-    """Takes the wallet limit off the players (default: the first two of `seed`): the wallet is always on and a player starts with a
-    balance of 0, so a test about anything else than the wallet starts from players the wallet does not stop."""
+    """Gives the players (default: the first two of `seed`) a balance in the wallet that no test spends: the wallet is always on and a
+    player starts with 0, so a test about anything else than the wallet starts from players the wallet does not stop."""
+    import datetime
+
     from src.database import models
 
     for user_id in user_ids or (1, 2):
-        row = db.get(models.UserSettings, user_id)
-        if row is None:
-            row = models.UserSettings(user_id=user_id)
-            db.add(row)
-        row.ai_wallet_unlimited = True
+        db.add(models.AiWalletEntry(user_id=user_id, amount_micros=10**12, created_at=datetime.datetime(2020, 1, 1)))
     db.commit()

@@ -24,6 +24,9 @@ from ..database import models
 from . import ai_ledger, ai_wallet, settings
 
 MICROS = 1_000_000
+# The monthly cap per player is not used for now: the wallet is the only limit. The code, the settings and the endpoints stay, so it
+# can be switched on again by setting this to True (nothing else changes).
+CAPS_ENFORCED = False
 USER = "user"  # the player has spent their share of the month
 USER_OFF = "user_off"  # the player's cap is 0: nothing of the group's key for them
 WALLET = "wallet"  # this player has nothing left in the wallet (utils/ai_wallet.py)
@@ -80,7 +83,7 @@ def unpriced(db: Session, now: datetime.datetime | None = None) -> dict:
 def exceeded(db: Session, user_id: int, now: datetime.datetime | None = None) -> str | None:
     """`USER` if this player has spent their share of the month, `WALLET` if their wallet balance is spent, else
     None. A cap of 0 has nothing to spend: `USER_OFF`."""
-    own = user_cap(db, user_id)
+    own = user_cap(db, user_id) if CAPS_ENFORCED else None
     if own is not None and (own == 0 or spent(db, user_id, now) >= own * MICROS):
         return USER_OFF if own == 0 else USER
     return WALLET if ai_wallet.empty(db, user_id) else None

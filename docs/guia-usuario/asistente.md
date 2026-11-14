@@ -25,6 +25,6 @@ Tus claves se guardan **cifradas con tu contraseña**: se abren al iniciar sesi�
 
 En la misma pantalla, **Tu gasto** te enseña cuántas preguntas has hecho, cuánto pesaron y una estimación de lo que han costado: lo que costó con tu clave y lo que cubrió el grupo, por mes, por función y por modelo. Solo lo ves tú, y no se guarda lo que escribes.
 
-Para que nadie se funda la cuota del grupo en pocos días, cada jugador tiene un **tope mensual** de lo que puede gastar de la clave del grupo (se renueva el día 1). Si lo agotas, el chat sigue con tu propia clave si la tienes; si no, te lo dice y no responde hasta el día 1.
+El límite de lo que puedes gastar de la clave del grupo es tu saldo del monedero (más abajo).
 
 El grupo paga la IA con un **monedero**: en la misma pantalla ves tu saldo (lo que has aportado menos lo que has gastado de la clave del grupo). Empiezas con 0, así que mientras un admin no te anote una aportación (o te quite el límite) la IA del grupo no funciona para ti. Cuando se agota, el chat y la guía siguen con tu propia clave si la tienes; si no, te lo dicen y no responden hasta que un admin anote otra aportación tuya.

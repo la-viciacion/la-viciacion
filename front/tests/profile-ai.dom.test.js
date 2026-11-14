@@ -331,16 +331,10 @@ test('without any use it says so instead of empty figures', async () => {
   assert.equal(el().querySelector('.pf-stats'), null);
 });
 
-test('their monthly share shows with what is spent and when it starts again, and nothing without a cap', async () => {
+test('the monthly cap is not shown for now: only the wallet line is', async () => {
   await open({ 'GET /users/ana/ai/usage': USAGE, 'GET /users/ana/ai': { ...stateOf(), budget: USAGE.budget } });
-  const text = el().querySelector('.ai-budget').textContent;
-  assert.doesNotMatch(text, /Presupuesto del grupo/);
-  assert.match(text, /Tu parte de la IA del grupo este mes: 0,40.* de 4,00/);
-  assert.match(text, /Se renueva el 1 de diciembre/);
-  await open({ 'GET /users/ana/ai': { ...stateOf(), budget: NOTHING.budget } });
   assert.equal(el().querySelector('.ai-budget'), null);
-  await open({ 'GET /users/ana/ai': { ...stateOf(), budget: { ...NOTHING.budget, user: { cap: 0, spent: 0 } } } });
-  assert.match(el().querySelector('.ai-budget').textContent, /Tu parte de la IA del grupo este mes: sin IA de la clave del grupo/);
+  assert.doesNotMatch(el().textContent, /Tu parte de la IA del grupo este mes/);
 });
 
 test('the wallet balance shows when there is one', async () => {

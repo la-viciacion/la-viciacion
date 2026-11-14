@@ -18,10 +18,9 @@ const day = (iso) => new Date(iso).toLocaleDateString('es-ES', { day: 'numeric',
 const playerRow = (p) => html`
   <tr data-user="${p.user_id}">
     <td>${p.name}${p.is_active ? '' : html` ${badge('Inactivo', 'gray')}`}</td>
-    <td>${money(p.contributed)}</td>
+    <td>${p.last_contribution ? day(p.last_contribution) : html`<span class="adm-sub">Nunca</span>`}</td>
     <td>${money(p.spent)}</td>
-    <td class="${isEmpty(p.balance) && !p.unlimited ? 'adm-neg' : ''}">${money(p.balance)} ${p.unlimited ? badge('Sin límite', 'gray') : isEmpty(p.balance) ? badge(p.balance < 0 ? 'En negativo' : 'Sin saldo', 'red') : ''}</td>
-    <td><input type="checkbox" data-unlimited="${p.user_id}" ${p.unlimited ? 'checked' : ''} aria-label="Sin límite de saldo para ${p.name}" /></td>
+    <td class="${isEmpty(p.balance) ? 'adm-neg' : ''}">${money(p.balance)} ${isEmpty(p.balance) ? badge(p.balance < 0 ? 'En negativo' : 'Sin saldo', 'red') : ''}</td>
   </tr>`;
 
 const entryRow = (e) => html`
@@ -84,10 +83,10 @@ function view(data, balances) {
       </div>
       <div class="adm-sub">${data.start ? `Ahora cuenta desde el ${day(data.start)}.` : 'Sin fecha: cuenta desde la primera aportación.'}</div>
 
-      ${cardTitle('Saldo de cada jugador', html`Aportado menos gastado de la clave del grupo desde que empezó el monedero. Cada jugador empieza con 0 y no puede usar la clave del grupo hasta que le anotes una aportación; en rojo, quien ya no puede. Marca «Sin límite» para quitarle el límite de saldo a un jugador (su tope mensual, si lo tiene, sigue valiendo).`)}
+      ${cardTitle('Saldo de cada jugador', html`Aportado menos gastado de la clave del grupo desde que empezó el monedero. Cada jugador empieza con 0 y no puede usar la clave del grupo hasta que le anotes una aportación; en rojo, quien ya no puede. La fecha es la de su última aportación (todas están en «Últimas aportaciones»).`)}
       ${data.players.length
         ? html`<div class="adm-table-wrap"><table class="adm-table">
-            <thead><tr><th>Jugador</th><th>Aportado</th><th>Gastado</th><th>Saldo</th><th>Sin límite</th></tr></thead>
+            <thead><tr><th>Jugador</th><th>Última aportación</th><th>Gastado</th><th>Saldo</th></tr></thead>
             <tbody>${data.players.map(playerRow)}</tbody>
           </table></div>`
         : html`<div class="adm-sub">No hay jugadores.</div>`}

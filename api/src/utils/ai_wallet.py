@@ -23,6 +23,9 @@ from . import ai_ledger, settings
 
 MICROS = 1_000_000
 MAX_USD = 10000
+# The "no wallet limit" switch of a player (`user_settings.ai_wallet_unlimited`) is not used for now: nobody is exempt from the
+# balance. The column, `set_unlimited` and the endpoint stay; set this to True to honour the switch again.
+UNLIMITED_HONORED = False
 
 
 def unlimited(db: Session, user_id: int) -> bool:
@@ -76,8 +79,8 @@ def balance(db: Session, user_id: int) -> int:
 
 
 def empty(db: Session, user_id: int) -> bool:
-    """Whether this player has nothing left in the wallet (0 or less) and has not been taken the limit off."""
-    return not unlimited(db, user_id) and balance(db, user_id) <= 0
+    """Whether this player has nothing left in the wallet (0 or less), unless the switch that takes the limit off is honoured and on."""
+    return not (UNLIMITED_HONORED and unlimited(db, user_id)) and balance(db, user_id) <= 0
 
 
 def _usd(micros: int) -> float:
@@ -89,13 +92,13 @@ def player(db: Session, user_id: int) -> dict:
     put, used, since = contributed(db, user_id), spent(db, user_id), start(db)
     return {
         "contributed": _usd(put), "spent": _usd(used), "balance": _usd(put - used),
-        "since": since.date().isoformat() if since else None, "unlimited": unlimited(db, user_id),
+        "since": since.date().isoformat() if since else None, "unlimited": UNLIMITED_HONORED and unlimited(db, user_id),
     }
 
 
 def overview(db: Session, entries: int = 50) -> dict:
     """For the admin: the wallet of the group (what is in, what is spent and what is left, to set against the balance of the
-    OpenAI account), each player's part and the latest contributions."""
+    OpenAI account), each player's part (with the date of their last contribution) and the latest contributions."""
     since = start(db)
     put_by = dict(
         db.query(models.AiWalletEntry.user_id, func.sum(models.AiWalletEntry.amount_micros))
@@ -108,13 +111,18 @@ def overview(db: Session, entries: int = 50) -> dict:
             .filter(models.AiUsage.key_source == ai_ledger.GROUP, models.AiUsage.created_at >= since, models.AiUsage.user_id.isnot(None))
             .group_by(models.AiUsage.user_id).all()
         )
-    free = {uid for uid, on in db.query(models.UserSettings.user_id, models.UserSettings.ai_wallet_unlimited).all() if on}
+    last_by = dict(
+        db.query(models.AiWalletEntry.user_id, func.max(models.AiWalletEntry.created_at))
+        .filter(models.AiWalletEntry.user_id.isnot(None), models.AiWalletEntry.amount_micros > 0).group_by(models.AiWalletEntry.user_id).all()
+    )
+    free = {uid for uid, on in db.query(models.UserSettings.user_id, models.UserSettings.ai_wallet_unlimited).all() if on and UNLIMITED_HONORED}
     players = []
     for user in db.query(models.User).filter(models.not_god()).order_by(models.User.username).all():
         put, used = int(put_by.get(user.id, 0) or 0), int(spent_by.get(user.id, 0) or 0)
         players.append({
             "user_id": user.id, "name": user.name or user.username, "is_active": bool(user.is_active),
             "contributed": _usd(put), "spent": _usd(used), "balance": _usd(put - used), "unlimited": user.id in free,
+            "last_contribution": last_by[user.id].isoformat() if last_by.get(user.id) else None,
         })
     total_in, total_out = contributed(db), spent(db)
     nobody = 0

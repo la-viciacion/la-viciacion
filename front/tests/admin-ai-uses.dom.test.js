@@ -432,20 +432,18 @@ test('the cards of the chat, the guide and the cost explain themselves in the "i
 test('everything that limits the AI is in one page: who takes the cost, the question limits, the money budget and the players\' table', async () => {
   const values = { ...VALUES, 'chat.key_source': 'group_then_user', 'guide.key_source': 'user_only', 'ai.user_budget_month': 5 };
   installApi({
-    'GET /manage/ai-usage/wallet': { active: false, start: null, start_setting: null, total: { contributed: 0, spent: 0, available: 0 }, players: [], entries: [] }, 'GET /manage/ai-usage/budgets': { month: '2026-11', resets_on: '2026-12-01', default_user_cap: 5, unpriced: { calls: 0, models: [] }, players: [{ user_id: 1, name: 'Ana', is_active: true, override: null, cap: 5, spent: 1, calls: 2 }] },
+    'GET /manage/ai-usage/wallet': { active: false, start: null, start_setting: null, total: { contributed: 0, spent: 0, available: 0 }, players: [{ user_id: 1, name: 'Ana', is_active: true, contributed: 0, spent: 0, balance: 0, last_contribution: null }], entries: [] }, 'GET /manage/ai-usage/budgets': { month: '2026-11', resets_on: '2026-12-01', default_user_cap: 5, unpriced: { calls: 0, models: [] }, players: [{ user_id: 1, name: 'Ana', is_active: true, override: null, cap: 5, spent: 1, calls: 2 }] },
     'GET /manage/settings': { values, jobs: {}, push_devices: { devices: 0, users: 0 }, mail: { configured: false, missing: [] }, ai_uses: USES, ai_model: { provider: 'google', model: 'gemini-test' }, chat: CHAT, guide: CHAT },
   });
   const { ENTITIES } = await import('../js/pages/admin/entities.js');
   await render(panel(), { entity: ENTITIES.ailimits });
   await settle();
   await settle();
-  const titles = [...panel().querySelectorAll('.adm-set-card h3, .adm-budgets-card h3')].map((h) => h.textContent);
-  assert.deepEqual(titles, ['Quién asume el coste', 'Límites de preguntas', 'Tope mensual por jugador (dinero)', 'Tope por jugador', 'Monedero de la clave del grupo', 'Anotar una aportación', 'Desde cuándo cuenta el gasto', 'Saldo de cada jugador', 'Últimas aportaciones']);
-  const card = panel().querySelector('.adm-aibudget-card');
-  assert.deepEqual([...card.querySelectorAll('input[type="number"]')].map((i) => [i.name, i.value]), [['ai.user_budget_month', '5']]);
-  assert.match(card.textContent, /límite de dinero, distinto de los límites de preguntas/);
-  assert.doesNotMatch(card.textContent, /Todo el grupo/, 'the group has no monthly budget');
-  assert.equal(panel().querySelector('tr[data-user="1"] [name="cap"]').value, '');
+  const titles = [...panel().querySelectorAll('.adm-set-card h3')].map((h) => h.textContent);
+  assert.deepEqual(titles, ['Quién asume el coste', 'Límites de preguntas', 'Monedero de la clave del grupo', 'Anotar una aportación', 'Desde cuándo cuenta el gasto', 'Saldo de cada jugador', 'Últimas aportaciones']);
+  assert.equal(panel().querySelector('.adm-aibudget-card'), null, 'the monthly caps are not used for now');
+  assert.equal(panel().querySelectorAll('table').length, 1, 'one table of players (the contributions are a list in the card)', );
+  assert.equal(panel().querySelector('[name="cap"]'), null);
 });
 
 test('a monthly cap left empty is no limit: emptying it sends null, writing a number sends the number, and a 0 is a 0', async () => {

@@ -100,6 +100,7 @@ class EnforcementTests(Base):
             self.put(1, 1.0)
             self.assertEqual(ai_budget.exceeded(self.db, 2, NOW), ai_budget.WALLET)
 
+    @mock.patch.object(ai_wallet, "UNLIMITED_HONORED", True)
     def test_an_admin_can_take_the_limit_off_a_player_and_put_it_back(self):
         with patched():
             self.assertEqual(ai_budget.exceeded(self.db, 1, NOW), ai_budget.WALLET)
@@ -112,6 +113,8 @@ class EnforcementTests(Base):
             ai_wallet.set_unlimited(self.db, 1, False)
             self.assertEqual(ai_budget.exceeded(self.db, 1, NOW), ai_budget.WALLET)
 
+    @mock.patch.object(ai_wallet, "UNLIMITED_HONORED", True)
+    @mock.patch.object(ai_budget, "CAPS_ENFORCED", True)
     def test_the_monthly_cap_still_stops_a_player_without_a_wallet_limit(self):
         with patched(**{"ai.user_budget_month": 1}):
             ai_wallet.set_unlimited(self.db, 1, True)
@@ -126,6 +129,7 @@ class EnforcementTests(Base):
             self.put(1, 2.0, when=NOW)
             self.assertIsNone(ai_budget.exceeded(self.db, 1, NOW))
 
+    @mock.patch.object(ai_budget, "CAPS_ENFORCED", True)
     def test_the_monthly_budgets_still_apply_on_top(self):
         with patched(**{"ai.user_budget_month": 1}):
             self.put(1, 50.0)
@@ -141,6 +145,18 @@ class EnforcementTests(Base):
             dek = ai_env.give_key(self.db, 1, KEY, "gpt-5-mini")
             decision = ai_source.decide(self.db, 1, "chat", dek)
             self.assertEqual((decision.source.key_source, decision.blocked), ("user", ai_budget.WALLET))
+
+
+class IgnoredSwitchTests(Base):
+    """For now nobody is exempt from the balance: the switch is stored but not honoured. Its code and column are still there."""
+
+    def test_a_player_marked_as_unlimited_is_still_stopped_by_the_wallet(self):
+        self.assertFalse(ai_wallet.UNLIMITED_HONORED)
+        with patched():
+            ai_wallet.set_unlimited(self.db, 1, True)
+            self.assertEqual(ai_budget.exceeded(self.db, 1, NOW), ai_budget.WALLET)
+            self.assertFalse(ai_wallet.player(self.db, 1)["unlimited"])
+            self.assertFalse(ai_wallet.overview(self.db)["players"][0]["unlimited"])
 
 
 class OverviewTests(Base):
@@ -165,6 +181,14 @@ class OverviewTests(Base):
             body = ai_wallet.overview(self.db)
         self.assertEqual(body["total"], {"contributed": 3.0, "spent": 0.75, "available": 2.25, "unassigned": 0.25})
         self.assertEqual(sum(p["spent"] for p in body["players"]) + body["total"]["unassigned"], body["total"]["spent"])
+
+    def test_each_player_has_the_date_of_their_last_contribution_and_none_if_they_never_put_anything_in(self):
+        with patched():
+            self.put(1, 3.0, when=datetime.datetime(2026, 11, 10, 9, 0))
+            self.put(1, 2.0, when=datetime.datetime(2026, 11, 12, 18, 30))
+            self.put(1, -1.0, when=datetime.datetime(2026, 11, 13, 8, 0))  # a refund is not a contribution
+            body = ai_wallet.overview(self.db)
+        self.assertEqual([(p["name"], p["last_contribution"]) for p in body["players"]], [("Ana", "2026-11-12T18:30:00"), ("Beto", None)])
 
     def test_the_money_of_a_deleted_account_stays_in_the_total(self):
         with patched():
@@ -199,6 +223,7 @@ class AdminRoutesTests(Base):
                 manage_route.post_wallet_entry(manage_route.WalletEntryBody(user_id=user_id, usd=usd), self.admin, self.db)
             self.assertEqual(caught.exception.status_code, status)
 
+    @mock.patch.object(ai_wallet, "UNLIMITED_HONORED", True)
     def test_an_admin_takes_the_limit_off_a_player_and_the_overview_says_so(self):
         with patched():
             body = manage_route.put_wallet_unlimited(2, manage_route.WalletUnlimitedBody(unlimited=True), self.db)
