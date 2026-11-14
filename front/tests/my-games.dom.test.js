@@ -150,7 +150,7 @@ test('a row says what was paid, and the price button opens one box per platform 
   document.querySelector('.pf-game[data-id="21"] [data-action="price"]').click();
   const boxes = [...document.querySelectorAll('.pf-game[data-id="21"] input[data-platform]')];
   assert.deepEqual(boxes.map((b) => [b.dataset.platform, b.value]), [['pc', '24,99'], ['switch', '']]);
-  assert.equal(document.querySelector('.pf-game[data-id="21"] [data-action="price"]'), null); // the form replaces the buttons
+  assert.equal(document.querySelector('.pf-game[data-id="21"] [data-action="price"]').getAttribute('aria-expanded'), 'true'); // opens under the row, like the sessions
   document.querySelector('[data-action="cancel-price"]').click();
   assert.equal(document.querySelector('[data-price-form]'), null);
 });
