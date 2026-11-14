@@ -1,26 +1,14 @@
 """The group endpoints through real requests: the achievements and who has them (MariaDB required, see api_support.py)."""
 import datetime
-import unittest
 from datetime import timedelta
 
 from sqlalchemy import text
 
-from src.crud import group
 from src.database import database, models
 from tests.api_support import ApiTestCase
 from tests import clock
 
 TODAY = clock.today
-
-
-class DescribeTests(unittest.TestCase):
-    def test_the_markup_and_the_placeholders_become_a_sentence(self):
-        self.assertEqual(
-            group.describe("*{}* acaba de jugar 8 horas a _{}_ en un día."),
-            "Alguien acaba de jugar 8 horas a un juego en un día.",
-        )
-        self.assertEqual(group.describe("{} lo logró {}"), "Alguien lo logró un juego")
-        self.assertEqual(group.describe(None), "")
 
 
 class AchievementsCatalogTests(ApiTestCase):
@@ -57,8 +45,7 @@ class AchievementsCatalogTests(ApiTestCase):
         for achievement in body:
             if achievement["id"] == self.first:
                 self.assertFalse(achievement["hidden"])
-                self.assertNotIn("{}", achievement["description"])
-                self.assertNotIn("*", achievement["description"])
+                self.assertTrue(achievement["description"])
             else:  # it is there to aim for: nothing is secret, but the ones of a later season are still hidden
                 self.assertEqual(achievement["hidden"], achievement["id"] in upcoming)
                 self.assertFalse(achievement["unlocked_by_me"])
@@ -66,7 +53,7 @@ class AchievementsCatalogTests(ApiTestCase):
                     self.assertEqual(set(achievement), {"id", "hidden", "unlocked_by_me", "secret", "special", "lifetime", "unlocked_by"})  # no name, only how many have it
                     continue
                 self.assertTrue(achievement["title"])
-                self.assertIsNone(achievement["description"])  # what it is about is for whoever earns it
+                self.assertTrue(achievement["description"])  # how to earn it is shown, a picture and a key are not
                 self.assertIsNone(achievement["key"])  # nor its key, nor its picture: they would say it
                 self.assertFalse(achievement["has_image"])
         self.assertEqual(next(a for a in body if a["id"] == self.second)["unlocked_by"], 1)

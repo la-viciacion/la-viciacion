@@ -253,7 +253,7 @@ class Achievements:
         """Create the achievements of the code that the table does not have yet.
 
         Existing rows are left alone: from then on the database is the source of truth, so
-        the title and message an admin edits (PATCH /manage/achievements) and whether it is active are kept.
+        the title, message and description an admin edits (PATCH /manage/achievements) and whether it is active are kept.
         A new one is active and valid from the season its definition says (`since`; the first season of the app
         when it says nothing): the season is what keeps it from counting before its time. It is also created as
         special or secret when its definition says so (`special`, `secret`: ordinary when it says nothing).
@@ -263,9 +263,19 @@ class Achievements:
         existing = {key for (key,) in db.query(models.Achievement.key).all()}
         missing = [a for a in AchievementsElems if a.name not in existing]
         dropped = existing - {a.name for a in AchievementsElems}
-        if not missing and not dropped:
+        undescribed = {
+            key for (key,) in db.query(models.Achievement.key).filter(
+                or_(models.Achievement.description.is_(None), models.Achievement.description == "")
+            )
+        }
+        if not missing and not dropped and not undescribed:
             return
         try:
+            for achievement in AchievementsElems:
+                if achievement.name in undescribed:  # an admin's text is never overwritten: only the empty ones are filled
+                    db.query(models.Achievement).filter(models.Achievement.key == achievement.name).update(
+                        {models.Achievement.description: achievement.value["description"]}, synchronize_session=False
+                    )
             if dropped:
                 db.query(models.Achievement).filter(models.Achievement.key.in_(dropped)).update(
                     {models.Achievement.active: False}, synchronize_session=False
@@ -276,6 +286,7 @@ class Achievements:
                         key=achievement.name,
                         title=achievement.value["title"],
                         message=achievement.value["message"],
+                        description=achievement.value["description"],
                         valid_from_season=first_season(achievement),
                         special=achievement.value.get("special", 0),
                         secret=achievement.value.get("secret", False),

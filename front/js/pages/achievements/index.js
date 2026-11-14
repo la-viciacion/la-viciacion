@@ -1,5 +1,5 @@
 // Achievements page (#/achievements): the achievements the viewer has unlocked with their picture and description, and
-// who of the group has unlocked them and when; the rest are listed hidden. They come in two blocks, the ones earned
+// who of the group has unlocked them and when; the secret ones they have not unlocked are listed hidden, with no clue. They come in two blocks, the ones earned
 // once a season and the lifetime ones (earned once, counting the whole history). The ones that add something up show
 // how far the viewer is from them. The season block has a pill per season: each shows only the achievements of that
 // season, with who had them and whether the viewer did then; the first pill, "Resumen", puts every season together: each
@@ -50,17 +50,21 @@ const hiddenCard = (a) => html`
     </div>
   </article>`;
 
-// How far the viewer is from an achievement that adds something up: only a bar, with no count, goal or unit, so that
-// a locked one does not say what it counts or where the limit is.
+// What the bar of each kind of achievement counts, to write after the figures ("35 / 100 h")
+const UNITS = { hours: 'h', game_hours: 'h', days: 'días', games: 'juegos', completed: 'completados', streak: 'días seguidos' };
+const figure = (n) => n.toLocaleString('es-ES', { maximumFractionDigits: 1 });
+
+// How far the viewer is from an achievement that adds something up: the bar and, under it, the count against the goal,
+// so that it is seen how much is left (the description already says what is being counted).
 const progressBar = (p) => (p ? html`
   <div class="ach-progress">
     <div class="ach-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${p.percent}" aria-label="Progreso">
       <div class="ach-bar-fill" style="width: ${p.percent}%"></div>
     </div>
+    <div class="pf-sub ach-count-of">${figure(p.current)} / ${figure(p.needed)} ${UNITS[p.metric] || ''}</div>
   </div>` : '');
 
-// One the viewer has not unlocked (and is not secret) is shown dimmed, with its name only: what it is about is for
-// them to work out.
+// One the viewer has not unlocked (and is not secret) is shown dimmed, with its name and how to earn it.
 const card = (a) => (a.hidden ? hiddenCard(a) : html`
   <article class="ach-card ${a.unlocked_by_me ? 'mine' : 'locked'}${specialClass(a.special)}">
     <div class="ach-head">

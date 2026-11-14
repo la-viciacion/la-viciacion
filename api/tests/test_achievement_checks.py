@@ -553,6 +553,23 @@ class AchievementCheckTests(unittest.IsolatedAsyncioTestCase):
         again = {a.key: (a.active, a.valid_from_season) for a in db.query(models.Achievement)}
         self.assertEqual(again["PLAYED_7_DAYS"], (True, 2023))
 
+    def test_every_definition_says_how_it_is_earned_and_the_table_is_filled_without_overwriting(self):
+        from tests.sqlite_db import make_session as fresh
+
+        for ach in ach_module.AchievementsElems:
+            text = ach.value["description"]
+            self.assertTrue(text and len(text) <= 255 and "{}" not in text and "*" not in text, ach.name)
+        db = fresh()
+        Achievements().populate_achievements(db)
+        self.assertTrue(all(a.description for a in db.query(models.Achievement)))
+        db.query(models.Achievement).filter_by(key="PLAYED_7_DAYS").update({"description": "Texto del admin"})
+        db.query(models.Achievement).filter_by(key="PLAYED_15_DAYS").update({"description": None})
+        db.commit()
+        Achievements().populate_achievements(db)  # an empty one is filled again, an edited one is left alone
+        got = {a.key: a.description for a in db.query(models.Achievement)}
+        self.assertEqual(got["PLAYED_7_DAYS"], "Texto del admin")
+        self.assertEqual(got["PLAYED_15_DAYS"], ach_module.AchievementsElems.PLAYED_15_DAYS.value["description"])
+
     async def test_an_achievement_that_is_not_valid_yet_is_not_earned_until_its_season(self):
         self.db.query(models.Achievement).filter_by(key="PLAYED_7_DAYS").update({"valid_from_season": YEAR + 1})
         self.db.commit()

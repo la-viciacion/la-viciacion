@@ -3,10 +3,11 @@
 the unlock agree; nothing is stored.
 
 Only the cumulative families have one. "Hours in a single day" or "Del tirón" are about one moment, not a total,
-so they have no bar, and secret achievements never do (the catalog hides them altogether). A season achievement
+so they have no bar, and secret achievements never do (the catalog hides them altogether). The bar carries the count and the goal. A season achievement
 counts the running season; a lifetime one the whole history from the season it starts to count in (`since`).
 The streak is the current run: how far the player is from the next day of it, not their best one."""
 import datetime
+import math
 from typing import Callable
 
 from sqlalchemy.orm import Session
@@ -38,14 +39,18 @@ def target_of(key: str) -> tuple[str, int] | None:
     return TARGETS.get(key)
 
 
-def bar(current: float, needed: int) -> dict:
-    """What the page draws: only how full the bar is, a whole percent. Neither the goal, the count nor its unit
-    are sent on purpose: a locked achievement must not give away what it counts or where the limit is. A little
-    progress still shows (never 0 once something is done) and a bar is only full when the goal is reached."""
-    if current <= 0:
-        return {"percent": 0}
-    percent = int(min(current, needed) / needed * 100)
-    return {"percent": max(1, min(100, percent))}
+def bar(current: float, needed: int, metric: str | None = None) -> dict:
+    """What the page draws: how full the bar is (a whole percent), the count, the goal and what is counted (`metric`:
+    hours, days, games, completed, game_hours or streak), so that the player sees how much is left. The description
+    already says how the achievement is earned, so none of it is a secret (a secret one never has a bar). A little
+    progress still shows (never 0 once something is done) and a bar is only full when the goal is reached. The count is
+    cut down to a tenth, so that 99.9 hours never reads as the 100 that unlock it."""
+    count = math.floor(min(max(current, 0), needed) * 10) / 10
+    count = int(count) if count == int(count) else count
+    out = {"percent": 0, "current": count, "needed": needed, "metric": metric}
+    if current > 0:
+        out["percent"] = max(1, min(100, int(min(current, needed) / needed * 100)))
+    return out
 
 
 class Metrics:
@@ -107,4 +112,4 @@ class Progress:
         scope = (seasons.ALL, valid_from_season or None) if lifetime else (seasons.current(), None)
         if scope not in self._scopes:
             self._scopes[scope] = Metrics(self.db, self.user_id, scope[0], scope[1], self.today)
-        return bar(self._scopes[scope].get(metric), needed)
+        return bar(self._scopes[scope].get(metric), needed, metric)

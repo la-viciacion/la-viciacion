@@ -2,7 +2,6 @@
 players and what is public of each one. Every player is listed, active or not (an inactive one cannot log in or act, nothing more; never the
 emergency account), and who has an achievement counts everybody who earned it."""
 import datetime
-import re
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -12,17 +11,6 @@ from . import affinity, time_entries, users
 from .achievement_progress import Progress
 from ..utils.achievements import is_lifetime  # after the crud modules: they import each other
 from ..utils import seasons, user_settings
-
-
-def describe(message: str | None) -> str:
-    """The text an achievement announces ("*{}* acaba de jugar 8 horas a _{}_") read as a description: the player
-    becomes "alguien", the game "un juego", and the Telegram markup goes."""
-    text = message or ""
-    for placeholder in ("alguien", "un juego"):
-        text = text.replace("{}", placeholder, 1)
-    text = text.replace("{}", "")
-    text = re.sub(r"[*_]", "", text).strip()
-    return text[:1].upper() + text[1:]
 
 
 def unlocked_ids(db: Session, user_id: int) -> set[int]:
@@ -42,11 +30,10 @@ def achievements_catalog(
     db: Session, viewer_id: int, today: datetime.date | None = None, season: int | None = None, summary: bool = False,
 ) -> list[dict]:
     """Every achievement with who has unlocked it and when last. The ones the viewer has not unlocked come with
-    their name and picture but **no description** (the front dims them: the player has to work out what they are
-    about) unless they are secret: those come hidden, with no key, title, description or picture (and of the players only how many, no names or dates), only that
+    their name and description (how to earn it) but **no picture** (the front dims them) unless they are secret: those come hidden, with no key, title, description or picture (and of the players only how many, no names or dates), only that
     they exist, whether they are secret and their special level (so that everybody knows there are special ones to
     unlock). One that is switched on but not valid yet (`valid_from_season` in the future), secret or not, is listed
-    that way too, in the running season, so it is already there as a hidden one when it begins to count. Whoever has unlocked an achievement once knows what it is: that is what shows the description and
+    that way too, in the running season, so it is already there as a hidden one when it begins to count. Whoever has unlocked an achievement once knows what it is: that is what
     lifts the secrecy, whatever the season on screen, except for a secret season achievement: that one is only
     revealed in the season the viewer earned it in. The same goes for its key and its picture, which would
     give away what it is about: they are only sent for the ones the viewer has unlocked.
@@ -67,7 +54,7 @@ def achievements_catalog(
     progress = Progress(db, viewer_id, today)
 
     achievements = db.query(
-        models.Achievement.id, models.Achievement.key, models.Achievement.title, models.Achievement.message,
+        models.Achievement.id, models.Achievement.key, models.Achievement.title, models.Achievement.description,
         models.Achievement.image.isnot(None).label("has_image"), models.Achievement.active, models.Achievement.secret,
         models.Achievement.special, models.Achievement.valid_from_season,
     ).order_by(models.Achievement.id).all()
@@ -124,7 +111,7 @@ def achievements_catalog(
             # never unlocked it (the front shows a placeholder instead)
             "key": row.key if is_known else None,
             "title": row.title,
-            "description": describe(row.message) if is_known else None,  # what it is about is for whoever earns it
+            "description": row.description,  # how it is earned: a secret one only gets here once the viewer has unlocked it
             "secret": bool(row.secret),
             "special": row.special,
             "lifetime": lifetime,  # earned once in a lifetime, not once a season

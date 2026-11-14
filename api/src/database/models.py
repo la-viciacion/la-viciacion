@@ -262,6 +262,8 @@ class Achievement(Base):
     key = Column(String(255))
     title = Column(String(255))
     message = Column(String(255))
+    # how it is earned, as the player reads it (the announcement is `message`); filled from the code's definitions when empty
+    description = Column(String(255))
     # not loaded with the achievement: only the image route reads it, and the lists of awards load many rows
     image = deferred(Column(LargeBinary))
     # an achievement that is switched off is not earned, announced, recalculated or shown (see crud/achievements.py)
