@@ -36,10 +36,13 @@ class GuideResponse(BaseModel):
 
 
 @router.get("/status")
-def get_status(current_user: models.User = Depends(auth.get_current_active_user), db: Session = Depends(get_db)):
+def get_status(
+    current_user: models.User = Depends(auth.get_current_active_user), dek: bytes | None = Depends(auth.get_unlock), db: Session = Depends(get_db)
+):
     """What this player can do with the guide now: `available` (it is on and somebody could pay for it), `needs_key` (the
-    group does not cover it: they have to save their own key) and `paid_by` (`user` or `group`, who would pay)."""
-    return ai_source.availability(db, current_user.id, "guide")  # `blocked`: the budget of the group's key is spent
+    group does not cover it: they have to save their own key), `paid_by` (`user` or `group`, who would pay) and `locked` (they have
+    keys of their own that this session cannot open until they type their password)."""
+    return ai_source.availability(db, current_user.id, "guide", dek)  # `blocked`: the budget of the group's key is spent
 
 
 @router.post("/{game_id}", response_model=GuideResponse)
@@ -47,10 +50,11 @@ def ask(
     game_id: str,
     body: GuideRequest,
     current_user: models.User = Depends(auth.get_current_active_user),
+    dek: bytes | None = Depends(auth.get_unlock),
     db: Session = Depends(get_db),
 ):
     """Answers a question about one game, searching the web. The history comes from the client; nothing is stored."""
-    decision = ai_source.decide(db, current_user.id, "guide")  # once: it decrypts the key and sums the month's spending
+    decision = ai_source.decide(db, current_user.id, "guide", dek)  # once: it opens the key and sums the month's spending
     state = ai_source.state_of("guide", decision)
     if not state["available"]:
         raise HTTPException(status_code=503, detail=messages.GUIDE_UNAVAILABLE)
@@ -63,6 +67,8 @@ def ask(
             question=body.message, turns=len(body.history), game_id=game_id,
         )
         raise HTTPException(status_code=429, detail=ai_source.blocked_message(state["blocked"], "guide"))
+    if decision.locked and decision.source is None:  # they have keys, this session cannot open them: the front asks for the password
+        raise HTTPException(status_code=423, detail=messages.USER_AI_LOCKED)
     if state["needs_key"]:
         raise HTTPException(status_code=403, detail=messages.USER_KEY_REQUIRED)
     source = decision.source

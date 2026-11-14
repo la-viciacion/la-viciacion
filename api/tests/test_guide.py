@@ -178,6 +178,7 @@ class EndpointTests(unittest.TestCase):
         app.include_router(guide_router.router)
         user = types.SimpleNamespace(id=1, username="ana", name="Ana", is_admin=0, is_active=1)
         app.dependency_overrides[auth.get_current_active_user] = lambda: user
+        app.dependency_overrides[auth.get_unlock] = lambda: None
         app.dependency_overrides[guide_router.get_db] = lambda: mock.MagicMock()
         self.client = TestClient(app)
         # the endpoint runs on another thread, where the in-memory database is empty: the overview is read here

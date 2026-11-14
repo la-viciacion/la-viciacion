@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 from ..config import Config
 from ..crud import users
 from ..database import models
-from . import email
+from . import email, user_ai
 from .logger import LogManager
 
 logger = LogManager().get_logger()
@@ -85,6 +85,8 @@ def reset_password(db: Session, token: str, new_password: str) -> bool:
         models.PasswordReset.user_id == user.id, models.PasswordReset.id != row.id
     ).delete(synchronize_session=False)
     db.commit()
+    if user_ai.wipe(db, user.id):  # nobody can open their AI keys any more: they are deleted and the player pastes them again
+        logger.info(f"The AI keys of user {user.id} were deleted: their password was reset through a recovery link")
     logger.info(f"Password of user {user.id} changed through a recovery link")
     return True
 

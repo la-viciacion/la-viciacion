@@ -13,7 +13,7 @@ from ..crud import users
 from ..database import models, schemas
 from ..utils import audit
 from ..utils import messages as msg
-from ..utils import password_reset
+from ..utils import password_reset, user_ai
 from ..utils.my_utils import validate_password_requirements
 from ..utils.logger import LogManager
 from ..utils.rate_limit import AttemptLimiter
@@ -76,6 +76,18 @@ def keepalive(request: Request):
     return "Yup, I'm alive!"
 
 
+def _open_keys(db: Session, user: models.User, password: str) -> bytes | None:
+    """The data key of the player's own AI keys, opened with the password they have just typed (their vault, or the old key that
+    was saved before it: it is adopted into a vault now). None for a player who has neither. It never stops a login: if the vault
+    cannot be read the session is simply locked."""
+    try:
+        return user_ai.unlock(db, user.id, password, create=False)
+    except Exception as e:  # noqa: BLE001
+        logger.error(f"The AI keys of user {user.id} could not be opened at login: {type(e).__name__}: {e}")
+        db.rollback()
+        return None
+
+
 @router.post("/token", response_model=auth.Token)
 def login_for_access_token(
     request: Request,
@@ -110,14 +122,15 @@ def login_for_access_token(
         audit.record_event(request, "login_disabled", status.HTTP_403_FORBIDDEN, user=user)
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=msg.ACCOUNT_DISABLED)
     audit.record_event(request, "login", status.HTTP_200_OK, user=user)
-    return auth.issue_token(user)
+    return auth.issue_token(user, _open_keys(db, user, form_data.password))
 
 
 @router.post("/auth/refresh", response_model=auth.Token)
-def refresh_token(user: models.User = Security(auth.get_current_active_user)):
+def refresh_token(user: models.User = Security(auth.get_current_active_user), dek: bytes | None = Depends(auth.get_unlock)):
     """A fresh token for a session that is still valid, so whoever keeps using the app is never sent back to the
-    login. A token that expired, was issued before a password change or belongs to a disabled account gets nothing."""
-    return auth.issue_token(user)
+    login. A token that expired, was issued before a password change or belongs to a disabled account gets nothing. The data
+    key of the player's own AI keys, if the session carries it, goes into the new token as new, so it lasts as long as the session."""
+    return auth.issue_token(user, dek)
 
 
 @router.get("/auth/active_user", response_model=schemas.User)

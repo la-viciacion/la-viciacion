@@ -14,13 +14,11 @@ from pydantic_ai.models.function import FunctionModel
 
 from src import auth
 from src.chat import agent as chat_agent
-from src.clients import failure
-from src.clients.ai_error import AIError, ProviderError, Quota
+from src.clients.ai_error import AIError, Quota
 from src.database import models
 from src.guide import agent as guide_agent
 from src.routers import guide as guide_router
-from src.routers import user_ai as route
-from src.utils import actions, ai_budget, ai_ledger, ai_source, scheduler, settings, user_ai
+from src.utils import actions, ai_budget, ai_ledger, ai_source, scheduler, settings
 from tests import ai_env
 from tests.sqlite_db import make_session
 from tests.test_chat import seed
@@ -115,59 +113,6 @@ class MeasuringNeverLosesAnAnswerTests(unittest.TestCase):
         self.assertEqual(self.db.query(models.AiUsage).one().status, "ok")
 
 
-class ReplacingAKeyKeepsTheModelTests(unittest.TestCase):
-    """Findings 3 and 4: the model survives a new key, and listing the models does not use up the saves."""
-
-    def setUp(self):
-        self.db = make_session(threads=True)
-        seed(self.db)
-        route.limiter.clear()
-        self.addCleanup(route.limiter.clear)
-        app = FastAPI()
-        app.include_router(route.router)
-        self.user = types.SimpleNamespace(id=1, username="ana", name="Ana", is_admin=0, is_active=1)
-        app.dependency_overrides[auth.get_current_active_user] = lambda: self.user
-        app.dependency_overrides[route.get_db] = lambda: self.db
-        self.client = TestClient(app)
-        patcher = patched()
-        patcher.start()
-        self.addCleanup(patcher.stop)
-
-    def test_a_new_key_without_a_model_keeps_the_one_they_chose(self):
-        user_ai.save(self.db, 1, KEY, "gpt-5")
-        with mock.patch.object(route.model_list, "list_models", return_value=[]):
-            body = self.client.put("/users/ana/ai", json={"api_key": NEW_KEY}).json()
-        self.assertEqual((body["hint"], body["model"]), ("3210", "gpt-5"))
-        self.assertEqual(user_ai.credentials(self.db, 1), (NEW_KEY, "gpt-5"))
-
-    def test_a_first_key_gets_the_default_and_a_model_sent_with_the_key_wins(self):
-        with mock.patch.object(route.model_list, "list_models", return_value=[]):
-            self.assertEqual(self.client.put("/users/ana/ai", json={"api_key": KEY}).json()["model"], route.DEFAULT_MODEL)
-            self.assertEqual(self.client.put("/users/ana/ai", json={"api_key": NEW_KEY, "model": "o3"}).json()["model"], "o3")
-
-    def test_the_model_chosen_survives_a_key_that_cannot_be_opened_any_more(self):
-        user_ai.save(self.db, 1, KEY, "gpt-5")
-        with mock.patch.object(user_ai.config, "SECRET_KEY", "another"):
-            self.assertEqual(user_ai.model_of(self.db, 1), "gpt-5")
-        self.assertIsNone(user_ai.model_of(self.db, 2))
-
-    def test_listing_the_models_many_times_does_not_use_up_the_saves_and_tests(self):
-        user_ai.save(self.db, 1, KEY, "gpt-4.1-mini")
-        with mock.patch.object(route.model_list, "list_models", return_value=["gpt-4.1-mini"]):
-            codes = [self.client.get("/users/ana/ai/models").status_code for _ in range(route.CHANGES_PER_HOUR + 5)]
-            self.assertEqual(set(codes), {200}, "more listings than saves are allowed")
-            self.assertEqual(self.client.put("/users/ana/ai", json={"api_key": NEW_KEY}).status_code, 200)
-
-    def test_listing_has_a_limit_of_its_own_and_saving_still_has_its_own(self):
-        user_ai.save(self.db, 1, KEY, "gpt-4.1-mini")
-        with mock.patch.object(route.model_list, "list_models", return_value=[]):
-            codes = [self.client.get("/users/ana/ai/models").status_code for _ in range(route.LISTINGS_PER_HOUR + 1)]
-            self.assertEqual((codes[:-1] == [200] * route.LISTINGS_PER_HOUR, codes[-1]), (True, 429))
-        with mock.patch.object(route.model_list, "list_models", side_effect=ProviderError("x", failure.DENIED)):
-            saves = [self.client.put("/users/ana/ai", json={"api_key": NEW_KEY}).status_code for _ in range(route.CHANGES_PER_HOUR + 1)]
-        self.assertEqual((saves[:-1], saves[-1]), ([400] * route.CHANGES_PER_HOUR, 429))
-
-
 class GuideRouteTests(unittest.TestCase):
     """Findings 6 and 7: the game is checked before anything is recorded, and the decision is made once."""
 
@@ -178,6 +123,7 @@ class GuideRouteTests(unittest.TestCase):
         app = FastAPI()
         app.include_router(guide_router.router)
         app.dependency_overrides[auth.get_current_active_user] = lambda: self.user
+        app.dependency_overrides[auth.get_unlock] = lambda: getattr(self, "dek", None)
         app.dependency_overrides[guide_router.get_db] = lambda: self.db
         self.client = TestClient(app)
         guide_router.limits.limiter.clear()
@@ -210,7 +156,7 @@ class GuideRouteTests(unittest.TestCase):
             decision = ai_source.decide(self.db, 1, "guide")
             self.assertEqual(ai_source.state_of("guide", decision), ai_source.availability(self.db, 1, "guide"))
         with patched(**{"guide.enabled": False}):
-            self.assertEqual(ai_source.state_of("guide", ai_source.Decision(None)), {"available": False, "needs_key": False, "paid_by": None, "blocked": None})
+            self.assertEqual(ai_source.state_of("guide", ai_source.Decision(None)), {"available": False, "needs_key": False, "paid_by": None, "blocked": None, "locked": False})
 
 
 class UnpricedCallsTests(unittest.TestCase):

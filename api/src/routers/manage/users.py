@@ -12,6 +12,7 @@ from ... import auth
 from ...auth import get_db
 from ...crud import users as users_crud
 from ...database import models
+from ...utils import user_ai
 from ...utils.my_utils import normalize_email, validate_email_format, validate_password_requirements, validate_username
 from .common import commit, confirm_or_409, get_or_404, like, router
 
@@ -208,7 +209,8 @@ def set_password(user_id: int, body: PasswordBody, db: Session = Depends(get_db)
         )
     user.password = hashpw(body.password.encode("utf-8"), gensalt()).decode()
     db.commit()
-    return {"message": "Contraseña actualizada"}
+    wiped = user_ai.wipe(db, user.id)  # the vault was wrapped with the old password: nobody can open it now
+    return {"message": "Contraseña actualizada" + (" y sus claves de IA borradas (no se pueden abrir sin su contraseña anterior)" if wiped else "")}
 
 
 @router.delete("/users/{user_id}")

@@ -70,22 +70,25 @@ class ChatResponse(BaseModel):
 
 
 @router.get("/status")
-def get_status(current_user: models.User = Depends(auth.get_current_active_user), db: Session = Depends(get_db)):
+def get_status(
+    current_user: models.User = Depends(auth.get_current_active_user), dek: bytes | None = Depends(auth.get_unlock), db: Session = Depends(get_db)
+):
     """Whether the chat is there for this player (it is on and somebody can pay for it: their own key, or the group's), so the
     front only shows it when it works. One whose budget is spent still sees it: asking tells them why it does not answer."""
-    decision = ai_source.decide(db, current_user.id, "chat")
-    return {"available": decision.source is not None or decision.blocked is not None}
+    decision = ai_source.decide(db, current_user.id, "chat", dek)
+    return {"available": decision.source is not None or decision.blocked is not None or decision.locked}
 
 
 @router.post("", response_model=ChatResponse)
 def ask(
     body: ChatRequest,
     current_user: models.User = Depends(auth.get_current_active_user),
+    dek: bytes | None = Depends(auth.get_unlock),
     db: Session = Depends(get_db),
 ):
     """Answers a question about video games and the group's data. Read-only: the history comes from the client and
     nothing of the conversation is stored."""
-    decision = ai_source.decide(db, current_user.id, "chat")
+    decision = ai_source.decide(db, current_user.id, "chat", dek)
     if decision.blocked and decision.source is None:  # with the player's own as the source it only says why the group's was not used
         ai_ledger.record(
             db, user_id=current_user.id, feature="chat", key_source=ai_ledger.GROUP, status=ai_ledger.BUDGET,
@@ -93,6 +96,8 @@ def ask(
         )
         raise HTTPException(status_code=429, detail=ai_source.blocked_message(decision.blocked, "chat"))
     source = decision.source
+    if source is None and decision.locked:  # they have keys, this session cannot open them: the front asks for the password
+        raise HTTPException(status_code=423, detail=messages.USER_AI_LOCKED)
     if source is None:
         raise HTTPException(status_code=503, detail=messages.CHAT_UNAVAILABLE)
     refused = limits.limiter.acquire(limits.scopes_of(current_user.id, source.own))

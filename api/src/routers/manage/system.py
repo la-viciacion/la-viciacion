@@ -112,7 +112,7 @@ def list_ai_models(provider: str = Query(..., pattern="^(" + "|".join(settings.A
     except ai.AIError as e:
         logger.error(f"Listing the {provider} models for {admin.username} failed: {e}", exc_info=True)
         raise HTTPException(status_code=502, detail=f"{provider} no ha dado la lista de modelos" + (": la clave no es válida" if isinstance(e, ProviderError) and e.kind == "denied" else ""))
-    shown = ai_models.for_chat(ids) if provider == "openai" else ids
+    shown = ai_models.for_chat(ids, provider)
     return {
         "provider": provider,
         "models": shown,
