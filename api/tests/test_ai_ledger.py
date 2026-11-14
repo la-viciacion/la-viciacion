@@ -184,6 +184,7 @@ class ChatRecordsEveryOutcomeTests(unittest.TestCase):
         with mock.patch.object(chat_agent, "failure", return_value=QuotaError("q", mock.Mock())), self.assertRaises(QuotaError):
             chat_agent.ask(self.db, self.user, "hola", [], model=FunctionModel(fail))
         self.assertEqual([r.status for r in rows(self.db)], ["error", "quota"])
+        self.assertTrue(all(r.requests == 1 and r.latency_ms is not None for r in rows(self.db)), "a failed question was asked, and it waited")
 
     def test_a_question_that_ran_into_a_usage_limit_is_recorded_as_too_big(self):
         loop = FunctionModel(lambda history, info: ModelResponse(parts=[ToolCallPart(tool_name="players", args={})]))
@@ -269,6 +270,29 @@ class SpendTests(unittest.TestCase):
     def test_the_month_bounds(self):
         self.assertEqual(ai_spend.month_bounds("2026-12"), (datetime.datetime(2026, 12, 1), datetime.datetime(2027, 1, 1)))
         self.assertEqual(ai_spend.month_bounds(None), (None, None))
+
+
+class ReportedSearchTests(unittest.TestCase):
+    """OpenRouter runs a web search on its side: no tool call in the messages, but it says so in the usage of the answer."""
+
+    def response(self, details):
+        return ModelResponse(parts=[TextPart("x")], provider_name="openrouter", model_name="vendor/m", provider_details=details)
+
+    def test_the_searches_it_reports_are_counted_and_the_search_is_named_as_a_tool(self):
+        found = self.response({"cost": 0.007, "server_tool_use": {"tool_calls_requested": 1, "tool_calls_executed": 1, "web_search_requests": 1}})
+        self.assertEqual(ai_ledger.tools_called([found]), (["web_search"], 1))
+        self.assertEqual(ai_ledger.reported_searches(found), 1)
+
+    def test_no_report_or_a_report_of_none_is_no_search(self):
+        for details in (None, {}, {"server_tool_use": {"web_search_requests": 0}}, {"server_tool_use": "odd"}):
+            self.assertEqual(ai_ledger.tools_called([self.response(details)]), ([], 0), details)
+
+    def test_a_search_made_by_a_tool_call_is_not_counted_twice_when_the_provider_reports_it_too(self):
+        from pydantic_ai.messages import NativeToolCallPart
+
+        both = ModelResponse(parts=[NativeToolCallPart(tool_name=ai_ledger.SEARCH_TOOL, args={})], provider_name="openrouter", provider_details={"server_tool_use": {"web_search_requests": 1}})
+        names, searches = ai_ledger.tools_called([both])
+        self.assertEqual((names, searches), (["web_search"], 1))
 
 
 class ReportedCostTests(unittest.TestCase):

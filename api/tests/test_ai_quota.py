@@ -212,3 +212,29 @@ class AnswersTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RealBodiesTests(unittest.TestCase):
+    """What the providers really answered when an account had nothing left (read from the real APIs, keys aside)."""
+
+    def test_openai_with_no_credits_is_billing_even_though_its_code_is_not_the_old_one(self):
+        body = {"message": "You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.",
+                "type": "insufficient_quota", "param": None, "code": "credit_balance_exhausted"}
+        found = quota.classify(ModelHTTPError(429, "gpt-4.1-mini", body))
+        self.assertEqual(found.kind, "billing")
+        self.assertIn("no credits remaining", found.message)
+
+    def test_the_old_code_and_a_type_alone_are_billing_too_and_a_plain_rate_limit_is_not(self):
+        self.assertEqual(quota.classify(ModelHTTPError(429, "m", {"error": {"code": "insufficient_quota"}})).kind, "billing")
+        self.assertEqual(quota.classify(ModelHTTPError(429, "m", {"error": {"type": "insufficient_quota"}})).kind, "billing")
+        self.assertEqual(quota.classify(ModelHTTPError(429, "m", {"error": {"code": "rate_limit_exceeded"}})).kind, "unknown")
+
+    def test_a_failure_says_which_feature_it_was(self):
+        from src.guide import agent as guide_agent  # noqa: F401  (the guide reports through the chat's `failure`)
+
+        with mock.patch.object(agent.ai_providers, "current", return_value=("openai", "m")), mock.patch.object(agent.ai_quota, "report"):
+            quota_error = agent.failure(ModelHTTPError(429, "m", {"error": {"code": "insufficient_quota"}}), "guide", feature="guide")
+            other = agent.failure(RuntimeError("boom"), "guide", feature="guide")
+        self.assertTrue(str(quota_error).startswith("guide:"))
+        self.assertTrue(str(other).startswith("guide: RuntimeError"))
+        self.assertTrue(str(agent.failure(RuntimeError("boom"), "chat")).startswith("chat: RuntimeError"))

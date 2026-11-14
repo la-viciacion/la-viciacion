@@ -82,12 +82,12 @@ def failure(e: Exception, source: str, key: str | None = None, feature: str = ai
     if quota:
         if key is None:
             ai_quota.report(quota, source, *ai_providers.current(feature))
-        return QuotaError(f"chat: {quota.describe()}", quota)
+        return QuotaError(f"{feature}: {quota.describe()}", quota)
     # a provider library may quote what it was given: never let the key out in the message
     text = str(e)
     for group_key in filter(None, (ai_providers.api_key(p) for p in ai_providers.PROVIDERS)):
         text = text.replace(group_key, "***")
-    message = f"chat: {type(e).__name__}: {text.replace(key or chr(0), '***')}"
+    message = f"{feature}: {type(e).__name__}: {text.replace(key or chr(0), '***')}"
     kind = provider_failure.kind(e)
     return ProviderError(message, kind) if kind else AIError(message)
 
@@ -111,11 +111,11 @@ def ask(db: Session, user: models.User, question: str, history: list[tuple[str, 
     except UsageLimitExceeded as e:
         # which limit it was is what tells whether a question is too big or a limit too tight
         logger.warning(f"Chat question stopped by a usage limit: {e}")
-        ai_ledger.record(db, status=ai_ledger.TOO_BIG, **recorded)
+        ai_ledger.record(db, status=ai_ledger.TOO_BIG, spent=ai_ledger.waited(started), **recorded)
         return Answer(messages.CHAT_TOO_COMPLEX, True)
     except Exception as e:
         error = failure(e, "chat", own_key(source))
-        ai_ledger.record(db, status=ai_ledger.QUOTA if isinstance(error, QuotaError) else ai_ledger.ERROR, **recorded)
+        ai_ledger.record(db, status=ai_ledger.QUOTA if isinstance(error, QuotaError) else ai_ledger.ERROR, spent=ai_ledger.waited(started), **recorded)
         raise error from None
     used = result.usage
     logger.info(

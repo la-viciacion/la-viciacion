@@ -52,6 +52,7 @@ def tools_called(messages) -> tuple[list[str], int]:
     for message in messages:
         if not isinstance(message, ModelResponse):
             continue
+        before = searches
         for part in message.parts:
             if isinstance(part, NativeToolCallPart) and part.tool_name == SEARCH_TOOL:
                 searches += 1
@@ -62,7 +63,19 @@ def tools_called(messages) -> tuple[list[str], int]:
                 continue
             if name not in names:
                 names.append(name)
+        reported = reported_searches(message) if searches == before else 0  # a search seen as a tool call is not counted again
+        if reported:
+            searches += reported
+            if SEARCH_TOOL not in names:
+                names.append(SEARCH_TOOL)
     return names, searches
+
+
+def reported_searches(response) -> int:
+    """The web searches a provider says it ran itself, which leave no tool call in the messages: OpenRouter reports them in the
+    usage of the answer (`server_tool_use.web_search_requests`) and charges them (ai_cost.reported_cost)."""
+    used = (getattr(response, "provider_details", None) or {}).get("server_tool_use")
+    return int(used.get("web_search_requests") or 0) if isinstance(used, dict) else 0
 
 
 def measure(result, provider: str | None, model: str | None, started: float, now: float) -> Spent:
@@ -189,6 +202,11 @@ def _record_alone(feature: str, status: str, spent: Spent, key_source: str = GRO
         record(db, user_id=user_id, feature=feature, key_source=key_source, status=status, spent=spent)
     finally:
         db.close()
+
+
+def waited(started: float) -> Spent:
+    """What is known of a call that failed before it said anything about its tokens: that it was made, and how long it took."""
+    return Spent(requests=1, latency_ms=int((time.monotonic() - started) * 1000))
 
 
 def _spent_of(kind: str | None, provider: str | None, model: str | None, started: float, result) -> Spent:
