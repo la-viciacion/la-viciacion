@@ -189,8 +189,8 @@ def set_preferred(db: Session, user_id: int, provider: str | None) -> None:
 
 
 def status(db: Session, user_id: int, dek: bytes | None) -> dict:
-    """What the player may see of their own keys. `locked`: they have keys that this session cannot open (it has no data key: type the
-    password). Per provider: whether there is a key, its last characters (only while unlocked), the model, and `unreadable` for a
+    """What the player may see of their own keys. `unlocked`: this session carries the data key (without it nothing can be saved or used:
+    the player types their password). `locked`: they have keys that it cannot open. Per provider: whether there is a key, its last characters (only while unlocked), the model, and `unreadable` for a
     key that is stored but does not open with the data key of the session."""
     held = providers_with_key(db, user_id)
     keys = {}
@@ -206,7 +206,13 @@ def status(db: Session, user_id: int, dek: bytes | None) -> dict:
             "model": row.model if row is not None else None,
             "unreadable": bool(dek is not None and row is not None and key is None),
         }
-    return {"locked": bool(held) and dek is None, "preferred": preferred(db, user_id), "keys": keys, "default_models": DEFAULT_MODELS}
+    return {
+        "unlocked": dek is not None,  # this session carries the data key: keys can be saved and used (a player with none yet is not unlocked either)
+        "locked": bool(held) and dek is None,
+        "preferred": preferred(db, user_id),
+        "keys": keys,
+        "default_models": DEFAULT_MODELS,
+    }
 
 
 def credentials(db: Session, user_id: int, dek: bytes | None, provider: str) -> tuple[str, str] | None:
