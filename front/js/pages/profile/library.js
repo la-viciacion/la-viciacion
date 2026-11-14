@@ -112,11 +112,13 @@ function priceForm(g) {
   return html`
     <form class="pf-date-form pf-price-form" data-price-form data-id="${g.id}">
       ${(g.platforms ?? []).map((p) => html`
-        <label class="pf-price-field">${p.name}
-          <input class="adm-input pf-price-input" type="text" inputmode="decimal" name="price" data-platform="${p.id}" data-was="${p.price_cents ?? ''}" value="${inputValue(p.price_cents)}" placeholder="—" aria-label="Precio en ${p.name}" /> €
+        <label class="pf-price-field"><span>${p.name}</span>
+          <span class="pf-price-box"><input class="adm-input pf-price-input" type="text" inputmode="decimal" name="price" data-platform="${p.id}" data-was="${p.price_cents ?? ''}" value="${inputValue(p.price_cents)}" placeholder="—" aria-label="Precio en ${p.name}" /><span aria-hidden="true">€</span></span>
         </label>`)}
-      <button class="pf-btn primary" type="submit">Guardar precio</button>
-      <button class="pf-btn" type="button" data-action="cancel-price">Ahora no</button>
+      <div class="pf-price-actions">
+        <button class="pf-btn primary" type="submit">Guardar precio</button>
+        <button class="pf-btn" type="button" data-action="cancel-price">Ahora no</button>
+      </div>
     </form>`;
 }
 
@@ -325,10 +327,10 @@ export function createLibrary(el, options) {
           ${g.complete_blocked ? html`<div class="pf-lock">🔒 ${blockedReason(g, season)}</div>` : ''}
           ${editing === g.id ? dateForm(g) : ''}
           ${rating === g.id ? scoreForm(g) : ''}
-          ${pricing === g.id ? priceForm(g) : ''}
         </div>
-        <div class="pf-game-actions">${editing === g.id || rating === g.id || pricing === g.id ? '' : html`${actions(g)}${filterable && (g.platforms ?? []).length ? act('price', g.id, euroIcon, 'Precio') : ''}`}</div>
+        <div class="pf-game-actions">${editing === g.id || rating === g.id ? '' : html`${actions(g)}${filterable && (g.platforms ?? []).length ? act('price', g.id, euroIcon, 'Precio', { extra: `aria-expanded="${pricing === g.id}"` }) : ''}`}</div>
         ${sessionList(g)}
+        ${pricing === g.id ? priceForm(g) : ''}
       </div>`;
   }
 
@@ -506,7 +508,7 @@ export function createLibrary(el, options) {
         pricing = null;
         return draw();
       case 'price':
-        pricing = id;
+        pricing = pricing === id ? null : id;
         editing = null;
         rating = null;
         return draw();
