@@ -191,32 +191,31 @@ def _record_alone(feature: str, status: str, spent: Spent, key_source: str = GRO
         db.close()
 
 
-def record_notice(source: str, provider: str | None, model: str | None, status: str, started: float, used=None, now: float | None = None) -> None:
+def _spent_of(kind: str | None, provider: str | None, model: str | None, started: float, result) -> Spent:
+    """What an agent run that is recorded apart from a player's question used (`result` is the run's, None when it failed), with
+    the kind of text it was."""
+    now = time.monotonic()
+    if result is None:
+        return Spent(provider=provider, model=model, latency_ms=int((now - started) * 1000), tools=kind)
+    return replace(measure(result, provider, model, started, now), tools=kind)
+
+
+def record_notice(source: str, provider: str | None, model: str | None, status: str, started: float, result=None) -> None:
     """Writes the row of a text the AI wrote on its own (a notice, the group's welcome, the admin's test of the notices): no
     player asked for it, so it has no user, and the group's key paid. It runs in the worker thread that asked the provider, so it
-    opens its own session. Never raises, like `record`. `used` is what the client left in clients/used.py."""
+    opens its own session. Never raises, like `record`. `result` is the run's, None when it failed."""
     found = notice_kind(source)
     if found is None:
         return
     feature, kind = found
-    spent = Spent(
-        provider=provider, model=model, requests=1, latency_ms=int(((now if now is not None else time.monotonic()) - started) * 1000), tools=kind,
-        input_tokens=used.input_tokens if used else 0, cached_tokens=used.cached_tokens if used else 0,
-        output_tokens=used.output_tokens if used else 0, reasoning_tokens=used.reasoning_tokens if used else 0,
-        cost_micros=ai_cost.completion_cost_micros(provider, model, used) if used else None,
-    )
-    _record_alone(feature, status, spent)
+    spent = _spent_of(kind, provider, model, started, result)
+    _record_alone(feature, status, spent if result is not None else replace(spent, requests=1))  # a failed notice was asked all the same
 
 
 def record_probe(kind: str, provider: str | None, model: str | None, status: str, started: float, result=None, key_source: str = GROUP, user_id: int | None = None) -> None:
     """Writes the row of a test button that runs an agent (the chat's and the guide's): `result` is the run's, None when it
     failed. A player's own test (`key_source` user, with their `user_id`) is in their record and never in the group's spending."""
-    now = time.monotonic()
-    if result is not None:
-        spent = replace(measure(result, provider, model, started, now), tools=kind)
-    else:
-        spent = Spent(provider=provider, model=model, latency_ms=int((now - started) * 1000), tools=kind)
-    _record_alone(TEST, status, spent, key_source, user_id)
+    _record_alone(TEST, status, _spent_of(kind, provider, model, started, result), key_source, user_id)
 
 
 def open_session() -> Session:

@@ -10,7 +10,6 @@ from pydantic_ai.messages import ModelResponse, NativeToolCallPart, TextPart, To
 from pydantic_ai.models.function import FunctionModel
 
 from src.chat import agent as chat_agent
-from src.clients import google_ai, open_ai, used
 from src.clients.ai_error import AIError, Quota, QuotaError
 from src.database import models
 from src.guide import agent as guide_agent
@@ -272,49 +271,33 @@ class SpendTests(unittest.TestCase):
         self.assertEqual(ai_spend.month_bounds(None), (None, None))
 
 
-class UsageOfAClientTests(unittest.TestCase):
-    def test_what_a_client_leaves_is_taken_once_and_only_by_its_own_thread(self):
-        import threading
+class ReportedCostTests(unittest.TestCase):
+    """OpenRouter says what each call cost, and its model names are not the price list's: its figure wins over the list."""
 
-        used.report(used.Used(input_tokens=5))
-        seen = []
-        thread = threading.Thread(target=lambda: seen.append(used.take()))
-        thread.start()
-        thread.join()
-        self.assertEqual(seen, [None], "another thread does not read it")
-        self.assertEqual(used.take(), used.Used(input_tokens=5))
-        self.assertIsNone(used.take(), "it is taken once")
+    def response(self, provider="openrouter", details=None, model="vendor/unknown-model"):
+        return ModelResponse(parts=[TextPart("x")], provider_name=provider, model_name=model, provider_details=details)
 
-    def test_openai_leaves_its_tokens_with_the_cached_and_reasoning_ones(self):
-        usage = types.SimpleNamespace(
-            prompt_tokens=120, completion_tokens=30,
-            prompt_tokens_details=types.SimpleNamespace(cached_tokens=20),
-            completion_tokens_details=types.SimpleNamespace(reasoning_tokens=10),
-        )
-        completion = types.SimpleNamespace(choices=[types.SimpleNamespace(message=types.SimpleNamespace(content=" Hola "))], usage=usage)
-        client = mock.Mock()
-        client.chat.completions.create.return_value = completion
-        used.discard()
-        with mock.patch.object(open_ai, "_client", return_value=client):
-            self.assertEqual(open_ai.generate("k", "gpt-4.1-mini", "s", "u", 1.0), "Hola")
-        self.assertEqual(used.take(), used.Used(input_tokens=120, cached_tokens=20, output_tokens=30, reasoning_tokens=10))
+    def test_what_openrouter_charged_is_the_cost_whatever_the_price_list_knows(self):
+        found = self.response(details={"cost": 0.0123, "is_byok": False})
+        self.assertEqual(ai_cost.tokens_cost_micros([found]), 12_300)
 
-    def test_google_counts_its_thinking_as_output_because_it_is_billed_so(self):
-        meta = types.SimpleNamespace(prompt_token_count=100, candidates_token_count=40, cached_content_token_count=None, thoughts_token_count=25)
-        used.discard()
-        google_ai._report(types.SimpleNamespace(usage_metadata=meta))
-        self.assertEqual(used.take(), used.Used(input_tokens=100, cached_tokens=0, output_tokens=65, reasoning_tokens=25))
+    def test_a_call_openrouter_reports_with_no_cost_was_free(self):
+        self.assertEqual(ai_cost.tokens_cost_micros([self.response(details={"is_byok": False, "upstream_inference_cost": 0.0})]), 0)
 
-    def test_a_response_without_usage_leaves_nothing(self):
-        used.discard()
-        google_ai._report(types.SimpleNamespace(usage_metadata=None))
-        open_ai._report(types.SimpleNamespace(usage=None))
-        self.assertIsNone(used.take())
+    def test_without_what_it_reports_the_price_list_decides_and_an_unknown_model_has_no_cost(self):
+        self.assertIsNone(ai_cost.tokens_cost_micros([self.response(details=None)]))
+        self.assertIsNone(ai_cost.reported_cost(self.response(provider="openai", details={"cost": 5.0})), "only OpenRouter is believed")
 
-    def test_a_completion_costs_its_tokens_at_the_price_of_its_model_and_nothing_when_there_is_none(self):
-        tokens = used.Used(input_tokens=1_000_000, output_tokens=1_000_000)
-        self.assertEqual(ai_cost.completion_cost_micros("openai", "gpt-4.1-mini", tokens), 2_000_000)
-        self.assertIsNone(ai_cost.completion_cost_micros("openai", "gpt-unknown-9", tokens))
+    def test_a_run_through_the_notices_records_the_reported_cost(self):
+        self.db = make_session()
+        seed(self.db)
+        with patched(**{"ai.enabled": True}), mock.patch.object(ai_ledger, "open_session", side_effect=lambda: self.db), \
+                mock.patch.object(ai.ai_quota, "report"), \
+                mock.patch.object(ai.ai_providers, "group_credentials", return_value=("openrouter", "KEY", "vendor/unknown-model")), \
+                ai_env.using(ai_env.says("Texto", 100, 50, provider="openrouter", model="vendor/unknown-model", provider_details={"cost": 0.002, "is_byok": False})):
+            ai.complete("s", "u", source="notice:new_game")
+        (row,) = rows(self.db)
+        self.assertEqual((row.provider, row.cost_micros), ("openrouter", 2_000))
 
 
 class FreePlanTests(unittest.TestCase):
@@ -381,10 +364,6 @@ class EveryCallToAProviderIsRecordedTests(unittest.TestCase):
         "chat/agent.py": 2,  # ask, probe
         "guide/agent.py": 2,  # ask, probe
         "utils/ai.py": 1,  # complete: the welcome, the notices and the test of the notices
-        "clients/open_ai.py": 1,  # generate, only reached from ai.complete
-        "clients/google_ai.py": 1,  # generate, only reached from ai.complete
-        "clients/anthropic_ai.py": 1,  # generate, only reached from ai.complete
-        "clients/openrouter_ai.py": 1,  # generate, only reached from ai.complete
     }
 
     def test_no_other_file_asks_a_model_for_text(self):
@@ -392,7 +371,7 @@ class EveryCallToAProviderIsRecordedTests(unittest.TestCase):
         import re
 
         src = pathlib.Path(__file__).resolve().parents[1] / "src"
-        pattern = re.compile(r"\.run_sync\(|\bPROVIDERS\[|chat\.completions\.create\(|\.generate_content\(|\.messages\.create\(")
+        pattern = re.compile(r"\.run_sync\(|chat\.completions\.create\(|\.generate_content\(|\.messages\.create\(")
         found = {}
         for path in src.rglob("*.py"):
             count = len(pattern.findall(path.read_text(encoding="utf-8")))
@@ -459,21 +438,14 @@ class NoticesAreRecordedTests(unittest.TestCase):
         ):
             patcher.start()
             self.addCleanup(patcher.stop)
-        used.discard()
 
-    def write(self, provider, source="notice:completed_game", tokens=None):
-        def fake(key, model, system, user, temperature):
-            if tokens is not None:
-                used.report(tokens)
-            if isinstance(provider, Exception):
-                raise provider
-            return "Texto"
-
-        with mock.patch.dict(ai.PROVIDERS, {"openai": fake}):
+    def write(self, failure=None, source="notice:completed_game", tokens=(0, 0), model="gpt-4.1-mini"):
+        model = ai_env.fails(failure) if failure else ai_env.says("Texto", *tokens, model=model)
+        with ai_env.using(model):
             return ai.complete("s", "u", source=source)
 
     def test_a_notice_leaves_its_tokens_cost_and_kind_and_belongs_to_the_group_with_no_player(self):
-        self.write(None, tokens=used.Used(input_tokens=2000, output_tokens=300))
+        self.write(tokens=(2000, 300))
         (row,) = rows(self.db)
         self.assertEqual((row.feature, row.key_source, row.user_id, row.status, row.tools), ("notice", "group", None, "ok", "completed_game"))
         self.assertEqual((row.provider, row.model, row.input_tokens, row.output_tokens, row.requests), ("openai", "gpt-4.1-mini", 2000, 300, 1))
@@ -481,7 +453,7 @@ class NoticesAreRecordedTests(unittest.TestCase):
         self.assertIsNotNone(row.latency_ms)
 
     def test_the_welcome_of_the_group_is_its_own_feature(self):
-        self.write(None, source="welcome", tokens=used.Used(input_tokens=10, output_tokens=5))
+        self.write(source="welcome", tokens=(10, 5))
         (row,) = rows(self.db)
         self.assertEqual((row.feature, row.tools), ("welcome", "welcome"))
 
@@ -490,14 +462,16 @@ class NoticesAreRecordedTests(unittest.TestCase):
             self.write(AIError("boom"))
         with self.assertRaises(QuotaError):
             self.write(QuotaError("q", Quota(kind="billing")))
-        self.assertEqual([(r.status, r.input_tokens, r.cost_micros) for r in rows(self.db)], [("error", 0, None), ("quota", 0, None)])
+        self.assertEqual([(r.status, r.input_tokens, r.cost_micros, r.requests) for r in rows(self.db)], [("error", 0, None, 1), ("quota", 0, None, 1)])
 
-    def test_what_a_provider_did_not_report_is_a_call_with_no_cost_and_not_a_free_one(self):
-        self.write(None)
-        self.assertIsNone(rows(self.db)[0].cost_micros)
+    def test_a_model_with_no_known_price_is_a_call_with_no_cost_and_not_a_free_one(self):
+        with mock.patch.object(ai.ai_providers, "group_credentials", return_value=("openai", "KEY", "gpt-unknown-9")):
+            self.write(tokens=(10, 5), model="gpt-unknown-9")
+        (row,) = rows(self.db)
+        self.assertEqual((row.model, row.cost_micros, row.input_tokens), ("gpt-unknown-9", None, 10))
 
     def test_the_test_button_of_the_notices_is_recorded_as_a_test_of_the_group(self):
-        self.write(None, source="ai_test", tokens=used.Used(input_tokens=5, output_tokens=5))
+        self.write(source="ai_test", tokens=(5, 5))
         (row,) = rows(self.db)
         self.assertEqual((row.feature, row.tools, row.key_source, row.user_id, row.status), ("test", "ai_test", "group", None, "ok"))
         self.assertGreater(row.cost_micros, 0)
@@ -505,17 +479,12 @@ class NoticesAreRecordedTests(unittest.TestCase):
     def test_what_a_test_button_spent_counts_in_the_groups_spending(self):
         from src.utils import ai_budget
 
-        self.write(None, source="ai_test", tokens=used.Used(input_tokens=1_000_000, output_tokens=1_000_000))
+        self.write(source="ai_test", tokens=(1_000_000, 1_000_000))
         self.assertEqual(ai_budget.spent(self.db), 2_000_000)
-
-    def test_tokens_left_by_an_earlier_call_are_not_read_by_the_next_one(self):
-        used.report(used.Used(input_tokens=999_999))
-        self.write(None)
-        self.assertEqual(rows(self.db)[0].input_tokens, 0)
 
     def test_a_failure_to_write_never_stops_the_text(self):
         with mock.patch.object(ai_ledger, "open_session", side_effect=RuntimeError("db down")), self.assertLogs(ai_ledger.logger, "ERROR"):
-            self.assertEqual(self.write(None, tokens=used.Used(input_tokens=1)), "Texto")
+            self.assertEqual(self.write(tokens=(1, 1)), "Texto")
 
     def test_the_kinds_of_notice_are_read_from_who_asked(self):
         self.assertEqual(ai_ledger.notice_kind("welcome"), ("welcome", "welcome"))
@@ -529,7 +498,7 @@ class NoticesAreRecordedTests(unittest.TestCase):
     def test_what_the_notices_spent_counts_in_the_groups_spending_but_never_in_a_players(self):
         from src.utils import ai_budget
 
-        self.write(None, tokens=used.Used(input_tokens=1_000_000, output_tokens=1_000_000))
+        self.write(tokens=(1_000_000, 1_000_000))
         self.assertEqual(ai_budget.spent(self.db), 2_000_000)
         self.assertEqual(ai_budget.spent(self.db, 1), 0)
 

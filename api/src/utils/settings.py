@@ -118,7 +118,7 @@ def _key_source(value: str) -> str | None:
 
 
 AI_PROVIDERS = ("openai", "google", "anthropic", "openrouter")  # the order is the preference when the admin has picked none
-MODEL_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/\-]{0,79}$")  # OpenRouter names a model provider/model (:free, :online...)
+MODEL_NAME = re.compile(r"^[~A-Za-z0-9][A-Za-z0-9._:/\-]{0,79}$")  # OpenRouter names a model provider/model (:free, :online...), an alias starts with ~
 
 
 def _ai_provider(value: str) -> str | None:

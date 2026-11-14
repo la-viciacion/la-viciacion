@@ -23,7 +23,7 @@ from src.clients.ai_error import AIError
 from src.database import models
 from src.routers import chat as chat_router
 from src.routers.manage import system
-from src.utils import ai_prompts, ai_source, messages, settings
+from src.utils import ai_build, ai_prompts, ai_providers, ai_source, messages, settings
 from tests import ai_env
 from tests.sqlite_db import make_session
 
@@ -534,12 +534,12 @@ class ReadinessTests(unittest.TestCase):
 
     def test_its_own_model_wins_and_without_it_the_ais_is_used(self):
         with self.values():
-            self.assertEqual(chat_model.in_use(), {"provider": "openai", "model": "m", "own_model": False})
+            self.assertEqual(chat_model.in_use(), {"provider": "openai", "model": "m", "own_model": False, "problem": None})
         with self.values(**{"chat.model.openai": "strong"}):  # picked in the panel
-            self.assertEqual(chat_model.in_use(), {"provider": "openai", "model": "strong", "own_model": True})
-            self.assertEqual(chat_model.build_model().model_name, "strong")
+            self.assertEqual(chat_model.in_use(), {"provider": "openai", "model": "strong", "own_model": True, "problem": None})
+            self.assertEqual(ai_build.model_for(ai_providers.CHAT).model_name, "strong")
         with self.values(**{"ai.openai.chat_model": "env-strong"}):  # the .env's default for the chat
-            self.assertEqual(chat_model.in_use(), {"provider": "openai", "model": "env-strong", "own_model": False})
+            self.assertEqual(chat_model.in_use(), {"provider": "openai", "model": "env-strong", "own_model": False, "problem": None})
 
     def test_its_own_model_is_enough_without_the_notices_model(self):
         with self.values(**{"chat.model.openai": "strong", "ai.openai.model": None}):
@@ -548,7 +548,7 @@ class ReadinessTests(unittest.TestCase):
     def test_the_model_is_built_for_each_provider(self):
         for provider in ("openai", "google"):
             with self.values(**ai_env.group(provider, "k", "m")):
-                self.assertEqual(chat_model.build_model().model_name, "m")
+                self.assertEqual(ai_build.model_for(ai_providers.CHAT).model_name, "m")
 
     def test_the_notices_general_switch_does_not_touch_the_chat(self):
         with self.values(**{"ai.enabled": False}):
@@ -562,12 +562,12 @@ class SettingsTests(unittest.TestCase):
         # nothing is picked in the panel: the stored settings are empty, the environment's are read as they are
         not_stored = lambda key: settings._from_env(settings.REGISTRY[key]) if settings.REGISTRY[key].env_only else None  # noqa: E731
         with mock.patch.dict(os.environ, env), mock.patch.object(settings, "get", side_effect=not_stored):
-            self.assertEqual(chat_model.in_use(), {"provider": "openai", "model": "gpt-strong", "own_model": False})
+            self.assertEqual(chat_model.in_use(), {"provider": "openai", "model": "gpt-strong", "own_model": False, "problem": None})
             self.assertEqual(settings.public_view(db)["ai.openai.chat_model"], {"is_set": True, "hint": None})
             with self.assertRaises(ValueError):
                 settings.set_values(db, {"ai.openai.chat_model": "other"})  # the default is the .env's, not the panel's
         with mock.patch.dict(os.environ, {**env, "OPENAI_CHAT_AI_MODEL": ""}), mock.patch.object(settings, "get", side_effect=not_stored):
-            self.assertEqual(chat_model.in_use(), {"provider": "openai", "model": "gpt-cheap", "own_model": False})
+            self.assertEqual(chat_model.in_use(), {"provider": "openai", "model": "gpt-cheap", "own_model": False, "problem": None})
 
     def test_the_chat_has_a_provider_pick_of_its_own_but_no_key_of_its_own(self):
         self.assertIn("chat.provider", settings.REGISTRY)  # stored: it follows the notices' provider until one is picked

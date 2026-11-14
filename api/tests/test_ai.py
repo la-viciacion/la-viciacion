@@ -3,13 +3,11 @@ import unittest
 from unittest import mock
 
 from fastapi import HTTPException
-from google.genai import errors, types
 
-from src.clients import google_ai
 from src.clients.ai_error import AIError
 from src.database import models
 from src.routers.manage import system
-from src.utils import ai, ai_prompts, ai_providers, my_utils, settings
+from src.utils import ai, ai_build, ai_prompts, ai_providers, my_utils, settings
 from tests import ai_env
 from tests.sqlite_db import make_session
 
@@ -71,7 +69,7 @@ class SettingsTests(unittest.TestCase):
         self.assertIsNone(settings.get_all(db)["ai.provider"])
 
     def test_the_providers_of_the_registry_are_the_ones_that_can_write(self):
-        self.assertEqual(set(ai.PROVIDERS), set(settings.AI_PROVIDERS))
+        self.assertEqual(set(ai_build._CLASSES), set(settings.AI_PROVIDERS))
 
 
 class ProviderChoiceTests(unittest.TestCase):
@@ -95,6 +93,24 @@ class ProviderChoiceTests(unittest.TestCase):
         with self.table(**{"ai.provider": "google"}):
             self.assertEqual(ai_providers.current(), ("google", "gem-d"))
             self.assertEqual(ai_providers.group_credentials(), ("google", "G", "gem-d"))
+
+    def test_a_provider_with_a_key_and_no_model_does_not_hide_one_that_is_complete(self):
+        with self.table(**{"ai.openai.model": None}):
+            self.assertEqual(ai_providers.selected(), "google")
+            self.assertEqual(ai_providers.group_credentials(), ("google", "G", "gem-d"))
+            self.assertEqual(ai_providers.selected(ai_providers.CHAT), "google", "the chat follows the notices")
+        with self.table(**{"ai.openai.model": None, "ai.model.openai": "gpt-picked"}):
+            self.assertEqual(ai_providers.selected(), "openai", "a model picked in the panel is a model")
+
+    def test_with_no_provider_complete_the_first_with_a_key_is_still_the_one_the_panel_asks_about(self):
+        with self.table(**{"ai.openai.model": None, "ai.google.model": None}):
+            self.assertEqual(ai_providers.selected(), "openai")
+            self.assertIsNone(ai_providers.group_credentials())
+
+    def test_a_pick_is_respected_even_without_a_model(self):
+        with self.table(**{"ai.provider": "openai", "ai.openai.model": None}):
+            self.assertEqual(ai_providers.selected(), "openai")
+            self.assertIsNone(ai_providers.group_credentials(), "the panel says the model is missing")
 
     def test_a_pick_whose_provider_lost_its_key_is_ignored(self):
         with self.table(**{"ai.provider": "google", "ai.google.api_key": None}):
@@ -157,115 +173,83 @@ class PerUseProviderTests(unittest.TestCase):
 
 class CompleteTests(unittest.TestCase):
     def test_off_or_without_a_key_it_answers_nothing_and_calls_nobody(self):
-        provider = mock.Mock()
-        with mock.patch.dict(ai.PROVIDERS, {"google": provider}):
+        with ai_env.using(ai_env.says()) as build:
             with values(**{"ai.enabled": False}):
                 self.assertIsNone(ai.complete("s", "u"))
                 self.assertFalse(ai.is_ready())
             with values(**{"ai.google.api_key": None}):
                 self.assertIsNone(ai.complete("s", "u"))
                 self.assertIsNone(ai.complete("s", "u", force=True))
-        provider.assert_not_called()
+        build.assert_not_called()
 
     def test_force_ignores_the_switch(self):
-        provider = mock.Mock(return_value="hola")
-        with mock.patch.dict(ai.PROVIDERS, {"google": provider}), values(**{"ai.enabled": False}):
+        with ai_env.using(ai_env.says("hola")), values(**{"ai.enabled": False}):
             self.assertEqual(ai.complete("s", "u", force=True), "hola")
 
     def test_the_panel_is_told_the_provider_and_the_model_in_use(self):
         with values():
-            self.assertEqual(ai.in_use(), {"provider": "google", "model": "gemini-test"})
+            self.assertEqual(ai.in_use(), {"provider": "google", "model": "gemini-test", "problem": None})
         with values(**ai_env.group("openai", KEY, "gpt-x")):
-            self.assertEqual(ai.in_use(), {"provider": "openai", "model": "gpt-x"})
+            self.assertEqual(ai.in_use(), {"provider": "openai", "model": "gpt-x", "problem": None})
         with values(**ai_env.group(None)):
-            self.assertEqual(ai.in_use(), {"provider": None, "model": None})
+            self.assertEqual(ai.in_use(), {"provider": None, "model": None, "problem": None})
 
     def test_without_a_key_or_a_model_the_ai_writes_nothing_and_calls_nobody(self):
-        provider = mock.Mock()
         for missing in ({"ai.google.model": None}, ai_env.group(None)):
-            with mock.patch.dict(ai.PROVIDERS, {"google": provider}), values(**missing):
+            with ai_env.using(ai_env.says()) as build, values(**missing):
                 self.assertFalse(ai.is_ready(), missing)
                 self.assertFalse(ai.is_ready("new_game"), missing)
                 self.assertIsNone(ai.complete("s", "u"), missing)
                 self.assertIsNone(ai.complete("s", "u", force=True), missing)
-        provider.assert_not_called()
+            build.assert_not_called()
 
     def test_the_provider_model_and_key_come_from_the_settings(self):
-        google, openai = mock.Mock(return_value="g"), mock.Mock(return_value="o")
-        with mock.patch.dict(ai.PROVIDERS, {"google": google, "openai": openai}):
-            with values():
-                self.assertEqual(ai.complete("sys", "usr"), "g")
-            google.assert_called_once_with(KEY, "gemini-test", "sys", "usr", 1.0)
-            with values(**ai_env.group("openai", KEY, "gpt-x")):
-                self.assertEqual(ai.complete("sys", "usr"), "o")
-            openai.assert_called_once_with(KEY, "gpt-x", "sys", "usr", 1.0)
+        with ai_env.using(ai_env.says("g")) as build, values():
+            self.assertEqual(ai.complete("sys", "usr"), "g")
+        build.assert_called_once_with("google", "gemini-test", KEY)
+        with ai_env.using(ai_env.says("o")) as build, values(**ai_env.group("openai", KEY, "gpt-x")):
+            self.assertEqual(ai.complete("sys", "usr"), "o")
+        build.assert_called_once_with("openai", "gpt-x", KEY)
+
+    def test_the_model_gets_the_instructions_the_text_and_the_temperature(self):
+        seen = []
+        with ai_env.using(ai_env.says(seen=seen)), values():
+            ai.complete("sys", "usr")
+        (messages, model_settings), = seen
+        self.assertEqual((messages[0].instructions, messages[0].parts[0].content), ("sys", "usr"))
+        self.assertEqual((model_settings["temperature"], model_settings["timeout"]), (1.0, ai.TIMEOUT_SECONDS))
+
+    def test_a_temperature_above_what_anthropic_accepts_is_lowered_for_everybody(self):
+        seen = []
+        with ai_env.using(ai_env.says(seen=seen)), values():
+            ai.complete("s", "u", temperature=1.8)
+        self.assertEqual(seen[0][1]["temperature"], ai.MAX_TEMPERATURE)
+
+    def test_the_model_of_the_group_is_built_once_and_not_for_every_notice(self):
+        with ai_env.using(ai_env.says("a")) as build, values():
+            ai.complete("s", "u")
+            ai.complete("s", "u")
+        build.assert_called_once()
+
+    def test_an_empty_answer_says_how_it_ended(self):
+        with ai_env.using(ai_env.says("   ", finish_reason="stop")), values(), self.assertRaisesRegex(AIError, r"sin texto \(stop\)"):
+            ai.complete("s", "u")
+
+    def test_an_answer_cut_before_any_text_is_explained_by_the_library_and_the_reason_reaches_the_admin(self):
+        with ai_env.using(ai_env.says("", finish_reason="length")), values(), self.assertRaisesRegex(AIError, "token limit"):
+            ai.complete("s", "u")
+
+    def test_the_text_is_trimmed_and_an_empty_answer_is_an_error(self):
+        with ai_env.using(ai_env.says("  hola \n")), values():
+            self.assertEqual(ai.complete("s", "u"), "hola")
+        with ai_env.using(ai_env.says("   ")), values(), self.assertRaisesRegex(AIError, "sin texto"):
+            ai.complete("s", "u")
 
     def test_a_failure_never_quotes_the_key(self):
-        boom = mock.Mock(side_effect=RuntimeError(f"bad key {KEY}"))
-        with mock.patch.dict(ai.PROVIDERS, {"google": boom}), values():
+        with ai_env.using(ai_env.fails(RuntimeError(f"bad key {KEY}"))), values():
             with self.assertRaises(AIError) as caught:
                 ai.complete("s", "u")
         self.assertNotIn(KEY, str(caught.exception))
-
-
-def answer(*texts, finish_reason=None):
-    parts = [types.Part(text=t) for t in texts]
-    return types.GenerateContentResponse(
-        candidates=[types.Candidate(content=types.Content(parts=parts), finish_reason=finish_reason)]
-    )
-
-
-class GoogleClientTests(unittest.TestCase):
-    def setUp(self):
-        google_ai._client.cache_clear()
-
-    def call(self, reply=None, error=None):
-        client = mock.Mock()
-        client.models.generate_content.side_effect = error
-        client.models.generate_content.return_value = reply
-        with mock.patch.object(google_ai, "_client", return_value=client):
-            try:
-                return client, google_ai.generate(KEY, "gemini-2.5-flash", "sys", "usr", 0.5)
-            except AIError as e:
-                return client, e
-
-    def test_the_request_carries_the_model_the_prompts_and_the_temperature(self):
-        client, text = self.call(answer("hi"))
-        self.assertEqual(text, "hi")
-        kwargs = client.models.generate_content.call_args.kwargs
-        self.assertEqual((kwargs["model"], kwargs["contents"]), ("gemini-2.5-flash", "usr"))
-        self.assertEqual((kwargs["config"].system_instruction, kwargs["config"].temperature), ("sys", 0.5))
-
-    def test_the_client_is_built_with_the_key_and_a_timeout_and_reused(self):
-        with mock.patch.object(google_ai.genai, "Client") as build:
-            first, second = google_ai._client(KEY), google_ai._client(KEY)
-        build.assert_called_once()
-        self.assertEqual(build.call_args.kwargs["api_key"], KEY)
-        self.assertEqual(build.call_args.kwargs["http_options"].timeout, google_ai.TIMEOUT_MS)
-        self.assertIs(first, second)
-
-    def test_the_parts_of_the_answer_are_joined(self):
-        _, text = self.call(answer("Hola ", "mundo"))
-        self.assertEqual(text, "Hola mundo")
-
-    def test_an_error_from_google_says_why_and_not_the_key(self):
-        error = errors.ClientError(400, {"error": {"code": 400, "message": "API key not valid", "status": "INVALID_ARGUMENT"}})
-        _, got = self.call(error=error)
-        self.assertIsInstance(got, AIError)
-        self.assertIn("400", str(got))
-        self.assertIn("API key not valid", str(got))
-        self.assertNotIn(KEY, str(got))
-
-    def test_a_blocked_prompt_is_explained(self):
-        blocked = types.GenerateContentResponse(
-            prompt_feedback=types.GenerateContentResponsePromptFeedback(block_reason=types.BlockedReason.SAFETY)
-        )
-        _, got = self.call(blocked)
-        self.assertIn("SAFETY", str(got))
-
-    def test_an_answer_without_text_says_how_it_ended(self):
-        _, got = self.call(answer(finish_reason=types.FinishReason.MAX_TOKENS))
-        self.assertIn("MAX_TOKENS", str(got))
 
 
 class UsesRegistryTests(unittest.TestCase):
@@ -415,14 +399,13 @@ class TestRouteTests(unittest.TestCase):
         self.assertIn("GOOGLE_AI_API_KEY", caught.exception.detail)
 
     def test_it_works_with_the_switch_off_and_reports_what_was_used(self):
-        with values(**{"ai.enabled": False}), mock.patch.dict(ai.PROVIDERS, {"google": mock.Mock(return_value="Hola")}):
+        with values(**{"ai.enabled": False}), ai_env.using(ai_env.says("Hola")):
             result = system.test_ai(self.admin)
         self.assertEqual(result["reply"], "Hola")
         self.assertEqual((result["provider"], result["model"]), ("google", "gemini-test"))
 
     def test_a_provider_failure_is_a_502_with_the_reason(self):
-        failing = mock.Mock(side_effect=AIError("Google respondio 403: no"))
-        with values(), mock.patch.dict(ai.PROVIDERS, {"google": failing}):
+        with values(), ai_env.using(ai_env.fails(AIError("Google respondio 403: no"))):
             with self.assertRaises(HTTPException) as caught:
                 system.test_ai(self.admin)
         self.assertEqual(caught.exception.status_code, 502)
@@ -433,15 +416,15 @@ class ModelListTests(unittest.TestCase):
 
     def test_it_asks_the_provider_for_its_models_now_and_offers_the_defaults(self):
         table = ai_env.group("openai", KEY, "gpt-d", **{"ai.openai.chat_model": "gpt-c"})
-        with mock.patch.object(ai.settings, "get", side_effect=lambda k: table[k]),                 mock.patch.object(system.open_ai, "list_models", return_value=["gpt-4.1", "gpt-4.1-2025-04-14", "text-embedding-3-small", "whisper-1"]) as listed:
+        with mock.patch.object(ai.settings, "get", side_effect=lambda k: table[k]),                 mock.patch.object(system.model_list, "list_models", return_value=["gpt-4.1", "gpt-4.1-2025-04-14", "text-embedding-3-small", "whisper-1"]) as listed:
             result = system.list_ai_models("openai", self.admin)
-        listed.assert_called_once_with(KEY)
+        listed.assert_called_once_with("openai", KEY)
         self.assertEqual(result["models"], ["gpt-4.1"])  # only the ones that write text, without the dated copies
         self.assertEqual(result["defaults"], {"notices": "gpt-d", "chat": "gpt-c"})
 
     def test_google_lists_its_own(self):
         table = ai_env.group("google", KEY, "gem-d")
-        with mock.patch.object(ai.settings, "get", side_effect=lambda k: table[k]),                 mock.patch.object(system.google_ai, "list_models", return_value=["gemini-2.5-flash"]):
+        with mock.patch.object(ai.settings, "get", side_effect=lambda k: table[k]),                 mock.patch.object(system.model_list, "list_models", return_value=["gemini-2.5-flash"]):
             self.assertEqual(system.list_ai_models("google", self.admin)["models"], ["gemini-2.5-flash"])
 
     def test_without_the_key_of_that_provider_it_is_a_409_that_names_the_variable(self):
@@ -453,7 +436,7 @@ class ModelListTests(unittest.TestCase):
 
     def test_a_provider_failure_is_a_502(self):
         table = ai_env.group("openai", KEY, "gpt-d")
-        with mock.patch.object(ai.settings, "get", side_effect=lambda k: table[k]),                 mock.patch.object(system.open_ai, "list_models", side_effect=AIError("boom")), self.assertRaises(HTTPException) as caught:
+        with mock.patch.object(ai.settings, "get", side_effect=lambda k: table[k]),                 mock.patch.object(system.model_list, "list_models", side_effect=AIError("boom")), self.assertRaises(HTTPException) as caught:
             system.list_ai_models("openai", self.admin)
         self.assertEqual(caught.exception.status_code, 502)
 

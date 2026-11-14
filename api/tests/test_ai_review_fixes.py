@@ -135,13 +135,13 @@ class ReplacingAKeyKeepsTheModelTests(unittest.TestCase):
 
     def test_a_new_key_without_a_model_keeps_the_one_they_chose(self):
         user_ai.save(self.db, 1, KEY, "gpt-5")
-        with mock.patch.object(route.open_ai, "list_models", return_value=[]):
+        with mock.patch.object(route.model_list, "list_models", return_value=[]):
             body = self.client.put("/users/ana/ai", json={"api_key": NEW_KEY}).json()
         self.assertEqual((body["hint"], body["model"]), ("3210", "gpt-5"))
         self.assertEqual(user_ai.credentials(self.db, 1), (NEW_KEY, "gpt-5"))
 
     def test_a_first_key_gets_the_default_and_a_model_sent_with_the_key_wins(self):
-        with mock.patch.object(route.open_ai, "list_models", return_value=[]):
+        with mock.patch.object(route.model_list, "list_models", return_value=[]):
             self.assertEqual(self.client.put("/users/ana/ai", json={"api_key": KEY}).json()["model"], route.DEFAULT_MODEL)
             self.assertEqual(self.client.put("/users/ana/ai", json={"api_key": NEW_KEY, "model": "o3"}).json()["model"], "o3")
 
@@ -153,17 +153,17 @@ class ReplacingAKeyKeepsTheModelTests(unittest.TestCase):
 
     def test_listing_the_models_many_times_does_not_use_up_the_saves_and_tests(self):
         user_ai.save(self.db, 1, KEY, "gpt-4.1-mini")
-        with mock.patch.object(route.open_ai, "list_models", return_value=["gpt-4.1-mini"]):
+        with mock.patch.object(route.model_list, "list_models", return_value=["gpt-4.1-mini"]):
             codes = [self.client.get("/users/ana/ai/models").status_code for _ in range(route.CHANGES_PER_HOUR + 5)]
             self.assertEqual(set(codes), {200}, "more listings than saves are allowed")
             self.assertEqual(self.client.put("/users/ana/ai", json={"api_key": NEW_KEY}).status_code, 200)
 
     def test_listing_has_a_limit_of_its_own_and_saving_still_has_its_own(self):
         user_ai.save(self.db, 1, KEY, "gpt-4.1-mini")
-        with mock.patch.object(route.open_ai, "list_models", return_value=[]):
+        with mock.patch.object(route.model_list, "list_models", return_value=[]):
             codes = [self.client.get("/users/ana/ai/models").status_code for _ in range(route.LISTINGS_PER_HOUR + 1)]
             self.assertEqual((codes[:-1] == [200] * route.LISTINGS_PER_HOUR, codes[-1]), (True, 429))
-        with mock.patch.object(route.open_ai, "list_models", side_effect=ProviderError("x", failure.DENIED)):
+        with mock.patch.object(route.model_list, "list_models", side_effect=ProviderError("x", failure.DENIED)):
             saves = [self.client.put("/users/ana/ai", json={"api_key": NEW_KEY}).status_code for _ in range(route.CHANGES_PER_HOUR + 1)]
         self.assertEqual((saves[:-1], saves[-1]), ([400] * route.CHANGES_PER_HOUR, 429))
 

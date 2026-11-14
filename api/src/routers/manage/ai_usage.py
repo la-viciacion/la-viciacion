@@ -9,7 +9,7 @@ from ... import auth
 from ...auth import get_db
 from ...clients.ai_error import AIError
 from ...database import models
-from ...utils import ai_budget, ai_cost, ai_spend, ai_usage, ai_wallet, messages, settings
+from ...utils import ai_balances, ai_budget, ai_cost, ai_spend, ai_usage, ai_wallet, messages, settings
 from .common import router
 
 
@@ -108,3 +108,11 @@ def put_wallet_start(body: WalletStartBody, admin: models.User = Depends(auth.ge
     """Chooses the day the wallet starts counting the spending (null: the day of the first contribution)."""
     settings.set_values(db, {"ai.wallet_start": body.date.isoformat() if body.date else None}, admin.id)
     return ai_wallet.overview(db)
+
+
+@router.get("/ai-usage/balances")
+def get_ai_balances(refresh: bool = False):
+    """What the accounts of the group's keys really hold, for the providers that say it (OpenRouter), to set against the wallet. It
+    asks the providers (a blocking call: a plain def, so it runs in a worker thread) and keeps the answer a few minutes; `refresh`
+    asks again. A provider that fails comes with its error; the rest still answer."""
+    return {"balances": ai_balances.summary(refresh)}

@@ -5,17 +5,28 @@ What is used (switch, provider, key, model) is read from the settings on every c
 functions block on the network: call them from a worker thread.
 """
 import time
+from functools import lru_cache
 
-from ..clients import anthropic_ai, google_ai, open_ai, openrouter_ai, used
+from pydantic_ai import Agent
+from pydantic_ai.settings import ModelSettings
+
 from ..clients.ai_error import AIError, QuotaError
 from ..clients.quota import classify
-from . import ai_ledger, ai_providers, ai_quota, settings
+from . import ai_build, ai_ledger, ai_providers, ai_quota, settings
 from .logger import LogManager
 
 log_manager = LogManager()
 logger = log_manager.get_logger()
 
-PROVIDERS = {"google": google_ai.generate, "openai": open_ai.generate, "anthropic": anthropic_ai.generate, "openrouter": openrouter_ai.generate}
+TIMEOUT_SECONDS = 30  # a notice is not worth a long wait
+MAX_TEMPERATURE = 1.0  # Anthropic's scale ends at 1 (OpenAI's at 2) and it refuses a higher one: the lowest ceiling is everybody's
+
+
+@lru_cache(maxsize=2)
+def _group_model(provider: str, model: str, key: str):
+    """The model of the group's key, built once: a provider's client (Google's most) is not worth making for every notice. Only the
+    group's key is kept like this: a player's own never is (utils/ai_build.py builds theirs for the call)."""
+    return ai_build.build(provider, model, key)
 
 __all__ = ["AIError", "QuotaError", "complete", "current", "is_ready", "prompt_for"]
 
@@ -50,7 +61,7 @@ def current() -> tuple[str | None, str | None]:
 def in_use() -> dict:
     """For the panel: the provider and the model (None if no provider has a key and a model) the notices will use now."""
     provider, model = current()
-    return {"provider": provider, "model": model}
+    return {"provider": provider, "model": model, "problem": ai_providers.model_problem(provider, model)}
 
 
 def complete(system_prompt: str, user_prompt: str, *, temperature: float = 1.0, force: bool = False, source: str = "notice") -> str | None:
@@ -62,10 +73,14 @@ def complete(system_prompt: str, user_prompt: str, *, temperature: float = 1.0, 
         return None
     provider, key, model = found
     started = time.monotonic()
-    used.discard()
     try:
-        text = PROVIDERS[provider](key, model, system_prompt, user_prompt, temperature)
-        ai_ledger.record_notice(source, provider, model, ai_ledger.OK, started, used.take())
+        settings_ = ModelSettings(temperature=min(temperature, MAX_TEMPERATURE), timeout=TIMEOUT_SECONDS)
+        result = Agent(_group_model(provider, model, key), instructions=system_prompt, model_settings=settings_).run_sync(user_prompt)
+        text = result.output.strip()
+        if not text:
+            ended = result.response.finish_reason
+            raise AIError(f"{provider} ha respondido sin texto" + (f" ({ended})" if ended else ""))
+        ai_ledger.record_notice(source, provider, model, ai_ledger.OK, started, result)
         return text
     except QuotaError as e:
         ai_quota.report(e.quota, source, provider, model)

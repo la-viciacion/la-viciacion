@@ -12,7 +12,7 @@ from pydantic_ai.exceptions import ModelHTTPError
 
 from src.chat import limits as chat_limits
 from src.chat import agent
-from src.clients import google_ai, quota
+from src.clients import quota
 from src.clients.ai_error import AIError, Quota, QuotaError
 from src.database import models
 from src.routers import chat as chat_router
@@ -145,30 +145,20 @@ class CallersTests(unittest.TestCase):
         base = {"ai.enabled": True, **ai_env.group("google", "KEY", "gemini-test"), "chat.prompt": "p"}
         return mock.patch.object(ai.settings, "get", side_effect=lambda key: base[key])
 
-    def test_the_google_client_turns_a_429_into_a_quota_error(self):
-        client = mock.Mock()
-        client.models.generate_content.side_effect = google_429()
-        with mock.patch.object(google_ai, "_client", return_value=client), self.assertRaises(QuotaError) as caught:
-            google_ai.generate("KEY", "m", "s", "u", 1.0)
-        self.assertEqual(caught.exception.quota.kind, "day")
-        self.assertIn("429", str(caught.exception))
-
     def test_a_notice_that_hits_the_quota_is_reported_with_its_source_and_raises(self):
-        failing = mock.Mock(side_effect=google_429())
-        with self.settings(), mock.patch.dict(ai.PROVIDERS, {"google": failing}), self.assertRaises(QuotaError):
+        with self.settings(), ai_env.using(ai_env.fails(google_429())), self.assertRaises(QuotaError):
             ai.complete("s", "u", source="notice:new_game")
         quota_arg, source, provider, model = self.report.call_args.args
         self.assertEqual((source, provider, model, quota_arg.kind), ("notice:new_game", "google", "gemini-test", "day"))
 
     def test_a_429_of_a_library_that_is_not_wrapped_is_recognized_too(self):
-        failing = mock.Mock(side_effect=openai_429("insufficient_quota"))
-        with self.settings(), mock.patch.dict(ai.PROVIDERS, {"google": failing}), self.assertRaises(QuotaError) as caught:
+        with self.settings(), ai_env.using(ai_env.fails(openai_429("insufficient_quota"))), self.assertRaises(QuotaError) as caught:
             ai.complete("s", "u")
         self.assertEqual(caught.exception.quota.kind, "billing")
         self.assertEqual(self.report.call_args.args[1], "notice")
 
     def test_other_failures_are_not_reported(self):
-        with self.settings(), mock.patch.dict(ai.PROVIDERS, {"google": mock.Mock(side_effect=RuntimeError("boom"))}), self.assertRaises(AIError) as caught:
+        with self.settings(), ai_env.using(ai_env.fails(RuntimeError("boom"))), self.assertRaises(AIError) as caught:
             ai.complete("s", "u")
         self.assertNotIsInstance(caught.exception, QuotaError)
         self.report.assert_not_called()
