@@ -26,7 +26,8 @@ const SPEND_INFO = html`<p>Lo que has usado de la IA con tu cuenta, según el re
 const PREFERRED_INFO = html`<p>Con claves de varios proveedores, esta es la que se usa primero. Si no eliges ninguna, la app usa la del proveedor que el grupo usa para esa función (si tienes clave de él) y, si no, la primera que tengas.</p>`;
 
 
-export async function initAi(el, { username }) {
+// `chatBubble`: an element (the switch for the chat button) that goes right under the note, and survives the redraws
+export async function initAi(el, { username, chatBubble = null }) {
   const path = `/users/${encodeURIComponent(username)}/ai`;
   let state = await api(path);
   if (!state) return;
@@ -188,11 +189,12 @@ export async function initAi(el, { username }) {
 
   function render() {
     const drafts = [...el.querySelectorAll('[name="api_key"], [name="password"]')].map((f) => [f.closest('[data-provider], [data-locked]')?.dataset.provider ?? 'unlock', f.name, f.value]);
-    mount(el, html`${costNoteView()}${aboutView()}${keysCard()}${spendCard()}`);
+    mount(el, html`${costNoteView()}${chatBubble ? html`<div data-chat-slot></div>` : ''}${aboutView()}${keysCard()}${spendCard()}`);
     for (const [owner, name, value] of drafts) {
       const field = owner === 'unlock' ? el.querySelector('[data-locked] [name="password"]') : el.querySelector(`[data-provider="${owner}"] [name="${name}"]`);
       if (field && value) field.value = value; // what was being typed survives a redraw (the models arriving, the spending loading)
     }
+    if (chatBubble) el.querySelector('[data-chat-slot]').replaceWith(chatBubble);
     for (const select of el.querySelectorAll('select[name="model"]')) searchable(select); // a long list of models is searched, not scrolled
     for (const [where, note] of Object.entries(notes)) if (note) flash(el.querySelector(`[data-msg="${where}"]`), note.message, note.ok);
     const fold = el.querySelector('[data-about-fold]');

@@ -22,6 +22,12 @@ test('without the chat on the API there is no button', async () => {
   assert.equal(q('#chat-root'), null);
 });
 
+test('a player who hid the button does not get it', async () => {
+  installApi({ 'GET /chat/status': { available: true, bubble: false } });
+  await mountChat();
+  assert.equal(q('#chat-root'), null);
+});
+
 test('a failing status request leaves the page alone', async () => {
   installApi({ 'GET /chat/status': () => json({ detail: 'x' }, 500) });
   await mountChat();

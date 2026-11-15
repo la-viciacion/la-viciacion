@@ -262,7 +262,8 @@ function syncVisibility() {
   if (el) el.hidden = hiddenHere();
 }
 
-/** Puts the button on the page if the API says the chat can answer (once per session; calling it again does nothing). */
+/** Puts the button on the page if the API says the chat can answer and the player has not hidden it (once per session;
+ * calling it again does nothing). */
 export async function mountChat() {
   if (root()) return;
   let status;
@@ -271,7 +272,7 @@ export async function mountChat() {
   } catch {
     return; // optional: a failure here must never show on any page
   }
-  if (!status?.available || root()) return;
+  if (!status?.available || status.bubble === false || root()) return; // bubble: the player chose to hide the button
   const el = document.createElement('div');
   el.id = ID;
   document.body.append(el);
