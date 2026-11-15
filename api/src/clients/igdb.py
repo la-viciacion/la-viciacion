@@ -152,7 +152,7 @@ def find_by_steam(steam_id: str) -> list[dict]:
     """The IGDB entries that have this Steam app (a game and, often, its editions or bundles), as IGDB gives them, with
     what `extras_of` reads."""
     return _post(
-        f"fields name,slug,first_release_date,game_type,version_parent,platforms.name,{EXTRA_FIELDS}; "
+        f"fields name,slug,first_release_date,game_type,version_parent,platforms.name,{EXTRA_FIELDS},{RELEASE_FIELDS}; "
         f"where external_games.external_game_source = {STEAM_SOURCE} & external_games.uid = {_quote(str(steam_id))}; limit 10;"
     )
 
@@ -248,7 +248,8 @@ STEAM_SOURCE = 1  # `external_game_source` of Steam in IGDB
 DLC_TYPES = (1, 2, 4)  # dlc_addon, expansion, standalone_expansion
 
 
-NOT_OFFICIAL = frozenset({"alpha", "beta", "early access", "offline", "cancelled"})  # statuses of a release that is not the launch
+EARLY_ACCESS = "early access"
+NOT_OFFICIAL = frozenset({"alpha", "beta", EARLY_ACCESS, "offline", "cancelled"})  # statuses of a release that is not the launch
 RELEASE_FIELDS = "release_dates.date,release_dates.date_format,release_dates.status.name"
 
 
@@ -259,6 +260,16 @@ def official_day(item: dict) -> datetime.date | None:
     days = [
         r["date"] for r in item.get("release_dates") or []
         if r.get("date") and r.get("date_format") == 0 and ((r.get("status") or {}).get("name") or "").casefold() not in NOT_OFFICIAL
+    ]
+    return _day(min(days)) if days else None
+
+
+def early_access_day(item: dict) -> datetime.date | None:
+    """The day the game went into early access: the earliest of its releases marked "Early Access" that has an exact day. None
+    when IGDB lists none (it is as good as the community's marking: a game IGDB does not mark is not told apart)."""
+    days = [
+        r["date"] for r in item.get("release_dates") or []
+        if r.get("date") and r.get("date_format") == 0 and ((r.get("status") or {}).get("name") or "").casefold() == EARLY_ACCESS
     ]
     return _day(min(days)) if days else None
 
@@ -286,6 +297,7 @@ def game_details(igdb_id: int) -> dict | None:
         "igdb_slug": candidate["slug"],
         "dev": candidate["dev"],
         "release_date": official_day(item),
+        "early_access_date": early_access_day(item),
         "steam_id": steam,
         "image_url": candidate["image_url"],
         "genres": ",".join(candidate["genres"]),
@@ -344,14 +356,14 @@ def series_of(igdb_id: int) -> list[dict] | None:
     return list(series.values())
 
 
-def release_dates(igdb_ids: list[int]) -> dict[int, datetime.date]:
-    """The official release day of each game IGDB has one for (`official_day`: exact, and not an early access or a beta);
-    the others are not in the answer."""
+def release_days(igdb_ids: list[int]) -> dict[int, tuple[datetime.date | None, datetime.date | None]]:
+    """(official launch day, early access day) of each game IGDB knows (`official_day`, `early_access_day`: either can be None);
+    a game IGDB does not know is not in the answer."""
     ids = ",".join(str(int(i)) for i in igdb_ids)
     if not ids:
         return {}
     found = _post(f"fields {RELEASE_FIELDS}; where id = ({ids}); limit {len(igdb_ids)};")
-    return {item["id"]: day for item in found if (day := official_day(item))}
+    return {item["id"]: (official_day(item), early_access_day(item)) for item in found}
 
 
 def parent_of(igdb_id: int) -> tuple[int, str] | None:

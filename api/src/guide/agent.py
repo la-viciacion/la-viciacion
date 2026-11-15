@@ -62,6 +62,8 @@ def game_context(data: dict) -> str:
     if game.get("release_date"):
         released = game["release_date"]
         lines.append(f"Salida: {released.isoformat() if isinstance(released, (datetime.date, datetime.datetime)) else released}")
+    if game.get("early_access") and game.get("early_access_date"):  # unfinished: advice on its ending or its length may change
+        lines.append(f"Está en acceso anticipado (early access) desde {game['early_access_date'].isoformat()}; aún no tiene lanzamiento oficial")
     for label, key in (("Géneros", "genres"), ("Desarrolladora", "dev")):
         value = game.get(key)
         if value:

@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from ..config import Config
 from ..crud import challenges as challenges_crud
-from ..crud import games, rankings, time_entries, users, wishlist
+from ..crud import early_access, games, rankings, time_entries, users, wishlist
 from ..crud.achievements import Achievements, Played
 from ..database import models
 from . import challenge_notices, challenges, my_utils as utils
@@ -482,9 +482,12 @@ async def check_wishlist(db: Session, today: datetime.date) -> str:
     which of the games they wished come out today, through the channels each one left on (both off: no notice).
     Nothing is remembered: a game comes out on one day only."""
     try:
-        changed, unanswered = await asyncio.to_thread(igdb_sync.refresh_release_dates, db, wishlist.to_refresh(db, today))
-        # IGDB first; RAWG for the games IGDB does not know or could not be asked about (and that have a RAWG id)
-        changed += await asyncio.to_thread(rawg_sync.refresh_release_dates, db, [g for g in unanswered if g.rawg_id])
+        wished = wishlist.to_refresh(db, today)
+        # the games in early access go in too: the launch day that ends it slips like any other (IGDB only: RAWG dates an early access by its start)
+        extra = [g for g in early_access.to_refresh(db, today) if g.id not in {w.id for w in wished}]
+        changed, unanswered = await asyncio.to_thread(igdb_sync.refresh_release_dates, db, wished + extra)
+        # IGDB first; RAWG for the wished games IGDB does not know or could not be asked about (and that have a RAWG id)
+        changed += await asyncio.to_thread(rawg_sync.refresh_release_dates, db, [g for g in unanswered if g.rawg_id and g not in extra])
     except Exception as e:  # the dates it has are the ones the notices go by: RAWG failing must not cost the day's notices
         db.rollback()
         logger.error(f"Release dates not refreshed: {redact_rawg_key(e)}", exc_info=True)

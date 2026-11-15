@@ -67,7 +67,7 @@ class WithoutRawgTestCase(ApiTestCase):
             mock.patch.object(igdb, "game_details", side_effect=lambda igdb_id: dict(DETAILS) if igdb_id == IGDB_ID else None),
             mock.patch.object(igdb, "media_of", return_value=dict(MEDIA)),
             mock.patch.object(igdb, "series_of", return_value=[{"igdb_id": 1, "rawg_id": None, "name": "Hades", "slug": "hades", "image_url": None, "released": "2020-09-17"}]),
-            mock.patch.object(igdb, "release_dates", return_value={}),
+            mock.patch.object(igdb, "release_days", return_value={}),
             mock.patch.object(igdb, "parent_of", return_value=None),
             mock.patch.object(igdb, "game_extras", side_effect=lambda igdb_id: {
                 "themes": "Fantasy", "keywords": "", "franchises": "", "collections": "", "perspectives": "", "game_modes": "", "igdb_slug": "hades-ii",
@@ -142,7 +142,7 @@ class WithoutRawgKeyTests(WithoutRawgTestCase):
         self.game("typed", "Typed", created_at=datetime.datetime.now(), release_date=datetime.date(2018, 1, 1))
         with database.SessionLocal() as db:
             games = [db.get(models.Game, "soon")]
-            with mock.patch.object(igdb, "release_dates", return_value={1: datetime.date.today() + datetime.timedelta(days=45)}):
+            with mock.patch.object(igdb, "release_days", return_value={1: (datetime.date.today() + datetime.timedelta(days=45), None)}):
                 changed, unanswered = igdb_sync.refresh_release_dates(db, games)
             self.assertEqual(([g.id for g in changed], unanswered), (["soon"], []))
             self.assertEqual(rawg_sync.refresh_release_dates(db, unanswered), [])  # no key, nothing to ask

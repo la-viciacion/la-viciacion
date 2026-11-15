@@ -286,15 +286,42 @@ class IgdbSyncRunTests(ApiTestCase):
         self.game("c", "C", rawg_id=3, release_date=old)  # IGDB does not know it
         with database.SessionLocal() as db:
             games = [db.get(models.Game, g) for g in ("a", "b", "c")]
-            with mock.patch.object(igdb, "release_dates", return_value={1: datetime.date(2026, 9, 15)}):
+            with mock.patch.object(igdb, "release_days", return_value={1: (datetime.date(2026, 9, 15), None), 2: (None, None)}):
                 changed, unanswered = igdb_sync.refresh_release_dates(db, games)
             self.assertEqual(([g.id for g in changed], [g.id for g in unanswered]), (["a"], ["c"]))  # B: IGDB has no exact day, so it stays
             self.assertEqual((games[0].release_date, games[1].release_date), (datetime.date(2026, 9, 15), old))
-            with mock.patch.object(igdb, "release_dates", side_effect=igdb.IgdbError("down")):
+            with mock.patch.object(igdb, "release_days", side_effect=igdb.IgdbError("down")):
                 changed, unanswered = igdb_sync.refresh_release_dates(db, games)
             self.assertEqual(([g.id for g in changed], sorted(g.id for g in unanswered)), ([], ["a", "b", "c"]))
         with mock.patch.object(igdb, "configured", return_value=False):
             self.assertEqual(igdb_sync.refresh_release_dates(None, games), ([], games))
+
+    def test_the_early_access_day_is_kept_and_a_launch_that_was_only_rawgs_early_access_day_goes_blank(self):
+        went_in, launch = datetime.date(2024, 5, 1), datetime.date(2027, 3, 1)
+        self.game("ea", "Ea", igdb_id=1, release_date=went_in)  # RAWG dated it by its early access
+        self.game("out", "Out", igdb_id=2, release_date=went_in)  # IGDB gives its launch: that one wins
+        self.game("hand", "Hand", igdb_id=3, release_date=datetime.date(2025, 1, 1))  # an admin's own date stays
+        with database.SessionLocal() as db:
+            games = [db.get(models.Game, g) for g in ("ea", "out", "hand")]
+            with mock.patch.object(igdb, "release_days", return_value={1: (None, went_in), 2: (launch, went_in), 3: (None, went_in)}):
+                changed, _ = igdb_sync.refresh_release_dates(db, games)
+            self.assertEqual(len(changed), 3)
+            self.assertEqual([(g.early_access_date, g.release_date) for g in games], [
+                (went_in, None), (went_in, launch), (went_in, datetime.date(2025, 1, 1)),
+            ])
+            with mock.patch.object(igdb, "release_days", return_value={1: (None, went_in)}):
+                self.assertEqual(igdb_sync.refresh_release_dates(db, games[:1])[0], [])  # nothing new: nothing changed
+
+    def test_the_scan_asks_igdb_about_every_linked_game_and_counts_what_it_changed(self):
+        went_in = datetime.date(2024, 5, 1)
+        self.game("a", "A", igdb_id=1)
+        self.game("b", "B", igdb_id=2)
+        self.game("c", "C")  # no IGDB id: not asked
+        with database.SessionLocal() as db, mock.patch.object(igdb, "release_days", return_value={1: (None, went_in)}):
+            self.assertEqual(igdb_sync.scan_early_access(db), {"asked": 2, "changed": 1, "failed": 0})
+            self.assertEqual(db.get(models.Game, "a").early_access_date, went_in)
+        with database.SessionLocal() as db, mock.patch.object(igdb, "release_days", side_effect=igdb.IgdbError("down")):
+            self.assertEqual(igdb_sync.scan_early_access(db), {"asked": 0, "changed": 0, "failed": 2})
 
     def test_a_doubtful_game_is_linked_by_hand_once_igdb_has_it(self):
         self.game("fear", "Fear")

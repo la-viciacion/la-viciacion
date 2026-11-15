@@ -7,7 +7,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..database import models
-from . import games, time_entries, wishlist
+from . import early_access as early_access_rule, games, time_entries, wishlist
 
 
 def _none_last(value, missing):
@@ -26,12 +26,14 @@ def catalog(
     rated: bool = False,
     playing: bool = False,
     with_players: bool = False,
+    early_access: bool = False,
     sort: str = "activity",
     limit: int = 30,
     offset: int = 0,
 ) -> dict:
     """`library`: "have" (in the viewer's library) or "not". `completed` / `rated`: by the viewer.
-    `playing`: somebody is playing it right now. `with_players`: at least one player has it."""
+    `playing`: somebody is playing it right now. `with_players`: at least one player has it. `early_access`: in early access today."""
+    today = datetime.date.today()
     players = (models.not_god(),)
 
     owners: dict[str, set[int]] = {}
@@ -87,6 +89,9 @@ def catalog(
             continue
         if playing and game.id not in live or with_players and game.id not in owners:
             continue
+        in_early_access = early_access_rule.is_early_access(game.early_access_date, game.release_date, today)
+        if early_access and not in_early_access:
+            continue
         seconds, last_session = played.get(game.id, (0, None))
         count, mean = ratings.get(game.id, (0, None))
         day = started.get(game.id)
@@ -98,6 +103,8 @@ def catalog(
             "genres": genres,
             "is_dlc": game.is_dlc,
             "release_date": game.release_date,
+            "early_access": in_early_access,
+            "early_access_date": game.early_access_date,
             "players": len(owners.get(game.id, ())),
             "played_seconds": seconds,
             "completed_by": len(completers.get(game.id, ())),

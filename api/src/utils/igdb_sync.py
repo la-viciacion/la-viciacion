@@ -309,10 +309,27 @@ def link_recent(db, limit: int = HOURLY_LIMIT, days: int = RECENT_DAYS) -> str:
 RELEASE_BATCH = 50  # games per request when the dates are refreshed
 
 
+def apply_days(game: models.Game, official: datetime.date | None, early: datetime.date | None) -> list[str]:
+    """Write the official launch day and the early access day IGDB gives (an exact day only: a blank never overwrites) and
+    return the fields that changed. RAWG dates an early access game by the day it went in, so when IGDB says the game
+    is in early access with no launch yet and our date is that very day, it was never a launch: it goes blank."""
+    changed = []
+    if early and early != game.early_access_date:
+        game.early_access_date = early
+        changed.append("early_access_date")
+    if official and official != game.release_date:
+        game.release_date = official
+        changed.append("release_date")
+    elif early and not official and game.release_date == early:
+        game.release_date = None
+        changed.append("release_date")
+    return changed
+
+
 def refresh_release_dates(db, games: list[models.Game]) -> tuple[list[models.Game], list[models.Game]]:
-    """Pull the release day of games that are not out yet from IGDB (one request per fifty): announced dates slip. Only
-    an exact day IGDB gives is written (never blanked, never a placeholder). Returns (the games whose date changed, the
-    games IGDB could not be asked about, to be tried elsewhere)."""
+    """Pull the release day and the early access day of games from IGDB (one request per fifty): announced dates slip and
+    an early access ends on the launch day. Only an exact day IGDB gives is written (never blanked, never a placeholder).
+    Returns (the games that changed, the games IGDB could not be asked about, to be tried elsewhere)."""
     asked = [g for g in games if g.igdb_id]
     if not asked or not igdb.configured():
         return [], list(games)
@@ -320,25 +337,31 @@ def refresh_release_dates(db, games: list[models.Game]) -> tuple[list[models.Gam
     for first in range(0, len(asked), RELEASE_BATCH):
         batch = asked[first:first + RELEASE_BATCH]
         try:
-            dates = igdb.release_dates([g.igdb_id for g in batch])
+            days = igdb.release_days([g.igdb_id for g in batch])
         except igdb.IgdbError as e:
             logger.warning(f"IGDB release dates not refreshed: {e}")
             unanswered.extend(batch)
             continue
         for game in batch:
-            day = dates.get(game.igdb_id)
-            if day and day != game.release_date:
-                game.release_date = day
+            if game.igdb_id in days and apply_days(game, *days[game.igdb_id]):
                 changed.append(game)
     db.commit()
     return changed, unanswered
+
+
+def scan_early_access(db) -> dict:
+    """Ask IGDB about the early access of every game that has an IGDB id, once, to fill what the catalogue had before the
+    column existed. It reads dates only, in batches of fifty: a few requests for the whole catalogue."""
+    games = db.query(models.Game).filter(models.Game.igdb_id.isnot(None)).all()
+    changed, unanswered = refresh_release_dates(db, games)
+    return {"asked": len(games) - len(unanswered), "changed": len(changed), "failed": len(unanswered)}
 
 
 def _blank(value) -> bool:
     return value is None or (isinstance(value, str) and value.strip() in ("", "-"))
 
 
-APPLIED = ("dev", "release_date", "image_url", "genres", "steam_id")
+APPLIED = ("dev", "image_url", "genres", "steam_id")  # the release and early access days go through apply_days
 
 
 def link_one(db, game: models.Game) -> bool:
@@ -353,6 +376,8 @@ def link_one(db, game: models.Game) -> bool:
     game.igdb_id = found["id"]
     game.igdb_slug = found.get("slug") or ""
     _fill(game, igdb.extras_of(found))
+    if igdb.early_access_day(found):  # a game made from RAWG is dated by its early access: IGDB tells which day is the launch
+        apply_days(game, igdb.official_day(found), igdb.early_access_day(found))
     db.commit()
     return True
 
@@ -369,6 +394,7 @@ def _apply_details(db, game: models.Game, details: dict) -> list[str]:
         if not _blank(new) and getattr(game, field) != new:
             setattr(game, field, new)
             changed.append(field)
+    changed += apply_days(game, details.get("release_date"), details.get("early_access_date"))
     if not _blank(details.get("igdb_slug")) and game.igdb_slug != details["igdb_slug"]:
         game.igdb_slug = details["igdb_slug"]
         changed.append("igdb_slug")
