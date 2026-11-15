@@ -22,7 +22,7 @@ export const KINDS = {
 
 export const CHANGELOG = [
   {
-    version: '2.43', date: '2026-11-15',
+    version: '2.44', date: '2026-11-15',
     title: 'La guía de cada juego y una IA que puedes llevar a tu manera',
     items: [
       ['new', 'Early access: los juegos que aún están en acceso anticipado llevan una etiqueta con el día en que entraron y, si se conoce, el de su lanzamiento oficial; desaparece sola cuando sale. En Juegos hay un filtro para verlos.'],
