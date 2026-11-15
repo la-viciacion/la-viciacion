@@ -201,7 +201,7 @@ class SettingsTests(UsersTestCase):
     def test_without_choices_every_value_is_the_default(self):
         body = self.api("GET", "/users/ana/settings", as_user="ana").json()
         self.assertEqual((body["forgotten_timer_hours"], body["timer_notice_minutes"]), (None, None))
-        self.assertEqual(body["defaults"], {"forgotten_timer_hours": 4, "timer_notice_minutes": 10, "show_playing": True, "forgotten_timer_telegram": True, "forgotten_timer_push": True, "wishlist_release_telegram": True, "wishlist_release_push": True,
+        self.assertEqual(body["defaults"], {"forgotten_timer_hours": 4, "timer_notice_minutes": 10, "show_playing": True, "show_chat": True, "forgotten_timer_telegram": True, "forgotten_timer_push": True, "wishlist_release_telegram": True, "wishlist_release_push": True,
                                           "challenge_notices_telegram": True, "challenge_notices_push": True, "challenge_reminders_telegram": False, "challenge_reminders_push": False})
         self.assertIsNone(body["show_playing"])
 
@@ -217,6 +217,12 @@ class SettingsTests(UsersTestCase):
         self.assertIs(self.patch(show_playing=True).json()["show_playing"], True)
         self.assertIsNone(self.patch(show_playing=None).json()["show_playing"])
         self.assertEqual(self.patch(show_playing="maybe").status_code, 422)
+
+    def test_the_chat_button_choice_is_saved_and_reset(self):
+        self.assertIsNone(self.api("GET", "/users/ana/settings", as_user="ana").json()["show_chat"])
+        self.assertIs(self.patch(show_chat=False).json()["show_chat"], False)
+        self.assertIs(self.patch(show_chat=True).json()["show_chat"], True)
+        self.assertIsNone(self.patch(show_chat=None).json()["show_chat"])
 
     def test_the_limits(self):
         for hours in (0, 25, -1):
