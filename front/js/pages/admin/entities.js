@@ -143,7 +143,7 @@ export const ENTITIES = {
       {
         label: 'Lanzamiento',
         sort: 'release_date',
-        render: (r) => html`${r.release_date || '—'}${r.upcoming ? badge('Sin salir', 'orange') : ''}`,
+        render: (r) => html`${r.release_date || '—'}${r.upcoming ? badge('Sin salir', 'orange') : ''}${r.early_access ? badge('Early access', 'orange') : ''}`,
       },
       { label: 'Sesiones', sort: 'sessions', render: (r) => r.sessions },
       { label: 'Jugadores', sort: 'players', render: (r) => peopleCount(r, 'players') },
@@ -153,7 +153,8 @@ export const ENTITIES = {
     fields: [
       { key: 'name', label: 'Nombre', type: 'text', required: true },
       { key: 'dev', label: 'Desarrolladora', type: 'text' },
-      { key: 'release_date', label: 'Lanzamiento', type: 'date' },
+      { key: 'release_date', label: 'Lanzamiento oficial', type: 'date' },
+      { key: 'early_access_date', label: 'Entró en early access (vacío: no lo ha tenido)', type: 'date' },
       { key: 'genres', label: 'Géneros (coma)', type: 'text' },
       { key: 'tags', label: 'Etiquetas (coma)', type: 'text' },
       { key: 'avg_time', label: 'Tiempo medio (s)', type: 'number' },
@@ -176,7 +177,7 @@ export const ENTITIES = {
       { label: 'Logros', run: (r, admin) => admin.jumpTo('awards', { game_id: r.id, game_name: r.name }) },
       { label: 'Resincronizar (IGDB y HLTB)…', run: async (r, admin) => (await import('./resync.js')).resyncGame(r, admin) },
     ],
-    toolbarActions: [{ act: 'hltb-sync', label: 'Sincronizar tiempos (HLTB)…' }, { act: 'igdb-sync', label: 'Enlazar con IGDB…' }],
+    toolbarActions: [{ act: 'hltb-sync', label: 'Sincronizar tiempos (HLTB)…' }, { act: 'igdb-sync', label: 'Enlazar con IGDB…' }, { act: 'early-access-scan', label: 'Detectar early access (IGDB)…' }],
     canDelete: true,
     deleteNote: 'Se borrarán también sus sesiones, entradas de biblioteca y logros.',
   },

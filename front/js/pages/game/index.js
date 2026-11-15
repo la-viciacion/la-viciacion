@@ -54,7 +54,9 @@ function draw(data) {
   const known = new Set(game.genres.map((genre) => genre.toLowerCase()));
   const tags = (game.tags || []).filter((tag) => !known.has(tag.toLowerCase()));
   const mine = players.find((p) => p.is_me);
-  const details = [game.dev, game.release_date ? formatDate(game.release_date) : null,
+  // in early access its official launch (when it has one) is still to come: the date says so; the day it went in is the tag's
+  const launch = game.release_date ? (game.early_access ? `lanzamiento oficial el ${formatDate(game.release_date)}` : formatDate(game.release_date)) : null;
+  const details = [game.dev, launch,
     game.avg_time ? `se completa en unas ${formatDuration(game.avg_time)}` : null].filter(Boolean).join(' · ');
 
   mount(main, html`
@@ -73,7 +75,7 @@ function draw(data) {
               ${game.parent ? html`<span class="pf-sub">Contenido adicional de <a href="#/game/${encodeURIComponent(game.parent.id)}">${game.parent.name}</a></span>` : ''}
             </div>` : ''}
           <div class="gm-pills">
-            <div class="gm-genres">${game.genres.map((genre) => html`<span class="pf-tag muted">${genre}</span>`)}</div>
+            <div class="gm-genres">${game.early_access ? html`<span class="pf-tag early" title="Aún sin lanzamiento oficial">Early access desde ${formatDate(game.early_access_date)}</span>` : ''}${game.genres.map((genre) => html`<span class="pf-tag muted">${genre}</span>`)}</div>
             ${tags.length ? html`<div class="gm-genres gm-tags" aria-label="Etiquetas">${tagPills(tags.slice(0, TAGS_SHOWN))}${tags.length > TAGS_SHOWN
               ? html`<button type="button" class="pf-tag muted gm-more" id="gmMoreTags" title="Ver todas las etiquetas">+${tags.length - TAGS_SHOWN}</button>` : ''}</div>` : ''}
           </div>

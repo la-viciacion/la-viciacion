@@ -294,6 +294,7 @@
 
 /* Wishlist page */
 .pf-tag.dlc { background: rgba(167, 139, 250, 0.15); color: #c4b5fd; }
+.pf-tag.early { background: rgba(251, 191, 36, 0.15); color: #fcd34d; }
 .pf-tag.wish { background: rgba(244, 114, 182, 0.15); color: #f9a8d4; }
 .wl-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
 .wl-card { position: relative; }

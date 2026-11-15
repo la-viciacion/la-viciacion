@@ -37,6 +37,20 @@ test('it asks for the game of the address and shows its name as text', () => {
   assert.equal(document.querySelectorAll('h1 b').length, 0);
 });
 
+test('a game in early access says since when and that its launch is still to come; one that is out says nothing', async () => {
+  const game = { ...OVERVIEW.game, early_access: true, early_access_date: '2021-02-02', release_date: '2099-03-01' };
+  installApi({ 'GET /games/celeste/overview': { ...OVERVIEW, game }, 'GET /users/photo/': json({ detail: 'no' }, 404) });
+  await page.render({ main: main(), user: { id: 1, username: 'ana' } });
+  await settle();
+  assert.match(main().querySelector('.gm-head .pf-tag.early').textContent, /^Early access desde .*2021/);
+  assert.match(main().querySelector('.gm-details').textContent, /lanzamiento oficial el /);
+  installApi({ 'GET /games/celeste/overview': { ...OVERVIEW, game: { ...game, early_access: false, release_date: '2024-03-01' } }, 'GET /users/photo/': json({ detail: 'no' }, 404) });
+  await page.render({ main: main(), user: { id: 1, username: 'ana' } });
+  await settle();
+  assert.equal(main().querySelectorAll('.pf-tag.early').length, 0);
+  assert.doesNotMatch(main().querySelector('.gm-details').textContent, /lanzamiento oficial/);
+});
+
 test('the game links to its IGDB page with a button, in a new tab, and never to RAWG', async () => {
   installApi({ 'GET /games/celeste/overview': { ...OVERVIEW, game: { ...OVERVIEW.game, links: [{ name: 'IGDB', url: 'https://www.igdb.com/games/celeste' }, { name: 'RAWG', url: 'https://rawg.io/games/celeste' }] } }, 'GET /users/photo/': json({ detail: 'no' }, 404) });
   await page.render({ main: main(), user: { id: 1, username: 'ana' } });

@@ -416,6 +416,10 @@ async function onClick(e) {
         const { igdbSyncFlow } = await import('./igdb-sync.js');
         return igdbSyncFlow({ onDone: admin.reload });
       }
+      case 'early-access-scan': {
+        const { earlyAccessScanFlow } = await import('./early-access-scan.js');
+        return earlyAccessScanFlow({ onDone: admin.reload });
+      }
       case 'hltb-sync': {
         const { hltbSyncFlow } = await import('./hltb-sync.js');
         return hltbSyncFlow({ onDone: admin.reload });
