@@ -26,6 +26,7 @@ import { initAvatar } from './avatar.js';
 import { initData } from './data.js';
 import { flash } from './flash.js';
 import { createLibrary } from './library.js';
+import { initChatBubble } from './chat-bubble.js';
 import { initNotifications } from './notifications.js';
 import { initPreferences } from './preferences.js';
 import { initPush } from './push.js';
@@ -142,7 +143,9 @@ function showTab(id) {
     if (SHOW_PLAYING_OPTION) initPreferences(main.querySelector('#pfPrefs'), { path: userPath('settings') }).catch(() => {});
     initPush(main.querySelector('#pfPush')).catch(() => {}); // optional: never breaks the page
     initAbout(main.querySelector('#pfAbout'), { path: userPath('settings') }).then((about) => { aboutYou = about; }).catch(() => {});
-    initAi(main.querySelector('#pfAi'), { username: user.username }).catch(() => {}); // optional: never breaks the page
+    const chatBubble = document.createElement('div');
+    initChatBubble(chatBubble, { path: userPath('settings') }).catch(() => {});
+    initAi(main.querySelector('#pfAi'), { username: user.username, chatBubble }).catch(() => {}); // optional: never breaks the page
     initData(main.querySelector('#pfDataFiles'), { username: user.username });
   }
 }
