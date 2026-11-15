@@ -22,6 +22,21 @@ export const KINDS = {
 
 export const CHANGELOG = [
   {
+    version: '2.43', date: '2026-11-15',
+    title: 'La guía de cada juego y una IA que puedes llevar a tu manera',
+    items: [
+      ['new', 'Guía del juego: en la página de un juego, y con el botón «¿Atascado?» del timer, una IA busca en internet y te ayuda con ese juego, sabiendo cuánto llevas y con el nivel de destripes que elijas.'],
+      ['new', 'Mi IA, en Perfil → Ajustes: usa tu propia cuenta de OpenAI, Anthropic, Google u OpenRouter para el chat y la guía, elige el modelo de cada una y cuál se usa primero.'],
+      ['new', 'Tu gasto: cuántas preguntas has hecho a la IA y una estimación de lo que han costado, por mes, función y modelo. Solo lo ves tú.'],
+      ['new', 'La IA del grupo se paga con un saldo por jugador: en Mi IA ves lo que has aportado y lo que has gastado.'],
+      ['new', 'En Servidor, los costes de mantenimiento incluyen ahora lo que gasta la IA.'],
+      ['better', 'En Logros, los que aún no tienes ya traen su descripción, para saber qué te falta.'],
+      ['better', 'Las barras de progreso de los logros acumulativos muestran la cifra actual y la meta, por ejemplo 35 / 100 h.'],
+      ['better', 'El botón del chat se puede arrastrar y el final de las páginas queda despejado para que no tape nada.'],
+      ['better', 'Los formularios, la guía del juego y los separadores tienen más aire, y el formulario del precio de un juego se abre justo debajo de su fila.'],
+    ],
+  },
+  {
     version: '2.41', date: '2026-11-11',
     title: 'Salón de la fama, temporadas anteriores y una app más cómoda',
     items: [
@@ -33,8 +48,6 @@ export const CHANGELOG = [
       ['better', '«Seguir donde lo dejaste» se ha rediseñado: la tarjeta se queda con Continuar y Nuevo timer y Sesión manual pasan a una fila propia justo debajo.'],
       ['better', 'En la lista de sesiones de Inicio, el botón de completar el juego ahora está dentro del desplegable, y cada juego ocupa mucho menos en el móvil.'],
       ['better', 'El menú lateral se ha reorganizado.'],
-      ['better', 'En Logros, los que aún no tienes ya traen su descripción, para saber qué te falta.'],
-      ['better', 'Las barras de progreso de los logros acumulativos muestran la cifra actual y la meta, por ejemplo 35 / 100 h.'],
     ],
   },
   {
