@@ -33,6 +33,7 @@ const ACTIONS = [
   ['POST', /^recalculate-achievements$/, 'Pidió recalcular todos los logros'],
   ['POST', /^rawg-sync\//, 'Usó la sincronización con RAWG'],
   ['POST', /^hltb-sync\//, 'Usó la sincronización de tiempos con HowLongToBeat'],
+  ['POST', /^igdb-sync\/early-access$/, 'Detectó el early access de los juegos con IGDB'],
   ['POST', /^igdb-sync\//, 'Usó el enlazado de juegos con IGDB'],
 ];
 

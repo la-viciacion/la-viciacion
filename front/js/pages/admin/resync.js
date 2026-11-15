@@ -6,7 +6,7 @@ import { toast } from '../../ui/toast.js';
 import { confirmDialog } from './dialogs.js';
 
 const FIELDS = {
-  rawg_id: 'ID de RAWG', slug: 'slug', dev: 'desarrolladora', release_date: 'lanzamiento',
+  rawg_id: 'ID de RAWG', slug: 'slug', dev: 'desarrolladora', release_date: 'lanzamiento', early_access_date: 'early access',
   image_url: 'imagen', genres: 'géneros', tags: 'etiquetas', steam_id: 'Steam ID',
   parent_rawg_id: 'juego base (DLC)',
   igdb_id: 'ID de IGDB', igdb_slug: 'enlace de IGDB', themes: 'temas', keywords: 'palabras clave', franchises: 'franquicias', collections: 'colecciones',

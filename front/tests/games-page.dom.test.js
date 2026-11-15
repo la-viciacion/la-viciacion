@@ -49,6 +49,21 @@ test('it lists the games as cards linking to their page, with names as text and 
   assert.deepEqual(text('.gc-card .pf-tag').slice(0, 5), ['Jugándose', 'En tu biblioteca', 'En tu lista', 'Indie', 'Platformer']); // two genres at most
 });
 
+test('a game in early access carries the tag with the day it went in, and the filter asks for them only', async () => {
+  const asked = installApi({
+    'GET /games/catalog?limit=24&offset=0&sort=activity&early_access=true': { total: 1, items: [GAME('v', 'Valheim', { early_access: true, early_access_date: '2021-02-02' })], genres: ['Indie'] },
+    'GET /games/catalog?limit=24&offset=0&sort=activity': { total: 1, items: [GAME('v', 'Valheim', { early_access: true, early_access_date: '2021-02-02' }), GAME('h', 'Hades')], genres: ['Indie'] },
+  });
+  await page.render({ main: main() });
+  await settle();
+  const tags = [...document.querySelectorAll('.gc-card')].map((card) => [...card.querySelectorAll('.pf-tag.early')].map((t) => t.textContent));
+  assert.deepEqual(tags, [['Early access'], []]);
+  assert.match(document.querySelector('.pf-tag.early').getAttribute('title'), /desde .*2021/);
+  document.querySelector('[data-toggle="early_access"]').click();
+  await settle();
+  assert.equal(asked.at(-1).path, '/games/catalog?limit=24&offset=0&sort=activity&early_access=true');
+});
+
 test('the genres of the answer fill the genre filter', () => {
   assert.deepEqual([...document.querySelectorAll('#gcGenre option')].map((o) => o.value), ['', 'Indie', 'Platformer']);
 });

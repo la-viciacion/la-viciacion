@@ -1,7 +1,7 @@
 // Games page (#/games): the whole catalog, with search, filters and order, as the way into each game's page.
 // GET /games/catalog (derived, nothing stored); a game can also be added from RAWG here.
 import { api } from '../../lib/api.js';
-import { formatDuration, formatRelative } from '../../lib/format.js';
+import { formatDate, formatDuration, formatRelative } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
 import { gameHref } from '../../lib/links.js';
 import { iconPlus } from '../../ui/icons.js';
@@ -26,6 +26,7 @@ export const SORTS = [
 const TOGGLES = [
   ['playing', 'Jugándose ahora'],
   ['with_players', 'Con jugadores'],
+  ['early_access', 'En early access'],
   ['completed', 'Completados por mí'],
   ['rated', 'Puntuados por mí'],
 ];
@@ -36,7 +37,7 @@ let total = 0;
 let genres = [];
 let timer = null;
 let latest = 0; // an answer to an older request must not replace a newer one
-const filters = { q: '', genre: '', library: '', sort: 'activity', playing: false, with_players: false, completed: false, rated: false };
+const filters = { q: '', genre: '', library: '', sort: 'activity', playing: false, with_players: false, early_access: false, completed: false, rated: false };
 
 /** The query string of the API for some filters (only what is set). */
 export function catalogQuery(f, offset = 0) {
@@ -56,6 +57,7 @@ const card = (g) => html`
       <div class="gc-tags">
         ${g.playing_now ? html`<span class="pf-tag live">Jugándose</span>` : ''}
         ${g.is_dlc ? html`<span class="pf-tag dlc">DLC</span>` : ''}
+        ${g.early_access ? html`<span class="pf-tag early" title="En early access desde ${formatDate(g.early_access_date)}">Early access</span>` : ''}
         ${g.have ? html`<span class="pf-tag done">En tu biblioteca</span>` : ''}
         ${g.wished ? html`<span class="pf-tag wish">En tu lista</span>` : ''}
         ${g.genres.slice(0, 2).map((genre) => html`<span class="pf-tag muted">${genre}</span>`)}
@@ -129,7 +131,7 @@ export async function render(ctx) {
   clearTimeout(timer);
   genres = [];
   items = [];
-  Object.assign(filters, { q: '', genre: '', library: '', sort: 'activity', playing: false, with_players: false, completed: false, rated: false });
+  Object.assign(filters, { q: '', genre: '', library: '', sort: 'activity', playing: false, with_players: false, early_access: false, completed: false, rated: false });
 
   mount(main, html`
     <h1 class="pf-title pg-title">Juegos</h1>
