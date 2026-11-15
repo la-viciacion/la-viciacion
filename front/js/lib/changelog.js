@@ -22,7 +22,7 @@ export const KINDS = {
 
 export const CHANGELOG = [
   {
-    version: '2.44', date: '2026-11-15',
+    version: '2.45', date: '2026-11-15',
     title: 'La guía de cada juego y una IA que puedes llevar a tu manera',
     items: [
       ['new', 'Early access: los juegos que aún están en acceso anticipado llevan una etiqueta con el día en que entraron y, si se conoce, el de su lanzamiento oficial; desaparece sola cuando sale. En Juegos hay un filtro para verlos.'],
@@ -33,8 +33,8 @@ export const CHANGELOG = [
       ['new', 'En Servidor, los costes de mantenimiento incluyen ahora lo que gasta la IA.'],
       ['better', 'En Logros, los que aún no tienes ya traen su descripción, para saber qué te falta.'],
       ['better', 'Las barras de progreso de los logros acumulativos muestran la cifra actual y la meta, por ejemplo 35 / 100 h.'],
+      ['new', 'Si no quieres ver el botón del chat, puedes ocultarlo en Perfil → Mi IA y volver a mostrarlo cuando quieras.'],
       ['better', 'El botón del chat se puede arrastrar y el final de las páginas queda despejado para que no tape nada.'],
-      ['better', 'Los formularios, la guía del juego y los separadores tienen más aire, y el formulario del precio de un juego se abre justo debajo de su fila.'],
     ],
   },
   {

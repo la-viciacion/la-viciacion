@@ -7,6 +7,7 @@ Si el administrador tiene la IA activada, verás un botón redondo abajo a la de
 - No guarda las conversaciones: al recargar la página o cerrar sesión empiezas de cero. El botón ↺ también empieza una nueva.
 - Ve lo mismo que ves tú en el grupo (nunca la biblioteca ni los datos privados de otra persona).
 - Hay un límite de preguntas, para que nadie gaste el cupo de la IA. Si te pasas, el chat te dice cuánto esperar.
+- Si no quieres ver el botón, puedes ocultarlo en **Perfil → Ajustes → Mi IA** (*Mostrar el botón del chat*); se muestra de nuevo cuando lo vuelvas a activar.
 
 ## Tus propias claves de IA
 
