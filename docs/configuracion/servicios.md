@@ -4,7 +4,7 @@ Todos son opcionales: la app arranca sin ninguno. El panel (**Inicio → Integra
 
 ## IGDB: la fuente principal de los juegos
 
-[IGDB](https://www.igdb.com/) (el catálogo de juegos de Twitch) es de donde salen los datos de los juegos: la búsqueda, la portada, los géneros, la desarrolladora, la fecha de lanzamiento **oficial** (no la de acceso anticipado ni la de una beta), los temas, las palabras clave, las franquicias y colecciones, la saga, y en la ficha el tráiler, las capturas y la nota de la crítica. **RAWG solo se usa como respaldo, si IGDB no responde o no tiene el juego, y el panel ya no lo menciona.**
+[IGDB](https://www.igdb.com/) (el catálogo de juegos de Twitch) es de donde salen los datos de los juegos: la búsqueda, la portada, los géneros, la desarrolladora, la fecha de lanzamiento **oficial** (no la de acceso anticipado ni la de una beta) y, aparte, la fecha en que entró en **acceso anticipado** (early access), que la app usa para marcar los juegos que aún no han salido de él, los temas, las palabras clave, las franquicias y colecciones, la saga, y en la ficha el tráiler, las capturas y la nota de la crítica. **RAWG solo se usa como respaldo, si IGDB no responde o no tiene el juego, y el panel ya no lo menciona.**
 
 1. Crea una aplicación en la [consola de desarrolladores de Twitch](https://dev.twitch.tv/console) (hace falta la verificación en dos pasos): URL de redirección `http://localhost`, categoría *Application Integration*, cliente *Confidential*.
 2. Copia el **Client ID** y genera un **Client Secret** (solo se ve una vez).
