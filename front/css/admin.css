@@ -83,7 +83,7 @@
 
 .adm-attn { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 10px 0; border-top: 1px solid var(--border); font-size: 0.9rem; }
 
-.adm-attn:first-of-type { border-top: none; }
+:not(.adm-attn) + .adm-attn, .adm-attn:first-child { border-top: none; }
 
 .adm-ok { color: var(--accent-teal); font-size: 0.9rem; }
 
