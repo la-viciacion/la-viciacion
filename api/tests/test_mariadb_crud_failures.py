@@ -121,7 +121,7 @@ class GameCatalogueFailureTests(FailureTestCase):
     def test_a_failed_average_time_update_is_raised(self):
         with self.session() as db:
             with self.failing_commit(db), self.assertRaises(OperationalError):
-                games_crud.update_avg_time_game(db, "celeste", 7200)
+                games_crud.update_hltb_times(db, "celeste", {"avg_time": 7200})
 
 
 class ReadsPropagateTests(FailureTestCase):

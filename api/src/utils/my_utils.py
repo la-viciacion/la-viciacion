@@ -357,22 +357,23 @@ async def igdb_parent_candidate(igdb_id: int, db: Session) -> schemas.GameParent
     return parent
 
 
-async def _hltb_details(name: str, released: str | None) -> tuple[int, str | None, str | None]:
-    """(average seconds, developer, Steam id) from HowLongToBeat. The time only from a clear match (seconds, like the
-    rest of `games.avg_time`); the developer and the Steam id, used only as fallbacks, from the closest result."""
+async def _hltb_details(name: str, released: str | None) -> tuple[dict[str, int], str | None, str | None]:
+    """(times, developer, Steam id) from HowLongToBeat. The times (`hltb_sync.times_of`: seconds keyed by the `games`
+    column, those HLTB gives) only from a clear match; the developer and the Steam id, used only as fallbacks, from the
+    closest result."""
     try:
         results = await HowLongToBeat().async_search(hltb_sync.clean_name(name))
         if not results:
-            return 0, None, None
+            return {}, None, None
         closest = max(results, key=lambda x: x.similarity)
         year = int(released[:4]) if released and released[:4].isdigit() else None
         matched = hltb_sync.best_entry(name, year, results)
-        avg_time = ((matched.json_content or {}).get("comp_main") or 0) if matched else 0
+        times = hltb_sync.times_of(matched.json_content) if matched else {}
         steam = getattr(closest, "profile_steam", None)
-        return avg_time, getattr(closest, "profile_dev", None) or None, str(steam) if steam else None
+        return times, getattr(closest, "profile_dev", None) or None, str(steam) if steam else None
     except Exception as e:  # HowLongToBeat is a bonus: the game is created without it
         logger.warning(f"HLTB search failed for '{name}': {e}")
-        return 0, None, None
+        return {}, None, None
 
 
 async def get_game_details_by_rawg_id(rawg_id: int) -> dict | None:
@@ -402,7 +403,7 @@ async def get_game_details_by_rawg_id(rawg_id: int) -> dict | None:
     released = data.get("released")
     # RAWG counts the games this one is an addition of: only a DLC costs the extra request
     parent = rawg_parent(rawg_id, params) if data.get("parents_count") else asyncio.sleep(0)
-    (avg_time, hltb_dev, hltb_steam), steam_id, parent = await asyncio.gather(_hltb_details(name, released), stores, parent)
+    (times, hltb_dev, hltb_steam), steam_id, parent = await asyncio.gather(_hltb_details(name, released), stores, parent)
 
     dev_list = [d["name"] for d in data.get("developers", []) if "name" in d] or [
         p["name"] for p in data.get("publishers", []) if "name" in p
@@ -425,7 +426,10 @@ async def get_game_details_by_rawg_id(rawg_id: int) -> dict | None:
         "genres": ",".join(g["name"] for g in data.get("genres", []) if "name" in g),
         # the tags RAWG has in other languages are the same ones again: only the English ones, and without the noise (game_tags)
         "tags": game_tags.clean(t["name"] for t in data.get("tags") or [] if t.get("name") and t.get("language") == "eng"),
-        "avg_time": int(avg_time) if avg_time else 0,
+        "avg_time": times.get("avg_time", 0),
+        "time_extra": times.get("time_extra"),
+        "time_100": times.get("time_100"),
+        "time_all": times.get("time_all"),
         # RAWG counts the games this one is an addition of even when asking for them failed
         "is_dlc": bool(data.get("parents_count")),
         "parent_rawg_id": parent[0] if parent else None,
@@ -461,13 +465,16 @@ async def get_game_details_by_igdb_id(igdb_id: int) -> dict | None:
     if details is None:
         return None
     released = details["release_date"]
-    avg_time, hltb_dev, hltb_steam = await _hltb_details(details["name"], released.isoformat() if released else None)
+    times, hltb_dev, hltb_steam = await _hltb_details(details["name"], released.isoformat() if released else None)
     return {
         **details,
         "dev": details["dev"] or hltb_dev or "-",
         "steam_id": details["steam_id"] or hltb_steam or "",
         "tags": "",
-        "avg_time": int(avg_time) if avg_time else 0,
+        "avg_time": times.get("avg_time", 0),
+        "time_extra": times.get("time_extra"),
+        "time_100": times.get("time_100"),
+        "time_all": times.get("time_all"),
     }  # `themes`, `keywords`, `franchises` and `collections` come in `details`
 
 

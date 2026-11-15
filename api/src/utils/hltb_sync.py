@@ -1,7 +1,8 @@
 """Bulk sync of the average time to complete of the games' catalogue against HowLongToBeat (admin-triggered).
 
-The time is the main story of HLTB (`comp_main`, in seconds) and goes to `games.avg_time`: the ranking of debt,
-"Justo a tiempo" and the notice of a completed game read it. Rules that keep it safe to run on real data:
+The main story of HLTB (`comp_main`, in seconds) goes to `games.avg_time`: the ranking of debt, "Justo a tiempo" and the
+notice of a completed game read it. Its other times (main + extras, completionist, all styles) go to `time_extra`, `time_100`
+and `time_all`, which the game guide reads. Rules that keep it safe to run on real data:
   * HLTB is the source of truth, so a time it gives **replaces** the one stored (an admin's hand edit included);
     a game HLTB has no time for keeps the one it has, and nothing is ever blanked out
   * a game is matched on its name only when the match is clear (`pick`); anything doubtful is reported as ambiguous
@@ -94,6 +95,31 @@ def _same_numbers(wanted: str, candidate: dict) -> bool:
     return any(_numbers(wanted) == _numbers(text) for text in (candidate["name"], candidate["alias"]) if text)
 
 
+# HLTB's times (seconds in its JSON) and the column of `games` each one goes to
+TIME_FIELDS = {"comp_main": "avg_time", "comp_plus": "time_extra", "comp_100": "time_100", "comp_all": "time_all"}
+
+
+def times_of(content: dict | None) -> dict[str, int]:
+    """The times of a HLTB entry's JSON keyed by the `games` column they go to; one HLTB does not give (missing, 0 or
+    not a number) is left out, so it never blanks a time the game already has."""
+    found = {}
+    for key, column in TIME_FIELDS.items():
+        value = (content or {}).get(key)
+        if isinstance(value, (int, float)) and value > 0:
+            found[column] = int(value)
+    return found
+
+
+def apply_times(game: models.Game, times: dict[str, int]) -> bool:
+    """Set the times HLTB gave on the game (not committed); True when any of them changed."""
+    changed = False
+    for column, seconds in times.items():
+        if getattr(game, column) != seconds:
+            setattr(game, column, seconds)
+            changed = True
+    return changed
+
+
 def candidates(entries) -> list[dict]:
     """HLTB's results as plain dicts (`seconds` is the main story, 0 when HLTB has none), keeping the entry."""
     return [
@@ -104,6 +130,7 @@ def candidates(entries) -> list[dict]:
             "type": entry.game_type,
             "year": entry.release_world,
             "seconds": int((entry.json_content or {}).get("comp_main") or 0),
+            "times": times_of(entry.json_content),
             "entry": entry,
         }
         for entry in entries or []
@@ -289,10 +316,9 @@ def _run(scope: str = "all", limit: int | None = None):
                     _push("ambiguous", {"game_id": game.id, "name": game.name, "candidates": [_report(c) for c in chosen]})
                 elif not chosen[0]["seconds"]:
                     _push("no_time", {"game_id": game.id, "name": game.name})
-                elif chosen[0]["seconds"] == game.avg_time:
+                elif not apply_times(game, chosen[0]["times"]):
                     _bump("unchanged")
                 else:
-                    game.avg_time = chosen[0]["seconds"]
                     db.commit()
                     _bump("updated")
             except ConnectionError as e:
@@ -335,8 +361,7 @@ def resync_one(db, game_id: str) -> dict:
     seconds = chosen[0]["seconds"]
     if not seconds:
         return {"status": "no_time"}
-    if seconds == game.avg_time:
+    if not apply_times(game, chosen[0]["times"]):
         return {"status": "unchanged", "seconds": seconds}
-    game.avg_time = seconds
     db.commit()
     return {"status": "updated", "seconds": seconds}

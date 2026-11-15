@@ -99,6 +99,22 @@ class HltbResyncTests(unittest.TestCase):
         self.assertEqual((got["status"], self.db.get(models.Game, "g").avg_time), ("updated", 72000))
         self.assertEqual(self.run_with([entry("Hades", 72000)])["status"], "unchanged")
 
+    def test_every_time_hltb_gives_is_stored_and_a_missing_one_blanks_nothing(self):
+        full = entry("Hades", 72000)
+        full.json_content = {"comp_main": 72000, "comp_plus": 90000, "comp_100": 150000, "comp_all": 100000}
+        self.assertEqual(self.run_with([full])["status"], "updated")
+        game = self.db.get(models.Game, "g")
+        self.assertEqual((game.avg_time, game.time_extra, game.time_100, game.time_all), (72000, 90000, 150000, 100000))
+        partial = entry("Hades", 72000)
+        partial.json_content = {"comp_main": 72000, "comp_plus": 0, "comp_100": None}
+        self.assertEqual(self.run_with([partial])["status"], "unchanged")
+        self.db.refresh(game)
+        self.assertEqual((game.time_extra, game.time_100, game.time_all), (90000, 150000, 100000))
+
+    def test_times_of_keeps_only_real_times(self):
+        self.assertEqual(hltb_sync.times_of({"comp_main": 3600, "comp_plus": "x", "comp_100": 0}), {"avg_time": 3600})
+        self.assertEqual(hltb_sync.times_of(None), {})
+
     def test_no_time_not_found_and_ambiguous_leave_the_time_alone(self):
         self.assertEqual(self.run_with([entry("Hades", 0)])["status"], "no_time")
         self.assertEqual(self.run_with([])["status"], "not_found")

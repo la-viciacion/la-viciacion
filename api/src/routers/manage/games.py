@@ -27,6 +27,9 @@ class GamePatch(BaseModel):
     genres: Optional[str] = None
     tags: Optional[str] = None
     avg_time: Optional[int] = None
+    time_extra: Optional[int] = None
+    time_100: Optional[int] = None
+    time_all: Optional[int] = None
     slug: Optional[str] = None
     rawg_id: Optional[int] = None
     igdb_id: Optional[int] = None
@@ -54,6 +57,9 @@ def _game_out(
         "genres": g.genres,
         "tags": g.tags,
         "avg_time": g.avg_time,
+        "time_extra": g.time_extra,
+        "time_100": g.time_100,
+        "time_all": g.time_all,
         "slug": g.slug,
         "rawg_id": g.rawg_id,
         "igdb_id": g.igdb_id,
