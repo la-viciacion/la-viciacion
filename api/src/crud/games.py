@@ -340,6 +340,7 @@ def _store_game(db: Session, game: schemas.NewGame, game_info: schemas.NewGame) 
         steam_id=game_info.steam_id,
         image_url=game_info.image_url,
         release_date=game_info.release_date,
+        early_access_date=game_info.early_access_date,
         genres=game_info.genres,
         tags=game_info.tags,
         avg_time=game_info.avg_time,

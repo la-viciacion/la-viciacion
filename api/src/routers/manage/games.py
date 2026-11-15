@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session, aliased
 from ...auth import get_db
 from ...database import models
 from ...clients import igdb
+from ...crud.early_access import is_early_access
 from ...crud.wishlist import is_upcoming
 from ...utils import hltb_sync, igdb_sync, messages, rawg_sync
 from ...utils.redaction import redact_rawg_key
@@ -20,6 +21,7 @@ class GamePatch(BaseModel):
     name: Optional[str] = None
     dev: Optional[str] = None
     release_date: Optional[datetime.date] = None
+    early_access_date: Optional[datetime.date] = None
     steam_id: Optional[str] = None
     image_url: Optional[str] = None
     genres: Optional[str] = None
@@ -45,6 +47,8 @@ def _game_out(
         "name": g.name,
         "dev": g.dev,
         "release_date": g.release_date,
+        "early_access_date": g.early_access_date,
+        "early_access": is_early_access(g.early_access_date, g.release_date, datetime.date.today()),
         "steam_id": g.steam_id,
         "image_url": g.image_url,
         "genres": g.genres,

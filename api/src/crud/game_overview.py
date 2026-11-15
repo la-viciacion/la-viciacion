@@ -2,11 +2,13 @@
 
 Everything here is derived from the library, the sessions and the ratings when asked; nothing is stored.
 Every player counts, active or not (never the emergency account), like the rankings and the recommendations."""
+import datetime
+
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..database import models
-from . import game_prices, games, time_entries, wishlist
+from . import early_access, game_prices, games, time_entries, wishlist
 
 
 def pace(seconds: int, completed: bool, others_seconds: list[int], avg_time: int | None) -> dict | None:
@@ -115,6 +117,8 @@ def overview(db: Session, game_id: str, viewer_id: int) -> dict | None:
             "collections": games.genre_list(game.collections),
             "dev": game.dev,
             "release_date": game.release_date,
+            "early_access_date": game.early_access_date,
+            "early_access": early_access.is_early_access(game.early_access_date, game.release_date, datetime.date.today()),
             "avg_time": game.avg_time or None,
         },
         "summary": {

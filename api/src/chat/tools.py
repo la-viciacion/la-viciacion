@@ -131,6 +131,7 @@ async def game_info(ctx: RunContext[ChatDeps], game: str) -> dict:
         "collections": info["collections"],
         "developer": info["dev"],
         "release_date": _day(info["release_date"]),
+        "early_access_since": _day(info["early_access_date"]) if info["early_access"] else None,  # in early access today
         "average_hours_to_finish": hours(info["avg_time"]) if info["avg_time"] else None,
         "players_count": summary["players"],
         "total_hours": hours(summary["played_seconds"]),

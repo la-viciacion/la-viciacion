@@ -125,6 +125,9 @@ class Game(Base):
     name = Column(String(255))
     dev = Column(String(255))
     release_date = Column(Date)
+    # The day the game went into early access, when it did (IGDB's "Early Access" release). Whether it is in early access
+    # now is derived from this and `release_date` (the official launch), see crud/early_access.py: nothing says "left it"
+    early_access_date = Column(Date, nullable=True)
     steam_id = Column(String(255))
     image_url = Column(String(255))
     genres = Column(String(255))

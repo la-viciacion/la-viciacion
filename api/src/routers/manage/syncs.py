@@ -111,6 +111,15 @@ def igdb_sync_start(body: IgdbSyncBody):
     return igdb_sync.status()
 
 
+@router.post("/igdb-sync/early-access")
+def igdb_sync_early_access(db: Session = Depends(get_db)):
+    """Ask IGDB, once, which games went into early access and when (and the official launch that ends it): the catalogue
+    from before the column. Only dates are written, a few requests in all. Later the daily job keeps them."""
+    if not igdb.configured():
+        raise HTTPException(status_code=400, detail="No hay credenciales de IGDB configuradas")
+    return igdb_sync.scan_early_access(db)
+
+
 @router.post("/igdb-sync/cancel")
 def igdb_sync_cancel():
     return {"cancelling": igdb_sync.cancel()}

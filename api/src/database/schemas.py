@@ -89,6 +89,7 @@ class Game(BaseModel):
     name: str
     dev: str | None = None
     release_date: Union[datetime.date, str, None] = None
+    early_access_date: datetime.date | None = None
     steam_id: str | None = None
     image_url: str | None = None
     genres: str | None = None
@@ -107,6 +108,7 @@ class NewGame(BaseModel):
     name: str
     dev: Optional[str | None] = None
     release_date: Optional[datetime.date | None] = None
+    early_access_date: Optional[datetime.date | None] = None
     steam_id: Optional[str | None] = None
     image_url: Optional[str | None] = None
     genres: Optional[str | None] = None

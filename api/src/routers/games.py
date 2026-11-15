@@ -70,6 +70,7 @@ def get_game_catalog(
     rated: bool = Query(False, description="Only the ones you rated"),
     playing: bool = Query(False, description="Only the ones somebody is playing right now"),
     with_players: bool = Query(False, description="Only the ones somebody has in their library"),
+    early_access: bool = Query(False, description="Only the ones in early access today"),
     sort: str = Query("activity", pattern="^(activity|played|rated|players|release|name)$"),
     limit: int = Query(30, ge=1, le=100),
     offset: int = Query(0, ge=0),
@@ -79,7 +80,7 @@ def get_game_catalog(
     """Every game with what the group has done with it (derived), filtered, ordered and paged"""
     return game_catalog.catalog(
         db, current_user.id, q=q, genre=genre, library=library, completed=completed, rated=rated,
-        playing=playing, with_players=with_players, sort=sort, limit=limit, offset=offset,
+        playing=playing, with_players=with_players, early_access=early_access, sort=sort, limit=limit, offset=offset,
     )
 
 

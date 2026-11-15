@@ -140,14 +140,35 @@ class IgdbClientTests(unittest.TestCase):
             {"id": 1, "release_dates": [{"date": 1789430400, "date_format": 0}, {"date": 1800000000, "date_format": 0}]},
             {"id": 2, "release_dates": [{"date": 1798675200, "date_format": 2}]},  # "2026": a placeholder day
             {"id": 3, "release_dates": []},
-            {"id": 4, "release_dates": [{"date": 1600000000, "date_format": 0, "status": {"name": "Early Access"}}, {"date": 1700000000, "date_format": 0, "status": {"name": "Full Release"}}]},
+            {"id": 4, "release_dates": [{"date": 1600000000, "date_format": 0, "status": {"name": "Early Access"}}, {"date": 1700000000, "date_format": 0, "status": {"name": "Full Release"}}]},  # 2020-09-13, 2023-11-14
             {"id": 5, "release_dates": [{"date": 1600000000, "date_format": 0, "status": {"name": "Beta"}}]},  # no launch yet
         ]
         with mock.patch.object(igdb.requests, "post", side_effect=[_response({"access_token": "t", "expires_in": 5000000}), _response(found)]) as post:
-            dates = igdb.release_dates([1, 2, 3, 4, 5])
-        self.assertEqual({k: str(v) for k, v in dates.items()}, {1: "2026-09-15", 4: "2023-11-14"})  # the earliest exact one that is a launch
+            days = igdb.release_days([1, 2, 3, 4, 5])
+        # the earliest exact day that is a launch, and the earliest exact early access (a placeholder or an empty list gives none)
+        self.assertEqual({k: tuple(str(d) if d else None for d in v) for k, v in days.items()}, {
+            1: ("2026-09-15", None), 2: (None, None), 3: (None, None), 4: ("2023-11-14", "2020-09-13"), 5: (None, None),
+        })
         self.assertIn(b"where id = (1,2,3,4,5);", post.call_args.kwargs["data"])
-        self.assertEqual(igdb.release_dates([]), {})
+        self.assertEqual(igdb.release_days([]), {})
+
+    def test_the_early_access_day_is_the_earliest_exact_release_marked_early_access(self):
+        item = {"release_dates": [
+            {"date": 1700000000, "date_format": 0, "status": {"name": "Early Access"}},  # 2023-11-14
+            {"date": 1600000000, "date_format": 0, "status": {"name": "early access"}},  # 2020-09-13: another platform, earlier
+            {"date": 1500000000, "date_format": 0, "status": {"name": "Beta"}},  # a beta is not an early access
+            {"date": 1400000000, "date_format": 2, "status": {"name": "Early Access"}},  # "2014": a placeholder day
+            {"date": 1800000000, "date_format": 0, "status": {"name": "Full Release"}},
+        ]}
+        self.assertEqual(str(igdb.early_access_day(item)), "2020-09-13")
+        self.assertIsNone(igdb.early_access_day({"release_dates": [{"date": 1800000000, "date_format": 0}]}))
+        self.assertIsNone(igdb.early_access_day({}))
+
+    def test_a_game_made_from_igdb_brings_its_early_access_day_apart_from_its_launch(self):
+        item = dict(ITEM, game_type=0, release_dates=[{"date": 1612224000, "date_format": 0, "status": {"name": "Early Access"}}])
+        with mock.patch.object(igdb.requests, "post", side_effect=[_response({"access_token": "t", "expires_in": 5000000}), _response([item])]):
+            details = igdb.game_details(1022)
+        self.assertEqual((details["release_date"], str(details["early_access_date"])), (None, "2021-02-02"))
 
     def test_a_game_takes_its_official_launch_not_its_early_access_for_the_release_date(self):
         item = dict(ITEM, game_type=0, release_dates=[
