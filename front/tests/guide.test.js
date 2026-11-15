@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { DEFAULT_LEVEL, LEVELS, conversationOf, forgetConversations, toGuideRequest } from '../js/lib/guide.js';
+import { DEFAULT_LEVEL, DEFAULT_MODE, LEVELS, MODES, conversationOf, forgetConversations, toGuideRequest } from '../js/lib/guide.js';
 
 test('the request is the chat\'s plus the level of help', () => {
   const body = toGuideRequest([{ role: 'user', content: 'a' }, { role: 'assistant', content: 'b' }], ' hola ', 'hint');
@@ -21,4 +21,13 @@ test('each game keeps its own conversation until they are forgotten', () => {
   assert.equal(conversationOf('g2').turns.length, 0);
   forgetConversations();
   assert.equal(conversationOf('g1').turns.length, 0);
+});
+
+test('the request carries the way of playing and an unknown one is the main story', () => {
+  assert.equal(toGuideRequest([], 'x', 'hint', 'completionist').mode, 'completionist');
+  assert.equal(toGuideRequest([], 'x', 'hint', 'extras').mode, 'extras');
+  assert.equal(toGuideRequest([], 'x', 'hint', 'free').mode, 'free');
+  assert.equal(toGuideRequest([], 'x', 'hint', 'speedrun').mode, DEFAULT_MODE);
+  assert.equal(MODES[0].id, DEFAULT_MODE);
+  assert.equal(conversationOf('new-game').mode, DEFAULT_MODE);
 });

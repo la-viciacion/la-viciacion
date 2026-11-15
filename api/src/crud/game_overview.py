@@ -120,6 +120,10 @@ def overview(db: Session, game_id: str, viewer_id: int) -> dict | None:
             "early_access_date": game.early_access_date,
             "early_access": early_access.is_early_access(game.early_access_date, game.release_date, datetime.date.today()),
             "avg_time": game.avg_time or None,
+            # HowLongToBeat's other times: main + extras, completionist and all styles (None = it has none)
+            "time_extra": game.time_extra or None,
+            "time_100": game.time_100 or None,
+            "time_all": game.time_all or None,
         },
         "summary": {
             "players": len(rows),

@@ -9,13 +9,25 @@ export const LEVELS = [
   { id: 'solution', label: 'Solución', hint: 'La respuesta completa (con destripes)' },
 ];
 export const DEFAULT_LEVEL = 'nudge';
+
+// How the player plays the game this time (api/src/guide/prompt.py MODES): the guide compares their hours with
+// HowLongToBeat's time of that mode to place them
+export const MODES = [
+  { id: 'normal', label: 'Historia principal' },
+  { id: 'extras', label: 'Historia + extras' },
+  { id: 'completionist', label: 'Completista (100 %)' },
+  { id: 'free', label: 'Sin referencia de tiempo' },
+];
+export const DEFAULT_MODE = 'normal';
 export { MAX_QUESTION };
 
 const known = (level) => LEVELS.some((l) => l.id === level);
+const knownMode = (mode) => MODES.some((m) => m.id === mode);
 
-/** The body of POST /guide/{game}: the chat's (question and last turns) plus the level of help; an unknown level is the softest. */
-export function toGuideRequest(turns, text, level) {
-  return { ...toRequest(turns, text), level: known(level) ? level : DEFAULT_LEVEL };
+/** The body of POST /guide/{game}: the chat's (question and last turns) plus the level of help and the way of playing;
+ * an unknown level is the softest and an unknown mode the main story. */
+export function toGuideRequest(turns, text, level, mode) {
+  return { ...toRequest(turns, text), level: known(level) ? level : DEFAULT_LEVEL, mode: knownMode(mode) ? mode : DEFAULT_MODE };
 }
 
 // The conversations of this visit, by game: leaving the page and coming back keeps them, a reload or logout forgets them
@@ -23,7 +35,7 @@ export function toGuideRequest(turns, text, level) {
 const conversations = new Map();
 
 export function conversationOf(gameId) {
-  if (!conversations.has(gameId)) conversations.set(gameId, { turns: [], level: DEFAULT_LEVEL });
+  if (!conversations.has(gameId)) conversations.set(gameId, { turns: [], level: DEFAULT_LEVEL, mode: DEFAULT_MODE });
   return conversations.get(gameId);
 }
 

@@ -28,6 +28,7 @@ router = APIRouter(
 class GuideRequest(BaseModel):
     message: str = Field(min_length=1, max_length=agent.MAX_QUESTION)
     level: Literal["nudge", "hint", "solution"] = "nudge"
+    mode: Literal["normal", "extras", "completionist", "free"] = "normal"
     history: list[ChatTurn] = Field(default_factory=list, max_length=agent.MAX_HISTORY)
 
 
@@ -78,7 +79,7 @@ def ask(
             )
             raise refusal(refused)
         deps = agent.GuideDeps(
-            game=agent.game_context(data), level=body.level, user_name=current_user.name or current_user.username,
+            game=agent.game_context(data, body.mode), level=body.level, user_name=current_user.name or current_user.username,
             db=db, user_id=current_user.id, game_id=game_id, source=source,
         )
         try:
