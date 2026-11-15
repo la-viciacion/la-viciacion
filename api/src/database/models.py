@@ -86,6 +86,8 @@ class UserSettings(Base):
     timer_notice_minutes = Column(SmallInteger, nullable=True)
     # whether the others see this player in "playing now" (NULL = the default: shown)
     show_playing = Column(Boolean, nullable=True)
+    # whether the chat button is on this player's screens while the group has the chat on (NULL = the default: shown)
+    show_chat = Column(Boolean, nullable=True)
     # where the player lives: a city chosen from a geocoder's answer (never a GPS fix), for the weather achievements.
     # All three are set or none is (checked in utils/user_settings.py)
     place_name = Column(String(255), nullable=True)

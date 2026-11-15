@@ -415,7 +415,13 @@ class EndpointTests(unittest.TestCase):
 
     def test_status_says_whether_the_chat_can_answer(self):
         self.ready(False)
-        self.assertEqual(self.client.get("/chat/status").json(), {"available": False})
+        with mock.patch.object(chat_router.user_settings, "show_chat", return_value=True):
+            self.assertEqual(self.client.get("/chat/status").json(), {"available": False, "bubble": True})
+
+    def test_status_carries_the_players_choice_to_see_the_button(self):
+        self.ready()
+        with mock.patch.object(chat_router.user_settings, "show_chat", return_value=False):
+            self.assertEqual(self.client.get("/chat/status").json(), {"available": True, "bubble": False})
 
     def test_without_the_ai_the_chat_answers_503(self):
         self.ready(False)
