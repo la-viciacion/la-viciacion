@@ -344,6 +344,9 @@ def _store_game(db: Session, game: schemas.NewGame, game_info: schemas.NewGame) 
         genres=game_info.genres,
         tags=game_info.tags,
         avg_time=game_info.avg_time,
+        time_extra=game_info.time_extra,
+        time_100=game_info.time_100,
+        time_all=game_info.time_all,
         slug=game_info.slug,
         igdb_slug=game_info.igdb_slug,
         rawg_id=game_info.rawg_id,
@@ -379,15 +382,10 @@ def _store_game(db: Session, game: schemas.NewGame, game_info: schemas.NewGame) 
         raise e
 
 
-def update_avg_time_game(db: Session, game_id: str, avg_time: int):
-    logger.info("Updating avg time for game...")
-    stmt = (
-        update(models.Game)
-        .where(models.Game.id == game_id)
-        .values(
-            avg_time=avg_time,
-        )
-    )
+def update_hltb_times(db: Session, game_id: str, times: dict[str, int]):
+    """Store the times HowLongToBeat gave (`hltb_sync.times_of`: seconds keyed by the `games` column)."""
+    logger.info("Updating HLTB times for game...")
+    stmt = update(models.Game).where(models.Game.id == game_id).values(**times)
     db.execute(stmt)
     db.commit()
 

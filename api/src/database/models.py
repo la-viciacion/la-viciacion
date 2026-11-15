@@ -133,7 +133,11 @@ class Game(Base):
     genres = Column(String(255))
     # RAWG's tags, comma separated ("Horror, Singleplayer, ..."): what the genres leave out (there is no Horror genre)
     tags = Column(Text, nullable=True)
-    avg_time = Column(Integer)
+    avg_time = Column(Integer)  # HowLongToBeat's main story, in seconds
+    # ...and its other times, in seconds: main + extras, completionist and all styles (NULL/0 = unknown)
+    time_extra = Column(Integer, nullable=True)
+    time_100 = Column(Integer, nullable=True)
+    time_all = Column(Integer, nullable=True)
     slug = Column(String(255))
     rawg_id = Column(Integer, nullable=True, index=True)
     # IGDB's id, the backup source of the catalogue: a game can have it, RAWG's, both or neither (typed by hand)

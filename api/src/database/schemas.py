@@ -114,6 +114,9 @@ class NewGame(BaseModel):
     genres: Optional[str | None] = None
     tags: Optional[str | None] = None
     avg_time: Optional[int | None] = None
+    time_extra: Optional[int | None] = None
+    time_100: Optional[int | None] = None
+    time_all: Optional[int | None] = None
     slug: Optional[str | None] = None
     rawg_id: Optional[int | None] = None
     igdb_id: Optional[int | None] = None

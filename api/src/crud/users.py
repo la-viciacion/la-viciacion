@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from ..config import Config
 from ..database import models, schemas
 from ..utils import my_utils as utils
-from ..utils import seasons, settings, streaks
+from ..utils import hltb_sync, seasons, settings, streaks
 from ..utils.logger import LogManager
 from . import game_prices, games, scores
 
@@ -859,11 +859,12 @@ async def after_completion(db: Session, entry: models.UserGame, silent: bool):
     user = get_user_by_id(db, entry.user_id)
     game_info = await utils.get_game_info(game.name)
     hltb = game_info["hltb"]
-    # a failed lookup must not wipe the time the game already has
-    avg_time = (hltb["comp_main"] if hltb is not None else 0) or game.avg_time or 0
-    if avg_time != game.avg_time:
-        games.update_avg_time_game(db, entry.game_id, avg_time)
+    # a failed lookup must not wipe the times the game already has: only the ones HLTB gave replace them
+    times = {column: seconds for column, seconds in hltb_sync.times_of(hltb).items() if getattr(game, column) != seconds}
+    if times:
+        games.update_hltb_times(db, entry.game_id, times)
         game = games.get_game_by_id(db, entry.game_id)
+    avg_time = game.avg_time or 0
     from . import time_entries as time_entries_crud
 
     # the time of this run of the game: since its previous completion, whatever the season

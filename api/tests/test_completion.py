@@ -19,7 +19,7 @@ class GenreListTests(unittest.TestCase):
 
 class AfterCompletionAvgTimeTests(unittest.IsolatedAsyncioTestCase):
     async def run_completion(self, hltb, stored_avg):
-        game = types.SimpleNamespace(id="g", name="Doom", genres=None, avg_time=stored_avg)
+        game = types.SimpleNamespace(id="g", name="Doom", genres=None, avg_time=stored_avg, time_extra=None, time_100=None, time_all=None)
         entry = types.SimpleNamespace(game_id="g", user_id=1, season=2026)
         update = mock.MagicMock()
         ach = mock.MagicMock(
@@ -29,7 +29,7 @@ class AfterCompletionAvgTimeTests(unittest.IsolatedAsyncioTestCase):
         with mock.patch.object(users.games, "get_game_by_id", return_value=game), \
                 mock.patch.object(users, "get_user_by_id", return_value=types.SimpleNamespace(id=1, name="Ana")), \
                 mock.patch.object(users.utils, "get_game_info", new=mock.AsyncMock(return_value={"rawg": None, "hltb": hltb})), \
-                mock.patch.object(users.games, "update_avg_time_game", update), \
+                mock.patch.object(users.games, "update_hltb_times", update), \
                 mock.patch.object(users.games, "completion_suggestion", return_value=None), \
                 mock.patch.object(users.settings, "get", return_value=True), \
                 mock.patch.object(users, "count_completed_games", return_value=1), \
@@ -46,7 +46,11 @@ class AfterCompletionAvgTimeTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_a_fresh_value_replaces_the_stored_one(self):
         update, _ = await self.run_completion(hltb={"comp_main": 40000}, stored_avg=36000)
-        update.assert_called_once_with(mock.ANY, "g", 40000)
+        update.assert_called_once_with(mock.ANY, "g", {"avg_time": 40000})
+
+    async def test_every_time_hltb_gives_is_stored(self):
+        update, _ = await self.run_completion(hltb={"comp_main": 36000, "comp_plus": 50000, "comp_100": 90000, "comp_all": 0}, stored_avg=36000)
+        update.assert_called_once_with(mock.ANY, "g", {"time_extra": 50000, "time_100": 90000})
 
     async def test_an_unchanged_value_is_not_written(self):
         update, _ = await self.run_completion(hltb={"comp_main": 36000}, stored_avg=36000)
@@ -55,7 +59,7 @@ class AfterCompletionAvgTimeTests(unittest.IsolatedAsyncioTestCase):
 
 class CompletionRecommendationSwitchTests(unittest.IsolatedAsyncioTestCase):
     async def completion(self, recommend):
-        game = types.SimpleNamespace(id="g", name="Doom", genres="RPG", avg_time=3600)
+        game = types.SimpleNamespace(id="g", name="Doom", genres="RPG", avg_time=3600, time_extra=None, time_100=None, time_all=None)
         entry = types.SimpleNamespace(game_id="g", user_id=1, season=2026)
         ach = mock.MagicMock(
             just_in_time=mock.AsyncMock(), user_completed_total_games=mock.AsyncMock(), completed_in_a_day=mock.AsyncMock(),
