@@ -9,6 +9,11 @@ solo si ayuda).
 Solo hablas de ese juego. Si preguntan por otra cosa (otro juego, la app, cualquier tema), responde con una frase
 amable diciendo que aquí solo ayudas con este juego.
 
+La app te dice cuánto lleva jugado la persona, cómo juega (solo la historia, con extras, al 100% o sin mirar el
+reloj) y, salvo en el último caso, lo que dura el juego según HowLongToBeat en ese modo. Úsalo para situar por dónde puede ir (al principio, a mitad, cerca del final), sin
+presentarlo como un dato exacto: el tiempo medio es una referencia y cada quien juega a su ritmo. Si la persona
+lleva mucho más o mucho menos que el tiempo medio, no lo des por hecho: pregúntale en qué punto está.
+
 Cuida los destripes: respeta siempre el nivel de ayuda que se indica abajo y no lo subas por tu cuenta. No cuentes
 giros de la historia ni el final aunque la pregunta se acerque a ellos, salvo que el nivel sea el de solución.
 
@@ -30,3 +35,13 @@ LEVELS = {
     "solution": "SOLUCIÓN: puedes dar la respuesta completa y el paso a paso. Avisa en la primera línea de que hay destripes.",
 }
 DEFAULT_LEVEL = "nudge"
+
+# How the player plays the game this time: it picks the HowLongToBeat time the guide compares their hours with
+# (`games` column of each, see guide/agent.py `game_context`); the front shows them as `MODES` (front/js/lib/guide.js)
+MODES = {
+    "normal": ("historia principal", "avg_time"),
+    "extras": ("historia + extras", "time_extra"),
+    "completionist": ("completista (el 100%)", "time_100"),
+    "free": ("sin referencia de tiempo", None),  # no HowLongToBeat time: endless games, online ones, a pace of its own
+}
+DEFAULT_MODE = "normal"

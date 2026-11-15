@@ -3,7 +3,7 @@
 // It reuses the chat's bubbles and answer rendering. The conversation is kept in memory only (lib/guide.js), per game.
 import { api, jsonRequest } from '../lib/api.js';
 import { parseAnswer } from '../lib/chat.js';
-import { LEVELS, MAX_QUESTION, conversationOf, guideStatus, toGuideRequest } from '../lib/guide.js';
+import { LEVELS, MAX_QUESTION, MODES, conversationOf, guideStatus, toGuideRequest } from '../lib/guide.js';
 import { html, mount } from '../lib/html.js';
 import { modalHeader, openModal } from './modal.js';
 
@@ -70,6 +70,11 @@ export async function showGuide(el, game, { dialog = false } = {}) {
               <label class="gd-level"><input type="radio" name="gd-level" value="${l.id}" ${l.id === chat.level ? 'checked' : ''} /> ${l.label}</label>`)}
           </fieldset>
           <div class="pf-sub gd-level-hint">${level.hint}</div>
+          <fieldset class="gd-levels">
+            <legend class="pf-sub">¿Cómo lo juegas?</legend>
+            ${MODES.map((m) => html`
+              <label class="gd-level"><input type="radio" name="gd-mode" value="${m.id}" ${m.id === chat.mode ? 'checked' : ''} /> ${m.label}</label>`)}
+          </fieldset>
           <div class="gd-log chat-log" role="log" aria-live="polite">
             ${chat.turns.length ? chat.turns.map(bubble) : html`<div class="chat-welcome">Cuéntame dónde te has atascado en <strong>${game.name}</strong> y cómo vas.</div>`}
             ${busy ? html`<div class="chat-msg chat-bot chat-typing" aria-label="Buscando"><span></span><span></span><span></span></div>` : ''}
@@ -93,7 +98,7 @@ export async function showGuide(el, game, { dialog = false } = {}) {
   async function send(text) {
     const question = text.trim();
     if (!question || busy) return;
-    const body = toGuideRequest(chat.turns, question, chat.level);
+    const body = toGuideRequest(chat.turns, question, chat.level, chat.mode);
     chat.turns.push({ role: 'user', content: body.message });
     busy = true;
     render();
@@ -123,6 +128,9 @@ export async function showGuide(el, game, { dialog = false } = {}) {
   el.addEventListener('change', (e) => {
     if (e.target.matches('input[name="gd-level"]')) {
       chat.level = e.target.value;
+      render();
+    } else if (e.target.matches('input[name="gd-mode"]')) {
+      chat.mode = e.target.value;
       render();
     }
   });

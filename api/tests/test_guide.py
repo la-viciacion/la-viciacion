@@ -45,6 +45,31 @@ class ContextTests(unittest.TestCase):
         self.assertIn("todavía no lo ha completado", text)
         self.assertIn("Beto", text)
 
+    def test_it_gives_every_hltb_time_and_compares_the_player_with_the_mode_they_chose(self):
+        data = overview(self.db)
+        data["game"].update(avg_time=36000, time_extra=54000, time_100=108000, time_all=None)
+        normal = agent.game_context(data)
+        self.assertIn("historia principal 10.0 h, historia + extras 15.0 h, completista 30.0 h", normal)
+        self.assertNotIn("todos los estilos", normal)
+        self.assertIn("modo historia principal: compara lo que lleva con 10.0 h", normal)
+        self.assertIn("modo completista (el 100%): compara lo que lleva con 30.0 h", agent.game_context(data, "completionist"))
+
+    def test_the_intermediate_mode_uses_the_extras_time_and_the_free_one_no_time_at_all(self):
+        data = overview(self.db)
+        data["game"].update(avg_time=36000, time_extra=54000, time_100=108000)
+        self.assertIn("modo historia + extras: compara lo que lleva con 15.0 h", agent.game_context(data, "extras"))
+        free = agent.game_context(data, "free")
+        self.assertIn("sin referencia de tiempo", free)
+        self.assertNotIn("HowLongToBeat", free)
+        self.assertNotIn("compara lo que lleva", free)
+
+    def test_a_mode_without_its_time_says_so_instead_of_using_another(self):
+        data = overview(self.db)
+        data["game"].update(avg_time=36000, time_100=None)
+        text = agent.game_context(data, "completionist")
+        self.assertIn("no tiene ese tiempo", text)
+        self.assertNotIn("compara lo que lleva con", text)
+
     def test_a_player_without_the_game_is_told_so(self):
         self.assertIn("no lo tiene en su biblioteca", agent.game_context(overview(self.db, viewer=3)))
 
@@ -211,6 +236,14 @@ class EndpointTests(unittest.TestCase):
     def test_a_switched_off_guide_is_a_503(self):
         with mock.patch.object(guide_router.ai_source, "state_of", return_value={"available": False, "needs_key": False, "paid_by": None, "blocked": None}):
             self.assertEqual(self.client.post("/guide/g1", json={"message": "hola"}).status_code, 503)
+
+    def test_the_way_of_playing_goes_into_what_the_model_is_told(self):
+        with mock.patch.object(agent, "ask", return_value="Ok") as ask:
+            self.client.post("/guide/g1", json={"message": "hola", "mode": "completionist"})
+            self.client.post("/guide/g1", json={"message": "hola", "mode": "free"})
+        self.assertIn("modo completista", ask.call_args_list[0].args[0].game)
+        self.assertIn("sin referencia de tiempo", ask.call_args_list[1].args[0].game)
+        self.assertEqual(self.client.post("/guide/g1", json={"message": "hola", "mode": "speedrun"}).status_code, 422)
 
     def test_an_unknown_level_or_a_long_question_is_refused(self):
         self.assertEqual(self.client.post("/guide/g1", json={"message": "hola", "level": "all"}).status_code, 422)

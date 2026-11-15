@@ -26,7 +26,7 @@ export const CHANGELOG = [
     title: 'La guía de cada juego y una IA que puedes llevar a tu manera',
     items: [
       ['new', 'Early access: los juegos que aún están en acceso anticipado llevan una etiqueta con el día en que entraron y, si se conoce, el de su lanzamiento oficial; desaparece sola cuando sale. En Juegos hay un filtro para verlos.'],
-      ['new', 'Guía del juego: en la página de un juego, y con el botón «¿Atascado?» del timer, una IA busca en internet y te ayuda con ese juego, sabiendo cuánto llevas y con el nivel de destripes que elijas.'],
+      ['new', 'Guía del juego: en la página de un juego, y con el botón «¿Atascado?» del timer, una IA busca en internet y te ayuda con ese juego, sabiendo cuánto llevas, si juegas la historia, con extras, al 100 % o sin mirar el reloj y con el nivel de destripes que elijas.'],
       ['new', 'Mi IA, en Perfil → Ajustes: usa tu propia cuenta de OpenAI, Anthropic, Google u OpenRouter para el chat y la guía, elige el modelo de cada una y cuál se usa primero.'],
       ['new', 'Tu gasto: cuántas preguntas has hecho a la IA y una estimación de lo que han costado, por mes, función y modelo. Solo lo ves tú.'],
       ['new', 'La IA del grupo se paga con un saldo por jugador: en Mi IA ves lo que has aportado y lo que has gastado.'],

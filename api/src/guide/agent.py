@@ -23,7 +23,7 @@ from ..clients.ai_error import QuotaError
 from ..chat.tools import hours
 from ..utils import ai_build, ai_ledger, ai_providers, messages, settings
 from ..utils.logger import LogManager
-from .prompt import DEFAULT_LEVEL, LEVELS
+from .prompt import DEFAULT_LEVEL, DEFAULT_MODE, LEVELS, MODES
 
 logger = LogManager().get_logger()
 
@@ -54,7 +54,11 @@ def configured() -> bool:
     return ai_providers.group_credentials(ai_providers.GUIDE) is not None
 
 
-def game_context(data: dict) -> str:
+# HowLongToBeat's times of a game (keys of `data["game"]`) as the model is told them
+TIME_LABELS = (("avg_time", "historia principal"), ("time_extra", "historia + extras"), ("time_100", "completista"), ("time_all", "todos los estilos"))
+
+
+def game_context(data: dict, mode: str = DEFAULT_MODE) -> str:
     """What the app knows about the game and the player who asks (the game page's overview, pure): enough for the model to
     place them (how long they have played, whether they finished it, who in the group did) and nothing it has to look up."""
     game, summary = data["game"], data["summary"]
@@ -68,8 +72,17 @@ def game_context(data: dict) -> str:
         value = game.get(key)
         if value:
             lines.append(f"{label}: {', '.join(value) if isinstance(value, list) else value}")
-    if game.get("avg_time"):
-        lines.append(f"Duración media para terminarlo: {hours(game['avg_time'])} h")
+    wanted, key = MODES.get(mode, MODES[DEFAULT_MODE])
+    times = [f"{label} {hours(game[k])} h" for k, label in TIME_LABELS if game.get(k)]
+    if key is None:  # they do not want to be placed by the clock: no time is given, so none can be leaned on
+        lines.append(f"La persona juega en modo {wanted}: no la sitúes por las horas ni por lo que dure el juego; pregúntale en qué punto está.")
+    else:
+        if times:
+            lines.append(f"Duración media según HowLongToBeat: {', '.join(times)}")
+        if game.get(key):
+            lines.append(f"La persona juega en modo {wanted}: compara lo que lleva con {hours(game[key])} h.")
+        else:
+            lines.append(f"La persona juega en modo {wanted}, pero HowLongToBeat no tiene ese tiempo: no lo uses para situarla.")
     mine = next((p for p in data["players"] if p["is_me"]), None)
     if mine is None:
         lines.append("La persona no lo tiene en su biblioteca.")
