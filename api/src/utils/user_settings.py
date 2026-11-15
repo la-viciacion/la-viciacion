@@ -18,6 +18,7 @@ DEFAULT_TIMER_NOTICE_MINUTES = 10
 MIN_TIMER_NOTICE_MINUTES = 10
 MAX_TIMER_NOTICE_MINUTES = 120
 DEFAULT_SHOW_PLAYING = True
+DEFAULT_SHOW_CHAT = True
 DEFAULT_FORGOTTEN_TIMER_CHANNEL = True
 DEFAULT_WISHLIST_RELEASE_CHANNEL = True
 DEFAULT_CHALLENGE_NOTICES_CHANNEL = True
@@ -131,6 +132,14 @@ def show_playing(db: Session, user_id: int) -> bool:
     return bool(row.show_playing)
 
 
+def show_chat(db: Session, user_id: int) -> bool:
+    """Whether the chat button is on this user's screens (their own choice or the default)."""
+    row = db.get(models.UserSettings, user_id)
+    if row is None or row.show_chat is None:
+        return DEFAULT_SHOW_CHAT
+    return bool(row.show_chat)
+
+
 def get(db: Session, user_id: int) -> dict:
     """What the profile form shows: the user's own value (None = default) and the default."""
     row = db.get(models.UserSettings, user_id)
@@ -138,6 +147,7 @@ def get(db: Session, user_id: int) -> dict:
         "forgotten_timer_hours": row.forgotten_timer_hours if row else None,
         "timer_notice_minutes": row.timer_notice_minutes if row else None,
         "show_playing": None if row is None or row.show_playing is None else bool(row.show_playing),
+        "show_chat": None if row is None or row.show_chat is None else bool(row.show_chat),
         "forgotten_timer_telegram": None if row is None or row.forgotten_timer_telegram is None else bool(row.forgotten_timer_telegram),
         "forgotten_timer_push": None if row is None or row.forgotten_timer_push is None else bool(row.forgotten_timer_push),
         "wishlist_release_telegram": None if row is None or row.wishlist_release_telegram is None else bool(row.wishlist_release_telegram),
@@ -160,6 +170,7 @@ def get(db: Session, user_id: int) -> dict:
             "forgotten_timer_hours": DEFAULT_FORGOTTEN_TIMER_HOURS,
             "timer_notice_minutes": DEFAULT_TIMER_NOTICE_MINUTES,
             "show_playing": DEFAULT_SHOW_PLAYING,
+            "show_chat": DEFAULT_SHOW_CHAT,
         },
     }
 
@@ -176,6 +187,8 @@ def update(db: Session, user_id: int, changes: dict) -> dict:
         row.timer_notice_minutes = changes["timer_notice_minutes"]
     if "show_playing" in changes:
         row.show_playing = changes["show_playing"]
+    if "show_chat" in changes:
+        row.show_chat = changes["show_chat"]
     for column in ("forgotten_timer_telegram", "forgotten_timer_push", "wishlist_release_telegram", "wishlist_release_push", *CHALLENGE_COLUMNS, *PLACE_COLUMNS, "birth_date"):
         if column in changes:
             setattr(row, column, changes[column])

@@ -228,7 +228,7 @@ class QuestionsStoppedTests(Base):
     def test_the_chat_is_still_there_for_whoever_ran_out_so_that_asking_tells_them_why(self):
         self.spend(1, 6.0)
         with patched(**{"ai.user_budget_month": 5}):
-            self.assertEqual(self.client.get("/chat/status").json(), {"available": True})
+            self.assertEqual(self.client.get("/chat/status").json(), {"available": True, "bubble": True})
 
     def test_a_guide_question_over_budget_is_a_429_too(self):
         self.spend(1, 6.0)

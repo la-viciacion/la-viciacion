@@ -10,7 +10,7 @@ from ..chat import agent, limits
 from ..clients import failure as provider_failure
 from ..clients.ai_error import AIError, ProviderError, QuotaError, wait_text
 from ..database import models
-from ..utils import ai_ledger, ai_source, in_flight, messages
+from ..utils import ai_ledger, ai_source, in_flight, messages, user_settings
 from ..utils.logger import LogManager
 from ..utils.rate_limit import Refused
 
@@ -74,9 +74,13 @@ def get_status(
     current_user: models.User = Depends(auth.get_current_active_user), dek: bytes | None = Depends(auth.get_unlock), db: Session = Depends(get_db)
 ):
     """Whether the chat is there for this player (it is on and somebody can pay for it: their own key, or the group's), so the
-    front only shows it when it works. One whose budget is spent still sees it: asking tells them why it does not answer."""
+    front only shows it when it works. One whose budget is spent still sees it: asking tells them why it does not answer.
+    `bubble` is the player's own choice to see the button (the profile offers the switch only where `available`)."""
     decision = ai_source.decide(db, current_user.id, "chat", dek)
-    return {"available": decision.source is not None or decision.blocked is not None or decision.locked}
+    return {
+        "available": decision.source is not None or decision.blocked is not None or decision.locked,
+        "bubble": user_settings.show_chat(db, current_user.id),
+    }
 
 
 @router.post("", response_model=ChatResponse)

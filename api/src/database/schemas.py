@@ -45,6 +45,8 @@ class UserSettingsUpdate(BaseModel):
     timer_notice_minutes: int | None = None
     # whether the others see the user in "playing now"; None goes back to the default (shown)
     show_playing: bool | None = None
+    # whether the chat button is shown to the user; None goes back to the default (shown)
+    show_chat: bool | None = None
     # the city the player lives in, as a geocoder gave it (all three, or none: null removes it); checked in the route
     place_name: str | None = Field(default=None, max_length=255)
     place_latitude: float | None = Field(default=None, ge=-90, le=90)

@@ -11,7 +11,7 @@ from src.utils import user_settings as us
 UNSET = {"place_name": None, "place_latitude": None, "place_longitude": None, "birth_date": None,
          "nintendo_id": None, "xbox_id": None, "playstation_id": None, "steam_id": None, "discord_id": None,
          "wishlist_release_telegram": None, "wishlist_release_push": None, "challenge_notices_telegram": None, "challenge_notices_push": None,
-         "challenge_reminders_telegram": None, "challenge_reminders_push": None}
+         "challenge_reminders_telegram": None, "challenge_reminders_push": None, "show_chat": None}
 
 
 def db_with(row):
@@ -39,6 +39,7 @@ class ForgottenTimerHoursTests(unittest.TestCase):
                 "forgotten_timer_hours": None,
                 "timer_notice_minutes": None,
                 "show_playing": None,
+                "show_chat": None,
                 "forgotten_timer_telegram": None,
                 "forgotten_timer_push": None,
                 "wishlist_release_telegram": None,
@@ -68,6 +69,7 @@ class ForgottenTimerHoursTests(unittest.TestCase):
                     "forgotten_timer_hours": us.DEFAULT_FORGOTTEN_TIMER_HOURS,
                     "timer_notice_minutes": us.DEFAULT_TIMER_NOTICE_MINUTES,
                     "show_playing": us.DEFAULT_SHOW_PLAYING,
+                    "show_chat": us.DEFAULT_SHOW_CHAT,
                 },
             },
         )
@@ -206,6 +208,22 @@ class RouteTests(unittest.TestCase):
     def test_null_resets_to_the_default(self):
         _, update = self.patch(timer_notice_minutes=None)
         self.assertEqual(update.call_args.args[2], {"timer_notice_minutes": None})
+
+
+class ShowChatTests(unittest.TestCase):
+    def test_shown_unless_the_user_chose_otherwise(self):
+        self.assertTrue(us.show_chat(db_with(None), 1))
+        self.assertTrue(us.show_chat(db_with(SimpleNamespace(show_chat=None)), 1))
+        self.assertTrue(us.show_chat(db_with(SimpleNamespace(show_chat=True)), 1))
+        self.assertFalse(us.show_chat(db_with(SimpleNamespace(show_chat=False)), 1))
+
+    def test_it_is_set_and_reset_without_touching_the_others(self):
+        row = SimpleNamespace(user_id=7, forgotten_timer_hours=6, timer_notice_minutes=None, show_playing=None, forgotten_timer_telegram=None, forgotten_timer_push=None, **UNSET)
+        db = db_with(row)
+        us.update(db, 7, {"show_chat": False})
+        self.assertEqual((row.forgotten_timer_hours, row.show_chat, row.show_playing), (6, False, None))
+        us.update(db, 7, {"show_chat": None})
+        self.assertIsNone(row.show_chat)
 
 
 class ShowPlayingTests(unittest.TestCase):
