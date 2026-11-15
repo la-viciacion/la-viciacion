@@ -70,7 +70,7 @@
 
 .pf-bar > div { height: 100%; background: var(--gradient-brand); }
 
-.pf-form { gap: 12px; }
+.pf-form { display: flex; flex-direction: column; gap: 12px; }
 
 #pfPush { margin-top: 12px; }
 
@@ -132,7 +132,7 @@
 .pf-avatar-actions .pf-btn { padding: 5px 12px; font-size: 0.8rem; }
 
 .pf-game { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
-.pf-game:last-of-type { border-bottom: 0; }
+.pf-game:not(:has(~ .pf-game)) { border-bottom: 0; }
 .pf-thumb { width: 44px; height: 44px; border-radius: var(--radius-sm); object-fit: cover; flex-shrink: 0; }
 .pf-thumb-placeholder { display: flex; align-items: center; justify-content: center; background: var(--bg-card-hover); }
 .pf-game-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -165,6 +165,9 @@
 .pf-btn.danger:hover:not(:disabled) { border-color: rgba(239, 68, 68, 0.7); background: rgba(239, 68, 68, 0.2); }
 
 /* Game page */
+/* the guide heading is the first child of its box, so the sibling rule of .section-header does not space it */
+#gmGuide > .section-header:first-child { margin-top: 32px; }
+
 .gm-back { margin-bottom: 14px; }
 .gm-head { display: flex; gap: 16px; align-items: flex-start; margin-bottom: 16px; }
 .gm-cover { width: 96px; height: 96px; border-radius: var(--radius-md); object-fit: cover; flex: none; }
