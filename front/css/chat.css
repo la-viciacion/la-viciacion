@@ -6,7 +6,8 @@
    #chat-root carries in --fab-bottom, never lower than --fab-min (above the bottom bar on a phone) nor off the top */
 .chat-fab {
   --fab-min: calc(16px + env(safe-area-inset-bottom));
-  position: fixed; z-index: 1040; touch-action: none; user-select: none; -webkit-user-select: none;
+  position: fixed; z-index: 150; /* above the bars (100), under everything that takes the screen: stories (200), modals (1000), the menu, search */
+  touch-action: none; user-select: none; -webkit-user-select: none;
   right: calc(16px + env(safe-area-inset-right)); bottom: clamp(var(--fab-min), var(--fab-bottom, 0px), calc(100dvh - 72px));
   width: 56px; height: 56px; border: none; border-radius: 50%; cursor: pointer;
   display: inline-flex; align-items: center; justify-content: center;
@@ -22,7 +23,7 @@
 
 /* On a phone it is the visual viewport, which the keyboard shrinks (js/ui/chat.js sets --chat-top and --chat-height) */
 .chat-panel {
-  position: fixed; z-index: 1050; top: var(--chat-top, 0); left: 0; right: 0; display: flex; flex-direction: column;
+  position: fixed; z-index: 160; top: var(--chat-top, 0); left: 0; right: 0; display: flex; flex-direction: column;
   height: var(--chat-height, 100dvh); background: var(--bg-surface); animation: chat-in 0.18s ease;
   padding-bottom: env(safe-area-inset-bottom);
 }
