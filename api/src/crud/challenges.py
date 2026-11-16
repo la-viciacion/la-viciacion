@@ -208,10 +208,17 @@ def visible(
 
 
 def outcome(progress: dict, user_id: int) -> dict:
-    """How a player did in a challenge (from its progress): whether they reached their part and whether the group did."""
+    """How a player did in a challenge (from its progress): whether they reached their part and whether the group did (and,
+    in one that only counts, how much they put in)."""
     mine = next((p for p in progress["players"] if p["user_id"] == user_id), None)
     firsts = [p for p in progress["players"] if p.get("position") == 1]
-    return {"done": bool(mine and mine["done"]), "group_done": progress.get("total_done"), "tied": len(firsts) > 1 and any(p["winner"] for p in firsts)}
+    return {
+        "done": bool(mine and mine.get("done")),
+        "group_done": progress.get("total_done"),
+        "tied": len(firsts) > 1 and any(p["winner"] for p in firsts),
+        # a challenge that only counts has nothing to meet: the history says what the player put in
+        **({"seconds": mine["seconds"]} if mine and mine.get("accumulate") else {}),
+    }
 
 
 def history(db: Session, player_id: int, today: datetime.date, since_year: int | None = None) -> list[dict]:

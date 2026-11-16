@@ -124,7 +124,7 @@ const unitName = (part, n) => (UNITS[part.unit] ?? UNITS.games)[n === 1 ? 0 : 1]
 
 /** "3 / 5 h", "0 / 1 juego", "3 / 7 días" or "12,5 % / 25 %"; a duel or a share of a group's total says only what was reached */
 export function amountLabel(part) {
-  if (part.versus || part.contribution) return isCount(part) ? `${part.count} ${unitName(part, part.count)}` : hoursLabel(part.seconds);
+  if (part.versus || part.contribution || part.accumulate) return isCount(part) ? `${part.count} ${unitName(part, part.count)}` : hoursLabel(part.seconds);
   if (isCount(part)) return `${part.count} / ${part.target_count} ${unitName(part, part.target_count)}`;
   if (isPercent(part)) return `${number(part.percent)} % / ${number(part.target_percent)} %`;
   return `${hoursLabel(part.seconds)} / ${hoursLabel(part.target_seconds)}`;
@@ -175,6 +175,10 @@ export function summaryLine(challenge) {
   if (challenge.kind === 'group_hours') {
     return `${challenge.label} · jugar ${hoursLabel(p.min_hours_total * 3600)} entre todos, a lo que sea${versusNote(challenge)}`;
   }
+  if (challenge.kind === 'game_hours') {
+    return `${challenge.label} · sumar horas de ${challenge.game?.name ?? 'ese juego'} entre todos, sin mínimo${versusNote(challenge)}`;
+  }
+  if (challenge.kind === 'own_game_hours') return `${challenge.label} · sumar horas de ${challenge.game?.name ?? 'ese juego'}, sin mínimo`;
   if (challenge.kind === 'finish_backlog') {
     return `${challenge.label} · completar ${p.games} ${p.games === 1 ? 'juego' : 'juegos'} de los que ya tenías empezados`;
   }
@@ -199,8 +203,12 @@ export function summaryLine(challenge) {
   return challenge.label;
 }
 
-/** The group's total of a challenge as a part to draw (hours or games), or null when the challenge has none. */
+/** The group's total of a challenge as a part to draw (hours or games), or null when the challenge has none. A challenge
+ * that only counts has a total with no target (`accumulate`): what the group put in, without a bar to fill. */
 export function totalPart(progress) {
+  if (progress.total_seconds !== undefined && progress.total_target_seconds === undefined && progress.players.some((p) => p.accumulate)) {
+    return { seconds: progress.total_seconds, accumulate: true };
+  }
   if (progress.total_target_count !== undefined) {
     return { count: progress.total_count, target_count: progress.total_target_count, done: progress.total_done };
   }
@@ -276,10 +284,20 @@ function contributionStanding(challenge, part, today) {
     : { tone: 'ok', text: `Al grupo le faltan ${left}` };
 }
 
+/** A challenge that only counts hours has nothing to meet: it says what the viewer has put in. */
+function accumulatedStanding(challenge, part) {
+  const played = part.seconds > 0;
+  const text = challenge.status === 'finished'
+    ? (played ? `${challenge.scope === 'group' ? 'Aportaste' : 'Acumulaste'} ${hoursLabel(part.seconds)}` : 'No jugaste')
+    : (played ? `Llevas ${hoursLabel(part.seconds)}` : 'Todavía no has jugado');
+  return { tone: played ? 'ok' : 'pending', text };
+}
+
 function baseStanding(challenge, meId, today) {
   if (challenge.scope === 'duel') return duelStanding(challenge, meId, today);
   const part = challenge.taking_part ? challenge.progress.players.find((p) => p.user_id === meId) : null;
   if (!part || challenge.status === 'upcoming') return null;
+  if (part.accumulate) return accumulatedStanding(challenge, part);
   if (part.contribution) return contributionStanding(challenge, part, today);
   if (part.failed) return { tone: 'failed', text: challenge.status === 'finished' ? 'Se perdió: empezaste un juego nuevo antes de terminar uno' : 'Perdido: empezaste un juego nuevo antes de terminar uno' };
   if (challenge.status === 'finished') {
@@ -354,6 +372,7 @@ export const PERSONAL_KINDS = [
   ['wishlist', 'Cumplir deseados'],
   ['finish_backlog', 'Terminar lo empezado'],
   ['finish_first', 'Terminar antes de empezar'],
+  ['own_game_hours', 'Horas en un juego'],
   ['duel_hours', 'Duelo de horas'],
   ['duel_game', 'Duelo en un juego'],
   ['duel_completed', 'Duelo de completados'],
@@ -375,6 +394,7 @@ export const DURATIONS = [['week', 'Una semana'], ['month', 'Un mes'], ['quarter
 /** The line a finished challenge gets in a player's history. */
 export function resultLine(entry) {
   if (entry.scope === 'duel') return entry.tied ? 'Empate' : entry.done ? 'Ganaste el duelo' : 'Perdiste el duelo';
+  if (entry.seconds !== undefined) return entry.seconds ? `${entry.scope === 'group' ? 'Aportaste' : 'Acumulaste'} ${hoursLabel(entry.seconds)}` : 'No jugaste'; // it only counts: nothing to meet
   if (entry.scope === 'user') return entry.done ? 'Lo conseguiste' : 'No se cumplió';
   if (entry.done) return entry.group_done ? 'Cumpliste tu parte y el grupo llegó al total' : 'Cumpliste tu parte';
   return entry.group_done ? 'El grupo llegó al total' : 'No se cumplió';

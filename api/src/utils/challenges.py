@@ -69,6 +69,11 @@ class Template:
     # the notices of a group challenge: what is asked when it is launched, and the group's total reached
     summary: Callable[[models.Challenge], str] | None = None
     reached: Callable[[models.Challenge, dict], str] | None = None
+    # what a group challenge asks, with no period and no word about a contest: the launch notice lists the rest apart
+    what: Callable[[models.Challenge], str] | None = None
+    # False for a template that only counts (no target to meet): its parts carry no `done`, and a challenge of it is not
+    # one that can be "met" (the achievement about every personal template leaves it out)
+    goal: bool = True
 
 
 # ── period and numbers ──────────────────────────────────────────
@@ -276,13 +281,23 @@ def progress_game(db: Session, challenge: models.Challenge, participant_ids: lis
     return game_result(played, names, params["min_hours_each"], params["min_hours_total"])
 
 
-def summary_game(challenge: models.Challenge) -> str:
+def period_text(challenge: models.Challenge) -> str:
+    """"del 20 de noviembre al 22 de noviembre"."""
+    return f"del {spanish_date(challenge.starts_on)} al {spanish_date(challenge.ends_on)}"
+
+
+def _summary(challenge: models.Challenge, what: str, versus: bool = True) -> str:
+    """What a group challenge asks and when, one sentence (the start notice); a contest says so at the end."""
+    return f"{what}, {period_text(challenge)}." + (" Gana quien más juegue." if versus and json.loads(challenge.params).get("versus") else "")
+
+
+def what_game(challenge: models.Challenge) -> str:
     params = json.loads(challenge.params)
-    return (
-        f"Mínimo {hours_text(params['min_hours_each'])} h cada uno y {hours_text(params['min_hours_total'])} h entre todos, "
-        f"del {spanish_date(challenge.starts_on)} al {spanish_date(challenge.ends_on)}."
-        + (" Gana quien más juegue." if params.get("versus") else "")
-    )
+    return f"Mínimo {hours_text(params['min_hours_each'])} h cada uno y {hours_text(params['min_hours_total'])} h entre todos"
+
+
+def summary_game(challenge: models.Challenge) -> str:
+    return _summary(challenge, what_game(challenge))
 
 
 def reached_game(challenge: models.Challenge, progress: dict) -> str:
@@ -612,14 +627,17 @@ def progress_themed(db: Session, challenge: models.Challenge, participant_ids: l
     return themed_result(names, params["mode"], amounts, params)
 
 
-def summary_themed(challenge: models.Challenge) -> str:
+def what_themed(challenge: models.Challenge) -> str:
     params = json.loads(challenge.params)
-    period = f"del {spanish_date(challenge.starts_on)} al {spanish_date(challenge.ends_on)}"
     if params["mode"] == "play":
         total = f" y {hours_text(params['min_hours_total'])} h entre todos" if "min_hours_total" in params else ""
-        return f"Jugar al menos {hours_text(params['min_hours_each'])} h a juegos de {themed_label(params)}, cada uno{total}, {period}."
+        return f"Jugar al menos {hours_text(params['min_hours_each'])} h a juegos de {themed_label(params)}, cada uno{total}"
     total = f" (y {params['min_games_total']} entre todos)" if "min_games_total" in params else ""
-    return f"Completar al menos un juego de {themed_label(params)}{total}, {period}."
+    return f"Completar al menos un juego de {themed_label(params)}{total}"
+
+
+def summary_themed(challenge: models.Challenge) -> str:
+    return _summary(challenge, what_themed(challenge), versus=False)
 
 
 def reached_themed(challenge: models.Challenge, progress: dict) -> str:
@@ -1162,17 +1180,70 @@ def progress_group_hours(db: Session, challenge: models.Challenge, participant_i
     return group_hours_result(played, names_of(db, participant_ids), json.loads(challenge.params)["min_hours_total"])
 
 
+def what_group_hours(challenge: models.Challenge) -> str:
+    return f"Jugar {hours_text(json.loads(challenge.params)['min_hours_total'])} h entre todos, a lo que sea"
+
+
 def summary_group_hours(challenge: models.Challenge) -> str:
-    params = json.loads(challenge.params)
-    return (
-        f"Jugar {hours_text(params['min_hours_total'])} h entre todos, a lo que sea, del {spanish_date(challenge.starts_on)} al {spanish_date(challenge.ends_on)}."
-        + (" Gana quien más juegue." if params.get("versus") else "")
-    )
+    return _summary(challenge, what_group_hours(challenge))
 
 
 def reached_group_hours(challenge: models.Challenge, progress: dict) -> str:
     contributed = sum(1 for p in progress["players"] if p["seconds"] > 0)
     return f"Entre todos habéis llegado a las {hours_text(json.loads(challenge.params)['min_hours_total'])} h. Han aportado {contributed} de {len(progress['players'])}."
+
+
+# ── Horas en un juego (grupo y personal) ────────────────────────
+
+
+def _game_of(db: Session, options: dict) -> models.Game:
+    game = db.get(models.Game, str(options.get("game_id") or ""))
+    if game is None:
+        raise ChallengeError("Elige un juego que exista")
+    return game
+
+
+def build_game_hours(db: Session, options: dict, today: datetime.date, user_id: int | None = None) -> Built:
+    """Options: game_id and the period (see `group_period`). Only the hours played in the game are counted: nobody has a
+    minimum and there is no total to reach."""
+    game = _game_of(db, options)
+    starts_on, ends_on = group_period(options, today)
+    return Built(title=f"Horas en {game.name}"[:MAX_TITLE], params=_versus(options), starts_on=starts_on, ends_on=ends_on, game_id=game.id)
+
+
+def build_own_game_hours(db: Session, options: dict, today: datetime.date, user_id: int | None = None) -> Built:
+    """Options: game_id and duration ("week", "month" or "quarter"; it starts today). The player's own count of the hours
+    they put in a game."""
+    game = _game_of(db, options)
+    duration, length = _duration(options)
+    return Built(
+        title=f"Horas en {game.name}"[:MAX_TITLE],
+        params={"duration": duration},
+        starts_on=today,
+        ends_on=today + datetime.timedelta(days=length - 1),
+        game_id=game.id,
+    )
+
+
+def game_hours_result(played: dict[int, int], names: dict[int, str]) -> dict:
+    """The progress of the hours in a game from what each participant played (pure). A part is only what the player put
+    in (`accumulate`: it has no target and so no `done`), and the total is what the group put in between everybody."""
+    players = [{"user_id": user_id, "name": name, "seconds": played.get(user_id, 0), "accumulate": True} for user_id, name in names.items()]
+    players.sort(key=lambda p: (-p["seconds"], p["name"].lower()))
+    return {"players": players, "total_seconds": sum(p["seconds"] for p in players)}
+
+
+def progress_game_hours(db: Session, challenge: models.Challenge, participant_ids: list[int]) -> dict:
+    played = seconds_in_game(db, participant_ids, challenge.game_id, challenge.starts_on, challenge.ends_on, starts_at(challenge))
+    return game_hours_result(played, names_of(db, participant_ids))
+
+
+def what_game_hours(challenge: models.Challenge) -> str:
+    return "Sumar las horas que se juegan, sin mínimo: solo se cuentan"
+
+
+def summary_game_hours(challenge: models.Challenge) -> str:
+    return _summary(challenge, what_game_hours(challenge))
 
 
 # ── Terminar lo empezado y Terminar antes de empezar (personal) ─
@@ -1257,9 +1328,11 @@ def progress_finish_first(db: Session, challenge: models.Challenge, participant_
 
 
 TEMPLATES: dict[str, Template] = {
-    "game": Template("Reto de juego", GROUP, build_game, progress_game, summary_game, reached_game),
-    "themed": Template("Temático", GROUP, build_themed, progress_themed, summary_themed, reached_themed),
-    "group_hours": Template("Horas entre todos", GROUP, build_group_hours, progress_group_hours, summary_group_hours, reached_group_hours),
+    "game": Template("Reto de juego", GROUP, build_game, progress_game, summary_game, reached_game, what_game),
+    "themed": Template("Temático", GROUP, build_themed, progress_themed, summary_themed, reached_themed, what_themed),
+    "group_hours": Template("Horas entre todos", GROUP, build_group_hours, progress_group_hours, summary_group_hours, reached_group_hours, what_group_hours),
+    "game_hours": Template("Horas en un juego", GROUP, build_game_hours, progress_game_hours, summary_game_hours, what=what_game_hours, goal=False),
+    "own_game_hours": Template("Horas en un juego", USER, build_own_game_hours, progress_game_hours, goal=False),
     "finish_backlog": Template("Terminar lo empezado", USER, build_finish_backlog, progress_finish_backlog),
     "finish_first": Template("Terminar antes de empezar", USER, build_finish_first, progress_finish_first),
     "new_genre": Template("Probar un género", USER, build_new_genre, progress_new_genre),

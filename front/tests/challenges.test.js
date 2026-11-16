@@ -373,3 +373,25 @@ test('the chosen period reads as a sentence for the summary before launching', (
   assert.equal(chosenPeriodLine({ period: 'range', from: '2026-11-20', to: '2026-11-27' }), 'Del 20 de noviembre de 2026 al 27 de noviembre de 2026');
   assert.equal(chosenPeriodLine({ period: 'month', repeat: true }), 'Cada mes (se lanza solo el día 1)');
 });
+
+test('a challenge that only counts hours says what was put in and draws a total with no target', () => {
+  const part = (seconds) => ({ user_id: 7, name: 'Yo', seconds, accumulate: true });
+  const counting = (seconds, extra = {}) => ({ ...running(part(seconds)), progress: { players: [part(seconds)], total_seconds: seconds + 3600 }, ...extra });
+  assert.equal(amountLabel(part(5400)), '1,5 h');
+  assert.deepEqual(totalPart(counting(7200).progress), { seconds: 10800, accumulate: true });
+  assert.deepEqual(standing(counting(7200), 7, TODAY), { tone: 'ok', text: 'Llevas 2 h' });
+  assert.deepEqual(standing(counting(0), 7, TODAY), { tone: 'pending', text: 'Todavía no has jugado' });
+  assert.equal(standing({ ...counting(7200), status: 'finished' }, 7, TODAY).text, 'Aportaste 2 h');
+  assert.equal(standing({ ...counting(7200, { scope: 'user' }), status: 'finished' }, 7, TODAY).text, 'Acumulaste 2 h');
+  assert.equal(standing({ ...counting(0), status: 'finished' }, 7, TODAY).text, 'No jugaste');
+});
+
+test('the history of a challenge that only counts says the hours, and its kinds are summarised', () => {
+  assert.equal(resultLine({ scope: 'group', done: false, seconds: 7200 }), 'Aportaste 2 h');
+  assert.equal(resultLine({ scope: 'user', done: false, seconds: 5400 }), 'Acumulaste 1,5 h');
+  assert.equal(resultLine({ scope: 'user', done: false, seconds: 0 }), 'No jugaste');
+  const game = { name: 'Hades' };
+  assert.equal(summaryLine({ kind: 'game_hours', label: 'Horas en un juego', params: {}, game }), 'Horas en un juego · sumar horas de Hades entre todos, sin mínimo');
+  assert.match(summaryLine({ kind: 'game_hours', label: 'x', params: { versus: true }, game }), /y gana quien más avance$/);
+  assert.equal(summaryLine({ kind: 'own_game_hours', label: 'Horas en un juego', params: {}, game }), 'Horas en un juego · sumar horas de Hades, sin mínimo');
+});

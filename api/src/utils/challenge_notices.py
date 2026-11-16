@@ -84,6 +84,35 @@ def remaining_text(part: dict) -> str:
     return f"te faltan {_hours(part['target_seconds'] - part['seconds'])}"
 
 
+MAX_NOTICE_TITLE = 80
+
+
+def launch_headline(title: str, notice_title: str | None, subject: str | None) -> str:
+    """What the launch notice calls the challenge: its title, or what the admin wrote for the notice followed by the game or
+    theme it is about ("Juego del fin de semana: Grand Theft Auto VI"; alone when there is none)."""
+    custom = (notice_title or "").strip()[:MAX_NOTICE_TITLE]
+    if not custom:
+        return title
+    return f"{custom}: {subject}" if subject else custom
+
+
+def launch_message(title: str, what: str, period: str, game: str | None, versus: bool, voluntary: bool, link: str | None) -> str:
+    """The group hears a challenge was launched, as a list of what it is (`game` is already a Markdown link or a name;
+    `link` is the page of the challenges in the app, when the app has a public address)."""
+    lines = ["🎯 *Nuevo reto del grupo*", _bold(title), "", f"• *Periodo*: {period}"]
+    if game:
+        lines.append(f"• *Juego*: {game}")
+    lines.append(f"• *Qué*: {utils.escape_markdown(what)}")
+    if versus:
+        lines.append("• *Competición*: gana quien más juegue")
+    lines.append("• *Quién participa*: " + ("voluntario, hay que apuntarse" if voluntary else "todos, y quien no quiera puede salirse en Retos"))
+    if link:
+        lines += ["", f"👉 [{'Apuntarme al reto' if voluntary else 'Ver el reto'}]({link})"]
+    elif voluntary:
+        lines += ["", "Apúntate en Retos."]
+    return "\n".join(lines)
+
+
 def group_start_message(title: str, summary: str, voluntary: bool, joined: int, players: int) -> str:
     """The group hears a challenge it already knew about begins today; a voluntary one says how many signed up."""
     who = f"Se han apuntado {joined} de {players}." if voluntary else "Participáis todos; quien no quiera, puede salirse en Retos."
@@ -114,6 +143,17 @@ def result_line(challenge: models.Challenge, progress: dict, user_id: int, names
         if mine_value == other_value:
             return f"🤝 {_bold(challenge.title)} contra {rival}: empate ({score})"
         return f"🥇 Ganaste el duelo a {rival} ({score})" if mine["done"] else f"🥈 Perdiste el duelo contra {rival} ({score})"
+    if mine.get("accumulate"):
+        mine_text = _hours(mine["seconds"])
+        if not mine["seconds"]:
+            line = f"⚪ {_bold(challenge.title)}: no jugaste"
+        else:
+            line = f"⏱️ {_bold(challenge.title)}: {'aportaste' if challenge.scope == challenges.GROUP else 'acumulaste'} {mine_text}"
+        if challenge.scope == challenges.GROUP and mine["seconds"]:
+            line += f" (el grupo sumó {_hours(progress['total_seconds'])})"
+        if mine.get("position"):
+            line += f" ({MEDALS[mine['position'] - 1] if mine['position'] <= 3 else str(mine['position']) + 'º'})"
+        return line
     line = f"{'✅' if mine['done'] else '❌'} {_bold(challenge.title)}: " + (
         "cumpliste tu parte" if mine["done"] else "se perdió: empezaste un juego nuevo antes de terminar uno" if mine.get("failed") else "no se cumplió"
     )
@@ -127,11 +167,16 @@ def result_line(challenge: models.Challenge, progress: dict, user_id: int, names
 def group_result_message(challenge: models.Challenge, progress: dict) -> str:
     """How a group challenge ended, one message for the group."""
     players = progress["players"]
-    met = sum(1 for p in players if p["done"])
-    text = f"🏁 *Ha terminado el reto del grupo*\n{_bold(challenge.title)}\n{met} de {len(players)} habéis cumplido vuestra parte"
-    if "total_done" in progress:
-        text += " y " + ("el grupo llegó al total" if progress["total_done"] else "el grupo no llegó al total")
-    text += "."
+    header = f"🏁 *Ha terminado el reto del grupo*\n{_bold(challenge.title)}\n"
+    if any(p.get("accumulate") for p in players):  # it only counts: there is nothing to meet
+        contributed = sum(1 for p in players if p["seconds"])
+        text = header + (f"Entre todos habéis acumulado {_hours(progress['total_seconds'])}. Han aportado {contributed} de {len(players)}." if contributed else "Nadie ha jugado.")
+    else:
+        met = sum(1 for p in players if p["done"])
+        text = f"{header}{met} de {len(players)} habéis cumplido vuestra parte"
+        if "total_done" in progress:
+            text += " y " + ("el grupo llegó al total" if progress["total_done"] else "el grupo no llegó al total")
+        text += "."
     winners = [p["name"] for p in players if p.get("winner")]
     if winners:
         text += f"\n🥇 {'Gana' if len(winners) == 1 else 'Ganan'} {utils.join_names([_bold(name) for name in winners])}."
@@ -294,6 +339,8 @@ async def send_reminders(db: Session, today: datetime.date) -> str:
         progress = _progress(db, challenge, taking)
         names = challenges.names_of(db, taking)
         for part in progress["players"]:
+            if part.get("accumulate"):
+                continue  # it only counts: there is nothing to remind
             if challenge.scope == challenges.DUEL:
                 other = next((p for p in progress["players"] if p["user_id"] != part["user_id"]), None)
                 if other is None or challenges.part_value(part) >= challenges.part_value(other):

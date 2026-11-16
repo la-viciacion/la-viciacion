@@ -2,6 +2,7 @@
 //
 // Field: { key, label, type, required?, omitEmpty?, step?, nameKey? (game: the row's key holding the game's name),
 //   clearable? (game: a button to leave it empty), checks? (game: the key of a checkbox that choosing a game checks) }
+// text: { hint? (a line of explanation under the label), placeholder?, maxLength? }
 // Types: text | textarea (rows?) | number | date | datetime | checkbox | select | month | platform | user | game | games | password | image
 // games: a list of games (the value is [{ id, name }], what is sent is the ids): each is added with the same picker as `game`
 // options: a list of short texts (the value is [text, ...]), one input row each, added and removed in the form: { min, max, maxLength }
@@ -104,7 +105,7 @@ function fieldHtml(f, value, row) {
     case 'number':
       return html`<label>${f.label}<input class="adm-input" type="number" step="${f.step || '1'}" id="${id}" value="${v}" /></label>`;
     default:
-      return html`<label>${f.label}<input class="adm-input" type="text" id="${id}" value="${v}" /></label>`;
+      return html`<label>${f.label}${f.hint ? html`<span class="adm-sub">${f.hint}</span>` : ''}<input class="adm-input" type="text" id="${id}" value="${v}" placeholder="${f.placeholder ?? ''}" maxlength="${f.maxLength ?? ''}" /></label>`;
   }
 }
 

@@ -11,7 +11,7 @@
 // Orders: [['key:dir', label], ...]   a dropdown that sets the sort (key and dir are the API's sort and order)
 // Action: { label, show?(row), run(row, admin) }   admin = { jumpTo, open, reload }
 import { api } from '../../lib/api.js';
-import { themeLabel } from '../../lib/challenges.js';
+import { hoursLabel, themeLabel } from '../../lib/challenges.js';
 import { formatDate, formatDuration, formatTimestamp } from '../../lib/format.js';
 import { html } from '../../lib/html.js';
 import { gameHref } from '../../lib/links.js';
@@ -340,7 +340,7 @@ export const ENTITIES = {
       { label: 'Reto', render: (r) => html`<strong>${r.title}</strong><div class="adm-sub">${r.label} · ${r.scope === 'group' ? 'de grupo' : `de ${r.owner ?? '—'}`}</div>` },
       { label: 'Periodo', render: (r) => html`${formatDate(r.starts_on)} – ${formatDate(r.ends_on)}` },
       { label: 'Estado', render: (r) => ({ active: badge('En marcha', 'green'), upcoming: badge('Próximo', 'orange'), finished: badge('Terminado', 'gray') })[r.status] },
-      { label: 'Participan', render: (r) => `${r.players} (${r.done_players} cumplen)${r.participation === 'opt_in' ? ' · voluntario' : ''}` },
+      { label: 'Participan', render: (r) => `${r.players} (${r.accumulated_seconds != null ? `${hoursLabel(r.accumulated_seconds)} en total` : `${r.done_players} cumplen`})${r.participation === 'opt_in' ? ' · voluntario' : ''}` },
       { label: 'Total', render: (r) => (r.total_done ? badge(r.notified ? 'Alcanzado, avisado' : 'Alcanzado', 'green') : '—') },
       { label: 'Lanzado por', render: (r) => r.created_by ?? '—' },
     ],
@@ -368,6 +368,7 @@ export const ENTITIES = {
           WHO,
           PARTICIPATION_FIELD,
           { key: 'announce', label: 'Avisar al grupo (Telegram y notificaciones)', type: 'checkbox', default: false, defaultBy: ANNOUNCE_REPEAT },
+          { key: 'notice_title', label: 'Título del aviso (opcional)', hint: 'Solo para el mensaje que se envía al grupo; el reto no lo guarda. Se le añade el juego o la temática: «Juego del fin de semana» sale como «Juego del fin de semana: Hades».', placeholder: 'Juego del fin de semana', maxLength: 80, type: 'text', when: { key: 'announce', is: true } },
         ],
       },
       {
@@ -383,6 +384,24 @@ export const ENTITIES = {
           WHO,
           PARTICIPATION_FIELD,
           { key: 'announce', label: 'Avisar al grupo (Telegram y notificaciones)', type: 'checkbox', default: false },
+          { key: 'notice_title', label: 'Título del aviso (opcional)', hint: 'Solo para el mensaje que se envía al grupo; el reto no lo guarda. Se le añade el juego o la temática: «Juego del fin de semana» sale como «Juego del fin de semana: Hades».', placeholder: 'Juego del fin de semana', maxLength: 80, type: 'text', when: { key: 'announce', is: true } },
+        ],
+      },
+      {
+        label: 'Lanzar horas en un juego',
+        choose: 'Horas en un juego',
+        body: { kind: 'game_hours' },
+        // only counts: no minimum and no total, and the group hears how many were put in when it ends
+        fields: [
+          WHEN,
+          PERIOD_FIELD,
+          WHAT,
+          { key: 'game_id', label: 'Juego', type: 'game', required: true },
+          { key: 'versus', label: 'Además es una competición (gana quien más juegue)', type: 'checkbox', default: false },
+          WHO,
+          PARTICIPATION_FIELD,
+          { key: 'announce', label: 'Avisar al grupo (Telegram y notificaciones)', type: 'checkbox', default: false },
+          { key: 'notice_title', label: 'Título del aviso (opcional)', hint: 'Solo para el mensaje que se envía al grupo; el reto no lo guarda. Se le añade el juego o la temática: «Juego del fin de semana» sale como «Juego del fin de semana: Hades».', placeholder: 'Juego del fin de semana', maxLength: 80, type: 'text', when: { key: 'announce', is: true } },
         ],
       },
       {
@@ -408,6 +427,7 @@ export const ENTITIES = {
             WHO,
             PARTICIPATION_FIELD,
             { key: 'announce', label: 'Avisar al grupo (Telegram y notificaciones)', type: 'checkbox', default: false, defaultBy: ANNOUNCE_REPEAT },
+            { key: 'notice_title', label: 'Título del aviso (opcional)', hint: 'Solo para el mensaje que se envía al grupo; el reto no lo guarda. Se le añade el juego o la temática: «Juego del fin de semana» sale como «Juego del fin de semana: Hades».', placeholder: 'Juego del fin de semana', maxLength: 80, type: 'text', when: { key: 'announce', is: true } },
           ];
         },
       },

@@ -359,8 +359,16 @@
 .ch-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; margin-bottom: 14px; }
 .ch-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
 .ch-title { font-weight: 700; min-width: 0; }
+/* the time left: one line, colored by where the challenge is (running, upcoming; the rest stay quiet) */
+.ch-time { flex: none; white-space: nowrap; }
+.ch-time.active { background: rgba(61, 217, 179, 0.15); color: var(--accent-teal); }
+.ch-time.upcoming { background: rgba(245, 197, 66, 0.15); color: var(--accent-gold); }
+.ch-time.finished, .ch-time.declined { background: transparent; border: 1px solid var(--border); color: var(--text-muted); }
+.ch-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.ch-chip { font-size: 0.72rem; font-weight: 600; padding: 2px 9px; border-radius: var(--radius-pill); background: var(--bg-surface); border: 1px solid var(--border); color: var(--text-secondary); }
+.ch-chip.versus { border-color: rgba(245, 197, 66, 0.4); color: var(--accent-gold); }
 .ch-players { display: flex; flex-direction: column; gap: 6px; }
-.ch-row { display: grid; grid-template-columns: 84px minmax(0, 1fr) 92px; gap: 10px; align-items: center; font-size: 0.85rem; }
+.ch-row { display: grid; grid-template-columns: 120px minmax(0, 1fr) 92px; gap: 10px; align-items: center; font-size: 0.85rem; }
 .ch-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ch-total { padding-top: 8px; border-top: 1px solid var(--border); font-weight: 600; }
 .ch-bar { height: 8px; border-radius: 4px; background: var(--bg-surface); overflow: hidden; }

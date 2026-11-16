@@ -121,6 +121,75 @@ class ResultLineTests(unittest.TestCase):
         self.assertNotIn("total", notices.group_result_message(challenge(), {"players": [{"name": "Ana", "done": True}]}))
 
 
+class LaunchMessageTests(unittest.TestCase):
+    PERIOD = "del 20 de noviembre al 22 de noviembre"
+
+    def test_it_lists_what_the_challenge_is_with_bold_labels_and_a_link_to_join(self):
+        text = notices.launch_message("Horas en Grand Theft Auto VI", "Sumar las horas que se juegan", self.PERIOD, "[GTA VI](https://x/#/game/gta)", False, True, "https://x/#/challenges")
+        self.assertEqual(text.splitlines(), [
+            "🎯 *Nuevo reto del grupo*",
+            "*Horas en Grand Theft Auto VI*",
+            "",
+            "• *Periodo*: del 20 de noviembre al 22 de noviembre",
+            "• *Juego*: [GTA VI](https://x/#/game/gta)",
+            "• *Qué*: Sumar las horas que se juegan",
+            "• *Quién participa*: voluntario, hay que apuntarse",
+            "",
+            "👉 [Apuntarme al reto](https://x/#/challenges)",
+        ])
+
+    def test_a_contest_says_so_and_an_open_challenge_links_to_the_page_without_asking_to_join(self):
+        text = notices.launch_message("Horas entre todos", "Jugar 40 h", self.PERIOD, None, True, False, "https://x/#/challenges")
+        self.assertIn("• *Competición*: gana quien más juegue", text)
+        self.assertNotIn("Juego*", text)
+        self.assertIn("todos, y quien no quiera puede salirse en Retos", text)
+        self.assertTrue(text.endswith("👉 [Ver el reto](https://x/#/challenges)"))
+
+    def test_without_a_public_address_there_is_no_link_and_a_voluntary_one_says_where_to_join(self):
+        voluntary = notices.launch_message("t", "q", self.PERIOD, None, False, True, None)
+        self.assertTrue(voluntary.endswith("\nApúntate en Retos."))
+        self.assertNotIn("](", voluntary)
+        self.assertNotIn("👉", notices.launch_message("t", "q", self.PERIOD, None, False, False, None))
+
+    def test_the_notice_can_call_it_something_else_followed_by_the_game_or_theme(self):
+        self.assertEqual(notices.launch_headline("Horas en Hades", "Juego del fin de semana", "Hades"), "Juego del fin de semana: Hades")
+        self.assertEqual(notices.launch_headline("Temático: Terror", " Reto de octubre ", "Terror"), "Reto de octubre: Terror")
+        self.assertEqual(notices.launch_headline("Sumar 40 h entre todos", "Maratón", None), "Maratón")  # nothing to follow it
+        for empty in (None, "", "   "):
+            self.assertEqual(notices.launch_headline("Horas en Hades", empty, "Hades"), "Horas en Hades")
+        self.assertEqual(len(notices.launch_headline("t", "x" * 500, None)), notices.MAX_NOTICE_TITLE)
+
+    def test_what_is_escaped_for_telegram(self):
+        self.assertIn(r"A\_b", notices.launch_message("t", "A_b", self.PERIOD, None, False, False, None))
+
+
+class AccumulatedHoursTests(unittest.TestCase):
+    """A challenge that only counts hours has nothing to meet: its notices say how many were put in."""
+
+    HOUR = 3600
+    NAMES = {1: "Ana", 2: "Bea", 3: "Cai"}
+
+    def progress(self, played, **extra):
+        return {**challenges.game_hours_result(played, self.NAMES), **extra}
+
+    def test_the_group_hears_the_hours_it_put_in_between_everybody(self):
+        text = notices.group_result_message(challenge("Horas en Hades"), self.progress({1: 3 * self.HOUR, 2: self.HOUR // 2}))
+        self.assertEqual(text.splitlines(), ["🏁 *Ha terminado el reto del grupo*", "*Horas en Hades*", "Entre todos habéis acumulado 3,5 h. Han aportado 2 de 3."])
+
+    def test_nobody_playing_is_said_and_a_contest_names_the_winner(self):
+        self.assertIn("Nadie ha jugado.", notices.group_result_message(challenge(), self.progress({})))
+        ranked = challenges.rank_players(self.progress({1: 3 * self.HOUR, 2: self.HOUR})["players"])
+        text = notices.group_result_message(challenge(), {"players": ranked, "total_seconds": 4 * self.HOUR})
+        self.assertIn("🥇 Gana *Ana*.", text)
+        self.assertNotIn("cumplido", text)
+
+    def test_each_player_hears_what_they_put_in(self):
+        progress = self.progress({1: 3 * self.HOUR, 2: self.HOUR})
+        self.assertEqual(notices.result_line(challenge("Horas en Hades"), progress, 1, self.NAMES), "⏱️ *Horas en Hades*: aportaste 3 h (el grupo sumó 4 h)")
+        self.assertEqual(notices.result_line(challenge("Horas en Hades"), progress, 3, self.NAMES), "⚪ *Horas en Hades*: no jugaste")
+        self.assertEqual(notices.result_line(challenge("Horas en Hades", scope="user"), progress, 1, self.NAMES), "⏱️ *Horas en Hades*: acumulaste 3 h")
+
+
 class DefaultsTests(unittest.TestCase):
     def setUp(self):
         self.db = make_session()
