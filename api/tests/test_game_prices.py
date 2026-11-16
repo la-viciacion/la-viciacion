@@ -20,7 +20,7 @@ class PerHourTests(unittest.TestCase):
         self.assertEqual(gp.per_hour(3000, 36000), 300)  # 30 euros over 10 hours
         self.assertEqual(gp.per_hour(1000, 7200), 500)
         self.assertEqual(gp.per_hour(1, 3600), 1)
-        self.assertEqual(gp.per_hour(0, 3600), 0)  # a free game costs nothing per hour
+        self.assertIsNone(gp.per_hour(0, 3600))  # a free game has no cost per hour: it would always be 0
         self.assertIsNone(gp.per_hour(3000, gp.MIN_SECONDS - 1))
         self.assertEqual(gp.per_hour(3000, gp.MIN_SECONDS), 6000)
 
@@ -43,6 +43,12 @@ class GroupRowsTests(unittest.TestCase):
         prices = {(1, "a"): 1000, (2, "a"): 1000, (3, "a"): 1000}
         seconds = {(1, "a"): self.HOUR, (2, "a"): self.HOUR, (3, "a"): gp.MIN_SECONDS - 1}
         self.assertEqual(gp.group_rows(prices, seconds), [])  # two contribute: not enough to show it
+
+    def test_a_free_copy_does_not_contribute(self):
+        prices = {(1, "a"): 1000, (2, "a"): 1000, (3, "a"): 0, (4, "a"): 1000}
+        seconds = {(u, "a"): self.HOUR for u in (1, 2, 3, 4)}
+        self.assertEqual(gp.group_rows(prices, seconds), [{"game_id": "a", "contributors": 3, "per_hour_cents": 1000}])  # the free one neither adds a hour nor lowers the mean
+        self.assertEqual(gp.group_rows({k: v for k, v in prices.items() if k[0] != 4}, seconds), [])  # without the fourth, only two paid: not enough
 
     def test_the_cheapest_per_hour_first_and_no_player_in_the_answer(self):
         prices = {(u, g): c for g, c in (("cheap", 100), ("dear", 6000)) for u in (1, 2, 3)}
