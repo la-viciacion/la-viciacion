@@ -6,16 +6,11 @@ from sqlalchemy.orm import Session
 
 from .. import auth
 from ..auth import get_db
-from ..clients import failure as provider_failure
-from ..clients.ai_error import AIError, ProviderError, QuotaError, wait_text
 from ..crud import game_overview
 from ..database import models
 from ..guide import agent, limits
-from ..utils import ai_ledger, ai_source, in_flight, messages
-from ..utils.logger import LogManager
-from .chat import PROVIDER_MESSAGES, ChatTurn, own_key_detail, refusal
-
-logger = LogManager().get_logger()
+from ..utils import ai_fallback, ai_ledger, ai_source, in_flight, messages
+from .chat import ChatTurn, refusal
 
 router = APIRouter(
     prefix="/guide",
@@ -64,7 +59,7 @@ def ask(
         raise HTTPException(status_code=404, detail="Game not exists")
     if state["blocked"] and decision.source is None:  # with the player's own as the source it only says why the group's was not used
         ai_ledger.record_blocked(db, user_id=current_user.id, feature="guide", question=body.message, turns=len(body.history), game_id=game_id)
-        raise HTTPException(status_code=429, detail=ai_source.blocked_message(state["blocked"], "guide"))
+        raise HTTPException(status_code=429, detail=ai_source.blocked_message(state["blocked"], "guide", decision.locked))
     if decision.locked and decision.source is None:  # they have keys, this session cannot open them: the front asks for the password
         raise HTTPException(status_code=423, detail=messages.USER_AI_LOCKED)
     if state["needs_key"]:
@@ -78,25 +73,18 @@ def ask(
                 question=body.message, turns=len(body.history), game_id=game_id,
             )
             raise refusal(refused)
-        deps = agent.GuideDeps(
-            game=agent.game_context(data, body.mode), level=body.level, user_name=current_user.name or current_user.username,
-            db=db, user_id=current_user.id, game_id=game_id, source=source,
-        )
-        try:
-            answer = agent.ask(deps, body.message.strip(), [(t.role, t.content) for t in body.history])
-        except QuotaError as e:
-            retry = e.quota.retry_after
-            raise HTTPException(
-                status_code=429,
-                detail=own_key_detail(source, e) or messages.CHAT_QUOTA.format(when=f" (reintenta en {wait_text(retry)})" if retry else ""),
-                headers={"Retry-After": str(retry)} if retry else None,
+        history = [(t.role, t.content) for t in body.history]
+
+        def call_with(chosen):
+            deps = agent.GuideDeps(
+                game=agent.game_context(data, body.mode), level=body.level, user_name=current_user.name or current_user.username,
+                db=db, user_id=current_user.id, game_id=game_id, source=chosen,
             )
-        except ProviderError as e:
-            # a provider that is slow, or a player's own key that was revoked, is not a bug of ours: a warning, not an event in Sentry
-            ours = e.kind not in (provider_failure.TIMEOUT, provider_failure.OVERLOADED) and not (source.own and e.kind == provider_failure.DENIED)
-            (logger.error if ours else logger.warning)("Guide failed: " + str(e), exc_info=ours)
-            raise HTTPException(status_code=504 if e.kind == provider_failure.TIMEOUT else 502, detail=own_key_detail(source, e) or PROVIDER_MESSAGES[e.kind])
-        except AIError as e:
-            logger.error("Guide failed: " + str(e), exc_info=True)
-            raise HTTPException(status_code=502, detail=messages.CHAT_FAILED)
+            return agent.ask(deps, body.message.strip(), history)
+
+        try:
+            # the group's key first and, if the provider says it cannot pay, the player's own ones (utils/ai_fallback.py)
+            answer = ai_fallback.run(decision.sources, call_with, "guide")
+        except ai_fallback.Failed as failed:
+            raise ai_fallback.explain(failed.attempts, lambda: ai_source.way_out("guide", decision.fallback_locked))
         return GuideResponse(answer=answer)

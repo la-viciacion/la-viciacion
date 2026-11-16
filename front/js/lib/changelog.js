@@ -40,6 +40,7 @@ export const CHANGELOG = [
       ['better', 'En Mis juegos, la portada va junto al título de cada juego y cada dato se distingue mejor.'],
       ['better', 'En Mis juegos, «¿Qué juego sigo?» y «Lo que has gastado» aparecen plegados para dejar la lista a la vista.'],
       ['better', 'En Mis juegos, cada estado se explica: un juego pausado dice cuántos días llevas sin jugarlo, y el icono junto al filtro «Estado» resume qué significa cada uno y cuáles cambian solos.'],
+      ['better', 'Si la IA del grupo no puede responder (se ha quedado sin saldo o sin cupo del día), el chat y la guía siguen solos con tu propia cuenta de IA si la tienes. Y cuando no hay forma de responder, el mensaje dice qué cuenta ha fallado y por qué, para que sepas qué arreglar.'],
     ],
   },
   {
