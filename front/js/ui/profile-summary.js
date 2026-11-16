@@ -2,14 +2,16 @@
 // the most played games and the latest achievements. `d` is what GET .../profile answers.
 import { formatDate, formatDuration } from '../lib/format.js';
 import { html } from '../lib/html.js';
+import { DAY_RULE } from '../lib/day-rule.js';
 import { gameHref } from '../lib/links.js';
 import { infoTip } from './info-tip.js';
 import { specialClass, specialTag } from '../lib/special.js';
 import * as seasons from '../lib/seasons.js';
 import { scoreBadge } from './score-badge.js';
 
-export const statTile = (label, value) => html`
-  <div class="pf-stat"><div class="pf-stat-label">${label}</div><div class="pf-stat-value">${value}</div></div>`;
+// With `info`, an "i" sits beside the label; its popover opens under the whole row of tiles (css: .pf-stats)
+export const statTile = (label, value, info) => html`
+  <div class="pf-stat"><div class="pf-stat-label">${info ? html`<span class="pf-info-head">${label}${infoTip(info, `Más información: ${label}`)}</span>` : label}</div><div class="pf-stat-value">${value}</div></div>`;
 
 // seconds -> hours with one decimal ("12,5"), enough for a tile
 const hours = (seconds) => (seconds / 3600).toLocaleString('es-ES', { maximumFractionDigits: 1 });
@@ -34,11 +36,11 @@ export function statsView(d) {
   const running = d.season === seasons.ALL || d.season === d.seasons[0];
   return html`
     ${statTile('Horas', hours(s.played_time))}
-    ${statTile('Días', s.played_days)}
+    ${statTile('Días', s.played_days, DAY_RULE)}
     ${statTile('Juegos', s.played_games)}
     ${statTile('Completados', s.completed_games)}
-    ${running ? statTile('Racha actual', `${s.current_streak} d`) : ''}
-    ${statTile('Mejor racha', `${s.best_streak} d`)}
+    ${running ? statTile('Racha actual', `${s.current_streak} d`, DAY_RULE) : ''}
+    ${statTile('Mejor racha', `${s.best_streak} d`, DAY_RULE)}
     ${statTile('Logros', s.achievements)}`;
 }
 
