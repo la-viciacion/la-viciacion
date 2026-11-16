@@ -425,6 +425,51 @@ class GroupHoursTests(unittest.TestCase):
         self.assertEqual(challenges.reached_group_hours(challenge, progress), "Entre todos habéis llegado a las 40 h. Han aportado 1 de 2.")
 
 
+class GameHoursTests(unittest.TestCase):
+    NAMES = {1: "Ana", 2: "Bea", 3: "Cai"}
+    HOUR = 3600
+
+    def test_it_only_counts_what_each_one_put_in_and_the_total(self):
+        result = challenges.game_hours_result({1: 2 * self.HOUR, 2: 5 * self.HOUR}, self.NAMES)
+        self.assertEqual(result["total_seconds"], 7 * self.HOUR)
+        self.assertEqual([(p["name"], p["seconds"]) for p in result["players"]], [("Bea", 5 * self.HOUR), ("Ana", 2 * self.HOUR), ("Cai", 0)])
+        self.assertTrue(all(p["accumulate"] and "done" not in p and "target_seconds" not in p for p in result["players"]))
+        self.assertNotIn("total_done", result)
+
+    def test_nobody_playing_is_a_total_of_zero(self):
+        self.assertEqual(challenges.game_hours_result({}, {}), {"players": [], "total_seconds": 0})
+
+    def test_the_group_one_takes_a_period_and_the_personal_one_a_duration(self):
+        game = types.SimpleNamespace(id="hades", name="Hades")
+        db = types.SimpleNamespace(get=lambda model, key: game if key == "hades" else None)
+        today = datetime.date(2026, 10, 15)
+        weekend = challenges.build_game_hours(db, {"game_id": "hades", "period": "range", "starts_on": "2026-10-17", "ends_on": "2026-10-18"}, today)
+        self.assertEqual((weekend.title, weekend.params, weekend.game_id, weekend.starts_on, weekend.ends_on), ("Horas en Hades", {}, "hades", datetime.date(2026, 10, 17), datetime.date(2026, 10, 18)))
+        self.assertEqual(challenges.build_game_hours(db, {"game_id": "hades", "month": "2026-11", "versus": True}, today).params, {"versus": True})
+        own = challenges.build_own_game_hours(db, {"game_id": "hades", "duration": "week"}, today, 1)
+        self.assertEqual((own.params, own.starts_on, own.ends_on), ({"duration": "week"}, today, datetime.date(2026, 10, 21)))
+
+    def test_a_game_that_does_not_exist_or_a_bad_period_is_refused(self):
+        db = types.SimpleNamespace(get=lambda model, key: types.SimpleNamespace(id="hades", name="Hades") if key == "hades" else None)
+        today = datetime.date(2026, 10, 15)
+        for options in ({}, {"game_id": "nope", "month": "2026-11"}, {"game_id": "hades", "month": "2026-09"}, {"game_id": "hades"}):
+            with self.assertRaises(ChallengeError, msg=options):
+                challenges.build_game_hours(db, options, today)
+        with self.assertRaises(ChallengeError):
+            challenges.build_own_game_hours(db, {"game_id": "nope"}, today, 1)
+
+    def test_neither_template_has_a_goal_and_only_the_group_one_is_the_groups(self):
+        self.assertFalse(challenges.TEMPLATES["game_hours"].goal or challenges.TEMPLATES["own_game_hours"].goal)
+        self.assertEqual((challenges.TEMPLATES["game_hours"].scope, challenges.TEMPLATES["own_game_hours"].scope), (challenges.GROUP, challenges.USER))
+        self.assertNotIn("game_hours", challenges.PROPOSABLE)  # for now only an admin launches it
+
+    def test_the_launch_notice_says_what_is_counted(self):
+        challenge = types.SimpleNamespace(params=json.dumps({}), starts_on=datetime.date(2026, 10, 17), ends_on=datetime.date(2026, 10, 18))
+        self.assertEqual(challenges.summary_game_hours(challenge), "Sumar las horas que se juegan, sin mínimo: solo se cuentan, del 17 de octubre al 18 de octubre.")
+        challenge.params = json.dumps({"versus": True})
+        self.assertTrue(challenges.summary_game_hours(challenge).endswith(" Gana quien más juegue."))
+
+
 class FinishFirstTests(unittest.TestCase):
     def day(self, n):
         return datetime.date(2026, 10, n)

@@ -17,19 +17,20 @@ let main;
 let user;
 let showAll = false; // the page asks for the latest finished challenges of each block; "Ver todos" asks for every one
 
-const bar = (part) => html`<div class="ch-bar${part.done ? ' ok' : ''}"><i style="width:${percent(partValue(part), partTarget(part))}%"></i></div>`;
+// a part that only counts has no target: its bar is against whoever put in the most
+const bar = (part, top) => html`<div class="ch-bar${part.done ? ' ok' : ''}"><i style="width:${part.accumulate ? (top ? percent(part.seconds, top) : 0) : percent(partValue(part), partTarget(part))}%"></i></div>`;
 
-const partRow = (p, me, ranked) => html`
+const partRow = (p, me, ranked, top) => html`
   <div class="ch-row">
     <span class="ch-name">${ranked && p.position ? `${medal(p.position)} ` : ''}${p.name}${p.user_id === me ? ' (tú)' : ''}</span>
-    ${bar(p)}
+    ${bar(p, top)}
     <span class="pf-sub">${amountLabel(p)}${p.done ? ' ✓' : p.failed ? ' ✗ perdido' : ''}</span>
   </div>`;
 
 const totalRow = (part) => html`
   <div class="ch-row ch-total">
     <span class="ch-name">Total</span>
-    ${bar(part)}
+    ${part.accumulate ? html`<span></span>` : bar(part)}
     <span class="pf-sub">${amountLabel(part)}${part.done ? ' ✓' : ''}</span>
   </div>`;
 
@@ -73,20 +74,31 @@ const partButton = (c) => {
   return html`<button class="pf-btn" type="button" data-part="${c.taking_part ? 'leave' : 'join'}">${label}</button>`;
 };
 
+// What kind of challenge it is, as chips under the title (the time left is the pill of the header)
+const chips = (c) => {
+  const list = [
+    c.participation === 'opt_in' ? html`<span class="ch-chip">Voluntario</span>` : '',
+    c.params?.versus ? html`<span class="ch-chip versus">Competición</span>` : '',
+  ].filter(Boolean);
+  return list.length ? html`<div class="ch-chips">${list}</div>` : '';
+};
+
 function card(c) {
   const mine = c.scope !== 'group' && c.owner?.id === user.id;
   const total = totalPart(c.progress);
   const ranked = Boolean(c.params?.versus) || c.scope === 'duel';
-  const parts = html`<div class="ch-players">${c.progress.players.map((p) => partRow(p, user.id, ranked))}</div>${total ? totalRow(total) : ''}`;
+  const top = Math.max(0, ...c.progress.players.map((p) => p.seconds ?? 0));
+  const parts = html`<div class="ch-players">${c.progress.players.map((p) => partRow(p, user.id, ranked, top))}</div>${total ? totalRow(total) : ''}`;
   return html`
     <article class="pf-card ch-card" data-challenge="${c.id}">
       <div class="ch-head">
         <div class="ch-title">
-          ${c.game ? html`<a class="game-link" href="${gameHref(c.game.id)}">${c.title}</a>` : c.title}${c.participation === 'opt_in' ? html` <span class="pf-tag muted">Voluntario</span>` : ''}
+          ${c.game ? html`<a class="game-link" href="${gameHref(c.game.id)}">${c.title}</a>` : c.title}
           <div class="pf-sub">${sub(c)}</div>
         </div>
-        <span class="${c.status === 'active' && !c.declined ? 'pf-tag' : 'pf-tag muted'}">${c.declined ? 'Rechazado' : timeLeft(c)}</span>
+        <span class="pf-tag ch-time ${c.declined ? 'declined' : c.status}">${c.declined ? 'Rechazado' : timeLeft(c)}</span>
       </div>
+      ${chips(c)}
       <div class="pf-sub">${summaryLine(c)}</div>
       ${c.scope === 'group' && c.participation === 'opt_in' && c.status !== 'finished' ? html`<div class="pf-sub">${joinedLine(c.progress.players.length)}</div>` : ''}
       ${themeLine(c)}
@@ -140,6 +152,7 @@ const OPTIONS = {
   duel_completed: (el) => ({ opponent_id: Number(el.duelOpponent.value) }),
   finish_backlog: (el) => ({ games: Number(el.backlogGames.value) }),
   finish_first: () => ({}),
+  own_game_hours: (el, state) => ({ game_id: state.game?.id }),
   new_genre: (el) => ({ genre: el.genre?.value, mode: el.mode?.value, ...(el.mode?.value === 'play' ? { hours: Number(el.hours.value) } : {}) }),
   debt_reduction: (el) => ({ mode: el.debtMode.value, [el.debtMode.value === 'percent' ? 'percent' : 'games']: Number(el.debtValue.value) }),
   streak: (el) => ({ mode: el.streakMode.value, days: Number(el.streakDays.value) }),
@@ -198,7 +211,11 @@ async function launchChallenge() {
         </select></label>
       </div>
 
-      <div data-kind="duel_game" hidden>
+      <div data-kind="own_game_hours" hidden>
+        <p class="adm-sub">Cuenta las horas que juegues a un juego desde hoy, sin ponerte un mínimo. Al terminar te decimos cuántas has acumulado.</p>
+      </div>
+
+      <div data-kind="duel_game own_game_hours" hidden>
         ${gameSearchField}
       </div>
 

@@ -35,6 +35,7 @@ export const CHANGELOG = [
       ['better', 'Las barras de progreso de los logros acumulativos muestran la cifra actual y la meta, por ejemplo 35 / 100 h.'],
       ['new', 'Si no quieres ver el botón del chat, puedes ocultarlo en Perfil → Mi IA y volver a mostrarlo cuando quieras.'],
       ['better', 'El botón del chat se puede arrastrar y el final de las páginas queda despejado para que no tape nada.'],
+      ['new', 'Retos: un reto nuevo, «Horas en un juego», sin objetivo: solo suma las horas que se juegan a un juego durante un periodo (por ejemplo, el fin de semana de un lanzamiento) y al acabar avisa de cuántas se han acumulado. Lo hay para el grupo y también personal, para ti.'],
       ['new', 'En la biblioteca del grupo se ve el coste medio por hora de cada juego.'],
       ['better', 'El coste por hora ya no cuenta los juegos gratis: con 0 € siempre saldría 0 y no decía nada.'],
       ['new', 'En Temporada, un nuevo botón «Total» muestra los mismos rankings sumando todas las temporadas, y dos más: los juegos más baratos y más caros por hora.'],

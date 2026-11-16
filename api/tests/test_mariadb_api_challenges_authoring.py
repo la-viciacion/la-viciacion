@@ -106,7 +106,7 @@ class VoluntaryTests(AuthoringTestCase):
         challenge = self.launch(participation="opt_in").json()["id"]
         with mock.patch.object(my_utils, "send_message", new=send), database.SessionLocal() as db:
             asyncio.run(actions.announce_challenge_launch(db, challenge))
-        self.assertIn("Es voluntario: apúntate en Retos", sent[0])
+        self.assertTrue("Apuntarme al reto" in sent[0] or "Apúntate en Retos" in sent[0])  # a link when the app has a public address, the plain words when not
 
 
 class ProposalTestCase(AuthoringTestCase):

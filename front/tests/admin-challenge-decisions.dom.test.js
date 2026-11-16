@@ -83,7 +83,7 @@ test('the panel lists the proposals in their own tab, the schedules under the ch
 });
 
 test('a game or a themed challenge can repeat every month (not offered for now), and a rotation needs its games', () => {
-  const [game, , themed] = ENTITIES.challenges.creates;
+  const [game, , , themed] = ENTITIES.challenges.creates;
   assert.deepEqual([game.repeat, themed.repeat], ['/manage/challenge-schedules', '/manage/challenge-schedules']);
   const games = game.fields.find((f) => f.key === 'games');
   assert.deepEqual([games.type, games.required, games.when], ['games', true, { key: 'period', is: 'repeat' }]);
@@ -101,10 +101,19 @@ test('no group challenge tells the group unless the admin ticks it, and every la
   }
 });
 
+test('every group challenge may name its notice, a field that shows only when the group is told', () => {
+  for (const type of ENTITIES.challenges.creates) {
+    const fields = typeof type.fields === 'function' ? null : type.fields;
+    if (!fields) continue; // the themed one loads its themes first
+    const title = fields.find((f) => f.key === 'notice_title');
+    assert.deepEqual([title.type, title.required, title.when], ['text', undefined, { key: 'announce', is: true }], type.choose);
+  }
+});
+
 test('the challenges have one button and the type is chosen in the form', () => {
   const { createLabel, creates } = ENTITIES.challenges;
   assert.equal(createLabel, 'Lanzar reto');
   assert.ok(creates.every((c) => c.choose && c.body.kind));
-  assert.deepEqual(creates.map((c) => c.choose), ['Reto de juego', 'Horas entre todos', 'Reto temático']);
+  assert.deepEqual(creates.map((c) => c.choose), ['Reto de juego', 'Horas entre todos', 'Horas en un juego', 'Reto temático']);
   assert.equal(ENTITIES.schedules.creates, undefined);
 });

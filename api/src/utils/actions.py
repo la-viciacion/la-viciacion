@@ -1,5 +1,6 @@
 import asyncio
 import datetime
+import json
 import threading
 import time
 
@@ -594,15 +595,22 @@ async def announce_wishlist_week(db: Session, today: datetime.date) -> str:
     return f"{len(releases)} games"
 
 
-async def announce_challenge_launch(db: Session, challenge_id: int) -> str:
-    """Tell the group a challenge has been launched (the admin chose to)."""
+async def announce_challenge_launch(db: Session, challenge_id: int, notice_title: str | None = None) -> str:
+    """Tell the group a challenge has been launched (the admin chose to). `notice_title` is what the notice calls it, only
+    there: it names the game or the theme after it ("Juego del fin de semana: Grand Theft Auto VI")."""
     challenge = db.get(models.Challenge, challenge_id)
     if challenge is None:
         return "gone"
-    template = challenges.TEMPLATES[challenge.kind]
-    title = utils.escape_markdown(challenge.title)
-    voluntary = "\nEs voluntario: apúntate en Retos." if challenge.participation == challenges.OPT_IN else ""
-    await utils.send_message(f"🎯 *Nuevo reto del grupo*\n*{title}*\n{template.summary(challenge)}{voluntary}", False)
+    game = db.get(models.Game, challenge.game_id) if challenge.game_id else None
+    params = json.loads(challenge.params)
+    subject = game.name if game else (challenges.themed_label(params) if challenge.kind == "themed" else None)
+    message = challenge_notices.launch_message(
+        challenge_notices.launch_headline(challenge.title, notice_title, subject), challenges.TEMPLATES[challenge.kind].what(challenge), challenges.period_text(challenge),
+        utils.app_game_link(game.name, game.id) if game else None,
+        bool(params.get("versus")), challenge.participation == challenges.OPT_IN,
+        f"{utils.config.PUBLIC_URL}/#/challenges" if utils.config.PUBLIC_URL else None,
+    )
+    await utils.send_message(message, False)
     return "sent"
 
 
@@ -654,13 +662,13 @@ async def announce_challenge_totals(db: Session, today: datetime.date | None = N
     return sent
 
 
-def after_challenge_launch(challenge_id: int):
+def after_challenge_launch(challenge_id: int, notice_title: str | None = None):
     """Background-task entrypoint for a challenge that has just been launched."""
     from ..database.database import SessionLocal
 
     async def _run():
         with SessionLocal() as db:
-            await announce_challenge_launch(db, challenge_id)
+            await announce_challenge_launch(db, challenge_id, notice_title)
 
     try:
         asyncio.run(_run())

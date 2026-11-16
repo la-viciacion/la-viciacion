@@ -1449,7 +1449,8 @@ class ChallengeAchievementTests(unittest.IsolatedAsyncioTestCase):
     def test_the_personal_kinds_of_the_test_are_the_ones_of_the_code(self):
         from src.utils import challenges
 
-        self.assertEqual({kind for kind, template in challenges.TEMPLATES.items() if template.scope == challenges.USER}, set(self.PERSONAL))
+        self.assertEqual({kind for kind, template in challenges.TEMPLATES.items() if template.scope == challenges.USER and template.goal}, set(self.PERSONAL))
+        self.assertFalse(challenges.TEMPLATES["own_game_hours"].goal)  # one that only counts is not one that can be met
 
 
 class CatalogueTests(unittest.TestCase):

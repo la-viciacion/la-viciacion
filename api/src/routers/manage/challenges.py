@@ -32,7 +32,8 @@ def list_challenges(db: Session = Depends(get_db)):
             "created_by": owner.username if owner else None,
             "owner": shown["owner"]["name"] if shown["owner"] else None,
             "players": len(shown["progress"]["players"]),
-            "done_players": sum(1 for p in shown["progress"]["players"] if p["done"]),
+            "done_players": sum(1 for p in shown["progress"]["players"] if p.get("done")),
+            "accumulated_seconds": shown["progress"]["total_seconds"] if any(p.get("accumulate") for p in shown["progress"]["players"]) else None,
             "total_done": shown["progress"].get("total_done"),
             "notified": challenge.total_notified_at is not None,
         })
@@ -62,6 +63,7 @@ class NewGroupChallenge(BaseModel):
     versus: Optional[bool] = None  # also rank who got furthest
     participation: Optional[str] = None  # "auto" (everybody, the default) or "opt_in" (only who joins)
     announce: bool = True  # tell the group (Telegram and push) that it was launched
+    notice_title: Optional[str] = None  # what the notice calls it instead of its title (only in the notice: it is not stored)
 
 
 @router.post("/challenges", status_code=201)
@@ -71,7 +73,7 @@ def launch_group_challenge(body: NewGroupChallenge, background_tasks: Background
     template = challenges_utils.TEMPLATES.get(body.kind)
     if template is None or template.scope != challenges_utils.GROUP:
         raise HTTPException(status_code=400, detail="Ese tipo de reto de grupo no existe")
-    options = body.model_dump(exclude={"kind", "announce", "participation"}, exclude_none=True)
+    options = body.model_dump(exclude={"kind", "announce", "participation", "notice_title"}, exclude_none=True)
     today = datetime.date.today()
     try:
         challenge = challenges_crud.create(db, admin, body.kind, options, today, body.participation or challenges_utils.AUTO)
@@ -80,7 +82,7 @@ def launch_group_challenge(body: NewGroupChallenge, background_tasks: Background
     except challenges_utils.ChallengeError as e:
         raise HTTPException(status_code=400, detail=str(e))
     if body.announce:
-        background_tasks.add_task(actions.after_challenge_launch, challenge.id)
+        background_tasks.add_task(actions.after_challenge_launch, challenge.id, body.notice_title)
     return challenges_crud.view(db, challenge, admin.id, today)
 
 

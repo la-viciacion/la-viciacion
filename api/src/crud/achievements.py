@@ -668,7 +668,7 @@ class Achievements:
         await self._unlock_reached(
             db, user, len(group_met), LIFETIME_CHALLENGES, silent, date_for=lambda needed: str(group_met[needed - 1]["ends_on"])
         )
-        every_kind = {kind for kind, template in challenge_templates.TEMPLATES.items() if template.scope == challenge_templates.USER}
+        every_kind = {kind for kind, template in challenge_templates.TEMPLATES.items() if template.scope == challenge_templates.USER and template.goal}
         seen: set[str] = set()
         for entry in met:
             seen.add(entry["kind"])

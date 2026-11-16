@@ -405,7 +405,7 @@ test('a duel is launched against a player of the list, with a game for a duel in
   form.elements.kind.value = 'duel_hours';
   form.elements.kind.dispatchEvent(new window.Event('change', { bubbles: true }));
   assert.equal(form.querySelector('[data-kind="duel_hours duel_game duel_completed"]').hidden, false);
-  assert.equal(form.querySelector('[data-kind="duel_game"]').hidden, true);
+  assert.equal(form.querySelector('[data-kind="duel_game own_game_hours"]').hidden, true);
   form.requestSubmit();
   await settle();
   assert.deepEqual(calls.find((c) => c.method === 'POST').body, { kind: 'duel_hours', options: { opponent_id: 2, duration: 'month' } });
@@ -415,7 +415,7 @@ test('a duel is launched against a player of the list, with a game for a duel in
   const second = document.querySelector('.modal-content form');
   second.elements.kind.value = 'duel_game';
   second.elements.kind.dispatchEvent(new window.Event('change', { bubbles: true }));
-  assert.equal(second.querySelector('[data-kind="duel_game"]').hidden, false);
+  assert.equal(second.querySelector('[data-kind="duel_game own_game_hours"]').hidden, false);
   second.elements.gameQuery.value = 'hades';
   second.elements.gameQuery.dispatchEvent(new window.Event('input', { bubbles: true }));
   await new Promise((resolve) => setTimeout(resolve, 300));
@@ -425,6 +425,35 @@ test('a duel is launched against a player of the list, with a game for a duel in
   second.requestSubmit();
   await settle();
   assert.deepEqual(calls.filter((c) => c.method === 'POST').at(-1).body, { kind: 'duel_game', options: { opponent_id: 2, game_id: 'hades', duration: 'month' } });
+});
+
+test('the hours in a game are launched with the game and a duration, and the card shows what was put in', async () => {
+  document.body.innerHTML = '<main id="main"></main>';
+  const counting = { ...personal(), kind: 'own_game_hours', title: 'Horas en Hades', params: { duration: 'week' }, game: { id: 'hades', name: 'Hades' }, progress: { players: [{ user_id: 1, name: 'Ana', seconds: 5400, accumulate: true }], total_seconds: 5400 } };
+  const calls = installApi({
+    'GET /challenges/debt': DEBT, 'GET /challenges/genres': [], 'GET /challenges': [counting], 'GET /group/players': [],
+    'GET /games/catalog?q=hades&limit=8': { items: [{ id: 'hades', name: 'Hades' }] }, 'POST /challenges': counting,
+  });
+  await page.render({ main: main(), user: ANA });
+  await settle();
+  assert.match(document.querySelector('[data-challenge]').textContent, /Llevas 1,5 h/);
+  assert.equal(document.querySelector('.ch-bar > i').style.width, '100%'); // against whoever put in the most
+  document.querySelector('#chNew').click();
+  await settle();
+  const form = document.querySelector('.modal-content form');
+  form.elements.kind.value = 'own_game_hours';
+  form.elements.kind.dispatchEvent(new window.Event('change', { bubbles: true }));
+  assert.equal(form.querySelector('[data-kind="duel_game own_game_hours"]').hidden, false);
+  assert.equal(form.querySelector('[data-kind="duel_hours duel_game duel_completed"]').hidden, true);
+  form.elements.gameQuery.value = 'hades';
+  form.elements.gameQuery.dispatchEvent(new window.Event('input', { bubbles: true }));
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  await settle();
+  form.querySelector('[data-game-id="hades"]').click();
+  form.elements.duration.value = 'week';
+  form.requestSubmit();
+  await settle();
+  assert.deepEqual(calls.filter((c) => c.method === 'POST').at(-1).body, { kind: 'own_game_hours', options: { game_id: 'hades', duration: 'week' } });
 });
 
 test('the kinds about finishing games and the duel of completed games send their options', async () => {
@@ -478,7 +507,7 @@ test('a voluntary group challenge says so and offers to join, and joining asks t
   const calls = installApi({ 'GET /challenges/proposals': [], 'GET /challenges': [voluntary], 'PUT /challenges/5/participation': challenge({ participation: 'opt_in' }) });
   await page.render({ main: main(), user: ANA });
   await settle();
-  assert.match(document.querySelector('.ch-title').textContent, /Voluntario/);
+  assert.match(document.querySelector('.ch-chips').textContent, /Voluntario/);
   assert.match(main().textContent, /Es un reto voluntario: apúntate si quieres jugarlo/);
   const button = document.querySelector('[data-part]');
   assert.equal(button.textContent.trim(), 'Apuntarme');
