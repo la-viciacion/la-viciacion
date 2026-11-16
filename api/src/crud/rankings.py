@@ -80,7 +80,7 @@ def user_ranking_achievements(
         .select_from(models.User)
         .outerjoin(
             models.UserAchievement,
-            and_(models.UserAchievement.user_id == models.User.id, models.UserAchievement.season == season),
+            and_(models.UserAchievement.user_id == models.User.id, time_entries.in_season(models.UserAchievement.season, season)),
         )
         .where(models.not_god())
         .group_by(models.User.id, models.User.name)
@@ -107,7 +107,7 @@ def user_played_games(
             .select_from(models.User)
             .outerjoin(
                 models.UserGame,
-                and_(models.UserGame.user_id == models.User.id, models.UserGame.season == season),
+                and_(models.UserGame.user_id == models.User.id, time_entries.in_season(models.UserGame.season, season)),
             )
             .where(models.not_god())
         )
@@ -134,7 +134,7 @@ def library_counts(db: Session, season: int = None, is_active: bool | None = Non
         .select_from(models.User)
         .outerjoin(
             models.UserGame,
-            and_(models.UserGame.user_id == models.User.id, models.UserGame.season == season),
+            and_(models.UserGame.user_id == models.User.id, time_entries.in_season(models.UserGame.season, season)),
         )
         .where(models.not_god())
         .group_by(models.User.id, models.User.name)

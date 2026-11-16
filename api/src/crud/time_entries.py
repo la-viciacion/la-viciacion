@@ -23,8 +23,8 @@ logger = log_manager.get_logger()
 config = Config()
 
 
-def _in_season(column, season: int):
-    """`column` is in the season (any season when asked for seasons.ALL)."""
+def in_season(column, season: int):
+    """`column` is in the season (any season when asked for seasons.ALL; the rankings of the Temporada page's Total use it)."""
     return true() if season == seasons.ALL else column == season
 
 
@@ -54,7 +54,7 @@ def players_played_time(db: Session, season: int = None, is_active: bool | None 
     sessions = sessions_subquery()
     total = (
         select(sessions.c.user_id, func.sum(sessions.c.duration).label("seconds"))
-        .where(sessions.c.season == season)
+        .where(in_season(sessions.c.season, season))
         .group_by(sessions.c.user_id)
         .subquery()
     )
@@ -148,7 +148,7 @@ def games_played_time(db: Session, season: int = None, limit: int | None = None,
         select(sessions.c.game_id.label("game_id"), models.Game.name, models.Game.image_url, played)
         .join(models.User, sessions.c.user_id == models.User.id)
         .join(models.Game, models.Game.id == sessions.c.game_id)
-        .where(sessions.c.season == season, models.not_god())
+        .where(in_season(sessions.c.season, season), models.not_god())
         .group_by(sessions.c.game_id, models.Game.name, models.Game.image_url)
         .having(func.sum(sessions.c.duration) > 0)
         .order_by(desc(played), models.Game.name)
@@ -187,7 +187,7 @@ def get_user_played_time(db: Session, user_id: str, season: int = None):
         )
         .where(
             sessions.c.user_id == user_id,
-            _in_season(sessions.c.season, season),
+            in_season(sessions.c.season, season),
         )
         .group_by(sessions.c.user_id)
     )
@@ -284,7 +284,7 @@ def get_played_time_by_day(db: Session, user_id: int, season: int = None, since:
         db.query(func.DATE(sessions.c.start), func.sum(sessions.c.duration))
         .filter(
             sessions.c.user_id == user_id,
-            _in_season(sessions.c.season, season),
+            in_season(sessions.c.season, season),
             sessions.c.season >= (since or 0),
         )
         .group_by(func.DATE(sessions.c.start))
@@ -304,7 +304,7 @@ def get_played_time_by_game_and_day(db: Session, user_id: int, season: int = Non
         )
         .filter(
             sessions.c.user_id == user_id,
-            _in_season(sessions.c.season, season),
+            in_season(sessions.c.season, season),
             sessions.c.season >= (since or 0),
         )
         .group_by(func.DATE(sessions.c.start), sessions.c.game_id)

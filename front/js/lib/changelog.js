@@ -36,6 +36,8 @@ export const CHANGELOG = [
       ['new', 'Si no quieres ver el botón del chat, puedes ocultarlo en Perfil → Mi IA y volver a mostrarlo cuando quieras.'],
       ['better', 'El botón del chat se puede arrastrar y el final de las páginas queda despejado para que no tape nada.'],
       ['new', 'En la biblioteca del grupo se ve el coste medio por hora de cada juego.'],
+      ['better', 'El coste por hora ya no cuenta los juegos gratis: con 0 € siempre saldría 0 y no decía nada.'],
+      ['new', 'En Temporada, un nuevo botón «Total» muestra los mismos rankings sumando todas las temporadas.'],
       ['better', 'En la lista de deseos, un juego se quita solo cuando ya ha salido y lo has jugado. Si lo juegas antes de que salga, por ejemplo en acceso anticipado, se queda hasta su día de salida.'],
       ['better', 'En Mis juegos, la portada va junto al título de cada juego y cada dato se distingue mejor.'],
       ['better', 'En Mis juegos, «¿Qué juego sigo?» y «Lo que has gastado» aparecen plegados para dejar la lista a la vista.'],

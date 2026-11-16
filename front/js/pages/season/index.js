@@ -6,7 +6,7 @@ import { api } from '../../lib/api.js';
 import { html, mount } from '../../lib/html.js';
 import { gameHref } from '../../lib/links.js';
 import { FAME } from '../../lib/hall-of-fame.js';
-import { barWidths, isFameHash, participantsOf, podiumOrder, positions, rankingsOf, rankingsPath, ringPercent, rowsOf, seasonFromHash } from '../../lib/season-stats.js';
+import { barWidths, isFameHash, participantsOf, podiumOrder, positions, rankingsOf, rankingsPath, ringPercent, rowsOf, seasonFromHash, TOTAL } from '../../lib/season-stats.js';
 import { available, current } from '../../lib/seasons.js';
 import { hydratePhotos, playerAvatar } from '../../ui/avatar.js';
 import { fameView } from './fame.js';
@@ -109,9 +109,10 @@ const card = (ranking, answer, players) => {
 };
 
 const header = (season) => html`
-  <h1 class="pf-title pg-title">${season === FAME ? 'Salón de la fama' : `Temporada ${season}`}</h1>
+  <h1 class="pf-title pg-title">${season === FAME ? 'Salón de la fama' : season === TOTAL ? 'Total de todas las temporadas' : `Temporada ${season}`}</h1>
   <div class="pf-season" role="group" aria-label="Temporada">${available().map((year) => html`
     <button type="button" class="pf-season-badge" data-season="${year}" aria-pressed="${String(year === season)}">${year}</button>`)}
+    <button type="button" class="pf-season-badge" data-season="${TOTAL}" aria-pressed="${String(season === TOTAL)}">Total</button>
     <button type="button" class="pf-season-badge" data-season="${FAME}" aria-pressed="${String(season === FAME)}">Salón de la fama</button>
   </div>`;
 
@@ -148,7 +149,7 @@ export async function render({ main }) {
     if (!pill || pill.getAttribute('aria-pressed') === 'true') return;
     const season = pill.dataset.season === FAME ? FAME : Number(pill.dataset.season);
     // the address follows the pill (so it can be shared) without going through the router again
-    history.replaceState(null, '', season === current() ? '#/season' : `#/season/${season}`);
+    history.replaceState(null, '', season === current() ? '#/season' : season === TOTAL ? '#/season/total' : `#/season/${season}`);
     show(season);
   });
   await show(isFameHash(location.hash) ? FAME : seasonFromHash(location.hash));
