@@ -128,15 +128,45 @@ class TimerPatch(BaseModel):
     notes: Optional[str] = Field(None, max_length=NOTES_MAX)
 
 
-def _follow_library(db: Session, timer: models.GameTimer, old_entry: tuple, old_day: datetime.date) -> None:
+def _follow_library(
+    db: Session, timer: models.GameTimer, old_entry: tuple, old_day: datetime.date, leftovers: dict | None = None
+) -> None:
     """A session that changed game, platform or season takes its library entry along: the new one is
-    created if missing and the old one goes when nothing is left in it (a completed one is kept)."""
+    created if missing and the old one goes when nothing is left in it (a completed one is kept).
+    With `leftovers` (a batch of sessions) the old entry is not looked at yet, since the next session of the
+    batch may still be in it: it is noted there, with the days of the sessions that left it, for `_drop_left`."""
     new_entry = (timer.game_id, timer.platform, seasons.of(timer.start_time))
     if new_entry == old_entry:
         return
     users_crud.ensure_library_entry(db, timer.user_id, timer.game_id, timer.platform, timer.start_time)
     db.flush()
-    users_crud.drop_empty_entry(db, timer.user_id, *old_entry, created_on=old_day)
+    if leftovers is None:
+        users_crud.drop_empty_entry(db, timer.user_id, *old_entry, created_on=old_day)
+    else:
+        leftovers.setdefault((timer.user_id, *old_entry), set()).add(old_day)
+
+
+def _drop_left(db: Session, leftovers: dict) -> None:
+    """The entries a batch of sessions left, once all of them have moved: one made by any of those sessions goes if empty."""
+    db.flush()
+    for key, days in leftovers.items():
+        for day in sorted(days):
+            if users_crud.drop_empty_entry(db, *key, created_on=day):
+                break
+
+
+def _change_timer(db: Session, timer: models.GameTimer, data: dict, leftovers: dict | None = None) -> int:
+    """Apply a change to a session (not committed) and make its library entry follow. Returns the season it was in."""
+    old_entry = (timer.game_id, timer.platform, seasons.of(timer.start_time))
+    old_day = timer.start_time.date()
+    for k, v in data.items():
+        setattr(timer, k, v)
+    _check_range(timer.start_time, timer.end_time)
+    if timer.end_time is not None:
+        timer.duration_seconds = int((timer.end_time - timer.start_time).total_seconds())
+        timer.is_active = False
+    _follow_library(db, timer, old_entry, old_day, leftovers)
+    return old_entry[2]
 
 
 @router.patch("/timers/{timer_id}")
@@ -150,21 +180,51 @@ def patch_timer(timer_id: int, body: TimerPatch, background_tasks: BackgroundTas
         data.pop("game_id", None)
     else:
         get_or_404(db, models.Game, data["game_id"], "Juego")
-    old_entry = (timer.game_id, timer.platform, seasons.of(timer.start_time))
-    old_day = timer.start_time.date()
-    for k, v in data.items():
-        setattr(timer, k, v)
-    _check_range(timer.start_time, timer.end_time)
-    if timer.end_time is not None:
-        timer.duration_seconds = int((timer.end_time - timer.start_time).total_seconds())
-        timer.is_active = False
-    _follow_library(db, timer, old_entry, old_day)
+    season_before = _change_timer(db, timer, data)
     commit(db, "Sesión")
     if was_running and not timer.is_active:
         # a stuck timer was finished by hand: its pinned notification has to go
         background_tasks.add_task(actions.after_timer_stop, timer.user_id, timer.game_id, timer.duration_seconds)
-    _recheck_achievements(background_tasks, timer.user_id, sorted({old_entry[2], seasons.of(timer.start_time)}))
+    _recheck_achievements(background_tasks, timer.user_id, sorted({season_before, seasons.of(timer.start_time)}))
     return _timer_out(timer, None, None)
+
+
+BULK_MAX = 500  # the front offers a selection of up to this many (front/js/pages/admin/bulk.js)
+
+
+class TimerBulkPatch(BaseModel):
+    """What can be the same for several sessions at once: the game and the platform (the dates and the notes are
+    each session's own). A field that is left out stays as it is; a null platform leaves them without one."""
+    ids: list[int] = Field(min_length=1, max_length=BULK_MAX)
+    game_id: Optional[str] = None
+    platform: Optional[str] = None
+
+
+@router.patch("/timers")
+def patch_timers(body: TimerBulkPatch, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    """Change the game and/or the platform of many sessions in one go, all or nothing. Each one takes its library
+    entry along exactly as in `PATCH /timers/{id}`."""
+    data = body.model_dump(exclude_unset=True, exclude={"ids"})
+    if data.get("game_id") is None:
+        data.pop("game_id", None)
+    else:
+        get_or_404(db, models.Game, data["game_id"], "Juego")
+    if not data:
+        raise HTTPException(status_code=400, detail="Indica qué cambiar: el juego o la plataforma")
+    ids = sorted(set(body.ids))
+    timers = db.query(models.GameTimer).filter(models.GameTimer.id.in_(ids)).all()
+    if len(timers) != len(ids):
+        raise HTTPException(status_code=404, detail="Alguna de las sesiones ya no existe")
+    touched: dict[int, set[int]] = {}
+    leftovers: dict = {}
+    for timer in sorted(timers, key=lambda t: t.id):
+        before = _change_timer(db, timer, data, leftovers)
+        touched.setdefault(timer.user_id, set()).update({before, seasons.of(timer.start_time)})
+    _drop_left(db, leftovers)
+    commit(db, "Sesión")
+    for user_id, season_list in touched.items():
+        _recheck_achievements(background_tasks, user_id, sorted(season_list))
+    return {"updated": len(timers)}
 
 
 @router.delete("/timers/{timer_id}")
