@@ -68,6 +68,8 @@ class RankingStatisticsTypes(str, Enum):
     debt = "debt"
     debt_total = "debt_total"
     games_last_played = "games_last_played"
+    games_value_cheapest = "games_value_cheapest"
+    games_value_priciest = "games_value_priciest"
 
 
 @router.get(
@@ -86,12 +88,16 @@ def get_ranking_statistics(
 
     Allowed values: 'user_hours', 'user_days', 'user_played_games',
     'user_completed_games', 'achievements', 'user_ratio', 'user_current_streak',
-    'user_best_streak', 'games_most_played', 'platform_played', 'debt', 'debt_total', 'games_last_played'
+    'user_best_streak', 'games_most_played', 'platform_played', 'debt', 'debt_total', 'games_last_played',
+    'games_value_cheapest', 'games_value_priciest'
 
     With `season=0` the rankings are the group's total over every season (a streak is the best run of consecutive days ever).
 
-    The `season` applies to every ranking but `platform_played`, `games_last_played` and `debt_total`, which look at
-    everything. The streaks are counted over the days of that season; `user_current_streak` only makes sense for the
+    The `season` applies to every ranking but `platform_played`, `games_last_played`, `debt_total`, `games_value_cheapest`
+    and `games_value_priciest`, which look at everything (the prices are not of a season).
+
+    `games_value_cheapest` / `games_value_priciest` are the games with the lowest / highest mean cost per hour, only those
+    that at least `MIN_CONTRIBUTORS` players paid for and played; they never carry a player or a price. The streaks are counted over the days of that season; `user_current_streak` only makes sense for the
     running one (a streak counts as current if it reaches today or yesterday).
 
     `debt` is the debt of a season (`season`, the running one by default) and `debt_total` the one over every
@@ -136,6 +142,8 @@ def get_ranking_statistics(
             data = debt.user_debt(db, seasons.ALL, is_active)
         elif ranking_type == RankingStatisticsTypes.games_last_played:
             data = rankings.games_last_played(db, is_active=is_active)
+        elif ranking_type in (RankingStatisticsTypes.games_value_cheapest, RankingStatisticsTypes.games_value_priciest):
+            data = rankings.games_value(db, cheapest=ranking_type == RankingStatisticsTypes.games_value_cheapest)
         else:
             data = {"message": "More rankings are coming"}
         content["type"] = ranking_type

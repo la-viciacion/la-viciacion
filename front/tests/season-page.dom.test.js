@@ -90,6 +90,26 @@ test('pressing a season loads it, follows it in the address and the last answer 
   assert.equal(calls.filter((c) => c.path.startsWith('/statistics/rankings')).length, 3);
 });
 
+test('the Total has the two cards of the cost per hour of the games, and no other season has them', async () => {
+  const value = [
+    { game_id: 'hades', name: 'Hades', image_url: null, per_hour_cents: 150, contributors: 4 },
+    { game_id: 'doom', name: 'Doom', image_url: null, per_hour_cents: 900, contributors: 3 },
+  ];
+  const calls = installApi({
+    'GET /statistics/rankings?': [...ANSWER, { type: 'games_value_cheapest', data: value }, { type: 'games_value_priciest', data: [...value].reverse() }],
+    'GET /users/photo/': json({ detail: 'no' }, 404),
+  });
+  await page.render({ main: freshMain() });
+  await settle();
+  assert.equal(document.querySelectorAll('#ss-cheapest, #ss-priciest').length, 0);
+  document.querySelector('[data-season="0"]').click();
+  await settle();
+  assert.match(calls.at(-1).path, /season=0&ranking=.*games_value_cheapest,games_value_priciest/);
+  assert.deepEqual(text('#ss-cheapest .ss-name'), ['Doom', 'Hades']); // Hades is the first (the cheapest) and the podium puts the second at its left
+  assert.match(text('#ss-priciest .ss-value')[0], /1,50/); // the dearest is Doom (first, at the right): the second, Hades, is at the left
+  window.location.hash = '';
+});
+
 const FAME = {
   seasons: [
     { season: 2025, champions: { hours: [{ user_id: 2, name: 'Bea', value: 7200 }, { user_id: 3, name: 'Cai <i>', value: 7200 }], days: [{ user_id: 2, name: 'Bea', value: 1 }], games: [], completed: [], achievements: [], streak: [{ user_id: 2, name: 'Bea', value: 1 }] } },
