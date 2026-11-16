@@ -35,7 +35,7 @@ La página tiene dos mitades, separadas por un título: arriba, **lo que dice el
 - **Terminados por varios**: juegos que han completado dos o más jugadores, cuántos de los que lo tienen lo han terminado y lo que han tardado de media.
 - **Sagas**: franquicias con al menos dos juegos en las bibliotecas del grupo (los datos de franquicia vienen de IGDB, así que un juego sin ellos no cuenta), con cuántos juegos, jugadores y horas suman.
 - **Por género** y **por plataforma**: cuántos juegos de las bibliotecas hay de cada género y de cada plataforma.
-- **Rentabilidad**: cuánto cuesta de media cada hora de un juego, los más baratos y los más caros. Sale de los precios que apuntan los jugadores, pero **solo aparece un juego si al menos 3 jugadores han puesto su precio y lo han jugado**, y nunca se enseña el precio ni la identidad de nadie (las horas de cada uno sí son públicas, y con ellas se podría deducir lo que pagó). En la página del juego sale como **Coste por hora**.
+- **Rentabilidad**: cuánto cuesta de media cada hora de un juego, los más baratos y los más caros. Sale de los precios que apuntan los jugadores, pero **solo aparece un juego si al menos 3 jugadores han puesto su precio y lo han jugado**, (un juego que te salió gratis no cuenta) y nunca se enseña el precio ni la identidad de nadie (las horas de cada uno sí son públicas, y con ellas se podría deducir lo que pagó). En la página del juego sale como **Coste por hora**.
 
 Cada juego enlaza a su página. Arriba hay una fila de **botones**, uno por sección, que te lleva directo a ella (y la abre si estaba plegada), y cada sección se puede **plegar** pulsando su título.
 

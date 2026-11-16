@@ -25,8 +25,9 @@ class PriceError(ValueError):
 
 
 def per_hour(cents: int, seconds: int) -> int | None:
-    """Euro cents per hour, rounded, or None when too little was played to say (pure)."""
-    return round(cents * 3600 / seconds) if seconds >= MIN_SECONDS else None
+    """Euro cents per hour, rounded, or None when there is nothing to say (pure): too little was played, or the game was
+    free (it would always be 0 and say nothing about what the games cost)."""
+    return round(cents * 3600 / seconds) if cents > 0 and seconds >= MIN_SECONDS else None
 
 
 def cents_of(amount) -> int:
@@ -93,14 +94,14 @@ def _seconds(db: Session, user_ids=None, game_ids=None) -> dict[tuple[int, str],
 
 def group_rows(prices: dict[tuple[int, str], int], seconds: dict[tuple[int, str], int]) -> list[dict]:
     """The mean cost per hour of each game that enough players contribute to (pure). `prices` is {(user, game): cents in
-    total for that player and game}, `seconds` {(user, game): seconds}. A player contributes when they have a price for the
-    game and played it at least MIN_SECONDS; the mean is the sum of their prices over the sum of their hours, so a player
+    total for that player and game}, `seconds` {(user, game): seconds}. A player contributes when they paid something for the
+    game (a free one is left out) and played it at least MIN_SECONDS; the mean is the sum of their prices over the sum of their hours, so a player
     with many hours weighs more. Games with fewer than MIN_CONTRIBUTORS contributors are left out, and the answer has no
     player in it. Cheapest per hour first."""
     per_game: dict[str, list[tuple[int, int]]] = {}
     for (user_id, game_id), cents in prices.items():
         played = seconds.get((user_id, game_id), 0)
-        if played >= MIN_SECONDS:
+        if cents > 0 and played >= MIN_SECONDS:
             per_game.setdefault(game_id, []).append((cents, played))
     rows = [
         {"game_id": game_id, "contributors": len(parts), "per_hour_cents": per_hour(sum(c for c, _ in parts), sum(s for _, s in parts))}
