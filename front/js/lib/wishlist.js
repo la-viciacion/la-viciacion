@@ -1,9 +1,10 @@
 // What the wishlist says about a game. Pure, so it can be tested.
 import { formatDate, formatPlayers } from './format.js';
 
-/** How long until a game comes out: "Sale hoy", "Mañana", "En 12 días", "En 3 meses", "Sin fecha confirmada", or '' once it is out. */
+/** How long until a game comes out: "Sale hoy", "Mañana", "En 12 días", "En 3 meses", "Sin fecha confirmada" (or the day it
+ * went into early access, when it has no official launch yet), or '' once it is out. */
 export function countdown(game) {
-  if (!game.release_date) return 'Sin fecha confirmada';
+  if (!game.release_date) return game.early_access_since ? `En early access desde ${formatDate(game.early_access_since)}` : 'Sin fecha confirmada';
   const days = game.days_until;
   if (days == null) return '';
   if (days === 0) return 'Sale hoy';

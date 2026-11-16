@@ -10,12 +10,19 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..database import models
-from . import games
+from . import early_access, games
 
 
 def is_upcoming(release_date: datetime.date | None, today: datetime.date) -> bool:
     """A game without a date counts as not released yet: RAWG lists the announced games with none (TBA)."""
     return release_date is None or release_date > today
+
+
+def early_access_since(game: models.Game, today: datetime.date) -> datetime.date | None:
+    """The day an undated game went into early access, to say so where "no date" would be shown; None for any other game."""
+    if game.release_date is None and early_access.is_early_access(game.early_access_date, game.release_date, today):
+        return game.early_access_date
+    return None
 
 
 def days_until(release_date: datetime.date | None, today: datetime.date) -> int | None:
@@ -113,6 +120,7 @@ def wishlist(db: Session, viewer_id: int, today: datetime.date) -> dict:
             "genres": games.genre_list(game.genres),
             "release_date": game.release_date,
             "days_until": days_until(game.release_date, today),
+            "early_access_since": early_access_since(game, today),
             "added_at": added_at,
             "in_library": game.id in owned,
             "wanted_by": others.get(game.id, []),
@@ -158,6 +166,7 @@ def releases(db: Session, viewer_id: int, year: int, month: int, today: datetime
             "genres": games.genre_list(game.genres),
             "release_date": game.release_date,
             "days_until": days_until(game.release_date, today),
+            "early_access_since": early_access_since(game, today),
             "wanted_by": [{**w, "is_me": w["user_id"] == viewer_id} for w in everyone.get(game.id, [])],
         }
         for game in rows

@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from ..database import models
 from ..utils.ttl_cache import TtlCache
 from . import games, users
-from .wishlist import is_upcoming
+from .wishlist import early_access_since, is_upcoming
 
 LIST_SIZE = 10  # items of each list
 HIDDEN_MAX_PLAYERS = 2  # a hidden gem is had by this many players at most...
@@ -242,7 +242,8 @@ def _library(db: Session) -> dict:
             "total": len(wanted),
             "items": [
                 {**game(g["game_id"]), "wanters": [names[u] for u in g["wanters"]], "release_date": meta[g["game_id"]].release_date,
-                 "upcoming": is_upcoming(meta[g["game_id"]].release_date, today)}
+                 "upcoming": is_upcoming(meta[g["game_id"]].release_date, today),
+                 "early_access_since": early_access_since(meta[g["game_id"]], today)}
                 for g in wanted[:LIST_SIZE]
             ],
         },

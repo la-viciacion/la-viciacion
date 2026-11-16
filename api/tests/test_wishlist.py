@@ -25,6 +25,38 @@ class UpcomingTests(unittest.TestCase):
         self.assertIsNone(wishlist.days_until(None, TODAY))
 
 
+class EarlyAccessSinceTests(unittest.TestCase):
+    """Only an undated game that is in early access says since when; every other game carries nothing new."""
+
+    def game(self, release, early):
+        return models.Game(id="g", name="G", release_date=release, early_access_date=early)
+
+    def test_an_undated_game_in_early_access_says_since_when(self):
+        self.assertEqual(wishlist.early_access_since(self.game(None, D(2026, 10, 1)), TODAY), D(2026, 10, 1))
+        self.assertEqual(wishlist.early_access_since(self.game(None, TODAY), TODAY), TODAY)
+
+    def test_every_other_game_says_nothing(self):
+        self.assertIsNone(wishlist.early_access_since(self.game(None, None), TODAY))  # a plain undated one
+        self.assertIsNone(wishlist.early_access_since(self.game(None, D(2026, 10, 5)), TODAY))  # early access still to come
+        self.assertIsNone(wishlist.early_access_since(self.game(D(2026, 12, 1), D(2026, 10, 1)), TODAY))  # it has an official date
+        self.assertIsNone(wishlist.early_access_since(self.game(D(2020, 1, 1), D(2019, 1, 1)), TODAY))  # launched already
+
+    def test_the_wishlist_and_the_calendar_carry_it_only_for_that_game(self):
+        db = make_session()
+        db.add_all([
+            models.User(id=1, username="ana", name="Ana", is_active=1),
+            models.Game(id="ea", name="Ea", release_date=None, early_access_date=D(2026, 9, 1)),
+            models.Game(id="tba", name="Tba", release_date=None),
+            models.Game(id="soon", name="Soon", release_date=D(2026, 10, 20), early_access_date=D(2026, 9, 1)),
+        ])
+        db.add_all([models.UserWishlist(user_id=1, game_id=g) for g in ("ea", "tba", "soon")])
+        db.commit()
+        listed = wishlist.wishlist(db, 1, TODAY)["upcoming"]
+        self.assertEqual({g["id"]: g["early_access_since"] for g in listed}, {"ea": D(2026, 9, 1), "tba": None, "soon": None})
+        undated = wishlist.releases(db, 1, 2026, 10, TODAY)["undated"]
+        self.assertEqual({g["id"]: g["early_access_since"] for g in undated}, {"ea": D(2026, 9, 1), "tba": None})
+
+
 class DropPlayedTests(unittest.TestCase):
     """A wish goes once the game has launched and the player has played it; before the launch it stays (early access)."""
 

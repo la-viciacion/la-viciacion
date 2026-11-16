@@ -19,6 +19,13 @@ test('the release line adds the date only when there is one', () => {
   assert.equal(releaseLine({ release_date: '2016-02-19', days_until: null }), formatDate('2016-02-19')); // already out: the date alone
 });
 
+test('an undated game in early access says since when; any other keeps "sin fecha"', () => {
+  assert.equal(countdown({ release_date: null, days_until: null, early_access_since: '2026-10-27' }), `En early access desde ${formatDate('2026-10-27')}`);
+  assert.equal(releaseLine({ release_date: null, days_until: null, early_access_since: '2026-10-27' }), `En early access desde ${formatDate('2026-10-27')}`);
+  assert.equal(countdown({ release_date: null, days_until: null, early_access_since: null }), 'Sin fecha confirmada');
+  assert.match(countdown({ release_date: '2026-12-03', days_until: 60, early_access_since: null }), /^En 60 días/); // an official date wins
+});
+
 test('who else wants a game, in singular and plural', () => {
   assert.equal(wantedBy([]), '');
   assert.equal(wantedBy([{ name: 'Bea' }]), 'Lo quiere Bea');
