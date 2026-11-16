@@ -136,7 +136,7 @@ function nextUpCard(entries) {
   const lists = NEXT_UP.filter(([key]) => found[key].length);
   if (!lists.length) return html``;
   return html`
-    <details class="pf-card pf-next" open>
+    <details class="pf-card pf-next">
       <summary><strong>¿Qué juego sigo?</strong> <span class="pf-sub">Juegos que merece la pena retomar</span></summary>
       <div class="pf-next-lists">
         ${lists.map(([key, title, hint, detail]) => html`
