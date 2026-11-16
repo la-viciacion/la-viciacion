@@ -7,6 +7,7 @@
 import { api } from '../../lib/api.js';
 import { formatDate, formatDuration } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
+import { DAY_RULE } from '../../lib/day-rule.js';
 import { gameHref } from '../../lib/links.js';
 import { storyHref } from '../../lib/story.js';
 import { change, clampPick, excludeRunningYear, finishedYearChoices, lastMonth, monthChoices, parseHash, periodKey, periodLabel, pickOf, previousPeriod, recapHref, withKind, yearChoices } from '../../lib/recap.js';
@@ -53,9 +54,9 @@ export function playerView(p) {
     ${hero(otherPlayer() ? 'Ha jugado' : 'Has jugado', p.seconds, p.previous_seconds, p.position ? html`<div class="rc-hero-sub">Puesto <strong>${p.position}º</strong> del grupo</div>` : '')}
     <div class="pf-stats">
       ${statTile('Sesiones', p.sessions)}
-      ${statTile('Días', p.days)}
+      ${statTile('Días', p.days, DAY_RULE)}
       ${statTile('Juegos', p.games)}
-      ${statTile('Mejor racha', `${p.best_streak} d`)}
+      ${statTile('Mejor racha', `${p.best_streak} d`, DAY_RULE)}
       ${statTile('Sesión más larga', formatDuration(p.longest_session))}
     </div>
     <div class="rc-moments">

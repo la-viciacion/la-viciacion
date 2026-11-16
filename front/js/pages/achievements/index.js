@@ -7,11 +7,13 @@
 // GET /group/achievements (derived, nothing stored).
 import { API_BASE, api } from '../../lib/api.js';
 import { createFolds, toggleFold } from '../../lib/fold.js';
+import { DAY_RULE } from '../../lib/day-rule.js';
 import { formatDate, formatPlayers } from '../../lib/format.js';
 import { html, mount } from '../../lib/html.js';
 import * as seasons from '../../lib/seasons.js';
 import { specialClass } from '../../lib/special.js';
 import { iconChevron } from '../../ui/icons.js';
+import { infoTip } from '../../ui/info-tip.js';
 import { titleView } from '../../ui/profile-summary.js';
 
 export const active = null; // it belongs to no item of the top bar
@@ -140,7 +142,7 @@ export async function render({ main }) {
   folded.clear();
   onlyMine = false;
   mount(main, html`
-    <h1 class="pf-title pg-title">Logros</h1>
+    <div class="pf-info-head pf-info-title"><h1 class="pf-title pg-title">Logros</h1>${infoTip(`Los logros de días jugados y de racha usan esta regla. ${DAY_RULE}`, 'Más información: días y rachas')}</div>
     <div id="achList"><div class="loading-spinner">Cargando logros...</div></div>`);
   main.querySelector('#achList').addEventListener('click', (e) => {
     const fold = e.target.closest('[data-fold]');

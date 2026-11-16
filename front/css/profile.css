@@ -21,7 +21,7 @@
 
 .pf-note { margin: 4px 0 10px; }
 
-.pf-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 10px; margin-bottom: 8px; }
+.pf-stats { position: relative; display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 10px; margin-bottom: 8px; }
 
 .pf-stat { background: var(--gradient-card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 10px 12px; }
 
@@ -425,6 +425,9 @@
 .pf-info summary:focus-visible { outline: 2px solid var(--accent-teal); outline-offset: 2px; }
 /* beside a title the popover is as wide as a sentence, not as the title: it opens below it, from its left edge */
 .pf-info-title { margin-bottom: 0; }
+/* in a tile the "i" is part of the label; its popover is as wide as the whole row of tiles and opens under it */
+.pf-stat .pf-info-head { position: static; display: inline-flex; margin: 0; }
+.pf-stat .pf-info-text { color: var(--text-secondary); font-size: 0.8rem; font-weight: 400; }
 .pf-info-title .pf-info-text { right: auto; width: min(34rem, calc(100vw - 48px)); font-size: 0.85rem; }
 .pf-info-title .pf-info-text p { margin: 0; }
 .pf-info-title .pf-info-text p + p { margin-top: 8px; }
