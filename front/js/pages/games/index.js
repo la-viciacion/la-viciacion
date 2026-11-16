@@ -31,6 +31,10 @@ const TOGGLES = [
   ['rated', 'Puntuados por mí'],
 ];
 
+// The toggles that are on screen, next to the sort; the rest of TOGGLES stays hidden (a row of five would crowd a phone)
+const SHOWN_TOGGLES = ['early_access'];
+const toggleButton = ([key, label]) => html`<button type="button" class="gc-toggle" data-toggle="${key}" aria-pressed="false">${label}</button>`;
+
 let main;
 let items = [];
 let total = 0;
@@ -114,14 +118,16 @@ function bind() {
   select('#gcSort', 'sort');
   select('#gcGenre', 'genre');
   select('#gcLibrary', 'library');
-  main.querySelector('#gcToggles').addEventListener('click', (e) => {
+  const onToggle = (e) => {
     const button = e.target.closest('[data-toggle]');
     if (!button) return;
     const key = button.dataset.toggle;
     filters[key] = !filters[key];
     button.setAttribute('aria-pressed', String(filters[key]));
     load();
-  });
+  };
+  main.querySelector('#gcOptions').addEventListener('click', onToggle);
+  main.querySelector('#gcToggles').addEventListener('click', onToggle);
   // a game added here has nobody yet: go to its page, where it can be rated or played
   main.querySelector('#gcAdd').addEventListener('click', () => openAddGame((id) => { location.hash = gameHref(id); }));
 }
@@ -139,15 +145,16 @@ export async function render(ctx) {
       <input class="adm-input gc-search" id="gcSearch" type="search" placeholder="Buscar un juego…" autocomplete="off" aria-label="Buscar un juego" />
       <button class="pf-btn primary" type="button" id="gcAdd">${iconPlus()} Añadir juego</button>
     </div>
-    <div class="gc-toolbar">
+    <div class="gc-toolbar" id="gcOptions">
       <select class="adm-input" id="gcSort" aria-label="Ordenar por">${SORTS.map(([value, label]) => html`<option value="${value}">${label}</option>`)}</select>
+      ${TOGGLES.filter(([key]) => SHOWN_TOGGLES.includes(key)).map(toggleButton)}
       <select class="adm-input" id="gcGenre" aria-label="Género" hidden><option value="">Todos los géneros</option></select>
       <select class="adm-input" id="gcLibrary" aria-label="Tu biblioteca" hidden>
         <option value="">Toda la base de datos</option><option value="have">Los que tengo</option><option value="not">Los que no tengo</option>
       </select>
     </div>
     <div class="gc-toggles" id="gcToggles" role="group" aria-label="Filtros" hidden>
-      ${TOGGLES.map(([key, label]) => html`<button type="button" class="gc-toggle" data-toggle="${key}" aria-pressed="false">${label}</button>`)}
+      ${TOGGLES.filter(([key]) => !SHOWN_TOGGLES.includes(key)).map(toggleButton)}
     </div>
     <div class="pf-sub gc-count" id="gcCount" role="status"></div>
     <div id="gcResults"><div class="loading-spinner">Cargando juegos...</div></div>`);
