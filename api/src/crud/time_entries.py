@@ -140,18 +140,21 @@ def players_played_dates(db: Session, season: int = None, is_active: bool | None
 
 
 def games_played_time(db: Session, season: int = None, limit: int | None = None, is_active: bool | None = None) -> list[dict]:
-    """Games with the seconds played in the season, most first (only games that were played), each with its cover."""
+    """Games with the seconds played in the season, most first (only games that were played), each with its cover and the
+    start of its latest session in the season (`last_played`). Games with the same time: the one played later goes first,
+    then alphabetically."""
     season = seasons.or_current(season)
     sessions = sessions_subquery()
     played = cast(func.sum(sessions.c.duration), Integer).label("played_time")
+    last = func.max(sessions.c.start).label("last_played")
     stmt = (
-        select(sessions.c.game_id.label("game_id"), models.Game.name, models.Game.image_url, played)
+        select(sessions.c.game_id.label("game_id"), models.Game.name, models.Game.image_url, played, last)
         .join(models.User, sessions.c.user_id == models.User.id)
         .join(models.Game, models.Game.id == sessions.c.game_id)
         .where(in_season(sessions.c.season, season), models.not_god())
         .group_by(sessions.c.game_id, models.Game.name, models.Game.image_url)
         .having(func.sum(sessions.c.duration) > 0)
-        .order_by(desc(played), models.Game.name)
+        .order_by(desc(played), desc(last), models.Game.name)
     )
     if is_active is not None:
         stmt = stmt.where(models.User.is_active == is_active)
