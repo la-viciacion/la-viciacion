@@ -397,7 +397,7 @@ class RankingsTests(CatalogTestCase):
         self.assertEqual(
             list(self.rankings()),
             ["user_hours", "user_days", "user_played_games", "user_completed_games", "achievements", "user_ratio",
-             "user_current_streak", "user_best_streak", "games_most_played", "platform_played", "debt", "debt_total", "games_last_played"],
+             "user_current_streak", "user_best_streak", "games_most_played", "platform_played", "debt", "debt_total", "games_last_played", "games_value_cheapest", "games_value_priciest"],
         )
 
     def test_the_players_are_ranked_by_hours_days_and_streaks(self):

@@ -206,6 +206,16 @@ class GroupTests(PriceTestCase):
         self.assertEqual([g["game_id"] for g in body["priciest"]], ["celeste", "hades"])
         self.assertEqual(self.api("GET", "/group/value").status_code, 401)
 
+    def test_the_rankings_of_the_season_page_give_the_cheapest_and_the_dearest_games_without_any_player(self):
+        self.priced("hades", (self.ana, self.bea, self.cai), 400)
+        self.priced("celeste", (self.ana, self.bea, self.cai), 6000)
+        body = self.api("GET", "/statistics/rankings?season=0&ranking=games_value_cheapest,games_value_priciest", as_user="dan").json()
+        cheapest, priciest = body[0]["data"], body[1]["data"]
+        self.assertEqual([(g["game_id"], g["name"], g["per_hour_cents"], g["contributors"]) for g in cheapest], [("hades", "Hades", 200, 3), ("celeste", "Celeste", 3000, 3)])
+        self.assertEqual([g["game_id"] for g in priciest], ["celeste", "hades"])
+        for secret in ("ana", "bea", "cai", "price", "amount", "user"):
+            self.assertNotIn(secret, json.dumps(body), secret)
+
     def test_the_emergency_account_is_not_a_contributor(self):
         god = self.user("admin", admin=True)  # models.GOD_USERNAME
         self.priced("hades", (self.ana, self.bea), 2000)

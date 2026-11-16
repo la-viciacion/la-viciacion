@@ -2,6 +2,7 @@
 // Pure (no DOM) so it can be tested. `value` is the number the bar is drawn from, `text` what is written next to it.
 import { DAY_RULE } from './day-rule.js';
 import { formatDuration } from './format.js';
+import { perHour } from './money.js';
 import { FIRST, current } from './seasons.js';
 
 const count = (key) => (e) => e[key];
@@ -10,7 +11,7 @@ const days = (n) => `${n} ${n === 1 ? 'día' : 'días'}`;
 /** The pill that adds every season together: it is the API's `season=0` (no real season is 0). */
 export const TOTAL = 0;
 
-/** Every ranking, in the order the page shows them. `api` is the name the API knows it by; `then` the rankings that break a tie, in order (see rowsOf); `info` the text of an "i" beside the title, when the figure needs explaining; `view` how it is drawn (podium, bars, tiles, rings or covers); `rows: 'games'` is a ranking of games, not of players. */
+/** Every ranking, in the order the page shows them. `api` is the name the API knows it by; `total: true` one that only exists in the Total; `order: 'asc'` one where the lowest value is the best; `then` the rankings that break a tie, in order (see rowsOf); `info` the text of an "i" beside the title, when the figure needs explaining; `view` how it is drawn (podium, bars, tiles, rings or covers); `rows: 'games'` is a ranking of games, not of players. */
 export const RANKINGS = [
   { id: 'hours', view: 'podium', then: ['days', 'games'], api: 'user_hours', title: 'Tiempo jugado', value: count('played_time'), text: (e) => formatDuration(e.played_time) },
   { id: 'days', view: 'podium', then: ['hours', 'games'], api: 'user_days', info: DAY_RULE, title: 'Días jugados', value: count('played_days'), text: (e) => days(e.played_days) },
@@ -21,10 +22,14 @@ export const RANKINGS = [
   { id: 'best-streak', view: 'podium', then: ['days', 'hours'], unit: 'días', icon: '🏆', api: 'user_best_streak', info: DAY_RULE, title: 'Mejor racha', value: count('best_streak'), text: (e) => days(e.best_streak) },
   { id: 'current-streak', view: 'podium', then: ['best-streak', 'days', 'hours'], unit: 'días', icon: '🔥', api: 'user_current_streak', info: DAY_RULE, title: 'Racha actual', value: count('current_streak'), text: (e) => days(e.current_streak) },
   { id: 'most-played', view: 'podium', api: 'games_most_played', title: 'Juegos más jugados', rows: 'games', value: count('played_time'), text: (e) => formatDuration(e.played_time) },
+  // The cost per hour of the group's games (never a player, never a price): it comes from what everybody paid over all their
+  // hours, not from a season, so these two cards only exist in the Total. The cheapest has the shortest bar the lowest value.
+  { id: 'cheapest', view: 'podium', api: 'games_value_cheapest', title: 'Juegos más baratos por hora', rows: 'games', total: true, order: 'asc', value: count('per_hour_cents'), text: (e) => `${perHour(e.per_hour_cents)} · ${e.contributors} jug.` },
+  { id: 'priciest', view: 'podium', api: 'games_value_priciest', title: 'Juegos más caros por hora', rows: 'games', total: true, value: count('per_hour_cents'), text: (e) => `${perHour(e.per_hour_cents)} · ${e.contributors} jug.` },
 ];
 
 /** The rankings a season has: a streak that is still running only makes sense for the running season. */
-export const rankingsOf = (season = current()) => RANKINGS.filter((r) => r.id !== 'current-streak' || season === current());
+export const rankingsOf = (season = current()) => RANKINGS.filter((r) => (r.id !== 'current-streak' || season === current()) && (!r.total || season === TOTAL));
 
 /** What to ask the API for: every ranking of the season (the running one by default) in one request. The running season is
  * only for the active players; an older one is for everybody, and `participantsOf` leaves out those who took no part in it. */
@@ -61,9 +66,12 @@ export const rowsOf = (answer, ranking, players = null) => {
   let rows = rowsOfType(answer, ranking);
   if (players && ranking.rows !== 'games') rows = rows.filter((row) => players.has(row.user_id));
   const breakers = ranking.rows === 'games' ? [] : (ranking.then ?? []).map((id) => valuesOf(answer, id));
-  // games with the same time: the one played later (the start of its latest session) goes first
-  const later = (a, b) => (ranking.rows === 'games' ? String(b.last_played ?? '').localeCompare(String(a.last_played ?? '')) : 0);
-  return [...rows].sort((a, b) => ranking.value(b) - ranking.value(a)
+  // games with the same value: the one more players contribute to, then the one played later (the start of its latest session)
+  const later = (a, b) => (ranking.rows === 'games'
+    ? (b.contributors ?? 0) - (a.contributors ?? 0) || String(b.last_played ?? '').localeCompare(String(a.last_played ?? ''))
+    : 0);
+  const sign = ranking.order === 'asc' ? -1 : 1;
+  return [...rows].sort((a, b) => sign * (ranking.value(b) - ranking.value(a))
     || later(a, b)
     || breakers.reduce((diff, values) => diff || (values.get(b.user_id) ?? 0) - (values.get(a.user_id) ?? 0), 0)
     || String(a.name).localeCompare(String(b.name), 'es', { sensitivity: 'base' }));
@@ -81,6 +89,10 @@ export function participantsOf(answer, rankings) {
 
 /** How far each bar goes, 0 to 100: the longest is full and the rest go in proportion. */
 export function barWidths(rows, ranking) {
+  if (ranking.order === 'asc') { // the lowest is the best and has the full bar
+    const low = Math.min(...rows.map((row) => ranking.value(row)));
+    return rows.map((row) => (ranking.value(row) > 0 ? Math.round((low / ranking.value(row)) * 100) : 100));
+  }
   const top = Math.max(0, ...rows.map((row) => ranking.value(row)));
   return rows.map((row) => (top > 0 ? Math.round((ranking.value(row) / top) * 100) : 0));
 }

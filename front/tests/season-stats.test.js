@@ -6,7 +6,7 @@ import { current } from '../js/lib/seasons.js';
 const by = (id) => RANKINGS.find((r) => r.id === id);
 
 test('it asks for every ranking of the active players in one request, with the names the API knows', () => {
-  assert.equal(RANKINGS.length, 9);
+  assert.equal(RANKINGS.length, 11); // the two of the cost per hour are only asked for in the Total
   const path = rankingsPath();
   assert.ok(path.startsWith(`/statistics/rankings?only_active=true&season=${current()}&ranking=user_hours,user_days,`));
   assert.ok(path.endsWith(',user_current_streak,games_most_played'));
@@ -35,12 +35,28 @@ test('the Total adds every season together: season 0, everybody who took part, a
   assert.equal(seasonFromHash('#/season/total/', now), TOTAL);
   assert.ok(rankingsPath(TOTAL).startsWith('/statistics/rankings?only_active=false&season=0&ranking='));
   assert.ok(!rankingsPath(TOTAL).includes('user_current_streak'));
-  assert.equal(rankingsOf(TOTAL).length, 8);
+  assert.equal(rankingsOf(TOTAL).length, 10); // and the two of the cost per hour, which only the Total has
 });
 
 test('the rankings that count days explain what a day is, and no other one does', () => {
   assert.deepEqual(RANKINGS.filter((r) => r.info).map((r) => r.id), ['days', 'best-streak', 'current-streak']);
   assert.match(by('days').info, /10 minutos/);
+});
+
+test('the cost per hour of the games is only in the Total, the cheapest first, and the cheapest has the full bar', () => {
+  assert.ok(!rankingsOf(current()).some((r) => r.total) && !rankingsOf(current() - 1).some((r) => r.total));
+  assert.deepEqual(rankingsOf(TOTAL).filter((r) => r.total).map((r) => r.id), ['cheapest', 'priciest']);
+  assert.match(rankingsPath(TOTAL), /games_value_cheapest,games_value_priciest/);
+  const rows = [
+    { game_id: 'b', name: 'Zelda', per_hour_cents: 200, contributors: 3 },
+    { game_id: 'a', name: 'Alan Wake', per_hour_cents: 200, contributors: 5 },
+    { game_id: 'c', name: 'Celeste', per_hour_cents: 100, contributors: 3 },
+  ];
+  const answer = [{ type: 'games_value_cheapest', data: rows }, { type: 'games_value_priciest', data: rows }];
+  assert.deepEqual(rowsOf(answer, by('cheapest')).map((r) => r.name), ['Celeste', 'Alan Wake', 'Zelda']); // a tie: more players first
+  assert.deepEqual(rowsOf(answer, by('priciest')).map((r) => r.name), ['Alan Wake', 'Zelda', 'Celeste']);
+  assert.deepEqual(barWidths(rowsOf(answer, by('cheapest')), by('cheapest')), [100, 50, 50]);
+  assert.match(by('cheapest').text(rows[0]), /^2,00\s€\/h · 3 jug\.$/);
 });
 
 test('each ranking writes its value the way the bot does', () => {

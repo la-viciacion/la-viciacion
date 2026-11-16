@@ -3,7 +3,7 @@ import datetime
 from sqlalchemy import and_, case, desc, func, select
 from sqlalchemy.orm import Session
 
-from ..crud import time_entries
+from ..crud import game_prices, time_entries
 from ..database import models
 from ..utils.logger import LogManager
 from ..utils import seasons, streaks
@@ -188,6 +188,16 @@ def games_last_played(db: Session, limit: int = 10, is_active: bool | None = Non
 
 def games_most_played(db: Session, limit: int = 10, is_active: bool | None = None, season: int = None) -> list[dict]:
     return time_entries.games_played_time(db, season, limit=limit, is_active=is_active)
+
+
+def games_value(db: Session, cheapest: bool = True, limit: int = 10) -> list[dict]:
+    """The games with the lowest (`cheapest`) or the highest mean cost per hour of the group, with their cover and how many
+    players it comes from (see crud.game_prices: only games with enough contributors, never a player or a price)."""
+    answer = game_prices.group_value(db, limit)
+    return [
+        {"game_id": g["game_id"], "name": g["game_name"], "image_url": g["image_url"], "per_hour_cents": g["per_hour_cents"], "contributors": g["contributors"]}
+        for g in answer["cheapest" if cheapest else "priciest"]
+    ]
 
 
 def platform_played_games(db: Session, limit: int = None, is_active: bool | None = None):
