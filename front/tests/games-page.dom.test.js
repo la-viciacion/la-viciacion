@@ -64,6 +64,14 @@ test('a game in early access carries the tag with the day it went in, and the fi
   assert.equal(asked.at(-1).path, '/games/catalog?limit=24&offset=0&sort=activity&early_access=true');
 });
 
+test('only the early access filter is on screen, next to the sort; the other toggles stay hidden', () => {
+  const visible = document.querySelector('#gcOptions [data-toggle="early_access"]');
+  assert.ok(visible);
+  assert.equal(visible.closest('[hidden]'), null);
+  assert.deepEqual([...document.querySelectorAll('#gcToggles [data-toggle]')].map((b) => b.dataset.toggle), ['playing', 'with_players', 'completed', 'rated']);
+  assert.ok(document.querySelector('#gcToggles').hidden);
+});
+
 test('the genres of the answer fill the genre filter', () => {
   assert.deepEqual([...document.querySelectorAll('#gcGenre option')].map((o) => o.value), ['', 'Indie', 'Platformer']);
 });
