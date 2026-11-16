@@ -33,7 +33,7 @@ export async function showValue(el, username) {
   if (!data?.priced_games) return mount(el, html``);
   const counted = data.games.filter((g) => g.per_hour_cents != null);
   mount(el, html`
-    <details class="pf-card pf-value" open>
+    <details class="pf-card pf-value">
       <summary><strong>Lo que has gastado</strong> <span class="pf-sub">Solo lo ves tú</span></summary>
       <section class="pf-stats" aria-label="Lo que has gastado">
         ${tile('Gastado', euros(data.spent_cents))}
