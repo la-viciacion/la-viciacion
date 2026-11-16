@@ -7,6 +7,7 @@ import { append, html, mount } from '../../lib/html.js';
 import { loadPlatforms } from '../../lib/platforms.js';
 import { toast } from '../../ui/toast.js';
 import { errorState, store } from './components.js';
+import { bulkBarView, openBulkEdit, refreshBulk, selectAllMatching } from './bulk.js';
 import { deleteRow, pickGame, showGamePeople } from './dialogs.js';
 import { ENTITIES, TABS } from './entities.js';
 import { openCreateForm, openForm } from './form.js';
@@ -18,7 +19,7 @@ export const adminOnly = true;
 
 const PAGE = 25;
 
-const state = Object.fromEntries(TABS.map((t) => [t, { filters: {}, search: '', offset: 0, data: null, sort: ENTITIES[t].defaultSort ? { ...ENTITIES[t].defaultSort } : null }]));
+const state = Object.fromEntries(TABS.map((t) => [t, { filters: {}, search: '', offset: 0, data: null, selected: new Set(), selectedFor: null, sort: ENTITIES[t].defaultSort ? { ...ENTITIES[t].defaultSort } : null }]));
 let root;
 let current = 'home';
 const lastTab = new Map(); // section -> the tab it was left on
@@ -198,6 +199,12 @@ async function load() {
     if (tab === current) await renderCustom(panel, { entity, admin });
     return;
   }
+  // what is ticked belongs to what is being looked at: other filters or another search drop it (paging and sorting keep it)
+  const looking = JSON.stringify([st.search, st.filters]);
+  if (looking !== st.selectedFor) {
+    st.selected.clear();
+    st.selectedFor = looking;
+  }
   paint(panel, entity, st, true);
   try {
     const result = await api(`${entity.endpoint}?${queryFor(entity, st)}`);
@@ -273,7 +280,7 @@ function toolbarView(entity, st) {
     </div>`;
 }
 
-function rowView(entity, r, i, companion = false) {
+function rowView(entity, r, i, companion = false, ticked = null) {
   const mark = companion ? html` data-c="1"` : ''; // a row of the companion table: its buttons act on that entity
   const cells = entity.columns.map((c, col) => (c.filter
     ? html`<td><button class="adm-link" data-act="cell-filter" data-col="${col}" data-i="${i}"${mark} title="Filtrar">${c.render(r)}</button></td>`
@@ -284,6 +291,7 @@ function rowView(entity, r, i, companion = false) {
   if (entity.canDelete) extras.push(html`<button class="adm-menu-item danger" data-act="delete" data-i="${i}"${mark}>${entity.deleteLabel || 'Borrar'}</button>`);
   return html`
     <tr>
+      ${ticked === null ? '' : html`<td class="adm-tick"><input type="checkbox" data-tick="${i}" aria-label="Seleccionar" ${ticked ? html`checked` : ''} /></td>`}
       ${cells}
       <td>
         <div class="adm-row-actions">
@@ -326,15 +334,19 @@ function contentView(entity, st, loading) {
       <button class="adm-btn sm" data-act="next" ${to >= total ? html`disabled` : ''}>Siguiente →</button>
     </div>` : '';
 
-  return html`${tableView(entity, items, false, st)}${pager}${companion}`;
+  return html`${entity.bulk ? html`<div id="admBulkBar">${bulkBarView(entity, st)}</div>` : ''}${tableView(entity, items, false, st)}${pager}${companion}`;
 }
 
 function tableView(entity, items, companion, st) {
+  const ticks = entity.bulk && !companion; // a column of boxes to tick rows for the bulk edit
+  const ticked = ticks ? items.filter((r) => st.selected.has(r.id)).length : 0;
   return html`
     <div class="adm-table-wrap">
       <table class="adm-table">
-        <thead><tr>${entity.columns.map((c) => headerView(c, st))}<th></th></tr></thead>
-        <tbody>${items.map((r, i) => rowView(entity, r, i, companion))}</tbody>
+        <thead><tr>
+          ${ticks ? html`<th class="adm-tick"><input type="checkbox" id="admBulkAll" aria-label="Seleccionar las de esta página" ${items.length && ticked === items.length ? html`checked` : ''} /></th>` : ''}
+          ${entity.columns.map((c) => headerView(c, st))}<th></th></tr></thead>
+        <tbody>${items.map((r, i) => rowView(entity, r, i, companion, ticks && st.selected.has(r.id)))}</tbody>
       </table>
     </div>`;
 }
@@ -352,6 +364,19 @@ function onInput(e) {
 
 function onChange(e) {
   const st = state[current];
+  const entity = ENTITIES[current];
+  if (entity.bulk && (e.target.dataset.tick != null || e.target.id === 'admBulkAll')) {
+    const items = st.data?.items || [];
+    if (e.target.id === 'admBulkAll') {
+      items.forEach((r) => (e.target.checked ? st.selected.add(r.id) : st.selected.delete(r.id)));
+      root.querySelectorAll('[data-tick]').forEach((box) => { box.checked = e.target.checked; });
+    } else {
+      const id = items[Number(e.target.dataset.tick)].id;
+      if (e.target.checked) st.selected.add(id);
+      else st.selected.delete(id);
+    }
+    return refreshBulk(entity, st);
+  }
   if (e.target.id === 'admFilterUser') {
     st.filters.user_id = e.target.value || undefined;
   } else if (e.target.id === 'admFilterActive') {
@@ -430,6 +455,13 @@ async function onClick(e) {
         // the fields of a variant may need data from the API (the themes of the games): they are loaded when it is opened
         return openForm(entity, null, admin, variant ? { ...variant, fields: typeof variant.fields === 'function' ? await variant.fields() : variant.fields } : null);
       }
+      case 'bulk-edit': return openBulkEdit(entity, st, admin);
+      case 'bulk-clear':
+        st.selected.clear();
+        return paint(document.getElementById('admPanel'), entity, st, false);
+      case 'bulk-all':
+        await selectAllMatching(entity, st, queryFor(entity, st));
+        return paint(document.getElementById('admPanel'), entity, st, false);
       case 'edit': return openForm(target, row, admin);
       case 'delete': return deleteRow(target, row, admin);
       case 'game-people': {
