@@ -145,8 +145,8 @@ const plain = (t) => t.replace(/\u00a0/g, ' ');
 
 test('a row says what was paid, and the price button opens one box per platform with what is noted', async () => {
   await open({ 'GET /users/ana/library': { season: 2026, total: 2, items: PRICED } });
-  assert.match(plain(document.querySelector('.pf-game[data-id="21"] .pf-sub').textContent), /Pagado: 24,99 €/);
-  assert.doesNotMatch(document.querySelector('.pf-game[data-id="22"] .pf-sub').textContent, /Pagado/);
+  assert.match(plain(document.querySelector('.pf-game[data-id="21"] .pf-meta').textContent), /Pagado\s*24,99 €/);
+  assert.doesNotMatch(document.querySelector('.pf-game[data-id="22"] .pf-meta').textContent, /Pagado/);
   document.querySelector('.pf-game[data-id="21"] [data-action="price"]').click();
   const boxes = [...document.querySelectorAll('.pf-game[data-id="21"] input[data-platform]')];
   assert.deepEqual(boxes.map((b) => [b.dataset.platform, b.value]), [['pc', '24,99'], ['switch', '']]);
