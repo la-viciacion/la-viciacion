@@ -35,7 +35,7 @@ Toda tu biblioteca, de todas las temporadas, con filtros por nombre (**Buscar ju
 
 Si has jugado un mismo juego en varias plataformas dentro de una temporada, sale **en una sola fila** con todas sus plataformas, no una por plataforma; las horas son las del juego entero y el filtro de plataforma encuentra la fila con cualquiera de ellas.
 
-Cada juego sin terminar tiene un **estado**: *En curso*, *Pausado* (llevas mucho sin jugarlo), *Pendiente* (lo tienes pero nunca lo has jugado), *Completado*, *Abandonado* o *Sin completar* (se quedó a medias en una temporada ya cerrada). Se puede filtrar por cualquiera.
+Cada juego sin terminar tiene un **estado**: *En curso*, *Pausado* (lo has jugado, pero llevas más de 30 días sin una sesión), *Pendiente* (lo tienes pero nunca lo has jugado), *Completado*, *Abandonado* o *Sin completar* (se quedó a medias en una temporada ya cerrada). Se puede filtrar por cualquiera. Solo *Completado* y *Abandonado* los pones tú; el resto es automático, así que un juego pausado vuelve a *En curso* en cuanto juegas una sesión. Un juego pausado muestra cuántos días llevas sin jugarlo, pasar el ratón por cualquier estado lo explica, y el icono **i** junto al filtro **Estado** los resume todos.
 
 Encima de la lista, **¿Qué juego sigo?** propone a qué volver, con listas de juegos **casi terminados**, **olvidados** y **cortos** (el icono **i** de cada lista explica cómo se elige).
 

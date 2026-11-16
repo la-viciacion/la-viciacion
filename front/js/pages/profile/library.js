@@ -19,7 +19,7 @@ import { api, jsonRequest } from '../../lib/api.js';
 import { blockedReason } from '../../lib/completion.js';
 import { formatDate, formatDateTime, formatDuration, formatRelative } from '../../lib/format.js';
 import { html, mount, raw } from '../../lib/html.js';
-import { ALMOST_CAP, ALMOST_SHARE, FORGOTTEN_DAYS, NO_FILTERS, NO_PLATFORM, SHORT_SECONDS, STATES, entryPlatforms, entryState, filterEntries, nextUp, unratedGames } from '../../lib/library-filter.js';
+import { ALMOST_CAP, ALMOST_SHARE, FORGOTTEN_DAYS, NO_FILTERS, NO_PLATFORM, SHORT_SECONDS, STATES, STATE_HELP, daysSincePlayed, entryPlatforms, entryState, filterEntries, nextUp, unratedGames } from '../../lib/library-filter.js';
 import { gameHref } from '../../lib/links.js';
 import { inputValue, paidText, parseEuros } from '../../lib/money.js';
 import { platformName } from '../../lib/platforms.js';
@@ -43,22 +43,28 @@ const thumb = (g) => (g.image_url
   : html`<div class="pf-thumb pf-thumb-placeholder" aria-hidden="true">🎮</div>`);
 
 function status(g) {
-  switch (entryState(g)) {
+  const state = entryState(g);
+  const help = STATE_HELP[state];
+  switch (state) {
     case 'completed':
-      return html`<span class="pf-tag done">Completado${g.completed_date ? ` el ${formatDate(g.completed_date)}` : ''}</span>`;
+      return html`<span class="pf-tag done" title="${help}">Completado${g.completed_date ? ` el ${formatDate(g.completed_date)}` : ''}</span>`;
     case 'abandoned':
-      return html`<span class="pf-tag abandoned">Abandonado</span>`;
+      return html`<span class="pf-tag abandoned" title="${help}">Abandonado</span>`;
     // an unfinished game of a closed season is no longer "in progress"
     case 'unfinished':
-      return html`<span class="pf-tag muted">Sin completar</span>`;
+      return html`<span class="pf-tag muted" title="${help}">Sin completar</span>`;
     case 'paused':
-      return html`<span class="pf-tag muted">Pausado</span>`;
+      return html`<span class="pf-tag muted" title="${help}">Pausado · ${daysSincePlayed(g)} días sin jugar</span>`;
     case 'backlog':
-      return html`<span class="pf-tag muted">Pendiente</span>`;
+      return html`<span class="pf-tag muted" title="${help}">Pendiente</span>`;
     default:
-      return html`<span class="pf-tag">En curso</span>`;
+      return html`<span class="pf-tag" title="${help}">En curso</span>`;
   }
 }
+
+// The six states in one place: the only spot where the player sees together which ones they set and which follow from
+// the sessions.
+const statesLegend = () => html`<div class="pf-info-head pf-info-title"><span class="pf-sub">Estados</span>${infoTip(html`${STATES.map(([key, label]) => html`<p><strong>${label}:</strong> ${STATE_HELP[key]}</p>`)}`, 'Qué significa cada estado')}</div>`;
 
 function scoreForm(g) {
   return html`
@@ -252,7 +258,7 @@ export function createLibrary(el, options) {
     mount(el.querySelector('.pf-lib-bar'), html`
       <input class="adm-input" type="search" data-filter="q" value="${filters.q}" placeholder="Buscar juego" aria-label="Buscar juego" />
       ${select('season', 'Temporada', years.map((y) => [y, y]), filters.season)}
-      ${select('state', 'Estado', STATES, filters.state)}
+      ${select('state', 'Estado', STATES, filters.state)}${statesLegend()}
       ${select('rated', 'Nota', [['yes', 'Puntuados'], ['no', 'Sin puntuar']], filters.rated)}
       ${select('platform', 'Plataforma', [...platforms], filters.platform)}
       ${pending ? html`<button class="pf-btn primary pf-rate-random" type="button" data-action="random-rate">${iconStar()}<span>Puntuar al azar (${pending})</span></button>` : ''}`);

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { STATES, entryPlatforms, entryState, filterEntries, nextUp, openGames, shuffle, unratedGames } from '../js/lib/library-filter.js';
+import { STATES, STATE_HELP, daysSincePlayed, entryPlatforms, entryState, filterEntries, nextUp, openGames, shuffle, unratedGames } from '../js/lib/library-filter.js';
 
 const e = (over) => ({ id: 1, game_id: 'a', game_name: 'Celeste', season: 2026, platform_id: 1, score: null, completed: false, abandoned: false, complete_blocked: null, played_time: 60, ...over });
 
@@ -85,6 +85,13 @@ test('the filter by state knows the new ones', () => {
   assert.deepEqual(STATES.map(([value]) => value), ['playing', 'paused', 'backlog', 'completed', 'abandoned', 'unfinished']);
   const ids = (state) => filterEntries(list, { state }).map((g) => g.id);
   assert.deepEqual([ids('playing'), ids('paused'), ids('backlog')], [[1], [2], [3]]);
+});
+
+test('every state has an explanation, the paused one says how long and the days since playing are counted', () => {
+  assert.deepEqual(Object.keys(STATE_HELP).sort(), STATES.map(([value]) => value).sort());
+  assert.match(STATE_HELP.paused, /30 días/);
+  assert.equal(daysSincePlayed(e({ last_played: daysAgo(45) }), NOW), 45);
+  assert.equal(daysSincePlayed(e({ last_played: null }), NOW), null);
 });
 
 test('open games are one per game, with the time of its runs not completed and only if the running season is pending', () => {

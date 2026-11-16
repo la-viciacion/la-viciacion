@@ -30,6 +30,22 @@ export const STATES = [
   ['unfinished', 'Sin completar'],
 ];
 
+/** What each state means, for the tooltip of a row's tag and the legend next to the filter. Only completing and
+ * abandoning are done by hand; the rest follows from the sessions. */
+export const STATE_HELP = {
+  playing: `Lo has jugado en los últimos ${PAUSED_DAYS} días. Es automático.`,
+  paused: `Lo has jugado alguna vez, pero llevas más de ${PAUSED_DAYS} días sin una sesión. Es automático: en cuanto juegues otra vez vuelve a En curso.`,
+  backlog: 'Lo tienes en la biblioteca pero nunca lo has jugado. Es automático: pasa a En curso con tu primera sesión.',
+  completed: 'Lo has marcado como completado.',
+  abandoned: 'Lo has abandonado a mano. Puedes retomarlo, y si vuelves a jugarlo se retoma solo.',
+  unfinished: 'Se quedó a medias en una temporada ya cerrada. Es automático: ya no se puede completar.',
+};
+
+/** Whole days since the last session of an entry (null when it has none). */
+export function daysSincePlayed(entry, now = new Date()) {
+  return entry.last_played ? Math.floor((now - new Date(entry.last_played)) / DAY) : null;
+}
+
 const OPEN = ['playing', 'paused', 'backlog'];
 
 /** The games of the library that are still to be played, one item per game: { game_id, game_name, image_url, avg_time,
