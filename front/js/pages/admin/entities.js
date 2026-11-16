@@ -3,7 +3,8 @@
 //
 // Entity: { label, nav? (shorter name for its tab), description? (line under the title), endpoint, search?, filters?, columns, fields, createFields?,
 //           createLabel?, creates? (several ways to create: [{ label, choose?, fields | async () => fields, body }]; with more than one, a single createLabel button opens a form that chooses the type by `choose`), name(row), actions?, toolbarActions?, canDelete, deleteLabel?, deleteNote?,
-//           selects?, orders?, defaultSort?, readOnly? (no edit button) }
+//           selects?, orders?, defaultSort?, readOnly? (no edit button),
+//           bulk? ({ noun, nouns }: rows can be ticked and edited together, see bulk.js; the API takes PATCH <endpoint> with the ids) }
 //         or a custom page: { label, custom (module in this folder exporting render(panel, { entity, admin })) }
 // Column: { label, render(row) -> html``, filter?(row) -> filters to apply on click, sort? (API sort key) }
 // Select: { key, label, options: [[value, label], ...] | () => [...] }   sent to the API as ?key=value
@@ -259,6 +260,7 @@ export const ENTITIES = {
       { key: 'notes', label: 'Notas', type: 'text' },
     ],
     createLabel: 'Nueva sesión',
+    bulk: { noun: 'sesión', nouns: 'sesiones' },
     name: (r) => `${r.game || r.game_id} · ${formatTimestamp(r.start_time)}`,
     actions: [
       { label: 'Cerrar ahora', show: (r) => r.is_active, run: (r, admin) => closeTimerNow(r, admin) },
