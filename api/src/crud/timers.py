@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from ..crud import scores as scores_crud
 from ..crud import users as users_crud
+from ..crud import wishlist
 from ..database.models import Game, GameTimer, PlatformTag, User, UserGame
 from ..database.schemas import (
     GameTimerCreate,
@@ -85,6 +86,9 @@ def create_timer(db: Session, timer: GameTimerCreate) -> tuple[GameTimer, bool]:
         db.rollback()
         raise Refused(409, "Ya tienes un timer de ese juego que empieza a esa hora")
     db.refresh(db_timer)
+    # a wished game that is already out is done once it is played; one in early access stays (the launch notice needs it)
+    wishlist.drop_played(db, datetime.date.today(), timer.user_id, timer.game_id)
+    db.commit()
 
     # One UserGame per (game, platform, season): the same game on another
     # platform, or in a later year, is a new entry.
@@ -391,6 +395,7 @@ def create_manual_session(db: Session, current_user: User, user_id: int, body: M
     db.add(timer)
     # the library entry of that game/platform/season, without announcing "new game"
     users_crud.ensure_library_entry(db, user_id, body.game_id, platform, body.start_time)
+    wishlist.drop_played(db, datetime.date.today(), user_id, body.game_id)
     _commit_session(db)
     db.refresh(timer)
     logger.info(

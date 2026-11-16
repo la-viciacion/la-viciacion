@@ -381,6 +381,17 @@ class WishlistReleaseNoticeTests(MessagingTestCase):
         self.assertIn("1 users told", self.check())
         self.assertEqual(self.sent, [(111, self.ana, True, True)])
 
+    def test_the_daily_check_drops_the_wish_of_a_played_game_launched_before_today_but_not_today(self):
+        self.game("early", "Early", release_date=self.today - datetime.timedelta(days=1), rawg_id=2)
+        with database.SessionLocal() as db:
+            db.add(models.UserWishlist(user_id=self.ana, game_id="early"))
+            db.commit()
+        for game in ("early", "hades"):
+            self.session(self.ana, game, datetime.datetime.now() - datetime.timedelta(hours=5), 30)
+        self.assertIn("1 played wishes dropped", self.check())
+        with database.SessionLocal() as db:
+            self.assertEqual({g for (g,) in db.query(models.UserWishlist.game_id).filter_by(user_id=self.ana)}, {"hades"})
+
     def test_only_the_channels_the_user_left_on_are_used(self):
         self.api("PATCH", "/users/ana/settings", as_user="ana", json={"wishlist_release_push": False})
         self.check()

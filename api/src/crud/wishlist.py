@@ -1,10 +1,12 @@
 """The wishlist: the games a player wants to play, among them the ones that are not released yet.
 
 Only the wish is stored (`users_wishlist`). Whether a game is upcoming, whether it is in the player's library and
-who else wants it are derived when asked. A wish stays until the player removes it, played or not (an early access,
-say). Only active players count (never the emergency account)."""
+who else wants it are derived when asked. A wish stays until the player removes it, or until they have played the game
+once it is out (`drop_played`); a game still before its official launch is kept, played or not (an early access, say), so
+the release-day notices still find it. Only active players count (never the emergency account)."""
 import datetime
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..database import models
@@ -30,6 +32,36 @@ def add(db: Session, user_id: int, game_id: str) -> None:
 def remove(db: Session, user_id: int, game_id: str) -> None:
     """Drop the wish (nothing happens if there is none). Not committed."""
     db.query(models.UserWishlist).filter_by(user_id=user_id, game_id=game_id).delete()
+
+
+def drop_played(
+    db: Session, today: datetime.date, user_id: int | None = None, game_id: str | None = None, *, launched_before_today: bool = False
+) -> int:
+    """Drop the wishes of games the player has played (any session, even a running timer) whose official launch has been
+    reached: the wish is done. A game not launched yet, or without a date, stays: it may be an early access, and the
+    wish is what makes the group hear about the launch. Limit it to one player and/or game, or sweep everything.
+    `launched_before_today` leaves the games that launch today for tomorrow (the daily sweep: the notices of the launch
+    day, which go by the wishes, are sent first). Returns how many were dropped. Not committed."""
+    db.flush()  # a session the caller just added counts
+    played = (
+        select(models.GameTimer.id)
+        .where(models.GameTimer.user_id == models.UserWishlist.user_id, models.GameTimer.game_id == models.UserWishlist.game_id)
+        .exists()
+    )
+    reached = models.Game.release_date < today if launched_before_today else models.Game.release_date <= today
+    query = (
+        db.query(models.UserWishlist.id)
+        .join(models.Game, models.UserWishlist.game_id == models.Game.id)
+        .filter(reached, played)
+    )
+    if user_id is not None:
+        query = query.filter(models.UserWishlist.user_id == user_id)
+    if game_id is not None:
+        query = query.filter(models.UserWishlist.game_id == game_id)
+    ids = [wish_id for (wish_id,) in query]
+    if ids:
+        db.query(models.UserWishlist).filter(models.UserWishlist.id.in_(ids)).delete(synchronize_session=False)
+    return len(ids)
 
 
 def in_library(db: Session, user_id: int, game_id: str) -> bool:

@@ -25,6 +25,71 @@ class UpcomingTests(unittest.TestCase):
         self.assertIsNone(wishlist.days_until(None, TODAY))
 
 
+class DropPlayedTests(unittest.TestCase):
+    """A wish goes once the game has launched and the player has played it; before the launch it stays (early access)."""
+
+    def setUp(self):
+        self.db = make_session()
+        self.db.add_all([
+            models.User(id=1, username="ana", name="Ana", is_active=1),
+            models.User(id=2, username="bea", name="Bea", is_active=1),
+            models.Game(id="out", name="Out", release_date=D(2020, 1, 1)),
+            models.Game(id="today", name="Today", release_date=TODAY),
+            models.Game(id="soon", name="Soon", release_date=D(2026, 12, 1)),
+            models.Game(id="tba", name="Tba", release_date=None),
+        ])
+        self.db.commit()
+
+    def wish(self, user_id, game_id, played=True):
+        self.db.add(models.UserWishlist(user_id=user_id, game_id=game_id))
+        if played:
+            when = datetime.datetime(2026, 10, 1, 20)
+            self.db.add(models.GameTimer(user_id=user_id, game_id=game_id, start_time=when, end_time=when, is_active=False))
+        self.db.commit()
+
+    def wished(self, user_id=1):
+        return wishlist.wished_ids(self.db, user_id)
+
+    def test_a_launched_game_the_player_played_is_dropped_and_an_unlaunched_one_stays(self):
+        for game in ("out", "today", "soon", "tba"):
+            self.wish(1, game)
+        self.assertEqual(wishlist.drop_played(self.db, TODAY), 2)
+        self.assertEqual(self.wished(), {"soon", "tba"})
+
+    def test_a_launched_game_not_played_stays_even_if_it_is_in_the_library(self):
+        self.wish(1, "out", played=False)
+        self.db.add(models.UserGame(user_id=1, game_id="out", started_date=TODAY, platform=None))
+        self.db.commit()
+        self.assertEqual(wishlist.drop_played(self.db, TODAY), 0)
+        self.assertEqual(self.wished(), {"out"})
+
+    def test_a_running_timer_counts_as_played(self):
+        self.db.add(models.UserWishlist(user_id=1, game_id="out"))
+        self.db.add(models.GameTimer(user_id=1, game_id="out", start_time=datetime.datetime(2026, 10, 4, 9), is_active=True))
+        self.db.commit()
+        self.assertEqual(wishlist.drop_played(self.db, TODAY), 1)
+
+    def test_only_the_player_who_played_loses_the_wish(self):
+        self.wish(1, "out")
+        self.wish(2, "out", played=False)
+        wishlist.drop_played(self.db, TODAY)
+        self.assertEqual((self.wished(1), self.wished(2)), (set(), {"out"}))
+
+    def test_it_can_be_limited_to_one_player_and_game(self):
+        self.wish(1, "out")
+        self.wish(1, "today")
+        self.wish(2, "out")
+        self.assertEqual(wishlist.drop_played(self.db, TODAY, 1, "out"), 1)
+        self.assertEqual((self.wished(1), self.wished(2)), ({"today"}, {"out"}))
+
+    def test_the_daily_sweep_leaves_what_launches_today_for_tomorrow(self):
+        self.wish(1, "out")
+        self.wish(1, "today")
+        self.assertEqual(wishlist.drop_played(self.db, TODAY, launched_before_today=True), 1)
+        self.assertEqual(self.wished(), {"today"})
+        self.assertEqual(wishlist.drop_played(self.db, TODAY + datetime.timedelta(days=1), launched_before_today=True), 1)
+
+
 class WishlistQueryTests(unittest.TestCase):
     def setUp(self):
         self.db = make_session()
