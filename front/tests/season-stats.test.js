@@ -38,6 +38,11 @@ test('the Total adds every season together: season 0, everybody who took part, a
   assert.equal(rankingsOf(TOTAL).length, 8);
 });
 
+test('the rankings that count days explain what a day is, and no other one does', () => {
+  assert.deepEqual(RANKINGS.filter((r) => r.info).map((r) => r.id), ['days', 'best-streak', 'current-streak']);
+  assert.match(by('days').info, /10 minutos/);
+});
+
 test('each ranking writes its value the way the bot does', () => {
   assert.equal(by('hours').text({ played_time: 5400 }), '1 h 30 min');
   assert.equal(by('days').text({ played_days: 1 }), '1 día');
@@ -56,9 +61,28 @@ test('the longest bar is full and the others go in proportion', () => {
   assert.deepEqual(barWidths([], by('days')), []);
 });
 
-test('players with the same value share the place', () => {
-  const rows = [{ played_days: 5 }, { played_days: 3 }, { played_days: 3 }, { played_days: 1 }];
-  assert.deepEqual(positions(rows, by('days')), [1, 2, 2, 4]);
+test('nobody shares a place', () => {
+  assert.deepEqual(positions([{}, {}, {}, {}]), [1, 2, 3, 4]);
+});
+
+test('a tie is broken by the other rankings, in order, and what is still tied goes alphabetically', () => {
+  const answer = [
+    { type: 'user_days', data: [{ user_id: 1, name: 'Zoe', played_days: 5 }, { user_id: 2, name: 'Ana', played_days: 5 }, { user_id: 3, name: 'Bea', played_days: 5 }, { user_id: 4, name: 'Dan', played_days: 5 }, { user_id: 5, name: 'Eva', played_days: 9 }] },
+    { type: 'user_hours', data: [{ user_id: 1, played_time: 7200 }, { user_id: 2, played_time: 3600 }, { user_id: 3, played_time: 3600 }, { user_id: 4, played_time: 3600 }, { user_id: 5, played_time: 0 }] },
+    { type: 'user_played_games', data: [{ user_id: 2, played_games: 1 }, { user_id: 3, played_games: 4 }, { user_id: 4, played_games: 4 }] },
+  ];
+  // Eva has more days; then the hours (Zoe); then the games (Bea and Dan over Ana); Bea and Dan are alike in everything: alphabetical
+  assert.deepEqual(rowsOf(answer, by('days')).map((r) => r.name), ['Eva', 'Zoe', 'Bea', 'Dan', 'Ana']);
+});
+
+test('the games with the same time: the one played later first, and alphabetically if even that is the same', () => {
+  const answer = [{ type: 'games_most_played', data: [
+    { game_id: 'b', name: 'Zelda', played_time: 5, last_played: '2026-03-01T10:00:00' },
+    { game_id: 'a', name: 'Alan Wake', played_time: 5, last_played: '2026-02-01T10:00:00' },
+    { game_id: 'c', name: 'Braid', played_time: 5, last_played: '2026-02-01T10:00:00' },
+    { game_id: 'd', name: 'Celeste', played_time: 9, last_played: '2025-01-01T10:00:00' },
+  ] }];
+  assert.deepEqual(rowsOf(answer, by('most-played')).map((r) => r.name), ['Celeste', 'Zelda', 'Alan Wake', 'Braid']);
 });
 
 test('the podium puts the second at the left of the first, and has fewer steps with fewer rows', () => {

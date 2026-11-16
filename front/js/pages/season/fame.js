@@ -4,7 +4,9 @@
 // dominates a season shows without reading names.
 import { html } from '../../lib/html.js';
 import { CATEGORIES, grandChampions, playerHues, seasonsWithChampions, titleRanking } from '../../lib/hall-of-fame.js';
+import { DAY_RULE } from '../../lib/day-rule.js';
 import { playerAvatar } from '../../ui/avatar.js';
+import { infoTip } from '../../ui/info-tip.js';
 
 const hueClass = (hues, id) => `hf-h${hues.get(id) ?? 0}`;
 
@@ -46,5 +48,7 @@ export function fameView(answer) {
   const history = seasonsWithChampions(answer);
   if (!history.length) return html`<div class="pf-empty">Todavía no ha terminado ninguna temporada con datos.</div>`;
   const hues = playerHues(answer);
-  return html`${lead(answer, hues)}<ol class="hf-timeline">${history.map((entry) => step(entry, hues))}</ol>`;
+  return html`${lead(answer, hues)}
+    <div class="pf-info-head pf-info-title pf-sub">Días jugados y mejor racha${infoTip(DAY_RULE, 'Más información: días jugados y mejor racha')}</div>
+    <ol class="hf-timeline">${history.map((entry) => step(entry, hues))}</ol>`;
 }

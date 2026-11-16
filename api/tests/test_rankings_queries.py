@@ -155,6 +155,15 @@ class RankingsOfAnotherSeasonTests(unittest.TestCase):
         self.assertEqual([(r["user_id"], r["completed_games"]) for r in self.ask("user_completed_games", 0)], [(1, 1), (2, 1)])
         self.assertEqual([g["game_id"] for g in self.ask("games_most_played", 0)], ["g1", "g2"])
 
+    def test_games_with_the_same_time_go_by_the_latest_session_first(self):
+        self.db.add(models.Game(id="g3", name="Zork"))
+        later = datetime.datetime(YEAR, 6, 1, 10)  # one hour, like Quake (January): played later, so it goes first
+        self.db.add(models.GameTimer(user_id=2, game_id="g3", start_time=later, end_time=later + datetime.timedelta(hours=1), duration_seconds=3600, is_active=False))
+        self.db.commit()
+        rows = self.ask("games_most_played")
+        self.assertEqual([g["game_id"] for g in rows], ["g3", "g2"])  # alphabetically Quake would lead: only the date puts Zork first
+        self.assertEqual(rows[0]["last_played"], later)
+
     def test_a_season_before_2000_is_refused_but_zero_is_not(self):
         with self.assertRaises(HTTPException) as refused:
             statistics.get_ranking_statistics(ranking="user_hours", only_active=True, season=5, db=self.db)

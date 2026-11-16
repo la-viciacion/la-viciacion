@@ -9,6 +9,7 @@ import { FAME } from '../../lib/hall-of-fame.js';
 import { barWidths, isFameHash, participantsOf, podiumOrder, positions, rankingsOf, rankingsPath, ringPercent, rowsOf, seasonFromHash, TOTAL } from '../../lib/season-stats.js';
 import { available, current } from '../../lib/seasons.js';
 import { hydratePhotos, playerAvatar } from '../../ui/avatar.js';
+import { infoTip } from '../../ui/info-tip.js';
 import { fameView } from './fame.js';
 
 export const active = null; // it belongs to no item of the top bar
@@ -101,7 +102,9 @@ const card = (ranking, answer, players) => {
   const rows = rowsOf(answer, ranking, players).slice(0, SHOWN);
   return html`
     <section class="pf-card ss-card ss-${ranking.view}-card" id="ss-${ranking.id}" aria-label="${ranking.title}">
-      <h2 class="ss-title">${ranking.title}</h2>
+      ${ranking.info
+        ? html`<div class="pf-info-head pf-info-title"><h2 class="ss-title">${ranking.title}</h2>${infoTip(ranking.info, `Más información: ${ranking.title}`)}</div>`
+        : html`<h2 class="ss-title">${ranking.title}</h2>`}
       ${rows.length
         ? VIEWS[ranking.view](ranking, rows, barWidths(rows, ranking), positions(rows, ranking))
         : html`<div class="pf-empty">Todavía no hay datos.</div>`}
