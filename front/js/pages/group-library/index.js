@@ -67,8 +67,13 @@ const sectionsOf = (d) => [
   ['platforms', 'Por plataforma', d.platforms.length],
 ];
 
-/** When a wished game comes out: the date, "sin fecha" for an announced one without it or that it is already out. */
-const releaseLine = (g) => (g.upcoming ? (g.release_date ? `sale el ${formatDate(g.release_date)}` : 'sin fecha de salida') : 'ya ha salido');
+/** When a wished game comes out: the date, "sin fecha" for an announced one without it (or its early access day, if it is in
+ * it) or that it is already out. */
+const releaseLine = (g) => {
+  if (!g.upcoming) return 'ya ha salido';
+  if (g.release_date) return `sale el ${formatDate(g.release_date)}`;
+  return g.early_access_since ? `en early access desde ${formatDate(g.early_access_since)}` : 'sin fecha de salida';
+};
 
 const more = (total, shown) => (total > shown ? html`<div class="pf-sub">y ${total - shown} más</div>` : '');
 
