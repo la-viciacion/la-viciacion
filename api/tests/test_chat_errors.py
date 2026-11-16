@@ -12,7 +12,7 @@ from src.chat import limits as chat_limits
 from src.clients import failure
 from src.clients.ai_error import AIError, ProviderError
 from src.routers import chat as chat_router
-from src.utils import ai_source, messages, settings
+from src.utils import ai_fallback, ai_source, messages, settings
 
 
 def http(status, category=None, body=None):
@@ -85,25 +85,25 @@ class AnswersTests(unittest.TestCase):
             (failure.TIMEOUT, 504, messages.CHAT_TIMEOUT),
             (failure.OVERLOADED, 502, messages.CHAT_OVERLOADED),
             (failure.SERVER, 502, messages.CHAT_SERVER),
-            (failure.DENIED, 502, messages.CHAT_DENIED),
+            (failure.DENIED, 502, messages.CHAT_DENIED + messages.OWN_KEY_WAY_OUT),  # a refused key of the group: the player may use their own
         ):
-            with self.assertLogs(chat_router.logger):
+            with self.assertLogs(ai_fallback.logger):
                 refused = self.ask(ProviderError("chat: x", kind))
             self.assertEqual((refused.status_code, refused.detail), (status, message), kind)
 
     def test_a_failure_with_nothing_to_tell_gets_the_general_answer(self):
-        with self.assertLogs(chat_router.logger):
+        with self.assertLogs(ai_fallback.logger):
             refused = self.ask(AIError("chat: boom"))
         self.assertEqual((refused.status_code, refused.detail), (502, messages.CHAT_FAILED))
 
     def test_never_a_503_for_the_provider_because_the_front_reads_it_as_the_chat_being_switched_off(self):
         for kind in (failure.TIMEOUT, failure.OVERLOADED, failure.SERVER, failure.DENIED):
-            with self.assertLogs(chat_router.logger):
+            with self.assertLogs(ai_fallback.logger):
                 self.assertNotEqual(self.ask(ProviderError("chat: x", kind)).status_code, 503)
 
     def test_a_slow_or_overloaded_provider_is_a_warning_and_the_rest_an_error(self):
         for kind, level in ((failure.TIMEOUT, "WARNING"), (failure.OVERLOADED, "WARNING"), (failure.SERVER, "ERROR"), (failure.DENIED, "ERROR")):
-            with self.assertLogs(chat_router.logger, "WARNING") as logged:
+            with self.assertLogs(ai_fallback.logger, "WARNING") as logged:
                 self.ask(ProviderError("chat: x", kind))
             self.assertEqual(logged.records[0].levelname, level, kind)
 

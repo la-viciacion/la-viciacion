@@ -7,15 +7,10 @@ from sqlalchemy.orm import Session
 from .. import auth
 from ..auth import get_db
 from ..chat import agent, limits
-from ..clients import failure as provider_failure
-from ..clients.ai_error import AIError, ProviderError, QuotaError, wait_text
+from ..clients.ai_error import wait_text
 from ..database import models
-from ..utils import ai_ledger, ai_source, in_flight, messages, user_settings
-from ..utils.logger import LogManager
+from ..utils import ai_fallback, ai_ledger, ai_source, in_flight, messages, user_settings
 from ..utils.rate_limit import Refused
-
-log_manager = LogManager()
-logger = log_manager.get_logger()
 
 router = APIRouter(
     prefix="/chat",
@@ -24,24 +19,6 @@ router = APIRouter(
     dependencies=[Depends(auth.get_current_active_user)],
 )
 
-def own_key_detail(source, error) -> str | None:
-    """What a player is told when their OWN key is what failed, so they do not take it for the group's trouble."""
-    if source is None or not source.own:
-        return None
-    if isinstance(error, QuotaError):
-        retry = error.quota.retry_after
-        return messages.USER_KEY_QUOTA.format(when=f" (reintenta en {wait_text(retry)})" if retry else "")
-    if getattr(error, "kind", None) == provider_failure.DENIED:
-        return messages.USER_KEY_DENIED
-    return None
-
-
-PROVIDER_MESSAGES = {
-    provider_failure.TIMEOUT: messages.CHAT_TIMEOUT,
-    provider_failure.OVERLOADED: messages.CHAT_OVERLOADED,
-    provider_failure.SERVER: messages.CHAT_SERVER,
-    provider_failure.DENIED: messages.CHAT_DENIED,
-}
 WHEN = {60: "el último minuto", 3600: "la última hora", 86400: "las últimas 24 horas"}
 
 
@@ -95,7 +72,7 @@ def ask(
     decision = ai_source.decide(db, current_user.id, "chat", dek)
     if decision.blocked and decision.source is None:  # with the player's own as the source it only says why the group's was not used
         ai_ledger.record_blocked(db, user_id=current_user.id, feature="chat", question=body.message, turns=len(body.history))
-        raise HTTPException(status_code=429, detail=ai_source.blocked_message(decision.blocked, "chat"))
+        raise HTTPException(status_code=429, detail=ai_source.blocked_message(decision.blocked, "chat", decision.locked))
     source = decision.source
     if source is None and decision.locked:  # they have keys, this session cannot open them: the front asks for the password
         raise HTTPException(status_code=423, detail=messages.USER_AI_LOCKED)
@@ -109,23 +86,12 @@ def ask(
                 question=body.message, turns=len(body.history),
             )
             raise refusal(refused)
+        history = [(t.role, t.content) for t in body.history]
         try:
-            answer = agent.ask(db, current_user, body.message.strip(), [(t.role, t.content) for t in body.history], source=source)
-        except QuotaError as e:
-            # already written to the audit log by the agent; not an error of ours, so not one in Sentry either
-            retry = e.quota.retry_after
-            raise HTTPException(
-                status_code=429,
-                detail=own_key_detail(source, e) or messages.CHAT_QUOTA.format(when=f" (reintenta en {wait_text(retry)})" if retry else ""),
-                headers={"Retry-After": str(retry)} if retry else None,
+            # the group's key first and, if the provider says it cannot pay, the player's own ones (utils/ai_fallback.py)
+            answer = ai_fallback.run(
+                decision.sources, lambda chosen: agent.ask(db, current_user, body.message.strip(), history, source=chosen), "chat"
             )
-        except ProviderError as e:
-            # a provider that is slow or overloaded is not a bug of ours: a warning, not an event in Sentry. The status is 504 for a
-            # timeout and 502 for the rest, never 503: the front reads that as "the admin switched the chat off"
-            transient = e.kind in (provider_failure.TIMEOUT, provider_failure.OVERLOADED) or (source.own and e.kind == provider_failure.DENIED)
-            (logger.warning if transient else logger.error)("Chat failed: " + str(e), exc_info=not transient)
-            raise HTTPException(status_code=504 if e.kind == provider_failure.TIMEOUT else 502, detail=own_key_detail(source, e) or PROVIDER_MESSAGES[e.kind])
-        except AIError as e:
-            logger.error("Chat failed: " + str(e), exc_info=True)
-            raise HTTPException(status_code=502, detail=messages.CHAT_FAILED)
+        except ai_fallback.Failed as failed:
+            raise ai_fallback.explain(failed.attempts, lambda: ai_source.way_out("chat", decision.fallback_locked))
         return ChatResponse(answer=answer.text, in_scope=answer.in_scope)

@@ -183,7 +183,7 @@ class AnswersTests(unittest.TestCase):
             with self.assertRaises(HTTPException) as caught:
                 chat_router.ask(chat_router.ChatRequest(message="hola"), current_user=user, db=mock.Mock())
         self.assertEqual(caught.exception.status_code, 429)
-        self.assertEqual(caught.exception.detail, messages.CHAT_QUOTA.format(when=" (reintenta en 2 min)"))
+        self.assertEqual(caught.exception.detail, messages.CHAT_QUOTA.format(when=" (reintenta en 2 min)") + messages.OWN_KEY_WAY_OUT)  # a player may go on with their own key
         self.assertEqual(caught.exception.headers, {"Retry-After": "90"})
 
     def test_without_a_known_wait_the_message_has_none(self):
@@ -194,7 +194,7 @@ class AnswersTests(unittest.TestCase):
                 mock.patch.object(settings, "get", return_value=0):
             with self.assertRaises(HTTPException) as caught:
                 chat_router.ask(chat_router.ChatRequest(message="hola"), current_user=types.SimpleNamespace(id=8), db=mock.Mock())
-        self.assertEqual(caught.exception.detail, messages.CHAT_QUOTA.format(when=""))
+        self.assertEqual(caught.exception.detail, messages.CHAT_QUOTA.format(when=""))  # a quota that does not say it lasts is a wait, not a reason to bill the player
         self.assertIsNone(caught.exception.headers)
 
     def test_the_test_buttons_say_which_quota_ran_out(self):

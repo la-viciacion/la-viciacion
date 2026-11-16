@@ -19,9 +19,8 @@ from src.clients import failure
 from src.clients.ai_error import AIError, ProviderError, Quota, QuotaError
 from src.database import models
 from src.guide import limits as guide_limits
-from src.routers import chat as chat_router
 from src.routers import user_ai as route
-from src.utils import ai_models, ai_source, ai_vault, messages, settings, user_ai
+from src.utils import ai_fallback, ai_models, ai_source, ai_vault, messages, settings, user_ai
 from tests import ai_env
 from tests.sqlite_db import make_session
 from tests.test_chat import seed
@@ -278,7 +277,7 @@ class WhichKeyTests(unittest.TestCase):
 
     def source(self, use="chat", group="google", **settings_):
         with patched(**ai_env.group(group, "G", "m"), **settings_):
-            return ai_source.own_source(self.db, 1, self.dek, use)
+            return (ai_source.own_sources(self.db, 1, self.dek, use) or [None])[0]
 
     def test_the_preferred_provider_comes_first(self):
         user_ai.set_preferred(self.db, 1, "anthropic")
@@ -303,13 +302,13 @@ class WhichKeyTests(unittest.TestCase):
 
     def test_a_locked_session_has_no_source_at_all(self):
         with patched():
-            self.assertIsNone(ai_source.own_source(self.db, 1, None, "chat"))
+            self.assertEqual(ai_source.own_sources(self.db, 1, None, "chat"), [])
 
     def test_the_first_choice_without_a_feature_is_the_preference_then_the_order(self):
         with patched():
-            self.assertEqual(ai_source.own_source(self.db, 1, self.dek).provider, "openai")
+            self.assertEqual(ai_source.own_sources(self.db, 1, self.dek)[0].provider, "openai")
             user_ai.set_preferred(self.db, 1, "google")
-            self.assertEqual(ai_source.own_source(self.db, 1, self.dek).provider, "google")
+            self.assertEqual(ai_source.own_sources(self.db, 1, self.dek)[0].provider, "google")
 
 
 class LimitsTests(unittest.TestCase):
@@ -369,19 +368,34 @@ class OwnKeyInAQuestionTests(unittest.TestCase):
 
 class OwnKeyMessagesTests(unittest.TestCase):
     own = ai_source.Source("user", "openai", KEY, "gpt-5")
-    group = ai_source.Source("group", "openai", "GROUPKEY", "gpt-5")
 
     def test_a_player_is_told_it_is_their_key_that_has_no_balance_or_was_refused(self):
-        quota = chat_router.own_key_detail(self.own, QuotaError("q", Quota(kind="billing", retry_after=None)))
-        denied = chat_router.own_key_detail(self.own, ProviderError("x", failure.DENIED))
-        self.assertEqual(quota, messages.USER_KEY_QUOTA.format(when=""))
-        self.assertEqual(denied, messages.USER_KEY_DENIED)
-        self.assertIn("tu clave", quota.lower())
+        quota = ai_fallback.own_problem("openai", QuotaError("q", Quota(kind="billing", retry_after=None)))
+        denied = ai_fallback.own_problem("anthropic", ProviderError("x", failure.DENIED))
+        self.assertIn("Tu clave de OpenAI se ha quedado sin saldo", quota)
+        self.assertIn("platform.openai.com", quota)
+        self.assertIn("Tu clave de Anthropic no es aceptada por Anthropic", denied)
+        self.assertNotIn("OpenAI", denied)
 
-    def test_the_groups_key_and_other_failures_keep_their_usual_answers(self):
-        self.assertIsNone(chat_router.own_key_detail(self.group, ProviderError("x", failure.DENIED)))
-        self.assertIsNone(chat_router.own_key_detail(self.own, ProviderError("x", failure.TIMEOUT)))
-        self.assertIsNone(chat_router.own_key_detail(None, AIError("x")))
+
+class ProviderErrorRouteTests(unittest.TestCase):
+    """What the test and save buttons of a key say when the provider fails: about THEIR key, with its provider."""
+
+    def test_each_failure_is_told_about_the_key_with_its_provider(self):
+        quota = route._provider_error(QuotaError("q", Quota(kind="billing")), "anthropic")
+        self.assertEqual(quota.status_code, 429)
+        self.assertIn("Tu clave de Anthropic se ha quedado sin saldo", quota.detail)
+        denied = route._provider_error(ProviderError("x", failure.DENIED), "google")
+        self.assertEqual(denied.status_code, 400)
+        self.assertIn("Google no acepta esa clave", denied.detail)
+        for kind, status in ((failure.TIMEOUT, 504), (failure.OVERLOADED, 502), (failure.SERVER, 502)):
+            out = route._provider_error(ProviderError("x", kind), "openrouter")
+            self.assertEqual(out.status_code, status)
+            self.assertTrue(out.detail.startswith("Tu clave de OpenRouter"), out.detail)
+        with self.assertLogs(route.logger):
+            plain = route._provider_error(AIError("x"), "openai")
+        self.assertEqual(plain.status_code, 502)
+        self.assertTrue(plain.detail.startswith("Tu clave de OpenAI"))
 
 
 class ModelsTests(unittest.TestCase):

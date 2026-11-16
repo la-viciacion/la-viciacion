@@ -18,10 +18,9 @@ from ..clients import model_list
 from ..clients.ai_error import AIError, ProviderError, QuotaError
 from ..database import models
 from ..guide import agent as guide_agent
-from ..utils import ai_budget, ai_ledger, ai_models, ai_source, ai_spend, ai_wallet, audit, messages, settings, user_ai
+from ..utils import ai_budget, ai_fallback, ai_ledger, ai_models, ai_source, ai_spend, ai_wallet, audit, messages, settings, user_ai
 from ..utils.logger import LogManager
 from ..utils.rate_limit import AttemptLimiter, Scope, UsageLimiter
-from .chat import PROVIDER_MESSAGES
 
 logger = LogManager().get_logger()
 
@@ -34,7 +33,7 @@ router = APIRouter(
 
 PROVIDER = "^(" + "|".join(settings.AI_PROVIDERS) + ")$"
 ProviderName = Annotated[str, Path(pattern=PROVIDER)]
-PROVIDER_NAMES = {"openai": "OpenAI", "google": "Google", "anthropic": "Anthropic", "openrouter": "OpenRouter"}
+PROVIDER_NAMES = ai_fallback.NAMES
 WHERE_TO_MAKE_IT = {
     "openai": "platform.openai.com → API keys", "google": "aistudio.google.com → API keys",
     "anthropic": "platform.claude.com → API keys", "openrouter": "openrouter.ai/settings/keys",
@@ -94,15 +93,13 @@ def _limited(user: models.User, listing: bool = False) -> None:
 
 def _provider_error(e: AIError, provider: str) -> HTTPException:
     """What an error from a provider says to the player about THEIR key (never the key itself)."""
-    if isinstance(e, QuotaError):
-        return HTTPException(status_code=429, detail=messages.USER_KEY_QUOTA.format(when=""))
     kind = getattr(e, "kind", None)
     if kind == provider_failure.DENIED:
         return HTTPException(status_code=400, detail=messages.USER_AI_KEY_REJECTED.format(provider=PROVIDER_NAMES[provider], where=WHERE_TO_MAKE_IT[provider]))
-    if isinstance(e, ProviderError):
-        return HTTPException(status_code=504 if kind == provider_failure.TIMEOUT else 502, detail=PROVIDER_MESSAGES[kind])
+    if isinstance(e, (QuotaError, ProviderError)):
+        return HTTPException(status_code=429 if isinstance(e, QuotaError) else 504 if kind == provider_failure.TIMEOUT else 502, detail=ai_fallback.own_problem(provider, e))
     logger.warning(f"A player's {provider} key could not be checked: {type(e).__name__}")
-    return HTTPException(status_code=502, detail=messages.CHAT_FAILED)
+    return HTTPException(status_code=502, detail=ai_fallback.own_problem(provider, e))
 
 
 def _state(db: Session, user: models.User, dek: bytes | None) -> dict:
