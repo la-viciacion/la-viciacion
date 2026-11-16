@@ -504,7 +504,10 @@ async def check_wishlist(db: Session, today: datetime.date) -> str:
             user.telegram_id, wishlist_release_message(releases), user_id=user.id, telegram_on=telegram_on, push_on=push_on
         )
         told += 1
-    return f"{len(changed)} dates changed, {told} users told"
+    # after the notices, which go by the wishes: a played game that has launched is no longer a wish
+    dropped = wishlist.drop_played(db, today, launched_before_today=True)
+    db.commit()
+    return f"{len(changed)} dates changed, {told} users told, {dropped} played wishes dropped"
 
 
 def _wishlist_header(when: str, count: int) -> str:

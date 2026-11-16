@@ -2,6 +2,7 @@
 import datetime
 from datetime import timedelta
 
+from src.crud import wishlist
 from src.database import database, models
 from tests.api_support import ApiTestCase
 from tests import clock
@@ -70,6 +71,45 @@ class WishlistTests(ApiTestCase):
         self.library_entry(self.ana, "out", TODAY(), "pc")
         wanted = self.wishlist()["wanted"]
         self.assertEqual([(g["id"], g["in_library"]) for g in wanted], [("out", True)])
+
+    def start(self, game, user="ana"):
+        user_id = {"ana": self.ana, "bea": self.bea}[user]
+        return self.api("POST", "/timers/start", as_user=user, json={"user_id": user_id, "game_id": game, "platform": "pc"})
+
+    def manual(self, game, hours_ago=3, user="ana"):
+        start = clock.ago(hours=hours_ago)
+        return self.api("POST", "/timers/manual", as_user=user, json={
+            "game_id": game, "platform": "pc", "start_time": start.isoformat(),
+            "end_time": (start + timedelta(hours=1)).isoformat(),
+        })
+
+    def test_starting_a_timer_of_a_wished_game_that_is_out_drops_the_wish(self):
+        self.wish("out")
+        self.wish("out", as_user="bea")
+        self.assertEqual(self.start("out").status_code, 200)
+        self.assertEqual(self.wishlist()["wanted"], [])
+        self.assertEqual([g["id"] for g in self.wishlist("bea")["wanted"]], ["out"])
+
+    def test_a_manual_session_of_a_wished_game_that_is_out_drops_the_wish(self):
+        self.wish("out")
+        self.assertEqual(self.manual("out").status_code, 201)
+        self.assertEqual(self.wishlist()["wanted"], [])
+
+    def test_playing_a_wished_game_before_its_launch_keeps_the_wish(self):
+        self.wish("soon")
+        self.wish("tba")
+        self.assertEqual(self.manual("soon").status_code, 201)
+        self.assertEqual(self.manual("tba", hours_ago=6).status_code, 201)
+        self.assertEqual([g["id"] for g in self.wishlist()["upcoming"]], ["soon", "tba"])
+
+    def test_the_daily_sweep_drops_the_wish_of_a_game_played_in_early_access_once_it_launched(self):
+        self.game("early", "Early", release_date=TODAY() - timedelta(days=1))
+        self.wish("early")
+        self.session(self.ana, "early", clock.ago(days=3), 60)
+        with database.SessionLocal() as db:
+            self.assertEqual(wishlist.drop_played(db, TODAY(), launched_before_today=True), 1)
+            db.commit()
+        self.assertEqual(self.wishlist()["wanted"], [])
 
     def test_the_list_and_the_game_page_say_who_else_wants_it(self):
         self.wish("soon")
