@@ -18,5 +18,5 @@ sentry-sdk[fastapi]==2.75.0
 openai==3.50.0
 google-genai==3.3.0
 anthropic==2.8.0
-pydantic-ai-slim[openai,google,anthropic,openrouter]==2.66.0
+pydantic-ai-slim[openai,google,anthropic,openrouter]==2.68.0
 genai-prices==0.2.3
