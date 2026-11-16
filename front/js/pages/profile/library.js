@@ -319,11 +319,12 @@ export function createLibrary(el, options) {
         ${thumb(g)}
         <div class="pf-row-main">
           <div class="pf-game-title"><strong><a class="game-link" href="${gameHref(g.game_id)}">${g.game_name}</a></strong> ${scoreBadge(g.score)} ${status(g)}</div>
-          <div class="pf-sub">
-            ${entryPlatforms(g).map((p) => p.name).join(' · ') || 'Sin plataforma'} · Temporada ${g.season} · ${formatDuration(g.played_time)}
-            ${g.last_played ? ` · Última sesión: ${formatRelative(g.last_played)}` : ''}
-            ${paidText(g.platforms) ? ` · Pagado: ${paidText(g.platforms)}` : ''}
-          </div>
+          <div class="pf-platforms">${entryPlatforms(g).length ? entryPlatforms(g).map((p) => html`<span class="pf-chip">${p.name}</span>`) : html`<span class="pf-chip muted">Sin plataforma</span>`}</div>
+          <dl class="pf-meta">
+            <div><dt>Tiempo</dt><dd>${formatDuration(g.played_time)}</dd></div>
+            ${g.last_played ? html`<div><dt>Última sesión</dt><dd>${formatRelative(g.last_played)}</dd></div>` : ''}
+            ${paidText(g.platforms) ? html`<div><dt>Pagado</dt><dd>${paidText(g.platforms)}</dd></div>` : ''}
+          </dl>
           ${g.complete_blocked ? html`<div class="pf-lock">🔒 ${blockedReason(g, season)}</div>` : ''}
           ${editing === g.id ? dateForm(g) : ''}
           ${rating === g.id ? scoreForm(g) : ''}
