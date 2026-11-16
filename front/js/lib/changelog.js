@@ -22,7 +22,7 @@ export const KINDS = {
 
 export const CHANGELOG = [
   {
-    version: '2.45', date: '2026-11-15',
+    version: '2.47', date: '2026-11-16',
     title: 'La guía de cada juego y una IA que puedes llevar a tu manera',
     items: [
       ['new', 'Early access: los juegos que aún están en acceso anticipado llevan una etiqueta con el día en que entraron y, si se conoce, el de su lanzamiento oficial; desaparece sola cuando sale. En Juegos hay un filtro para verlos.'],
@@ -35,6 +35,7 @@ export const CHANGELOG = [
       ['better', 'Las barras de progreso de los logros acumulativos muestran la cifra actual y la meta, por ejemplo 35 / 100 h.'],
       ['new', 'Si no quieres ver el botón del chat, puedes ocultarlo en Perfil → Mi IA y volver a mostrarlo cuando quieras.'],
       ['better', 'El botón del chat se puede arrastrar y el final de las páginas queda despejado para que no tape nada.'],
+      ['better', 'En Mis juegos, cada estado se explica: un juego pausado dice cuántos días llevas sin jugarlo, y el icono junto al filtro «Estado» resume qué significa cada uno y cuáles cambian solos.'],
     ],
   },
   {
