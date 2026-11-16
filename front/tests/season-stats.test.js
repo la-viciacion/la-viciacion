@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { RANKINGS, barWidths, podiumOrder, positions, participantsOf, rankingsOf, rankingsPath, ringPercent, rowsOf, seasonFromHash } from '../js/lib/season-stats.js';
+import { RANKINGS, barWidths, podiumOrder, positions, participantsOf, rankingsOf, rankingsPath, ringPercent, rowsOf, seasonFromHash, TOTAL } from '../js/lib/season-stats.js';
 import { current } from '../js/lib/seasons.js';
 
 const by = (id) => RANKINGS.find((r) => r.id === id);
@@ -27,6 +27,15 @@ test('the address names the season, and the running one is the answer to anythin
   assert.equal(seasonFromHash('#/season/2024', now), 2024);
   assert.equal(seasonFromHash('#/season/2024/', now), 2024);
   for (const hash of ['#/season', '', undefined, '#/season/2027', '#/season/2022', '#/season/abc', '#/season/20244']) assert.equal(seasonFromHash(hash, now), 2026);
+});
+
+test('the Total adds every season together: season 0, everybody who took part, and no current streak', () => {
+  const now = new Date(2026, 5, 1);
+  assert.equal(seasonFromHash('#/season/total', now), TOTAL);
+  assert.equal(seasonFromHash('#/season/total/', now), TOTAL);
+  assert.ok(rankingsPath(TOTAL).startsWith('/statistics/rankings?only_active=false&season=0&ranking='));
+  assert.ok(!rankingsPath(TOTAL).includes('user_current_streak'));
+  assert.equal(rankingsOf(TOTAL).length, 8);
 });
 
 test('each ranking writes its value the way the bot does', () => {

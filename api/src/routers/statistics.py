@@ -77,7 +77,7 @@ class RankingStatisticsTypes(str, Enum):
 def get_ranking_statistics(
     ranking: str = None,
     only_active: bool = False,
-    season: int = Query(None, ge=2000, description="The season of the rankings (default: the running one)"),
+    season: int = Query(None, ge=0, description="The season of the rankings (default: the running one; 0 for every season together)"),
     db: Session = Depends(get_db),
 ):
     """
@@ -87,6 +87,8 @@ def get_ranking_statistics(
     Allowed values: 'user_hours', 'user_days', 'user_played_games',
     'user_completed_games', 'achievements', 'user_ratio', 'user_current_streak',
     'user_best_streak', 'games_most_played', 'platform_played', 'debt', 'debt_total', 'games_last_played'
+
+    With `season=0` the rankings are the group's total over every season (a streak is the best run of consecutive days ever).
 
     The `season` applies to every ranking but `platform_played`, `games_last_played` and `debt_total`, which look at
     everything. The streaks are counted over the days of that season; `user_current_streak` only makes sense for the
@@ -99,6 +101,8 @@ def get_ranking_statistics(
         rankings_list = ranking.split(",")
     else:
         rankings_list = [elem.value for elem in RankingStatisticsTypes]
+    if season is not None and seasons.ALL < season < 2000:
+        raise HTTPException(status_code=400, detail="Esa temporada no existe")
     if season is not None and season > seasons.current():
         raise HTTPException(status_code=400, detail="Esa temporada todavía no existe")
     is_active = True if only_active else None

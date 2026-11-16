@@ -68,7 +68,7 @@ test('there is a pill per season, the running one pressed, and the address picks
   await settle();
   assert.equal(text('h1')[0], `Temporada ${current() - 1}`);
   assert.match(calls[0].path, new RegExp(`season=${current() - 1}&`));
-  assert.equal(document.querySelectorAll('#main [data-season]').length, current() - 2023 + 2); // a pill per season and the hall of fame
+  assert.equal(document.querySelectorAll('#main [data-season]').length, current() - 2023 + 3); // a pill per season, the total and the hall of fame
   assert.equal(document.querySelector('[data-season][aria-pressed="true"]').textContent, String(current() - 1));
   assert.equal(document.querySelectorAll('.ss-card').length, 8); // no current streak in an old season
   assert.deepEqual(text('#ss-hours .ss-name'), ['Bea', 'Ana <b>']); // Cai and Dan did nothing that season: they are not listed, however they are today

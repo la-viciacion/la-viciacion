@@ -147,6 +147,19 @@ class RankingsOfAnotherSeasonTests(unittest.TestCase):
         self.assertEqual([(r["user_id"], r["played_time"]) for r in self.ask("user_hours")], [(2, 3600), (1, 0)])
         self.assertEqual([g["game_id"] for g in self.ask("games_most_played")], ["g2"])
 
+    def test_season_zero_adds_every_season_together(self):
+        self.assertEqual([(r["user_id"], r["played_time"]) for r in self.ask("user_hours", 0)], [(1, 10800), (2, 3600)])
+        self.assertEqual([(r["user_id"], r["played_days"]) for r in self.ask("user_days", 0)], [(1, 2), (2, 1)])
+        self.assertEqual([(r["user_id"], r["best_streak"]) for r in self.ask("user_best_streak", 0)], [(1, 2), (2, 1)])
+        self.assertEqual([(r["user_id"], r["played_games"]) for r in self.ask("user_played_games", 0)], [(1, 1), (2, 1)])
+        self.assertEqual([(r["user_id"], r["completed_games"]) for r in self.ask("user_completed_games", 0)], [(1, 1), (2, 1)])
+        self.assertEqual([g["game_id"] for g in self.ask("games_most_played", 0)], ["g1", "g2"])
+
+    def test_a_season_before_2000_is_refused_but_zero_is_not(self):
+        with self.assertRaises(HTTPException) as refused:
+            statistics.get_ranking_statistics(ranking="user_hours", only_active=True, season=5, db=self.db)
+        self.assertEqual(refused.exception.status_code, 400)
+
     def test_a_season_that_has_not_come_yet_is_refused(self):
         with self.assertRaises(HTTPException) as refused:
             statistics.get_ranking_statistics(ranking="user_hours", only_active=True, season=YEAR + 1, db=self.db)

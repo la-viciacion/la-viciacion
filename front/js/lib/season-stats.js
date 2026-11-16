@@ -6,6 +6,9 @@ import { FIRST, current } from './seasons.js';
 const count = (key) => (e) => e[key];
 const days = (n) => `${n} ${n === 1 ? 'día' : 'días'}`;
 
+/** The pill that adds every season together: it is the API's `season=0` (no real season is 0). */
+export const TOTAL = 0;
+
 /** Every ranking, in the order the page shows them. `api` is the name the API knows it by; `view` how it is drawn (podium, bars, tiles, rings or covers); `rows: 'games'` is a ranking of games, not of players. */
 export const RANKINGS = [
   { id: 'hours', view: 'podium', api: 'user_hours', title: 'Tiempo jugado', value: count('played_time'), text: (e) => formatDuration(e.played_time) },
@@ -29,8 +32,9 @@ export const rankingsPath = (season = current()) => `/statistics/rankings?only_a
 /** Does the address ask for the hall of fame (`#/season/fame`)? */
 export const isFameHash = (hash) => /^#\/season\/fame\/?$/.test(hash ?? '');
 
-/** The season an address asks for (`#/season/2025`); the running one when it names none or a season that cannot exist. */
+/** The season an address asks for (`#/season/2025`), or TOTAL (`#/season/total`); the running one when it names none or a season that cannot exist. */
 export function seasonFromHash(hash, now = new Date()) {
+  if (/^#\/season\/total\/?$/.test(hash ?? '')) return TOTAL;
   const match = /^#\/season\/(\d{4})\/?$/.exec(hash ?? '');
   const year = match ? Number(match[1]) : null;
   return year !== null && year >= FIRST && year <= current(now) ? year : current(now);

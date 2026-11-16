@@ -58,7 +58,7 @@
     En **Inicio** ves los de la temporada en curso, y en **Perfil → Mis juegos** toda tu biblioteca, de todas las temporadas, con filtros. Desde cualquiera de las dos puedes editar tus sesiones (solo las de esta temporada). Más en [Inicio](sesiones.md#tu-historial-en-inicio) y [Mis juegos](perfil.md#mis-juegos).
 
 ??? question "¿Puedo ver temporadas anteriores?"
-    Sí. En tu perfil y en la página de logros hay una pastilla por temporada (y **Total**, o **Resumen**, para todo el historial). Los rankings de **Temporada** son siempre los de la temporada en curso.
+    Sí. En tu perfil y en la página de logros hay una pastilla por temporada (y **Total**, o **Resumen**, para todo el historial). Los rankings de **Temporada** empiezan en la temporada en curso, y tienen su propia pastilla **Total**.
 
 ??? question "¿Por qué no me sale un logro que creo merecer?"
     Los logros se evalúan cada vez que paras un timer o cambias tus sesiones. Algunos requieren una duración mínima (las sesiones de menos de 10 minutos no cuentan para días ni rachas) y los logros nuevos no son retroactivos. Si sigues pensando que falta, pide a un administrador que **recalcule los logros**.
