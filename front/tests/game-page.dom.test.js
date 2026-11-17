@@ -112,7 +112,7 @@ test('without a slug there is no RAWG button', async () => {
 
 test('the figures of the group and the players, the most played first, with who plays now', () => {
   assert.equal(document.querySelector('.gm-group-title .section-title').textContent, 'En el grupo');
-  assert.deepEqual(text('.pf-stat-label'), ['Jugadores', 'Horas del grupo', 'Completados', 'Nota del grupo (2)']);
+  assert.deepEqual(text('.gm-col-group .pf-stat-label'), ['Jugadores', 'Horas del grupo', 'Completados', 'Nota del grupo (2)']);
   assert.deepEqual(text('.gm-player-name').map((t) => t.split('\n')[0].trim().replace(/\s+/g, ' ')).map((t) => t.split(' ')[0]), ['Bea', 'Ana']);
   assert.ok(document.querySelector('.gm-player .pl-avatar.live'));
   assert.equal(document.querySelectorAll('.gm-player .pl-avatar.live').length, 1);
@@ -120,7 +120,7 @@ test('the figures of the group and the players, the most played first, with who 
 });
 
 test('your own rating can be set from the page', () => {
-  assert.equal(document.querySelector('#gmRate').textContent, 'Puntuar');
+  assert.equal(document.querySelector('#gmRate .pf-stat-value').textContent, 'Puntuar');
 });
 
 test('a game of your library has no wish button', () => {
@@ -192,7 +192,8 @@ test('the pace card tells the time of the viewer against the group and HowLongTo
   });
   await page.render({ main: main(), user: { id: 1, username: 'ana' } });
   await settle();
-  assert.match(document.querySelector('#gmPace').textContent, /Llevas 1 h de juego\./);
+  assert.deepEqual(text('.gm-you-stats .pf-stat-label'), ['Tu tiempo', 'Tu nota ✎']);
+  assert.equal(text('.gm-you-stats .pf-stat-value')[0], '1 h');
   assert.match(document.querySelector('#gmPace').textContent, /Es el 50 % de lo que ha tardado el resto del grupo/);
   installApi({ 'GET /games/celeste/overview': { ...OVERVIEW, pace: null }, 'GET /users/photo/': json({ detail: 'no' }, 404) });
   await page.render({ main: main(), user: { id: 1, username: 'ana' } });
@@ -283,12 +284,12 @@ test('the cost per hour of the group is a figure of the game when the API gives 
   installApi({ 'GET /games/celeste/overview': { ...OVERVIEW, cost_per_hour: { per_hour_cents: 275, contributors: 3 } }, 'GET /users/photo/': json({ detail: 'no' }, 404) });
   await page.render({ main: main(), user: { id: 1, username: 'ana' } });
   await settle();
-  assert.ok(text('.pf-stat-label').includes('Coste por hora (3)'));
-  assert.match(document.querySelector('.pf-stats').textContent.replace(/\u00a0/g, ' '), /2,75 €\/h/);
+  assert.ok(text('.gm-col-group .pf-stat-label').includes('Coste por hora (3)'));
+  assert.match(document.querySelector('.gm-col-group .pf-stats').textContent.replace(/\u00a0/g, ' '), /2,75 €\/h/);
   installApi({ 'GET /games/celeste/overview': { ...OVERVIEW, cost_per_hour: null }, 'GET /users/photo/': json({ detail: 'no' }, 404) });
   await page.render({ main: main(), user: { id: 1, username: 'ana' } });
   await settle();
-  assert.deepEqual(text('.pf-stat-label'), ['Jugadores', 'Horas del grupo', 'Completados', 'Nota del grupo (2)']);
+  assert.deepEqual(text('.gm-col-group .pf-stat-label'), ['Jugadores', 'Horas del grupo', 'Completados', 'Nota del grupo (2)']);
 });
 
 const EXTRAS = {
