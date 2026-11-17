@@ -57,6 +57,7 @@ test('a group with nothing says so in every list', async () => {
   assert.match(main().textContent, /Todavía no hay ningún juego poco conocido/);
   assert.match(main().textContent, /Nadie ha abandonado nada/);
   assert.match(main().textContent, /Sin datos de géneros todavía/);
+  assert.equal(document.querySelectorAll('.gl-pills [data-go]').length, 0); // nothing to jump to: no pill for an empty section
   assert.equal(document.querySelectorAll('.gl-bar').length, 0);
 });
 

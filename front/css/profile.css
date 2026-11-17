@@ -476,6 +476,14 @@
 .sg-summary { margin-bottom: 4px; }
 .gl-section { scroll-margin-top: 70px; }
 .gl-pills { margin: 4px 0 12px; }
+@media (max-width: 640px) {
+  /* One strip that scrolls sideways and stays under the navbar, instead of four ragged rows */
+  .gl-pills { position: sticky; top: 64px; z-index: 50; flex-wrap: nowrap; overflow-x: auto; margin: 4px -16px 12px; padding: 8px 16px; background: rgba(10, 10, 20, 0.92); border-bottom: 1px solid var(--border); scrollbar-width: none; }
+  .gl-pills::-webkit-scrollbar { display: none; }
+  .gl-pills .pf-season-badge { flex: none; }
+  .gl-pills:not(:has(button)) { display: none; }
+  .gl-section { scroll-margin-top: 120px; }
+}
 .gl-count { margin-left: 6px; }
 .gl-fold .gl-count, .gl-section .section-header .gl-count { white-space: nowrap; }
 .sg-count { margin-left: 6px; }
