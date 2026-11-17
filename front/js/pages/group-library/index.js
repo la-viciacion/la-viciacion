@@ -104,7 +104,7 @@ function draw(d) {
     </section>
 
     <nav class="pf-season gl-pills" aria-label="Secciones">
-      ${sectionsOf(d).map(([key, title, n]) => html`<button type="button" class="pf-season-badge" data-go="${key}">${title} <span class="gl-count">${n}</span></button>`)}
+      ${sectionsOf(d).filter(([, , n]) => n > 0).map(([key, title, n]) => html`<button type="button" class="pf-season-badge" data-go="${key}">${title} <span class="gl-count">${n}</span></button>`)}
     </nav>
 
     ${section('gems', 'Joyas ocultas', count.gems, gameList(d.hidden_gems, (g) => html`${plural(g.players, 'jugador lo tiene', 'jugadores lo tienen')} · nota media ${scoreBadge(Math.round(g.score_mean))} (${g.score_count})`, 'Todavía no hay ningún juego poco conocido y bien puntuado.'),
