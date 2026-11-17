@@ -1,5 +1,5 @@
 // Release calendar (#/calendar): every game of the catalogue with a release date, by day, wanted by somebody or not. GET /group/releases?month=YYYY-MM; any month, past ones included.
-// A day with releases opens a modal with its games (one or several, so every day behaves the same). The games with no confirmed date are listed apart. Nothing is stored here: the wishes are the only data.
+// A day with releases opens a modal with its games (one or several, so every day behaves the same). The games with no confirmed date are listed apart. A game that went into early access has an entry on that day, with its pill. Nothing is stored here: the wishes are the only data.
 import { api } from '../../lib/api.js';
 import { byDay, monthLabel, monthOf, monthWeeks, shiftMonth, waiting } from '../../lib/calendar.js';
 import { formatDate } from '../../lib/format.js';
@@ -28,8 +28,10 @@ const card = (g, inModal = false) => html`
       : html`<div class="gc-cover gc-cover-placeholder" aria-hidden="true">🎮</div>`}
     <div class="gc-body">
       <div class="gc-name">${g.name}</div>
-      <div class="gc-tags">${g.genres.slice(0, 2).map((genre) => html`<span class="pf-tag muted">${genre}</span>`)}</div>
-      <div class="gc-meta"><span>${[countdown(g), g.release_date && formatDate(g.release_date)].filter(Boolean).join(' · ')}</span></div>
+      <div class="gc-tags">${g.early_access ? html`<span class="pf-tag early">Early access</span>` : ''}${g.genres.slice(0, 2).map((genre) => html`<span class="pf-tag muted">${genre}</span>`)}</div>
+      <div class="gc-meta"><span>${g.early_access
+        ? [formatDate(g.release_date), g.launch_date && `Lanzamiento: ${formatDate(g.launch_date)}`].filter(Boolean).join(' · ')
+        : [countdown(g), g.release_date && formatDate(g.release_date)].filter(Boolean).join(' · ')}</span></div>
       <div class="pf-sub">${waiting(g.wanted_by)}</div>
     </div>
   </a>`;

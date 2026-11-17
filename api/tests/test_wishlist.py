@@ -56,6 +56,24 @@ class EarlyAccessSinceTests(unittest.TestCase):
         undated = wishlist.releases(db, 1, 2026, 10, TODAY)["undated"]
         self.assertEqual({g["id"]: g["early_access_since"] for g in undated}, {"ea": D(2026, 9, 1), "tba": None})
 
+    def test_the_day_a_game_went_into_early_access_is_an_entry_of_its_month_apart_from_its_launch(self):
+        db = make_session()
+        db.add_all([
+            models.User(id=1, username="ana", name="Ana", is_active=1),
+            models.Game(id="both", name="Both", release_date=D(2026, 12, 1), early_access_date=D(2026, 10, 10)),
+            models.Game(id="open", name="Open", release_date=None, early_access_date=D(2026, 10, 3)),  # nobody wants it
+            models.Game(id="old", name="Old", release_date=None, early_access_date=D(2019, 6, 1)),  # years ago: not in this month
+        ])
+        db.add(models.UserWishlist(user_id=1, game_id="both"))
+        db.commit()
+        october = wishlist.releases(db, 1, 2026, 10, TODAY)
+        self.assertEqual([(g["id"], g["release_date"], g.get("early_access"), g["launch_date"]) for g in october["releases"]],
+                         [("open", D(2026, 10, 3), True, None), ("both", D(2026, 10, 10), True, D(2026, 12, 1))])
+        self.assertEqual(october["undated"], [])
+        december = wishlist.releases(db, 1, 2026, 12, TODAY)
+        self.assertEqual([(g["id"], g["release_date"], g.get("early_access")) for g in december["releases"]], [("both", D(2026, 12, 1), None)])
+        self.assertEqual([g["id"] for g in wishlist.releases(db, 1, 2019, 6, TODAY)["releases"]], ["old"])
+
 
 class DropPlayedTests(unittest.TestCase):
     """A wish goes once the game has launched and the player has played it; before the launch it stays (early access)."""

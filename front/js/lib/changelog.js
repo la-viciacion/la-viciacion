@@ -25,6 +25,7 @@ export const CHANGELOG = [
     version: '2.47', date: '2026-11-16',
     title: 'La guía de cada juego y una IA que puedes llevar a tu manera',
     items: [
+      ['new', 'Calendario: el día en que un juego entra en early access también aparece, con su etiqueta; si luego tiene lanzamiento oficial, sale una segunda vez en su día.'],
       ['new', 'Early access: los juegos que aún están en acceso anticipado llevan una etiqueta con el día en que entraron y, si se conoce, el de su lanzamiento oficial; desaparece sola cuando sale. En Juegos hay un filtro para verlos.'],
       ['new', 'Guía del juego: en la página de un juego, y con el botón «¿Atascado?» del timer, una IA busca en internet y te ayuda con ese juego, sabiendo cuánto llevas, si juegas la historia, con extras, al 100 % o sin mirar el reloj y con el nivel de destripes que elijas.'],
       ['new', 'Mi IA, en Perfil → Ajustes: usa tu propia cuenta de OpenAI, Anthropic, Google u OpenRouter para el chat y la guía, elige el modelo de cada una y cuál se usa primero.'],

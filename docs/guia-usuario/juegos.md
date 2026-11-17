@@ -41,6 +41,6 @@ Cada juego enlaza a su página. Arriba hay una fila de **botones**, uno por secc
 
 ## Calendario
 
-**Menú → Calendario** pone en un mes (empezando en lunes) **todos los juegos del catálogo con fecha de lanzamiento**, los hayan jugado o no. Pulsa un día para ver sus juegos en una ventana y entrar en cualquiera; el panel **Juegos del mes** los lista con quién quiere cada uno. Los juegos sin fecha confirmada que alguien desea aparecen aparte, y las flechas ‹ y › cambian de mes y el botón **Hoy** te devuelve al mes en curso (solo sale si estás en otro).
+**Menú → Calendario** pone en un mes (empezando en lunes) **todos los juegos del catálogo con fecha de lanzamiento**, los hayan jugado o no. Pulsa un día para ver sus juegos en una ventana y entrar en cualquiera; el panel **Juegos del mes** los lista con quién quiere cada uno. El día en que un juego **entra en early access** también sale en el calendario, con su etiqueta *Early access*; si después tiene lanzamiento oficial, aparece una segunda vez en su día (solo en el mes que miras, así que los early access antiguos que no terminan no ensucian la lista). Los juegos sin fecha confirmada que alguien desea aparecen aparte, y las flechas ‹ y › cambian de mes y el botón **Hoy** te devuelve al mes en curso (solo sale si estás en otro).
 
 ![Calendario de lanzamientos](../assets/screens/calendar.webp){ .screenshot }
