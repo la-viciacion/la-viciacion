@@ -675,6 +675,11 @@ ENTITIES.aiusage = {
   description: 'Qué ha usado la IA de la app y cuánto ha costado (estimado, por jugador, función y tipo de pregunta), lo que ha facturado OpenAI en el último año y cómo se calcula y cuánto se conserva.',
   custom: 'ai-usage',
 };
+ENTITIES.performance = {
+  label: 'Rendimiento',
+  description: 'Cómo va la API: peticiones, tiempo de respuesta, errores y las rutas más lentas y más pedidas, de lo que la propia API cuenta a Prometheus.',
+  custom: 'performance',
+};
 ENTITIES.backup = {
   label: 'Copia de seguridad',
   description: 'Descarga de toda la base de datos.',
