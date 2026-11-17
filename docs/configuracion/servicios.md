@@ -92,6 +92,8 @@ Para ver también la **memoria**, el **espacio en disco**, la **carga** y el **t
 1. Pon en el `.env` `COMPOSE_PROFILES=monitoring` y ejecuta `docker compose up -d`. Esa misma línea le dice a la API dónde está Prometheus; no hace falta nada más. (`PROMETHEUS_URL` en el `.env` solo sirve para un Prometheus que esté en otro sitio.)
 2. Espera uno o dos minutos a que Prometheus recoja los primeros datos. Puedes comprobarlo desde el servidor con `docker compose exec laviciacion-prometheus wget -qO- localhost:9090/api/v1/targets`: el objetivo `node` debe decir `"health":"up"`.
 
+Prometheus también recoge las **métricas de la propia API** (peticiones y tiempo de respuesta por ruta, peticiones en curso, memoria y CPU del proceso). No hay que configurar nada: salen en `/metrics`, que solo se alcanza desde dentro de la red del stack, no desde internet. Con el objetivo `api` de `/api/v1/targets` en `"health":"up"` ya se están guardando.
+
 Para apagarlos, quita la línea y ejecuta `docker compose up -d --remove-orphans`. Los dos contenedores viven en la red del stack y no publican ningún puerto, así que no hace falta tocar el cortafuegos del servidor. Con la monitorización encendida, si Prometheus no responde (o aún no tiene datos) la página entera muestra el error en lugar de las gráficas, para que se note enseguida.
 
 ## Chat de la app
