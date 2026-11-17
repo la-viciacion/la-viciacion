@@ -41,7 +41,7 @@ test('a day with releases is marked and opens its games with everybody who waits
     [`GET /group/releases?month=${THIS}`]: { month: THIS, releases: [], undated: [] },
     [`GET /group/releases?month=${NEXT}`]: {
       month: NEXT,
-      releases: [game('a', 'Alpha', '05', [ANA, BEA]), game('b', 'Beta', '05', [BEA]), game('c', 'Gamma', '20', [ANA])],
+      releases: [game('a', 'Alpha', '05', [ANA, BEA]), game('b', 'Beta', '05', [BEA]), game('c', 'Gamma', '20', [ANA]), { ...game('e', 'Echo <i>', '05', []), early_access: true, launch_date: `${shiftMonth(NEXT, 2)}-01` }],
       undated: [{ ...game('d', 'Delta', '01', [BEA]), release_date: null, days_until: null }],
     },
   });
@@ -50,8 +50,14 @@ test('a day with releases is marked and opens its games with everybody who waits
   document.querySelector('[data-step="1"]').click();
   await settle();
   assert.equal(document.querySelectorAll('.cal-cell.has').length, 2);
+  // an early access is an entry like any other, with its pill and its launch day when it has one
+  const echo = [...document.querySelectorAll('#calMonth .cal-game')].find((a) => a.textContent.includes('Echo'));
+  assert.equal(echo.querySelector('.pf-tag.early').textContent, 'Early access');
+  assert.match(echo.querySelector('.gc-meta').textContent, /Lanzamiento: /);
+  assert.equal(document.querySelectorAll('#calMonth i').length, 0); // escaped
+  assert.equal(document.querySelectorAll('#calMonth .pf-tag.early').length, 1);
   assert.equal(document.querySelector('.modal-overlay'), null, 'no day is opened by default');
-  assert.deepEqual(text('#calMonth .gc-name'), ['Alpha', 'Beta', 'Gamma']);
+  assert.deepEqual(text('#calMonth .gc-name'), ['Alpha', 'Beta', 'Echo <i>', 'Gamma']);
   assert.match(text('#calMonth .pf-sub')[0], /Lo quieren tú y Bea <b>/);
   assert.equal(document.querySelectorAll('#calMonth b').length, 0); // escaped
   // every day with releases is a button that opens its games, one or several
@@ -61,7 +67,7 @@ test('a day with releases is marked and opens its games with everybody who waits
   document.querySelector('.modal-overlay [data-close]').click();
   assert.equal(document.querySelector('.modal-overlay'), null);
   document.querySelector(`[data-day="${NEXT}-05"]`).click();
-  assert.deepEqual(text('.modal-overlay .gc-name'), ['Alpha', 'Beta']);
+  assert.deepEqual(text('.modal-overlay .gc-name'), ['Alpha', 'Beta', 'Echo <i>']);
   assert.ok(document.querySelector('.modal-overlay a[href="#/game/a"][data-close]'));
   document.querySelector('.modal-overlay [data-close]').click();
   assert.deepEqual(text('#calUndated .gc-name'), ['Delta']);

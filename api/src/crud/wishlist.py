@@ -141,8 +141,11 @@ def month_bounds(year: int, month: int) -> tuple[datetime.date, datetime.date]:
 def releases(db: Session, viewer_id: int, year: int, month: int, today: datetime.date) -> dict:
     """The release calendar of the group: every game of the catalogue that comes out in the month, wanted or not,
     out already or not, by date, and apart the games somebody wants that have
-    no date yet (the undated ones nobody wants are most of the catalogue, and not upcoming). Each comes with
-    everybody who wants it, the viewer included (`is_me`), and nobody if none does. Derived; only the wishes are stored."""
+    no date yet (the undated ones nobody wants are most of the catalogue, and not upcoming). A game that went into
+    early access in the month is also an entry, on that day (`early_access`: true, its official launch, if known, in
+    `launch_date`), so a game with both days has two entries, one in each month. Only the month shown: the early
+    accesses that never ended would otherwise pile up. Each comes with everybody who wants it, the viewer included
+    (`is_me`), and nobody if none does. Derived; only the wishes are stored."""
     first, last = month_bounds(year, month)
     wished = (
         db.query(models.UserWishlist.game_id)
@@ -153,24 +156,32 @@ def releases(db: Session, viewer_id: int, year: int, month: int, today: datetime
         db.query(models.Game)
         .filter(
             models.Game.release_date.between(first, last)
+            | models.Game.early_access_date.between(first, last)
             | (models.Game.release_date.is_(None) & models.Game.id.in_(wished))
         )
         .all()
     )
     everyone = wanters(db, [game.id for game in rows])
-    items = [
-        {
+
+    def entry(game: models.Game, day: datetime.date | None, **extra) -> dict:
+        return {
             "id": game.id,
             "name": game.name,
             "image_url": game.image_url,
             "genres": games.genre_list(game.genres),
-            "release_date": game.release_date,
-            "days_until": days_until(game.release_date, today),
+            "release_date": day,
+            "days_until": days_until(day, today),
             "early_access_since": early_access_since(game, today),
             "wanted_by": [{**w, "is_me": w["user_id"] == viewer_id} for w in everyone.get(game.id, [])],
+            **extra,
         }
-        for game in rows
-    ]
+
+    items = []
+    for game in rows:
+        if (game.release_date is None and game.id in everyone) or (game.release_date and first <= game.release_date <= last):
+            items.append(entry(game, game.release_date))
+        if game.early_access_date and first <= game.early_access_date <= last:
+            items.append(entry(game, game.early_access_date, early_access=True, launch_date=game.release_date))
     items.sort(key=lambda g: (g["release_date"] or datetime.date.max, (g["name"] or "").lower()))
     return {
         "month": f"{year:04d}-{month:02d}",
