@@ -34,7 +34,7 @@ const chart = (title, label, points, range, format) => {
 
 const routeTable = (title, rows) => html`
   <section class="adm-set-card">
-    ${cardTitle(title, html`Solo las rutas con al menos 3 peticiones en el periodo. El tiempo es el percentil 95: el 95 % de las peticiones tarda menos que eso, estimado a partir de los tramos del histograma.`)}
+    ${cardTitle(title, html`Solo las rutas con al menos 3 peticiones en el periodo; la sonda keepalive del healthcheck no cuenta. El tiempo es el percentil 95: el 95 % de las peticiones tarda menos que eso, estimado a partir de los tramos del histograma.`)}
     <div class="adm-table-wrap"><table class="adm-table">
       <thead><tr><th>Ruta</th><th>Peticiones</th><th>p95</th><th>Errores 5xx</th></tr></thead>
       <tbody>${rows.length

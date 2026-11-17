@@ -15,10 +15,12 @@ MIN_ROUTE_REQUESTS = 3  # a route asked twice has no p95 worth telling
 ROUTES_SHOWN = 10
 MIN_RATE_SECONDS = 60  # a rate needs at least two scrapes (every 30 s) inside its window
 
-REQUESTS = "laviciacion_http_requests_total"
-BUCKETS = "laviciacion_http_request_duration_seconds_bucket"
+# The keepalive is asked by the compose healthcheck every 30 s: it would top every table and tint every figure, so it is left out
+REAL = 'route!~".*/keepalive"'
+REQUESTS = f"laviciacion_http_requests_total{{{REAL}}}"
+BUCKETS = f"laviciacion_http_request_duration_seconds_bucket{{{REAL}}}"
 IN_FLIGHT = "laviciacion_http_requests_in_flight"
-SERVER_ERRORS = f'{REQUESTS}{{status=~"5.."}}'
+SERVER_ERRORS = f'laviciacion_http_requests_total{{{REAL},status=~"5.."}}'
 
 _cache = TtlCache(CACHE_SECONDS)
 
