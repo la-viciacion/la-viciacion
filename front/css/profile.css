@@ -181,12 +181,26 @@
 .gm-head { display: flex; gap: 16px; align-items: flex-start; margin-bottom: 16px; }
 .gm-cover { width: 96px; height: 96px; border-radius: var(--radius-md); object-fit: cover; flex: none; }
 .gm-cover-placeholder { display: flex; align-items: center; justify-content: center; background: var(--bg-card); font-size: 2rem; }
-.gm-wanted { margin: 0 0 8px; }
 /* genres and tags are two lists, but one run of pills */
 .gm-pills { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0; align-items: center; }
 .gm-pills > .gm-genres { display: contents; }
 .gm-genres, .gm-dlc { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0; align-items: center; }
-.gm-mine { flex-direction: row; align-items: center; justify-content: space-between; margin: 12px 0 8px; }
+.gm-you-row { flex-direction: row; align-items: center; justify-content: space-between; }
+.gm-rate { font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.gm-rate:hover { background: var(--bg-card-hover); border-color: var(--border-accent); }
+.gm-rate:focus-visible { outline: 2px solid var(--accent-teal); outline-offset: 2px; }
+/* A chip of its own under the figures, so it reads as part of the group's data and not as a stray line */
+.gm-wanted { display: inline-flex; align-items: center; gap: 8px; margin: 10px 0 0; padding: 6px 14px; border: 1px solid var(--border-accent); border-radius: 999px; background: rgba(61, 217, 179, 0.08); color: var(--text-primary); font-size: 0.85rem; }
+.gm-wanted::before { content: "♥"; color: var(--accent-teal); }
+.gm-body { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0 28px; align-items: start; margin-top: 28px; } /* air between the screenshots and what follows */
+@media (min-width: 1000px) {
+  /* What is yours on the left, the group on the right: the page is no longer one long strip */
+  .gm-body { grid-template-columns: minmax(300px, 4fr) minmax(0, 7fr); grid-template-areas: "you group"; }
+  .gm-col-you { grid-area: you; }
+  .gm-col-group { grid-area: group; }
+  .gm-col-group .pf-stats { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
+}
+.gm-wanted + .gm-lower { margin-top: 12px; }
 .gm-players { list-style: none; margin: 0; gap: 14px; }
 .gm-player { display: flex; align-items: center; gap: 12px; }
 .gm-player .pl-avatar { width: 40px; height: 40px; font-size: 1rem; border: 0; }
@@ -446,7 +460,7 @@
 .lc-side { display: grid; grid-template-columns: 3.5rem 1fr auto; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-secondary); }
 .lc-who { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lc-done { white-space: nowrap; }
-.gm-pace { display: flex; flex-direction: column; gap: 4px; }
+.gm-pace { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
 .gl-note { margin: 0 0 8px; }
 .gl-games { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 .gl-game { display: flex; gap: 10px; align-items: center; }
@@ -491,9 +505,7 @@
 @media (min-width: 1000px) { .gm-desc:not(.open) { -webkit-line-clamp: 6; } }
 .gm-lower { margin-top: 4px; }
 @media (min-width: 1000px) {
-  /* Who plays the game on the left, its saga on the right (always open: there is room); without a saga the list has the width */
-  .gm-lower.has-saga { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; align-items: start; }
-  .gm-lower.has-saga #gmSaga { margin-top: 0; } /* level with the list's heading, not below it */
+  /* The saga is always open on a wide screen: there is room */
   #gmSagaBlock .ach-content { display: block; }
   #gmSagaBlock .ach-fold { pointer-events: none; }
   #gmSagaBlock .ach-chevron { display: none; }

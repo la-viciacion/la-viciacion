@@ -91,6 +91,28 @@ function draw(data) {
       <div id="gmMedia"></div>
     </div>
 
+    <div id="gmGuide"></div>
+
+    <div class="gm-body">
+    <div class="gm-col-you">
+    <div class="section-header gm-you-title"><h2 class="section-title">Tu partida</h2><div class="section-line"></div></div>
+    ${mine ? html`
+      <section class="pf-stats gm-you-stats" aria-label="Tu partida">
+        ${data.pace ? tile('Tu tiempo', formatDuration(data.pace.seconds)) : ''}
+        <button class="pf-stat gm-rate" type="button" id="gmRate" title="${mine.score == null ? 'Puntuar este juego' : 'Cambiar tu nota'}">
+          <div class="pf-stat-value">${mine.score == null ? 'Puntuar' : scoreBadge(mine.score)}</div>
+          <div class="pf-stat-label">Tu nota <span aria-hidden="true">✎</span></div>
+        </button>
+      </section>
+      ${paceLines(data.pace).length > 1 ? html`
+        <div class="gm-pace" id="gmPace">${paceLines(data.pace).slice(1).map((line) => html`<span class="pf-sub">${line}</span>`)}</div>` : ''}` : html`
+      <div class="pf-card gm-you-row">
+        <div>${data.wished ? 'Está en tu lista de deseados.' : html`<span class="pf-sub">No lo tienes en tu biblioteca.</span>`}</div>
+        <button class="pf-btn" type="button" id="gmWish">${data.wished ? 'Quitar de mi lista' : 'Añadir a mi lista'}</button>
+      </div>`}
+    </div>
+
+    <div class="gm-col-group">
     <div class="section-header gm-group-title"><h2 class="section-title">En el grupo</h2><div class="section-line"></div></div>
     <section class="pf-stats" aria-label="El grupo y este juego">
       ${tile('Jugadores', summary.players)}
@@ -99,25 +121,7 @@ function draw(data) {
       ${tile(summary.score_count ? `Nota del grupo (${summary.score_count})` : 'Nota del grupo', summary.score_count ? scoreBadge(Math.round(summary.score_mean)) : '—')}
       ${data.cost_per_hour ? tile(`Coste por hora (${data.cost_per_hour.contributors})`, perHour(data.cost_per_hour.per_hour_cents)) : ''}
     </section>
-
-    ${data.wanted_by.length ? html`<div class="pf-sub gm-wanted">${wantedBy(data.wanted_by)}</div>` : ''}
-    ${mine ? '' : html`
-      <div class="pf-card gm-mine">
-        <div>${data.wished ? 'Está en tu lista de deseados.' : html`<span class="pf-sub">No lo tienes en tu biblioteca.</span>`}</div>
-        <button class="pf-btn" type="button" id="gmWish">${data.wished ? 'Quitar de mi lista' : 'Añadir a mi lista'}</button>
-      </div>`}
-    ${mine ? html`
-      <div class="pf-card gm-mine">
-        <div>${mine.score == null ? html`<span class="pf-sub">Todavía no lo has puntuado.</span>` : html`Tu nota ${scoreBadge(mine.score)}`}</div>
-        <button class="pf-btn" type="button" id="gmRate">${mine.score == null ? 'Puntuar' : 'Cambiar nota'}</button>
-      </div>` : ''}
-
-    ${paceLines(data.pace).length ? html`
-      <div class="pf-card gm-pace" id="gmPace">
-        ${paceLines(data.pace).map((line, i) => (i === 0 ? html`<strong>${line}</strong>` : html`<span class="pf-sub">${line}</span>`))}
-      </div>` : ''}
-
-    <div id="gmGuide"></div>
+    ${data.wanted_by.length ? html`<div class="gm-wanted">${wantedBy(data.wanted_by)}</div>` : ''}
 
     <div class="gm-lower">
       <div>
@@ -127,7 +131,9 @@ function draw(data) {
           : html`<div class="pf-empty">Nadie del grupo lo tiene todavía.</div>`}
       </div>
       <div id="gmSaga"></div>
-    </div>`); // the saga after who plays the game: below it on a phone, beside it on a wide screen
+    </div>
+    </div>
+    </div>`); // wide screen: yours on the left, the group on the right; on a phone one column, the guide first, full width, right after the media
 
   hydratePhotos(main);
   main.querySelector('#gmMoreTags')?.addEventListener('click', () => mount(main.querySelector('.gm-tags'), html`${tagPills(tags)}`));
