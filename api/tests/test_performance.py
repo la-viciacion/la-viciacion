@@ -54,6 +54,18 @@ class ShapeTests(unittest.TestCase):
         self.assertIn("[1800s]", performance.series_queries(1800)["p95"])
 
 
+class KeepaliveTests(unittest.TestCase):
+    def test_every_expression_over_requests_leaves_out_the_healthcheck(self):
+        expressions = [*performance.now_queries(3600).values(), *performance.series_queries(300).values(), *performance.route_queries(3600).values()]
+        about_requests = [e for e in expressions if "laviciacion_http_request" in e and "in_flight" not in e]
+        self.assertGreaterEqual(len(about_requests), 10)
+        for expression in about_requests:
+            self.assertIn('route!~".*/keepalive"', expression)
+
+    def test_the_errors_selector_keeps_its_status_filter(self):
+        self.assertIn('status=~"5.."', performance.now_queries(60)["errors"])
+
+
 class OverviewTests(unittest.TestCase):
     def setUp(self):
         performance.clear()
