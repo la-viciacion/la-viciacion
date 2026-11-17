@@ -14,6 +14,7 @@ from .utils import push as push_utils
 from .utils import achievement_images, ai_cost, scheduler
 from .routers import activity, basic, challenges, chat, games, group, guide, manage, notifications, push, server, statistics, timers, user_ai, users, utils
 from .utils.logger import LogManager
+from .utils.metrics import MetricsMiddleware
 from .utils.request_log import RequestLogMiddleware
 
 log_manager = LogManager()
@@ -102,3 +103,5 @@ app.add_middleware(
 
 
 app.add_middleware(RequestLogMiddleware, excluded_paths=full_excluded_paths)
+# added last, so it is the outermost: it counts every request and serves /metrics before anything else sees it
+app.add_middleware(MetricsMiddleware)
