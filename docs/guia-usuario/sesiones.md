@@ -40,6 +40,8 @@ Si el juego que eliges es un **DLC o una expansión**, te lo dice antes de añad
 
 Si no has usado el timer, pulsa **Sesión manual** en Inicio (justo debajo de la tarjeta del timer), elige el juego y rellena la plataforma y las horas de **inicio** y **fin**. Antes de guardar, la app te dice cuánto tiempo vas a añadir («Vas a añadir 1 h 30 min a …») y te pide confirmar.
 
+Si es la primera vez que juegas a ese juego esta temporada, el grupo recibe el aviso de **juego nuevo**, igual que con un timer. Si ya lo habías jugado, no se avisa.
+
 ![Formulario de sesión manual](../assets/screens/manual.webp){ .screenshot }
 
 Las sesiones manuales tienen unas reglas, para que los datos sean fiables:

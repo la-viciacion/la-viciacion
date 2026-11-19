@@ -26,6 +26,12 @@ def _by_admin(current_user: User, user_id: int) -> bool:
     return current_user.id != user_id
 
 
+def _ranking_before(db: Session, current_user: User, user_id: int) -> dict | None:
+    """The rankings before a player changes one of their sessions, to announce how it moved them afterwards. An
+    admin's changes are silent: nothing to compare."""
+    return None if _by_admin(current_user, user_id) else actions.ranking_snapshot(db)
+
+
 router = APIRouter(
     prefix="/timers",
     tags=["timers"],
@@ -64,11 +70,16 @@ def create_manual_session_endpoint(
     """Add a finished session by hand: game, platform, start and end."""
     user_id = body.user_id if body.user_id is not None else current_user.id
     auth.ensure_self_or_admin(current_user, user_id=user_id)
-    timer = timers.create_manual_session(db, current_user, user_id, body)
-    # what it earns is announced and what it cannot hold is revoked; the rankings are not (it is a retroactive entry)
+    ranking_before = _ranking_before(db, current_user, user_id)
+    timer, new_game = timers.create_manual_session(db, current_user, user_id, body)
+    by_admin = _by_admin(current_user, timer.user_id)
+    # what it earns is announced and what it cannot hold is revoked, and so is how it moved the rankings (as when a
+    # timer stops: a player who forgot to start one adds it by hand). A game the player had not played this season
+    # is announced as with a timer. An admin's entry is silent
     background_tasks.add_task(
-        actions.after_session_change, timer.user_id, _by_admin(current_user, timer.user_id),
+        actions.after_session_change, timer.user_id, by_admin, ranking_before,
         recalculate=[seasons.of(timer.start_time)], since=timer.start_time.date(),
+        new_game_id=timer.game_id if new_game and not by_admin else None,
     )
     return timer
 
@@ -85,11 +96,12 @@ def update_session_endpoint(
     timer = timers.get_session(db, timer_id)
     auth.ensure_self_or_admin(current_user, user_id=timer.user_id)
     old_start = timer.start_time
+    ranking_before = _ranking_before(db, current_user, timer.user_id)
     timer = timers.update_session(db, current_user, timer, body)
     # the achievements of the seasons it was in and is in now are worked out again: it may no longer earn what it did
     changed = sorted({seasons.of(old_start), seasons.of(timer.start_time)})
     background_tasks.add_task(
-        actions.after_session_change, timer.user_id, _by_admin(current_user, timer.user_id),
+        actions.after_session_change, timer.user_id, _by_admin(current_user, timer.user_id), ranking_before,
         recalculate=changed, since=min(old_start, timer.start_time).date(),
     )
     return timer
@@ -121,9 +133,11 @@ def delete_session_endpoint(
     timer = timers.get_session(db, timer_id)
     auth.ensure_self_or_admin(current_user, user_id=timer.user_id)
     owner, start = timer.user_id, timer.start_time
+    ranking_before = _ranking_before(db, current_user, owner)
     timers.delete_session(db, current_user, timer)
     background_tasks.add_task(
-        actions.after_session_change, owner, _by_admin(current_user, owner), recalculate=[seasons.of(start)], since=start.date()
+        actions.after_session_change, owner, _by_admin(current_user, owner), ranking_before,
+        recalculate=[seasons.of(start)], since=start.date()
     )
     return {"message": "Sesión eliminada"}
 
