@@ -70,6 +70,18 @@ class ActivityTests(ApiTestCase):
             ("played", "hades"), ("started", "hades"), ("rated", "celeste"), ("played", "celeste"), ("started", "celeste"),
         ])
 
+    def test_the_days_never_interleave_around_midnight(self):
+        yesterday = TODAY() - timedelta(days=1)
+        self.library_entry(self.ana, "celeste", yesterday, "pc")
+        self.session(self.ana, "celeste", datetime.datetime.combine(yesterday, datetime.time(22, 0)), 180)  # ends today at 01:00
+        self.award(self.ana, yesterday, "celeste")  # placed after that session, which ends on the next day
+        self.library_entry(self.bea, "hades", TODAY(), "pc")
+        self.session(self.bea, "hades", self.at(0, 0), 60)  # starts at 00:00: its start would fall on yesterday
+        items = self.feed()["items"]
+        days = [i["day"] for i in items]
+        self.assertEqual(days, sorted(days, reverse=True))
+        self.assertEqual([(i["type"], i["name"]) for i in items[:2]], [("played", "Bea"), ("started", "Bea")])
+
     def test_a_secret_achievement_is_announced_to_everybody_naming_the_player_but_not_which(self):
         self.award(self.ana, TODAY(), "celeste")
         with self.engine.begin() as conn:
