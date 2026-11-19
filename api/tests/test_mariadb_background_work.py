@@ -471,6 +471,20 @@ class EditedSessionTests(WorkTestCase):
         self.assertTrue(any("Ana" in text for text in told), told)
         self.assertTrue(all(not m["silent"] for m in self.sent))
 
+    def test_a_game_first_played_in_a_session_added_by_hand_tells_the_group(self):
+        self.library_entry(self.ana, "celeste", at(3, 7).date())
+        self.session(self.ana, "celeste", at(3, 7), 30)
+        self.real_actions["after_session_change"](self.ana, False, recalculate=[YEAR], since=at(3, 7).date(), new_game_id="celeste")
+        told = [m["text"] for m in self.sent]
+        self.assertTrue(any("Celeste" in text and "Ana" in text for text in told), told)
+        self.assertTrue(all(not m["silent"] for m in self.sent))
+
+    def test_a_session_added_by_hand_without_a_new_game_does_not(self):
+        self.library_entry(self.ana, "celeste", at(3, 7).date())
+        self.session(self.ana, "celeste", at(3, 7), 30)
+        self.real_actions["after_session_change"](self.ana, False, recalculate=[YEAR], since=at(3, 7).date())
+        self.assertFalse(any("acaba de empezar" in m["text"] for m in self.sent), self.sent)
+
     def test_what_the_recalculation_finds_from_before_the_session_is_stored_without_announcing_it(self):
         self.play_days(self.ana, 6)
         self.session(self.ana, "celeste", at(3, 7), 30)  # the seventh day was played, but nothing worked it out

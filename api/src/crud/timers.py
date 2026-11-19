@@ -372,8 +372,12 @@ def _commit_session(db: Session) -> None:
         raise Refused(409, "Ya tienes una sesión de ese juego que empieza a esa hora")
 
 
-def create_manual_session(db: Session, current_user: User, user_id: int, body: ManualSessionCreate) -> GameTimer:
-    """A finished session of `user_id` entered by hand (the caller already checked it may)."""
+def create_manual_session(
+    db: Session, current_user: User, user_id: int, body: ManualSessionCreate
+) -> tuple[GameTimer, bool]:
+    """A finished session of `user_id` entered by hand (the caller already checked it may). Returns it and whether
+    the group must be told about a new game: the first time the player plays it in the running season, whatever
+    the platform, as with a timer (the announcement is slow, so the caller sends it in the background)."""
     if db.query(Game.id).filter(Game.id == body.game_id).first() is None:
         raise Refused(404, "Juego no encontrado")
     platform = _valid_platform(db, body.platform)
@@ -393,16 +397,20 @@ def create_manual_session(db: Session, current_user: User, user_id: int, body: M
         is_active=False,
     )
     db.add(timer)
-    # the library entry of that game/platform/season, without announcing "new game"
+    season = seasons.of(body.start_time)
+    new_game = season == seasons.current() and (
+        db.query(UserGame.id).filter_by(user_id=user_id, game_id=body.game_id, season=season).first() is None
+    )
+    # the library entry of that game/platform/season (the announcement is the caller's)
     users_crud.ensure_library_entry(db, user_id, body.game_id, platform, body.start_time)
     wishlist.drop_played(db, datetime.date.today(), user_id, body.game_id)
     _commit_session(db)
     db.refresh(timer)
     logger.info(
         f"Manual session {timer.id} added: user={user_id} game={timer.game_id} platform={platform} "
-        f"{body.start_time.isoformat()} -> {body.end_time.isoformat()} by={current_user.username}"
+        f"{body.start_time.isoformat()} -> {body.end_time.isoformat()} by={current_user.username} new_game={new_game}"
     )
-    return timer
+    return timer, new_game
 
 
 def get_session(db: Session, timer_id: int) -> GameTimer:

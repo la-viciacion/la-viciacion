@@ -143,6 +143,7 @@ def after_session_change(
     stopped: tuple | None = None,
     recalculate: list[int] | None = None,
     since: datetime.date | None = None,
+    new_game_id: str | None = None,
 ):
     """Background-task entrypoint for routers/timers.py and the admin panel.
 
@@ -162,12 +163,19 @@ def after_session_change(
     earned and no longer holds is revoked (see crud/achievements_recalc.py). What it adds is announced unless
     `silent` (an admin's changes are silent); a revocation never is. `since` is the first day the session touches: only
     what is dated then or later is announced, the rest the recalculation finds is stored in silence (today by default).
+    `new_game_id` is set when a session added by hand is the first time the player plays that game this season: the
+    group hears about it first, as when a timer starts (`after_timer_start`), dated `since`.
     """
     from ..database.database import SessionLocal
 
     async def _run():
         db = SessionLocal()
         try:
+            if new_game_id is not None:
+                user = users.get_user_by_id(db, user_id)
+                game = games.get_game_by_id(db, new_game_id)
+                if user is not None and game is not None:
+                    await users.announce_new_game(db, user, game, since or datetime.date.today(), silent=False)
             if recalculate:
                 from ..crud import achievements_recalc  # imports this module too
 

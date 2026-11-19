@@ -1,6 +1,7 @@
 """Timers and manual sessions through real requests (MariaDB required, see api_support.py)."""
 import datetime
 from datetime import timedelta
+from unittest import mock
 
 from sqlalchemy import text
 
@@ -318,9 +319,42 @@ class ManualSessionTests(TimerTestCase):
         self.assertFalse(body["is_active"])
         self.assertEqual((body["duration_seconds"], body["notes"], body["platform"]), (90 * 60, "speedrun", "pc"))
         self.assertEqual(self.library(self.ana), [("celeste", "pc", seasons.current())])
-        # not silent: what it earns is announced, and its season is worked out again so what it cannot hold is revoked
-        self.background["after_session_change"].assert_called_once_with(self.ana, False, recalculate=[seasons.of(start)], since=start.date())
+        # not silent: what it earns is announced, and its season is worked out again so what it cannot hold is revoked;
+        # the rankings from before go along, to say how it moved them
+        self.background["after_session_change"].assert_called_once_with(
+            self.ana, False, mock.ANY,
+            recalculate=[seasons.of(start)], since=start.date(), new_game_id="celeste")
         self.background["after_timer_start"].assert_not_called()
+
+    def new_game_of_last_call(self):
+        return self.background["after_session_change"].call_args.kwargs["new_game_id"]
+
+    def test_the_rankings_go_along_as_they_were_before_the_session(self):
+        self.manual(start=ago(hours=6))
+        self.manual(start=ago(hours=3), game="hades")
+        before = self.background["after_session_change"].call_args.args[2]
+        self.assertEqual(before["games"], ["celeste"])  # hades was not there yet
+
+    def test_the_group_is_told_about_a_game_only_the_first_time_in_a_season(self):
+        self.manual(start=ago(hours=6))
+        self.assertEqual(self.new_game_of_last_call(), "celeste")
+        self.manual(start=ago(hours=3))  # the game was already played this season
+        self.assertIsNone(self.new_game_of_last_call())
+        self.manual(start=ago(hours=9), platform="switch")  # another platform: a new entry, not news
+        self.assertIsNone(self.new_game_of_last_call())
+        self.assertEqual([r[1] for r in self.library(self.ana)], ["pc", "switch"])
+        self.manual(start=ago(hours=12), game="hades")
+        self.assertEqual(self.new_game_of_last_call(), "hades")
+
+    def test_a_game_first_played_by_a_timer_is_no_news_to_a_session_added_after_it(self):
+        self.finish_and_rewind(self.start().json()["id"])
+        self.manual(start=ago(hours=9))
+        self.assertIsNone(self.new_game_of_last_call())
+
+    def test_a_closed_season_never_announces_a_new_game(self):
+        last_year = datetime.datetime(seasons.current() - 1, 6, 1, 12, 0)
+        self.assertEqual(self.manual(as_user="root", start=last_year).status_code, 201)
+        self.assertIsNone(self.new_game_of_last_call())
 
     def test_the_time_rules(self):
         now = datetime.datetime.now().replace(microsecond=0)
@@ -383,17 +417,19 @@ class ManualSessionTests(TimerTestCase):
         done = self.api("POST", "/timers/manual", as_user="root", json=body)
         self.assertEqual((done.status_code, done.json()["user_id"]), (201, self.bea))
         # an admin's change checks the player silently, like the ones of the admin panel
-        self.background["after_session_change"].assert_called_once_with(self.bea, True, recalculate=[seasons.of(start)], since=start.date())
+        # and says nothing of a new game
+        self.background["after_session_change"].assert_called_once_with(
+            self.bea, True, None, recalculate=[seasons.of(start)], since=start.date(), new_game_id=None)
 
     def test_an_admin_editing_or_deleting_somebody_elses_session_stays_silent(self):
         start = ago(hours=6)
         session_id = self.manual(start=start, end=start + timedelta(hours=1)).json()["id"]
         self.background["after_session_change"].reset_mock()
         self.api("PATCH", f"/timers/{session_id}", as_user="root", json={"end_time": iso(start + timedelta(hours=2))})
-        self.background["after_session_change"].assert_called_once_with(self.ana, True, recalculate=[seasons.of(start)], since=start.date())
+        self.background["after_session_change"].assert_called_once_with(self.ana, True, None, recalculate=[seasons.of(start)], since=start.date())
         self.background["after_session_change"].reset_mock()
         self.api("DELETE", f"/timers/{session_id}", as_user="root")
-        self.background["after_session_change"].assert_called_once_with(self.ana, True, recalculate=[seasons.of(start)], since=start.date())
+        self.background["after_session_change"].assert_called_once_with(self.ana, True, None, recalculate=[seasons.of(start)], since=start.date())
 
 
 class EditSessionTests(TimerTestCase):
@@ -425,7 +461,9 @@ class EditSessionTests(TimerTestCase):
         response = self.patch(end_time=iso(self.start_at + timedelta(hours=2)))
         self.assertEqual((response.status_code, response.json()["duration_seconds"]), (200, 2 * 3600))
         # what it earned may no longer hold: the achievements of its season are worked out again
-        self.background["after_session_change"].assert_called_once_with(self.ana, False, recalculate=[seasons.of(self.start_at)], since=self.start_at.date())
+        self.background["after_session_change"].assert_called_once_with(
+            self.ana, False, mock.ANY, recalculate=[seasons.of(self.start_at)], since=self.start_at.date())
+        self.assertEqual(self.background["after_session_change"].call_args.args[2]["games"], ["celeste"])
 
     def test_it_changes_the_notes_and_can_clear_them(self):
         self.assertEqual(self.patch(notes="first try").json()["notes"], "first try")
@@ -487,7 +525,9 @@ class DeleteSessionTests(TimerTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(self.scalar("SELECT COUNT(*) FROM game_timers"), 0)
         # the achievements of its season are worked out again: it may have earned some
-        self.background["after_session_change"].assert_called_once_with(self.ana, False, recalculate=[seasons.of(self.began)], since=self.began.date())
+        self.background["after_session_change"].assert_called_once_with(
+            self.ana, False, mock.ANY, recalculate=[seasons.of(self.began)], since=self.began.date())
+        self.assertEqual(self.background["after_session_change"].call_args.args[2]["games"], ["celeste"])  # as it was before
 
     def test_deleting_the_only_session_of_a_game_drops_the_empty_entry_it_made(self):
         self.assertEqual(self.library(self.ana), [("celeste", "pc", seasons.current())])
