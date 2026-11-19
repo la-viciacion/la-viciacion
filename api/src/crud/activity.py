@@ -63,6 +63,9 @@ def _place_in_time(db: Session, events: list[dict]) -> None:
             e["at"] = last[key] + second if key in last else after_day
         else:  # achievement
             e["at"] = after_day
+        # a session that crosses midnight, or one that starts at 00:00, would push the event onto a neighbouring day
+        # and the days of the list would interleave: it stays within its own day
+        e["at"] = min(max(e["at"], day_start), day_end)
 
 
 def feed(db: Session, limit: int = 30, offset: int = 0) -> dict:
